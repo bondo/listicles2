@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Spotless + detekt on every commit. Do not bypass with --no-verify.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+./scripts/guards.sh >/dev/null || { ./scripts/guards.sh; exit 1; }
+./gradlew -q --console=plain spotlessCheck detekt 2>&1 | grep -v '^Picked up' | tail -25
+exit "${PIPESTATUS[0]}"

@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "dev.listicles.app"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -19,6 +19,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -39,7 +40,12 @@ android {
         // Missing Danish (or English) strings fail the build.
         error += "MissingTranslation"
         // Dependency freshness is handled by Dependabot, not by failing PRs.
-        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+        disable += // justified: dependency freshness is Dependabot's job
+            setOf(
+                "GradleDependency",
+                "NewerVersionAvailable",
+                "AndroidGradlePluginVersion",
+            )
     }
 }
 
