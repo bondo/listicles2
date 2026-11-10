@@ -29,6 +29,7 @@ step() {
 gradle() { ./gradlew -q --console=plain "$@"; }
 
 step guards ./scripts/guards.sh
+step hook-tests python3 -I -m unittest discover -s scripts/hooks
 step spotless gradle spotlessCheck
 step detekt gradle detekt
 step lint gradle :app:lintDebug

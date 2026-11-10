@@ -1,0 +1,50 @@
+# Single source of truth for agent roles (PLAN section 9.1). Changed only through a reviewed PR,
+# and only by the metrics retro (9.4) or the owner. Budgets are starting values, calibrated after M0.
+# `high_effort_when` lists the PLAN 9.1 escalation rules; agents must not escalate on their own judgment.
+roles:
+  orchestrator:
+    model: sonnet
+    effort: low
+    session: one long-lived session; handoff at ~50% context
+    token_budget: null
+    prompt: agents/prompts/orchestrator.md
+  planner:
+    model: opus
+    effort: high
+    session: fresh, once per milestone
+    token_budget: 150000
+    prompt: agents/prompts/planner.md
+  implementer:
+    model: sonnet
+    effort: medium
+    session: fresh, one per PR
+    token_budget: 300000
+    prompt: agents/prompts/implementer.md
+    high_effort_when:
+      - verify.sh failed 3 times on the same error
+      - 2 review rounds ended with blockers
+      - the PR is tagged risk:high in the milestone doc
+  reviewer:
+    model: opus
+    effort: high
+    session: fresh, one per review round
+    token_budget: 100000
+    prompt: agents/prompts/reviewer.md
+    max_effort_when:
+      - the PR is tagged risk:high in the milestone doc
+  explorer:
+    model: haiku
+    effort: low
+    session: subagent
+    definition: .claude/agents/explorer.md
+  ci-triage:
+    model: haiku
+    effort: low
+    session: subagent
+    definition: .claude/agents/ci-triage.md
+context:
+  handoff_at_percent: 50
+  handoff_template: handoff/TEMPLATE.md
+review:
+  max_rounds: 4
+  severities: [blocker, major, minor, nit]
