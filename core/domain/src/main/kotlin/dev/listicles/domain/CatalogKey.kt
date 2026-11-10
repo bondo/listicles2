@@ -9,7 +9,9 @@ import java.util.Locale
  * stored, so the rules below can evolve without migrating data.
  *
  * - Unicode NFC, so a decomposed "å" (a + U+030A) equals a composed "å".
- * - Invisible format/control characters (e.g. zero-width space U+200B) are removed.
+ * - Invisible format/control characters (e.g. zero-width space U+200B, BOM) are removed.
+ *   This deliberately includes ZWJ/ZWNJ: item names don't need them, at the cost of
+ *   merging some emoji sequences.
  * - Leading/trailing and repeated whitespace of any Unicode kind (incl. NBSP) is collapsed.
  * - Case-insensitive via [Locale.ROOT].
  * - Letters such as æ, ø and å are kept, so "bær" and "baer" stay distinct.

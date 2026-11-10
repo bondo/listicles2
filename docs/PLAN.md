@@ -43,7 +43,7 @@ CLAUDE.md             Agent instructions: the only commands to run, and the rule
 
 ```
 users/{uid}                      { householdId }                       // only readable by the user
-households/{hid}                 { name, createdBy, createdAt }
+households/{hid}                 { name, createdBy, createdAt, ownerUid, deleted: bool }
 households/{hid}/members/{uid}   { role: owner|member, displayName, joinedAt, viaInvite? }
 invites/{code}                   { householdId, createdBy, createdAt, expiresAt }
 households/{hid}/lists/{lid}     { kind: INVENTORY|PACKING_TEMPLATE|TRIP, name, createdAt, updatedAt,
@@ -62,9 +62,11 @@ are combined, so a later change to the normalization rules can't break existing 
 
 Every rule below gets at least one allow test and one deny test in the emulator.
 Notation: `get`/`exists` see the state **before** a batch, `getAfter`/`existsAfter`
-see it **after**. `M(x)` means `exists(/households/$(hid)/members/$(x))`.
+see it **after**. `M(x)` means `exists(/households/$(hid)/members/$(x))`. `O(x)` means
+`get(/households/$(hid)).data.ownerUid == x`. `LIVE` means
+`get(/households/$(hid)).data.deleted == false`; every rule below also requires `LIVE`.
 
-**Reads**: members (`M(uid)`) can read the household doc and everything under it.
+**Reads**: members (`M(uid)`, `LIVE`) can read the household doc and everything under it.
 `users/{uid}` can be read and written only by that user, and holds nothing but
 `householdId`.
 
@@ -72,22 +74,28 @@ see it **after**. `M(x)` means `exists(/households/$(hid)/members/$(x))`.
 
 | Path / action | Allowed when |
 |---|---|
-| Create household + owner (one batch) | `!exists(household)` (it is new) **and** `getAfter(household).createdBy == uid` **and** the member doc has `role == owner`. Because of `!exists`, a former creator can't make themselves owner again later. |
+| Create household + owner (one batch) | Household: `!exists(household)`, `createdBy == ownerUid == uid`, `deleted == false`, **and** `existsAfter(members/uid)`. Member doc: `!exists(household)` **and** `getAfter(household).ownerUid == uid` **and** `role == owner`. Household docs are never deleted (see Delete household), so `!exists` can never be true again for an id that has existed. A former creator can't become owner again, and nobody can reclaim leftover data. |
 | Create invite `invites/{code}` | `M(uid)` of `householdId`; `createdBy == uid`; `createdAt == request.time`; `expiresAt <= request.time + duration.value(7, 'd')`; `code.size() >= 16`. No updates. |
 | Read one invite (`get`) | Any signed-in user (they need the code). |
 | Query invites (`list`) | Only queries filtered on `householdId == hid` where `M(uid)`, so members can see and revoke their household's invites. Nobody can enumerate other codes. |
 | Delete invite | Its creator or the owner (revoke); **any member** once `expiresAt < request.time` (cleanup); the joiner in the join batch (below). |
-| Join (one batch) | Create `members/{uid}` with `role == member`, `joinedAt == request.time`, `viaInvite == code`, where: `!M(uid)` before the batch; the invite exists, points at `hid` and hasn't expired; and the invite's creator is **still a member** (`M(invite.createdBy)`). Also delete `invites/{code}`. That delete is allowed only if `!M(uid) && getAfter(member).viaInvite == code`, so an existing member can't burn someone else's invite. Single use follows from the delete. |
+| Join (one batch) | Create `members/{uid}` with `role == member`, `joinedAt == request.time`, `viaInvite == code`, where: `!M(uid)` before the batch; the invite exists, points at `hid` and hasn't expired; the invite's creator is **still a member** (`M(invite.createdBy)`); **and** `!existsAfter(invites/{code})`, so the join is only valid if the same batch deletes the invite. That delete is allowed only if `!M(uid) && getAfter(member).viaInvite == code`, so an existing member can't burn someone else's invite. Single use follows from the delete. |
 | Update own member doc | Only `displayName` may change. |
-| Leave | A member (not the owner) deletes their own member doc. The client also deletes that member's invites in the same batch. |
-| Remove member | Owner only, target `role == member`. The same batch deletes the removed member's open invites, so they can't rejoin with a code they made. |
-| Transfer ownership (one batch) | The caller is the owner; `getAfter(caller).role == member` **and** `getAfter(target).role == owner`; the target was a member before. Exactly one owner before and after. |
+| Leave | A member who is not the owner (`!O(uid)`) deletes their own member doc. The client also deletes that member's invites (allowed: the creator may delete their own invites). |
+| Remove member | `O(uid)`, and the target isn't the owner. The same batch deletes the removed member's open invites. Even if that cleanup is skipped, the `M(invite.createdBy)` check makes those invites unusable while the person is not a member. Accepted residual risk: if they rejoin through someone else's link, any of their old invites that haven't expired (7 days at most) start working again. |
+| Transfer ownership (one batch) | Updates `household.ownerUid` and the `role` of both member docs. Household update: `O(uid)` and only `ownerUid` changes, to an existing member. Each member-doc update: only `role` changes, `O(uid)` before the batch, and the new role equals `getAfter(household).ownerUid == thisDoc ? owner : member`. `ownerUid` is the single source of truth, so there is always exactly one owner. `role` is a cached copy for display, and rules use `O(x)`. |
 | Lists and items | `M(uid)` plus field validation (below). |
-| Delete household | Owner only. Client order: items → lists → invites → other members → **one final batch** that deletes the household and the owner's own member doc. The owner may delete their own member doc only when `!existsAfter(household)`. |
+| Delete household | `O(uid)`. **Soft delete**: first one update sets `deleted: true`. From that moment `LIVE` is false, so every read and write under the household is denied to everyone except the owner's cleanup. Then the client deletes items → lists → invites → members in pages; these deletes are allowed for `O(uid)` while `deleted == true`. The household doc itself stays as a tombstone (`{ ownerUid, deleted: true }`, name cleared), so its id can never be reused. A crash mid-cleanup leaves data no one can access, and the next app start resumes the cleanup. |
 
 Rules can't count members, so "the owner can't leave while others remain" is
-enforced by the rule shapes above: the owner's member doc can only be deleted
-together with the household, so the owner must transfer ownership first.
+enforced by the rule shapes above: the owner can't use Leave, so they must transfer
+ownership or delete the household.
+
+**Spike first (M1, PR 1)**: prove in the emulator that (a) the invite `list` rule,
+filtered on `householdId` with a membership `exists()`, is accepted, (b) the join
+batch with `existsAfter`/`getAfter` works, and (c) the transfer batch works. If (a)
+fails, the fallback is to nest invites under the household, with a top-level
+`inviteCodes/{code} → hid` index used only for `get`.
 
 **Field validation** on every write:
 * types, string lengths and allowed enum values;
@@ -150,17 +158,24 @@ inputs are bounded by validation (`nights <= 365`, `travellers <= 50`, `amount`,
 5. Within one template, duplicate match keys are **summed**: they are the same item,
    entered twice.
 6. Across templates, group by match key and take the **max**.
-7. Final cap at 9,999. With the input bounds this cap is never hit; it is a safety net,
-   and tests check it.
+7. Final cap at 9,999, applied after the max. The cap **can** be hit with extreme inputs,
+   and the UI shows "9,999+". All intermediate steps use `Long` with
+   `addExact`/`multiplyExact`, so nothing overflows before the cap.
 
 **Merging**: `combine(templates, nights, travellers): List<TripItem>` applies the pipeline.
 * When keys collide, the display name and `sortKey` come from the template that is first
   in the user's selection order. Notes and tags are unioned. Source templates are recorded.
 * Output order is deterministic: by first template's `sortKey`, then by name.
 
-**Match key** (`CatalogKey`): Unicode NFC normalization, trim, collapse every Unicode
-whitespace including NBSP, then `lowercase(Locale.ROOT)`. Æ/Ø/Å are kept, so
-"bær" ≠ "baer".
+**Match key** (`CatalogKey`):
+1. Unicode NFC normalization.
+2. Remove invisible format and control characters: zero-width space, BOM, and also ZWJ
+   and ZWNJ, which is intentional for item names, even though it merges some emoji
+   sequences.
+3. Collapse every Unicode whitespace, including NBSP and U+0085, into one space; trim.
+4. `lowercase(Locale.ROOT)`, then NFC again.
+
+Æ/Ø/Å are kept, so "bær" ≠ "baer".
 
 **Search, sort and filter**: pure functions over item lists (text match on name, notes
 and barcode, using the same normalization; tag filter; sort by name, created or updated).
@@ -170,7 +185,7 @@ Testing:
 * **Property-based tests** with Unicode-aware generators (not just ASCII). Invariants:
   * quantities don't depend on template order or grouping: combining in any
     permutation gives the same quantities per key;
-  * each result is at least each input's quantity for that key;
+  * each result is at least `min(input quantity, 9,999)` for every input with that key;
   * combining a template with itself changes nothing;
   * results never decrease as nights or travellers increase;
   * results are never negative and never exceed 9,999. Scaling is checked against a `BigInteger` reference
