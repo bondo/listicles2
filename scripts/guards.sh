@@ -19,7 +19,8 @@ EXCL=(':!docs' ':!handoff' ':!*.md' ':!scripts/guards.sh' ':!*package-lock.json'
 GREP=(git grep -nHI -E)
 [ "$STAGED" = 1 ] && GREP=(git grep --cached -nHI -E)
 # Runs git grep; a real error (rc>1, e.g. bad regex) fails the guard instead of looking like "no match".
-ERRF=$(mktemp); trap 'rm -f "$ERRF"' EXIT
+ERRF=$(mktemp) || { echo "guard: mktemp failed" >&2; exit 1; }
+trap 'rm -f "$ERRF"' EXIT
 gg() {
   local o rc
   o=$("${GREP[@]}" "$@"); rc=$?
@@ -36,7 +37,8 @@ out=$(gg '@([A-Za-z]+\.)*Ignored?\b|@Disabled[A-Za-z]*|@Enabled(If|On)[A-Za-z]*|
 out=$(gg 'enabled(If|OrReasonIf)? *[=(]|\bx(it|test|describe|context|should|expect|when|then|given|feature|scenario|and|[A-Z][A-Za-z]*)\(|\bfit\(|assume(True|False)\(|"(!|f:)[A-Za-z]|passWithNoTests|testPathIgnorePatterns' -- "${TESTSRC[@]}" "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled or focused test: /'; fail=1; }
 
-out=$(gg 'enabled *= *false|excludeTestsMatching|onlyIf *\{ *false|passWithNoTests|testPathIgnorePatterns|testMatch|kotest\.(tags|filter)' -- "${CFGSRC[@]}" "${EXCL[@]}")
+# Not exhaustive by nature; CODEOWNERS (owner review of build files) is the real control.
+out=$(gg '[Ee]nabled *(= *|\() *(false|!)|onlyIf *(\([^)]*\))? *\{ *false|excludeTest(s|sMatching)?\b|exclude(Tags|Engines)\(|exclude\("[^"]*[Tt]est|passWithNoTests|testPathIgnorePatterns|testMatch|testRegex|"roots"|testNamePattern|testPathPattern| -t |kotest\.(tags|filter)' -- "${CFGSRC[@]}" "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled tests via build config: /'; fail=1; }
 
 # 2. Suppressions and weakened settings need "justified: <reason>" on the same line.
