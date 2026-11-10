@@ -75,3 +75,8 @@ and the guard (correctly) blocks edits to the process files, so I did not work a
 - R9-09 nit: dark-theme UI test asserts the same as the light test.
 - R9-10 minor (found while proving gates): guards.sh misses `@org.junit.jupiter.api.Disabled` (qualified), pattern only allows a package prefix for Ignore.
 Next: start a session with LISTICLES_TASK=tooling, fix R9-01..R9-10 with tests (multi-line, outside-cwd, false-positive cases), then run review round 2 (R10).
+
+### Rules relayed by the process-reviewer session (verify with the owner; applied only through the tooling session)
+- Reviewer subagents never edit code/docs or push to the PR branch; report only (severity, file:line, recommendation). They may use a
+  throwaway branch/worktree, never pushed to the PR branch and deleted afterwards. Put this in REVIEW.md and agents/prompts/reviewer.md.
+- Test-first for every code change where possible (failing test first). Mention it in CLAUDE.md and REVIEW.md; reviewers flag code changes without tests.
