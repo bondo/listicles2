@@ -21,7 +21,7 @@ Finish milestone M0 from `docs/PLAN.md` §7: tooling and agent setup only, no fe
    `@firebase/rules-unit-testing` with one deny test. firebase-tools comes from npm. Check that the
    emulator jar download host is reachable (storage.googleapis.com answered 400 at root, which is probably fine).
 3. `.github/workflows/ci.yml` (jobs: static, unit, firebase, ui, guards, secrets), `dependabot.yml`,
-   `pull_request_template.md`, `CODEOWNERS` (ask the owner for their GitHub handle), wrapper validation.
+   `pull_request_template.md`, `CODEOWNERS` (`* @bondo` for the guarded paths), wrapper validation.
 4. `REVIEW.md` (severity definitions, JSON findings format with IDs, 4-round cap), `CLAUDE.md`.
 5. Agent setup (PLAN §9): `agents/roles.yaml`, `agents/prompts/*.md`, `.claude/agents/{explorer,ci-triage}.md`,
    `.claude/settings.json` (status line + PreToolUse deny hooks + context-guard hook),
@@ -42,6 +42,6 @@ Finish milestone M0 from `docs/PLAN.md` §7: tooling and agent setup only, no fe
 - Kover counts value-class synthetic code, which is why `CatalogKey` is a data class.
 
 ## Waiting on the owner
-- Accept the round-4 fixes without a 5th round?
-- Open a draft PR for this branch?
-- GitHub handle for CODEOWNERS. Make the repo public.
+- (Resolved) Owner accepted the round-4 fixes; no 5th round.
+- (Resolved) Draft PR opened; continue on this branch, one review round per batch of commits.
+- Make the repo public (owner gets a reminder on 2026-11-11).
