@@ -308,10 +308,13 @@ def drift(graph: Graph, issues=None, prs=None) -> list[str]:
     msgs: list[str] = []
     for t in graph.tasks:
         st = owner_issue_state(t, by_number, by_title)
+        linked = {x for x in (by_number.get(t.issue) if t.issue is not None else None, by_title.get(t.id)) if x}
+        if len(linked) > 1:
+            msgs.append(f"{t.id}: linked issues disagree ({', '.join(sorted(linked))}); the task counts as {st}")
         if t.status == "todo" and st == "completed":
             msgs.append(f"{t.id}: issue closed but status is todo (set done in the next PR)")
         if t.status == "todo" and st == "not_planned":
-            msgs.append(f"{t.id}: issue closed as not planned (owner decides: drop the task, or reopen the issue)")
+            msgs.append(f"{t.id}: issue closed without completion (not planned, duplicate, ...; owner decides: drop the task, or reopen the issue)")
         if t.status == "done" and st == "open":
             msgs.append(f"{t.id}: status done but its issue is still open")
         if t.status == "todo" and t.pr is not None and t.pr in merged:

@@ -83,6 +83,8 @@ class ValidateTest(unittest.TestCase):
         self.assertIn("still todo", errors_of(task("M0-01"), task("M0-02", status="done", deps=["M0-01"])))
         # an owner dependency may be finished on GitHub only (drift), so it is allowed
         graph(task("M0-O1", assignee="owner"), task("M0-02", status="done", deps=["M0-O1"]))
+        # owner-only todo members of a milestone are derived from GitHub, so they don't make the file invalid
+        graph(task("M0-O1", assignee="owner"), task("M1-01", milestone="M1", status="done", deps=["milestone:M0"]))
         msg = errors_of(task("M0-01"), task("M1-01", milestone="M1", status="done", deps=["milestone:M0"]))
         self.assertIn("still todo", msg)
 
@@ -192,10 +194,16 @@ class DriftTest(unittest.TestCase):
         self.assertIn("M0-01: PR #3 merged", msgs)
         self.assertIn("M0-O9: owner issue title names an unknown task id", msgs)
 
+    def test_reports_disagreeing_linked_issues(self):
+        g = graph(task("M0-O1", assignee="owner", issue=12))
+        issues = [{"number": 12, "title": "", "state": "closed"},
+                  {"number": 50, "title": "[owner] M0-O1: stray", "state": "open"}]
+        self.assertIn("linked issues disagree", "\n".join(tasks.drift(g, issues, [])))
+
     def test_reports_not_planned_close(self):
         g = graph(task("M0-O1", assignee="owner", issue=12))
         issues = [{"number": 12, "title": "", "state": "closed", "state_reason": "not_planned"}]
-        self.assertIn("closed as not planned", "\n".join(tasks.drift(g, issues, [])))
+        self.assertIn("closed without completion", "\n".join(tasks.drift(g, issues, [])))
 
 
 class CliTest(unittest.TestCase):
