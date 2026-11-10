@@ -50,3 +50,28 @@ Finish milestone M0 from `docs/PLAN.md` §7: tooling and agent setup only, no fe
 - (Resolved) Owner accepted the round-4 fixes; no 5th round.
 - (Resolved) Draft PR opened; continue on this branch, one review round per batch of commits.
 - Make the repo public (owner gets a reminder on 2026-11-11).
+
+## Session 3 (batch 2, steps 4-8): state at stop
+Done and pushed (HEAD 4e62a14): review contract, agent guide, agent roles and prompts, subagent definitions, PreToolUse guard,
+statusline, context guard, SessionEnd metrics hook (proven on a real transcript), handoff template, dark theme, Kover on :app (80%),
+ADR 0001 (stay on detekt 1.23.8; type-resolved detektMain/detektTest on :core:domain in verify.sh only).
+Gates proven: CI run 23 on a deliberately broken commit failed in `static` (MissingTranslation), reverted in 4e62a14.
+Locally in a scratch copy: unjustified suppression, baseline file, lowered floor, format error, magic numbers, wrong assertion,
+missing Danish string and untested code each fail the matching gate. One gap found (R9-10 below).
+CI on the branch is green except `guards` (diff over 600 lines: owner applies `big-pr`).
+
+### Review round 1 (R9), reviewer verdict: changes_requested. NOT fixed: this session lacks LISTICLES_TASK=tooling
+and the guard (correctly) blocks edits to the process files, so I did not work around it.
+- R9-01 major: guard skips every git check when a command has newlines (shlex treats newline as whitespace). Split lines before shlex.
+- R9-02 major: process-file check uses the hook cwd as repo root; outside the repo it allows edits. Use CLAUDE_PROJECT_DIR / the file's own dir.
+- R9-03 major: ci.yml `static` job lacks `:core:domain:detektMain :core:domain:detektTest` (also pre-commit hook). Add them.
+- R9-04 major (verified here): the statusline never runs in cloud sessions, so no context % file exists and the 50% reminder is inert.
+  Compute usage in the PostToolUse hook from transcript_path (last assistant usage / context window) instead.
+- R9-05 minor: false positives (`2>&1`, `2>/dev/null`, protected names in heredocs/commit messages/quoted text, `git merge -n`).
+  Also reported independently by the process reviewer session. Fix: tokenise, ignore fd redirects, match protected paths only as write targets.
+- R9-06 minor: abbreviated long options (`--har`, `--no-verif`), `HEAD:heads/main`, `git checkout HEAD f`, GIT_CONFIG_PARAMETERS, aliases, `timeout` wrapper, `.git/config`.
+- R9-07 minor: metrics dir follows cwd; use project root.
+- R9-08 nit: explorer/ci-triage frontmatter lacks effort; CLAUDE.md omits install-hooks.sh; statusline hardcodes 50.
+- R9-09 nit: dark-theme UI test asserts the same as the light test.
+- R9-10 minor (found while proving gates): guards.sh misses `@org.junit.jupiter.api.Disabled` (qualified), pattern only allows a package prefix for Ignore.
+Next: start a session with LISTICLES_TASK=tooling, fix R9-01..R9-10 with tests (multi-line, outside-cwd, false-positive cases), then run review round 2 (R10).
