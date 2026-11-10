@@ -1,5 +1,6 @@
 package dev.listicles.app
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,8 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
-fun ListiclesApp() {
-    MaterialTheme {
+fun ListiclesApp(darkTheme: Boolean = isSystemInDarkTheme()) {
+    ListiclesTheme(darkTheme) {
         Scaffold { padding ->
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),

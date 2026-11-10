@@ -46,11 +46,24 @@ tasks.withType<Detekt>().configureEach {
 }
 
 dependencies {
+    kover(project(":app"))
     kover(project(":core:domain"))
 }
 
 kover {
     reports {
+        filters {
+            excludes {
+                // Same exclusions as app/build.gradle.kts (the aggregate report does not inherit them).
+                annotatedBy("androidx.compose.runtime.Composable", "androidx.compose.ui.tooling.preview.Preview")
+                classes(
+                    "dev.listicles.app.MainActivity",
+                    "dev.listicles.app.R",
+                    "dev.listicles.app.R$*",
+                    "*ComposableSingletons*",
+                )
+            }
+        }
         verify {
             // Overall floor. Per-module floors live in each module's build file.
             rule("overall line coverage") {

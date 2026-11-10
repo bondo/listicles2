@@ -19,4 +19,11 @@ class ListiclesAppTest {
         compose.setContent { ListiclesApp() }
         compose.onNodeWithText(welcome).assertExists()
     }
+
+    @Test
+    fun showsWelcomeTextInDarkTheme() {
+        val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
+        compose.setContent { ListiclesApp(darkTheme = true) }
+        compose.onNodeWithText(welcome).assertExists()
+    }
 }
