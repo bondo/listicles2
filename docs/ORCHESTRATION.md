@@ -27,8 +27,10 @@ Each fact has exactly one canonical location. Everything else links to it and do
 |---|---|---|---|
 | Current milestone, batches, running sessions, branch locks, next steps | **State issue** body (currently #15, label `orchestrator-state`), format in [`orchestrator-state.md`](orchestrator-state.md) | Orchestrator only | Orchestrator, successor, owner |
 | History: metrics rows, incidents, owner decisions, handovers | **State issue comments** (append-only, §6) | Orchestrator only | Successor, retro, `scripts/agent-metrics` |
-| Owner to-dos | One **issue per to-do**, label `owner-todo` (§4) | Orchestrator opens; owner closes | Everyone |
-| Review findings per round | One **findings comment on the PR** with a JSON block (§7.2) | Reviewer | Implementer, next reviewer, metrics |
+| Tasks, dependencies, done/todo (agent and owner work alike) | **`docs/tasks.toml`** at the tasks ref (§4), queried with `scripts/tasks.py` | Planner (adds), the PR that finishes a task (sets `done`), process PRs | Orchestrator (`ready`), everyone |
+| Who is working on a task right now (claims) | **State issue** Sessions table, `Task` column | Orchestrator | `scripts/tasks.py --claimed` |
+| Owner to-do details and completion | One **issue per owner task**, label `owner-todo`, title `[owner] <task id>: …` (§4.5) | Orchestrator opens; owner closes | Everyone, `scripts/tasks.py --issues` |
+| Review findings per round | One **findings comment on the PR**, in the `REVIEW.md` JSON format (§7.2) | Reviewer | Implementer, next reviewer, metrics |
 | Implementation progress inside a batch | `handoff/<branch>.md` on that branch | The implementer holding the branch lock | Next implementer on that branch |
 | Worker outcome | `WORKER-RESULT` block (§7.3): last message of the session **and** a PR comment | Worker | Orchestrator |
 | Cost and tokens per session | `get_session` → `external_metadata.usage` (read once the session is idle) | The platform | Orchestrator, copied into a metrics row |
@@ -53,6 +55,7 @@ listicles:<milestone or task>   e.g. listicles:M0, listicles:process
 role:<role>                     orchestrator | implementer | reviewer | planner | retro
 pr:<number>                     when the work belongs to a PR
 batch:<id>                      e.g. batch:M0-2
+task:<id>                       one per task worked on, e.g. task:M0-04
 round:<R-id>                    reviewers only, e.g. round:R9
 ```
 
@@ -67,11 +70,12 @@ goes to comments, not the body.
 * `Orchestrator:` session id, started-at, predecessor session id, **lineage depth** (from
   `get_session` → `lineage.depth`).
 * `Updated:` UTC timestamp of the last edit, and what triggered it.
-* **Sessions**: one row per live worker: id, role, tags, branch, task, spawned-at,
+* `Tasks ref:` the git ref whose `docs/tasks.toml` is canonical (§4.2).
+* **Sessions**: one row per live worker: id, role, tags, branch, **task ids** (the claims), spawned-at,
   expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived`).
 * **Branches**: one row per active branch: holder (session id or `none`),
   `reviewed_through` SHA, unreviewed commits since then and their disposition.
-* **Owner to-dos**: issue numbers only, each with the orchestrator's follow-up action.
+* **Owner to-dos**: task id and issue number only, each with the orchestrator's follow-up action.
 * **Scheduled tasks**: trigger id, the session it fires into, purpose, next run.
 * **PR subscriptions** held by the orchestrator.
 * **Next**: the next 1-3 actions, concrete enough for a cold successor.
@@ -82,25 +86,118 @@ Only the active orchestrator edits the body or posts log comments. Workers repor
 their PRs (§7.3). The owner comments on the state issue or replies in the orchestrator
 session; the orchestrator folds the comment into the body on its next wake.
 
-## 4. Owner to-dos
+## 4. Tasks, dependencies and owner to-dos
 
-Each to-do is its own issue so it can be closed, linked and searched:
+### 4.1 Options considered
 
-* Title `[owner] <imperative>`, label `owner-todo`.
+| Option | Deterministic "what's ready"? | Works with our tools | Reviewed and versioned | Visible to the owner | Verdict |
+|---|---|---|---|---|---|
+| A. GitHub issues + sub-issues + "blocked by" links + labels | No: an agent has to walk links page by page and interpret labels anyone can set | Partly: the GitHub MCP tools here can't set or read "blocked by" links, and `gh` is limited to search | No diff, no review | Yes | Rejected as the source of truth |
+| B. A task file in the repo + a small script | Yes: same file + same inputs → same output, and it's testable | Yes: the file is plain text, and the script needs only Python 3.11+ | Yes: changes go through PRs and review | Through the script output and the state issue | **Chosen** |
+| C. Both, kept in sync both ways | Only if sync never fails | Needs a sync job (Actions or the orchestrator) | Partly | Yes | Rejected: two sources of truth |
+
+Chosen: **B, plus read-only facts from GitHub.** The graph (ids, dependencies, risk, who) and
+`todo`/`done`/`dropped` live in `docs/tasks.toml`. GitHub facts that the file can't know yet
+(a closed owner issue, a merged PR) are fed into the script as inputs, never written back by hand.
+Issues stay the place for owner to-dos, because the owner needs a clickable item. They're linked to tasks by id.
+
+### 4.2 Schema (`docs/tasks.toml`)
+
+```toml
+milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]   # order = priority
+
+[[task]]
+id = "M1-03"              # <milestone>-NN (agent) or <milestone>-O<n> (owner); stable, never reused
+title = "Invite links: create, redeem, revoke + rules tests"
+milestone = "M1"
+status = "todo"           # todo | done | dropped   (no "in progress": that is a claim, §2)
+assignee = "implementer"  # owner | implementer | planner | process | retro
+risk = "high"             # normal | high (PLAN 9.1 risk:high → high effort, max-effort review)
+depends_on = ["M1-02", "M0.5-O1"]   # task ids, or "milestone:M0" = all of M0 done or dropped
+issue = 31                # optional; owner tasks: the to-do issue
+pr = 7                    # optional; the PR that delivers it
+notes = "…"               # optional, one line
+```
+
+`scripts/tasks.py validate` rejects:
+* unknown fields, missing fields and bad enum values
+* duplicate ids, and ids that don't start with their milestone
+* owner ids on non-owner tasks, and the reverse
+* unknown dependencies, and dependencies on the task's own milestone
+* cycles, including cycles through `milestone:` dependencies
+
+**Tasks ref.** The canonical copy is `docs/tasks.toml` on `main`. Until M0 is merged, `main`
+has no task file, so the tasks ref is the PR #1 branch (once this branch has been merged
+into it; until then, `claude/orchestration-review`). The state issue's `Tasks ref:` line says
+which one applies.
+
+### 4.3 The ready query (the only way to pick work)
+
+The orchestrator runs this on every wake, before it spawns anything. It runs the script from
+the tasks ref, without checking it out:
+
+```bash
+REF=claude/sleepy-mccarthy-z2paqx      # the "Tasks ref:" line; main once M0 is merged
+T="${TMPDIR:-/tmp}/tasks"; mkdir -p "$T"
+git fetch -q origin "$REF"
+git show "origin/$REF:scripts/tasks.py" > "$T/tasks.py"
+gh api -X GET search/issues -f q='repo:bondo/listicles2 is:issue' -f per_page=100 \
+  --jq '{items: [.items[] | {number, title, state}]}' > "$T/issues.json"
+gh api -X GET search/issues -f q='repo:bondo/listicles2 is:pr is:merged' -f per_page=100 \
+  --jq '{items: [.items[] | {number, merged_at: .pull_request.merged_at}]}' > "$T/prs.json"
+python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T/prs.json" \
+  --claimed "<comma-separated task ids from the Sessions table>" ready
+```
+
+* The output is one line per ready task, sorted by milestone order and then by position in the file.
+  `--json` gives the same list as JSON. `--assignee agent` or `--assignee owner` splits it.
+  `status` shows every task with its derived state and what it waits on.
+* A task is **ready** when it is `todo`, every dependency is satisfied (`done`, `dropped`, or an
+  owner task finished on GitHub), and no running session claims it.
+* An owner task counts as finished when its `issue` is closed, when a closed issue is titled
+  `[owner] <id>: …`, or when its `pr` is merged (merge tasks such as M0-O7). Agent tasks finish
+  **only** through `status = "done"` in the file.
+* The search API can lag by a minute or so. If a result contradicts something you just did, run the query again.
+* The script runs from the tasks ref, not from the working tree, so every session gets the same answer.
+
+### 4.4 How status changes
+
+| Change | Who | How |
+|---|---|---|
+| Add tasks | Planner (per milestone), process PRs | In the same PR as `docs/milestones/Mx.md`. New work found mid-flight (a deferred finding, say) is added by the PR that finds it, or noted in the state issue under "pending task additions" for the next PR |
+| Claim (start) | Orchestrator | Add the task id to the worker's row in the Sessions table, then spawn. Release the claim when the worker ends |
+| `todo` → `done` (agent task) | The implementer, in the PR that delivers it | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. For multi-step PRs such as M0, a step is marked done on the PR branch once its batch review has finished |
+| Owner task finished | Owner | Close the issue (or merge the PR). This takes effect at once through `--issues`/`--prs`. The next PR that touches the file sets `status = "done"`; `drift` lists what is outstanding |
+| `dropped` | Owner decision, recorded by the next PR | Add `notes` with the reason and a link to the decision comment |
+| Edits to ids or dependencies | Planner or process PR | Ids are never reused or renumbered |
+
+`scripts/tasks.py drift --issues … --prs …` reports:
+* closed owner issues whose task is still `todo`
+* `done` tasks whose issue is open
+* merged PRs whose task is still `todo`
+* `[owner] <id>` issue titles that name an unknown task
+
+The orchestrator logs drift in the state issue and hands it to the next implementer or process session.
+
+### 4.5 Owner to-dos
+
+Owner work is tasks with `assignee = "owner"`, and each one gets an issue once it is **ready**
+(not before, so the owner's list holds only actionable items):
+
+* Title `[owner] <task id>: <imperative>`, label `owner-todo`. Older issues (#12-#14) are linked through
+  the task's `issue` field instead.
 * Body, in this order:
   * **What**: one sentence.
   * **Where**: the exact click path or command.
-  * **Why**: what is blocked until it's done.
+  * **Why**: what is blocked until it's done (list the tasks that depend on it).
   * **Done when**: something the orchestrator can check (a label exists, the default branch is `main`,
     the repository is public, a secret is set).
   * **Then**: what the orchestrator does next.
-* The owner closes the issue when done. They don't need to tell the orchestrator: on each wake
-  the orchestrator lists open and recently closed `owner-todo` issues, checks the
-  *Done when* condition itself, and logs `todo-done #N` in the state issue. If the check fails, it reopens the issue with
-  a one-line comment.
-* Reminders are scheduled tasks bound to the **current** orchestrator, recorded in the
-  state body. Don't bind them to a worker or to a session that is about to hand over.
-* When you report to the owner, give the open to-dos as one short list in priority order. Don't dribble them out one per message.
+* The owner closes the issue when done. They don't need to tell the orchestrator: on each wake the
+  orchestrator runs the ready query (closed issues count at once), checks *Done when* itself, and logs
+  `todo-done <id>` in the state issue. If the check fails, it reopens the issue with a one-line comment.
+* Reminders are scheduled tasks bound to the **current** orchestrator, recorded in the state body.
+* When you report to the owner, give the ready owner tasks (`--assignee owner ready`) as one short list in priority order.
 
 ## 5. Orchestrator handover
 
@@ -128,7 +225,8 @@ once past about 30%, rather than mid-batch at 50%.
 1. Read this file, then the state body, then the comments since the last `handover`.
    Don't read predecessor transcripts.
 2. Check that the state is true. For each session row, run `get_session`. For each branch row, compare
-   `git ls-remote` HEAD against the recorded SHA. Re-check each `owner-todo`. Note what you corrected.
+   `git ls-remote` HEAD against the recorded SHA. Run the ready query (§4.3) and `drift`.
+   Note what you corrected.
 3. Recreate the reminders listed in the handover comment, bound to yourself. Subscribe to the PRs.
 4. Set `Orchestrator:` to yourself (with predecessor and depth), and post `handover-ack`.
 5. Child-session failure events go to the session that **spawned** a worker, so a predecessor's
@@ -145,8 +243,8 @@ an empty field, not a guess.
 
 ```csv
 # metrics:session
-date,batch,pr,role,session_id,model,effort,result,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,handoffs,verify_fails_before_push,ci_red_runs
-{date},{batch},{pr},reviewer,{session_id},{last_served_model},high,done,{cost},{in},{out},{cache_r},{cache_w},0,,
+date,batch,pr,tasks,role,session_id,model,effort,result,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,handoffs,verify_fails_before_push,ci_red_runs
+{date},{batch},{pr},{task ids space-separated},reviewer,{session_id},{last_served_model},high,done,{cost},{in},{out},{cache_r},{cache_w},0,,
 ```
 
 `cost_usd` and the token fields come from `get_session` → `external_metadata.usage`.
@@ -157,12 +255,13 @@ date,batch,pr,role,session_id,model,effort,result,cost_usd,input_tokens,output_t
 ```csv
 # metrics:round
 date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,disputed,withdrawn,verdict
-2026-11-10,M0-1,1,R8,session_...,809080c,c1b54ff,0,0,1,1,0,0,findings
+2026-11-10,M0-1,1,8,session_...,809080c,c1b54ff,0,0,1,1,0,0,changes_requested
 ```
 
-Rounds are numbered **per PR**, globally and monotonically: R1, R2, … and never reset per batch.
-The 4-round cap counts rounds **within a batch**. A finding ID is `<round>-<nn>` (e.g. `R8-01`).
-`verdict` is `findings | ready-nits-only | cap-reached`.
+Rounds are numbered **per PR**, globally and monotonically (1, 2, … giving IDs R1-…, R2-…) and never reset per batch.
+The 4-round cap counts rounds **within a batch**. A finding ID is `R<round>-<nn>` (e.g. `R8-01`).
+`verdict` is the reviewer's (`changes_requested | ready_nits_only`), or `cap_reached`, which the orchestrator
+sets after round 4 of a batch.
 
 ### 6.3 Incident row
 
@@ -173,7 +272,7 @@ date,batch,session_id,kind,impact,recovery,prevention
 ```
 
 Suggested values for `kind`: `destructive-git`, `wrong-branch-push`, `concurrent-push`, `dead-session`,
-`stale-state`, `model-fallback`, `unreviewed-merge`, `budget-over`, `guard-bypass`.
+`stale-state`, `model-fallback`, `unreviewed-merge`, `budget-over`, `guard-bypass`, `task-drift`.
 
 ### 6.4 Batch summary
 
@@ -184,7 +283,9 @@ total cost, incidents. Then refresh the PR description's review table from the r
 
 ### 7.1 Spawning
 
-* `create_session` with the prompt template (§8), the tags from §2.1, the model and effort
+* Start only tasks that the ready query (§4.3) lists, in the order it lists them. Batching several ready
+  tasks of one PR into one session is fine; claim them all.
+* `create_session` with the spawn message (§8), the tags from §2.1, the model and effort
   from PLAN §9.1, and for writers `outcome_branch` = the branch they hold.
 * **Branch lock**: before spawning a writer, set the branch's holder in the state body.
   Only one writer per branch at a time. Reviewers hold no lock and never push.
@@ -196,18 +297,10 @@ total cost, incidents. Then refresh the PR description's review table from the r
 * The orchestrator gives the reviewer the PR number, `base_sha` (= the branch's
   `reviewed_through`), `head_sha`, the round ID, and the IDs of findings that are still open.
 * The reviewer reviews `base_sha..head_sha` only, plus re-checks of open findings, and posts **one**
-  PR comment:
-
-  ````
-  ## Review R9 (base abc1234 → head def5678)
-  ```json
-  {"round":"R9","base":"abc1234","head":"def5678","verdict":"findings",
-   "findings":[{"id":"R9-01","severity":"major","file":"scripts/guards.sh","line":42,
-                "status":"open","summary":"..."}],
-   "rechecked":[{"id":"R8-01","status":"fixed"}]}
-  ```
-  WORKER-RESULT …
-  ````
+  PR comment with the fenced `json` block defined in `REVIEW.md` (`round` as a number,
+  `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>`, `verdict`
+  `changes_requested | ready_nits_only`), followed by its `WORKER-RESULT` block (§7.3).
+  `REVIEW.md` owns the format; this file does not repeat it.
 * After the round, the orchestrator sets `reviewed_through = head_sha`.
 * Any commit after `reviewed_through` is **unreviewed** until the next round covers it, or until the
   owner explicitly accepts it. That acceptance goes in a `decision` log comment and in the branch row.
@@ -250,50 +343,53 @@ The orchestrator collects results in this order, from cheapest to most expensive
 Archive finished worker sessions once their metrics row is logged and the owner has
 seen the batch report.
 
-## 8. Prompt templates
+## 8. Spawn messages
 
-These are the bodies the orchestrator sends. When M0 step 5 creates `agents/prompts/*.md`,
-those files become canonical, and this section is replaced with links to them. Placeholders are `{…}`.
+The role rules live in `agents/prompts/<role>.md` (models and effort in `agents/roles.yaml`).
+A spawn message points at the role prompt and adds only the per-task parameters below, so
+rules are never copied into prompts. Until task M0-10 aligns `agents/prompts/*`, the bodies
+below win where they disagree (the prompts still mention `docs/status.md`,
+`handoff/orchestrator.md` and an older summary format). Placeholders are `{…}`.
 
 ### 8.1 Orchestrator bootstrap (successor, or owner-started)
 
 ```
-You are the Listicles orchestrator for bondo/listicles2. You coordinate only: never edit
-files, commit or push. Read docs/ORCHESTRATION.md first, then state issue #{state_issue}
-(body, then comments since the last "handover"). Follow §5.2 (incoming checklist) before
-doing anything else, then continue from "Next:". Predecessor: {session_id}.
+You are the Listicles orchestrator for bondo/listicles2 (rules: agents/prompts/orchestrator.md,
+overridden by docs/ORCHESTRATION.md where they differ). You coordinate only: never edit files,
+commit or push. Read docs/ORCHESTRATION.md, then state issue #{state_issue} (body, then comments
+since the last "handover"). Do §5.2 (incoming checklist) first, including the ready query (§4.3),
+then continue from "Next:". Predecessor: {session_id}.
 ```
 
 ### 8.2 Implementer
 
 ```
-You are an implementer for Listicles (bondo/listicles2), batch {batch}, PR #{pr}.
-Branch: {branch}. You are the only writer on this branch; push only to it.
-Task: {steps, or the Mx.md section}. Read CLAUDE.md, then handoff/{branch_slug}.md if it exists.
-Rules: tests first; run scripts/verify.sh before every push; small commits; never use
-git reset --hard, stash, --force or --no-verify; don't touch main or other branches.
-At about 50% context: finish the current step, update handoff/{branch_slug}.md (goal, done,
-next, decisions, open findings, resume commands), commit, push, and stop.
-Refer to owner to-dos by issue number only. Finish with a WORKER-RESULT block
-(docs/ORCHESTRATION.md §7.3), as your last message and as a comment on PR #{pr}.
+Role: agents/prompts/implementer.md. Repo bondo/listicles2, PR #{pr}, batch {batch}.
+Tasks: {task ids with titles} (docs/tasks.toml). Branch: {branch}. You are its only writer.
+Inputs: {Mx.md section / steps}, handoff/{branch_slug}.md if present.
+In the PR that finishes a task, set its status = "done" in docs/tasks.toml. Add any new task
+you discover there too, with dependencies.
+Refer to owner work by task id or issue number only.
+Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3): your last message, and a comment on PR #{pr}.
 ```
 
 ### 8.3 Reviewer
 
 ```
-You are a fresh-context reviewer for Listicles PR #{pr}, round {round}.
-Review only {base_sha}..{head_sha} against REVIEW.md, and re-check these open findings:
-{open_ids_with_one_line_each}. Don't review unchanged code, don't push, and don't edit files.
-Rely on the CI result; run targeted tests only when a finding needs proof.
-Post ONE PR comment in the format of docs/ORCHESTRATION.md §7.2 (finding IDs {round}-01…),
-ending with a WORKER-RESULT block, and repeat that block as your last message.
+Role: agents/prompts/reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}.
+Open findings to re-check: {ids with one line each}. Tasks this PR claims to finish: {task ids}.
+Check that docs/tasks.toml marks exactly those as done.
+Post ONE PR comment: the REVIEW.md json block, then a WORKER-RESULT block
+(docs/ORCHESTRATION.md §7.3), and repeat that block as your last message. Don't push.
 ```
 
 ### 8.4 One-off task (planner, retro, process review)
 
 ```
-You are a fresh-context {role} for Listicles (bondo/listicles2). Task: {task}.
+You are a fresh-context {role} for Listicles (bondo/listicles2). Task {task id}: {task}.
 Inputs: {files/issues}. Push only to {branch}; don't open a PR unless told to.
+Planners: add PR-sized tasks with dependencies and risk to docs/tasks.toml, and run
+scripts/tasks.py validate.
 Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 ```
 
@@ -312,3 +408,6 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 | F9 | Cost numbers without a source | Read `get_session` usage only. Leave unknown values empty (§6) |
 | F10 | The owner has to relay "done" to the orchestrator | The orchestrator checks `owner-todo` issues itself on each wake (§4) |
 | F11 | Two orchestrators alive at once overwrite the body | The `Orchestrator:` lock, plus the ack-then-stop handover (§5.1 step 8) |
+| F12 | "What's next" is decided from memory, so dependencies get skipped or work gets started twice | `scripts/tasks.py ready` with claims is the only way to pick work (§4.3) |
+| F13 | Task status drifts from GitHub (closed owner issue, merged PR) | Status is derived from GitHub on every query. `drift` lists what the next PR must fix in the file (§4.4) |
+| F14 | Role prompts and this file disagree (e.g. `agents/prompts/orchestrator.md` still says to write `docs/status.md`) | This file wins until task M0-10 aligns the prompts. Reviewers flag the disagreement |

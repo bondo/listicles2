@@ -1,0 +1,266 @@
+# Listicles task graph: the single source of truth for tasks and their dependencies.
+# Process and field meanings: docs/ORCHESTRATION.md section 4. Check: scripts/tasks.py validate
+#
+# status:     todo | done | dropped   ("in progress" is not stored: it is a claim in the state issue)
+# assignee:   owner | implementer | planner | process | retro
+# risk:       normal | high           (high = PLAN 9.1 risk:high: higher effort, max-effort review)
+# depends_on: task ids, or "milestone:<M>" = every task of milestone <M> is done or dropped
+# ids:        <milestone>-NN for agent tasks, <milestone>-O<n> for owner tasks
+# A dropped dependency counts as satisfied. Order within a milestone = priority.
+
+milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]
+
+# ---------------------------------------------------------------- M0 foundation (one PR: #1)
+# M0 is a single multi-step PR. Its tasks are marked done on the PR #1 branch once their
+# batch's review rounds have finished. M0-O7 (the merge) closes the milestone.
+
+[[task]]
+id = "M0-01"
+title = "Implementation plan (docs/PLAN.md), 4 review rounds"
+milestone = "M0"
+status = "done"
+assignee = "planner"
+risk = "normal"
+depends_on = []
+pr = 1
+
+[[task]]
+id = "M0-02"
+title = "Gradle skeleton, version catalog, spotless/detekt/lint/Kover"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-01"]
+pr = 1
+
+[[task]]
+id = "M0-03"
+title = "Batch 1: verify/guards/hooks, Firebase emulator + deny tests, CI, Dependabot, PR template, CODEOWNERS"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-02"]
+pr = 1
+notes = "Reviewed R5-R8; c1b54ff unreviewed, accepted by the owner"
+
+[[task]]
+id = "M0-04"
+title = "REVIEW.md and CLAUDE.md"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 1
+notes = "Batch M0-2; committed in f707f92, awaiting review"
+
+[[task]]
+id = "M0-05"
+title = "Agent setup: roles.yaml, prompts, .claude settings and hooks, status line, handoff template, metrics spike"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 1
+notes = "Batch M0-2; committed in f707f92, awaiting review"
+
+[[task]]
+id = "M0-06"
+title = "detekt 2.x vs 1.23 ADR, Kover on :app, dark theme"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 1
+notes = "Batch M0-2"
+
+[[task]]
+id = "M0-07"
+title = "Prove the gates: CI green on GitHub, a deliberately broken commit fails CI, then revert"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-04", "M0-05", "M0-06", "M0-O1"]
+pr = 1
+notes = "Batch M0-2. guards failed on the first GitHub run (diff size) until the big-pr label is set"
+
+[[task]]
+id = "M0-08"
+title = "Branch-protection guide for the owner"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 1
+notes = "Batch M0-2"
+
+[[task]]
+id = "M0-09"
+title = "Orchestration process: docs/ORCHESTRATION.md, state template, task graph + scripts/tasks.py"
+milestone = "M0"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = []
+notes = "Branch claude/orchestration-review; set done when the owner merges it"
+
+[[task]]
+id = "M0-10"
+title = "Tooling session: align agents/prompts, handoff template and CI with ORCHESTRATION.md; run tasks.py in CI; CODEOWNERS for the process docs"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-05", "M0-09"]
+pr = 1
+notes = "Needs LISTICLES_TASK=tooling (process files are hook-protected)"
+
+[[task]]
+id = "M0-O1"
+title = "Add the big-pr label to PR #1"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 12
+
+[[task]]
+id = "M0-O2"
+title = "Set the default branch to main"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 13
+
+[[task]]
+id = "M0-O3"
+title = "Make the repository public"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 14
+
+[[task]]
+id = "M0-O4"
+title = "Confirm the CODEOWNERS handle"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-03"]
+
+[[task]]
+id = "M0-O5"
+title = "Decide how the orchestration branch lands (merge into the PR #1 branch or a separate PR)"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-09"]
+
+[[task]]
+id = "M0-O6"
+title = "Turn on branch protection for main using the guide"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-08", "M0-O2"]
+
+[[task]]
+id = "M0-O7"
+title = "Squash-merge PR #1 (M0)"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-10", "M0-O1", "M0-O4", "M0-O5"]
+pr = 1
+
+# ---------------------------------------------------------------- M0.5 product design (no code)
+
+[[task]]
+id = "M0.5-01"
+title = "User stories with acceptance criteria (docs/product/stories.md)"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["milestone:M0"]
+
+[[task]]
+id = "M0.5-02"
+title = "App-flow diagram (docs/product/flow.md, Mermaid)"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M0.5-01"]
+
+[[task]]
+id = "M0.5-03"
+title = "Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M0.5-01"]
+
+[[task]]
+id = "M0.5-O1"
+title = "Approve stories, flow and design"
+milestone = "M0.5"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
+
+# ---------------------------------------------------------------- M1 auth + households
+# The planner (M1-01) breaks M1 into PR-sized tasks and adds them here in its PR.
+
+[[task]]
+id = "M1-01"
+title = "Plan M1: docs/milestones/M1.md and PR-sized tasks in this file"
+milestone = "M1"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["milestone:M0.5"]
+
+[[task]]
+id = "M1-02"
+title = "Start the Firestore emulator in the ui CI job (known gap R6-09), with the first Firebase-backed UI test"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+
+[[task]]
+id = "M1-O1"
+title = "Create the Firebase project (Spark), enable Google sign-in and Firestore, add google-services.json as a GitHub secret"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["milestone:M0"]
+
+[[task]]
+id = "M1-O2"
+title = "Register the debug and release SHA-1 fingerprints in Firebase"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
