@@ -1,0 +1,11 @@
+# The owner must review anything that controls the process or security.
+/.github/                    @bondo
+/scripts/                    @bondo
+/.githooks/                  @bondo
+/.claude/                    @bondo
+/agents/                     @bondo
+/CLAUDE.md                   @bondo
+/REVIEW.md                   @bondo
+/firebase/firestore.rules    @bondo
+**/screenshots/              @bondo
+**/golden/                   @bondo
