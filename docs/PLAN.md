@@ -124,11 +124,15 @@ enforce the rules rather than goodwill.
 3. The author fixes everything above nit and pushes, then the reviewer re-reviews the new commits.
 4. When only nits remain, the reviewer posts a "ready (nits only)" summary and you merge.
 
+Each review round runs in a **new** reviewer session, so the reviewer never sees the
+author's reasoning. It gets only the diff, the PR description, `REVIEW.md`, and the
+previous round's open findings.
+
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 
 | # | Scope | Done when |
 |---|---|---|
-| M0 | **Foundation**: Gradle multi-module skeleton, version catalog, spotless/detekt/lint/Kover, `verify.sh`, hooks, CI workflows, Firebase emulator config + an empty rules test, REVIEW.md, CLAUDE.md, PR template, branch-protection guide | All CI jobs run green on a hello-world app plus a trivial test, and a test that's deliberately broken makes CI fail |
+| M0 | **Foundation**: agent setup (section 9: role prompts, `.claude/` settings, status line, handoff template, metrics script) + Gradle multi-module skeleton, version catalog, spotless/detekt/lint/Kover, `verify.sh`, hooks, CI workflows, Firebase emulator config + an empty rules test, REVIEW.md, CLAUDE.md, PR template, branch-protection guide | All CI jobs run green on a hello-world app plus a trivial test, and a test that's deliberately broken makes CI fail |
 | M1 | Auth + households: Google sign-in, create household, invite code/link, join, leave; rules + tests | Two emulator users can join one household, and an outsider is denied (rules tests) |
 | M2 | Inventory lists: CRUD lists and items, real-time sync, offline, search/sort/filter, en/da | A UI test shows an edit on client A appearing on client B through the emulator |
 | M3 | Packing domain: scaling + merging in `core/domain` with property tests | Coverage floor met, and all invariants are property-tested |
@@ -144,3 +148,83 @@ enforce the rules rather than goodwill.
 * Create a release keystore and add it to GitHub secrets (M6).
 * Turn on branch protection using the guide from M0.
 * Later: a Play developer account if you want the Play track.
+
+## 9. Agents, effort levels and token budget
+
+### 9.1 Roles
+
+| Role | Model / effort | Runs as | Gets | Produces |
+|---|---|---|---|---|
+| **Orchestrator** | Sonnet / low | One long-lived session | `PLAN.md`, `docs/status.md`, child-session summaries | Spawns sessions, updates status, asks the owner for merges and decisions |
+| **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR |
+| **Implementer** | Sonnet / medium | Fresh session per PR | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green |
+| **Reviewer** | Opus / high | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line |
+| **Explorer** (subagent) | Haiku / low | Subagent inside an implementer or reviewer | A narrow question | File paths and short excerpts, no dumps |
+| **CI triage** (subagent) | Haiku / low | Subagent inside an implementer | Failing job log | The failing test or rule and the minimal error |
+
+Escalation rules (written down so agents don't decide on their own):
+* An implementer that fails `verify.sh` 3 times on the same error, or gets 2 review
+  rounds with blockers, hands off to a fresh implementer at **high** effort.
+* Security rules, sync and merge logic, and the release workflow are tagged `risk:high`
+  in `Mx.md`. Their implementers run at high effort, and their review runs at max effort.
+* De-escalation (lower effort or a cheaper model for a role) happens only through the
+  metrics retro (section 9.4), never ad hoc.
+
+Role definitions are checked in, so they get reviewed and versioned like code:
+* `.claude/agents/explorer.md` and `.claude/agents/ci-triage.md`: subagent definitions,
+  with model and effort in their frontmatter.
+* `agents/prompts/{orchestrator,planner,implementer,reviewer}.md`: opening prompts for the sessions.
+* `agents/roles.yaml`: the single source of truth for each role's model, effort and token budget.
+
+### 9.2 Token-saving rules (in CLAUDE.md)
+
+* Read files in parts and search narrowly. Delegate broad searches to the Explorer.
+* Never paste full CI logs. Use CI triage, or the `verify.sh` summary, which prints only failures.
+* `verify.sh` has quiet output by default (one line per step, plus failure details).
+* One PR = one concern, about 400 lines or fewer. Smaller diffs mean cheaper reviews.
+* Reviewers don't re-run the whole suite. They rely on the CI result and only run
+  targeted tests when a finding needs proof.
+* The orchestrator never reads child transcripts. It reads only the final summary
+  (fixed format: status, PR link, open items, tokens used).
+
+### 9.3 Context limits and handoff
+
+* **One PR per implementer session. One review round per reviewer session.**
+* A status line shows the context % in every session.
+* At **about 50%** context, the session finishes its current step, writes
+  `handoff/<branch>.md` from a template, commits it, and ends.
+  The template covers: goal, what's done, what's next, decisions made, open
+  findings, and commands to resume. The orchestrator starts a fresh session with
+  that file as input. `/compact` is only a fallback, e.g. in the middle of a step
+  that can't be split.
+* Handoff files are deleted in the PR's final commit, so they never reach `main`.
+* The threshold warning comes from tooling, not memory: a status-line script plus a
+  hook that injects a reminder once 50% is crossed. M0 checks the exact hook
+  mechanism against the current Claude Code docs.
+
+### 9.4 Performance reviews
+
+`scripts/agent-metrics` pulls the sessions linked to each PR, using PR or branch
+tags set at spawn time, and appends a row to `docs/agent-metrics.csv`:
+
+| Metric | Why |
+|---|---|
+| Tokens (in/out/cache) per role per PR | Cost |
+| Number of sessions and handoffs per PR | How well the context limit works |
+| `verify.sh` failures before the first push, and CI red runs | Implementer quality |
+| Review rounds; findings by severity | Implementer quality, and whether the reviewer is useful |
+| Escaped defects: bugs found after merge, traced back to a PR (label `escaped`) | Reviewer quality, the most important signal |
+| Reviewer false positives (findings the author rejected and a later round agreed) | Reviewer precision |
+
+At the **end of each milestone**, a retro session (Sonnet / medium) reads only the CSV and
+`docs/agent-tuning.md`. It proposes at most 3 changes, e.g. "drop the implementer to
+low effort for UI-only PRs", "tighten REVIEW.md section X". Each change comes as a
+reviewed PR to `agents/roles.yaml` or the prompts, with the expected effect logged.
+The next retro checks whether that effect happened, and reverts the change if not.
+
+Guardrail: quality metrics take precedence over cost. A change that cuts tokens but
+raises escaped defects or blockers per PR gets reverted.
+
+Starting budgets (calibrated after M0): implementer about 300k tokens/PR, reviewer
+about 100k tokens per round, planner about 150k per milestone. Going over a budget
+doesn't stop work. It flags the PR for the retro.
