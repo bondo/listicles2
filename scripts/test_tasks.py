@@ -83,6 +83,8 @@ class ValidateTest(unittest.TestCase):
         self.assertIn("still todo", errors_of(task("M0-01"), task("M0-02", status="done", deps=["M0-01"])))
         # an owner dependency may be finished on GitHub only (drift), so it is allowed
         graph(task("M0-O1", assignee="owner"), task("M0-02", status="done", deps=["M0-O1"]))
+        msg = errors_of(task("M0-01"), task("M1-01", milestone="M1", status="done", deps=["milestone:M0"]))
+        self.assertIn("still todo", msg)
 
     def test_rejects_missing_required_field(self):
         self.assertIn("missing ['risk']", errors_of(task("M0-01").replace('risk = "normal"\n', "")))
@@ -136,6 +138,21 @@ class DeriveTest(unittest.TestCase):
         self.assertEqual(ready_ids(g, issues=issues), ["M0-O1"])
         issues[0]["state_reason"] = "completed"
         self.assertEqual(ready_ids(g, issues=issues), ["M0-01"])
+
+    def test_search_item_shape_merged_pr_is_detected(self):
+        g = graph(task("M0-O1", assignee="owner", pr=1), task("M0-01", deps=["M0-O1"]))
+        item = {"number": 1, "state": "closed", "pull_request": {"merged_at": "2026-11-12T00:00:00Z"}}
+        self.assertEqual(ready_ids(g, prs=[item]), ["M0-01"])
+        item["pull_request"]["merged_at"] = None
+        self.assertEqual(ready_ids(g, prs=[item]), ["M0-O1"])
+
+    def test_duplicate_close_reason_does_not_finish_and_open_issue_wins(self):
+        g = graph(task("M0-O1", assignee="owner", issue=12), task("M0-01", deps=["M0-O1"]))
+        dup = {"number": 12, "title": "", "state": "closed", "state_reason": "duplicate"}
+        self.assertEqual(ready_ids(g, issues=[dup]), ["M0-O1"])
+        stray = {"number": 50, "title": "[owner] M0-O1: stray", "state": "closed", "state_reason": "completed"}
+        opened = {"number": 12, "title": "", "state": "open"}
+        self.assertEqual(ready_ids(g, issues=[opened, stray]), ["M0-O1"])
 
     def test_duplicate_title_issues_are_order_independent(self):
         g = graph(task("M0-O2", assignee="owner"), task("M0-01", deps=["M0-O2"]))

@@ -11,7 +11,7 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 | Role | Model / effort | Lifetime | Writes to | Never |
 |---|---|---|---|---|
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
-| **Orchestrator** | Sonnet / low | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo issues, scheduled tasks, session tags | Commits, pushes, edits files, reviews code, reads full transcripts, merges, applies `big-pr` without the owner's say-so |
+| **Orchestrator** | Sonnet / low | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo issues, draft PRs, Dependabot PR closes, scheduled tasks, session tags | Commits, pushes, edits files, reviews code, reads full transcripts, merges, applies `big-pr` without the owner's say-so |
 | **Implementer** | Sonnet / medium (high on escalation or `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR | Pushes to `main` or to any branch it was not assigned |
 | **Reviewer** | Opus / high (max for `risk:high`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
@@ -29,12 +29,13 @@ The orchestrator runs **unattended until usage limits stop it**. There is no spe
 * start workers for tasks the ready query lists (§4.3) and run review rounds (max 4 per batch, §6.2);
 * keep the state issue and the metrics comments current;
 * open draft PRs;
-* close Dependabot PRs once the default branch has changed (§9, F6);
+* close Dependabot PRs once the default branch has changed (their base is no longer valid, §9 F6);
 * create issues for owner-only tasks (§4.5).
 
 **It must stop and ask the owner**, one question at a time with a recommendation, for:
 * merges (of any PR);
-* the 4-round cap being hit, or a blocker that is still open after a round;
+* the 4-round cap being hit, or a blocker still open after its fix round (a blocker in two rounds first escalates the
+  implementer to high effort, §7.4; ask the owner only if that does not clear it);
 * `risk:high` work (before starting it);
 * repository settings and visibility (default branch, public/private, branch protection);
 * approval of the M0.5 design (stories, flow, design tokens).
@@ -74,6 +75,15 @@ Rules that follow from the table:
   `handoff/orchestrator.md`. Its handover note is a state-issue comment (§5).
 * When a fact is found to be wrong (e.g. "CI has never run" while check runs exist),
   correct it at its canonical location in the same wake, and log the correction.
+
+### 2.0 Test-first rule (relayed from the owner; owner to confirm)
+
+Every change is preceded by tests where possible: write the failing test, see it fail, change the code, see it pass.
+Show this in commit order and messages (test commit first, or test and fix in one commit with the red run noted).
+It covers tooling as much as app code: hooks, guards, scripts, CI checks and `tasks.py`. Every tool has automated
+tests that run in `verify.sh` and CI, including **negative cases** (the tool must fail on a bad input). Reviewers flag
+code changes that lack tests (severity at least `major`). Implementer prompt wording for the tooling
+session: task M0-10 notes in `docs/tasks.toml`.
 
 ### 2.1 Session tags
 
@@ -197,14 +207,15 @@ python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T
   owner task finished on GitHub), no running session claims it, and it is not awaiting review.
 * **Two pick lists, nothing else:** `ready` is where implementer work comes from. `review` (same flags) lists
   tasks that are committed on a branch and awaiting review or merge (the `--in-review` ids); each
-  review round (§7.2) is started from it. A task leaves `--in-review` when its status-sync commit sets it
-  `done` (§4.4) or its PR is merged. A claim hides a task from both lists while a session works on it.
+  review round (§7.2) is started from it. A task leaves `--in-review` **only once the tasks ref says `done`**
+  (§4.4), never merely because its PR merged, so finished work can't turn `ready` again. A claim hides a task from both lists while a session works on it.
 * An owner task counts as finished when its `issue` is closed **as completed**, when an issue titled
   `[owner] <id>: …` is closed as completed (and none with that title is still open), or when its `pr` is merged
   (merge tasks such as M0-O7). An issue closed **as not planned** does not finish it: `drift` reports it and the
   owner decides (drop the task or reopen). Agent tasks finish **only** through `status = "done"` in the file.
 * Search returns at most 1000 items; `--paginate` fetches them all up to that. Past 1000 issues or merged PRs, switch to
-  `gh api repos/bondo/listicles2/issues --paginate --slurp -f state=all` (and the pulls endpoint).
+  `gh api -X GET repos/bondo/listicles2/issues --paginate --slurp -f state=all` (it returns PRs too: drop items that have a
+  `pull_request` key from the issues file) and the `pulls` endpoint for merged PRs.
 * The search API can lag by a minute or so. If a result contradicts something you just did, run the query again.
 * The script runs from the tasks ref, not from the working tree, so every session gets the same answer.
 
@@ -215,7 +226,7 @@ python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T
 | Add tasks | Planner (per milestone), process PRs | In the same PR as `docs/milestones/Mx.md`. New work found mid-flight (a deferred finding, say) is added by the PR that finds it, or noted in the state issue under "pending task additions" for the next PR |
 | Claim (start) | Orchestrator | Add the task id to the worker's row in the Sessions table, then spawn. Release the claim when the worker ends |
 | Delivered, awaiting review or merge | Orchestrator | When a worker's result reports commits for a task, move its id from the Sessions claim to the Branches table's `Tasks awaiting review/merge`. It then shows in `review`, not in `ready`, so a cold successor can't re-spawn finished work |
-| `todo` → `done` (agent task) | The implementer, in the PR that delivers it, **on the tasks ref** | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. When the PR's branch is not the tasks ref (PR #1 before M0-O8), a **status-sync commit** on the tasks ref sets `done` for its finished tasks once their batch review has finished. The next implementer or process session on the tasks-ref branch makes it (M0-10 for the first one), and it changes no other file |
+| `todo` → `done` (agent task) | The implementer, in the PR that delivers it, **on the tasks ref** | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. When the PR's branch is not the tasks ref (PR #1 before M0-O8), a **status-sync commit** on the tasks ref sets `done` for its finished tasks once their batch review has finished. The next implementer or process session on the tasks-ref branch makes it (M0-10 is the first one; it does not wait for the sync), and it changes no other file |
 | Owner task finished | Owner | Close the issue (or merge the PR). This takes effect at once through `--issues`/`--prs`. The next PR that touches the file sets `status = "done"`; `drift` lists what is outstanding |
 | `dropped` | Owner decision, recorded by the next PR | Add `notes` with the reason and a link to the decision comment |
 | Edits to ids or dependencies | Planner or process PR | Ids are never reused or renumbered |
@@ -274,14 +285,15 @@ successor takes them over only after the outgoing one has released them.
 2. Refresh every running worker's status (`get_session`). Record cost for idle workers.
 3. Rewrite the state body from the template. Every field in §3.1 must be filled, and `Next:` must be concrete.
 4. Post a `handover` log comment: what changed since the last handover, open questions, anything
-   you suspect is stale, the id of every trigger you hold (`list_triggers`) with its purpose, and every PR you are subscribed to.
+   you suspect is stale, the id of every trigger **this session created** (`list_triggers`, only those whose `persistent_session_id` is you or that
+   you recorded in the body; never a trigger that spawns worker sessions) with its purpose, and every PR you are subscribed to.
 5. Spawn the successor with the bootstrap prompt (§8.1), unless lineage depth is ≥ 6 (§9, F3).
    In that case, ask the owner to start it from the app with the same prompt.
 6. Keep working as orchestrator, and keep your own check-in, until the successor's `handover-ack` comment
    appears (look every 5 minutes with `send_later`). No ack after 30 minutes: the successor failed. Log
    a `dead-session` incident, spawn one more, and if that fails too, stop and ask the owner (§1.1 stop condition).
-7. On the ack: `delete_trigger` every trigger you hold **except** the ones the ack lists as the successor's.
-   (Triggers you hold are listed in your own handover comment; the ack lists the successor's replacements.)
+7. On the ack: `delete_trigger` each trigger listed in your own handover comment (and nothing else on the account).
+   The ack lists the successor's replacements.
    Then `unsubscribe_pr_activity` on every PR, set the body's `Orchestrator:` line to
    `handover to {successor} at {UTC}, released`, and post `handover-released`.
 8. Stop. Don't spawn, edit the body or message workers after that. The owner archives you.
@@ -301,10 +313,17 @@ successor takes them over only after the outgoing one has released them.
 5. When `handover-released` appears (check every 5 minutes with `send_later`): subscribe to the PRs, read each PR's
    comments since the predecessor's last check for anything the gap missed, set `Orchestrator:` to yourself (with
    predecessor and depth), update `Updated:` and continue from `Next:`.
+   If you won the lock by a `takeover` (§5.3) there is no release to wait for: do this step at once.
+   If no `handover-released` appears within 30 minutes of your ack, run the dead-or-alive check of §5.3 on the predecessor.
 6. Child-session failure events go to the session that **spawned** a worker, so a predecessor's
    workers will not wake you. Schedule a check-in (`send_later`) for each one that is still running.
 
 ### 5.3 Lease, arbitration and recovery
+
+**Lock check on every wake (all orchestrators, first thing).** Read the state comments since your own last `Updated:`.
+If a `takeover` or `handover-ack` names another session and you did not hand over to it, you have lost the lock
+(a revived holder after a usage limit, say): post `lock-lost`, `delete_trigger` the triggers you created, don't edit the
+body, spawn or message workers, and stop. This is what stops a presumed-dead holder from waking up next to its taker.
 
 The `Orchestrator:` line is a **lease**, not a lock. The holder renews it on every wake by updating
 `Updated:`, so a live holder's line is never older than about 45 minutes (one check-in) plus slack.

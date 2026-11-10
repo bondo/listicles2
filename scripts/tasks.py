@@ -18,7 +18,7 @@ Usage:
 --issues: JSON from GitHub issue list or search: an array of {"number", "title", "state", "state_reason"},
           {"items": [...]}, an array of such pages (gh api --paginate --slurp), or JSON lines.
           An issue closed with state_reason "not_planned" does NOT finish an owner task.
---prs:    same shapes, items {"number", "state", "merged"} or {"number", "merged_at"}.
+--prs:    same shapes, items {"number", "state", "merged"} or {"number", "merged_at"} or a search item with pull_request.merged_at.
 --claimed: comma-separated task ids held by running sessions (the state issue's Sessions table).
 --in-review: comma-separated task ids committed on a branch and awaiting review or merge
           (the state issue's Branches table). They are not ready, and `review` lists them.
@@ -164,6 +164,12 @@ def parse(text: str) -> Graph:
         if t.status != "done" or t.assignee == "owner":
             continue
         for d in t.depends_on:
+            if d.startswith(MILESTONE_DEP):
+                for x in tasks:
+                    if x.milestone == d[len(MILESTONE_DEP):] and x.assignee != "owner" and x.status == "todo":
+                        errors.append(f"{t.id}: status done but depends on {d}, where {x.id} is still todo")
+                        break
+                continue
             dep = by_id.get(d)
             if dep is not None and dep.assignee != "owner" and dep.status == "todo":
                 errors.append(f"{t.id}: status done but depends on {d}, which is still todo")
@@ -217,8 +223,9 @@ def find_cycle(graph: Graph) -> list[str] | None:
 def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict, dict, set[int]]:
     """Return (issue number -> issue state, owner task id from title -> issue state, merged PR numbers).
 
-    Issue state is "open", "completed" or "not_planned". Several issues titled for one task id are
-    combined independent of their order: any open one wins, then any completed one.
+    Issue state is "open", "completed" or "not_planned" (any close reason other than completed). Several
+    issues titled for one task id are combined independent of their order: any open one wins, then any
+    completed one.
     """
     by_number: dict[int, str] = {}
     by_title: dict[str, str] = {}
@@ -226,8 +233,8 @@ def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict
     for it in issues or []:
         if str(it.get("state", "")).lower() != "closed":
             st = "open"
-        elif str(it.get("state_reason") or "").lower() == "not_planned":
-            st = "not_planned"
+        elif str(it.get("state_reason") or "completed").lower() != "completed":
+            st = "not_planned"  # not_planned, duplicate, ...: closed without the work being done
         else:
             st = "completed"
         by_number[int(it["number"])] = st
@@ -237,14 +244,15 @@ def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict
     merged = {
         int(p["number"]) for p in prs or []
         if p.get("merged") is True or p.get("merged_at") or str(p.get("state", "")).lower() == "merged"
+        or (p.get("pull_request") or {}).get("merged_at")  # search/issues item shape
     }
     return by_number, by_title, merged
 
 
 def owner_issue_state(t: Task, by_number: dict, by_title: dict) -> str | None:
-    """Combined GitHub state of a task's issues (linked by number or by title): completed > open > not_planned."""
+    """Combined GitHub state of a task's issues (linked by number or by title): open > completed > not_planned."""
     states = {s for s in (by_number.get(t.issue) if t.issue is not None else None, by_title.get(t.id)) if s}
-    for st in ("completed", "open", "not_planned"):
+    for st in ("open", "completed", "not_planned"):
         if st in states:
             return st
     return None

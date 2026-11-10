@@ -120,7 +120,7 @@ milestone = "M0"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0-05"]
+depends_on = []
 pr = 16
 notes = """Tooling session (LISTICLES_TASK=tooling; process files are hook-protected), on the PR #16 branch. Needed changes: \
 (1) REVIEW.md:70 and the round-cap line in the root CLAUDE.md (:40): the 4-round cap is per batch (a one-batch PR: per PR), see ORCHESTRATION 6.2; \
@@ -130,7 +130,13 @@ and may test only in a throwaway branch or worktree that is never pushed to the 
 the 45-minute check-in and the handover and takeover protocol (5); agents/prompts/implementer.md: done-status goes on the tasks ref only (4.4); \
 (4) CI: run `python3 -I scripts/test_tasks.py` and `python3 -I scripts/tasks.py validate`, and add both to scripts/verify.sh; \
 (5) CODEOWNERS: docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py; \
-(6) handoff/TEMPLATE.md: refer to owner to-dos by issue number, never restate them"""
+(6) handoff/TEMPLATE.md: refer to owner to-dos by issue number, never restate them; \
+(7) test-first for tooling too (ORCHESTRATION 2.0, relayed by a peer session, owner to confirm): implementer prompt says write the failing test first, \
+reviewer prompt flags code changes lacking tests; every hook, guard, script and CI check gets automated tests in verify.sh and CI, with negative cases; \
+(8) hook false positives: the PreToolUse guard blocks harmless commands that merely mention a protected path or contain the word git inside a heredoc \
+or quoted string (seen: python heredocs naming the root instructions file or the hooks dir, and "could not parse this git command"); fix it with a test for each \
+blocked-but-harmless case and each allowed-but-harmful case; \
+(9) also do the first status-sync commit (ORCHESTRATION 4.4): set done for the PR #1 tasks whose batch review has finished"""
 
 [[task]]
 id = "M0-O1"
