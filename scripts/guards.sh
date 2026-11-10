@@ -41,11 +41,14 @@ if git rev-parse --verify -q "$BASE" >/dev/null; then
   if [ "${GOLDEN_UPDATE:-0}" != 1 ] && git diff --name-only "$MB" HEAD | grep -E '(^|/)(screenshots|golden)/.*\.png$|/roborazzi/.*\.png$' | grep -q .; then
     bad "screenshot references changed without the golden-update label"
   fi
-  # Diff size outside generated files.
-  n=$(git diff --numstat "$MB" HEAD -- . ':!docs' ':!handoff' ':!*.lock' ':!gradle/wrapper' ':!gradlew' ':!gradlew.bat' ':!*/package-lock.json' ':!*.png' ':!*.jar' \
-      | awk '$1 != "-" {s += $1 + $2} END {print s + 0}')
-  max="${GUARD_MAX_DIFF:-600}"
-  [ "$n" -gt "$max" ] && bad "diff is $n changed lines (limit $max, excluding docs); split the PR"
+  # Diff size outside generated files. Enforced in CI only (locally it would block every commit of a big PR).
+  # A PR that needs more sets GUARD_MAX_DIFF via the owner-approved `big-pr` label.
+  if [ "${CI:-}" = true ]; then
+    n=$(git diff --numstat "$MB" HEAD -- . ':!docs' ':!handoff' ':!*.lock' ':!gradle/wrapper' ':!gradlew' ':!gradlew.bat' \
+        ':!*package-lock.json' ':!*.png' ':!*.jar' | awk '$1 != "-" {s += $1 + $2} END {print s + 0}')
+    max="${GUARD_MAX_DIFF:-600}"
+    [ "$n" -gt "$max" ] && bad "diff is $n changed lines (limit $max, excluding docs); split the PR"
+  fi
 else
   echo "guard: note: base '$BASE' not found, skipped diff-based checks"
 fi

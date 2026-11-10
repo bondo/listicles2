@@ -1,0 +1,14 @@
+{
+  "name": "listicles-firebase",
+  "private": true,
+  "description": "Firestore rules and emulator tests",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-listicles \"jest --runInBand\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.0",
+    "firebase": "12.6.0",
+    "firebase-tools": "15.0.0",
+    "jest": "30.2.0"
+  }
+}
