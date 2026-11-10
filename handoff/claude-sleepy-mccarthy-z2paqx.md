@@ -80,3 +80,8 @@ Next: start a session with LISTICLES_TASK=tooling, fix R9-01..R9-10 with tests (
 - Reviewer subagents never edit code/docs or push to the PR branch; report only (severity, file:line, recommendation). They may use a
   throwaway branch/worktree, never pushed to the PR branch and deleted afterwards. Put this in REVIEW.md and agents/prompts/reviewer.md.
 - Test-first for every code change where possible (failing test first). Mention it in CLAUDE.md and REVIEW.md; reviewers flag code changes without tests.
+- Relayed clarification: test-first also covers tooling (hooks, guards, scripts, CI checks, metrics/status). Every tool needs automated tests
+  wired into verify.sh/CI, including negative cases; reviewers flag untested tooling. Reflect in CLAUDE.md and REVIEW.md.
+  Known untested tooling today: scripts/guards.sh (my gate proofs were ad hoc scratch scripts, not committed), scripts/verify.sh,
+  and the statusline is only tested with a hand-written JSON shape (R9-04). Turn the gate proofs (and the qualified-@Disabled case, R9-10)
+  into a committed guards test suite.
