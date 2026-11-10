@@ -61,42 +61,53 @@ are combined, so a later change to the normalization rules can't break existing 
 ### 3.1 Security rules (no Cloud Functions, so everything is enforced here)
 
 Every rule below gets at least one allow test and one deny test in the emulator.
+Notation: `get`/`exists` see the state **before** a batch, `getAfter`/`existsAfter`
+see it **after**. `M(x)` means `exists(/households/$(hid)/members/$(x))`.
 
-* **Read/write household data** only if `households/{hid}/members/{request.auth.uid}` exists.
-* **Create a household**: one batched write creating `households/{hid}` with
-  `createdBy == uid` and `members/{uid}` with `role == owner`. The member rule checks
-  `getAfter(household).data.createdBy == uid`, so nobody can create an owner record
-  for a household they didn't create in the same batch.
-* **Create an invite**: only a member of `householdId`; `createdBy == uid`;
-  `createdAt == request.time`; `expiresAt <= request.time + 7d`; code is at least 16
-  characters (the client generates 16+ random characters from a 32-symbol
-  alphabet, about 80 bits). **No updates.** `get` is allowed for signed-in users who know
-  the code; `list` is denied, so codes can't be enumerated.
-* **Join**: in one batch, create `members/{uid}` with `role == member`,
-  `joinedAt == request.time`, `viaInvite == code`, where the invite exists, points at
-  `hid` and hasn't expired, **and** delete `invites/{code}` (checked with
-  `getAfter` / `existsAfter`). That makes links single use.
-* **Revoke an invite**: its creator or the owner deletes it.
-* **Leave**: a member deletes their own member doc. The owner can't leave without
-  transferring ownership first, unless they are the last member, in which case
-  they delete the household (see below).
-* **Remove a member / transfer ownership**: owner only. Transfer is a batch that sets
-  the new owner and demotes the old one.
-* **No self-promotion**: members can update only `displayName` on their own member doc.
-* **Field validation** on every write: types, string lengths, allowed enum values, rule
-  invariants (`amount >= 0`, `perNights >= 1`, `min <= max`, `nights >= 1`,
-  `travellers >= 1`), `updatedBy == request.auth.uid`, `updatedAt == request.time`,
-  and `createdAt` can't change.
-* **Deletion**: Firestore doesn't delete subcollections automatically, so the client
-  deletes in pages (items, then lists, then members, then the household). The rules
-  allow the owner to do this.
-* **Account deletion** (required by Google Play): in-app "Delete my account" leaves the
-  household (or deletes it if this is the last member), deletes `users/{uid}`, then
-  deletes the Firebase Auth user.
-* **Expired invites**: a member's app deletes its household's expired invites when it
-  opens the household screen. TTL policies are not relied on.
-* **App Check** (Play Integrity, free) is turned on before the first release, as extra
-  protection against scripted abuse.
+**Reads**: members (`M(uid)`) can read the household doc and everything under it.
+`users/{uid}` can be read and written only by that user, and holds nothing but
+`householdId`.
+
+**Writes**, path by path:
+
+| Path / action | Allowed when |
+|---|---|
+| Create household + owner (one batch) | `!exists(household)` (it is new) **and** `getAfter(household).createdBy == uid` **and** the member doc has `role == owner`. Because of `!exists`, a former creator can't make themselves owner again later. |
+| Create invite `invites/{code}` | `M(uid)` of `householdId`; `createdBy == uid`; `createdAt == request.time`; `expiresAt <= request.time + duration.value(7, 'd')`; `code.size() >= 16`. No updates. |
+| Read one invite (`get`) | Any signed-in user (they need the code). |
+| Query invites (`list`) | Only queries filtered on `householdId == hid` where `M(uid)`, so members can see and revoke their household's invites. Nobody can enumerate other codes. |
+| Delete invite | Its creator or the owner (revoke); **any member** once `expiresAt < request.time` (cleanup); the joiner in the join batch (below). |
+| Join (one batch) | Create `members/{uid}` with `role == member`, `joinedAt == request.time`, `viaInvite == code`, where: `!M(uid)` before the batch; the invite exists, points at `hid` and hasn't expired; and the invite's creator is **still a member** (`M(invite.createdBy)`). Also delete `invites/{code}`. That delete is allowed only if `!M(uid) && getAfter(member).viaInvite == code`, so an existing member can't burn someone else's invite. Single use follows from the delete. |
+| Update own member doc | Only `displayName` may change. |
+| Leave | A member (not the owner) deletes their own member doc. The client also deletes that member's invites in the same batch. |
+| Remove member | Owner only, target `role == member`. The same batch deletes the removed member's open invites, so they can't rejoin with a code they made. |
+| Transfer ownership (one batch) | The caller is the owner; `getAfter(caller).role == member` **and** `getAfter(target).role == owner`; the target was a member before. Exactly one owner before and after. |
+| Lists and items | `M(uid)` plus field validation (below). |
+| Delete household | Owner only. Client order: items → lists → invites → other members → **one final batch** that deletes the household and the owner's own member doc. The owner may delete their own member doc only when `!existsAfter(household)`. |
+
+Rules can't count members, so "the owner can't leave while others remain" is
+enforced by the rule shapes above: the owner's member doc can only be deleted
+together with the household, so the owner must transfer ownership first.
+
+**Field validation** on every write:
+* types, string lengths and allowed enum values;
+* rule invariants: `amount >= 0`, `extra >= 0`, `1 <= perNights <= 365`,
+  `min <= max`, `1 <= nights <= 365`, `1 <= travellers <= 50`;
+* `updatedBy == request.auth.uid` and `updatedAt == request.time`;
+* `createdAt` can't change.
+
+**Account deletion** (required by Google Play): in-app "Delete my account". A member
+leaves; an owner with other members must transfer ownership first, and the UI
+guides them; a last member deletes the household. Then the app deletes
+`users/{uid}` and the Auth user. If Firebase demands a recent sign-in
+(`FirebaseAuthRecentLoginRequiredException`), the app asks the user to sign in
+again first.
+
+**Expired invites**: a member's app queries its household's invites when the household
+screen opens and deletes the expired ones. TTL policies are not relied on.
+
+**App Check** (Play Integrity, free) is turned on before the first release, as extra
+protection against scripted abuse.
 
 ### 3.2 Sync semantics
 
@@ -125,20 +136,27 @@ Every rule below gets at least one allow test and one deny test in the emulator.
 
 All arithmetic uses whole numbers (`Int`/`Long`). No floating point anywhere in the domain.
 
-**Scaling**: `quantityFor(rule, nights)`, where `nights >= 1`:
-* `FIXED`: `amount`
-* `PER_NIGHTS`: `amount * ceilDiv(nights, perNights)`, where
-  `ceilDiv(a, b) = (a + b - 1) / b` (for example 1 per night is
-  `perNights = 1`, and 1 shampoo per 7 nights is `perNights = 7`)
-* then `+ extra`, then clamp to `[min, max]` when set. Overflow is guarded:
-  results are capped at 9,999 and checked with `Math.multiplyExact`.
+**Pipeline** for each item. Every step uses `Math.addExact`/`multiplyExact`, and
+inputs are bounded by validation (`nights <= 365`, `travellers <= 50`, `amount`,
+`extra`, `min`, `max` <= 999):
 
-**Merging**: `combine(templates, nights, travellers): List<TripItem>`.
-1. Scale each item. Items from a `perPerson` template are multiplied by `travellers`.
-2. Within one template, duplicate names are summed: they are the same item, entered twice.
-3. Across templates, group by match key and take the **max**.
-4. Notes and tags are unioned. Source templates are recorded. Output order is
-   deterministic: by first template's `sortKey`, then by name.
+1. **Base**: `FIXED` → `amount`; `PER_NIGHTS` → `amount * ceilDiv(nights, perNights)`,
+   where `ceilDiv(a, b) = (a + b - 1) / b`. For example 1 per night is `perNights = 1`,
+   and 1 shampoo per 7 nights is `perNights = 7`.
+2. `+ extra` (`extra >= 0`).
+3. Clamp to `[min, max]` when set. `min`, `max` and `extra` apply **per person**, because
+   a rule describes what one traveller needs.
+4. If the template is `perPerson`: `× travellers`.
+5. Within one template, duplicate match keys are **summed**: they are the same item,
+   entered twice.
+6. Across templates, group by match key and take the **max**.
+7. Final cap at 9,999. With the input bounds this cap is never hit; it is a safety net,
+   and tests check it.
+
+**Merging**: `combine(templates, nights, travellers): List<TripItem>` applies the pipeline.
+* When keys collide, the display name and `sortKey` come from the template that is first
+  in the user's selection order. Notes and tags are unioned. Source templates are recorded.
+* Output order is deterministic: by first template's `sortKey`, then by name.
 
 **Match key** (`CatalogKey`): Unicode NFC normalization, trim, collapse every Unicode
 whitespace including NBSP, then `lowercase(Locale.ROOT)`. Æ/Ø/Å are kept, so
@@ -150,9 +168,12 @@ and barcode, using the same normalization; tag filter; sort by name, created or 
 Testing:
 * Kotest + JUnit5.
 * **Property-based tests** with Unicode-aware generators (not just ASCII). Invariants:
-  merge is commutative and associative; the result is at least each input; merging
-  a template with itself changes nothing; results never decrease as nights or
-  travellers increase. Scaling is checked against a `BigInteger` reference
+  * quantities don't depend on template order or grouping: combining in any
+    permutation gives the same quantities per key;
+  * each result is at least each input's quantity for that key;
+  * combining a template with itself changes nothing;
+  * results never decrease as nights or travellers increase;
+  * results are never negative and never exceed 9,999. Scaling is checked against a `BigInteger` reference
   implementation.
 * **Mutation testing** (PIT) on `core/domain`, so tests without real assertions
   can't satisfy the coverage gate. The mutation score floor is 85%.
@@ -181,7 +202,14 @@ enforce the rules rather than goodwill.
    * A context-% warning (section 9.3).
 4. **CI (GitHub Actions)**, required checks on `main`:
    * `static`: spotless, detekt, Android Lint (warnings are errors, `MissingTranslation`
-     and `ExtraTranslation` are errors, `HardcodedText` is an error)
+     and `ExtraTranslation` are errors, `HardcodedText` is an error). `targetSdk`
+     follows `compileSdk`; if they differ, `OldTargetApi` is disabled with a
+     `// justified:` comment rather than failing the build silently. Detekt: M0
+     evaluates detekt 2.x, which supports Kotlin 2.4 and type resolution
+     (`detektMain`/`detektTest`). If it isn't stable enough, M0 stays on 1.23
+     without type resolution and records that gap in an ADR.
+   * Danish and English plural strings use `<plurals>`, with a unit test per locale
+     for 0, 1 and many.
    * `unit`: JVM tests + Kover verify + PIT on `core/domain`
    * `firebase`: Firebase emulator (project `demo-listicles`, **no secrets needed**)
      → Jest rules tests + Kotlin data-layer integration tests
