@@ -9,3 +9,12 @@
 /firebase/firestore.rules    @bondo
 **/screenshots/              @bondo
 **/golden/                   @bondo
+**/snapshots/                @bondo
+**/roborazzi/                @bondo
+**/src/*[Tt]est*/**/*.png    @bondo
+/config/                     @bondo
+/.editorconfig               @bondo
+**/lint*.xml                 @bondo
+*.gradle.kts                 @bondo
+/gradle/libs.versions.toml   @bondo
+/firebase/                   @bondo

@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
 
@@ -103,7 +104,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: gitleaks
+      - name: gitleaks (version and checksum pinned; update both by hand)
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar -xz gitleaks
+          f=gitleaks_8.28.0_linux_x64.tar.gz
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/$f" -o "$f"
+          echo "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  $f" | sha256sum -c -
+          tar -xzf "$f" gitleaks
           ./gitleaks detect --source . --redact --no-banner

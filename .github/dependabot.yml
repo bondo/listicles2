@@ -9,6 +9,9 @@ updates:
   - package-ecosystem: npm
     directory: /firebase
     schedule: { interval: weekly }
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }

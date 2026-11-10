@@ -8,6 +8,6 @@ naming:
     ignoreAnnotated: ['Composable']
 style:
   MagicNumber:
-    excludes: ['**/test/**', '**/androidTest/**']
+    excludes: ['**/test/**', '**/androidTest/**']  # justified: test literals are not magic numbers
   UnusedPrivateMember:
     ignoreAnnotated: ['Preview']

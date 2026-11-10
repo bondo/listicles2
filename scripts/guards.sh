@@ -18,27 +18,36 @@ EXCL=(':!docs' ':!handoff' ':!*.md' ':!scripts/guards.sh' ':!*package-lock.json'
   ':!gradle/wrapper' ':!gradlew' ':!gradlew.bat' ':!**/node_modules/**' ':!**/build/**')
 GREP=(git grep -nHI -E)
 [ "$STAGED" = 1 ] && GREP=(git grep --cached -nHI -E)
+# Runs git grep; a real error (rc>1, e.g. bad regex) fails the guard instead of looking like "no match".
+gg() {
+  local o rc
+  o=$("${GREP[@]}" "$@"); rc=$?
+  [ "$rc" -gt 1 ] && { echo "guard: internal error in git grep (rc=$rc)" >&2; fail=1; }
+  printf '%s' "$o"
+}
+TESTSRC=('*/src/*[Tt]est*/*.kt' '*/src/*[Tt]est*/*.js' '*/src/*[Tt]est*/*.ts' 'firebase/test/*')
 
-# 1. Disabled or focused tests.
-out=$("${GREP[@]}" '@([A-Za-z]+\.)*Ignored?\b|@Disabled[A-Za-z]*|@EnabledIf|\bx(it|test|describe|context|should|[A-Z][A-Za-z]*)\(|enabled *= *false|\.(only|skip)\(|\bfit\(' -- "${EXCL[@]}")
+# 1. Disabled or focused tests (anywhere), and test-only forms (test sources only, so production code may use enabled = false).
+out=$(gg '@([A-Za-z]+\.)*Ignored?\b|@Disabled[A-Za-z]*|@Enabled(If|On)[A-Za-z]*|\.(only|skip)\(' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled test: /'; fail=1; }
-out=$("${GREP[@]}" '"(!|f:)[A-Za-z]' -- '*/src/*[Tt]est*/*.kt' '*/src/*[Tt]est*/*.js')
-[ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled or focused test name: /'; fail=1; }
+out=$(gg 'enabled(If|OrReasonIf)? *[=(]|\bx(it|test|describe|context|should|expect|when|then|given|feature|scenario|and|[A-Z][A-Za-z]*)\(|\bfit\(|assume(True|False)\(|"(!|f:)[A-Za-z]|passWithNoTests|testPathIgnorePatterns' -- "${TESTSRC[@]}" "${EXCL[@]}")
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled or focused test: /'; fail=1; }
 
 # 2. Suppressions and weakened settings need "justified: <reason>" on the same line.
-PAT='Suppress\(|tools:ignore|ktlint-disable|detekt:|lint\.disable|noinspection|disable *\+?=|disable\.add|disable\(|'
-PAT+='ktlint_[A-Za-z0-9_-]+ *= *disabled|ij_[a-z_]*ktlint[a-z_]*|(informational|warning|ignore) *\+?= *["(s]|'
-PAT+='severity *[=:] *"?(ignore|informational|info)|warningsAsErrors *[=:] *false|ignoreWarnings|ignoreFailures *= *true|'
-PAT+='abortOnError *= *false|checkReleaseBuilds *= *false|maxIssues: *[1-9]|active: *false'
-out=$("${GREP[@]}" "$PAT" -- "${EXCL[@]}" | grep -vE 'justified:[[:space:]]*[^[:space:]*/]')
+PAT='Suppress[A-Za-z]*\(|tools:ignore|ktlint-disable|detekt:|lint\.disable|noinspection|disable *\+?=|disable\.add|disable\(|'
+PAT+='ktlint_[A-Za-z0-9_-]+ *= *disabled|to *"disabled"|ij_[a-z_]*ktlint[a-z_]*|(informational|warning|ignore) *\+?= *["(s]|'
+PAT+='severity *[=:] *["'"'"']?(ignore|informational|info)|warningsAsErrors *[=:] *false|ignoreWarnings|ignoreFailures *= *true|'
+PAT+='abortOnError *= *false|checkReleaseBuilds *= *false|maxIssues: *[1-9]|active: *false|excludes:|checkOnly|ignoreTestSources|'
+PAT+='disableDefaultRuleSets|<ignore |failOnNoDiscoveredTests *= *false'
+out=$(gg "$PAT" -- "${EXCL[@]}" | grep -vE 'justified:[[:space:]]*[^[:space:]*/]')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
 
-# 3. Baselines, by name, by wiring and by content.
+# 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
 LS=(git ls-files)
 [ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AM)
-out=$("${LS[@]}" | grep -E '(^|/)[^/]*baseline[^/]*\.xml$')
+out=$("${LS[@]}" | grep -iE 'baseline')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline file: /'; fail=1; }
-out=$("${GREP[@]}" 'baseline *[=(]|<SmellBaseline>|<issues format=' -- '*.kts' '*.gradle' '*.xml' '*.yml' | grep -v 'justified:')
+out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline wiring: /'; fail=1; }
 
 if [ "$STAGED" = 0 ]; then
@@ -54,9 +63,10 @@ if [ "$STAGED" = 0 ]; then
     git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
+      /^diff --git/ { file = $3; next }
       /^(---|\+\+\+)/ { next }
       /(minBound|mutationThreshold|threshold|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
-        l = norm($0); key = l; gsub(/[0-9]+/, "N", key)
+        l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key)
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = num(l) } else { add[key] = l; addn[key] = num(l) }
       }
       END {
