@@ -18,3 +18,4 @@
 *.gradle.kts                 @bondo
 /gradle/libs.versions.toml   @bondo
 /firebase/                   @bondo
+/gradle.properties           @bondo

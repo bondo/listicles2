@@ -19,19 +19,25 @@ EXCL=(':!docs' ':!handoff' ':!*.md' ':!scripts/guards.sh' ':!*package-lock.json'
 GREP=(git grep -nHI -E)
 [ "$STAGED" = 1 ] && GREP=(git grep --cached -nHI -E)
 # Runs git grep; a real error (rc>1, e.g. bad regex) fails the guard instead of looking like "no match".
+ERRF=$(mktemp); trap 'rm -f "$ERRF"' EXIT
 gg() {
   local o rc
   o=$("${GREP[@]}" "$@"); rc=$?
-  [ "$rc" -gt 1 ] && { echo "guard: internal error in git grep (rc=$rc)" >&2; fail=1; }
+  # Marker file, because callers run gg in a subshell where fail=1 would be lost.
+  [ "$rc" -gt 1 ] && echo "guard: internal error in git grep (rc=$rc)" | tee -a "$ERRF" >&2
   printf '%s' "$o"
 }
 TESTSRC=('*/src/*[Tt]est*/*.kt' '*/src/*[Tt]est*/*.js' '*/src/*[Tt]est*/*.ts' 'firebase/test/*')
+CFGSRC=('*.gradle.kts' '*.gradle' '*package.json' '*jest.config.*' '*.properties' '*/src/*[Tt]est*/resources/*')
 
 # 1. Disabled or focused tests (anywhere), and test-only forms (test sources only, so production code may use enabled = false).
 out=$(gg '@([A-Za-z]+\.)*Ignored?\b|@Disabled[A-Za-z]*|@Enabled(If|On)[A-Za-z]*|\.(only|skip)\(' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled test: /'; fail=1; }
 out=$(gg 'enabled(If|OrReasonIf)? *[=(]|\bx(it|test|describe|context|should|expect|when|then|given|feature|scenario|and|[A-Z][A-Za-z]*)\(|\bfit\(|assume(True|False)\(|"(!|f:)[A-Za-z]|passWithNoTests|testPathIgnorePatterns' -- "${TESTSRC[@]}" "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled or focused test: /'; fail=1; }
+
+out=$(gg 'enabled *= *false|excludeTestsMatching|onlyIf *\{ *false|passWithNoTests|testPathIgnorePatterns|testMatch|kotest\.(tags|filter)' -- "${CFGSRC[@]}" "${EXCL[@]}")
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled tests via build config: /'; fail=1; }
 
 # 2. Suppressions and weakened settings need "justified: <reason>" on the same line.
 PAT='Suppress[A-Za-z]*\(|tools:ignore|ktlint-disable|detekt:|lint\.disable|noinspection|disable *\+?=|disable\.add|disable\(|'
@@ -65,7 +71,7 @@ if [ "$STAGED" = 0 ]; then
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
       /^diff --git/ { file = $3; next }
       /^(---|\+\+\+)/ { next }
-      /(minBound|mutationThreshold|threshold|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
+      /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key)
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = num(l) } else { add[key] = l; addn[key] = num(l) }
       }
@@ -92,5 +98,6 @@ if [ "$STAGED" = 0 ]; then
   fi
 fi
 
+[ -s "$ERRF" ] && fail=1
 [ "$fail" = 0 ] && echo "guards: ok"
 exit "$fail"

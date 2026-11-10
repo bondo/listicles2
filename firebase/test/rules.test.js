@@ -4,7 +4,6 @@ const {
   initializeTestEnvironment,
   assertFails,
 } = require("@firebase/rules-unit-testing");
-const { doc, getDoc, setDoc } = require("firebase/firestore");
 
 let env;
 
@@ -29,7 +28,10 @@ const {
   addDoc,
   collection,
   deleteDoc,
+  doc,
+  getDoc,
   getDocs,
+  setDoc,
   updateDoc,
 } = require("firebase/firestore");
 
