@@ -312,8 +312,8 @@ enforce the rules rather than goodwill.
 | **CI triage** (subagent) | Haiku / low | Subagent inside an implementer | Failing job log | The failing test or rule and the minimal error |
 
 Escalation rules (written down so agents don't decide on their own):
-* An implementer that fails `verify.sh` 3 times on the same error, or gets 2 review
-  rounds with blockers, hands off to a fresh implementer at **high** effort.
+* An implementer that fails `verify.sh` 3 times on the same error, or gets blockers in 2
+  consecutive review rounds, hands off to a fresh implementer at **high** effort.
 * Security rules, sync and merge logic, and the release workflow are tagged `risk:high`
   in `Mx.md`. Their implementers run at high effort, and their review runs at max effort.
 * De-escalation (lower effort or a cheaper model for a role) happens only through the

@@ -28,7 +28,7 @@ The orchestrator runs **unattended until usage limits stop it**. There is no spe
 **Without asking**, it may:
 * start workers for tasks the ready query lists (§4.3) and run review rounds (max 4 per batch, §6.2);
 * keep the state issue and the metrics comments current;
-* open draft PRs;
+* open draft PRs, and spawn fix rounds, escalation respawns and status-sync sessions (§7.1);
 * close Dependabot PRs once the default branch has changed (their base is no longer valid, §9 F6);
 * create issues for owner-only tasks (§4.5).
 
@@ -226,7 +226,7 @@ python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T
 | Add tasks | Planner (per milestone), process PRs | In the same PR as `docs/milestones/Mx.md`. New work found mid-flight (a deferred finding, say) is added by the PR that finds it, or noted in the state issue under "pending task additions" for the next PR |
 | Claim (start) | Orchestrator | Add the task id to the worker's row in the Sessions table, then spawn. Release the claim when the worker ends |
 | Delivered, awaiting review or merge | Orchestrator | When a worker's result reports commits for a task, move its id from the Sessions claim to the Branches table's `Tasks awaiting review/merge`. It then shows in `review`, not in `ready`, so a cold successor can't re-spawn finished work |
-| `todo` → `done` (agent task) | The implementer, in the PR that delivers it, **on the tasks ref** | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. When the PR's branch is not the tasks ref (PR #1 before M0-O8), a **status-sync commit** on the tasks ref sets `done` for its finished tasks once the commits that deliver them are covered by a review round with verdict `ready_nits_only` (or accepted by the owner). The orchestrator spawns a **one-off status-sync process session** (§8.4) for that, on the tasks-ref branch, holding its branch lock (§7.1); it changes only `docs/tasks.toml`. This is the one kind of work that doesn't come from `ready`. Batches are sliced so a task's dependencies are synced before it starts: batch M0-2 covers M0-04, M0-05, M0-06; M0-07 and M0-08 are batch M0-3 |
+| `todo` → `done` (agent task) | The implementer, in the PR that delivers it, **on the tasks ref** | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. **Exception: tasks whose PR branch is the tasks ref (M0-09, M0-10, M0-11 on PR #16)** are set `done` only by the status-sync session below, after the review; an implementer on them leaves `status = "todo"` (else the task would leave `review` and unblock dependents before review). When the PR's branch is not the tasks ref (PR #1 before M0-O8), a **status-sync commit** on the tasks ref sets `done` for its finished tasks once the batch's latest round has verdict `ready_nits_only` and `reviewed_through` equals the branch head (or the owner accepted it). The orchestrator spawns a **one-off status-sync process session** (§8.4) for that, on the tasks-ref branch, holding its branch lock (§7.1); it changes only `docs/tasks.toml`. A reviewer doesn't flag such a commit for marking other PRs' tasks done. Status-sync is not picked from `ready`. Batches are sliced so a task's dependencies are synced before it starts: batch M0-2 covers M0-04, M0-05, M0-06; M0-07 and M0-08 are batch M0-3 |
 | Owner task finished | Owner | Close the issue (or merge the PR). This takes effect at once through `--issues`/`--prs`. The next PR that touches the file sets `status = "done"`; `drift` lists what is outstanding |
 | `dropped` | Owner decision, recorded by the next PR | Add `notes` with the reason and a link to the decision comment |
 | Edits to ids or dependencies | Planner or process PR | Ids are never reused or renumbered |
@@ -311,7 +311,7 @@ successor takes them over only after the outgoing one has released them.
    Don't subscribe to PRs yet: events go to one session at a time (see 5.1 step 7).
 4. Post `handover-ack`: your session id, the new trigger ids, and the PRs you will subscribe to.
    The ack is a claim on the lock (§5.3 arbitration); it does not change `Orchestrator:` yet.
-5. When `handover-released` appears (check every 5 minutes with `send_later`): subscribe to the PRs, read each PR's
+5. When a `handover-released` that names you appears (check every 5 minutes with `send_later`): subscribe to the PRs, read each PR's
    comments since the predecessor's last check for anything the gap missed, set `Orchestrator:` to yourself (with
    predecessor and depth), update `Updated:` and continue from `Next:`.
    If you won the lock by a `takeover` (§5.3) there is no release to wait for: do this step at once.
@@ -324,8 +324,9 @@ successor takes them over only after the outgoing one has released them.
 
 **Lock check on every wake (all orchestrators, first thing).** Read the state comments since your own last `Updated:`.
 If the body's `Orchestrator:` line doesn't name you **and** a claim that wins arbitration (below) names another
-session, you have lost the lock. A winning claim is the lowest-id claim after the latest `handover`/`handover-released`,
-or a `takeover` posted while your lease was presumed dead (`Updated:` older than 90 minutes). A claim that loses
+session, you have lost the lock. A winning claim is the lowest-id claim after the latest `handover` comment (an ack posted after the matching
+`handover-released` always loses), or a `takeover` posted while your lease was presumed dead (`Updated:` older than
+90 minutes), or a `takeover` that cites an owner `decision` comment. A claim that loses
 arbitration, or an ack for a handover you made, does not cost you the lock. Typical case: a revived holder after a
 usage limit. When you have lost it: post `lock-lost`, `delete_trigger` the triggers you created, don't edit the
 body, spawn or message workers, and stop. This is what stops a presumed-dead holder from waking up next to its taker.
@@ -338,8 +339,8 @@ is not `working` (idle, failed or archived). A holder that is `working` but whos
 **stalled**, not dead.
 
 **Arbitration.** Claims on the lock are comments: `handover-ack` (normal handover) and `takeover`
-(§ below). If two sessions claim after the same `handover` or `handover-released`, the claim with the
-**lowest comment id** wins. The other posts `lock-lost`, deletes the triggers it created, never subscribes,
+(§ below). If two sessions claim after the same `handover`, the claim with the
+**lowest comment id** wins, and a claim posted after the matching `handover-released` loses. The other posts `lock-lost`, deletes the triggers it created, never subscribes,
 and stops. A session that finds a lower-id claim than its own does the same.
 
 | Situation | What to do |
@@ -407,7 +408,8 @@ total cost, incidents. Then refresh the PR description's review table from the r
 ### 7.1 Spawning
 
 * Start only tasks that the ready query (§4.3) lists, in the order it lists them. The exceptions are review rounds
-  (from `review`) and the status-sync sessions of §4.4. Batching several ready
+  (from `review`), fix-round implementers after `changes_requested` (their tasks are in `review`, §7.2), the escalation and
+  failure respawns of §7.4, and the status-sync sessions of §4.4. Batching several ready
   tasks of one PR into one session is fine; claim them all.
 * `create_session` with the spawn message (§8), the tags from §2.1, the model and effort
   from PLAN §9.1, and for writers `outcome_branch` = the branch they hold.
@@ -498,7 +500,7 @@ Follow §1.1 (autonomy: what you may do unasked, what you must ask the owner). P
 Role: agents/prompts/implementer.md. Repo bondo/listicles2, PR #{pr}, batch {batch}.
 Tasks: {task ids with titles} (docs/tasks.toml). Branch: {branch}. You are its only writer.
 Inputs: {Mx.md section / steps}, handoff/{branch_slug}.md if present.
-In the PR that finishes a task, set its status = "done" in docs/tasks.toml. Add any new task
+In the PR that finishes a task, set its status = "done" in docs/tasks.toml (unless your branch is the tasks ref, ORCHESTRATION §4.4: then leave it). Add any new task
 you discover there too, with dependencies.
 Refer to owner work by task id or issue number only.
 Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3): your last message, and a comment on PR #{pr}.
@@ -509,7 +511,7 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3): your last messa
 ```
 Role: agents/prompts/reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}.
 Open findings to re-check: {ids with one line each}. Tasks this PR claims to finish: {task ids}.
-Check that docs/tasks.toml marks exactly those as done.
+Check that docs/tasks.toml marks exactly those as done (not on a PR whose branch is the tasks ref, §4.4; status-sync commits that mark other PRs' tasks are fine).
 You NEVER edit files on, or push to, the PR branch. You only report findings (severity, file:line,
 recommendation). You may reproduce a problem in a throwaway branch or worktree that you never push to the PR
 branch and that you delete afterwards.

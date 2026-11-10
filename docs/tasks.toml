@@ -12,7 +12,7 @@ milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]
 
 # ---------------------------------------------------------------- M0 foundation (two stacked PRs: #1, #16)
 # M0 lands as two stacked PRs: #1 (foundation, M0-01..M0-08) merges first, then #16 (process:
-# M0-09, M0-10) is retargeted to main and merged (owner decision, M0-O5). This file lives ONLY on
+# M0-09, M0-10, M0-11) is retargeted to main and merged (owner decision, M0-O5). This file lives ONLY on
 # the tasks ref (docs/ORCHESTRATION.md 4.2): branch claude/orchestration-review until M0-O8, then
 # main. Done-status for PR #1 tasks is set here by a status-sync commit, never on the PR #1 branch.
 
@@ -78,7 +78,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
 pr = 1
-notes = "Batch M0-2"
+notes = "Batch M0-2 (M0-04, M0-05, M0-06)"
 
 [[task]]
 id = "M0-07"
@@ -122,7 +122,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = []
 pr = 16
-notes = """Needs LISTICLES_TASK=tooling (process files are hook-protected), on the PR #16 branch. Test-first, with negative cases (ORCHESTRATION 2.0). \
+notes = """Needs LISTICLES_TASK=tooling (process files are hook-protected), on the PR #16 branch. Leave status = todo: done is set by the status-sync session after review (ORCHESTRATION 4.4). Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
 (1) CI and scripts/verify.sh: run `python3 -I scripts/test_tasks.py` and `python3 -I scripts/tasks.py validate`; \
 (2) CODEOWNERS: docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py"""
 
@@ -135,7 +135,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-04", "M0-05", "M0-10"]
 pr = 16
-notes = """Needs LISTICLES_TASK=tooling. Waits for M0-04 and M0-05 to be done (reviewed and status-synced) so that fixes from their review don't conflict with it in protected files. Test-first with negative cases (ORCHESTRATION 2.0). Needed changes: \
+notes = """Needs LISTICLES_TASK=tooling. Leave status = todo (status-sync sets done after review, ORCHESTRATION 4.4). First merge origin/claude/sleepy-mccarthy-z2paqx into the branch with a merge commit so you edit the current protected files. Waits for M0-04 and M0-05 to be done (reviewed and status-synced) so that fixes from their review don't conflict with it in protected files. Test-first with negative cases (ORCHESTRATION 2.0). Needed changes: \
 (1) REVIEW.md:70 and the round-cap line in the root CLAUDE.md (:40): the 4-round cap is per batch (a one-batch PR: per PR), see ORCHESTRATION 6.2; \
 (2) agents/prompts/reviewer.md: reviewers never edit or push to the PR branch, they only report findings (severity, file:line, recommendation), \
 and may test only in a throwaway branch or worktree that is never pushed to the PR branch and is deleted afterwards; flag code changes lacking tests; \

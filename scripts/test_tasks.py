@@ -200,6 +200,12 @@ class DriftTest(unittest.TestCase):
                   {"number": 50, "title": "[owner] M0-O1: stray", "state": "open"}]
         self.assertIn("linked issues disagree", "\n".join(tasks.drift(g, issues, [])))
 
+    def test_reports_disagreeing_title_linked_issues(self):
+        g = graph(task("M0-O4", assignee="owner"))
+        issues = [{"number": 60, "title": "[owner] M0-O4: a", "state": "closed"},
+                  {"number": 61, "title": "[owner] M0-O4: b", "state": "open"}]
+        self.assertIn("linked issues disagree", "\n".join(tasks.drift(g, issues, [])))
+
     def test_reports_not_planned_close(self):
         g = graph(task("M0-O1", assignee="owner", issue=12))
         issues = [{"number": 12, "title": "", "state": "closed", "state_reason": "not_planned"}]

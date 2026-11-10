@@ -220,7 +220,7 @@ def find_cycle(graph: Graph) -> list[str] | None:
     return None
 
 
-def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict, dict, set[int]]:
+def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict, dict, set[int], dict]:
     """Return (issue number -> issue state, owner task id from title -> issue state, merged PR numbers).
 
     Issue state is "open", "completed" or "not_planned" (any close reason other than completed). Several
@@ -229,6 +229,7 @@ def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict
     """
     by_number: dict[int, str] = {}
     by_title: dict[str, str] = {}
+    title_states: dict[str, set[str]] = {}
     rank = {"open": 0, "completed": 1, "not_planned": 2}
     for it in issues or []:
         if str(it.get("state", "")).lower() != "closed":
@@ -239,6 +240,8 @@ def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict
             st = "completed"
         by_number[int(it["number"])] = st
         m = OWNER_TITLE.match(str(it.get("title", "")))
+        if m:
+            title_states.setdefault(m.group(1), set()).add(st)
         if m and (m.group(1) not in by_title or rank[st] < rank[by_title[m.group(1)]]):
             by_title[m.group(1)] = st
     merged = {
@@ -246,7 +249,7 @@ def load_github(issues: list[dict] | None, prs: list[dict] | None) -> tuple[dict
         if p.get("merged") is True or p.get("merged_at") or str(p.get("state", "")).lower() == "merged"
         or (p.get("pull_request") or {}).get("merged_at")  # search/issues item shape
     }
-    return by_number, by_title, merged
+    return by_number, by_title, merged, title_states
 
 
 def owner_issue_state(t: Task, by_number: dict, by_title: dict) -> str | None:
@@ -260,7 +263,7 @@ def owner_issue_state(t: Task, by_number: dict, by_title: dict) -> str | None:
 
 def derive(graph: Graph, issues=None, prs=None, claimed=(), in_review=()) -> dict[str, dict]:
     """Derived state per task: done | dropped | claimed | in-review | ready | blocked, plus unmet dependencies."""
-    by_number, by_title, merged = load_github(issues, prs)
+    by_number, by_title, merged, _ = load_github(issues, prs)
     claimed, in_review = set(claimed), set(in_review)
 
     def finished(t: Task) -> bool:
@@ -304,11 +307,12 @@ def derive(graph: Graph, issues=None, prs=None, claimed=(), in_review=()) -> dic
 
 
 def drift(graph: Graph, issues=None, prs=None) -> list[str]:
-    by_number, by_title, merged = load_github(issues, prs)
+    by_number, by_title, merged, title_states = load_github(issues, prs)
     msgs: list[str] = []
     for t in graph.tasks:
         st = owner_issue_state(t, by_number, by_title)
-        linked = {x for x in (by_number.get(t.issue) if t.issue is not None else None, by_title.get(t.id)) if x}
+        linked = {by_number[t.issue]} if t.issue in by_number else set()
+        linked |= title_states.get(t.id, set())
         if len(linked) > 1:
             msgs.append(f"{t.id}: linked issues disagree ({', '.join(sorted(linked))}); the task counts as {st}")
         if t.status == "todo" and st == "completed":
