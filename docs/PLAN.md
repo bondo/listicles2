@@ -31,7 +31,7 @@ that combine into scaled trip checklists). Changes sync in real time between mem
 /core/data            Firestore + Auth repositories, mappers, UPC lookup client (Ktor/OkHttp)
 /core/testing         Fakes (in-memory repositories), test fixtures
 /firebase             firestore.rules, firestore.indexes.json, firebase.json, rules tests (Jest)
-/docs                 PLAN.md, ARCHITECTURE.md, ADRs
+/docs                 PLAN.md, ORCHESTRATION.md, ARCHITECTURE.md, ADRs
 /scripts              verify.sh and guard scripts used by CI and git hooks
 REVIEW.md             Review rubric and severity definitions
 CLAUDE.md             Agent instructions: the only commands to run, and the rules
@@ -262,8 +262,9 @@ enforce the rules rather than goodwill.
    `REVIEW.md`: correctness, security rules, test adequacy (do the tests fail when the
    code is wrong?), offline/sync behavior, i18n, accessibility, free-tier cost, and
    every `// justified:` suppression.
-3. Findings are posted as one PR comment containing a JSON block: each finding has a
-   stable ID (`R1-03`), a severity (`blocker | major | minor | nit`), a file and line,
+3. Findings are posted as one PR comment containing a JSON block (format in
+   `docs/ORCHESTRATION.md` §7.2): each finding has a stable ID (`R1-03`; rounds are
+   numbered per PR and never reset per batch), a severity (`blocker | major | minor | nit`), a file and line,
    and a status (`open | fixed | disputed | withdrawn`). This makes the round-over-round
    metrics in section 9.4 possible.
 4. The author fixes everything above nit, or marks it `disputed` with a reason, and pushes.
@@ -303,7 +304,7 @@ enforce the rules rather than goodwill.
 
 | Role | Model / effort | Runs as | Gets | Produces |
 |---|---|---|---|---|
-| **Orchestrator** | Sonnet / low | One long-lived session | `PLAN.md`, `docs/status.md`, child-session summaries | Spawns sessions, updates status, asks the owner for merges and decisions |
+| **Orchestrator** | Sonnet / low | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions; never commits |
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR |
 | **Implementer** | Sonnet / medium | Fresh session per PR | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green |
 | **Reviewer** | Opus / high | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line |
@@ -333,7 +334,8 @@ Role definitions are checked in, so they get reviewed and versioned like code:
 * Reviewers don't re-run the whole suite. They rely on the CI result and only run
   targeted tests when a finding needs proof.
 * The orchestrator never reads child transcripts. It reads only the final summary
-  (fixed format: status, PR link, open items, tokens used).
+  (the `WORKER-RESULT` block, `docs/ORCHESTRATION.md` §7.3); tokens and cost come from
+  `get_session`, not from the worker.
 
 ### 9.3 Context limits and handoff
 
@@ -346,7 +348,8 @@ Role definitions are checked in, so they get reviewed and versioned like code:
   that file as input. `/compact` is only a fallback, e.g. in the middle of a step
   that can't be split.
 * Handoff files are deleted in the PR's final commit. Because merges are squash-only, they never reach `main`'s history.
-* The orchestrator follows the same rule: at about 50% it writes `handoff/orchestrator.md` (milestone, open PRs, waiting-on-owner items) and a fresh orchestrator continues from it.
+* The orchestrator follows the same rule, but it never commits: its state lives in the state issue
+  and it hands over with the checklist in `docs/ORCHESTRATION.md` §5.
 * The threshold warning comes from tooling, not memory: a status-line script plus a
   hook that injects a reminder once 50% is crossed. M0 checks the exact hook
   mechanism against the current Claude Code docs.
@@ -355,8 +358,10 @@ Role definitions are checked in, so they get reviewed and versioned like code:
 
 Each metric must have a data source proven in M0; a metric whose source can't be
 proven is dropped, not guessed. The candidate sources are a SessionEnd hook that
-writes token usage from the transcript to `metrics/sessions/<id>.json`, and the
-reviewer's JSON findings comment.
+writes token usage from the transcript to `metrics/sessions/<id>.json`, the
+reviewer's JSON findings comment, and `get_session` → `external_metadata.usage` (cost and
+tokens per session; confirmed to work on 2026-11-10). Until the script exists, rows are logged on the
+state issue in the format of `docs/ORCHESTRATION.md` §6.
 
 `scripts/agent-metrics` pulls the sessions linked to each PR, using PR or branch
 tags set at spawn time, and appends a row to `docs/agent-metrics.csv`:
