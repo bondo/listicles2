@@ -12,3 +12,5 @@ firestore-debug.log
 app/google-services.json
 *.jks
 *.keystore
+metrics/sessions/
+__pycache__/
