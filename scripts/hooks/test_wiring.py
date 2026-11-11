@@ -83,6 +83,17 @@ class AgentEffort(unittest.TestCase):
         self.assertEqual(set(roles()), {"orchestrator", "planner", "implementer", "reviewer", "explorer", "ci-triage"})
 
 
+class GitEnvImports(unittest.TestCase):
+    def test_every_hook_test_that_runs_git_imports_gitenv_directly(self):
+        """R12-51: protection through another module's import is accidental; discover order must not matter."""
+        d = os.path.join(ROOT, "scripts", "hooks")
+        for name in sorted(os.listdir(d)):
+            if name.startswith("test_") and name.endswith(".py") and name != "test_wiring.py":
+                src = read("scripts", "hooks", name)
+                if re.search(r"""\[\s*["']git["']|"git",|subprocess""", src):
+                    self.assertRegex(src, r"(?m)^import gitenv", name)
+
+
 class OwnerRules(unittest.TestCase):
     """The owner rules must stay written down where agents read them."""
 
@@ -105,7 +116,7 @@ class OwnerRules(unittest.TestCase):
         review = read("REVIEW.md")
         self.has(review, "`deferred`", "every remaining minor is deferred")
         for text in (review, read("docs", "PLAN.md")):  # R10-54: the merge condition must agree with the verdict rule
-            self.has(text, "only nits or deferred minors remain")
+            self.has(text, "only nits or deferred minors remain", "deferred minors do not count")  # R12-53: the round-4 cap
         self.has(read("agents", "prompts", "implementer.md"), "defer")
         self.has(read("docs", "PLAN.md"), "deferred")
 
