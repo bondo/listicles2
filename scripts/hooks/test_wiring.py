@@ -92,6 +92,12 @@ class GitEnvImports(unittest.TestCase):
                 src = read("scripts", "hooks", name)
                 if re.search(r"""\[\s*["']git["']|"git",|subprocess""", src):
                     self.assertRegex(src, r"(?m)^import gitenv", name)
+class DarkThemeUiTest(unittest.TestCase):
+    def test_ui_test_inspects_rendered_pixels_for_both_themes(self):
+        """R9-09: a text-presence assertion passes whatever the theme; the test must read pixels and compare both themes."""
+        src = read("app", "src", "androidTest", "kotlin", "dev", "listicles", "app", "ListiclesAppTest.kt")
+        for needle in ("captureToImage", "luminance", "darkTheme = dark.value", "dark.value = false"):
+            self.assertIn(needle, src)
 
 
 class OwnerRules(unittest.TestCase):
