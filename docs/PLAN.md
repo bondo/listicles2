@@ -20,7 +20,7 @@ that combine into scaled trip checklists). Changes sync in real time between mem
 | i18n | English + Danish; all strings in resources; CI fails on missing translations |
 | AI at runtime | No AI code apart from on-device ML Kit. No LLM or cloud AI calls |
 | Distribution | Signed APK on GitHub Releases on each `v*` tag; Play internal-testing pipeline prepared but turned off until the $25 account exists |
-| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits remain (max 4 rounds, then the owner decides) → the owner squash-merges |
+| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits remain (max 4 rounds per batch, then the owner decides) → the owner squash-merges |
 | Repo | **Public** (unlimited free GitHub Actions minutes). No secrets in the repo; secrets live in GitHub secrets |
 
 ## 2. Repository layout
@@ -263,7 +263,7 @@ enforce the rules rather than goodwill.
    code is wrong?), offline/sync behavior, i18n, accessibility, free-tier cost, and
    every `// justified:` suppression.
 3. Findings are posted as one PR comment containing a JSON block (format in
-   `docs/ORCHESTRATION.md` §7.2): each finding has a stable ID (`R1-03`; rounds are
+   `REVIEW.md`; `docs/ORCHESTRATION.md` §7.2 says how it is used): each finding has a stable ID (`R1-03`; rounds are
    numbered per PR and never reset per batch), a severity (`blocker | major | minor | nit`), a file and line,
    and a status (`open | fixed | disputed | withdrawn`). This makes the round-over-round
    metrics in section 9.4 possible.
@@ -272,7 +272,7 @@ enforce the rules rather than goodwill.
    last round, the open findings, and `REVIEW.md`. It re-checks open findings and reviews
    the new code. It doesn't re-review unchanged code, so the loop converges.
 6. When only nits remain, the reviewer posts "ready (nits only)" and you squash-merge.
-   If round 4 still has findings above nit, the loop stops and you decide.
+   If round 4 of a batch still has findings above nit, the loop stops and you decide.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 
@@ -304,16 +304,16 @@ enforce the rules rather than goodwill.
 
 | Role | Model / effort | Runs as | Gets | Produces |
 |---|---|---|---|---|
-| **Orchestrator** | Sonnet / low | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions; never commits |
+| **Orchestrator** | Sonnet / low | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR; the PR-sized tasks with dependencies in `docs/tasks.toml` |
 | **Implementer** | Sonnet / medium | Fresh session per PR | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green |
-| **Reviewer** | Opus / high | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line |
+| **Reviewer** | Opus / high | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
 | **Explorer** (subagent) | Haiku / low | Subagent inside an implementer or reviewer | A narrow question | File paths and short excerpts, no dumps |
 | **CI triage** (subagent) | Haiku / low | Subagent inside an implementer | Failing job log | The failing test or rule and the minimal error |
 
 Escalation rules (written down so agents don't decide on their own):
-* An implementer that fails `verify.sh` 3 times on the same error, or gets 2 review
-  rounds with blockers, hands off to a fresh implementer at **high** effort.
+* An implementer that fails `verify.sh` 3 times on the same error, or gets blockers in 2
+  consecutive review rounds, hands off to a fresh implementer at **high** effort.
 * Security rules, sync and merge logic, and the release workflow are tagged `risk:high`
   in `Mx.md`. Their implementers run at high effort, and their review runs at max effort.
 * De-escalation (lower effort or a cheaper model for a role) happens only through the

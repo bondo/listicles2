@@ -5,7 +5,7 @@ real but not worth blocking the merge becomes a **follow-up**: a GitHub issue th
 burn-down task must clear before the milestone closes.
 
 Canonical for this process. `docs/ORCHESTRATION.md` links here; `REVIEW.md` and the role prompts are
-aligned to it by task M0-10 (section 8). Until then this file wins where they disagree.
+aligned to it by task M0-11 (section 8). Until then this file wins where they disagree.
 
 ## 1. Design, and what changed from the first proposal
 
@@ -18,7 +18,7 @@ Adjustments made while evaluating the first proposal:
 |---|---|
 | A hand-written burn-down task goes stale: a planner adds a task and forgets to add it to the burn-down's `depends_on`, so the burn-down could run before the milestone's work is finished. | `scripts/tasks.py validate` enforces it: every milestone with non-owner tasks has exactly one `Mx-FU`, assigned to `implementer`, depending on **every** other non-owner task of that milestone. Later milestones depend on `milestone:Mx`, which includes `Mx-FU`, so the ready query cannot start them early. |
 | "Security-rules / sync-merge / release findings are never deferred" needs a machine-readable tag, or it depends on the orchestrator's memory. | Reviewers tag each finding with `area` (section 5). The follow-up issue carries `area:*` and, for anything protected, a mandatory `owner-ok` label. `tasks.py drift` flags violations (blocker; major or protected area without `owner-ok`; missing severity/target). |
-| A burn-down inside the last PR of a milestone is the PR being merged, so deferring into it defers nothing. | A finding is deferred to the earliest milestone that still has a **later feature PR** (section 3). Findings from PR #1 (M0's last PR) target `M1`. |
+| A burn-down inside the last PR of a milestone is the PR being merged, so deferring into it defers nothing. | A finding is deferred to the earliest milestone that still has a **later feature PR** (section 3). Findings from PR #16 (M0's last PR, merged after #1) target `M1`. |
 | Deferral with no limit becomes a dumping ground. | Prefer fixing when the fix is small (section 2). More than 8 open follow-ups for one milestone: the orchestrator stops deferring and reports to the owner. |
 | The reviewer's verdict (`ready_nits_only`) was computed before the deferral decision. | `deferred` is a finding status set by the decider (not the reviewer). The verdict counts only unresolved, non-deferred findings, and the next round re-checks every deferral (section 4). |
 
@@ -48,8 +48,8 @@ Deferral never changes severity. A deferred finding keeps its ID and severity.
 `target:<Mx>` names the milestone whose burn-down must clear the issue. Pick the earliest milestone that
 still has a **feature PR** (not its own `Mx-FU` burn-down PR) to come after the one being reviewed, and prefer the one
 whose code the fix touches. Examples: a finding from M1 PR 2 of 3 targets `M1`; one from the last M1 feature PR
-targets `M2` (the `M1-FU` PR is too late and too small to take new work); one from PR #1 (M0's last PR) targets `M1`;
-one from the process PR #16 (before PR #1) targets `M0`. `M0.5` is design-only, so code follow-ups never target it.
+targets `M2` (the `M1-FU` PR is too late and too small to take new work); one from PR #16 (M0's last PR, merged after #1) targets `M1`;
+one from PR #1 (PR #16 still follows) targets `M0`. `M0.5` is design-only, so code follow-ups never target it.
 
 ## 4. Who decides, and how a round ends
 
@@ -126,10 +126,10 @@ When in doubt: `fix-now`.
 
 ## 7. The issue
 
-Issue title: `[follow-up] <finding title>`. Labels (the owner creates them once, task M0-O8; the orchestrator
+Issue title: `[follow-up] <finding title>`. Labels (the owner creates them once, task M0-O10; the orchestrator
 checks they exist before the first filing. It files with all labels in the same call and on **every** filing checks that the returned issue carries every
 label (the API can drop labels silently, e.g. without push access). If any is missing it closes that issue, keeps the finding
-`open` (fix-now, or ask the owner), stops deferring and asks the owner to do M0-O8):
+`open` (fix-now, or ask the owner), stops deferring and asks the owner to do M0-O10):
 
 | Label | Meaning |
 |---|---|
@@ -139,7 +139,7 @@ label (the API can drop labels silently, e.g. without push access). If any is mi
 | `area:security-rules`, `area:sync-merge`, `area:release` | Only when the finding has that area |
 | `owner-ok` | Owner approved the deferral (required for majors and protected areas) |
 
-Body template (copy exactly; `.github/` is a protected path, so the template lives here until M0-10 adds
+Body template (copy exactly; `.github/` is a protected path, so the template lives here until M0-11 adds
 it as `.github/ISSUE_TEMPLATE/follow-up.md`, section 8):
 
 ```markdown
@@ -157,7 +157,7 @@ it as `.github/ISSUE_TEMPLATE/follow-up.md`, section 8):
 Closing: fixing PR says `Closes #<n>`. Re-deferral to a later milestone changes the `target:` label and
 adds an `owner-ok` comment link; a follow-up older than one milestone is reported to the owner.
 
-## 8. Burn-down, queries, state, and files for M0-10
+## 8. Burn-down, queries, state, and files for M0-11
 
 **Burn-down task `Mx-FU`** (in `docs/tasks.toml`, enforced by `tasks.py validate`): an implementer task that
 runs after all of the milestone's work. Done means every issue labelled `target:Mx` is closed or has been
@@ -178,7 +178,7 @@ with its milestone's own count. `tasks.py followups` lists them by severity; `dr
 
 **State issue**: one line `Follow-ups: <summary from tasks.py followups>` (template updated in `orchestrator-state.md`).
 
-**Protected files for task M0-10** (a `LISTICLES_TASK=tooling` session; this PR does not touch them):
+**Protected files for task M0-11** (a `LISTICLES_TASK=tooling` session; this PR does not touch them):
 
 | File | Change |
 |---|---|
@@ -198,5 +198,5 @@ with its milestone's own count. `tasks.py followups` lists them by severity; `dr
 | Deferral used to dodge a fix | Section 2 size and acceptance-criteria tests; reviewers re-check deferrals; more than 8 open per milestone goes to the owner |
 | A follow-up is forgotten | `Mx-FU` is a dependency of everything later; `drift` flags open issues targeting a done or dropped burn-down |
 | Protected area slips through | Reviewer `area` tag, `owner-ok` label, `drift` check, PR task `risk = "high"` check by the orchestrator |
-| Labels missing, so issues are unqueryable | Owner task M0-O8; `drift` reports follow-ups lacking `severity:`/`target:` (only works for issues that carry the `follow-up` label, so the orchestrator creates them with all labels in one call) |
+| Labels missing, so issues are unqueryable | Owner task M0-O10; `drift` reports follow-ups lacking `severity:`/`target:` (only works for issues that carry the `follow-up` label, so the orchestrator creates them with all labels in one call) |
 | Search API lag hides a just-filed issue | Re-run the query; the orchestrator also holds the number in its decision comment |
