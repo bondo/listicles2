@@ -11,7 +11,7 @@ GUARD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pretooluse_gua
 
 
 def run(tool, tool_input, cwd, env=None):
-    e = {k: v for k, v in os.environ.items() if k != "LISTICLES_TASK"}
+    e = {k: v for k, v in os.environ.items() if k not in ("LISTICLES_TASK", "CLAUDE_PROJECT_DIR")}
     e.update(env or {})
     r = subprocess.run(
         [sys.executable, "-I", GUARD],
@@ -23,6 +23,13 @@ def run(tool, tool_input, cwd, env=None):
 
 def sh(cwd, *a):
     subprocess.run(a, cwd=cwd, check=True, capture_output=True)
+
+
+def repo(branch="work"):
+    d = tempfile.mkdtemp()
+    sh(d, "git", "init", "-q", "-b", branch)
+    sh(d, "git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "i")
+    return d
 
 
 class Guard(unittest.TestCase):
