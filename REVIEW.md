@@ -8,7 +8,9 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 - Round N>1: only the commits since the last round, the open findings, and this file. Re-check each
   open finding, then review the new code. Do not re-review unchanged code.
 - Rely on CI for the full suite. Run targeted tests only when a finding needs proof.
-- Do not edit the branch. Report findings; the author fixes them.
+- **Reviewers never edit or push the PR branch.** Report only: severity, file:line, recommendation, and a recommended
+  disposition (`fix-now` or `defer`) per finding. The author fixes. A reviewer may use a throwaway branch or worktree to
+  prove a finding; it is never pushed to the PR branch (or anywhere shared) and is deleted afterwards.
 
 ## What to check
 1. **Correctness**: logic errors, edge cases, overflow, nullability, concurrency, error handling.
@@ -23,6 +25,10 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 8. **Process files and suppressions**: every `// justified:` reason is true and specific; no disabled tests,
    baselines or lowered thresholds (`scripts/guards.sh` catches the mechanical cases; check intent).
 9. **Scope**: one concern per PR; flag unrelated changes.
+10. **Test-first**: every code change, tooling included (hooks, scripts, guards, CI checks, metrics, status line), needs
+    automated tests wired into `scripts/verify.sh` and CI, including negative cases (the check must fail on bad input).
+    The commit order must show the failing test first, then the fix. Flag any untested change or untested tooling
+    (`major` when it is a gate or guard, otherwise `minor`).
 
 ## Severity
 | Severity | Meaning | Author must |
@@ -50,6 +56,8 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
       "line": 42,
       "title": "Short statement of the defect",
       "detail": "Failing scenario: input, expected, actual.",
+      "recommendation": "What to change.",
+      "disposition": "fix-now",
       "status": "open"
     }
   ],
@@ -59,6 +67,7 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 
 - IDs are `R<round>-<nn>` and are stable; a finding keeps its ID in later rounds. When the repository has
   earlier review rounds recorded in commit messages or comments, continue the numbering from the last used.
+- `disposition` (recommended by the reviewer): `fix-now`, or `defer` (only for `minor`/`nit`, see below).
 - `status`: `open | fixed | disputed | withdrawn`. The reviewer sets `fixed` or `withdrawn` after checking;
   the author may set `disputed` with a reason in the PR, never `fixed`.
 - `verdict`: `changes_requested`, or `ready_nits_only` when nothing above `nit` is open.
@@ -67,6 +76,9 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 1. Author fixes everything above `nit` (or disputes with a reason) and pushes.
 2. A new reviewer session runs the next round.
 3. When only nits remain the reviewer posts `ready_nits_only` and the owner squash-merges.
+   Deferral: once no blocker or major is open, `minor` and `nit` findings may be deferred to follow-up issues instead of
+   another round. The author opens one issue per deferred finding (title, file:line, scenario) and links it in the PR.
+   Blockers and majors are never deferred.
 4. **Maximum 4 rounds.** If round 4 still has findings above `nit`, stop and report to the owner, who decides.
    Fixes made after round 4 are not re-reviewed unless the owner asks.
 5. Disputes: the reviewer either withdraws or restates with new evidence; the owner breaks ties.
