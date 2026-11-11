@@ -272,7 +272,7 @@ date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,d
 Rounds are numbered **per PR**, globally and monotonically (1, 2, … giving IDs R1-…, R2-…) and never reset per batch.
 The 4-round cap counts rounds **within a batch**. A finding ID is `R<round>-<nn>` (e.g. `R8-01`).
 `blocker`..`nit` count the round's findings by severity as reported. `deferred` counts findings of that round the orchestrator later deferred
-(it can only be filled once the decision is made; leave it empty until then, never guess). `verdict` is the reviewer's (`changes_requested | ready_nits_only`), or one the orchestrator sets: `cap_reached` after
+(it can only be filled once the decision is made; leave it empty until then, never guess). `verdict` is the reviewer's (`changes_requested | ready_nits_only`), or one the decider sets (the orchestrator; in a manual loop the implementer, in its PR comment): `cap_reached` after
 round 4 of a batch, or `ready_deferred` when every finding above nit was deferred and no commit followed (FOLLOW-UPS.md §4).
 
 ### 6.3 Incident row
@@ -332,7 +332,7 @@ and the "only nits remain" test count only unresolved, non-deferred findings. If
 commit followed the reviewed range, the PR needs no further round: the orchestrator posts a `decision` comment
 `accepted: all findings above nit deferred (#a, #b)` and sets the round's verdict to `ready_deferred` (taking precedence
 over `cap_reached`); that is the owner's signal to merge. An implementer deciding without an orchestrator posts the
-`accepted:` comment on the PR and updates the round row and PR table. More than 8 open follow-ups for one milestone: stop deferring and report to the owner (count targets
+`accepted:` comment on the PR with the round row inside it, and writes nothing to the state issue; the next orchestrator copies the row into the log. More than 8 open follow-ups for one milestone: stop deferring and report to the owner (count targets
 with `tasks.py --followups … --json followups`). The deferral is in the decision comment at once; the PR review table
 is refreshed at batch close and no later than when the PR is declared ready.
 

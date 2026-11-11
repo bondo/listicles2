@@ -68,8 +68,9 @@ Round flow with deferral:
 3. If every finding above `nit` was deferred and no commit followed the reviewed range, the PR is accepted
    **without another review round**: nothing unreviewed exists. The orchestrator sets the round's verdict to
    `ready_deferred` (round row, PR table) and posts `accepted: all findings above nit deferred (#a, #b)`; that is the
-   owner's signal to merge. An implementer deciding without an orchestrator posts the same `accepted:` comment on the PR
-   and updates the round row and PR table itself. If this happens in round 4, `ready_deferred` takes precedence over `cap_reached`. If any fix was committed, `reviewed_through`
+   owner's signal to merge. An implementer deciding without an orchestrator posts the same `accepted:` comment on the PR, with the
+   round row (verdict `ready_deferred`) as a `metrics:round` block inside it; it writes nothing to the state issue, and the
+   next orchestrator copies the row into the log. If this happens in round 4, `ready_deferred` takes precedence over `cap_reached`. If any fix was committed, `reviewed_through`
    rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked by the
    owner at merge time (PR review table, `Deferred` column) and by the next round if one happens.
 4. The **4-round cap** and the **"only nits remain"** test count only unresolved, non-deferred findings.
@@ -101,7 +102,7 @@ Each finding in the `REVIEW.md` JSON block gains three fields (existing fields a
 * `recommend`: `fix-now | defer`. Blockers and majors are always `fix-now`. `recommend_reason` is one line, required
   for `defer`.
 * `status` gains `deferred`. Only the decider sets it, and only together with the issue link in the PR.
-* The reviewer's `verdict` keeps its two values (`ready_deferred` and `cap_reached` are set by the decider, section 4). `ready_nits_only` means: nothing above `nit` is **open**, where `deferred`
+* The reviewer's `verdict` keeps its two values (`ready_deferred` and `cap_reached` are set by the decider, section 4: the orchestrator, or the implementer in a manual loop through its PR comment). `ready_nits_only` means: nothing above `nit` is **open**, where `deferred`
   findings are not open. A reviewer who sees a deferred finding re-checks only that the record is complete
   and section 2 is respected; if it is, the finding is not counted against the verdict.
 * The round row (`ORCHESTRATION.md` §6.2) gets a `deferred` column.
@@ -126,9 +127,9 @@ When in doubt: `fix-now`.
 ## 7. The issue
 
 Issue title: `[follow-up] <finding title>`. Labels (the owner creates them once, task M0-O8; the orchestrator
-checks they exist before the first filing. If they don't exist yet it files with the labels in the same call, and
-it checks that the returned issue carries every label (the API can drop labels silently without push access); if not, it stops
-deferring and asks the owner to do M0-O8):
+checks they exist before the first filing. It files with all labels in the same call and on **every** filing checks that the returned issue carries every
+label (the API can drop labels silently, e.g. without push access). If any is missing it closes that issue, keeps the finding
+`open` (fix-now, or ask the owner), stops deferring and asks the owner to do M0-O8):
 
 | Label | Meaning |
 |---|---|
