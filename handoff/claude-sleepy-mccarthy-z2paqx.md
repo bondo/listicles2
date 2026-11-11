@@ -85,3 +85,34 @@ Next: start a session with LISTICLES_TASK=tooling, fix R9-01..R9-10 with tests (
   Known untested tooling today: scripts/guards.sh (my gate proofs were ad hoc scratch scripts, not committed), scripts/verify.sh,
   and the statusline is only tested with a hand-written JSON shape (R9-04). Turn the gate proofs (and the qualified-@Disabled case, R9-10)
   into a committed guards test suite.
+
+## Session 4 (tooling session, LISTICLES_TASK=tooling): state at stop (context hook fired at 89%)
+Owner rules for this batch (relayed in the task prompt; apply in REVIEW.md, CLAUDE.md, agents/prompts/reviewer.md + implementer.md):
+1. TEST-FIRST for every change incl. tooling; failing test committed first, negative cases, wired into verify.sh/CI; reviewers flag untested changes.
+2. Reviewers NEVER edit/push the PR branch; report only (severity, file:line, recommendation); throwaway branch/worktree allowed, never pushed, deleted after.
+
+Done and committed (test commit first, then fix, as the rule asks):
+- 231cf2e tests / dd304ae fix: R9-01,02,05,06 (scripts/hooks/pretooluse_guard.py rewritten as a shell tokeniser; tests in
+  scripts/hooks/test_guard_forms.py, 26 guard tests pass). Covers multi-line, heredocs, quoted text, redirects, wrappers
+  (timeout/sudo/env/xargs/find -exec/bash -c/eval), abbreviated options, HEAD:heads/main, checkout <tree> <path>, GIT_CONFIG_*,
+  aliases, `.git/config` + `.git/hooks/` (never writable, even for tooling), project root from CLAUDE_PROJECT_DIR/script repo/file's repo.
+  The guard now fails closed on an internal error (exit 2).
+- tests + fix commit: R9-04 (context_guard.py reads usage from transcript_path tail; window env LISTICLES_CONTEXT_WINDOW default 200000,
+  1M for `[1m]` models; threshold env LISTICLES_CONTEXT_THRESHOLD), R9-07 (metrics under project root), R9-08 part (statusline threshold from env).
+  All 38 hook tests pass: `python3 -I -m unittest discover -s scripts/hooks`.
+- NOTE: the new context hook reported 89% in THIS session. If this session actually has a 1M window that is a false alarm: calibrate
+  LISTICLES_CONTEXT_WINDOW per role (owner/orchestrator decision) before trusting the 50% rule on 1M models.
+
+Still TODO (not started), in this order, each as failing test commit then fix commit:
+1. R9-10 + guards test suite: new `scripts/hooks/test_guards_sh.py` (temp git repos running scripts/guards.sh: unjustified suppression, baseline file,
+   lowered floor, disabled tests incl. `@org.junit.jupiter.api.Disabled` qualified, missing justification, clean repo passes, --staged). Fix pattern in
+   guards.sh line 35 (`@([A-Za-z]+\.)*Ignored?` -> also `@([A-Za-z]+\.)*Disabled[A-Za-z]*`, `Enabled(If|On)`).
+2. R9-03: add `:core:domain:detektMain :core:domain:detektTest` to ci.yml `static` job and `.githooks/pre-commit`; failing wiring test first
+   (e.g. scripts/hooks/test_wiring.py reading ci.yml and .githooks/pre-commit; same test: CI `guards` job runs the hook tests; agents frontmatter `effort:` matches roles.yaml).
+3. R9-08: add `effort: low` to .claude/agents/explorer.md and ci-triage.md (CLAUDE.md already mentions install-hooks.sh).
+4. R9-09: dark-theme UI test that can fail: in app/src/androidTest ListiclesAppTest use `compose.onRoot().captureToImage()` and assert the
+   pixel luminance is low for darkTheme=true and high for false (compile check with `:app:assembleDebugAndroidTest`; no emulator here).
+5. Docs/rules: REVIEW.md (reviewer never edits/pushes PR branch; test-first; flag untested changes), CLAUDE.md (test-first incl. tooling),
+   agents/prompts/reviewer.md + implementer.md; make scripts/verify.sh run every Python test (already does via discover) and add detekt to verify (already).
+6. `scripts/verify.sh` run, push, then review round 2 (R10): fresh Opus high-effort report-only reviewer subagents, fix, repeat; max rounds 2-4.
+Nothing has been pushed yet in this session; push with `git push -u origin claude/sleepy-mccarthy-z2paqx` after the handoff commit.
