@@ -121,7 +121,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-05", "M0-09", "M0-11"]
 pr = 1
-notes = "Needs LISTICLES_TASK=tooling (process files are hook-protected). Also: apply the protected-file list in docs/FOLLOW-UPS.md section 8 (REVIEW.md, role prompts, PR template, issue template, CI, hook allow-list)"
+notes = "Needs LISTICLES_TASK=tooling (process files are hook-protected). Also: apply the protected-file list in docs/FOLLOW-UPS.md section 8 (REVIEW.md, role prompts, PR template, issue template, CI, hook allow-list). Also: the pre-push hook should skip the Android build for docs/scripts-only diffs (it blocked pushing PR #16 in a container without the SDK)"
 
 [[task]]
 id = "M0-11"
