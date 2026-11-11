@@ -12,7 +12,7 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 |---|---|---|---|---|
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
 | **Orchestrator** | Sonnet / low | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, scheduled tasks, session tags | Commits, pushes, edits files, reviews code, reads full transcripts |
-| **Implementer** | Sonnet / medium (high on escalation or `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues and the deferral decision as a PR comment (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
+| **Implementer** | Sonnet / medium (high on escalation or `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
 | **Reviewer** | Opus / high (max for `risk:high`) | One review round | One findings comment on the PR | Pushes, edits files, approves or merges |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
 
@@ -186,7 +186,7 @@ python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T
 * merged PRs whose task is still `todo`
 * `[owner] <id>` issue titles that name an unknown task
 * follow-up issues that break the deferral rules or lack labels (blocker; major or protected `area:` without `owner-ok`;
-  no `severity:` or `target:`; targeting a milestone whose burn-down is already done)
+  no `severity:` or `target:`; targeting a milestone whose burn-down is already done or dropped; more than one `severity:`/`target:` label)
 
 The orchestrator logs drift in the state issue and hands it to the next implementer or process session.
 
@@ -330,8 +330,9 @@ or `release`, or on a `risk:high` task, never without owner OK. For each deferra
 `decision` comment on the state issue, and lists the finding in the PR's review table (`Deferred` column). The 4-round cap
 and the "only nits remain" test count only unresolved, non-deferred findings. If everything above nit was deferred and no
 commit followed the reviewed range, the PR needs no further round: the orchestrator posts a `decision` comment
-`accepted: all findings above nit deferred (#a, #b)` and sets the round's verdict to `ready_deferred`; that is the owner's
-signal to merge. More than 8 open follow-ups for one milestone: stop deferring and report to the owner (count targets
+`accepted: all findings above nit deferred (#a, #b)` and sets the round's verdict to `ready_deferred` (taking precedence
+over `cap_reached`); that is the owner's signal to merge. An implementer deciding without an orchestrator posts the
+`accepted:` comment on the PR and updates the round row and PR table. More than 8 open follow-ups for one milestone: stop deferring and report to the owner (count targets
 with `tasks.py --followups … --json followups`). The deferral is in the decision comment at once; the PR review table
 is refreshed at batch close and no later than when the PR is declared ready.
 

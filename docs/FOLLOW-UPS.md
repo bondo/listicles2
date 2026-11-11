@@ -68,7 +68,8 @@ Round flow with deferral:
 3. If every finding above `nit` was deferred and no commit followed the reviewed range, the PR is accepted
    **without another review round**: nothing unreviewed exists. The orchestrator sets the round's verdict to
    `ready_deferred` (round row, PR table) and posts `accepted: all findings above nit deferred (#a, #b)`; that is the
-   owner's signal to merge. If any fix was committed, `reviewed_through`
+   owner's signal to merge. An implementer deciding without an orchestrator posts the same `accepted:` comment on the PR
+   and updates the round row and PR table itself. If this happens in round 4, `ready_deferred` takes precedence over `cap_reached`. If any fix was committed, `reviewed_through`
    rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked by the
    owner at merge time (PR review table, `Deferred` column) and by the next round if one happens.
 4. The **4-round cap** and the **"only nits remain"** test count only unresolved, non-deferred findings.
@@ -100,7 +101,7 @@ Each finding in the `REVIEW.md` JSON block gains three fields (existing fields a
 * `recommend`: `fix-now | defer`. Blockers and majors are always `fix-now`. `recommend_reason` is one line, required
   for `defer`.
 * `status` gains `deferred`. Only the decider sets it, and only together with the issue link in the PR.
-* `verdict` keeps its two values. `ready_nits_only` means: nothing above `nit` is **open**, where `deferred`
+* The reviewer's `verdict` keeps its two values (`ready_deferred` and `cap_reached` are set by the decider, section 4). `ready_nits_only` means: nothing above `nit` is **open**, where `deferred`
   findings are not open. A reviewer who sees a deferred finding re-checks only that the record is complete
   and section 2 is respected; if it is, the finding is not counted against the verdict.
 * The round row (`ORCHESTRATION.md` §6.2) gets a `deferred` column.
@@ -126,7 +127,8 @@ When in doubt: `fix-now`.
 
 Issue title: `[follow-up] <finding title>`. Labels (the owner creates them once, task M0-O8; the orchestrator
 checks they exist before the first filing. If they don't exist yet it files with the labels in the same call, and
-if the call rejects them it stops deferring and asks the owner to do M0-O8):
+it checks that the returned issue carries every label (the API can drop labels silently without push access); if not, it stops
+deferring and asks the owner to do M0-O8):
 
 | Label | Meaning |
 |---|---|
@@ -171,7 +173,7 @@ python3 -I "$T/tasks.py" … --followups "$T/followups.json" ready
 
 `ready` then prints `open follow-ups: N (blocker 0, major 0, minor 2, nit 1)` and annotates the ready `Mx-FU` line
 with its milestone's own count. `tasks.py followups` lists them by severity; `drift` adds label violations and
-"burn-down already done but issues still target it". `--json` output of `ready` is unchanged.
+"burn-down already done or dropped but issues still target it", and more than one `severity:`/`target:` label on an issue. `--json` output of `ready` is unchanged.
 
 **State issue**: one line `Follow-ups: <summary from tasks.py followups>` (template updated in `orchestrator-state.md`).
 
@@ -193,7 +195,7 @@ with its milestone's own count. `tasks.py followups` lists them by severity; `dr
 | Failure | Mitigation |
 |---|---|
 | Deferral used to dodge a fix | Section 2 size and acceptance-criteria tests; reviewers re-check deferrals; more than 8 open per milestone goes to the owner |
-| A follow-up is forgotten | `Mx-FU` is a dependency of everything later; `drift` flags open issues targeting a done burn-down |
+| A follow-up is forgotten | `Mx-FU` is a dependency of everything later; `drift` flags open issues targeting a done or dropped burn-down |
 | Protected area slips through | Reviewer `area` tag, `owner-ok` label, `drift` check, PR task `risk = "high"` check by the orchestrator |
 | Labels missing, so issues are unqueryable | Owner task M0-O8; `drift` reports follow-ups lacking `severity:`/`target:` (only works for issues that carry the `follow-up` label, so the orchestrator creates them with all labels in one call) |
 | Search API lag hides a just-filed issue | Re-run the query; the orchestrator also holds the number in its decision comment |
