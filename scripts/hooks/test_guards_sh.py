@@ -110,6 +110,20 @@ class CleanAndDisabledTests(GuardsCase):
         self.repo.commit()
         self.assertPasses()
 
+    def test_typealias_pattern_does_not_flag_ordinary_production_types(self):
+        """R11-09."""
+        self.repo.write("app/src/main/kotlin/X.kt", "class DisabledReasons\ntypealias Reasons = DisabledReasons\ntypealias L = OnDisabledChangeListener\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_imported_python_skip_decorators_fail(self):
+        """R10-10: the plain imported form."""
+        for body in ("from unittest import " + "skip\n@" + "skip('x')\n", "from unittest import " + "skip" + "If\n@" + "skip" + "If(True, 'x')\n"):
+            with self.subTest(body=body):
+                self.repo.write("scripts/hooks/test_a.py", "import unittest\n" + body + "class T(unittest.TestCase):\n    def test_a(self): pass\n")
+                self.repo.commit()
+                self.assertFails("guard: skipped python test:")
+
     def test_python_skip_forms_in_hook_tests_fail_even_in_the_guard_suite(self):
         """R10-10: the hook suites are a CI gate, so skipping one must fail like skipping a Kotlin test."""
         forms = ["@unittest." + "skip('flaky')", "@unittest." + "skip" + "If(True, 'x')", "@unittest." + "skip" + "Unless(False, 'x')",

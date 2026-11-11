@@ -190,6 +190,44 @@ class Expansions(Base):
         self.allowed(["echo ${X:-fallback}", "echo $(echo hi)"])
 
 
+class RoundThree(Base):
+    """R11-01 (major false positive), R11-02 (branches without a killing test), R11-03, R11-08(3)."""
+
+    def test_case_word_in_message_text_is_not_a_case_statement(self):
+        self.allowed([
+            "git commit -m \"$(cat <<'EOF'\nfix: handle the edge case in the parser\nEOF\n)\"",
+            "git commit -m \"$(cat <<'EOF'\ntest: add a case for push in guard\nEOF\n)\"",
+            "git commit -m \"$(echo 'a case in point')\"",
+            "echo $(echo edge case in parser)",
+            "gh pr create --title x --body \"$(cat <<'EOF'\nCovers the case in .github/workflows\nEOF\n)\"",
+        ])
+        self.denied(["echo $(case x in x) git push --force;; esac)", "echo $(true; case x in x) git push --force;; esac)"])
+
+    def test_alias_chain_depth_and_unknown_expansion_to_git_config(self):
+        d = repo()
+        for k, v in (("alias.a1", "a2"), ("alias.a2", "a3"), ("alias.a3", "a4"), ("alias.a4", "status")):
+            subprocess.run(["git", "config", k, v], cwd=d, check=True)
+        self.assertEqual(run("Bash", {"command": "git a1"}, d), 2)  # four deep is too deep to check
+        subprocess.run(["git", "config", "alias.a3", "status"], cwd=d, check=True)
+        self.assertEqual(run("Bash", {"command": "git a1"}, d), 0)
+        self.denied(["echo x > $H/.gitconfig", "echo x > ${H}/.config/git/config"])
+
+    def test_cd_to_the_repo_root_and_config_reads(self):
+        self.allowed(["cd \"$(git rev-parse --show-toplevel)\" && echo x > notes.txt", "git config alias.st", "git config user.name"])
+        self.denied(["git config alias.st status", "git config --add alias.st status"])
+
+    def test_mirror_config_and_glob_refspecs_that_shorten(self):
+        self.denied(["git -c remote.origin.mirror=true push origin", "git config remote.origin.mirror true",
+                     "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.mirror git push origin",
+                     "git push origin 'refs/h*:refs/h*'", "git push origin 'r*:r*'", "git push origin 'refs/heads/mast*:refs/heads/mast*'"])
+        self.allowed(["git push origin 'refs/heads/work*:refs/heads/work*'", "git config --get remote.origin.mirror"])
+
+    def test_branch_variable_from_show_current_is_resolved(self):
+        self.allowed(["BR=$(git branch --show-current); git push -u origin \"$BR\""])
+        d = repo("main")
+        self.assertEqual(run("Bash", {"command": "BR=$(git branch --show-current); git push -u origin \"$BR\""}, d), 2)
+
+
 class Wrappers(Base):
     """R10-07."""
 
