@@ -464,11 +464,17 @@ def read_text(file: str | None, ref: str | None) -> str:
     return sys.stdin.read() if str(path) == "-" else path.read_text(encoding="utf-8")
 
 
+class InputError(Exception):
+    pass
+
+
 def read_json(path: str | None) -> list[dict] | None:
     """Accept an array, {"items": [...]}, an array of such pages (gh --paginate --slurp), or JSON lines."""
     if not path:
         return None
     text = Path(path).read_text(encoding="utf-8")
+    if not text.strip():
+        raise InputError(f"{path} is empty (a failed gh call?); refusing to treat it as zero items")
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
@@ -506,8 +512,12 @@ def main(argv: list[str] | None = None) -> int:
         for msg in e.errors:
             print(f"error: {msg}", file=sys.stderr)
         return 1
-    issues, prs = read_json(a.issues), read_json(a.prs)
-    fus = load_followups(read_json(a.followups))
+    try:
+        issues, prs = read_json(a.issues), read_json(a.prs)
+        fus = load_followups(read_json(a.followups))
+    except InputError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
     if a.command == "followups" and not a.followups:
         print("error: followups needs --followups (open issues labelled follow-up)", file=sys.stderr)
         return 1

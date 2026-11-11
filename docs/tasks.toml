@@ -58,7 +58,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
 pr = 1
-notes = "Batch M0-2 (M0-04, M0-05, M0-06); committed in f707f92, awaiting review"
+notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round cap was reached and the owner accepted the post-cap fixes. Done is set by the status-sync session (ORCHESTRATION 4.4)"
 
 [[task]]
 id = "M0-05"
@@ -69,7 +69,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
 pr = 1
-notes = "Batch M0-2 (M0-04, M0-05, M0-06); committed in f707f92, awaiting review"
+notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round cap was reached and the owner accepted the post-cap fixes. Done is set by the status-sync session (ORCHESTRATION 4.4)"
 
 [[task]]
 id = "M0-06"
@@ -80,7 +80,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
 pr = 1
-notes = "Batch M0-2 (M0-04, M0-05, M0-06)"
+notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round cap was reached and the owner accepted the post-cap fixes. Done is set by the status-sync session (ORCHESTRATION 4.4)"
 
 [[task]]
 id = "M0-07"
@@ -113,7 +113,7 @@ assignee = "process"
 risk = "normal"
 depends_on = []
 pr = 16
-notes = "Branch claude/orchestration-review, PR #16 (stacked after #1). Set done in this PR's final commit once review ends, like any task"
+notes = "Branch claude/orchestration-review, PR #16 (stacked after #1). Leave status = todo: the status-sync session sets done after review (ORCHESTRATION 4.4)"
 
 [[task]]
 id = "M0-10"
@@ -145,9 +145,8 @@ and may test only in a throwaway branch or worktree that is never pushed to the 
 (3) agents/prompts/orchestrator.md: drop docs/status.md and handoff/orchestrator.md, add the autonomy rules (ORCHESTRATION 1.1), \
 the 45-minute check-in, the handover, lock check and takeover protocol (5); agents/prompts/implementer.md: write the failing test first, done-status goes on the tasks ref only (4.4); \
 (4) handoff/TEMPLATE.md: refer to owner to-dos by issue number, never restate them; \
-(5) hook false positives (seen in this PR's work): the PreToolUse guard blocks harmless commands that merely mention a protected path (a read-only listing of .github, reading REVIEW.md) or contain the word git inside a heredoc \
-or quoted string ("could not parse this git command"); fix with a test for each blocked-but-harmless case and each allowed-but-harmful case; \
-(6) REVIEW.md severity for missing tests, if the owner confirms the 2.0 rule (relayed by a peer session); \
+(5) hook false positives: largely done on PR #1 in review rounds R10-R12. Re-check the current PreToolUse guard first; only the cases still failing are in scope (a harmless command that merely mentions a protected path, or the word git inside a heredoc or quoted string), each with a test for the blocked-but-harmless case and the allowed-but-harmful case; \
+(6) REVIEW.md severity for missing tests (test-first is a standing owner rule, ORCHESTRATION 2.0); \
 (7) follow-ups: apply the protected-file list in docs/FOLLOW-UPS.md section 8 (REVIEW.md findings format and cap wording, role prompts, the follow-up issue template, PR template Deferred column)"""
 
 [[task]]
@@ -159,7 +158,7 @@ assignee = "process"
 risk = "normal"
 depends_on = []
 pr = 16
-notes = "Branch claude/orchestration-review (PR #16); protected-file edits are listed for M0-11"
+notes = "Branch claude/orchestration-review (PR #16); protected-file edits are listed for M0-11. Leave status = todo: the status-sync session sets done after review (ORCHESTRATION 4.4)"
 
 [[task]]
 id = "M0-FU"
@@ -170,7 +169,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-01", "M0-02", "M0-03", "M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-09", "M0-10", "M0-11", "M0-12"]
 pr = 16
-notes = "PR #16 is the last M0 PR, so findings deferred from it target M1, not M0 (docs/FOLLOW-UPS.md section 3)"
+notes = "PR #16 is the last M0 PR, so findings deferred from it target M1, not M0 (docs/FOLLOW-UPS.md section 3). Leave status = todo: the status-sync session sets done after review (ORCHESTRATION 4.4). Follow-up issue #19 (10 findings from PR #1, target M0, currently unlabelled) must be split into one issue per finding and labelled once the labels exist (M0-O10). Owner decision to flag: does the limit of 8 open follow-ups per milestone hold for those 10?"
 
 [[task]]
 id = "M0-O1"
@@ -237,8 +236,8 @@ milestone = "M0"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M0-12"]
-notes = "Exact label names: docs/FOLLOW-UPS.md section 7"
+depends_on = []
+notes = "Exact label names: docs/FOLLOW-UPS.md section 7. Once the labels exist, issue #19 is split and labelled (see M0-FU)"
 
 [[task]]
 id = "M0-O7"

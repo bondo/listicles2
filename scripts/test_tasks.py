@@ -446,6 +446,21 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(out.startswith("M0-01"))
 
+    def test_empty_github_input_file_is_an_error_not_zero_items(self):
+        text = task("M0-01")
+        for name, body in {"empty": "", "blank": "\n  \n"}.items():
+            for flag in ("--issues", "--prs", "--followups"):
+                with self.subTest(name, flag=flag), tempfile.TemporaryDirectory() as d:
+                    f = Path(d, "in.json")
+                    f.write_text(body)
+                    code, _, err = self.run_cli(text, flag, str(f), "ready")
+                    self.assertEqual(code, 1)
+                    self.assertIn("empty", err)
+        with tempfile.TemporaryDirectory() as d:  # a legitimately empty result is still fine
+            f = Path(d, "in.json")
+            f.write_text('[{"items": []}]')
+            self.assertEqual(self.run_cli(text, "--followups", str(f), "ready")[0], 0)
+
     def test_issues_file_accepts_paginated_slurp_and_json_lines(self):
         text = task("M0-O1", assignee="owner", issue=12) + task("M0-01", deps=["M0-O1"])
         closed = {"number": 12, "title": "", "state": "closed"}
