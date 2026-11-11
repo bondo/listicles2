@@ -104,6 +104,20 @@ class PrePushHook(unittest.TestCase):
         self.assertEqual(self.push()[0], 0)
         self.assertTrue(self.gradle_called())
 
+    def test_hook_does_not_leak_git_dir_into_what_it_runs(self):
+        """R11-51: git exports GIT_DIR when pushing from a linked worktree; the guards and tests the hook runs must not inherit it."""
+        sentinel = tempfile.mkdtemp()
+        subprocess.run(["git", "init", "-q", sentinel], check=True)
+        probe = ("import subprocess, unittest\n\nclass T(unittest.TestCase):\n    def test_x(self):\n"
+                 "        subprocess.run(['git', 'config', 'leak.probe', '1'], check=True)\n")
+        with open(os.path.join(self.repo, "scripts", "hooks", "test_stub.py"), "w") as f:
+            f.write(probe)
+        self.commit("docs/a.md", "x")
+        rc, out = self.push(GIT_DIR=os.path.join(sentinel, ".git"))
+        self.assertEqual(rc, 0, out)
+        sentinel_cfg = subprocess.run(["git", "config", "--local", "--list"], cwd=sentinel, capture_output=True, text=True).stdout
+        self.assertNotIn("leak.probe", sentinel_cfg)
+
     def test_new_branch_without_origin_main_builds(self):
         self.commit("docs/a.md", "x")
         self.assertEqual(self.push(stdin=f"refs/heads/b {self.rev()} refs/heads/b {ZERO}\n")[0], 0)

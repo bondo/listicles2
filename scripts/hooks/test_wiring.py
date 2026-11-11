@@ -104,6 +104,8 @@ class OwnerRules(unittest.TestCase):
         """R10-54: a deferred minor must not keep the verdict at changes_requested."""
         review = read("REVIEW.md")
         self.has(review, "`deferred`", "every remaining minor is deferred")
+        for text in (review, read("docs", "PLAN.md")):  # R10-54: the merge condition must agree with the verdict rule
+            self.has(text, "only nits or deferred minors remain")
         self.has(read("agents", "prompts", "implementer.md"), "defer")
         self.has(read("docs", "PLAN.md"), "deferred")
 
