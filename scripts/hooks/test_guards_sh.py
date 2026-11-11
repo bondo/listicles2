@@ -91,6 +91,38 @@ class CleanAndDisabledTests(GuardsCase):
         self.repo.commit()
         self.assertPasses()
 
+    def test_aliased_and_backticked_disabled_annotations_fail(self):
+        """R10-11."""
+        forms = [
+            "import org.junit.jupiter.api.Disabled as Off\nclass B { @Off @Test fun t() {} }",
+            "typealias Later = org.junit.Ignore\nclass B { @Later @Test fun t() {} }",
+            "class B { @`Disabled` @Test fun t() {} }",
+            "class B { @org.junit.jupiter.api.`Disabled` @Test fun t() {} }",
+        ]
+        for form in forms:
+            with self.subTest(form=form):
+                self.repo.write("core/src/test/kotlin/B.kt", form + "\n")
+                self.repo.commit()
+                self.assertFails("guard: disabled test:")
+        self.repo.write("core/src/test/kotlin/B.kt", "import org.junit.jupiter.api.Test as T\nclass B { @T fun t() {} }\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_python_skip_forms_in_hook_tests_fail_even_in_the_guard_suite(self):
+        """R10-10: the hook suites are a CI gate, so skipping one must fail like skipping a Kotlin test."""
+        forms = ["@unittest." + "skip('flaky')", "@unittest.skip" + "If(True, 'x')", "@unittest.skip" + "Unless(False, 'x')",
+                 "self.skip" + "Test('x')", "raise unittest.Skip" + "Test('x')", "@unittest.expected" + "Failure"]
+        for name in ("test_something.py", "test_guards_sh.py"):
+            for form in forms:
+                with self.subTest(file=name, form=form):
+                    self.repo.write("scripts/hooks/" + name, f"import unittest\nclass T(unittest.TestCase):\n    {form}\n    def test_a(self): pass\n")
+                    self.repo.commit()
+                    self.assertFails("guard: skipped python test:")
+        self.repo.write("scripts/hooks/test_something.py", "import unittest\nclass T(unittest.TestCase):\n    def test_a(self): pass\n")
+        self.repo.write("scripts/hooks/test_guards_sh.py", "# skipped diff-based checks are mentioned in prose\n")
+        self.repo.commit()
+        self.assertPasses()
+
     def test_focused_and_skipped_js_tests_fail(self):
         for form in ["it.only('a', () => {})", "describe.skip('a', () => {})", "xit('a', () => {})", "fit('a', () => {})"]:
             with self.subTest(form=form):
