@@ -202,6 +202,11 @@ class RoundThree(Base):
             "gh pr create --title x --body \"$(cat <<'EOF'\nCovers the case in .github/workflows\nEOF\n)\"",
         ])
         self.denied(["echo $(case x in x) git push --force;; esac)", "echo $(true; case x in x) git push --force;; esac)"])
+        # R12-01: '!' and 'time' (with -p) also put the next word in command position
+        self.denied(["echo $(! case x in x) git push origin main;; esac)", "echo \"$(! case x in x) git push --force;; esac)\"",
+                     "echo $(time case x in x) git reset --hard;; esac)", "echo $(time -p case x in x) git push --force;; esac)",
+                     "echo $(! ! case x in x) git push --force;; esac)"])
+        self.allowed(["git log --grep=$(echo time case in point)", "git commit -m \"$(echo ! a case in point)\""])
 
     def test_alias_chain_depth_and_unknown_expansion_to_git_config(self):
         d = repo()
