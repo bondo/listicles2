@@ -12,7 +12,7 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 |---|---|---|---|---|
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
 | **Orchestrator** | Sonnet / low | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, scheduled tasks, session tags | Commits, pushes, edits files, reviews code, reads full transcripts |
-| **Implementer** | Sonnet / medium (high on escalation or `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR | Pushes to `main` or to any branch it was not assigned |
+| **Implementer** | Sonnet / medium (high on escalation or `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues and the deferral decision as a PR comment (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
 | **Reviewer** | Opus / high (max for `risk:high`) | One review round | One findings comment on the PR | Pushes, edits files, approves or merges |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
 
@@ -84,7 +84,7 @@ goes to comments, not the body.
 
 ### 3.2 Who may edit
 
-Only the active orchestrator edits the body or posts log comments. Workers report through
+Only the active orchestrator edits the body or posts log comments (the one exception: deferral decisions by an implementer when no orchestrator is active, as PR comments). Workers report through
 their PRs (§7.3). The owner comments on the state issue or replies in the orchestrator
 session; the orchestrator folds the comment into the body on its next wake.
 
@@ -145,7 +145,7 @@ REF=claude/sleepy-mccarthy-z2paqx      # the "Tasks ref:" line; main once M0 is 
 T="${TMPDIR:-/tmp}/tasks"; mkdir -p "$T"
 git fetch -q origin "$REF"
 git show "origin/$REF:scripts/tasks.py" > "$T/tasks.py"
-gh api -X GET search/issues -f q='repo:bondo/listicles2 is:issue' -f per_page=100 \
+gh api -X GET search/issues -f q='repo:bondo/listicles2 is:issue -label:follow-up' -f per_page=100 \
   --jq '{items: [.items[] | {number, title, state}]}' > "$T/issues.json"
 gh api -X GET search/issues -f q='repo:bondo/listicles2 is:pr is:merged' -f per_page=100 \
   --jq '{items: [.items[] | {number, merged_at: .pull_request.merged_at}]}' > "$T/prs.json"
@@ -272,8 +272,8 @@ date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,d
 Rounds are numbered **per PR**, globally and monotonically (1, 2, … giving IDs R1-…, R2-…) and never reset per batch.
 The 4-round cap counts rounds **within a batch**. A finding ID is `R<round>-<nn>` (e.g. `R8-01`).
 `blocker`..`nit` count the round's findings by severity as reported. `deferred` counts findings of that round the orchestrator later deferred
-(it can only be filled once the decision is made; leave it empty until then, never guess). `verdict` is the reviewer's (`changes_requested | ready_nits_only`), or `cap_reached`, which the orchestrator
-sets after round 4 of a batch.
+(it can only be filled once the decision is made; leave it empty until then, never guess). `verdict` is the reviewer's (`changes_requested | ready_nits_only`), or one the orchestrator sets: `cap_reached` after
+round 4 of a batch, or `ready_deferred` when every finding above nit was deferred and no commit followed (FOLLOW-UPS.md §4).
 
 ### 6.3 Incident row
 
@@ -307,7 +307,8 @@ total cost, incidents. Then refresh the PR description's review table from the r
 ### 7.2 Review rounds
 
 * The orchestrator gives the reviewer the PR number, `base_sha` (= the branch's
-  `reviewed_through`), `head_sha`, the round ID, and the IDs of findings that are still open.
+  `reviewed_through`), `head_sha`, the round ID, the IDs of findings that are still open, and the IDs of deferred findings with their issue
+  links (the reviewer re-checks each deferral record against FOLLOW-UPS.md §2).
 * The reviewer reviews `base_sha..head_sha` only, plus re-checks of open findings, and posts **one**
   PR comment with the fenced `json` block defined in `REVIEW.md` (`round` as a number,
   `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>`, `verdict`
@@ -328,7 +329,11 @@ blocker or major is open; majors only with owner OK; blockers never; anything in
 or `release`, or on a `risk:high` task, never without owner OK. For each deferral it files the follow-up issue, posts a
 `decision` comment on the state issue, and lists the finding in the PR's review table (`Deferred` column). The 4-round cap
 and the "only nits remain" test count only unresolved, non-deferred findings. If everything above nit was deferred and no
-commit followed the reviewed range, the PR needs no further round.
+commit followed the reviewed range, the PR needs no further round: the orchestrator posts a `decision` comment
+`accepted: all findings above nit deferred (#a, #b)` and sets the round's verdict to `ready_deferred`; that is the owner's
+signal to merge. More than 8 open follow-ups for one milestone: stop deferring and report to the owner (count targets
+with `tasks.py --followups … --json followups`). The deferral is in the decision comment at once; the PR review table
+is refreshed at batch close and no later than when the PR is declared ready.
 
 ### 7.3 Results
 

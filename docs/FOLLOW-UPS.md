@@ -18,7 +18,7 @@ Adjustments made while evaluating the first proposal:
 |---|---|
 | A hand-written burn-down task goes stale: a planner adds a task and forgets to add it to the burn-down's `depends_on`, so the burn-down could run before the milestone's work is finished. | `scripts/tasks.py validate` enforces it: every milestone with non-owner tasks has exactly one `Mx-FU`, assigned to `implementer`, depending on **every** other non-owner task of that milestone. Later milestones depend on `milestone:Mx`, which includes `Mx-FU`, so the ready query cannot start them early. |
 | "Security-rules / sync-merge / release findings are never deferred" needs a machine-readable tag, or it depends on the orchestrator's memory. | Reviewers tag each finding with `area` (section 5). The follow-up issue carries `area:*` and, for anything protected, a mandatory `owner-ok` label. `tasks.py drift` flags violations (blocker; major or protected area without `owner-ok`; missing severity/target). |
-| A burn-down inside a single-PR milestone (M0) is the same PR that is being merged, so deferring into it defers nothing. | A finding is deferred to the earliest milestone that still has an **unmerged later PR** (section 3). For M0 that means `target:M1`. |
+| A burn-down inside the last PR of a milestone is the PR being merged, so deferring into it defers nothing. | A finding is deferred to the earliest milestone that still has a **later feature PR** (section 3). Findings from PR #1 (M0's last PR) target `M1`. |
 | Deferral with no limit becomes a dumping ground. | Prefer fixing when the fix is small (section 2). More than 8 open follow-ups for one milestone: the orchestrator stops deferring and reports to the owner. |
 | The reviewer's verdict (`ready_nits_only`) was computed before the deferral decision. | `deferred` is a finding status set by the decider (not the reviewer). The verdict counts only unresolved, non-deferred findings, and the next round re-checks every deferral (section 4). |
 
@@ -46,9 +46,10 @@ Deferral never changes severity. A deferred finding keeps its ID and severity.
 ## 3. Target milestone
 
 `target:<Mx>` names the milestone whose burn-down must clear the issue. Pick the earliest milestone that
-still has at least one unmerged PR after the one being reviewed, and prefer the one whose code the fix
-touches. Examples: a finding from M1 PR 2 of 3 targets `M1`; a finding from the last M1 PR targets `M2`;
-a finding from M0 (one PR) targets `M1`. `M0.5` is design-only, so code follow-ups never target it.
+still has a **feature PR** (not its own `Mx-FU` burn-down PR) to come after the one being reviewed, and prefer the one
+whose code the fix touches. Examples: a finding from M1 PR 2 of 3 targets `M1`; one from the last M1 feature PR
+targets `M2` (the `M1-FU` PR is too late and too small to take new work); one from PR #1 (M0's last PR) targets `M1`;
+one from the process PR #16 (before PR #1) targets `M0`. `M0.5` is design-only, so code follow-ups never target it.
 
 ## 4. Who decides, and how a round ends
 
@@ -59,13 +60,15 @@ a finding from M0 (one PR) targets `M1`. `M0.5` is design-only, so code follow-u
   Reviewers and implementers never decide for their own findings or work alone when the rules need owner OK:
   they put the question in `needs_owner` of their `WORKER-RESULT`.
 * `recommend: defer` is advice. The decider may still say fix-now. A fix-now recommendation on a
-  `major` or `blocker` can never be turned into a deferral without owner OK.
+  `major` can only be turned into a deferral with owner OK, and on a `blocker` never.
 
 Round flow with deferral:
 1. Reviewer posts the round with recommendations.
 2. Decider fixes, defers, or disputes each finding (disputes as in `REVIEW.md`).
 3. If every finding above `nit` was deferred and no commit followed the reviewed range, the PR is accepted
-   **without another review round**: nothing unreviewed exists. If any fix was committed, `reviewed_through`
+   **without another review round**: nothing unreviewed exists. The orchestrator sets the round's verdict to
+   `ready_deferred` (round row, PR table) and posts `accepted: all findings above nit deferred (#a, #b)`; that is the
+   owner's signal to merge. If any fix was committed, `reviewed_through`
    rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked by the
    owner at merge time (PR review table, `Deferred` column) and by the next round if one happens.
 4. The **4-round cap** and the **"only nits remain"** test count only unresolved, non-deferred findings.
@@ -109,9 +112,10 @@ When in doubt: `fix-now`.
 ## 6. Where the decision is recorded
 
 1. **Findings comment** stays the reviewer's source (never edited by others). The decider's decision goes in a
-   `decision` log comment on the state issue (`defer R9-03 → #52, owner-ok: no`) and, when an orchestrator is
-   not active, as a PR comment.
-2. **PR review table** (a view, refreshed when a batch closes): one row per round, columns
+   `decision` log comment on the state issue (`defer R9-03 → #52, owner-ok: no`); an implementer deciding
+   without an active orchestrator posts it as a PR comment instead (the only case where a non-orchestrator
+   writes this record).
+2. **PR review table** (a view: refreshed at batch close, and no later than when the PR is declared ready): one row per round, columns
    `Round | Blocker | Major | Minor | Nit | Deferred | Verdict`, plus a **Deferred** list under it:
    `R9-03 minor → #52 (target M1)`.
 3. **The follow-up issue** names the finding ID, PR, round and reason (section 7), and the finding's
@@ -121,7 +125,8 @@ When in doubt: `fix-now`.
 ## 7. The issue
 
 Issue title: `[follow-up] <finding title>`. Labels (the owner creates them once, task M0-O8; the orchestrator
-checks they exist before the first filing):
+checks they exist before the first filing. If they don't exist yet it files with the labels in the same call, and
+if the call rejects them it stops deferring and asks the owner to do M0-O8):
 
 | Label | Meaning |
 |---|---|
@@ -174,7 +179,7 @@ with its milestone's own count. `tasks.py followups` lists them by severity; `dr
 
 | File | Change |
 |---|---|
-| `REVIEW.md` | Findings format: add `area`, `recommend`, `recommend_reason` and the `deferred` status (section 5). Severity table: minor/nit "Fix, or defer per `docs/FOLLOW-UPS.md`". Loop and cap: the cap and the "only nits remain" test count unresolved non-deferred findings; add the rule that the reviewer recommends and never decides |
+| `REVIEW.md` | Findings format: add `area`, `recommend`, `recommend_reason` and the `deferred` status (section 5). Severity table: minor/nit "Fix, or defer per `docs/FOLLOW-UPS.md`". Loop and cap: the cap and the "only nits remain" test count unresolved non-deferred findings; the reviewer recommends and never decides; the `ready_deferred` acceptance path (section 4 step 3) as a second signal to merge |
 | `agents/prompts/reviewer.md` | Tag every finding with `area` and `recommend`; re-check deferral records; never decide |
 | `agents/prompts/orchestrator.md`, `agents/prompts/implementer.md` | Orchestrator applies section 2 and files the issue; implementer proposes in `WORKER-RESULT` and fixes everything not deferred; neither defers majors or protected areas alone |
 | `.github/ISSUE_TEMPLATE/follow-up.md` (new) | Section 7 body, with front matter `labels: follow-up` |

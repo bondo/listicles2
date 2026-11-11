@@ -105,8 +105,9 @@ class BurnDownTest(unittest.TestCase):
         msg = errors_of(task("M0-01"), task("M0-FU", assignee="planner", deps=["M0-01"]), burn_down=True)
         self.assertIn("M0-FU must be assigned to implementer", msg)
 
-    def test_burn_down_id_is_reserved_for_burn_down(self):
+    def test_ids_other_than_nn_owner_or_fu_are_rejected(self):
         self.assertIn("id must look like", errors_of(task("M0-XX")))
+        self.assertIn("id must look like", errors_of(task("M0-FUX")))
 
     def test_tasks_may_depend_on_the_burn_down_without_a_cycle(self):
         # a task may depend on the burn-down (e.g. the milestone merge) without creating a cycle
@@ -222,6 +223,22 @@ class FollowUpTest(unittest.TestCase):
         self.assertIn("#1: target M0 but burn-down M0-FU is already done", msg)
         self.assertEqual("", self.drift_of([fu_issue(1, "nit", "M1")], *parts))
 
+    def test_drift_open_follow_up_after_burn_down_dropped(self):
+        parts = [task("M0-01", status="done"), task("M0-FU", status="dropped", deps=["M0-01"])]
+        msg = self.drift_of([fu_issue(1, "nit", "M0")], *parts)
+        self.assertIn("#1: target M0 but burn-down M0-FU is already dropped", msg)
+
+    def test_drift_open_follow_up_with_todo_burn_down_is_fine(self):
+        parts = [task("M0-01"), task("M0-FU", deps=["M0-01"])]
+        self.assertEqual("", self.drift_of([fu_issue(1, "nit", "M0")], *parts))
+
+    def test_drift_conflicting_severity_or_target_labels(self):
+        extra_sev = fu_issue(1, "minor", labels=["severity:major"])
+        msg = self.drift_of([extra_sev], task("M0-01"))
+        self.assertIn("#1: more than one severity: label", msg)
+        extra_tgt = fu_issue(2, "minor", "M0", labels=["target:M1"])
+        self.assertIn("#2: more than one target: label", self.drift_of([extra_tgt], task("M0-01")))
+
     def test_ready_burn_down_line_shows_its_open_follow_ups(self):
         g = graph(task("M0-01", status="done"), task("M0-FU", deps=["M0-01"]))
         fus = tasks.load_followups([fu_issue(1, "minor", "M0"), fu_issue(2, "nit", "M1")])
@@ -269,7 +286,18 @@ class CliTest(unittest.TestCase):
         code, out, _ = self.run_fu(text, [fu_issue(1, "minor", "M0")], "ready")
         self.assertEqual(code, 0)
         self.assertIn("M0-FU", out)
-        self.assertIn("open follow-ups: 1 (blocker 0, major 0, minor 1, nit 0)", out)
+        self.assertIn("M0-FU", out.splitlines()[0])
+        self.assertIn("[open follow-ups: 1 (blocker 0, major 0, minor 1, nit 0)]", out.splitlines()[0])
+        # total differs from the milestone's count, so the note cannot be mistaken for the summary line
+        code, out, _ = self.run_fu(text, [fu_issue(1, "minor", "M0"), fu_issue(2, "nit", "M1")], "ready")
+        self.assertIn("[open follow-ups: 1 (", out.splitlines()[0])
+        self.assertEqual(out.splitlines()[-1], "open follow-ups: 2 (blocker 0, major 0, minor 1, nit 1)")
+
+    def test_plain_ready_output_is_unchanged_without_followups_file(self):
+        text = task("M0-01", status="done") + task("M0-FU", deps=["M0-01"])
+        code, out, _ = self.run_cli(text, "ready")
+        self.assertEqual(code, 0)
+        self.assertNotIn("follow-ups", out)
 
     def test_ready_json_stays_a_plain_list(self):
         text = task("M0-01")

@@ -315,6 +315,7 @@ class FollowUp:
     target: str | None
     areas: list[str]
     owner_ok: bool
+    conflicts: list[str] = field(default_factory=list)  # label prefixes that appear more than once
 
 
 def load_followups(items: list[dict] | None) -> list[FollowUp]:
@@ -335,6 +336,7 @@ def load_followups(items: list[dict] | None) -> list[FollowUp]:
             number=int(it["number"]), title=str(it.get("title", "")), severity=one("severity:"),
             target=one("target:"), areas=[n[len("area:"):] for n in names if n.startswith("area:")],
             owner_ok="owner-ok" in names,
+            conflicts=[p for p in ("severity:", "target:") if sum(n.startswith(p) for n in names) > 1],
         ))
     return out
 
@@ -364,6 +366,7 @@ def followup_drift(graph: Graph, fus: list[FollowUp]) -> list[str]:
     msgs: list[str] = []
     for f in fus:
         n = f"#{f.number}"
+        msgs += [f"{n}: more than one {c} label (keep exactly one)" for c in f.conflicts]
         if f.severity is None:
             msgs.append(f"{n}: follow-up has no severity:<level> label")
         elif f.severity not in SEVERITIES:
@@ -380,8 +383,8 @@ def followup_drift(graph: Graph, fus: list[FollowUp]) -> list[str]:
             msgs.append(f"{n}: target milestone {f.target!r} is unknown")
         else:
             fu = graph.by_id.get(f"{f.target}-{BURN_DOWN}")
-            if fu is not None and fu.status == "done":
-                msgs.append(f"{n}: target {f.target} but burn-down {fu.id} is already done (retarget with owner OK)")
+            if fu is not None and fu.status in ("done", "dropped"):
+                msgs.append(f"{n}: target {f.target} but burn-down {fu.id} is already {fu.status} (retarget with owner OK)")
     return msgs
 
 

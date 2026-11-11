@@ -119,7 +119,7 @@ milestone = "M0"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0-05", "M0-09"]
+depends_on = ["M0-05", "M0-09", "M0-11"]
 pr = 1
 notes = "Needs LISTICLES_TASK=tooling (process files are hook-protected). Also: apply the protected-file list in docs/FOLLOW-UPS.md section 8 (REVIEW.md, role prompts, PR template, issue template, CI, hook allow-list)"
 
@@ -142,7 +142,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-01", "M0-02", "M0-03", "M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-09", "M0-10", "M0-11"]
 pr = 1
-notes = "M0 is one PR, so findings deferred from it should target M1, not M0 (docs/FOLLOW-UPS.md section 3)"
+notes = "PR #1 is the last M0 PR, so findings deferred from it target M1, not M0 (docs/FOLLOW-UPS.md section 3)"
 
 [[task]]
 id = "M0-O1"
@@ -209,7 +209,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0-11"]
-notes = "Exact names and colours: docs/FOLLOW-UPS.md section 7"
+notes = "Exact label names: docs/FOLLOW-UPS.md section 7"
 
 [[task]]
 id = "M0-O7"

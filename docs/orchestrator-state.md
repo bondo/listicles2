@@ -38,7 +38,7 @@ unless you are the orchestrator named below; comment instead.
 
 ## Follow-ups
 (From `scripts/tasks.py --followups … followups`; rules in FOLLOW-UPS.md.)
-- Open follow-ups: {N} (blocker 0, major {a}, minor {b}, nit {c}); oldest target milestone {Mx}
+- {paste the `open follow-ups: N (blocker …, major …, minor …, nit …)` line}
 
 ## Pending task additions (for the next PR that touches docs/tasks.toml)
 - {new task, deps, why} / drift: {from `tasks.py drift`}
