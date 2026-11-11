@@ -208,7 +208,8 @@ enforce the rules rather than goodwill.
    only this.
 2. **Git hooks** (installed by `scripts/install-hooks.sh`, which a session-start hook
    runs automatically): pre-commit runs spotless and detekt on the changed modules,
-   and pre-push runs the unit tests.
+   and pre-push runs the guards, the hook tests and the unit tests (it skips the Gradle unit tests for pushes that only touch
+   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build).
 3. **Claude Code hooks** in `.claude/settings.json`, which agents can't skip:
    * PreToolUse denies `git commit --no-verify`, `git push --force`, `git reset --hard`
      on shared branches, and pushes to `main`.
@@ -264,9 +265,10 @@ enforce the rules rather than goodwill.
    every `// justified:` suppression.
 3. Findings are posted as one PR comment containing a JSON block: each finding has a
    stable ID (`R1-03`), a severity (`blocker | major | minor | nit`), a file and line,
-   and a status (`open | fixed | disputed | withdrawn`). This makes the round-over-round
+   and a status (`open | fixed | disputed | withdrawn | deferred`). This makes the round-over-round
    metrics in section 9.4 possible.
-4. The author fixes everything above nit, or marks it `disputed` with a reason, and pushes.
+4. The author fixes everything above nit, or marks it `disputed` with a reason, and pushes. Once no blocker or major is
+   open, minor and nit findings may be `deferred` to follow-up issues instead of another round.
 5. Each later round runs in a **new** reviewer session that sees only the commits since the
    last round, the open findings, and `REVIEW.md`. It re-checks open findings and reviews
    the new code. It doesn't re-review unchanged code, so the loop converges.

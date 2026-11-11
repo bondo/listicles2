@@ -87,7 +87,7 @@ class OwnerRules(unittest.TestCase):
     """The owner rules must stay written down where agents read them."""
 
     def has(self, text, *needles):
-        low = text.lower()
+        low = " ".join(text.lower().split())  # line wrapping must not matter
         for n in needles:
             self.assertIn(n.lower(), low, n)
 

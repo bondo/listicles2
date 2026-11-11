@@ -10,7 +10,7 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 - Rely on CI for the full suite. Run targeted tests only when a finding needs proof.
 - **Reviewers never edit or push the PR branch.** Report only: severity, file:line, recommendation, and a recommended
   disposition (`fix-now` or `defer`) per finding. The author fixes. A reviewer may use a throwaway branch or worktree to
-  prove a finding; it is never pushed to the PR branch (or anywhere shared) and is deleted afterwards.
+  prove a finding; it is never pushed anywhere and is deleted afterwards.
 
 ## What to check
 1. **Correctness**: logic errors, edge cases, overflow, nullability, concurrency, error handling.
@@ -35,7 +35,7 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 |---|---|---|
 | `blocker` | Data loss or corruption, security hole, crash on a main path, or a broken build/gate. Must not merge. | Fix |
 | `major` | Wrong behavior in a realistic case, a test that cannot catch the bug it claims to, a weakened gate. | Fix |
-| `minor` | Real but low-impact: edge case, unclear code that invites bugs, missing non-critical test. | Fix, or mark `disputed` with a reason |
+| `minor` | Real but low-impact: edge case, unclear code that invites bugs, missing non-critical test. | Fix, mark `disputed` with a reason, or `deferred` with an issue link (see Loop and cap) |
 | `nit` | Style, naming, wording, taste. | Optional |
 
 When unsure between two levels, choose the lower and say why. Do not pad: no findings is a valid result.
@@ -68,12 +68,12 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 - IDs are `R<round>-<nn>` and are stable; a finding keeps its ID in later rounds. When the repository has
   earlier review rounds recorded in commit messages or comments, continue the numbering from the last used.
 - `disposition` (recommended by the reviewer): `fix-now`, or `defer` (only for `minor`/`nit`, see below).
-- `status`: `open | fixed | disputed | withdrawn`. The reviewer sets `fixed` or `withdrawn` after checking;
+- `status`: `open | fixed | disputed | withdrawn | deferred` (`deferred` = minor/nit moved to a follow-up issue; the author links it). The reviewer sets `fixed` or `withdrawn` after checking;
   the author may set `disputed` with a reason in the PR, never `fixed`.
-- `verdict`: `changes_requested`, or `ready_nits_only` when nothing above `nit` is open.
+- `verdict`: `changes_requested`, or `ready_nits_only` when nothing above `nit` is open, or every remaining minor is deferred.
 
 ## Loop and cap
-1. Author fixes everything above `nit` (or disputes with a reason) and pushes.
+1. Author fixes everything above `nit` (or disputes with a reason; minors may be deferred, see below) and pushes.
 2. A new reviewer session runs the next round.
 3. When only nits remain the reviewer posts `ready_nits_only` and the owner squash-merges.
    Deferral: once no blocker or major is open, `minor` and `nit` findings may be deferred to follow-up issues instead of
