@@ -216,21 +216,28 @@ def find_backtick(src, i):
 def find_close(src, i):
     """Index of the ')' that closes a '$(' whose body starts at i. Aware of quotes and heredocs."""
     depth, n = 1, len(src)
-    at_cmd, in_case = True, False  # `case` only starts a statement in command position; quotes and heredoc bodies are skipped below
+    at_cmd, in_case, after_time = True, False, False  # `case` only starts a statement in command position; quotes and heredoc bodies are skipped below
     while i < n:
         c = src[i]
         if c in " \t":
             i += 1
             continue
         was_cmd = at_cmd
-        at_cmd = c in ";&|(\n{"
+        at_cmd = c in ";&|(\n{!"  # '!' negates a pipeline: the next word is still in command position
+        if c == "-" and after_time:  # time -p
+            while i < n and src[i] not in " \t\n":
+                i += 1
+            at_cmd = True
+            continue
+        after_time = False
         if c.isalpha() or c == "_":
             w = WORD.match(src, i).group(0)
             if was_cmd and w == "case":
                 in_case = True
             elif in_case and w == "in":
                 raise ValueError("case statement inside $(")  # its patterns' ')' would end the $( early
-            at_cmd = w in ("then", "do", "else", "elif", "if", "while", "until")
+            at_cmd = w in ("then", "do", "else", "elif", "if", "while", "until") or (was_cmd and w == "time")
+            after_time = was_cmd and w == "time"
             i += len(w)
             continue
         if c == "\\":
