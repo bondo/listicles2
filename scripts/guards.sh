@@ -14,7 +14,7 @@ fail=0
 bad() { echo "guard: $*"; fail=1; }
 
 # Everything tracked except prose, generated and third-party files, and this script (it names the patterns).
-EXCL=(':!docs' ':!handoff' ':!*.md' ':!scripts/guards.sh' ':!*package-lock.json' ':!*.lock' ':!*.png' ':!*.jar'
+EXCL=(':!docs' ':!handoff' ':!*.md' ':!scripts/guards.sh' ':!scripts/hooks/test_guards_sh.py' ':!*package-lock.json' ':!*.lock' ':!*.png' ':!*.jar'
   ':!gradle/wrapper' ':!gradlew' ':!gradlew.bat' ':!**/node_modules/**' ':!**/build/**')
 GREP=(git grep -nHI -E)
 [ "$STAGED" = 1 ] && GREP=(git grep --cached -nHI -E)
@@ -66,7 +66,7 @@ if [ "$STAGED" = 0 ]; then
     if [ "${CI:-}" = true ]; then bad "no base/merge-base '$BASE' (CI checkout needs fetch-depth: 0)"
     else echo "guard: note: base '$BASE' not found, skipped diff-based checks"; fi
   else
-    DSPEC=(. ':!docs' ':!handoff' ':!scripts/guards.sh' ':!*package-lock.json')
+    DSPEC=(. ':!docs' ':!handoff' ':!scripts/guards.sh' ':!scripts/hooks/test_guards_sh.py' ':!*package-lock.json')
     # Lowered or removed thresholds and severities.
     git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }
