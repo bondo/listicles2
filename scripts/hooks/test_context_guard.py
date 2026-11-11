@@ -151,6 +151,21 @@ class Headless(unittest.TestCase):
                              env=env, capture_output=True, text=True).stdout
         self.assertNotIn("HANDOFF", out)
 
+    def test_statusline_threshold_boundaries_and_garbage(self):
+        def status(pct, thr):
+            env = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
+            env.update(TMPDIR=self.tmp, **({"LISTICLES_CONTEXT_THRESHOLD": thr} if thr is not None else {}))
+            return subprocess.run(["bash", STATUS], input=json.dumps({"session_id": "s2", "context_window": {"used_percentage": pct}}),
+                                  env=env, capture_output=True, text=True).stdout
+
+        self.assertNotIn("HANDOFF", status(49, None))
+        self.assertIn("HANDOFF NOW", status(50, None))
+        self.assertNotIn("HANDOFF", status(79, "80"))
+        self.assertIn("HANDOFF NOW", status(80, "80"))
+        for bad in ("abc", "0", "-1", ""):
+            self.assertIn("HANDOFF NOW", status(60, bad), bad)  # garbage falls back to 50
+            self.assertNotIn("HANDOFF", status(40, bad), bad)
+
 
 if __name__ == "__main__":
     unittest.main()
