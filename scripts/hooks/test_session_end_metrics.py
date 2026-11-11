@@ -44,5 +44,41 @@ class Metrics(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
 
 
+class OutputDir(unittest.TestCase):
+    """R9-07: metrics go to the project root, not wherever the hook's cwd happens to be."""
+
+    def run_hook(self, cwd, env=None):
+        d = tempfile.mkdtemp()
+        tp = os.path.join(d, "s.jsonl")
+        open(tp, "w").write(json.dumps(rec("a", 1)) + "\n")
+        e = {k: v for k, v in os.environ.items() if k not in ("LISTICLES_METRICS_DIR", "CLAUDE_PROJECT_DIR")}
+        e.update(env or {})
+        r = subprocess.run([sys.executable, "-I", HOOK], input=json.dumps(
+            {"session_id": "s", "transcript_path": tp, "cwd": cwd, "reason": "other"}), env=e, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_project_dir_env_wins_over_cwd(self):
+        proj, elsewhere = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.run_hook(elsewhere, {"CLAUDE_PROJECT_DIR": proj})
+        self.assertTrue(os.path.exists(os.path.join(proj, "metrics", "sessions", "s.json")))
+        self.assertFalse(os.path.exists(os.path.join(elsewhere, "metrics")))
+
+    def test_git_root_of_cwd_without_env(self):
+        root = tempfile.mkdtemp()
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        sub = os.path.join(root, "app", "src")
+        os.makedirs(sub)
+        self.run_hook(sub)
+        self.assertTrue(os.path.exists(os.path.join(root, "metrics", "sessions", "s.json")))
+        self.assertFalse(os.path.exists(os.path.join(sub, "metrics")))
+
+    def test_plain_cwd_when_not_a_repo_and_explicit_dir_wins(self):
+        plain, out = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.run_hook(plain)
+        self.assertTrue(os.path.exists(os.path.join(plain, "metrics", "sessions", "s.json")))
+        self.run_hook(plain, {"LISTICLES_METRICS_DIR": out})
+        self.assertTrue(os.path.exists(os.path.join(out, "s.json")))
+
+
 if __name__ == "__main__":
     unittest.main()
