@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import unittest
 
+import gitenv  # noqa: F401  (drops GIT_DIR and friends, see gitenv.py)
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 ZERO = "0" * 40
 

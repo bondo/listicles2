@@ -20,7 +20,7 @@ that combine into scaled trip checklists). Changes sync in real time between mem
 | i18n | English + Danish; all strings in resources; CI fails on missing translations |
 | AI at runtime | No AI code apart from on-device ML Kit. No LLM or cloud AI calls |
 | Distribution | Signed APK on GitHub Releases on each `v*` tag; Play internal-testing pipeline prepared but turned off until the $25 account exists |
-| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits remain (max 4 rounds, then the owner decides) → the owner squash-merges |
+| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds, then the owner decides) → the owner squash-merges |
 | Repo | **Public** (unlimited free GitHub Actions minutes). No secrets in the repo; secrets live in GitHub secrets |
 
 ## 2. Repository layout
@@ -272,7 +272,7 @@ enforce the rules rather than goodwill.
 5. Each later round runs in a **new** reviewer session that sees only the commits since the
    last round, the open findings, and `REVIEW.md`. It re-checks open findings and reviews
    the new code. It doesn't re-review unchanged code, so the loop converges.
-6. When only nits remain, the reviewer posts "ready (nits only)" and you squash-merge.
+6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and you squash-merge.
    If round 4 still has findings above nit, the loop stops and you decide.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)

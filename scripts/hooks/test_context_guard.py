@@ -7,6 +7,8 @@ import sys
 import tempfile
 import unittest
 
+import gitenv  # noqa: F401  (drops GIT_DIR and friends, see gitenv.py)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 GUARD = os.path.join(HERE, "context_guard.py")
 STATUS = os.path.join(HERE, "..", "statusline.sh")

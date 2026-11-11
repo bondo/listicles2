@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 import unittest
 
+import gitenv  # noqa: F401  (drops GIT_DIR and friends, see gitenv.py)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 GUARDS = os.path.join(HERE, "..", "guards.sh")
 

@@ -75,7 +75,7 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 ## Loop and cap
 1. Author fixes everything above `nit` (or disputes with a reason; minors may be deferred, see below) and pushes.
 2. A new reviewer session runs the next round.
-3. When only nits remain the reviewer posts `ready_nits_only` and the owner squash-merges.
+3. When only nits or deferred minors remain the reviewer posts `ready_nits_only` and the owner squash-merges.
    Deferral: once no blocker or major is open, `minor` and `nit` findings may be deferred to follow-up issues instead of
    another round. The author opens one issue per deferred finding (title, file:line, scenario) and links it in the PR.
    Blockers and majors are never deferred.

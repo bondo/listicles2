@@ -11,6 +11,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import prepush_scope  # noqa: E402
 
+import gitenv  # noqa: F401  (drops GIT_DIR and friends, see gitenv.py)
+
 ZERO = "0" * 40
 
 
