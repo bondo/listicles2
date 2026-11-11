@@ -97,6 +97,15 @@ class Cli(unittest.TestCase):
         self.commit("app/src/main/A.kt", "x")
         self.assertEqual(self.scope(self.rev(), ZERO), "android")
 
+    def test_moving_an_android_file_into_a_skip_directory_builds(self):
+        """R10-53: rename detection hides the source path; the build lost a file."""
+        self.commit("app/src/main/kotlin/Foo.kt", "class Foo")
+        base = self.rev()
+        os.makedirs(os.path.join(self.repo, "docs"))
+        self.git("mv", "app/src/main/kotlin/Foo.kt", "docs/Foo.kt")
+        self.git("commit", "-q", "-m", "move")
+        self.assertEqual(self.scope(self.rev(), base), "android")
+
     def test_branch_delete_skips(self):
         self.assertEqual(self.scope(ZERO, self.base), "skip")
 

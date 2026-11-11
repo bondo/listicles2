@@ -123,18 +123,46 @@ class Headless(unittest.TestCase):
         self.write([assistant(100000, mid="b")])
         self.assertIn("50%", self.hook(sid="e1", env=w))
 
-    def test_window_from_hook_input_is_used_and_env_overrides_it(self):
+    def test_context_window_in_hook_input_is_ignored(self):
+        """R10-55: PostToolUse input never carries context_window (statusline JSON only); do not trust an invented shape."""
         self.write([assistant(250000)])
         data = {"session_id": "i1", "transcript_path": self.tp, "context_window": {"context_window_size": 400000}}
+        e = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
+        e.update(TMPDIR=self.tmp)
+        out = subprocess.run([sys.executable, "-I", GUARD], input=json.dumps(data), env=e, capture_output=True, text=True).stdout
+        self.assertEqual(out, "")  # 250k of the default 1M window is 25%
 
-        def run(env):
-            e = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
-            e.update(TMPDIR=self.tmp, **env)
+    def test_subagent_tool_calls_neither_warn_nor_use_up_the_reminder(self):
+        """R10-51: PostToolUse also fires inside subagents; the main session must still get its one reminder."""
+        self.write([assistant(600000)])
+        e = dict(os.environ, TMPDIR=self.tmp)
+        e.pop("LISTICLES_CONTEXT_WINDOW", None)
+        e.pop("LISTICLES_CONTEXT_THRESHOLD", None)
+
+        def run(extra):
+            data = dict({"session_id": "a1", "transcript_path": self.tp}, **extra)
             return subprocess.run([sys.executable, "-I", GUARD], input=json.dumps(data), env=e, capture_output=True, text=True).stdout
 
-        self.assertIn("62%", run({}))  # 250k of the 400k window in the input
-        os.remove(os.path.join(self.tmp, "listicles-ctx", "i1.warned"))
-        self.assertEqual(run({"LISTICLES_CONTEXT_WINDOW": "1000000"}), "")  # env wins
+        self.assertEqual(run({"agent_id": "sub-1", "agent_type": "explorer"}), "")
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "listicles-ctx", "a1.warned")))
+        self.assertIn("60%", run({}))  # the main thread still gets it
+        self.assertEqual(run({}), "")  # and only once
+        self.assertEqual(run({"agent_id": ""}), "")  # empty agent_id counts as main thread (already warned)
+
+    def test_trailing_sidechain_record_is_skipped(self):
+        """R10-56: the last record is a sidechain one above the threshold; the earlier main record is below it."""
+        self.write([assistant(100000, mid="main"), assistant(900000, mid="side", sidechain=True)])
+        self.assertEqual(self.hook(), "")
+
+    def test_non_ascii_digits_are_garbage_not_a_crash(self):
+        """R10-59: '²'.isdigit() is True but int('²') raises."""
+        self.write([assistant(600000)])
+        for bad in ("\u00b2", "\u0663"):
+            r = subprocess.run([sys.executable, "-I", GUARD], input=json.dumps({"session_id": "u" + str(ord(bad)), "transcript_path": self.tp}),
+                               env=dict(os.environ, TMPDIR=self.tmp, LISTICLES_CONTEXT_THRESHOLD=bad, LISTICLES_CONTEXT_WINDOW=bad),
+                               capture_output=True, text=True)
+            self.assertEqual(r.stderr, "", bad)
+            self.assertIn("60%", r.stdout, bad)  # both fall back to 50% of 1M
 
     def test_garbage_window_env_falls_back_to_1m(self):
         self.write([assistant(600000)])

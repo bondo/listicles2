@@ -100,6 +100,22 @@ class OwnerRules(unittest.TestCase):
     def test_review_md_allows_deferring_minor_and_nit_after_blockers(self):
         self.has(read("REVIEW.md"), "follow-up issue", "no blocker or major")
 
+    def test_deferral_is_part_of_status_verdict_and_author_duties(self):
+        """R10-54: a deferred minor must not keep the verdict at changes_requested."""
+        review = read("REVIEW.md")
+        self.has(review, "`deferred`", "every remaining minor is deferred")
+        self.has(read("agents", "prompts", "implementer.md"), "defer")
+        self.has(read("docs", "PLAN.md"), "deferred")
+
+    def test_throwaway_rule_is_identical_everywhere(self):
+        """R10-57: never pushed anywhere, deleted afterwards."""
+        for parts in (("REVIEW.md",), ("agents", "prompts", "reviewer.md"), ("CLAUDE.md",)):
+            self.has(read(*parts), "never pushed anywhere", "deleted afterwards")
+
+    def test_plan_describes_the_pre_push_scope_skip(self):
+        """R10-58"""
+        self.has(read("docs", "PLAN.md"), "pre-push", "skips the gradle unit tests")
+
     def test_reviewer_prompt_has_the_rules(self):
         self.has(read("agents", "prompts", "reviewer.md"), "never edit or push", "report only", "fix-now", "defer", "untested", "throwaway")
 
