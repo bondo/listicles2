@@ -5,8 +5,9 @@ write handoff/<branch>.md from handoff/TEMPLATE.md, commit and end (PLAN 9.3).
 Usage source (works headless/in the cloud, where the statusline never runs): the last main-thread assistant record in
 transcript_path, context = input + cache_creation + cache_read + output tokens of that call. If scripts/statusline.sh did
 record a value for the session (interactive CLI), the larger of the two is used.
-Env: LISTICLES_CONTEXT_THRESHOLD (percent, default 50), LISTICLES_CONTEXT_WINDOW (tokens, default 200000; 1000000 for
-models whose id contains [1m]). Output: hookSpecificOutput.additionalContext. Never fails."""
+Window: LISTICLES_CONTEXT_WINDOW (tokens), else the hook input's context_window.context_window_size, else 1,000,000
+(the models used here have a 1M window; a 200k default fired the reminder at ~100k tokens). Garbage values fall back.
+Env: LISTICLES_CONTEXT_THRESHOLD (percent, default 50). Output: hookSpecificOutput.additionalContext. Never fails."""
 
 import json
 import os
@@ -14,11 +15,13 @@ import re
 import sys
 
 TAIL_BYTES = 512 * 1024
+DEFAULT_WINDOW = 1_000_000
+DEFAULT_THRESHOLD = 50
 FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
 
 
 def last_usage(path):
-    """(tokens, model) of the last main-thread assistant record, reading only the end of the file."""
+    """Context tokens of the last main-thread assistant record, reading only the end of the file."""
     try:
         with open(path, "rb") as f:
             size = f.seek(0, 2)
@@ -40,8 +43,21 @@ def last_usage(path):
         u = m["usage"]
         total = sum(u[k] for k in FIELDS if isinstance(u.get(k), int))
         if total > 0:
-            return total, str(m.get("model", ""))
+            return total
     return None
+
+
+def positive_int(value):
+    """int(value) when it is a plain positive integer, else None (garbage falls back to the default)."""
+    s = str(value).strip() if value is not None else ""
+    return int(s) if s.isdigit() and int(s) > 0 else None
+
+
+def window_of(data):
+    """LISTICLES_CONTEXT_WINDOW, else the hook input's context_window.context_window_size, else 1,000,000."""
+    cw = data.get("context_window")
+    from_input = positive_int(cw.get("context_window_size")) if isinstance(cw, dict) else None
+    return positive_int(os.environ.get("LISTICLES_CONTEXT_WINDOW")) or from_input or DEFAULT_WINDOW
 
 
 def main():
@@ -58,13 +74,11 @@ def main():
     tp = data.get("transcript_path")
     found = last_usage(tp) if isinstance(tp, str) and tp else None
     if found:
-        tokens, model = found
-        window = int(os.environ.get("LISTICLES_CONTEXT_WINDOW") or (1_000_000 if "[1m]" in model else 200_000))
-        pcts.append(tokens * 100 // window)
+        pcts.append(found * 100 // window_of(data))
     if not pcts:
         return
     pct = max(pcts)
-    limit = int(os.environ.get("LISTICLES_CONTEXT_THRESHOLD", "50"))
+    limit = positive_int(os.environ.get("LISTICLES_CONTEXT_THRESHOLD")) or DEFAULT_THRESHOLD
     flag = os.path.join(base, sid + ".warned")
     if pct < limit or os.path.exists(flag):
         return
