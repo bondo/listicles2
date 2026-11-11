@@ -1,12 +1,47 @@
 #!/usr/bin/env python3
-"""PostToolUse hook: once context use (written by scripts/statusline.sh) reaches the threshold, remind the agent
-ONCE per session to finish the step, write handoff/<branch>.md from handoff/TEMPLATE.md, commit and end (PLAN 9.3).
-Threshold: LISTICLES_CONTEXT_THRESHOLD (default 50). Output: hookSpecificOutput.additionalContext. Never fails."""
+"""PostToolUse hook: once context use reaches the threshold, remind the agent ONCE per session to finish the step,
+write handoff/<branch>.md from handoff/TEMPLATE.md, commit and end (PLAN 9.3).
+
+Usage source (works headless/in the cloud, where the statusline never runs): the last main-thread assistant record in
+transcript_path, context = input + cache_creation + cache_read + output tokens of that call. If scripts/statusline.sh did
+record a value for the session (interactive CLI), the larger of the two is used.
+Env: LISTICLES_CONTEXT_THRESHOLD (percent, default 50), LISTICLES_CONTEXT_WINDOW (tokens, default 200000; 1000000 for
+models whose id contains [1m]). Output: hookSpecificOutput.additionalContext. Never fails."""
 
 import json
 import os
 import re
 import sys
+
+TAIL_BYTES = 512 * 1024
+FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
+
+
+def last_usage(path):
+    """(tokens, model) of the last main-thread assistant record, reading only the end of the file."""
+    try:
+        with open(path, "rb") as f:
+            size = f.seek(0, 2)
+            f.seek(max(0, size - TAIL_BYTES))
+            data = f.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+    lines = data.split("\n")
+    if size > TAIL_BYTES:
+        lines = lines[1:]  # the first line is probably cut in half
+    for line in reversed(lines):
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        m = o.get("message") if isinstance(o, dict) else None
+        if o.get("type") != "assistant" or o.get("isSidechain") or not isinstance(m, dict) or not isinstance(m.get("usage"), dict):
+            continue
+        u = m["usage"]
+        total = sum(u[k] for k in FIELDS if isinstance(u.get(k), int))
+        if total > 0:
+            return total, str(m.get("model", ""))
+    return None
 
 
 def main():
@@ -15,14 +50,25 @@ def main():
     if not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
         return
     base = os.path.join(os.environ.get("TMPDIR", "/tmp"), "listicles-ctx")
+    pcts = []
     try:
-        pct = int(open(os.path.join(base, sid)).read().strip())
+        pcts.append(int(open(os.path.join(base, sid)).read().strip()))
     except (OSError, ValueError):
+        pass
+    tp = data.get("transcript_path")
+    found = last_usage(tp) if isinstance(tp, str) and tp else None
+    if found:
+        tokens, model = found
+        window = int(os.environ.get("LISTICLES_CONTEXT_WINDOW") or (1_000_000 if "[1m]" in model else 200_000))
+        pcts.append(tokens * 100 // window)
+    if not pcts:
         return
+    pct = max(pcts)
     limit = int(os.environ.get("LISTICLES_CONTEXT_THRESHOLD", "50"))
     flag = os.path.join(base, sid + ".warned")
     if pct < limit or os.path.exists(flag):
         return
+    os.makedirs(base, exist_ok=True)
     open(flag, "w").close()
     msg = (f"CONTEXT {pct}% (limit {limit}%). Finish the current step only, then: write handoff/<branch>.md from "
            "handoff/TEMPLATE.md, commit it, and end the session. Do not start new work.")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code status line: model, branch, context %. Also records the context % for the context-guard hook
-# (scripts/hooks/context_guard.py), because hooks do not receive it themselves.
+# (scripts/hooks/context_guard.py) when it runs (interactive CLI only; headless sessions use the transcript instead).
 # Input: status JSON on stdin (context_window.used_percentage, session_id, model.display_name, workspace.current_dir).
 in=$(cat)
 pct=$(printf '%s' "$in" | jq -r '.context_window.used_percentage // empty' 2>/dev/null)
@@ -14,5 +14,5 @@ if [ -n "$pct" ] && [ -n "$sid" ] && [[ "$sid" =~ ^[A-Za-z0-9_-]+$ ]]; then
 fi
 p=${pct%.*}
 printf '%s | %s | ctx %s%%' "$model" "${br:-no-branch}" "${p:-?}"
-[ -n "$p" ] && [ "$p" -ge 50 ] 2>/dev/null && printf ' | HANDOFF NOW'
+[ -n "$p" ] && [ "$p" -ge "${LISTICLES_CONTEXT_THRESHOLD:-50}" ] 2>/dev/null && printf ' | HANDOFF NOW'
 echo
