@@ -2,5 +2,5 @@
 # Guards on the staged content, then spotless + detekt. Do not bypass with --no-verify.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 ./scripts/guards.sh --staged || exit 1
-./gradlew -q --console=plain spotlessCheck detekt 2>&1 | grep -v '^Picked up' | tail -25
+./gradlew -q --console=plain spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest 2>&1 | grep -v '^Picked up' | tail -25
 exit "${PIPESTATUS[0]}"
