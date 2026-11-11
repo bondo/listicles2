@@ -118,7 +118,7 @@ class CleanAndDisabledTests(GuardsCase):
 
     def test_imported_python_skip_decorators_fail(self):
         """R10-10: the plain imported form."""
-        for body in ("from unittest import " + "skip\n@" + "skip('x')\n", "from unittest import " + "skip" + "If\n@" + "skip" + "If(True, 'x')\n"):
+        for body in ("from unittest imp" + "ort skip\n@" + "skip('x')\n", "from unittest imp" + "ort skip" + "If\n@" + "skip" + "If(True, 'x')\n"):
             with self.subTest(body=body):
                 self.repo.write("scripts/hooks/test_a.py", "import unittest\n" + body + "class T(unittest.TestCase):\n    def test_a(self): pass\n")
                 self.repo.commit()

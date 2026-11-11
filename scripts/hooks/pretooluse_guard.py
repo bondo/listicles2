@@ -75,8 +75,8 @@ GIT_COMMON = {"status", "log", "diff", "add", "commit", "push", "fetch", "pull",
               "merge", "rebase", "stash", "clean", "rm", "mv", "config", "remote", "tag", "cherry-pick", "am", "apply", "blame", "grep",
               "ls-files", "rev-parse", "init", "clone", "describe", "worktree", "update-ref", "read-tree", "symbolic-ref", "ls-remote",
               "reflog", "shortlog", "bisect", "archive", "show-ref", "for-each-ref", "cat-file", "merge-base", "rev-list", "notes"}
-RISKY_CONFIG = re.compile(r"(?i)^(core\.hookspath|alias\.|include(if\..*)?\.path|remote\..*\.push|push\.default)")
-RISKY_CONFIG_ANY = re.compile(r"(?i)(core\.hookspath|alias\.|include(if\..*)?\.path|remote\..*\.push|push\.default)")  # anywhere in a value
+RISKY_CONFIG = re.compile(r"(?i)^(core\.hookspath|alias\.|include(if\..*)?\.path|remote\..*\.(push|mirror)|push\.default)")
+RISKY_CONFIG_ANY = re.compile(r"(?i)(core\.hookspath|alias\.|include(if\..*)?\.path|remote\..*\.(push|mirror)|push\.default)")  # anywhere in a value
 CONFIG_FILE_VARS = {"GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"}
 HOME_GIT = re.compile(r"(^|/)\.gitconfig$|(^|/)\.config/git(/|$)")
 ALL_ARGS_MUTATORS = {"rm", "rmdir", "unlink", "touch", "truncate", "chmod", "chown", "chgrp", "tee", "patch", "shred", "mv", "mkdir"}
@@ -196,6 +196,8 @@ class Cmd:
         return not (self.words or self.writes or self.subs or self.heredocs or self.group)
 
 
+BRANCH_SUBS = ("$(git branch --show-current)", "$(git rev-parse --abbrev-ref HEAD)")
+WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 HEREDOC_START = re.compile(r"<<-?[ \t]*(['\"]?)\\?([A-Za-z_][A-Za-z0-9_]*)\1")
 
 
@@ -213,9 +215,24 @@ def find_backtick(src, i):
 
 def find_close(src, i):
     """Index of the ')' that closes a '$(' whose body starts at i. Aware of quotes and heredocs."""
-    depth, n, start = 1, len(src), i
+    depth, n = 1, len(src)
+    at_cmd, in_case = True, False  # `case` only starts a statement in command position; quotes and heredoc bodies are skipped below
     while i < n:
         c = src[i]
+        if c in " \t":
+            i += 1
+            continue
+        was_cmd = at_cmd
+        at_cmd = c in ";&|(\n{"
+        if c.isalpha() or c == "_":
+            w = WORD.match(src, i).group(0)
+            if was_cmd and w == "case":
+                in_case = True
+            elif in_case and w == "in":
+                raise ValueError("case statement inside $(")  # its patterns' ')' would end the $( early
+            at_cmd = w in ("then", "do", "else", "elif", "if", "while", "until")
+            i += len(w)
+            continue
         if c == "\\":
             i += 2
             continue
@@ -251,8 +268,6 @@ def find_close(src, i):
         elif c == ")":
             depth -= 1
             if depth == 0:
-                if re.search(r"\bcase\b[^;]*\bin\b", src[start:i]):  # a case pattern's ')' would end the $( early
-                    raise ValueError("case statement inside $(")
                 return i
         i += 1
     raise ValueError("unterminated $(")
@@ -609,7 +624,10 @@ def check_git(words, state, assigns_dirty=False):
             dst = norm_ref(r.split(":")[-1])
             if dst in ("HEAD", "@"):
                 dst = cur
-            if dst in SHARED or dst == "*" or (re.search(r"[*?\[]", dst) and any(fnmatch.fnmatch(sh, dst) for sh in SHARED)):
+            raw = r.split(":")[-1]  # globs match full ref names: refs/h* reaches refs/heads/main although norm_ref shortens it
+            glob = re.search(r"[*?\[]", raw) and any(
+                fnmatch.fnmatch(full, pat) for sh in SHARED for full in (sh, "refs/heads/" + sh) for pat in (raw, dst))
+            if dst in SHARED or dst == "*" or glob:
                 deny("pushing to main/master is not allowed; open a PR from your branch")
         if not refspecs:
             up = norm_ref(git_out(gcwd, "config", "--get", f"branch.{cur}.merge") or "") if cur else ""
@@ -759,7 +777,7 @@ def expand(w, state):
         if name == "CLAUDE_PROJECT_DIR" and os.environ.get("CLAUDE_PROJECT_DIR"):
             return os.environ["CLAUDE_PROJECT_DIR"]
         return m.group(0)
-    for q in ("$(git branch --show-current)", "$(git rev-parse --abbrev-ref HEAD)"):
+    for q in BRANCH_SUBS:
         if q in w:
             w = w.replace(q, branch(state["cwd"]) or q)
     return re.sub(r"\$\{(\w+)\}|\$(\w+)", rep, w)
@@ -828,7 +846,9 @@ def check_simple(cmd, state, depth):
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values
             name, val = a.split("=", 1)
-            if "$" in val or "`" in val:
+            if val in BRANCH_SUBS:
+                state["vars"][name] = branch(state["cwd"]) or val
+            elif "$" in val or "`" in val:
                 state["vars"].pop(name, None)
             else:
                 state["vars"][name] = val

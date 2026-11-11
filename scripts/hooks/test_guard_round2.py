@@ -198,7 +198,7 @@ class RoundThree(Base):
             "git commit -m \"$(cat <<'EOF'\nfix: handle the edge case in the parser\nEOF\n)\"",
             "git commit -m \"$(cat <<'EOF'\ntest: add a case for push in guard\nEOF\n)\"",
             "git commit -m \"$(echo 'a case in point')\"",
-            "echo $(echo edge case in parser)",
+            "echo $(echo edge case in parser)", "git log --grep=$(echo edge case in parser)",
             "gh pr create --title x --body \"$(cat <<'EOF'\nCovers the case in .github/workflows\nEOF\n)\"",
         ])
         self.denied(["echo $(case x in x) git push --force;; esac)", "echo $(true; case x in x) git push --force;; esac)"])
