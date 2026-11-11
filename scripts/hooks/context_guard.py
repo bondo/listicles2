@@ -5,8 +5,9 @@ write handoff/<branch>.md from handoff/TEMPLATE.md, commit and end (PLAN 9.3).
 Usage source (works headless/in the cloud, where the statusline never runs): the last main-thread assistant record in
 transcript_path, context = input + cache_creation + cache_read + output tokens of that call. If scripts/statusline.sh did
 record a value for the session (interactive CLI), the larger of the two is used.
-Window: LISTICLES_CONTEXT_WINDOW (tokens), else the hook input's context_window.context_window_size, else 1,000,000
-(the models used here have a 1M window; a 200k default fired the reminder at ~100k tokens). Garbage values fall back.
+Window: LISTICLES_CONTEXT_WINDOW (tokens), else 1,000,000 (the models used here have a 1M window; a 200k default fired
+the reminder at ~100k tokens). Set LISTICLES_CONTEXT_WINDOW at spawn for a smaller window. Garbage values fall back.
+Calls made inside subagents (hook input has agent_id) are ignored.
 Env: LISTICLES_CONTEXT_THRESHOLD (percent, default 50). Output: hookSpecificOutput.additionalContext. Never fails."""
 
 import json
@@ -50,18 +51,18 @@ def last_usage(path):
 def positive_int(value):
     """int(value) when it is a plain positive integer, else None (garbage falls back to the default)."""
     s = str(value).strip() if value is not None else ""
-    return int(s) if s.isdigit() and int(s) > 0 else None
+    return int(s) if re.fullmatch(r"[0-9]+", s) and int(s) > 0 else None  # ASCII digits only: int("\u00b2") raises
 
 
-def window_of(data):
-    """LISTICLES_CONTEXT_WINDOW, else the hook input's context_window.context_window_size, else 1,000,000."""
-    cw = data.get("context_window")
-    from_input = positive_int(cw.get("context_window_size")) if isinstance(cw, dict) else None
-    return positive_int(os.environ.get("LISTICLES_CONTEXT_WINDOW")) or from_input or DEFAULT_WINDOW
+def window_of():
+    """LISTICLES_CONTEXT_WINDOW, else 1,000,000. (PostToolUse input has no window field; only the statusline JSON does.)"""
+    return positive_int(os.environ.get("LISTICLES_CONTEXT_WINDOW")) or DEFAULT_WINDOW
 
 
 def main():
     data = json.load(sys.stdin)
+    if data.get("agent_id"):  # PostToolUse also fires inside subagents: neither warn them nor use up the main reminder
+        return
     sid = str(data.get("session_id", ""))
     if not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
         return
@@ -74,7 +75,7 @@ def main():
     tp = data.get("transcript_path")
     found = last_usage(tp) if isinstance(tp, str) and tp else None
     if found:
-        pcts.append(found * 100 // window_of(data))
+        pcts.append(found * 100 // window_of())
     if not pcts:
         return
     pct = max(pcts)

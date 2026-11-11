@@ -37,7 +37,7 @@ def changed_paths(local, remote):
         return None
     else:
         base = remote
-    out = run_git("diff", "--name-only", base, local)
+    out = run_git("diff", "--name-only", "--no-renames", base, local)  # renames must show both paths
     return None if out is None else [p for p in out.splitlines() if p]
 
 
