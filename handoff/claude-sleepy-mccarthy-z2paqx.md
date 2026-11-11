@@ -116,3 +116,34 @@ Still TODO (not started), in this order, each as failing test commit then fix co
    agents/prompts/reviewer.md + implementer.md; make scripts/verify.sh run every Python test (already does via discover) and add detekt to verify (already).
 6. `scripts/verify.sh` run, push, then review round 2 (R10): fresh Opus high-effort report-only reviewer subagents, fix, repeat; max rounds 2-4.
 Nothing has been pushed yet in this session; push with `git push -u origin claude/sleepy-mccarthy-z2paqx` after the handoff commit.
+
+## Session 5 (tooling session #2, LISTICLES_TASK=tooling): state at stop (context hook fired at 50%)
+Done and pushed (test commit first, fix second):
+- 80c841d tests / 2eda1eb fix: **R9-10 + guards.sh test suite** (item 1 of the Session 4 TODO list). `scripts/hooks/test_guards_sh.py`: 21 tests on throwaway
+  git repos (clean pass, every disabled-test form incl. qualified, JS skip/only, enabled=false prod vs test, build-config disabling, suppressions with and
+  without `justified:`, baselines, lowered/removed thresholds, screenshots, diff size CI-only, missing base, `--staged` index-only, doc exclusions).
+  guards.sh now excludes the suite itself (it names the patterns). All 59 hook tests pass (`python3 -I -m unittest discover -s scripts/hooks`).
+- Env note for a fresh container: Maven Central returns 429 through the proxy. Recreate `~/.gradle/init.d/central-mirror.gradle.kts` (rewrites
+  repo.maven.apache.org / repo1.maven.org URLs to `https://maven-central.storage-download.googleapis.com/maven2/` in settings pluginManagement,
+  dependencyResolutionManagement and project/buildscript repositories via `withType<MavenArtifactRepository>().configureEach`). Local only, no Android SDK
+  here yet (`/opt/android-sdk` absent), so `:app:*` tasks need the SDK setup from "Facts that save time" above; spotless/detekt run without it.
+
+Still TODO, in this order (each: failing test commit, then fix commit; push after each):
+2. **R9-03**: add `:core:domain:detektMain :core:domain:detektTest` to ci.yml `static` job (line `spotlessCheck detekt :app:lintDebug`) and to
+   `.githooks/pre-commit` (`spotlessCheck detekt`). Failing wiring test first: new `scripts/hooks/test_wiring.py` reading `.github/workflows/ci.yml`
+   and `.githooks/pre-commit` (assert both name the two tasks; assert the CI `guards` job runs `unittest discover -s scripts/hooks`; assert
+   `.claude/agents/*.md` frontmatter `effort:` equals `agents/roles.yaml` for explorer/ci-triage).
+3. **R9-08 rest**: `effort: low` in `.claude/agents/explorer.md` and `ci-triage.md` frontmatter (covered by the wiring test above).
+4. **R9-09**: dark-theme UI test that can fail: `app/src/androidTest` ListiclesAppTest, `compose.onRoot().captureToImage()`, assert mean pixel luminance
+   low for darkTheme=true and high for false; compile with `:app:assembleDebugAndroidTest` (no emulator here; needs the Android SDK).
+5. **Docs/rules** (owner rules from the task prompt): REVIEW.md, CLAUDE.md, agents/prompts/reviewer.md and implementer.md must state:
+   (a) test-first for every change incl. tooling, failing test committed first, negative cases, wired into verify.sh/CI, reviewers flag untested changes;
+   (b) reviewers NEVER edit or push the PR branch, report only (severity, file:line, recommendation, recommended disposition fix-now/defer),
+   throwaway branch/worktree allowed, never pushed, deleted afterwards; (c) minor/nit findings may be deferred to follow-up issues once no
+   blocker/major is open (process in docs/ORCHESTRATION.md on the PR #16 branch once merged; until then report deferrable findings clearly).
+   Add a test (in test_wiring.py) that REVIEW.md and both prompts contain the reviewer-never-pushes and test-first sentences.
+6. Run `scripts/verify.sh`, push, then review round 2 (R10): FRESH Opus high-effort report-only reviewer subagents (no authoring context), fix, repeat
+   until only nits remain; max 4 rounds in this batch (round 1 = R9 already ran). Final summary: what changed, rounds, findings per severity per
+   round, incidents, owner actions (big-pr label, make repo public, branch protection).
+Open question for the owner/orchestrator: the context hook fires at 50% of a 200k default window. If this session model has a 1M window this is a
+false alarm; calibrate `LISTICLES_CONTEXT_WINDOW` per role (same note as session 4). Two sessions in a row hit the hook early, so the calibration matters.
