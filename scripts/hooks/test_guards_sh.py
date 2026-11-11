@@ -110,7 +110,7 @@ class CleanAndDisabledTests(GuardsCase):
 
     def test_python_skip_forms_in_hook_tests_fail_even_in_the_guard_suite(self):
         """R10-10: the hook suites are a CI gate, so skipping one must fail like skipping a Kotlin test."""
-        forms = ["@unittest." + "skip('flaky')", "@unittest.skip" + "If(True, 'x')", "@unittest.skip" + "Unless(False, 'x')",
+        forms = ["@unittest." + "skip('flaky')", "@unittest." + "skip" + "If(True, 'x')", "@unittest." + "skip" + "Unless(False, 'x')",
                  "self.skip" + "Test('x')", "raise unittest.Skip" + "Test('x')", "@unittest.expected" + "Failure"]
         for name in ("test_something.py", "test_guards_sh.py"):
             for form in forms:
