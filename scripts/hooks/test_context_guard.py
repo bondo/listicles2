@@ -68,35 +68,34 @@ class Headless(unittest.TestCase):
         return r.stdout
 
     def test_warns_once_from_transcript_at_threshold(self):
+        w = {"LISTICLES_CONTEXT_WINDOW": "200000"}
         self.write([assistant(80000)])
-        self.assertEqual(self.hook(), "")  # 40%
+        self.assertEqual(self.hook(env=w), "")  # 40%
         self.write([assistant(80000), assistant(100000, mid="b")])  # exactly 50%
-        out = json.loads(self.hook())
+        out = json.loads(self.hook(env=w))
         self.assertIn("50%", out["hookSpecificOutput"]["additionalContext"])
         self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "PostToolUse")
-        self.assertEqual(self.hook(), "")  # only once per session
-        self.assertNotEqual(self.hook(sid="other"), "")  # other sessions warn separately
+        self.assertEqual(self.hook(env=w), "")  # only once per session
+        self.assertNotEqual(self.hook(sid="other", env=w), "")  # other sessions warn separately
 
     def test_below_threshold_is_silent(self):
         self.write([assistant(99999)])
-        self.assertEqual(self.hook(), "")
+        self.assertEqual(self.hook(env={"LISTICLES_CONTEXT_WINDOW": "200000"}), "")
 
     def test_uses_the_last_main_thread_usage_and_skips_noise(self):
         self.write([assistant(150000, mid="a"), {"type": "user"}, assistant(190000, mid="s", sidechain=True), "not json",
                     assistant(40000, mid="b"), {"type": "assistant", "message": {"id": "x"}}])
-        self.assertEqual(self.hook(), "")  # last real main record is 20%
+        self.assertEqual(self.hook(env={"LISTICLES_CONTEXT_WINDOW": "200000"}), "")  # last real main record is 20%
 
     def test_window_and_threshold_come_from_env_or_model(self):
         self.write([assistant(120000)])
         self.assertEqual(self.hook(env={"LISTICLES_CONTEXT_WINDOW": "1000000"}), "")  # 12%
-        self.assertNotEqual(self.hook(sid="w2", env={"LISTICLES_CONTEXT_THRESHOLD": "30"}), "")
-        self.write([assistant(120000, model="claude-opus-5-5[1m]")])
-        self.assertEqual(self.hook(sid="w3"), "")  # [1m] models have a 1M window
+        self.assertNotEqual(self.hook(sid="w2", env={"LISTICLES_CONTEXT_THRESHOLD": "30", "LISTICLES_CONTEXT_WINDOW": "200000"}), "")
 
     def test_large_transcript_only_tail_is_needed(self):
         self.write([assistant(10000, mid=f"m{i}") for i in range(30000)] + [assistant(150000, mid="last")])
         self.assertGreater(os.path.getsize(self.tp), 4_000_000)
-        self.assertIn("75%", self.hook())
+        self.assertIn("75%", self.hook(env={"LISTICLES_CONTEXT_WINDOW": "200000"}))
 
     def test_bad_or_missing_transcript_is_silent(self):
         self.assertEqual(self.hook(tp="/nonexistent/x.jsonl"), "")
@@ -104,6 +103,47 @@ class Headless(unittest.TestCase):
         self.assertEqual(self.hook(sid="e"), "")
         r = subprocess.run([sys.executable, "-I", GUARD], input=json.dumps({"session_id": "h2"}), capture_output=True, text=True)
         self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+    # Default window is 1,000,000 (the models used here); a 200k default fired the reminder at ~100k tokens.
+    def test_default_window_is_1m_so_120k_does_not_warn(self):
+        for model in ("claude-sonnet-5-5", "claude-opus-5-5[1m]", ""):
+            self.write([assistant(120000, model=model)])
+            self.assertEqual(self.hook(sid="d" + model[-4:]), "", model)
+
+    def test_default_window_warns_at_500k(self):
+        self.write([assistant(499999)])
+        self.assertEqual(self.hook(sid="d1"), "")
+        self.write([assistant(500000, mid="b")])
+        self.assertIn("50%", json.loads(self.hook(sid="d1"))["hookSpecificOutput"]["additionalContext"])
+
+    def test_200k_window_still_warns_at_its_own_50_percent(self):
+        w = {"LISTICLES_CONTEXT_WINDOW": "200000"}
+        self.write([assistant(99999)])
+        self.assertEqual(self.hook(sid="e1", env=w), "")
+        self.write([assistant(100000, mid="b")])
+        self.assertIn("50%", self.hook(sid="e1", env=w))
+
+    def test_window_from_hook_input_is_used_and_env_overrides_it(self):
+        self.write([assistant(250000)])
+        data = {"session_id": "i1", "transcript_path": self.tp, "context_window": {"context_window_size": 400000}}
+
+        def run(env):
+            e = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
+            e.update(TMPDIR=self.tmp, **env)
+            return subprocess.run([sys.executable, "-I", GUARD], input=json.dumps(data), env=e, capture_output=True, text=True).stdout
+
+        self.assertIn("62%", run({}))  # 250k of the 400k window in the input
+        os.remove(os.path.join(self.tmp, "listicles-ctx", "i1.warned"))
+        self.assertEqual(run({"LISTICLES_CONTEXT_WINDOW": "1000000"}), "")  # env wins
+
+    def test_garbage_window_env_falls_back_to_1m(self):
+        self.write([assistant(600000)])
+        for i, bad in enumerate(("abc", "0", "-5", "1.5")):
+            self.assertIn("60%", self.hook(sid=f"g{i}", env={"LISTICLES_CONTEXT_WINDOW": bad}), bad)
+
+    def test_garbage_threshold_env_falls_back_to_50(self):
+        self.write([assistant(600000)])
+        self.assertIn("60%", self.hook(sid="t1", env={"LISTICLES_CONTEXT_THRESHOLD": "abc"}))
 
     def test_statusline_threshold_follows_env(self):
         env = dict(os.environ, TMPDIR=self.tmp, LISTICLES_CONTEXT_THRESHOLD="80")
