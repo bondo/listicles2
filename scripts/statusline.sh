@@ -14,5 +14,7 @@ if [ -n "$pct" ] && [ -n "$sid" ] && [[ "$sid" =~ ^[A-Za-z0-9_-]+$ ]]; then
 fi
 p=${pct%.*}
 printf '%s | %s | ctx %s%%' "$model" "${br:-no-branch}" "${p:-?}"
-[ -n "$p" ] && [ "$p" -ge "${LISTICLES_CONTEXT_THRESHOLD:-50}" ] 2>/dev/null && printf ' | HANDOFF NOW'
+limit=${LISTICLES_CONTEXT_THRESHOLD:-50}
+[[ "$limit" =~ ^[0-9]+$ ]] && [ "$limit" -gt 0 ] || limit=50  # garbage falls back to 50
+[ -n "$p" ] && [ "$p" -ge "$limit" ] 2>/dev/null && printf ' | HANDOFF NOW'
 echo
