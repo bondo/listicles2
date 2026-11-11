@@ -154,8 +154,9 @@ override, ignores subagent calls via `agent_id`), statusline threshold, pre-push
 gradle/guards), type-resolved detekt in CI `static` + pre-commit (R9-03), subagent `effort: low` (R9-08), owner rules in REVIEW.md/CLAUDE.md/
 reviewer+implementer prompts (test-first incl. tooling, reviewers report only, `deferred` status), PreToolUse guard hardening (R10-01..09,
 R11-01..03, R12-01), guards.sh (R10-10/11, R11-09), `gitenv.py` so hook tests never touch the enclosing repo (R11-51, R12-51/52).
-Rounds (fresh Opus high reviewers, report only): R10 = 2 major + 9 minor (guard) and 3 major... see summary; R11 = 1 major + minors; R12 = 0 major,
-only minors/nits. All majors fixed; deferred minors/nits are in issue #19. 148 hook tests pass (`python3 -I -m unittest discover -s scripts/hooks`).
+Rounds (fresh Opus high reviewers, report only; new findings per round): R10 = 4 major, 13 minor, 3 nit; R11 = 2 major, 9 minor, 1 nit;
+R12 = 0 major, 4 minor, 3 nit. All majors fixed; R12-01/51/52/53 fixed after round 4 (not re-reviewed); the rest is deferred in issue #19.
+148 hook tests pass (`python3 -I -m unittest discover -s scripts/hooks`).
 NOT PUSHED: the last commit (R9-09 dark-theme pixel test in `ListiclesAppTest.kt` + a wiring test). The pre-push hook builds Gradle for `app/` changes
 and this container has no Android SDK (the SDK download was denied). Push it from a machine with the SDK, or let a session install it
 (`sdkmanager "platforms;android-37.0" "platforms;android-36" "build-tools;36.0.0"`); CI compiles it in `unit` and runs it in `ui`.
