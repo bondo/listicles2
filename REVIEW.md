@@ -79,6 +79,6 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
    Deferral: once no blocker or major is open, `minor` and `nit` findings may be deferred to follow-up issues instead of
    another round. The author opens one issue per deferred finding (title, file:line, scenario) and links it in the PR.
    Blockers and majors are never deferred.
-4. **Maximum 4 rounds.** If round 4 still has findings above `nit`, stop and report to the owner, who decides.
+4. **Maximum 4 rounds.** If round 4 still has open findings above `nit` (deferred minors do not count), stop and report to the owner, who decides.
    Fixes made after round 4 are not re-reviewed unless the owner asks.
 5. Disputes: the reviewer either withdraws or restates with new evidence; the owner breaks ties.

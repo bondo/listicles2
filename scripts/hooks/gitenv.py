@@ -14,6 +14,9 @@ LOCAL_ENV_VARS = (
 def scrub():
     for name in LOCAL_ENV_VARS:
         os.environ.pop(name, None)
+    # Fixture repos set their own identity; the developer's global/system config (signing, hooks) must not apply (R12-52).
+    os.environ["GIT_CONFIG_GLOBAL"] = os.devnull
+    os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
 
 
 scrub()

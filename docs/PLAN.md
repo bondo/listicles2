@@ -273,7 +273,7 @@ enforce the rules rather than goodwill.
    last round, the open findings, and `REVIEW.md`. It re-checks open findings and reviews
    the new code. It doesn't re-review unchanged code, so the loop converges.
 6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and you squash-merge.
-   If round 4 still has findings above nit, the loop stops and you decide.
+   If round 4 still has open findings above nit (deferred minors do not count), the loop stops and you decide.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 
