@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-# Full guards, then unit tests, before every push.
+# Full guards, hook tests, and (unless the push cannot affect the Android build) unit tests before every push.
+# Docs/scripts/hooks/CI/firebase-only pushes skip Gradle (scripts/hooks/prepush_scope.py decides; unknown means build).
 cd "$(git rev-parse --show-toplevel)" || exit 1
+scope=$(python3 -I scripts/hooks/prepush_scope.py)  # reads the pre-push stdin
+echo "pre-push: scope=$scope"
 ./scripts/guards.sh || exit 1
+python3 -I -m unittest discover -s scripts/hooks 2>&1 | tail -15
+[ "${PIPESTATUS[0]}" = 0 ] || exit 1
+if [ "$scope" = skip ]; then
+  echo "pre-push: no Android-affecting changes, skipping Gradle unit tests"
+  exit 0
+fi
 ./gradlew -q --console=plain testDebugUnitTest :core:domain:test 2>&1 | grep -v '^Picked up' | tail -25
 exit "${PIPESTATUS[0]}"
