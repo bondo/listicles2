@@ -10,10 +10,14 @@ Usage:
   validate  schema, ids, dependencies and cycles; exit 1 on any error
   ready     todo tasks whose dependencies are all satisfied and that nobody has claimed
   status    every task with its derived state and unmet dependencies
-  drift     places where the file disagrees with GitHub (closed issue / merged PR vs. status)
+  drift     places where the file disagrees with GitHub (closed issue / merged PR vs. status),
+            plus follow-up rule violations when --followups is given
+  followups open follow-up issues (docs/FOLLOW-UPS.md), counted by severity; needs --followups
 
 --issues: JSON array of {"number", "title", "state"} (GitHub issue list or search items).
 --prs:    JSON array of {"number", "state", "merged"} or {"number", "merged_at"}.
+--followups: JSON of OPEN issues labelled `follow-up` (same shapes, plus "labels"). Labels:
+          severity:<blocker|major|minor|nit>, target:<milestone>, area:<security-rules|sync-merge|release>, owner-ok.
 --claimed: comma-separated task ids held by running sessions (the state issue's Sessions table).
 """
 
@@ -32,6 +36,9 @@ DEFAULT_FILE = "docs/tasks.toml"
 STATUSES = ("todo", "done", "dropped")
 RISKS = ("normal", "high")
 ASSIGNEES = ("owner", "implementer", "planner", "process", "retro")
+SEVERITIES = ("blocker", "major", "minor", "nit")
+PROTECTED_AREAS = ("security-rules", "sync-merge", "release")  # never deferred without owner-ok
+BURN_DOWN = "FU"
 REQUIRED = ("id", "title", "milestone", "status", "assignee", "risk", "depends_on")
 OPTIONAL = ("issue", "pr", "notes")
 MILESTONE_DEP = "milestone:"
@@ -69,8 +76,11 @@ class Graph:
         self.by_id = {t.id: t for t in self.tasks}
 
 
-def parse(text: str) -> Graph:
-    """Parse and validate. Raises TaskFileError listing every problem found."""
+def parse(text: str, burn_down: bool = True) -> Graph:
+    """Parse and validate. Raises TaskFileError listing every problem found.
+
+    burn_down: also require each milestone with agent work to have its Mx-FU task (see check_burn_downs).
+    """
     try:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
@@ -106,8 +116,8 @@ def parse(text: str) -> Graph:
             assignee=raw["assignee"], risk=raw["risk"], depends_on=raw["depends_on"], index=i,
             issue=raw.get("issue"), pr=raw.get("pr"), notes=raw.get("notes", ""),
         )
-        if not isinstance(t.id, str) or not re.fullmatch(r"[A-Za-z0-9.]+-(\d{2}|O\d+)", t.id):
-            errors.append(f"{where}: id must look like M1-03 (agent) or M1-O2 (owner)")
+        if not isinstance(t.id, str) or not re.fullmatch(r"[A-Za-z0-9.]+-(\d{2}|O\d+|FU)", t.id):
+            errors.append(f"{where}: id must look like M1-03 (agent), M1-O2 (owner) or M1-FU (burn-down)")
         elif t.id in seen:
             errors.append(f"{where}: duplicate id")
         seen.add(str(t.id))
@@ -148,6 +158,8 @@ def parse(text: str) -> Graph:
                 errors.append(f"{t.id}: depends on unknown task {d!r}")
             elif d == t.id:
                 errors.append(f"{t.id}: depends on itself")
+    if burn_down:
+        errors += check_burn_downs(milestones, tasks)
     if errors:
         raise TaskFileError(errors)
     graph = Graph(milestones, tasks)
@@ -155,6 +167,27 @@ def parse(text: str) -> Graph:
     if cycle:
         raise TaskFileError(["dependency cycle: " + " -> ".join(cycle)])
     return graph
+
+
+def check_burn_downs(milestones: list[str], tasks: list[Task]) -> list[str]:
+    """Each milestone with non-owner work has one Mx-FU task: implementer, depending on all that work.
+
+    That makes the follow-up burn-down the last agent task of its milestone, so `milestone:Mx`
+    dependencies (and the merge task) cannot be satisfied while follow-ups are un-triaged.
+    """
+    errors: list[str] = []
+    for m in milestones:
+        mine = [t for t in tasks if t.milestone == m]
+        work = [t for t in mine if t.assignee != "owner" and t.id != f"{m}-{BURN_DOWN}"]
+        fu = next((t for t in mine if t.id == f"{m}-{BURN_DOWN}"), None)
+        if fu is None:
+            if work:
+                errors.append(f"{m} has no burn-down task {m}-{BURN_DOWN} (docs/FOLLOW-UPS.md)")
+            continue
+        if fu.assignee != "implementer":
+            errors.append(f"{fu.id} must be assigned to implementer")
+        errors += [f"{fu.id} must depend on {t.id}" for t in work if t.id not in fu.depends_on]
+    return errors
 
 
 def edges(graph: Graph, t: Task) -> list[str]:
@@ -274,6 +307,84 @@ def drift(graph: Graph, issues=None, prs=None) -> list[str]:
     return msgs
 
 
+@dataclass
+class FollowUp:
+    number: int
+    title: str
+    severity: str | None
+    target: str | None
+    areas: list[str]
+    owner_ok: bool
+
+
+def load_followups(items: list[dict] | None) -> list[FollowUp]:
+    """Open issues labelled `follow-up`. Labels may be strings or {"name": ...} objects."""
+    out: list[FollowUp] = []
+    for it in items or []:
+        if str(it.get("state", "open")).lower() == "closed":
+            continue
+        names = [str(x.get("name", "") if isinstance(x, dict) else x) for x in it.get("labels") or []]
+        if "follow-up" not in names:
+            continue
+
+        def one(prefix: str) -> str | None:
+            vals = [n[len(prefix):] for n in names if n.startswith(prefix)]
+            return vals[0] if vals else None
+
+        out.append(FollowUp(
+            number=int(it["number"]), title=str(it.get("title", "")), severity=one("severity:"),
+            target=one("target:"), areas=[n[len("area:"):] for n in names if n.startswith("area:")],
+            owner_ok="owner-ok" in names,
+        ))
+    return out
+
+
+def followup_counts(fus: list[FollowUp], target: str | None = None) -> dict[str, int]:
+    counts = dict.fromkeys(SEVERITIES, 0)
+    for f in fus:
+        if (target is None or f.target == target) and f.severity in counts:
+            counts[f.severity] += 1
+    return counts
+
+
+def followup_summary(fus: list[FollowUp], target: str | None = None) -> str:
+    counts = followup_counts(fus, target)
+    total = sum(1 for f in fus if target is None or f.target == target)
+    return f"open follow-ups: {total} (" + ", ".join(f"{k} {v}" for k, v in counts.items()) + ")"
+
+
+def followup_notes(graph: Graph, fus: list[FollowUp]) -> dict[str, str]:
+    """Burn-down task id -> its milestone's open follow-ups, for the ready/status output."""
+    return {t.id: followup_summary(fus, t.milestone) for t in graph.tasks
+            if t.id == f"{t.milestone}-{BURN_DOWN}" and any(f.target == t.milestone for f in fus)}
+
+
+def followup_drift(graph: Graph, fus: list[FollowUp]) -> list[str]:
+    """Violations of the deferral rules that can be seen from labels alone."""
+    msgs: list[str] = []
+    for f in fus:
+        n = f"#{f.number}"
+        if f.severity is None:
+            msgs.append(f"{n}: follow-up has no severity:<level> label")
+        elif f.severity not in SEVERITIES:
+            msgs.append(f"{n}: unknown severity {f.severity!r}")
+        elif f.severity == "blocker":
+            msgs.append(f"{n}: blockers are never deferred")
+        elif f.severity == "major" and not f.owner_ok:
+            msgs.append(f"{n}: major follow-up needs the owner-ok label")
+        if not f.owner_ok:
+            msgs += [f"{n}: area:{a} follow-up needs the owner-ok label" for a in f.areas if a in PROTECTED_AREAS]
+        if f.target is None:
+            msgs.append(f"{n}: follow-up has no target:<milestone> label")
+        elif f.target not in graph.milestones:
+            msgs.append(f"{n}: target milestone {f.target!r} is unknown")
+        else:
+            fu = graph.by_id.get(f"{f.target}-{BURN_DOWN}")
+            if fu is not None and fu.status == "done":
+                msgs.append(f"{n}: target {f.target} but burn-down {fu.id} is already done (retarget with owner OK)")
+    return msgs
+
+
 def order_key(graph: Graph, t: Task) -> tuple[int, int]:
     return (graph.milestones.index(t.milestone), t.index)
 
@@ -310,10 +421,11 @@ def main(argv: list[str] | None = None) -> int:
     src.add_argument("--ref", help=f"read {DEFAULT_FILE} from this git ref, e.g. origin/main")
     ap.add_argument("--issues", help="JSON file with GitHub issues (number, title, state)")
     ap.add_argument("--prs", help="JSON file with GitHub PRs (number, merged / merged_at)")
+    ap.add_argument("--followups", help="JSON file with OPEN `follow-up` issues (number, title, state, labels)")
     ap.add_argument("--claimed", default="", help="comma-separated task ids held by running sessions")
     ap.add_argument("--assignee", help="filter: owner, agent, or one role")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
-    ap.add_argument("command", choices=("validate", "ready", "status", "drift"))
+    ap.add_argument("command", choices=("validate", "ready", "status", "drift", "followups"))
     a = ap.parse_args(argv)
 
     try:
@@ -323,6 +435,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {msg}", file=sys.stderr)
         return 1
     issues, prs = read_json(a.issues), read_json(a.prs)
+    fus = load_followups(read_json(a.followups))
+    if a.command == "followups" and not a.followups:
+        print("error: followups needs --followups (open issues labelled follow-up)", file=sys.stderr)
+        return 1
     claimed = [c.strip() for c in a.claimed.split(",") if c.strip()]
     unknown_claims = sorted(set(claimed) - set(graph.by_id))
     if unknown_claims:
@@ -333,14 +449,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ok: {len(graph.tasks)} tasks in {len(graph.milestones)} milestones")
         return 0
     if a.command == "drift":
-        msgs = drift(graph, issues, prs)
+        msgs = drift(graph, issues, prs) + followup_drift(graph, fus)
         print(json.dumps(msgs, indent=2) if a.json else "\n".join(msgs) or "no drift")
+        return 0
+
+    if a.command == "followups":
+        if a.json:
+            print(json.dumps({"counts": followup_counts(fus), "items": [
+                {"number": f.number, "title": f.title, "severity": f.severity, "target": f.target,
+                 "areas": f.areas, "owner_ok": f.owner_ok} for f in fus]}, indent=2))
+            return 0
+        for f in sorted(fus, key=lambda f: (SEVERITIES.index(f.severity) if f.severity in SEVERITIES else 9, f.number)):
+            print(f"#{f.number:<5} {f.severity or '?':<8} {f.target or '?':<5} {f.title}")
+        print(followup_summary(fus))
         return 0
 
     derived = derive(graph, issues, prs, claimed)
     rows = sorted((t for t in graph.tasks if matches(t, a.assignee)), key=lambda t: order_key(graph, t))
     if a.command == "ready":
         rows = [t for t in rows if derived[t.id]["state"] == "ready"]
+    notes = followup_notes(graph, fus)
     if a.json:
         print(json.dumps([{
             "id": t.id, "title": t.title, "milestone": t.milestone, "assignee": t.assignee, "risk": t.risk,
@@ -357,9 +485,13 @@ def main(argv: list[str] | None = None) -> int:
             line += f"  [waits on {', '.join(d['unmet'])}]"
         if t.issue:
             line += f"  (#{t.issue})"
+        if t.id in notes:
+            line += f"  [{notes[t.id]}]"
         print(line)
     if a.command == "ready" and not rows:
         print("no ready tasks")
+    if a.followups:
+        print(followup_summary(fus))
     return 0
 
 

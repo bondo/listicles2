@@ -7,6 +7,8 @@
 # depends_on: task ids, or "milestone:<M>" = every task of milestone <M> is done or dropped
 # ids:        <milestone>-NN for agent tasks, <milestone>-O<n> for owner tasks
 # A dropped dependency counts as satisfied. Order within a milestone = priority.
+# Mx-FU = the milestone's follow-up burn-down (docs/FOLLOW-UPS.md): every milestone with agent work
+#         has one, it depends on all of that work, and validate enforces both.
 
 milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]
 
@@ -119,7 +121,28 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-05", "M0-09"]
 pr = 1
-notes = "Needs LISTICLES_TASK=tooling (process files are hook-protected)"
+notes = "Needs LISTICLES_TASK=tooling (process files are hook-protected). Also: apply the protected-file list in docs/FOLLOW-UPS.md section 8 (REVIEW.md, role prompts, PR template, issue template, CI, hook allow-list)"
+
+[[task]]
+id = "M0-11"
+title = "Follow-ups process: docs/FOLLOW-UPS.md, tasks.py follow-up counts and burn-down checks"
+milestone = "M0"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = []
+notes = "Branch claude/orchestration-review (PR #16); protected-file edits are listed for M0-10"
+
+[[task]]
+id = "M0-FU"
+title = "Follow-up burn-down for M0 (close or re-defer each open follow-up targeting M0)"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-01", "M0-02", "M0-03", "M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-09", "M0-10", "M0-11"]
+pr = 1
+notes = "M0 is one PR, so findings deferred from it should target M1, not M0 (docs/FOLLOW-UPS.md section 3)"
 
 [[task]]
 id = "M0-O1"
@@ -179,13 +202,23 @@ risk = "normal"
 depends_on = ["M0-08", "M0-O2"]
 
 [[task]]
+id = "M0-O8"
+title = "Create the follow-up labels (follow-up, severity:*, target:*, area:*, owner-ok)"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-11"]
+notes = "Exact names and colours: docs/FOLLOW-UPS.md section 7"
+
+[[task]]
 id = "M0-O7"
 title = "Squash-merge PR #1 (M0)"
 milestone = "M0"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-10", "M0-O1", "M0-O4", "M0-O5"]
+depends_on = ["M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-10", "M0-11", "M0-FU", "M0-O1", "M0-O4", "M0-O5", "M0-O8"]
 pr = 1
 
 # ---------------------------------------------------------------- M0.5 product design (no code)
@@ -218,6 +251,15 @@ risk = "normal"
 depends_on = ["M0.5-01"]
 
 [[task]]
+id = "M0.5-FU"
+title = "Follow-up burn-down for M0.5"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
+
+[[task]]
 id = "M0.5-O1"
 title = "Approve stories, flow and design"
 milestone = "M0.5"
@@ -246,6 +288,15 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
+
+[[task]]
+id = "M1-FU"
+title = "Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01", "M1-02"]
 
 [[task]]
 id = "M1-O1"

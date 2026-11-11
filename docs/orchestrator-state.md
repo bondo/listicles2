@@ -3,7 +3,7 @@
 Copy everything below the line into the state issue body (label `orchestrator-state`).
 Rules: [`ORCHESTRATION.md`](ORCHESTRATION.md) §3. Only the active orchestrator edits it.
 History goes into comments (`metrics:*`, `incident`, `decision`, `handover`, `handover-ack`,
-`todo-done`, `correction`), not into this body.
+`todo-done`, `correction`; deferrals are `decision` comments), not into this body.
 
 ---
 
@@ -35,6 +35,10 @@ unless you are the orchestrator named below; comment instead.
 
 ## Owner to-dos (ready owner tasks, `owner-todo` issues)
 - {task id} #{n} {title}: then the orchestrator {follow-up}
+
+## Follow-ups
+(From `scripts/tasks.py --followups … followups`; rules in FOLLOW-UPS.md.)
+- Open follow-ups: {N} (blocker 0, major {a}, minor {b}, nit {c}); oldest target milestone {Mx}
 
 ## Pending task additions (for the next PR that touches docs/tasks.toml)
 - {new task, deps, why} / drift: {from `tasks.py drift`}

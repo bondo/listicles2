@@ -11,7 +11,7 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 | Role | Model / effort | Lifetime | Writes to | Never |
 |---|---|---|---|---|
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
-| **Orchestrator** | Sonnet / low | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo issues, scheduled tasks, session tags | Commits, pushes, edits files, reviews code, reads full transcripts |
+| **Orchestrator** | Sonnet / low | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, scheduled tasks, session tags | Commits, pushes, edits files, reviews code, reads full transcripts |
 | **Implementer** | Sonnet / medium (high on escalation or `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR | Pushes to `main` or to any branch it was not assigned |
 | **Reviewer** | Opus / high (max for `risk:high`) | One review round | One findings comment on the PR | Pushes, edits files, approves or merges |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
@@ -31,6 +31,7 @@ Each fact has exactly one canonical location. Everything else links to it and do
 | Who is working on a task right now (claims) | **State issue** Sessions table, `Task` column | Orchestrator | `scripts/tasks.py --claimed` |
 | Owner to-do details and completion | One **issue per owner task**, label `owner-todo`, title `[owner] <task id>: …` (§4.5) | Orchestrator opens; owner closes | Everyone, `scripts/tasks.py --issues` |
 | Review findings per round | One **findings comment on the PR**, in the `REVIEW.md` JSON format (§7.2) | Reviewer | Implementer, next reviewer, metrics |
+| Deferred findings (follow-ups) | One **issue per finding**, label `follow-up`, body template and rules in [`FOLLOW-UPS.md`](FOLLOW-UPS.md); the deferral decision is a `decision` comment on the state issue | Orchestrator (implementer if no orchestrator is active); never the reviewer | Burn-down task `Mx-FU`, orchestrator (`tasks.py followups`) |
 | Implementation progress inside a batch | `handoff/<branch>.md` on that branch | The implementer holding the branch lock | Next implementer on that branch |
 | Worker outcome | `WORKER-RESULT` block (§7.3): last message of the session **and** a PR comment | Worker | Orchestrator |
 | Cost and tokens per session | `get_session` → `external_metadata.usage` (read once the session is idle) | The platform | Orchestrator, copied into a metrics row |
@@ -78,6 +79,7 @@ goes to comments, not the body.
 * **Owner to-dos**: task id and issue number only, each with the orchestrator's follow-up action.
 * **Scheduled tasks**: trigger id, the session it fires into, purpose, next run.
 * **PR subscriptions** held by the orchestrator.
+* **Follow-ups**: the one-line count by severity from `tasks.py followups` (FOLLOW-UPS.md §8).
 * **Next**: the next 1-3 actions, concrete enough for a cold successor.
 
 ### 3.2 Who may edit
@@ -125,6 +127,8 @@ notes = "…"               # optional, one line
 * owner ids on non-owner tasks, and the reverse
 * unknown dependencies, and dependencies on the task's own milestone
 * cycles, including cycles through `milestone:` dependencies
+* a milestone with agent work and no burn-down task `<M>-FU`, or a burn-down that is not assigned to `implementer`
+  or does not depend on every other non-owner task of its milestone (FOLLOW-UPS.md §8; ids end in `-FU`)
 
 **Tasks ref.** The canonical copy is `docs/tasks.toml` on `main`. Until M0 is merged, `main`
 has no task file, so the tasks ref is the PR #1 branch (once this branch has been merged
@@ -145,13 +149,18 @@ gh api -X GET search/issues -f q='repo:bondo/listicles2 is:issue' -f per_page=10
   --jq '{items: [.items[] | {number, title, state}]}' > "$T/issues.json"
 gh api -X GET search/issues -f q='repo:bondo/listicles2 is:pr is:merged' -f per_page=100 \
   --jq '{items: [.items[] | {number, merged_at: .pull_request.merged_at}]}' > "$T/prs.json"
+gh api -X GET search/issues -f q='repo:bondo/listicles2 is:issue is:open label:follow-up' -f per_page=100 \
+  --jq '{items: [.items[] | {number, title, state, labels: [.labels[].name]}]}' > "$T/followups.json"
 python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T/prs.json" \
-  --claimed "<comma-separated task ids from the Sessions table>" ready
+  --followups "$T/followups.json" --claimed "<comma-separated task ids from the Sessions table>" ready
 ```
 
 * The output is one line per ready task, sorted by milestone order and then by position in the file.
   `--json` gives the same list as JSON. `--assignee agent` or `--assignee owner` splits it.
   `status` shows every task with its derived state and what it waits on.
+* The last line is the open follow-up count by severity, and a ready `Mx-FU` line shows its own milestone's count.
+  Copy the count to the state issue's `Follow-ups:` line. `--json` output of `ready` is unchanged;
+  `tasks.py --followups … followups` lists the issues by severity.
 * A task is **ready** when it is `todo`, every dependency is satisfied (`done`, `dropped`, or an
   owner task finished on GitHub), and no running session claims it.
 * An owner task counts as finished when its `issue` is closed, when a closed issue is titled
@@ -171,11 +180,13 @@ python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T
 | `dropped` | Owner decision, recorded by the next PR | Add `notes` with the reason and a link to the decision comment |
 | Edits to ids or dependencies | Planner or process PR | Ids are never reused or renumbered |
 
-`scripts/tasks.py drift --issues … --prs …` reports:
+`scripts/tasks.py drift --issues … --prs … --followups …` reports:
 * closed owner issues whose task is still `todo`
 * `done` tasks whose issue is open
 * merged PRs whose task is still `todo`
 * `[owner] <id>` issue titles that name an unknown task
+* follow-up issues that break the deferral rules or lack labels (blocker; major or protected `area:` without `owner-ok`;
+  no `severity:` or `target:`; targeting a milestone whose burn-down is already done)
 
 The orchestrator logs drift in the state issue and hands it to the next implementer or process session.
 
@@ -254,13 +265,14 @@ date,batch,pr,tasks,role,session_id,model,effort,result,cost_usd,input_tokens,ou
 
 ```csv
 # metrics:round
-date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,disputed,withdrawn,verdict
-2026-11-10,M0-1,1,8,session_...,809080c,c1b54ff,0,0,1,1,0,0,changes_requested
+date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,disputed,withdrawn,deferred,verdict
+2026-11-10,M0-1,1,8,session_...,809080c,c1b54ff,0,0,1,1,0,0,0,changes_requested
 ```
 
 Rounds are numbered **per PR**, globally and monotonically (1, 2, … giving IDs R1-…, R2-…) and never reset per batch.
 The 4-round cap counts rounds **within a batch**. A finding ID is `R<round>-<nn>` (e.g. `R8-01`).
-`verdict` is the reviewer's (`changes_requested | ready_nits_only`), or `cap_reached`, which the orchestrator
+`blocker`..`nit` count the round's findings by severity as reported. `deferred` counts findings of that round the orchestrator later deferred
+(it can only be filled once the decision is made; leave it empty until then, never guess). `verdict` is the reviewer's (`changes_requested | ready_nits_only`), or `cap_reached`, which the orchestrator
 sets after round 4 of a batch.
 
 ### 6.3 Incident row
@@ -300,11 +312,23 @@ total cost, incidents. Then refresh the PR description's review table from the r
   PR comment with the fenced `json` block defined in `REVIEW.md` (`round` as a number,
   `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>`, `verdict`
   `changes_requested | ready_nits_only`), followed by its `WORKER-RESULT` block (§7.3).
-  `REVIEW.md` owns the format; this file does not repeat it.
+  `REVIEW.md` owns the format; this file does not repeat it. **Until M0-10 aligns `REVIEW.md`**, each finding also
+  carries `area`, `recommend` (`fix-now | defer`) and `recommend_reason`, and `status` may be `deferred`
+  ([`FOLLOW-UPS.md`](FOLLOW-UPS.md) §5). The reviewer recommends only. The orchestrator decides deferral (§7.2.1).
 * After the round, the orchestrator sets `reviewed_through = head_sha`.
 * Any commit after `reviewed_through` is **unreviewed** until the next round covers it, or until the
   owner explicitly accepts it. That acceptance goes in a `decision` log comment and in the branch row.
   Handoff-only and docs-only commits still count. They are listed, not silently skipped.
+
+### 7.2.1 Deferring findings
+
+Rules, labels and the issue template: [`FOLLOW-UPS.md`](FOLLOW-UPS.md). In short: after each round the orchestrator
+sorts the findings. Everything not deferred goes back to the implementer. Nits and minors may be deferred when no
+blocker or major is open; majors only with owner OK; blockers never; anything in `security-rules`, `sync-merge`
+or `release`, or on a `risk:high` task, never without owner OK. For each deferral it files the follow-up issue, posts a
+`decision` comment on the state issue, and lists the finding in the PR's review table (`Deferred` column). The 4-round cap
+and the "only nits remain" test count only unresolved, non-deferred findings. If everything above nit was deferred and no
+commit followed the reviewed range, the PR needs no further round.
 
 ### 7.3 Results
 
@@ -411,3 +435,4 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 | F12 | "What's next" is decided from memory, so dependencies get skipped or work gets started twice | `scripts/tasks.py ready` with claims is the only way to pick work (§4.3) |
 | F13 | Task status drifts from GitHub (closed owner issue, merged PR) | Status is derived from GitHub on every query. `drift` lists what the next PR must fix in the file (§4.4) |
 | F14 | Role prompts and this file disagree (e.g. `agents/prompts/orchestrator.md` still says to write `docs/status.md`) | This file wins until task M0-10 aligns the prompts. Reviewers flag the disagreement |
+| F15 | Minor findings block acceptance, or are deferred and forgotten | Follow-up issues with a mandatory burn-down task per milestone that the ready query enforces ([`FOLLOW-UPS.md`](FOLLOW-UPS.md)) |
