@@ -32,7 +32,7 @@ TESTSRC=('*/src/*[Tt]est*/*.kt' '*/src/*[Tt]est*/*.js' '*/src/*[Tt]est*/*.ts' 'f
 CFGSRC=('*.gradle.kts' '*.gradle' '*package.json' '*jest.config.*' '*.properties' '*/src/*[Tt]est*/resources/*')
 
 # 1. Disabled or focused tests (anywhere), and test-only forms (test sources only, so production code may use enabled = false).
-out=$(gg '@([A-Za-z]+\.)*Ignored?\b|@Disabled[A-Za-z]*|@Enabled(If|On)[A-Za-z]*|\.(only|skip)\(' -- "${EXCL[@]}")
+out=$(gg '@([A-Za-z]+\.)*(Ignored?\b|Disabled[A-Za-z]*|Enabled(If|On)[A-Za-z]*)|\.(only|skip)\(' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled test: /'; fail=1; }
 out=$(gg 'enabled(If|OrReasonIf)? *[=(]|\bx(it|test|describe|context|should|expect|when|then|given|feature|scenario|and|[A-Z][A-Za-z]*)\(|\bfit\(|assume(True|False)\(|"(!|f:)[A-Za-z]|passWithNoTests|testPathIgnorePatterns' -- "${TESTSRC[@]}" "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled or focused test: /'; fail=1; }
