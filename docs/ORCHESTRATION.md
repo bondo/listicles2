@@ -31,7 +31,7 @@ Each fact has exactly one canonical location. Everything else links to it and do
 | Who is working on a task right now (claims) | **State issue** Sessions table, `Task` column | Orchestrator | `scripts/tasks.py --claimed` |
 | Owner to-do details and completion | One **issue per owner task**, label `owner-todo`, title `[owner] <task id>: …` (§4.5) | Orchestrator opens; owner closes | Everyone, `scripts/tasks.py --issues` |
 | Review findings per round | One **findings comment on the PR**, in the `REVIEW.md` JSON format (§7.2) | Reviewer | Implementer, next reviewer, metrics |
-| Deferred findings (follow-ups) | One **issue per finding**, label `follow-up`, body template and rules in [`FOLLOW-UPS.md`](FOLLOW-UPS.md); the deferral decision is a `decision` comment on the state issue | Orchestrator (implementer if no orchestrator is active); never the reviewer | Burn-down task `Mx-FU`, orchestrator (`tasks.py followups`) |
+| Deferred findings (follow-ups) | One **issue per finding**, label `follow-up`, body template and rules in [`FOLLOW-UPS.md`](FOLLOW-UPS.md); the deferral decision is a `decision` comment on the state issue (a PR comment when the implementer decides) | Orchestrator (implementer if no orchestrator is active); never the reviewer | Burn-down task `Mx-FU`, orchestrator (`tasks.py followups`) |
 | Implementation progress inside a batch | `handoff/<branch>.md` on that branch | The implementer holding the branch lock | Next implementer on that branch |
 | Worker outcome | `WORKER-RESULT` block (§7.3): last message of the session **and** a PR comment | Worker | Orchestrator |
 | Cost and tokens per session | `get_session` → `external_metadata.usage` (read once the session is idle) | The platform | Orchestrator, copied into a metrics row |
@@ -236,7 +236,7 @@ once past about 30%, rather than mid-batch at 50%.
 1. Read this file, then the state body, then the comments since the last `handover`.
    Don't read predecessor transcripts.
 2. Check that the state is true. For each session row, run `get_session`. For each branch row, compare
-   `git ls-remote` HEAD against the recorded SHA. Run the ready query (§4.3) and `drift`.
+   `git ls-remote` HEAD against the recorded SHA. Scan PRs touched since the last handover for `accepted:` comments carrying a `metrics:round` block and copy them into the log. Run the ready query (§4.3) and `drift`.
    Note what you corrected.
 3. Recreate the reminders listed in the handover comment, bound to yourself. Subscribe to the PRs.
 4. Set `Orchestrator:` to yourself (with predecessor and depth), and post `handover-ack`.

@@ -72,7 +72,7 @@ Round flow with deferral:
    round row (verdict `ready_deferred`) as a `metrics:round` block inside it; it writes nothing to the state issue, and the
    next orchestrator copies the row into the log. If this happens in round 4, `ready_deferred` takes precedence over `cap_reached`. If any fix was committed, `reviewed_through`
    rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked by the
-   owner at merge time (PR review table, `Deferred` column) and by the next round if one happens.
+   owner at merge time (PR review table, `Deferred` column; in a manual loop, from the decision and `accepted:` PR comments, since nobody refreshes the table) and by the next round if one happens.
 4. The **4-round cap** and the **"only nits remain"** test count only unresolved, non-deferred findings.
    Deferred findings are listed in the report to the owner but do not hold a round open.
 5. A deferral that violates section 2, or lacks the issue or decision record, is a finding itself
