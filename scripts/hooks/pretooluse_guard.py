@@ -20,7 +20,9 @@ Fails closed: an unparseable command that mentions git or a protected path is de
 
 import json
 import os
+import fnmatch
 import re
+import shlex
 import subprocess
 import sys
 
@@ -42,7 +44,7 @@ ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash"}
 INTERPRETERS = re.compile(r"^(python[0-9.]*|node|nodejs|ruby|perl|php|deno|bun)$")
 RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for", "in", "case", "esac", "!", "{", "}", "function",
-            "select", "time"}
+            "select"}
 # name -> (options that take a value, number of leading positional arguments to skip)
 WRAPPERS = {
     "env": ({"-u", "-C", "--unset", "--chdir", "-S", "--split-string"}, 0),
@@ -62,10 +64,27 @@ WRAPPERS = {
     "watch": ({"-n", "-d"}, 0),
     "flock": ({"-w", "-E", "--timeout", "--conflict-exit-code"}, 1),
     "xargs": ({"-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "-R", "-S", "--arg-file"}, 0),
+    "time": ({"-f", "-o", "--format", "--output"}, 0),
+    "strace": ({"-o", "-e", "-p", "-s", "-u", "-E", "-a", "-b", "-I", "-P", "-X", "-O", "-S"}, 0),
+    "ltrace": ({"-o", "-e", "-p", "-s", "-u", "-a", "-n", "-l"}, 0),
+    "chrt": (set(), 1),
+    "taskset": ({"-c", "--cpu-list"}, 1),  # the mask is a positional unless -c/--cpu-list is used
+    "caffeinate": ({"-t", "-w"}, 0),
 }
+GIT_COMMON = {"status", "log", "diff", "add", "commit", "push", "fetch", "pull", "branch", "checkout", "switch", "restore", "reset", "show",
+              "merge", "rebase", "stash", "clean", "rm", "mv", "config", "remote", "tag", "cherry-pick", "am", "apply", "blame", "grep",
+              "ls-files", "rev-parse", "init", "clone", "describe", "worktree", "update-ref", "read-tree", "symbolic-ref", "ls-remote",
+              "reflog", "shortlog", "bisect", "archive", "show-ref", "for-each-ref", "cat-file", "merge-base", "rev-list", "notes"}
+RISKY_CONFIG = re.compile(r"(?i)^(core\.hookspath|alias\.|include(if\..*)?\.path|remote\..*\.push|push\.default)")
+RISKY_CONFIG_ANY = re.compile(r"(?i)(core\.hookspath|alias\.|include(if\..*)?\.path|remote\..*\.push|push\.default)")  # anywhere in a value
+CONFIG_FILE_VARS = {"GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"}
+HOME_GIT = re.compile(r"(^|/)\.gitconfig$|(^|/)\.config/git(/|$)")
 ALL_ARGS_MUTATORS = {"rm", "rmdir", "unlink", "touch", "truncate", "chmod", "chown", "chgrp", "tee", "patch", "shred", "mv", "mkdir"}
 DEST_LAST_MUTATORS = {"cp", "ln", "install", "rsync"}
-CODE_WRITES = re.compile(r"open\s*\([^)]*['\"][wax+][^'\"]*['\"]|write_text|write_bytes|writeFile|File\.write|\.write\s*\(|\bFileUtils\.")
+CODE_WRITES = re.compile(
+    r"open\s*\([^,)]+,\s*(?:mode\s*=\s*)?['\"][rwxabt+]*[wax+][rwxabt+]*['\"]|write_text|write_bytes|writeFile|File\.write"
+    r"|(?<!stdout)(?<!stderr)\.write\s*\(|\bFileUtils\.")
+PROCESS_CALLS = re.compile(r"subprocess|os\.system|os\.popen|popen|execSync|execFileSync|child_process|spawn|\bsystem\s*\(|\bexec\s*\(|%x")
 SENSITIVE_SUBS = {"reset", "push", "checkout", "restore", "clean", "stash", "commit", "config", "switch", "rm"}
 TOOLING = os.environ.get("LISTICLES_TASK") == "tooling"
 
@@ -117,6 +136,8 @@ def _kind(rel):
 
 
 def _suffix_kind(path):
+    if HOME_GIT.search(path):
+        return "always"
     for pats, kind in ((ALWAYS, "always"), (PROTECTED, "process")):
         for pat in pats:
             core = re.escape(pat.rstrip("/"))
@@ -138,6 +159,8 @@ def protection(path, cwd):
     if "$" in path or "`" in path:  # unknown expansion: judge by the tail of the path, conservatively
         return _suffix_kind(path)
     abs_ = os.path.normpath(os.path.join(cwd, path))
+    if HOME_GIT.search(os.path.realpath(abs_)):
+        return "always"
     d = abs_
     while d and not os.path.isdir(d) and d != os.path.dirname(d):
         d = os.path.dirname(d)
@@ -165,13 +188,15 @@ def guard_path(path, cwd, what="write to"):
 
 class Cmd:
     def __init__(self):
-        self.words, self.writes, self.subs, self.heredocs = [], [], [], []
+        self.words, self.writes, self.subs, self.heredocs = [], [], [], []  # heredocs also holds here-strings
+        self.group = None  # "open"/"close" marker for ( ) groups: a subshell's cd must not leak
+        self.piped = None  # the command whose output feeds this one through a pipe
 
     def empty(self):
-        return not (self.words or self.writes or self.subs or self.heredocs)
+        return not (self.words or self.writes or self.subs or self.heredocs or self.group)
 
 
-HEREDOC_START = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+HEREDOC_START = re.compile(r"<<-?[ \t]*(['\"]?)\\?([A-Za-z_][A-Za-z0-9_]*)\1")
 
 
 def find_backtick(src, i):
@@ -188,7 +213,7 @@ def find_backtick(src, i):
 
 def find_close(src, i):
     """Index of the ')' that closes a '$(' whose body starts at i. Aware of quotes and heredocs."""
-    depth, n = 1, len(src)
+    depth, n, start = 1, len(src), i
     while i < n:
         c = src[i]
         if c == "\\":
@@ -226,6 +251,8 @@ def find_close(src, i):
         elif c == ")":
             depth -= 1
             if depth == 0:
+                if re.search(r"\bcase\b[^;]*\bin\b", src[start:i]):  # a case pattern's ')' would end the $( early
+                    raise ValueError("case statement inside $(")
                 return i
         i += 1
     raise ValueError("unterminated $(")
@@ -288,6 +315,8 @@ def lex(src):
             if kind == "write":
                 if not re.fullmatch(r"\d+-?|-", text):
                     cur.writes.append(text)
+            elif kind == "herestring":
+                cur.heredocs.append(text)
             elif kind[0] == "heredoc":
                 heredocs.append((text, q, kind[1], cur))
             return
@@ -367,6 +396,7 @@ def lex(src):
             if j < 0:
                 raise ValueError("unterminated ${")
             word.append(src[i:j + 1])
+            cur.subs.extend(extract_subs(src[i:j + 1]))
             in_word = True
             i = j + 1
         elif c in " \t\r":
@@ -395,10 +425,18 @@ def lex(src):
                 i += 1
         elif c in ";|" or (c == "&" and not src.startswith("&>", i)) or c in "()":
             flush()
+            ended = cur if not cur.empty() else None
             end_cmd()
+            is_pipe = c == "|" and not src.startswith("||", i)
+            if c in "()":
+                marker = Cmd()
+                marker.group = "open" if c == "(" else "close"
+                cmds.append(marker)
             i += 1
             while i < n and src[i] in ";&|":
                 i += 1
+            if is_pipe and ended is not None:
+                cur.piped = ended
         elif c in "<>&":
             if c != "&" and src.startswith("(", i + 1):  # process substitution: the '(' separates commands
                 flush()
@@ -413,7 +451,9 @@ def lex(src):
             i += len(op)
             if op in ("<<", "<<-"):
                 pending = ("heredoc", op == "<<-")
-            elif op in ("<", "<<<", "<&"):
+            elif op == "<<<":
+                pending = "herestring"
+            elif op in ("<", "<&"):
                 pending = "read"
             else:
                 pending = "write"
@@ -466,6 +506,22 @@ def has_short(args, letter, takes_value):
     return False
 
 
+def push_positionals(args):
+    """Positionals of git push, skipping the values of options that take one (-o ci.skip must not become the remote)."""
+    out, k = [], 0
+    while k < len(args):
+        a = args[k]
+        if a == "--":
+            out.extend(args[k + 1:])
+            break
+        if a in ("-o", "--push-option", "--repo", "--receive-pack", "--exec"):
+            k += 1
+        elif not a.startswith("-"):
+            out.append(a)
+        k += 1
+    return out
+
+
 def norm_ref(ref):
     return re.sub(r"^(refs/)?(heads/)?", "", ref)
 
@@ -498,10 +554,8 @@ def check_git(words, state, assigns_dirty=False):
             custom = True
         i += 1
     for c in cfg:
-        if re.match(r"(?i)core\.hookspath", c):
-            deny("overriding core.hooksPath bypasses the git hooks")
-        if re.match(r"(?i)alias\.", c):
-            deny("defining git aliases on the command line can hide a blocked command")
+        if RISKY_CONFIG.match(c):
+            deny("this -c override can bypass the git hooks, hide a blocked command in an alias, or change what push targets")
     if i >= len(words):
         return
     sub, args = words[i], words[i + 1:]
@@ -509,30 +563,53 @@ def check_git(words, state, assigns_dirty=False):
         deny("the git subcommand is built from a variable or substitution; write it out")
     flags, pos = split_args(args)
     cur = branch(gcwd)
+    if state.get("xargs") and sub in SENSITIVE_SUBS:
+        deny(f"git {sub} gets its arguments from xargs, which cannot be checked; write the arguments out")
+    if sub not in GIT_COMMON:
+        alias = git_out(gcwd, "config", "--get", f"alias.{sub}")
+        if alias:
+            if state.get("alias_depth", 0) >= 3:
+                deny("git alias nesting is too deep to check")
+            st = dict(state, alias_depth=state.get("alias_depth", 0) + 1, vars=dict(state["vars"]))
+            if alias.startswith("!"):
+                check_command_string(alias[1:] + " " + " ".join(shlex.quote(a) for a in args), st, state.get("depth", 0) + 1)
+            else:
+                try:
+                    check_git(["git", *shlex.split(alias), *args], st)
+                except ValueError:
+                    deny("could not parse this git alias; write the command out")
+            return
 
     if sub in ("commit", "push", "merge", "am", "cherry-pick", "rebase"):
         if any(opt(f, "--no-verify", 6) for f in flags) or (
                 sub in ("commit", "am") and has_short(args, "n", "mFCctS")):
             deny(f"git {sub} --no-verify skips the hooks; fix what the hook reports instead")
     if sub == "config":
-        if any(re.match(r"(?i)core\.hookspath", a) for a in args):
-            deny("changing core.hooksPath disables the hooks (use scripts/install-hooks.sh)")
         read_only = any(opt(f, n, 4) for f in flags for n in ("--get", "--get-all", "--get-regexp", "--list", "--get-urlmatch")) or "-l" in flags
-        if not read_only and any(re.match(r"(?i)alias\.", a) for a in args):
-            deny("defining git aliases can hide a blocked command")
+        read_only = read_only or (len(pos) <= 1 and not any(f in ("--add", "--replace-all") or opt(f, "--replace-all", 4) for f in flags))
+        if any(re.match(r"(?i)core\.hookspath", a) for a in args):
+            deny("changing or querying core.hooksPath is not allowed (hooks are installed by scripts/install-hooks.sh)")
+        if not read_only and any(RISKY_CONFIG.match(a) for a in pos):
+            deny("changing core.hooksPath, aliases, include.path or push targets in git config can disable the hooks or hide a blocked "
+                 "command (hooks are installed by scripts/install-hooks.sh)")
     if sub == "push":
         if any(opt(f, "--force", 4) or opt(f, "--mirror", 4) or re.fullmatch(r"-[a-zA-Z]*f[a-zA-Z]*", f) for f in flags):
             deny("git push --force is not allowed (use --force-with-lease on your own branch if you must)")
         if any(opt(f, "--all", 4) for f in flags):
             deny("push --all/--mirror can touch main; push your branch explicitly")
-        refspecs = pos[1:]  # first positional is the remote
+        ppos = push_positionals(args)
+        refspecs = ppos[1:]  # first positional is the remote
         if any(a.startswith("+") for a in refspecs):
             deny("forced refspec (+ref) is not allowed")
         for r in refspecs:
+            if r == ":":
+                deny("the matching refspec ':' pushes every branch that exists on both sides, main included")
+            if "$" in r or "`" in r:
+                deny("the push refspec is built from a variable or substitution; write the branch out")
             dst = norm_ref(r.split(":")[-1])
             if dst in ("HEAD", "@"):
                 dst = cur
-            if dst in SHARED or dst == "*":
+            if dst in SHARED or dst == "*" or (re.search(r"[*?\[]", dst) and any(fnmatch.fnmatch(sh, dst) for sh in SHARED)):
                 deny("pushing to main/master is not allowed; open a PR from your branch")
         if not refspecs:
             up = norm_ref(git_out(gcwd, "config", "--get", f"branch.{cur}.merge") or "") if cur else ""
@@ -549,7 +626,7 @@ def check_git(words, state, assigns_dirty=False):
         if not creating:
             _, cpos = split_args(args)
             if (any(f == "-f" or opt(f, "--force", 4) or f == "-p" or opt(f, "--patch", 4) or opt(f, "--ours", 4) or opt(f, "--theirs", 4)
-                    for f in flags) or "--" in args or len(cpos) >= 2):
+                    or opt(f, "--pathspec-from-file", 4) for f in flags) or "--" in args or len(cpos) >= 2):
                 destructive = True
             elif len(cpos) == 1:
                 t = cpos[0]
@@ -573,6 +650,9 @@ def check_git(words, state, assigns_dirty=False):
         destructive = True
     elif (sub == "update-ref" and "-d" in args) or (sub == "read-tree" and any(opt(f, "--reset", 4) for f in flags)):
         destructive = True
+    if (not destructive and sub in ("reset", "checkout", "restore", "clean", "stash", "switch", "rm")
+            and any(a.startswith(("$", "`")) for a in args)):
+        destructive = True  # an option may hide in the expansion (git reset $(echo --hard)); only matters when there is work to lose
     if destructive and (custom or dirty(gcwd)):
         deny(f"git {sub} with uncommitted changes can lose work (a previous session did). "
              "Commit first (a WIP commit is fine), then retry.")
@@ -587,8 +667,9 @@ def check_git(words, state, assigns_dirty=False):
 # ---------------------------------------------------------------- command checks
 
 def unwrap(words):
-    """Strip env assignments, reserved words and wrapper commands. Returns (assignments, rest, nested command strings)."""
-    assigns, nested, i = [], [], 0
+    """Strip env assignments, reserved words and wrapper commands.
+    Returns (assignments, rest, nested command strings, wrapper names)."""
+    assigns, nested, i, seen = [], [], 0, set()
     while i < len(words):
         w = words[i]
         if ASSIGN.match(w):
@@ -599,8 +680,17 @@ def unwrap(words):
             i += 1
             continue
         base = os.path.basename(w)
+        if base == "script":  # script -qc 'cmd' /dev/null runs cmd
+            for k in range(i + 1, len(words)):
+                a = words[k]
+                if a.startswith("--command="):
+                    nested.append(a.split("=", 1)[1])
+                elif (a == "--command" or (a.startswith("-") and not a.startswith("--") and "c" in a[1:])) and k + 1 < len(words):
+                    nested.append(words[k + 1])
+            return assigns, [], nested, seen
         if base in WRAPPERS:
             opts, npos = WRAPPERS[base]
+            seen.add(base)
             i += 1
             while i < len(words) and words[i].startswith("-") and words[i] != "--":
                 o = words[i]
@@ -608,6 +698,8 @@ def unwrap(words):
                 if o in opts and i < len(words):
                     if base == "env" and o in ("-S", "--split-string"):
                         nested.append(words[i])
+                    if base == "taskset":
+                        npos = 0
                     i += 1
             if i < len(words) and words[i] == "--":
                 i += 1
@@ -615,13 +707,15 @@ def unwrap(words):
                 i += npos
             continue
         break
-    return assigns, words[i:], nested
+    return assigns, words[i:], nested, seen
 
 
 def check_assign(a):
     name, val = a.split("=", 1)
-    if name.startswith("GIT_CONFIG") and re.search(r"(?i)hookspath|alias\.", val):
-        deny("GIT_CONFIG_* must not override core.hooksPath or define aliases")
+    if name in CONFIG_FILE_VARS:
+        deny(f"{name} swaps git's config file, which can disable the hooks or hide aliases")
+    if name.startswith("GIT_CONFIG") and RISKY_CONFIG_ANY.search(val):
+        deny("GIT_CONFIG_* must not override core.hooksPath, include.path, push targets or define aliases")
 
 
 def write_targets(prog, args):
@@ -650,6 +744,27 @@ def write_targets(prog, args):
     return []
 
 
+def child(state, **extra):
+    return dict(state, vars=dict(state["vars"]), **extra)
+
+
+def expand(w, state):
+    """Substitute variables assigned earlier in the same command line (H=--hard; git reset $H) and a few known values."""
+    def rep(m):
+        name = m.group(1) or m.group(2)
+        if name in state["vars"]:
+            return state["vars"][name]
+        if name == "PWD":
+            return state["cwd"]
+        if name == "CLAUDE_PROJECT_DIR" and os.environ.get("CLAUDE_PROJECT_DIR"):
+            return os.environ["CLAUDE_PROJECT_DIR"]
+        return m.group(0)
+    for q in ("$(git branch --show-current)", "$(git rev-parse --abbrev-ref HEAD)"):
+        if q in w:
+            w = w.replace(q, branch(state["cwd"]) or q)
+    return re.sub(r"\$\{(\w+)\}|\$(\w+)", rep, w)
+
+
 def check_command_string(command, state, depth=0):
     if depth > 8:
         deny("command nesting is too deep to check")
@@ -659,22 +774,66 @@ def check_command_string(command, state, depth=0):
         if re.search(r"\bgit\b|CLAUDE\.md|REVIEW\.md|\.claude|\.github|\.githooks|agents/|scripts/|\.git/", command):
             deny("could not parse this command (unbalanced quote or substitution); simplify it")
         return
+    stack = []
     for cmd in cmds:
+        if cmd.group == "open":
+            stack.append((state["cwd"], state["known"]))
+            continue
+        if cmd.group == "close":
+            if stack:
+                state["cwd"], state["known"] = stack.pop()
+            continue
         for s in cmd.subs:
-            check_command_string(s, dict(state), depth + 1)
+            check_command_string(s, child(state), depth + 1)
         check_simple(cmd, state, depth)
+
+
+def stdin_texts(cmd):
+    """Text this command reads on stdin: here-strings, heredocs and what echo/printf/cat pipe into it."""
+    out = list(cmd.heredocs)
+    p, hops = cmd.piped, 0
+    while p is not None and hops < 4 and p.words:
+        base = os.path.basename(p.words[0])
+        if base in ("echo", "printf"):
+            out.append(" ".join(p.words[1:]).replace("\\n", "\n"))
+            break
+        if base != "cat":
+            break
+        out.extend(p.heredocs)
+        p, hops = p.piped, hops + 1
+    return out
+
+
+def check_literals(code, state, depth):
+    """String literals in interpreter code that run a git command (subprocess.run(['git', 'push', '--force']))."""
+    lits = [a or b for a, b in re.findall(r"'([^']*)'|\"([^\"]*)\"", code)]
+    cands = [lit for lit in lits if re.search(r"\bgit\b", lit)]
+    cands += [" ".join(lits[k:]) for k, lit in enumerate(lits) if lit == "git"]
+    for c in cands:
+        try:
+            lex(c)
+        except ValueError:
+            continue
+        check_command_string(c, child(state), depth + 1)
 
 
 def check_simple(cmd, state, depth):
     for t in cmd.writes:
-        guard_path(t, state["cwd"], "redirect to")
-    assigns, words, nested = unwrap(cmd.words)
+        guard_target(expand(t, state), state, "redirect to")
+    assigns, words, nested, wrappers = unwrap(cmd.words)
     for a in assigns:
         check_assign(a)
     for s in nested:
-        check_command_string(s, dict(state), depth + 1)
+        check_command_string(s, child(state), depth + 1)
     if not words:
+        for a in assigns:  # a plain assignment statement: remember literal values
+            name, val = a.split("=", 1)
+            if "$" in val or "`" in val:
+                state["vars"].pop(name, None)
+            else:
+                state["vars"][name] = val
         return
+    words = [words[0]] + [expand(w, state) for w in words[1:]]
     prog, args = os.path.basename(words[0]), words[1:]
     if "$" in words[0] or "`" in words[0]:
         if any(a in SENSITIVE_SUBS for a in args[:3]):
@@ -682,27 +841,35 @@ def check_simple(cmd, state, depth):
         return
     if prog in ("cd", "pushd"):
         tgt = [a for a in args if not a.startswith("-")]
-        if tgt and "$" not in tgt[-1] and "`" not in tgt[-1]:
-            state["cwd"] = os.path.normpath(os.path.join(state["cwd"], os.path.expanduser(tgt[-1])))
+        t = tgt[-1] if tgt else "~"
+        if t == "$(git rev-parse --show-toplevel)":
+            state["cwd"] = git_out(state["cwd"], "rev-parse", "--show-toplevel") or state["cwd"]
+        elif "$" in t or "`" in t:
+            state["known"] = False
+        else:
+            state["cwd"] = os.path.normpath(os.path.join(state["cwd"], os.path.expanduser(t)))
         return
     if prog == "git":
-        check_git([words[0]] + args, state)
+        check_git([words[0]] + args, child(state, xargs="xargs" in wrappers, depth=depth))
         return
     if prog in ("export", "declare", "typeset", "readonly", "local"):
         for a in args:
             if ASSIGN.match(a):
                 check_assign(a)
         return
+    texts = stdin_texts(cmd)
     if prog in SHELLS:
+        ran_c = False
         for k, a in enumerate(args):
             if a.startswith("-") and not a.startswith("--") and "c" in a[1:] and k + 1 < len(args):
-                check_command_string(args[k + 1], dict(state), depth + 1)
+                check_command_string(args[k + 1], child(state), depth + 1)
+                ran_c = True
                 break
-        for body in cmd.heredocs:
-            check_command_string(body, dict(state), depth + 1)
+        for body in (cmd.heredocs if ran_c else texts):
+            check_command_string(body, child(state), depth + 1)
         return
     if prog == "eval":
-        check_command_string(" ".join(args), dict(state), depth + 1)
+        check_command_string(" ".join(args), child(state), depth + 1)
         return
     if prog == "find":
         j = 0
@@ -714,28 +881,37 @@ def check_simple(cmd, state, depth):
                     k += 1
                 sub = Cmd()
                 sub.words = inner
-                check_simple(sub, dict(state), depth + 1)
+                check_simple(sub, child(state), depth + 1)
                 j = k
             j += 1
         if "-delete" in args:
             for a in args:
                 if a.startswith(("-", "(", "!")):
                     break
-                guard_path(a, state["cwd"], "find -delete under")
+                guard_target(a, state, "find -delete under")
         return
     if INTERPRETERS.match(prog):
-        code = " ".join(args)
+        code = " ".join(args + texts)
         if CODE_WRITES.search(code):
             for pat in PROTECTED + ALWAYS:
                 if re.search(r"(^|[\s'\"=/])" + re.escape(pat.rstrip("/")) + (r"(/|\b)" if pat.endswith("/") else r"\b"), code):
                     if pat in ALWAYS or not TOOLING:
                         deny(f"inline code looks like it writes to the protected path {pat}")
+        if PROCESS_CALLS.search(code):
+            check_literals(code, state, depth)
     for t in write_targets(prog, args):
-        guard_path(t, state["cwd"])
+        guard_target(t, state)
+
+
+def guard_target(path, state, what="write to"):
+    """guard_path, but after a cd whose target could not be resolved a relative path cannot be judged: deny it."""
+    if not state["known"] and path and not os.path.isabs(path) and not path.startswith(("~", "$")):
+        deny(f"{what} {path}: an earlier cd target is built from a variable or substitution; write the directory out")
+    guard_path(path, state["cwd"], what)
 
 
 def check_bash(command, cwd):
-    check_command_string(command, {"cwd": cwd})
+    check_command_string(command, {"cwd": cwd, "known": True, "vars": {}})
 
 
 def main():
@@ -753,10 +929,14 @@ def main():
     sys.exit(0)
 
 
-if __name__ == "__main__":
+def run_guarded():
     try:
         main()
     except SystemExit:
         raise
     except Exception as e:  # fail closed: a crashing guard must not look like an allow (exit 1 would not block)
         deny(f"internal error ({type(e).__name__}: {e}); report this to the owner")
+
+
+if __name__ == "__main__":
+    run_guarded()
