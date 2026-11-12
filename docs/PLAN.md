@@ -246,13 +246,20 @@ enforce the rules rather than goodwill.
    * `secrets`: gitleaks
    * Unit tests run with network access blocked (a JUnit extension that fails if a
      socket opens), so tests can't silently depend on the internet.
-5. **CODEOWNERS**: the owner is required reviewer for `.github/`, `scripts/`, `.claude/`,
+5. **CODEOWNERS**: the owner is the designated reviewer for `.github/`, `scripts/`, `.claude/`,
    `agents/`, `CLAUDE.md`, `REVIEW.md`, `firebase/firestore.rules`, and screenshot
-   reference images. Labels that agents could set themselves are not trusted on
-   their own; CODEOWNERS is the real control.
-6. **Branch protection** on `main`: PR required, all checks green, CODEOWNERS review
-   required, **squash merge only**, no force-push. You set this in GitHub settings
-   (step-by-step guide in the foundation PR).
+   reference images. CODEOWNERS marks these files and requests the owner's review; it is
+   not an enforced approval (see item 6). Labels that agents could set themselves are not
+   trusted on their own; the owner's merge is the review.
+6. **Branch protection** on `main`: PR required, all checks green (source: GitHub Actions),
+   **squash merge only**, no force-push, no deletion, branch up to date. **0 required
+   approvals and Code Owners review off**: agents act as the owner's GitHub identity and
+   GitHub does not let an author approve their own PR, so a required approval could never
+   be met; the owner's merge is the review. **Empty bypass list**: a standing owner bypass
+   would also bypass for agents. The owner adds themselves for an emergency merge only,
+   then removes themselves. A separate machine account for agent PRs is a possible later
+   improvement (it would allow 1 approval plus Code Owners review). You set this in GitHub
+   settings (step-by-step guide: `docs/BRANCH-PROTECTION.md`).
 7. **Dependency hygiene**: Gradle version catalog, Dependabot, Gradle wrapper validation.
 
 ## 6. Review loop
