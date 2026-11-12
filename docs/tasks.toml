@@ -119,11 +119,11 @@ notes = "Delivered by PR #16 (squash-merged to main): docs/ORCHESTRATION.md, doc
 id = "M0-10"
 title = "Tooling session A: run tasks.py and its tests in CI and verify.sh; CODEOWNERS for the process docs"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
-notes = """Still open on main (verify.sh and ci.yml do not run tasks.py or test_tasks.py; CODEOWNERS lacks the process docs). Needs LISTICLES_TASK=tooling (process files are hook-protected), on a new branch from main; this PR sets status = done. Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
+notes = """Delivered by PR #35 (squash-merged to main). Needed LISTICLES_TASK=tooling (process files are hook-protected). Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
 (1) CI and scripts/verify.sh: run `python3 -I scripts/test_tasks.py` and `python3 -I scripts/tasks.py validate`; \
 (2) CODEOWNERS: docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py, docs/FOLLOW-UPS.md; \
 (3) the pre-push hook should skip the Android build for docs/scripts-only diffs (it blocked pushing PR #16 from a container without the SDK)"""
@@ -272,11 +272,11 @@ depends_on = ["M0-08", "M0-O2"]
 id = "M0-O10"
 title = "Create the follow-up labels (follow-up, severity:*, target:*, area:*, owner-ok)"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Exact label names: docs/FOLLOW-UPS.md section 7. Still open: on 2026-11-12 the repo has follow-up, severity:minor, severity:nit and target:M0, but not severity:major, severity:blocker, target:M1 and later, area:security-rules, area:sync-merge, area:release or owner-ok"
+notes = "Exact label names: docs/FOLLOW-UPS.md section 7. Done: labels created 2026-11-12"
 
 [[task]]
 id = "M0-O7"
@@ -315,11 +315,11 @@ notes = "Decisions are taken in the orchestrator session, one at a time with a r
 id = "M0-O9"
 title = "Create the GitHub labels orchestrator-state and owner-todo"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "The GitHub tools available to agents cannot create labels. Repo, Issues, Labels, New label; names exactly as written. Still open: neither label exists on 2026-11-12"
+notes = "The GitHub tools available to agents cannot create labels. Repo, Issues, Labels, New label; names exactly as written. Done: both labels created 2026-11-12"
 
 # ---------------------------------------------------------------- M0.5 product design (no code)
 
@@ -470,7 +470,7 @@ notes = "Normal env unless CI wiring is added (then tooling). Effort M. Backfill
 id = "M0.5-14"
 title = "ORCHESTRATION.md retro changes: delta review, one batch per PR, env pick, default deferral, early stall diagnosis, F18 tripwire, smoke task, PR-body refresh and squash checks before a merge request (C1)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = ["M0-O11"]
