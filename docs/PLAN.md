@@ -244,14 +244,19 @@ enforce the rules rather than goodwill.
      * changed screenshot reference images, unless the PR has the `golden-update` label
      * a diff over 600 changed lines outside generated files
    * `secrets`: gitleaks
+   * `tasks`: `scripts/test_tasks.py` and `scripts/tasks.py validate` (the task graph in
+     `docs/tasks.toml`); also run by `scripts/verify.sh`, including `--fast`
    * Unit tests run with network access blocked (a JUnit extension that fails if a
      socket opens), so tests can't silently depend on the internet.
 5. **CODEOWNERS**: the owner is the designated reviewer for `.github/`, `scripts/`, `.claude/`,
-   `agents/`, `CLAUDE.md`, `REVIEW.md`, `firebase/firestore.rules`, and screenshot
+   `agents/`, `CLAUDE.md`, `REVIEW.md`, `firebase/firestore.rules`, the process docs
+   (`docs/ORCHESTRATION.md`, `docs/orchestrator-state.md`, `docs/tasks.toml`,
+   `docs/FOLLOW-UPS.md`, listed explicitly because `docs/` has no directory rule), and screenshot
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
    trusted on their own; the owner's merge is the review.
-6. **Branch protection** on `main`: PR required, all checks green (source: GitHub Actions),
+6. **Branch protection** on `main`: PR required, all 8 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
+   `guards`, `secrets`, `tasks`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never
