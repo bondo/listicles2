@@ -293,7 +293,7 @@ enforce the rules rather than goodwill.
 | # | Scope | Done when |
 |---|---|---|
 | M0 | **Foundation**: agent setup (section 9: role prompts, `.claude/` settings, status line, handoff template, metrics script) + Gradle multi-module skeleton, version catalog, spotless/detekt/lint/Kover, `verify.sh`, hooks, CI workflows, Firebase emulator config + an empty rules test, REVIEW.md, CLAUDE.md, PR template, branch-protection guide | All CI jobs run green on a hello-world app plus a trivial test, and a test that's deliberately broken makes CI fail |
-| M0.5 | **Product design** (no code): user stories with acceptance criteria (`docs/product/stories.md`), app-flow diagram (`docs/product/flow.md`, Mermaid), screen wireframes and design tokens (colors, type, spacing, dark mode) published as an artifact for review | You approve stories, flow and design. Each later milestone's acceptance tests are traced to story IDs |
+| M0.5 | **Product design** (no code): user stories with acceptance criteria (`docs/product/stories.md`), app-flow diagram (`docs/product/flow.md`, Mermaid), screen wireframes and design tokens (colors, type, spacing, dark mode) published as an artifact for review | You approve stories, flow and design (owner-only sign-off; the collaborator comments and reviews, `docs/COLLABORATING.md`). Each later milestone's acceptance tests are traced to story IDs |
 | M1 | Auth + households: Google sign-in, create household, single-use invite link, join, leave, remove member, transfer ownership, delete account; rules + tests | Two emulator users can join one household, and an outsider is denied (rules tests) |
 | M2 | Inventory lists: CRUD lists and items, real-time sync, offline, search/sort/filter, en/da | A UI test shows an edit on client A appearing on client B through the emulator |
 | M3 | Packing domain: scaling, per-person templates and merging in `core/domain`, with property tests and PIT | Coverage and mutation floors met, and all invariants are property-tested |
@@ -310,6 +310,7 @@ enforce the rules rather than goodwill.
 * Make the repository public (decided: unlimited free Actions minutes).
 * Add yourself as CODEOWNER (the M0 PR adds the file; you confirm the handle).
 * Turn on branch protection using the guide from M0.
+* Collaborator: check the Actions settings, invite them, ask for 2FA, create the labels `feedback`, `idea`, `decision`, `needs-collaborator`, `needs-owner`, send them `docs/COLLABORATING.md`, run the live test (tasks M0.5-O3, M0.5-O4).
 * Later: a Play developer account if you want the Play track.
 
 ## 9. Agents, effort levels and token budget
