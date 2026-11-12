@@ -6,6 +6,7 @@ activityCompose = "1.13.0"
 coreKtx = "1.19.1"
 lifecycle = "2.10.0"
 kotest = "6.2.6"
+konsist = "0.18.1"
 junit = "6.1.3"
 androidxTestJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
@@ -33,6 +34,7 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 kotest-runner = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
+konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
