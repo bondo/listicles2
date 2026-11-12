@@ -12,11 +12,11 @@
 
 milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]
 
-# ---------------------------------------------------------------- M0 foundation (two stacked PRs: #1, #16)
-# M0 lands as two stacked PRs: #1 (foundation, M0-01..M0-08) merges first, then #16 (process:
-# M0-09, M0-10, M0-11) is retargeted to main and merged (owner decision, M0-O5). This file lives ONLY on
-# the tasks ref (docs/ORCHESTRATION.md 4.2): branch claude/orchestration-review until M0-O8, then
-# main. Done-status for PR #1 tasks is set here by a status-sync commit, never on the PR #1 branch.
+# ---------------------------------------------------------------- M0 foundation (PRs #1 and #16, both merged)
+# M0 landed as PR #1 (foundation) and then PR #16 (process docs, this file, scripts/tasks.py), both squash-merged
+# to main (owner decision, M0-O5). The tasks ref is now main (docs/ORCHESTRATION.md 4.2). The remaining M0 work
+# (tooling sessions M0-10/M0-11, the M0-08 guide, the #20 review chain, the M0-FU burn-down) is delivered by new
+# PRs against main, and each PR sets its own tasks to done (4.4).
 
 [[task]]
 id = "M0-01"
@@ -53,7 +53,7 @@ notes = "Reviewed R5-R8; c1b54ff unreviewed, accepted by the owner"
 id = "M0-04"
 title = "REVIEW.md and CLAUDE.md"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
@@ -64,7 +64,7 @@ notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round c
 id = "M0-05"
 title = "Agent setup: roles.yaml, prompts, .claude settings and hooks, status line, handoff template, metrics spike"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
@@ -75,7 +75,7 @@ notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round c
 id = "M0-06"
 title = "detekt 2.x vs 1.23 ADR, Kover on :app, dark theme"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
@@ -86,7 +86,7 @@ notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round c
 id = "M0-07"
 title = "Prove the gates: CI green on GitHub, a deliberately broken commit fails CI, then revert"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-04", "M0-05", "M0-06", "M0-O1"]
@@ -101,19 +101,18 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
-pr = 1
-notes = "Batch M0-3"
+notes = "Not delivered: PR #1 merged without a branch-protection guide (PLAN section 5 item 6 and the M0 row list one; none exists under docs/ on main). Needed for M0-O6"
 
 [[task]]
 id = "M0-09"
 title = "Orchestration process: docs/ORCHESTRATION.md, state template, task graph + scripts/tasks.py"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = []
 pr = 16
-notes = "Branch claude/orchestration-review, PR #16 (stacked after #1). Leave status = todo: the status-sync session sets done after review (ORCHESTRATION 4.4)"
+notes = "Delivered by PR #16 (squash-merged to main): docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py + scripts/test_tasks.py"
 
 [[task]]
 id = "M0-10"
@@ -123,8 +122,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
-pr = 16
-notes = """Needs LISTICLES_TASK=tooling (process files are hook-protected), on the PR #16 branch. Leave status = todo: done is set by the status-sync session after review (ORCHESTRATION 4.4). Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
+notes = """Still open on main (verify.sh and ci.yml do not run tasks.py or test_tasks.py; CODEOWNERS lacks the process docs). Needs LISTICLES_TASK=tooling (process files are hook-protected), on a new branch from main; this PR sets status = done. Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
 (1) CI and scripts/verify.sh: run `python3 -I scripts/test_tasks.py` and `python3 -I scripts/tasks.py validate`; \
 (2) CODEOWNERS: docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py, docs/FOLLOW-UPS.md; \
 (3) the pre-push hook should skip the Android build for docs/scripts-only diffs (it blocked pushing PR #16 from a container without the SDK)"""
@@ -137,8 +135,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-04", "M0-05", "M0-10", "M0-12"]
-pr = 16
-notes = """Needs LISTICLES_TASK=tooling. Leave status = todo (status-sync sets done after review, ORCHESTRATION 4.4). First merge origin/claude/sleepy-mccarthy-z2paqx into the branch with a merge commit so you edit the current protected files. Waits for M0-04 and M0-05 to be done (reviewed and status-synced) so that fixes from their review don't conflict with it in protected files. Test-first with negative cases (ORCHESTRATION 2.0). Needed changes: \
+notes = """Still open on main (agents/prompts/orchestrator.md still mentions docs/status.md). Needs LISTICLES_TASK=tooling, on a new branch from main; this PR sets status = done. M0-04 and M0-05 are done, so protected files are current. Test-first with negative cases (ORCHESTRATION 2.0). Needed changes: \
 (1) REVIEW.md:70 and the round-cap line in the root CLAUDE.md (:40): the 4-round cap is per batch (a one-batch PR: per PR), see ORCHESTRATION 6.2; \
 (2) agents/prompts/reviewer.md: reviewers never edit or push to the PR branch, they only report findings (severity, file:line, recommendation), \
 and may test only in a throwaway branch or worktree that is never pushed to the PR branch and is deleted afterwards; flag code changes lacking tests; \
@@ -153,12 +150,32 @@ the 45-minute check-in, the handover, lock check and takeover protocol (5); agen
 id = "M0-12"
 title = "Follow-ups process: docs/FOLLOW-UPS.md, tasks.py follow-up counts and burn-down checks"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = []
 pr = 16
-notes = "Branch claude/orchestration-review (PR #16); protected-file edits are listed for M0-11. Leave status = todo: the status-sync session sets done after review (ORCHESTRATION 4.4)"
+notes = "Delivered by PR #16 (squash-merged to main): docs/FOLLOW-UPS.md, follow-up counts and burn-down checks in scripts/tasks.py. Protected-file edits are listed for M0-11"
+
+[[task]]
+id = "M0-13"
+title = "Process and tooling review (#20): written review in docs/, prioritised proposals with effort and cost"
+milestone = "M0"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = ["M0-11"]
+notes = """Issue #20 lists the six questions (static checks, TypeScript, linting, test automation, design and visual review for agents, M0 process retrospective). Fresh Opus reviewers, report-only (CLAUDE.md, ORCHESTRATION 7.2). Output: docs/reviews/process-tooling.md with findings, a prioritised proposal, effort and cost estimates. Must finish before M0.5 starts (M0.5-01 depends on milestone:M0). Findings above nit are fixed or deferred to M1: M0 already holds 8 open follow-ups (the FOLLOW-UPS.md limit). Protected-file changes go through the tooling environment"""
+
+[[task]]
+id = "M0-14"
+title = "Turn the proposals the owner adopts (M0-O11) into PR-sized tasks with dependencies; open follow-up issues for the deferred ones"
+milestone = "M0"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M0-13", "M0-O11"]
+notes = "Adds the adopted tasks to this file in the milestone they belong to (tooling work that must precede M0.5 goes in M0 and into M0-FU depends_on; validate enforces it). Tooling tasks are test-first with negative cases (ORCHESTRATION 2.0)"
 
 [[task]]
 id = "M0-FU"
@@ -167,15 +184,14 @@ milestone = "M0"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0-01", "M0-02", "M0-03", "M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-09", "M0-10", "M0-11", "M0-12"]
-pr = 16
-notes = "PR #16 is the last M0 PR, so findings deferred from it target M1, not M0 (docs/FOLLOW-UPS.md section 3). Leave status = todo: the status-sync session sets done after review (ORCHESTRATION 4.4). Follow-up issue #19 (10 findings from PR #1, target M0, currently unlabelled) must be split into one issue per finding and labelled once the labels exist (M0-O10). Owner decision to flag: does the limit of 8 open follow-ups per milestone hold for those 10?"
+depends_on = ["M0-01", "M0-02", "M0-03", "M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-09", "M0-10", "M0-11", "M0-12", "M0-13", "M0-14"]
+notes = "Issue #19 was split into follow-up issues #21-#28 (target:M0, exactly the limit of 8 open follow-ups per milestone, so no further deferral to M0: fix it or target M1). Close or re-defer each of #21-#28. Findings deferred from PRs after #16 target M1 (docs/FOLLOW-UPS.md section 3)"
 
 [[task]]
 id = "M0-O1"
 title = "Add the big-pr label to PR #1"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
@@ -185,7 +201,7 @@ issue = 12
 id = "M0-O2"
 title = "Set the default branch to main"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
@@ -195,7 +211,7 @@ issue = 13
 id = "M0-O3"
 title = "Make the repository public"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
@@ -237,29 +253,40 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Exact label names: docs/FOLLOW-UPS.md section 7. Once the labels exist, issue #19 is split and labelled (see M0-FU)"
+notes = "Exact label names: docs/FOLLOW-UPS.md section 7. Still open: on 2026-11-12 the repo has follow-up, severity:minor, severity:nit and target:M0, but not severity:major, severity:blocker, target:M1 and later, area:security-rules, area:sync-merge, area:release or owner-ok"
 
 [[task]]
 id = "M0-O7"
 title = "Squash-merge PR #1 (M0)"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-O1", "M0-O4", "M0-O5"]
 pr = 1
-notes = "Merges PR #1 only. The process PR (#16) merges afterwards: M0-O8"
+notes = "PR #1 is merged (squash)"
 
 [[task]]
 id = "M0-O8"
 title = "Retarget PR #16 to main after #1 merges, then squash-merge it"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0-O7", "M0-09", "M0-10", "M0-11", "M0-12", "M0-FU"]
 pr = 16
-notes = "After #1 squash-merges: update the PR #16 branch from main with a merge commit (no force-push), retarget to main. Then the tasks ref becomes main (ORCHESTRATION 4.2)"
+notes = "PR #16 is merged (squash). The tasks ref is now main (ORCHESTRATION 4.2)"
+
+[[task]]
+id = "M0-O11"
+title = "Decide which proposals from the #20 process and tooling review to adopt"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-13"]
+issue = 20
+notes = "Decisions are taken in the orchestrator session, one at a time with a recommendation; the owner closes issue #20 as completed when done. Adopted items become tasks in M0-14"
 
 [[task]]
 id = "M0-O9"
@@ -269,7 +296,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "The GitHub tools available to agents cannot create labels. Repo, Issues, Labels, New label; names exactly as written"
+notes = "The GitHub tools available to agents cannot create labels. Repo, Issues, Labels, New label; names exactly as written. Still open: neither label exists on 2026-11-12"
 
 # ---------------------------------------------------------------- M0.5 product design (no code)
 
@@ -301,13 +328,23 @@ risk = "normal"
 depends_on = ["M0.5-01"]
 
 [[task]]
+id = "M0.5-04"
+title = "App and repo name shortlist (#17): 5-8 candidates with Play Store, GitHub and domain availability, one recommendation"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["milestone:M0"]
+notes = "The name appears in the applicationId/package, app label (en and da), Firebase project, repo name and docs, and is costly to change after M1. Output: docs/product/naming.md. No agent renames anything without the owner's sign-off"
+
+[[task]]
 id = "M0.5-FU"
 title = "Follow-up burn-down for M0.5"
 milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04"]
 
 [[task]]
 id = "M0.5-O1"
@@ -317,6 +354,17 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
+
+[[task]]
+id = "M0.5-O2"
+title = "Pick the app and repo name from the shortlist"
+milestone = "M0.5"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0.5-04"]
+issue = 17
+notes = "Must be decided before M1 (M1 tasks depend on milestone:M0.5). Then the rename of the repo, applicationId and labels is a task for M1-01 to plan"
 
 # ---------------------------------------------------------------- M1 auth + households
 # The planner (M1-01) breaks M1 into PR-sized tasks and adds them here in its PR.
@@ -355,7 +403,8 @@ milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["milestone:M0"]
+depends_on = ["milestone:M0", "M0.5-O2"]
+notes = "Waits for the name decision (M0.5-O2): the Firebase project name and applicationId derive from it"
 
 [[task]]
 id = "M1-O2"
