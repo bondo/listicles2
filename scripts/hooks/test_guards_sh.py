@@ -373,6 +373,50 @@ CONFIG_CLEAN = [
 ]
 
 
+# Round 2 (R2-01..R2-05). (path, text with an unjustified relaxation, same text fully justified)
+ROUND2_RELAXATIONS = [
+    # R2-01: the opener line need not end in a bracket; every entry carries its own justification
+    ("ruff.toml", "[lint]\nignore = [\"E501\",  # justified: x\n  \"F401\",\n]",
+     "[lint]\nignore = [\"E501\",  # justified: x\n  \"F401\",  # justified: y\n]"),
+    ("eslint.config.js", "export default [{\n  ignores: ['dist/**', // justified: x\n    'src/**',\n  ],\n}];",
+     "export default [{\n  ignores: ['dist/**', // justified: x\n    'src/**', // justified: y\n  ],\n}];"),
+    ("pyproject.toml", "[tool.coverage.report]\nexclude_lines = [\"if X:\",  # justified: x\n  \"def \",\n]",
+     "[tool.coverage.report]\nexclude_lines = [\"if X:\",  # justified: x\n  \"def \",  # justified: y\n]"),
+    ("pyproject.toml", "[tool.mypy]\ndisable_error_code = [ # justified: x\n  \"attr-defined\",\n]",
+     "[tool.mypy]\ndisable_error_code = [ # justified: x\n  \"attr-defined\",  # justified: y\n]"),
+    ("mypy.ini", "[mypy]\ndisable_error_code = # justified: x\n    attr-defined\n    misc",
+     "[mypy]\ndisable_error_code = # justified: x\n    attr-defined  # justified: y\n    misc  # justified: z"),
+    # R2-02: forms real mypy applies
+    ("pyproject.toml", "no_strict_optional = true", "no_strict_optional = true  # justified: migration"),
+    ("mypy.ini", "no_warn_no_return = True", "no_warn_no_return = True  # justified: migration"),
+    ("mypy.ini", "ignore_errors: yes", "ignore_errors: yes  # justified: vendored"),
+    ("mypy.ini", "strict_optional: false", "strict_optional: false  # justified: migration"),
+    ("a.py", "# mypy:no-strict-optional", "# mypy:no-strict-optional  # justified: migration"),
+    ("a.py", "# mypy:allow-untyped-defs", "# mypy:allow-untyped-defs  # justified: migration"),
+    ("a.py", "# mypy: strict-optional,no-warn-unused-ignores", "# mypy: strict-optional,no-warn-unused-ignores  # justified: migration"),
+    # R2-03
+    ("tox.ini", "[flake8]\nextend_ignore = F401", "[flake8]\nextend_ignore = F401  # justified: re-exports"),
+    ("setup.cfg", "[flake8]\nignore: F401", "[flake8]\nignore: F401  # justified: re-exports"),
+    # R2-04: ESLint 9 treats 0 as off, also for a later key on the line
+    ("eslint.config.js", "export default [{rules: { eqeqeq: 'error', 'no-console': 0 }}];",
+     "export default [{rules: { eqeqeq: 'error', 'no-console': 0 }}]; // justified: CLI output"),
+    # R2-05: tsc reads nocheck case-insensitively
+    ("a.ts", "// @TS-NOCHECK", "// @TS-NOCHECK  // justified: generated"),
+    ("a.ts", "// @Ts-NoCheck", "// @Ts-NoCheck  // justified: generated"),
+]
+
+ROUND2_CLEAN = [
+    ("mypy.ini", "[mypy]\nno_implicit_optional = True\nno_implicit_reexport = True\nstrict_optional: true\nignore_errors: no\n"),
+    ("pyproject.toml", "[tool.mypy]\nno_strict_optional = false\nno_warn_no_return = false\n"),
+    ("tox.ini", "[flake8]\nmax-line-length = 100\nextend_select = B\n"),
+    ("eslint.config.js", "export default [{rules: { eqeqeq: 'error', 'max-params': ['error', { max: 0, min: 1 }], 'no-console': 'error' }}];\n"),
+    ("a.py", "# mypy: strict-optional, warn-unused-ignores\n# mypy:disallow-untyped-defs\n"),
+    ("a.ts", "// @ts-check\n"),
+    ("ruff.toml", "[lint]\nignore = [\"E501\",  # justified: x\n  \"F401\",  # justified: y\n]\n"),
+    ("eslint.config.js", "export default [{\n  ignores: ['dist/**', // justified: x\n    'src/**', // justified: y\n  ],\n}];\n"),
+]
+
+
 class LinterSuppressions(GuardsCase):
     def drop(self, path):
         """Remove a fixture so that one failing case cannot make the cases after it fail too."""
@@ -404,6 +448,21 @@ class LinterSuppressions(GuardsCase):
         for path, bad, good in MULTILINE_RELAXATIONS:
             with self.subTest(path=path, text=bad):
                 self.check_pair(path, bad, good)
+
+    def test_round2_relaxations_need_a_justification(self):
+        for path, bad, good in ROUND2_RELAXATIONS:
+            with self.subTest(path=path, text=bad):
+                self.check_pair(path, bad, good)
+
+    def test_round2_legitimate_settings_do_not_fire(self):
+        for path, text in ROUND2_CLEAN:
+            with self.subTest(path=path, text=text):
+                self.repo.write(path, text)
+                self.repo.commit()
+                try:
+                    self.assertPasses()
+                finally:
+                    self.drop(path)
 
     def test_multiline_relaxations_are_checked_in_staged_mode_from_the_index(self):
         self.repo.write("pyproject.toml", "[tool.ruff.lint]\nignore = [  # justified: long URLs\n  \"E501\",\n]\n")
