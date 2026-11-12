@@ -107,6 +107,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: tasks.py tests
         run: python3 -I scripts/test_tasks.py
+      - name: issue form tests
+        run: python3 -I scripts/test_issue_forms.py
+      - name: issue forms validate
+        run: python3 -I scripts/issue_forms.py
       - name: docs/tasks.toml validates
         run: python3 -I scripts/tasks.py validate
 

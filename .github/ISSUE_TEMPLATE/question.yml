@@ -1,0 +1,19 @@
+name: Question for the team
+description: Ask something you want the team to answer.
+labels: [needs-owner]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in English or Danish. The owner reads this and will reply here.
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know?
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where does this come from? (optional)
+      description: A screen, a pull request or a document. A link helps.

@@ -1,0 +1,20 @@
+name: Feedback
+description: Tell us what you think about the app, a design or a plan.
+labels: [feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Write in English or Danish, whichever is easier. No special format needed.
+  - type: textarea
+    id: feedback
+    attributes:
+      label: What do you think?
+      description: What did you see, and what did you like or not understand?
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where did you see it? (optional)
+      description: A screen, a pull request or a document. A link helps.
