@@ -52,6 +52,34 @@ class Settings(unittest.TestCase):
         ok = GOOD_REPOS.replace("google {", "google() {")
         self.assertEqual(c.check_settings(settings(plugin_repos=ok)), [])
 
+    def test_line_commented_mirror_does_not_count(self):
+        bad = 'google { content { includeGroup("androidx") } }\n// maven("' + c.MIRROR + '")\nmavenCentral()\n'
+        self.assertIn("Maven Central mirror " + c.MIRROR + " missing", c.check_settings(settings(dep_repos=bad))[0])
+
+    def test_block_commented_central_does_not_count(self):
+        bad = 'google { content { includeGroup("androidx") } }\nmaven("' + c.MIRROR + '")\n/* mavenCentral() */\n'
+        self.assertIn("mavenCentral() fallback missing", c.check_settings(settings(dep_repos=bad))[0])
+
+    def test_commented_out_mirror_on_one_line(self):
+        bad = 'google{content{includeGroup("androidx")}} // maven("' + c.MIRROR + '") mavenCentral()\n'
+        self.assertNotEqual(c.check_settings(settings(dep_repos=bad)), [])
+
+    def test_no_google_is_fine_despite_googleapis_url(self):
+        ok = f'maven("{c.MIRROR}")\nmavenCentral()\n'
+        self.assertEqual(c.check_settings(settings(plugin_repos=ok, dep_repos=ok)), [])
+
+    def test_second_unfiltered_google(self):
+        bad = GOOD_REPOS + "        google()\n"
+        self.assertEqual(c.check_settings(settings(dep_repos=bad)), ["dependencyResolutionManagement: google() needs a content filter"])
+
+    def test_empty_content_filter(self):
+        bad = GOOD_REPOS.replace('includeGroupAndSubgroups("androidx")', "")
+        self.assertEqual(c.check_settings(settings(plugin_repos=bad)), ["pluginManagement: google() needs a content filter"])
+
+    def test_google_block_without_content(self):
+        bad = f'google {{ }}\nmaven("{c.MIRROR}")\nmavenCentral()\n'
+        self.assertEqual(c.check_settings(settings(plugin_repos=bad)), ["pluginManagement: google() needs a content filter"])
+
     def test_missing_block(self):
         self.assertIn("pluginManagement: no repositories block", c.check_settings("rootProject.name = \"x\"\n"))
 
