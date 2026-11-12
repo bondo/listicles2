@@ -29,6 +29,7 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
     automated tests wired into `scripts/verify.sh` and CI, including negative cases (the check must fail on bad input).
     The commit order must show the failing test first, then the fix. Flag any untested change or untested tooling
     (`major` when it is a gate or guard, otherwise `minor`).
+11. **Android guidance**: code under `app/` follows `docs/ANDROID-BEST-PRACTICES.md` (implementers too); a deviation needs a recorded decision, otherwise `minor`.
 
 ## Severity
 | Severity | Meaning | Author must |
