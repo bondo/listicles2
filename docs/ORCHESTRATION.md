@@ -439,9 +439,19 @@ total cost, incidents. Then refresh the PR description's review table from the r
 * Start only tasks that the ready query (§4.3) lists, in the order it lists them. The exceptions are review rounds
   (from `review`), fix-round implementers after `changes_requested` (their tasks are in `review`, §7.2), the escalation and
   failure respawns of §7.4, and the status-sync sessions of §4.4. Batching several ready
-  tasks of one PR into one session is fine; claim them all.
+  tasks of one PR into one session is fine; claim them all. **One batch = one PR, no stacking** (retro R3): the next batch
+  branches from `main` after the previous PR is squash-merged. `big-pr` is only for generated or mechanical diffs.
 * `create_session` with the spawn message (§8), the tags from §2.1, the model and effort
   from PLAN §9.1, and for writers `outcome_branch` = the branch they hold.
+* **Pick the environment before `create_session`** (retro R8). Tasks that touch a process file (`CLAUDE.md`, `REVIEW.md`,
+  `agents/`, `.claude/`, `.github/`, `.githooks/`, `scripts/guards.sh`, `scripts/hooks/`) need the tooling environment
+  (`LISTICLES_TASK=tooling`); everything else uses the normal one. The task's `notes` names it. A wrong pick blocks the worker.
+* **Smoke task** (retro R10): whenever an environment's setup script changes, run a fresh-session smoke task first (SDK present,
+  `scripts/verify.sh --fast` passes) before spawning real work on it.
+* **Post-spawn check**: about 8 minutes after each spawn, check the worker with `get_session` (status bucket). This is
+  short and separate from the 45-minute check-in.
+* **Merge conflicts after a squash-merged stacked PR**: the worker takes `main` in with a **merge commit** (never a rebase
+  or force-push). A worker prompt that asks for a force-push is denied by the auto-mode classifier; do not write one.
 * **Branch lock**: before spawning a writer, set the branch's holder in the state body.
   Only one writer per branch at a time. Reviewers hold no lock and never push.
 * The orchestrator's own **45-minute check-in** (`send_later`, §1.1) is re-scheduled on every wake, and it is
@@ -468,8 +478,14 @@ total cost, incidents. Then refresh the PR description's review table from the r
 * Any commit after `reviewed_through` is **unreviewed** until the next round covers it, or until the
   owner explicitly accepts it. That acceptance goes in a `decision` log comment and in the branch row.
   Handoff-only and docs-only commits still count. They are listed, not silently skipped.
+* **Delta review** (retro R4): a commit after the last round gets one delta review before the merge request: a fresh
+  reviewer, range `reviewed_through..head_sha` only (about $1-2). Gate and threshold changes always get one. Record
+  `reviewed_through` afterwards. Reviewers see what changed since the last round, not the whole PR again.
 
 ### 7.2.1 Deferring findings
+
+**Default (retro R9):** once a round has no blocker and no major, the orchestrator defers the remaining minors and nits
+(follow-up issues) instead of running another round, unless a minor is in a gate (guards, hooks, thresholds, CI checks).
 
 Rules, labels and the issue template: [`FOLLOW-UPS.md`](FOLLOW-UPS.md). In short: after each round the orchestrator
 sorts the findings. Everything not deferred goes back to the implementer. Nits and minors may be deferred when no
@@ -502,6 +518,9 @@ needs_owner: <decision or action, or "none">
 handoff: <path to handoff file, or "none">
 ```
 
+Every worker's **last action** is a `send_message` to its spawning session with a compact one-line WORKER-RESULT (PR number,
+head SHA, what was done, checks run/skipped), so the orchestrator is woken without polling.
+
 The orchestrator collects results in this order, from cheapest to most expensive:
 1. Read PR comments (durable, and visible to a successor too).
 2. `get_session` status bucket.
@@ -511,6 +530,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
 
 | Symptom | Action |
 |---|---|
+| First check shows a stall, a block or red CI (retro R12) | Diagnose at once, do not wait a check-in: read targeted `list_events` (`kinds` filter, small `limit`) and the job log (via `ci-triage`). Orchestrator context is a minor cost: orchestrators hand over themselves (§5). Add no new compact-format rituals. |
 | Worker idle, no `WORKER-RESULT` | `send_message` once: "post your WORKER-RESULT". If there is still nothing at the next check-in, treat it as dead. |
 | `status_bucket` failed, or no progress across two check-ins | Mark the row `failed` and log an incident. Read `handoff/<branch>.md` and `git ls-remote` HEAD. Interrupt the session if it might still push. Only then release the lock and spawn a fresh worker from the handoff file. |
 | Branch HEAD moved but no session holds the lock | Stop spawning on that branch. Identify the commit's author (`git log`). Log a `concurrent-push` incident and ask the owner. |
@@ -521,6 +541,13 @@ The orchestrator collects results in this order, from cheapest to most expensive
 
 Archive finished worker sessions once their metrics row is logged and the owner has
 seen the batch report.
+
+### 7.5 Pull requests and the merge request
+
+* **PR convention:** a **draft** PR is not ready. A **non-draft** PR is mergeable and carries a comment with checks run,
+  skips and decisions. The owner's queue is `is:open is:pr draft:false`.
+* **Before asking the owner to merge** the orchestrator checks (retro R2, R6): (1) the PR body is refreshed (scope, review
+  table, test evidence; no "still to do" or "not yet reviewed"); (2) the request says **squash**.
 
 ## 8. Spawn messages
 
@@ -597,3 +624,4 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 | F15 | Finished-but-unmerged work looks ready again to a cold orchestrator, or a task file exists in two branches with different status | `--in-review` from the Branches table (§4.4); one canonical tasks ref (§4.2) |
 | F16 | A reviewer "helpfully" fixes the PR and so is both author and reviewer | Reviewers never edit or push to the PR branch (§7.2, §8.3) |
 | F17 | Minor findings block acceptance, or are deferred and forgotten | Follow-up issues with a mandatory burn-down task per milestone that the ready query enforces ([`FOLLOW-UPS.md`](FOLLOW-UPS.md)) |
+| F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. The boundary is branch protection, required CODEOWNERS review and squash-only. Do not extend its shell model; findings against it are by design |
