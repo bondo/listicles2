@@ -29,7 +29,7 @@ The orchestrator runs **unattended until usage limits stop it**. There is no spe
 * start workers for tasks the ready query lists (§4.3) and run review rounds (max 4 per batch, §6.2);
 * keep the state issue and the metrics comments current;
 * open draft PRs, and spawn fix rounds, escalation respawns and status-sync sessions (§7.1);
-* close Dependabot PRs once the default branch has changed (their base is no longer valid, §9 F6);
+* close individual Dependabot PRs once the grouped Dependabot PR has merged (§7.5; §9 F6);
 * create issues for owner-only tasks (§4.5).
 
 **It must stop and ask the owner**, one question at a time with a recommendation, for:
@@ -79,7 +79,7 @@ Rules that follow from the table:
   (`waiting on #14`) and never restate them, and they don't keep running metrics.
 * The PR description review table is a **view** of the findings comments, refreshed when
   a batch closes. Findings comments are the source.
-* The orchestrator never commits, so it never writes `docs/status.md` or
+* The orchestrator never authors commits (the only exception is §7.5's server-side update-branch merge of `main`), so it never writes `docs/status.md` or
   `handoff/orchestrator.md`. Its handover note is a state-issue comment (§5).
 * When a fact is found to be wrong (e.g. "CI has never run" while check runs exist),
   correct it at its canonical location in the same wake, and log the correction.
@@ -565,7 +565,7 @@ seen the batch report.
   merges `main` itself, or the orchestrator waits.
 * **Dependabot weekly routine:** once a week one batch triage worker reads the open Dependabot PRs and groups the bumps
   into one new branch cut from `main` (never a feature branch, F6), opens a draft PR and posts a "ready" comment on it.
-  The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since their base is then stale.
+  The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since its bumps then supersede them.
 * **Owner-run push tests:** a check that needs a real push (hooks, protection, ruleset behaviour) is run by the owner in
   their own clone and the result noted on #15. Agents never try to prove it by pushing to `main` or force-pushing.
 
