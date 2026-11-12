@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import check_gradle_repos as c  # noqa: E402
+import check_gradle_repos as c  # noqa: E402  # justified: must follow the sys.path insert above
 
 ROOT = Path(__file__).resolve().parent.parent
 GOOD_REPOS = f"""
