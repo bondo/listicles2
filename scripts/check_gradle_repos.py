@@ -56,10 +56,23 @@ def _body(text, open_brace):
     return text[open_brace + 1 : i - 1] if depth == 0 else None
 
 
+def _spans(text, name):
+    """(start, end) of the body of every top-level-in-text `name { ... }` block, in order."""
+    spans, pos = [], 0
+    pattern = re.compile(r"\b" + re.escape(name) + r"(\(\))?\s*\{")
+    while (m := pattern.search(text, pos)) is not None:
+        body = _body(text, m.end() - 1)
+        if body is None:
+            break
+        spans.append((m.end(), m.end() + len(body)))
+        pos = m.end() + len(body) + 1
+    return spans
+
+
 def _block(text, name):
     """Body of the first `name { ... }` block, or None."""
-    m = re.search(r"\b" + re.escape(name) + r"(\(\))?\s*\{", text)
-    return _body(text, m.end() - 1) if m else None
+    spans = _spans(text, name)
+    return text[spans[0][0] : spans[0][1]] if spans else None
 
 
 def _filtered(repos, call):
@@ -70,16 +83,27 @@ def _filtered(repos, call):
     return content is not None and re.search(r"\binclude\w*\s*\(", content) is not None
 
 
+def _repositories(text, name):
+    """Every repositories { } body inside every `name { }` block, joined in order (Gradle adds them all up).
+
+    Returns (code with string contents blanked, code with strings kept); both have the same length."""
+    blanked, kept = _strip(text, blank_strings=True), _strip(text)
+    parts = []
+    for o_start, o_end in _spans(blanked, name):
+        for r_start, r_end in _spans(blanked[o_start:o_end], "repositories"):
+            parts.append((o_start + r_start, o_start + r_end))
+    if not parts:
+        return None, None
+    return "\n".join(blanked[a:b] for a, b in parts), "\n".join(kept[a:b] for a, b in parts)
+
+
 def check_settings(text):
     problems = []
     for name in BLOCKS:
-        outer = _block(_strip(text, blank_strings=True), name)
-        outer_text = _block(_strip(text), name)
-        repos = _block(outer, "repositories") if outer is not None else None
+        repos, repos_text = _repositories(text, name)
         if repos is None:
             problems.append(f"{name}: no repositories block")
             continue
-        repos_text = _block(outer_text, "repositories")
         mirror = repos_text.find(f'"{MIRROR}"')
         central = re.search(r"\bmavenCentral\s*\(\s*\)", repos)
         if mirror < 0:
@@ -88,7 +112,8 @@ def check_settings(text):
             problems.append(f"{name}: mavenCentral() fallback missing")
         elif mirror > central.start():
             problems.append(f"{name}: Maven Central mirror must come before mavenCentral()")
-        calls = re.finditer(r"(?<![\w.])google\b\s*(\(\s*\))?", repos)
+        # A qualified call (this.google(), foo.google()) counts too; strings are blanked, so URLs never match.
+        calls = re.finditer(r"(?<!\w)google\b\s*(\(\s*\))?", repos)
         if not all(_filtered(repos, call) for call in calls):
             problems.append(f"{name}: google() needs a content filter")
     return problems
