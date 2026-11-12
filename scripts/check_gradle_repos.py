@@ -21,36 +21,75 @@ TENTATIVES = "systemProp.org.gradle.internal.repository.max.tentatives"
 BACKOFF = "systemProp.org.gradle.internal.repository.initial.backoff"
 
 
-def _block(text, name):
-    """Body of the first `name { ... }` block, or None."""
-    m = re.search(r"\b" + re.escape(name) + r"(\(\))?\s*\{", text)
-    if not m:
-        return None
-    depth, i = 1, m.end()
+def _strip(text, blank_strings=False):
+    """Kotlin source without // and /* */ comments; string contents become spaces if blank_strings."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        if text.startswith("//", i):
+            while i < n and text[i] != "\n":
+                i += 1
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            i = n if end < 0 else end + 2
+        elif text[i] == '"':
+            out.append('"')
+            i += 1
+            while i < n and text[i] != '"':
+                step = 2 if text[i] == "\\" else 1
+                out.append(" " * step if blank_strings else text[i : i + step])
+                i += step
+            if i < n:
+                out.append('"')
+                i += 1
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
+
+
+def _body(text, open_brace):
+    """Body of the block whose `{` is at open_brace, or None if unbalanced."""
+    depth, i = 1, open_brace + 1
     while i < len(text) and depth:
         depth += {"{": 1, "}": -1}.get(text[i], 0)
         i += 1
-    return text[m.end() : i - 1] if depth == 0 else None
+    return text[open_brace + 1 : i - 1] if depth == 0 else None
+
+
+def _block(text, name):
+    """Body of the first `name { ... }` block, or None."""
+    m = re.search(r"\b" + re.escape(name) + r"(\(\))?\s*\{", text)
+    return _body(text, m.end() - 1) if m else None
+
+
+def _filtered(repos, call):
+    """True if the google() call at match `call` has a content { include...(...) } filter."""
+    brace = re.compile(r"\s*\{").match(repos, call.end())
+    body = _body(repos, brace.end() - 1) if brace else None
+    content = _block(body, "content") if body is not None else None
+    return content is not None and re.search(r"\binclude\w*\s*\(", content) is not None
 
 
 def check_settings(text):
     problems = []
     for name in BLOCKS:
-        outer = _block(text, name)
+        outer = _block(_strip(text, blank_strings=True), name)
+        outer_text = _block(_strip(text), name)
         repos = _block(outer, "repositories") if outer is not None else None
         if repos is None:
             problems.append(f"{name}: no repositories block")
             continue
-        mirror = repos.find(MIRROR)
-        central = repos.find("mavenCentral()")
+        repos_text = _block(outer_text, "repositories")
+        mirror = repos_text.find(f'"{MIRROR}"')
+        central = re.search(r"\bmavenCentral\s*\(\s*\)", repos)
         if mirror < 0:
             problems.append(f"{name}: Maven Central mirror {MIRROR} missing")
-        elif central < 0:
+        elif central is None:
             problems.append(f"{name}: mavenCentral() fallback missing")
-        elif mirror > central:
+        elif mirror > central.start():
             problems.append(f"{name}: Maven Central mirror must come before mavenCentral()")
-        google = re.search(r"\bgoogle(\(\))?\s*(\{)?", repos)
-        if google and not (google.group(2) and "content" in (_block(repos[google.start() :], "google") or "")):
+        calls = re.finditer(r"(?<![\w.])google\b\s*(\(\s*\))?", repos)
+        if not all(_filtered(repos, call) for call in calls):
             problems.append(f"{name}: google() needs a content filter")
     return problems
 
