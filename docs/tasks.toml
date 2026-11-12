@@ -123,7 +123,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
-notes = """Still open on main (verify.sh and ci.yml do not run tasks.py or test_tasks.py; CODEOWNERS lacks the process docs). Needs LISTICLES_TASK=tooling (process files are hook-protected), on a new branch from main; this PR sets status = done. Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
+notes = """Delivered by PR #35 (squash-merged to main). Needed LISTICLES_TASK=tooling (process files are hook-protected). Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
 (1) CI and scripts/verify.sh: run `python3 -I scripts/test_tasks.py` and `python3 -I scripts/tasks.py validate`; \
 (2) CODEOWNERS: docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py, docs/FOLLOW-UPS.md; \
 (3) the pre-push hook should skip the Android build for docs/scripts-only diffs (it blocked pushing PR #16 from a container without the SDK)"""

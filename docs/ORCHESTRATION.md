@@ -70,7 +70,7 @@ Each fact has exactly one canonical location. Everything else links to it and do
 | Review findings per round | One **findings comment on the PR**, in the `REVIEW.md` JSON format (§7.2) | Reviewer | Implementer, next reviewer, metrics |
 | Deferred findings (follow-ups) | One **issue per finding**, label `follow-up`, body template and rules in [`FOLLOW-UPS.md`](FOLLOW-UPS.md); the deferral decision is a `decision` comment on the state issue (a PR comment when the implementer decides) | Orchestrator (implementer if no orchestrator is active); never the reviewer | Burn-down task `Mx-FU`, orchestrator (`tasks.py followups`) |
 | Implementation progress inside a batch | `handoff/<branch>.md` on that branch | The implementer holding the branch lock | Next implementer on that branch |
-| Worker outcome | `WORKER-RESULT` block (§7.3): last message of the session **and** a PR comment | Worker | Orchestrator |
+| Worker outcome | `WORKER-RESULT` block (§7.3): PR comment **and** a `send_message` to the orchestrator as the last action | Worker | Orchestrator |
 | Cost and tokens per session | `get_session` → `external_metadata.usage` (read once the session is idle) | The platform | Orchestrator, copied into a metrics row |
 | Process rules | This file, `PLAN.md`, `REVIEW.md`, `CLAUDE.md` | Reviewed PRs only | Everyone |
 
@@ -438,7 +438,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
 
 * Start only tasks that the ready query (§4.3) lists, in the order it lists them. The exceptions are review rounds
   (from `review`), fix-round implementers after `changes_requested` (their tasks are in `review`, §7.2), the escalation and
-  failure respawns of §7.4, and the status-sync sessions of §4.4. Batching several ready
+  failure respawns of §7.4, and the status-sync sessions of §4.4, and environment smoke tasks (§7.1 smoke bullet; spawn with the §8.4 one-off template, role implementer). Batching several ready
   tasks of one PR into one session is fine; claim them all. **One batch = one PR, no stacking** (retro R3): the next batch
   branches from `main` after the previous PR is squash-merged. `big-pr` is only for generated or mechanical diffs.
 * `create_session` with the spawn message (§8), the tags from §2.1, the model and effort
@@ -479,13 +479,15 @@ total cost, incidents. Then refresh the PR description's review table from the r
   owner explicitly accepts it. That acceptance goes in a `decision` log comment and in the branch row.
   Handoff-only and docs-only commits still count. They are listed, not silently skipped.
 * **Delta review** (retro R4): a commit after the last round gets one delta review before the merge request: a fresh
-  reviewer, range `reviewed_through..head_sha` only (about $1-2). Gate and threshold changes always get one. Record
+  reviewer, range `reviewed_through..head_sha` only (about $1-2). Default: a delta review. Owner acceptance (the bullet above) is the only
+  alternative, and never for gate or threshold changes, which always get a delta review. Record
   `reviewed_through` afterwards. Reviewers see what changed since the last round, not the whole PR again.
 
 ### 7.2.1 Deferring findings
 
 **Default (retro R9):** once a round has no blocker and no major, the orchestrator defers the remaining minors and nits
-(follow-up issues) instead of running another round, unless a minor is in a gate (guards, hooks, thresholds, CI checks).
+(follow-up issues) instead of running another round, unless a minor is in a gate (guards, hooks, thresholds, CI checks). The default is subject to the rules below and
+[`FOLLOW-UPS.md`](FOLLOW-UPS.md): the owner-OK areas (`security-rules`, `sync-merge`, `release`, `risk:high` tasks, majors) and the limit of 8 open follow-ups per milestone.
 
 Rules, labels and the issue template: [`FOLLOW-UPS.md`](FOLLOW-UPS.md). In short: after each round the orchestrator
 sorts the findings. Everything not deferred goes back to the implementer. Nits and minors may be deferred when no
@@ -502,7 +504,7 @@ is refreshed at batch close and no later than when the PR is declared ready.
 
 ### 7.3 Results
 
-Every worker ends its last message with this block and also posts it as a PR comment
+Every worker posts this block as a PR comment
 (the reviewer appends it to its findings comment):
 
 ```
@@ -530,8 +532,8 @@ The orchestrator collects results in this order, from cheapest to most expensive
 
 | Symptom | Action |
 |---|---|
-| First check shows a stall, a block or red CI (retro R12) | Diagnose at once, do not wait a check-in: read targeted `list_events` (`kinds` filter, small `limit`) and the job log (via `ci-triage`). Orchestrator context is a minor cost: orchestrators hand over themselves (§5). Add no new compact-format rituals. |
-| Worker idle, no `WORKER-RESULT` | `send_message` once: "post your WORKER-RESULT". If there is still nothing at the next check-in, treat it as dead. |
+| First check shows a stall, a block or red CI (retro R12) | Diagnose at once, do not wait a check-in: read targeted `list_events` (`kinds` filter, small `limit`) and the job log (via `ci-triage`). Orchestrator context is a minor cost: orchestrators hand over themselves (§5). |
+| Worker idle, no `WORKER-RESULT` (the R12 row above comes first: diagnose, then nudge) | `send_message` once: "post your WORKER-RESULT". If there is still nothing at the next check-in, treat it as dead. |
 | `status_bucket` failed, or no progress across two check-ins | Mark the row `failed` and log an incident. Read `handoff/<branch>.md` and `git ls-remote` HEAD. Interrupt the session if it might still push. Only then release the lock and spawn a fresh worker from the handoff file. |
 | Branch HEAD moved but no session holds the lock | Stop spawning on that branch. Identify the commit's author (`git log`). Log a `concurrent-push` incident and ask the owner. |
 | Model fallback (`last_served_model` ≠ `configured_model`) | Log an incident. For a reviewer, rerun the round on the intended model before trusting a "ready" verdict. |
@@ -577,7 +579,8 @@ Inputs: {Mx.md section / steps}, handoff/{branch_slug}.md if present.
 In the PR that finishes a task, set its status = "done" in docs/tasks.toml (unless your branch is the tasks ref, ORCHESTRATION §4.4: then leave it). Add any new task
 you discover there too, with dependencies.
 Refer to owner work by task id or issue number only.
-Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3): your last message, and a comment on PR #{pr}.
+Orchestrator session: {orchestrator_session}.
+Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3) as a comment on PR #{pr}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT.
 ```
 
 ### 8.3 Reviewer
@@ -590,7 +593,7 @@ You NEVER edit files on, or push to, the PR branch. You only report findings (se
 recommendation). You may reproduce a problem in a throwaway branch or worktree that you never push to the PR
 branch and that you delete afterwards.
 Post ONE PR comment: the REVIEW.md json block, then a WORKER-RESULT block
-(docs/ORCHESTRATION.md §7.3), and repeat that block as your last message.
+(docs/ORCHESTRATION.md §7.3). Orchestrator session: {orchestrator_session}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT.
 ```
 
 ### 8.4 One-off task (planner, retro, process review)
@@ -598,6 +601,7 @@ Post ONE PR comment: the REVIEW.md json block, then a WORKER-RESULT block
 ```
 You are a fresh-context {role} for Listicles (bondo/listicles2). Task {task id}: {task}.
 Inputs: {files/issues}. Push only to {branch}; don't open a PR unless told to.
+Orchestrator session: {orchestrator_session}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT (§7.3).
 Planners: add PR-sized tasks with dependencies and risk to docs/tasks.toml, and run
 scripts/tasks.py validate.
 Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
@@ -624,4 +628,4 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 | F15 | Finished-but-unmerged work looks ready again to a cold orchestrator, or a task file exists in two branches with different status | `--in-review` from the Branches table (§4.4); one canonical tasks ref (§4.2) |
 | F16 | A reviewer "helpfully" fixes the PR and so is both author and reviewer | Reviewers never edit or push to the PR branch (§7.2, §8.3) |
 | F17 | Minor findings block acceptance, or are deferred and forgotten | Follow-up issues with a mandatory burn-down task per milestone that the ready query enforces ([`FOLLOW-UPS.md`](FOLLOW-UPS.md)) |
-| F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. The boundary is branch protection, required CODEOWNERS review and squash-only. Do not extend its shell model; findings against it are by design |
+| F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. Do not extend its shell model. The boundary is branch protection, required CODEOWNERS review and squash-only. "By design" (close #21-#26 as such) applies only once M0-O6 is done (branch protection confirmed on); until then, hook-bypass findings are recorded and deferred, not dismissed |
