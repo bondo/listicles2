@@ -59,9 +59,9 @@ PAT+='severity *[=:] *["'"'"']?(ignore|informational|info)|warningsAsErrors *[=:
 PAT+='abortOnError *= *false|checkReleaseBuilds *= *false|maxIssues: *[1-9]|active: *false|excludes:|checkOnly|ignoreTestSources|'
 PAT+='disableDefaultRuleSets|<ignore |failOnNoDiscoveredTests *= *false|'
 # Linter, type-checker, coverage and formatter directives (ruff/flake8, mypy, ESLint, TypeScript, coverage.py, c8/istanbul/v8, prettier, black, biome).
-PAT+='[Nn][Oo][Qq][Aa]|type: *ignore|eslint-disable|@ts-(ignore|expect-error|nocheck)|/\*[[:space:]]*eslint[[:space:]]+[@A-Za-z]|'
+PAT+='[Nn][Oo][Qq][Aa]|type: *ignore|eslint-disable|@ts-(ignore|expect-error)|@[Tt][Ss]-[Nn][Oo][Cc][Hh][Ee][Cc][Kk]|/\*[[:space:]]*eslint[[:space:]]+[@A-Za-z]|'
 # mypy inline flags that relax (ignore-*, allow-*, no-*, =False, follow-imports=skip); ignore-without-code and =True are strict.
-PAT+='mypy:.*(ignore-(errors|missing-imports)|[[:space:]]allow-|disable-error-code|[[:space:]]no-|follow-imports[[:space:]]*=[[:space:]]*(skip|silent)|=[[:space:]]*([Ff]alse|0))|'
+PAT+='mypy:(.*[[:space:],:])?(allow|no)-|mypy:.*(ignore-(errors|missing-imports)|disable-error-code|follow-imports[[:space:]]*=[[:space:]]*(skip|silent)|=[[:space:]]*([Ff]alse|0))|'
 PAT+='[Pp][Rr][Aa][Gg][Mm][Aa][:[:space:]]?[[:space:]]*[Nn][Oo][[:space:]]*([Cc][Oo][Vv][Ee][Rr]|[Bb][Rr][Aa][Nn][Cc][Hh])|(c8|v8|istanbul) ignore|prettier-ignore|biome-ignore|dprint-ignore|fmt: *(off|skip)|yapf: *disable|isort: *(skip|off)|@formatter:off'
 JUST='justified:[[:space:]]*[^[:space:]*/]'
 out=$(gg "$PAT" -- "${EXCL[@]}" | grep -vE "$JUST")
@@ -89,8 +89,8 @@ BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; ini = (F ~ /(\.ini|\.cfg|\.flake8|\
   if (mode == 2) { depth += nest(c); if (!closer) check(); if (depth <= 0) mode = 0; next }
   if (first) { first = 0; if (nc ~ /^[ \t]*["\047]?(off|warn|0|1)["\047]?[ \t]*,?[ \t]*$/) check() }
   if (c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/ && lc ~ /per-file-(ignores|target-version)/) { mode = 1; next }
-  if (lc ~ /(ignore|exclude|omit|per-file|collectcoveragefrom)[a-z_.-]*["\047]?[ \t]*[:=(][ \t]*[[{(]+[ \t]*$/) { depth = nest(c); if (depth > 0) mode = 2; next }
-  if (ini && line ~ /^[A-Za-z]/ && lc ~ /^(extend-|force-)?(ignore|exclude|omit|per-file-ignores|per-file-target-version|exclude_lines|exclude_also)[ \t]*[=:]/) { mode = 3; next }
+  if (lc ~ /(ignore|exclude|omit|per-file|collectcoveragefrom|disable_error_code)[a-z_.-]*["\047]?[ \t]*[:=(][ \t]*[[{(]/) { depth = nest(c); if (depth > 0) mode = 2; next }
+  if (ini && line ~ /^[A-Za-z]/ && lc ~ /^(extend[-_]|force[-_])?(ignore|exclude|omit|per-file-ignores|per-file-target-version|exclude_lines|exclude_also|disable_error_code)[ \t]*[=:]/) { mode = 3; next }
   if (es && nc ~ /:[ \t]*\[[ \t]*$/) first = 1
 }'
 entrycheck() { # entrycheck <pathspec>...
@@ -121,10 +121,11 @@ extcheck() {
 KEYB='(^|[^A-Za-z0-9_-])["'"'"']?'
 TRUE='([Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]|[Oo][Nn]|1)([^A-Za-z0-9_.]|$)'
 FALSE='([Ff][Aa][Ll][Ss][Ee]|[Nn][Oo]|[Oo][Ff][Ff]|0)([^A-Za-z0-9_.]|$)'
-PYPAT='per-file-ignores|per-file-target-version|'"$KEYB"'(extend-|force-)?(ignore|exclude)["'"'"']?[[:space:]]*=|'"$KEYB"'(omit|exclude_lines|exclude_also)["'"'"']?[[:space:]]*=|'
-PYPAT+='(^|[^a-z_])(ignore_errors|ignore_missing_imports|implicit_reexport|allow_[a-z_]+)["'"'"']?[[:space:]]*=[[:space:]]*'"$TRUE"'|'
-PYPAT+='(strict|strict_optional|strict_equality|check_untyped_defs|no_implicit_optional|(disallow|warn)_[a-z_]+)["'"'"']?[[:space:]]*=[[:space:]]*'"$FALSE"'|'
-PYPAT+='follow_imports[[:space:]]*=[[:space:]]*.?(skip|silent)|disable_error_code'
+PYPAT='per-file-ignores|per-file-target-version|'"$KEYB"'(extend[-_]|force[-_])?(ignore|exclude)["'"'"']?[[:space:]]*[=:]|'"$KEYB"'(omit|exclude_lines|exclude_also)["'"'"']?[[:space:]]*[=:]|'
+PYPAT+='(^|[^a-z_])(ignore_errors|ignore_missing_imports|implicit_reexport|allow_[a-z_]+)["'"'"']?[[:space:]]*[=:][[:space:]]*'"$TRUE"'|'
+PYPAT+='(^|[^a-z_])no_(strict|strict_optional|strict_equality|check_untyped_defs|(disallow|warn)_[a-z_]+)["'"'"']?[[:space:]]*[=:][[:space:]]*'"$TRUE"'|'
+PYPAT+='(^|[^a-z_])(strict|strict_optional|strict_equality|check_untyped_defs|no_implicit_optional|(disallow|warn)_[a-z_]+)["'"'"']?[[:space:]]*[=:][[:space:]]*'"$FALSE"'|'
+PYPAT+='follow_imports[[:space:]]*[=:][[:space:]]*.?(skip|silent)|disable_error_code'
 # tsconfig
 TSPAT='"(strict|noImplicitAny|strictNullChecks|strictFunctionTypes|strictBindCallApply|strictPropertyInitialization|noImplicitThis|alwaysStrict|'
 TSPAT+='useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noImplicitReturns|noImplicitOverride|noFallthroughCasesInSwitch|'
@@ -134,6 +135,7 @@ TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|
 # Numbers only count as severities after a rule key (line start or first key of `rules: {`), so option objects like { max: 1 } do not.
 ESPAT=':[[:space:]]*(\[[[:space:]]*)?.?(off|warn).?[[:space:]]*([],}]|$|//)|'
 ESPAT+='(^|rules["'"'"']?[[:space:]]*:[[:space:]]*\{)[[:space:]]*["'"'"']?[@A-Za-z0-9/_$-]+["'"'"']?[[:space:]]*:[[:space:]]*(\[[[:space:]]*)?[01][[:space:]]*([],}]|$|//)|'
+ESPAT+='rules["'"'"']?[[:space:]]*:[[:space:]]*\{([^][{}]|\[[^]]*\])*,[[:space:]]*["'"'"']?[@A-Za-z0-9/_$-]+["'"'"']?[[:space:]]*:[[:space:]]*(\[[[:space:]]*)?[01][[:space:]]*([],}]|$|//)|'
 ESPAT+='\bignores[[:space:]]*:|ignorePatterns|globalIgnores|'
 ESPAT+='reportUnusedDisableDirectives[[:space:]]*:[[:space:]]*(false|.?off.?|0)'
 # coverage exclusions in jest, vitest, nyc and c8 config
