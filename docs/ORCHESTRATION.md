@@ -438,7 +438,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
 
 * Start only tasks that the ready query (§4.3) lists, in the order it lists them. The exceptions are review rounds
   (from `review`), fix-round implementers after `changes_requested` (their tasks are in `review`, §7.2), the escalation and
-  failure respawns of §7.4, and the status-sync sessions of §4.4, and environment smoke tasks (§7.1 smoke bullet; spawn with the §8.4 one-off template, role implementer). Batching several ready
+  failure respawns of §7.4, the status-sync sessions of §4.4, and the environment smoke tasks (§7.1 smoke bullet; spawn with the §8.4 one-off template, role implementer). Batching several ready
   tasks of one PR into one session is fine; claim them all. **One batch = one PR, no stacking** (retro R3): the next batch
   branches from `main` after the previous PR is squash-merged. `big-pr` is only for generated or mechanical diffs.
 * `create_session` with the spawn message (§8), the tags from §2.1, the model and effort
@@ -628,4 +628,4 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 | F15 | Finished-but-unmerged work looks ready again to a cold orchestrator, or a task file exists in two branches with different status | `--in-review` from the Branches table (§4.4); one canonical tasks ref (§4.2) |
 | F16 | A reviewer "helpfully" fixes the PR and so is both author and reviewer | Reviewers never edit or push to the PR branch (§7.2, §8.3) |
 | F17 | Minor findings block acceptance, or are deferred and forgotten | Follow-up issues with a mandatory burn-down task per milestone that the ready query enforces ([`FOLLOW-UPS.md`](FOLLOW-UPS.md)) |
-| F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. Do not extend its shell model. The boundary is branch protection, required CODEOWNERS review and squash-only. "By design" (close #21-#26 as such) applies only once M0-O6 is done (branch protection confirmed on); until then, hook-bypass findings are recorded and deferred, not dismissed |
+| F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. Do not extend its shell model. The boundary is branch protection, required CODEOWNERS review and squash-only. "By design" closing of #21-#26 (all open) applies only once M0-O6 is done (branch protection confirmed on). Until then hook-bypass findings are recorded, not dismissed, and are deferred only as §7.2.1 allows (minors and nits; a major needs owner OK) |
