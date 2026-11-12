@@ -1,0 +1,13 @@
+build:
+  maxIssues: 0
+config:
+  warningsAsErrors: true
+naming:
+  FunctionNaming:
+    # Composables are PascalCase.
+    ignoreAnnotated: ['Composable']
+style:
+  MagicNumber:
+    excludes: ['**/test/**', '**/androidTest/**']  # justified: test literals are not magic numbers
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']

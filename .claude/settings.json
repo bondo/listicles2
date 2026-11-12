@@ -1,0 +1,23 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/statusline.sh\""
+  },
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/install-hooks.sh\" >/dev/null 2>&1 || true" }] }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [{ "type": "command", "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/hooks/pretooluse_guard.py\"" }]
+      }
+    ],
+    "PostToolUse": [
+      { "hooks": [{ "type": "command", "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/hooks/context_guard.py\"" }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/hooks/session_end_metrics.py\"" }] }
+    ]
+  }
+}
