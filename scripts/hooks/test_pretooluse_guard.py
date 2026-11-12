@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-import gitenv  # noqa: F401  (drops GIT_DIR and friends, see gitenv.py)
+import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 
 GUARD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pretooluse_guard.py")
 
