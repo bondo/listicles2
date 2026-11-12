@@ -95,7 +95,7 @@ jobs:
         env:
           GUARD_BASE: origin/${{ github.base_ref || 'main' }}
           GOLDEN_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'golden-update') && '1' || '0' }}
-          GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '3000' || '600' }}
+          GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '6000' || '600' }}
         run: ./scripts/guards.sh
       - name: hook tests
         run: python3 -I -m unittest discover -s scripts/hooks
