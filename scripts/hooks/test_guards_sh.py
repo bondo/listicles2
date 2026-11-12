@@ -237,18 +237,23 @@ class DiffChecks(GuardsCase):
         self.assertFails("changed lines (limit 10)", CI="true", GUARD_MAX_DIFF="10")
         self.assertPasses(CI="true", GUARD_MAX_DIFF="100")
 
-    def test_big_pr_cap_6000_boundaries(self):
-        # CI passes GUARD_MAX_DIFF=6000 for PRs labelled big-pr: between the old 3000 cap and 6000 passes, above fails.
+    def test_big_pr_cap_1500_boundaries(self):
+        # CI passes GUARD_MAX_DIFF=1500 for PRs labelled big-pr (owner decision D2): above 1500 fails, up to 1500 passes.
         self.repo.write("notes.txt", "x\n" * 3500)
         self.repo.commit()
-        self.assertFails("changed lines (limit 3000)", CI="true", GUARD_MAX_DIFF="3000")
-        self.assertPasses(CI="true", GUARD_MAX_DIFF="6000")
+        self.assertFails("changed lines (limit 1500)", CI="true", GUARD_MAX_DIFF="1500")
+        self.repo.write("notes.txt", "x\n" * 1499)
+        self.repo.commit()
+        self.assertPasses(CI="true", GUARD_MAX_DIFF="1500")  # just under the cap
+        self.repo.write("notes.txt", "x\n" * 1500)
+        self.repo.commit()
+        self.assertPasses(CI="true", GUARD_MAX_DIFF="1500")  # exactly at the cap
+        self.repo.write("notes.txt", "x\n" * 1501)
+        self.repo.commit()
+        self.assertFails("changed lines (limit 1500)", CI="true", GUARD_MAX_DIFF="1500")
         self.repo.write("notes.txt", "x\n" * 6000)
         self.repo.commit()
-        self.assertPasses(CI="true", GUARD_MAX_DIFF="6000")  # exactly at the cap
-        self.repo.write("notes.txt", "x\n" * 6001)
-        self.repo.commit()
-        self.assertFails("changed lines (limit 6000)", CI="true", GUARD_MAX_DIFF="6000")
+        self.assertFails("changed lines (limit 1500)", CI="true", GUARD_MAX_DIFF="1500")  # old 6000 cap no longer enough
 
     def test_default_cap_is_600_without_override(self):
         self.repo.write("notes.txt", "x\n" * 601)
