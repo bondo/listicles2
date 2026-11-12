@@ -72,3 +72,30 @@ kover {
         }
     }
 }
+
+// M0.5-09: every Kotlin compile task (all modules, all variants, tests included) must treat warnings as errors.
+// Run: ./gradlew checkWarningsAsErrors (wired into detekt, so verify.sh and CI, in the next commit).
+val checkWarningsAsErrors by tasks.registering {
+    group = "verification"
+    description = "Fails if any Kotlin compile task does not set allWarningsAsErrors."
+    // Evaluated lazily (when the task graph is built), after every project has been configured.
+    val compileTasks =
+        provider {
+            allprojects.flatMap { p ->
+                p.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().toList()
+            }
+        }
+    val offenders =
+        compileTasks.map { all ->
+            all.filter { !it.compilerOptions.allWarningsAsErrors.getOrElse(false) }.map { it.path }
+        }
+    val taskCount = compileTasks.map { it.size }
+    inputs.property("offenders", offenders)
+    inputs.property("taskCount", taskCount)
+    doLast {
+        check(taskCount.get() > 0) { "checkWarningsAsErrors found no Kotlin compile tasks; the check is broken" }
+        check(offenders.get().isEmpty()) {
+            "allWarningsAsErrors is not enabled for: ${offenders.get().joinToString()}"
+        }
+    }
+}
