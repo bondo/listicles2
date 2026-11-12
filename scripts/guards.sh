@@ -50,15 +50,51 @@ PAT='Suppress[A-Za-z]*\(|tools:ignore|ktlint-disable|detekt:|lint\.disable|noins
 PAT+='ktlint_[A-Za-z0-9_-]+ *= *disabled|to *"disabled"|ij_[a-z_]*ktlint[a-z_]*|(informational|warning|ignore) *\+?= *["(s]|'
 PAT+='severity *[=:] *["'"'"']?(ignore|informational|info)|warningsAsErrors *[=:] *false|ignoreWarnings|ignoreFailures *= *true|'
 PAT+='abortOnError *= *false|checkReleaseBuilds *= *false|maxIssues: *[1-9]|active: *false|excludes:|checkOnly|ignoreTestSources|'
-PAT+='disableDefaultRuleSets|<ignore |failOnNoDiscoveredTests *= *false'
-out=$(gg "$PAT" -- "${EXCL[@]}" | grep -vE 'justified:[[:space:]]*[^[:space:]*/]')
+PAT+='disableDefaultRuleSets|<ignore |failOnNoDiscoveredTests *= *false|'
+# Linter, type-checker, coverage and formatter directives (ruff/flake8, mypy, ESLint, TypeScript, coverage.py, c8/istanbul/v8, prettier, black, biome).
+PAT+='[Nn][Oo][Qq][Aa]|type: *ignore|mypy: *(ignore-errors|allow-|disable-error-code)|eslint-disable|@ts-(ignore|expect-error|nocheck)|'
+PAT+='pragma: *no (cover|branch)|(c8|v8|istanbul) ignore|prettier-ignore|biome-ignore|dprint-ignore|fmt: *(off|skip)|yapf: *disable|isort: *(skip|off)|@formatter:off'
+JUST='justified:[[:space:]]*[^[:space:]*/]'
+out=$(gg "$PAT" -- "${EXCL[@]}" | grep -vE "$JUST")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
+
+# 2b. Relaxed settings in the linter config files themselves (same justification rule). Each pattern only applies to the files
+# named with it, so ordinary code and data (`ignore = x`, "off") never match.
+cfgcheck() { # cfgcheck <pattern> <pathspec>...
+  local pat="$1" o; shift
+  o=$(gg "$pat" -- "$@" "${EXCL[@]}" | grep -vE "$JUST")
+  [ -n "$o" ] && echo "$o" | sed 's/^/guard: unjustified suppression: /'
+  return 0
+}
+# ruff, flake8, mypy, coverage.py
+PYPAT='per-file-ignores|per-file-target-version|^[[:space:]]*(extend-|force-)?(ignore|exclude)[[:space:]]*=|^[[:space:]]*(omit|exclude_lines|exclude_also)[[:space:]]*=|'
+PYPAT+='(^|[^a-z_])(ignore_errors|ignore_missing_imports|implicit_reexport|allow_[a-z_]+)[[:space:]]*=[[:space:]]*(true|True|1)|'
+PYPAT+='(strict|strict_optional|strict_equality|check_untyped_defs|no_implicit_optional|(disallow|warn)_[a-z_]+)[[:space:]]*=[[:space:]]*(false|False|0)|'
+PYPAT+='follow_imports[[:space:]]*=[[:space:]]*.?(skip|silent)|disable_error_code'
+# tsconfig
+TSPAT='"(strict|noImplicitAny|strictNullChecks|strictFunctionTypes|strictBindCallApply|strictPropertyInitialization|noImplicitThis|alwaysStrict|'
+TSPAT+='useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noImplicitReturns|noImplicitOverride|noFallthroughCasesInSwitch|'
+TSPAT+='noUnusedLocals|noUnusedParameters|noPropertyAccessFromIndexSignature|checkJs)"[[:space:]]*:[[:space:]]*false|'
+TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors)"[[:space:]]*:[[:space:]]*true'
+# ESLint (rules off or downgraded to warn, ignored files, unused-directive reporting off) and biome
+ESPAT=':[[:space:]]*(\[[[:space:]]*)?(.?(off|warn).?|0|1)[[:space:]]*([],}]|$|//)|\bignores[[:space:]]*:|ignorePatterns|globalIgnores|'
+ESPAT+='reportUnusedDisableDirectives[[:space:]]*:[[:space:]]*(false|.?off.?|0)'
+# coverage exclusions in jest, vitest, nyc and c8 config
+COVPAT='coveragePathIgnorePatterns|collectCoverageFrom|exclude[^A-Za-z0-9_:]{0,2}:'
+out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' '*tox.ini' '*.flake8' '*.coveragerc'
+  cfgcheck "$TSPAT" '*tsconfig*.json' '*jsconfig*.json'
+  cfgcheck "$ESPAT" '*eslint.config.*' '*eslintrc*' '*biome.json*'
+  cfgcheck "$COVPAT" '*vitest.config.*' '*jest.config.*' '*nycrc*' '*c8rc*')
+[ -n "$out" ] && { echo "$out"; fail=1; }
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
 LS=(git ls-files)
 [ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AM)
 out=$("${LS[@]}" | grep -iE 'baseline')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline file: /'; fail=1; }
+# Formatter and linter ignore files cannot carry a same-line justification, so they are refused outright (ask the owner).
+out=$("${LS[@]}" | grep -E '(^|/)\.(prettier|eslint|stylelint|dprint)ignore$')
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: ignore file: /'; fail=1; }
 out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline wiring: /'; fail=1; }
 
