@@ -14,6 +14,7 @@ import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 TASK = ":core:domain:compileKotlin"
+GATE_MESSAGE = "warnings are not all errors"
 
 # Groovy init script; %s is the statement applied to the compile task's compilerOptions.
 INIT = """
@@ -28,6 +29,8 @@ BAD = {
     "warning-level-disabled-other-id": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=UNUSED_VARIABLE:disabled')",
     "nowarn": "compilerOptions.freeCompilerArgs.add('-nowarn')",
     "suppress-warnings-property": "compilerOptions.suppressWarnings.set(true)",
+    "warning-level-split-arg": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level', 'DEPRECATION:disabled'])",
+    "suppress-warning-split-arg": "compilerOptions.freeCompilerArgs.addAll(['-Xsuppress-warning', 'DEPRECATION'])",
     "xsuppress-warning": "compilerOptions.freeCompilerArgs.add('-Xsuppress-warning=DEPRECATION')",
 }
 
@@ -59,6 +62,12 @@ class WarningsGateTest(unittest.TestCase):
         rc, out = gradle("checkWarningsAsErrors")
         self.assertEqual(rc, 0, out)
 
+    def test_broken_injection_is_not_mistaken_for_gate_rejection(self):
+        # An injection that fails on its own (rc != 0, task path in the error) must not satisfy the negative tests.
+        rc, out = gradle("checkWarningsAsErrors", init="compilerOptions.nope.set(true)")
+        self.assertNotEqual(rc, 0, out)
+        self.assertNotIn(GATE_MESSAGE, out)
+
     def test_detekt_depends_on_gate(self):
         rc, out = gradle("detekt", "--dry-run")
         self.assertEqual(rc, 0, out)
@@ -69,6 +78,7 @@ def _make(name, statement):
     def test(self):
         rc, out = gradle("checkWarningsAsErrors", init=statement)
         self.assertNotEqual(rc, 0, f"gate accepted {name}:\n{out}")
+        self.assertIn(GATE_MESSAGE, out, f"{name} failed for another reason, the gate did not reject it:\n{out}")
         self.assertIn(TASK, out)
 
     return test
