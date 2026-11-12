@@ -194,7 +194,7 @@ notes = "Delivered by PR #36 (squash-merged to main). Owner decision D2 (logged 
 id = "M0-16"
 title = "Close follow-ups #21-#26 as by-design once branch protection is confirmed on (D1)"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = ["M0-O6"]
@@ -263,7 +263,7 @@ notes = "Decided by the owner: a separate stacked PR (#16), merged after #1. Mar
 id = "M0-O6"
 title = "Turn on branch protection for main using the guide"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0-08", "M0-O2"]
@@ -348,9 +348,8 @@ milestone = "M0.5"
 status = "todo"
 assignee = "planner"
 risk = "normal"
-depends_on = ["M0.5-01"]
-notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1"
-
+depends_on = ["M0.5-01", "M0.5-16"]
+notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1 Review packet for the collaborator (docs/reviews/collaborator-workflow.md section 7): docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
 [[task]]
 id = "M0.5-04"
 title = "App and repo name shortlist (#17): 5-8 candidates with Play Store, GitHub and domain availability, one recommendation"
@@ -493,7 +492,7 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19"]
 
 [[task]]
 id = "M0.5-O1"
@@ -503,7 +502,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
-
+notes = "Sign-off is owner only (D5): the collaborator comments or reviews but does not formally approve. Done when the owner approves the M0.5-03 PR."
 [[task]]
 id = "M0.5-O2"
 title = "Pick the app and repo name from the shortlist"
@@ -514,6 +513,70 @@ risk = "normal"
 depends_on = ["M0.5-04"]
 issue = 17
 notes = "Must be decided before M1 (M1 tasks depend on milestone:M0.5). Then the rename of the repo, applicationId and labels is a task for M1-01 to plan"
+
+# ---- Collaborator workflow (docs/reviews/collaborator-workflow.md; owner decisions D1-D7 logged on #15, final)
+# D2: trust = repo role only, no allowlist file. D5: design sign-off is owner only.
+
+[[task]]
+id = "M0.5-O3"
+title = "Log collaborator decisions D1-D7, create the five labels, check Actions settings (C5)"
+milestone = "M0.5"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Decisions are logged and the labels feedback, idea, decision, needs-collaborator, needs-owner were created by the orchestrator. Still open for the owner: check the Actions settings by eye (C5: read-only workflow permissions, no create/approve PRs, auto-merge OFF, no secrets or variables); do it before M0.5-O4"
+
+[[task]]
+id = "M0.5-16"
+title = "COLLABORATING.md plus ORCHESTRATION, PLAN and orchestrator-state changes for the collaborator"
+milestone = "M0.5"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = ["M0.5-O3"]
+notes = "Normal env (docs only). Effort S. One page for the collaborator (working agreement, how to give feedback, privacy, watch settings), ORCHESTRATION 1, 1.1, 2, 3.2 (fold only owner comments from #15), 7, 8, PLAN 8 and the M0.5 row"
+
+[[task]]
+id = "M0.5-17"
+title = "Issue forms for feedback, ideas and questions, with a test that parses them"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-O3"]
+notes = "Tooling env (.github/). Effort S. Forms only: no collaborators.toml (D2). Test-first, wired into verify.sh and the tasks job; negatives: unknown label (checked against a fixture list of the five labels), missing field. Blank issues stay allowed"
+
+[[task]]
+id = "M0.5-18"
+title = "scripts/collab_inbox.py: digest of trusted collaborator activity since a time, from saved API JSON"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-17"]
+notes = "Tooling env. Effort M. Filters by the API author_association / repo role (Write or better), not an id list (D2); strips hidden markup. Tests include a renamed login, a public non-Write author and an edited comment"
+
+[[task]]
+id = "M0.5-19"
+title = "Orchestrator and worker prompts: inbox and accident-check wake steps, tiers, fenced text, label limits"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-16", "M0.5-18"]
+issue = 44
+notes = "Tooling env (agents/prompts). Effort S. Links follow-up #44: agents never resolve a collaborator's review thread"
+
+[[task]]
+id = "M0.5-O4"
+title = "Record the collaborator, invite them, confirm 2FA and run the live test"
+milestone = "M0.5"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0.5-19", "M0.5-O3"]
+notes = "Invite only after COLLABORATING.md and the wake steps exist; send COLLABORATING.md. Live test: report section 6 (comment, PR review, form issue, and what Merge does on a green PR), results noted on #15"
 
 # ---------------------------------------------------------------- M1 auth + households
 # The planner (M1-01) breaks M1 into PR-sized tasks and adds them here in its PR.
