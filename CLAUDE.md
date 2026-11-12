@@ -20,7 +20,9 @@ lists app: Kotlin, Compose, Firebase (Firestore + Auth), no Cloud Functions, Eng
 - Never commit secrets or `google-services.json`.
 
 ## How to work
-- Tests first. A bug fix starts with a test that fails for the right reason. Domain logic gets property tests.
+- Test-first for ALL code, tooling included (hooks, guards, scripts, CI checks, metrics, status line): commit a failing test
+  first (the commit order shows it), with negative cases, wired into `scripts/verify.sh` and CI. A bug fix starts with a
+  test that fails for the right reason. Domain logic gets property tests. Reviewers flag untested changes.
 - One PR = one concern, about 400 changed lines or fewer.
 - Strings only in resources, always English and Danish (`values/` and `values-da/`). Plurals use `<plurals>`.
 - Domain code (`core/domain`) is pure Kotlin, whole-number arithmetic only, no floating point.
@@ -38,4 +40,6 @@ lists app: Kotlin, Compose, Firebase (Firestore + Auth), no Cloud Functions, Eng
 
 ## Reviews
 - Process and finding format: `REVIEW.md`. Max 4 rounds; then stop and report to the owner.
+- Reviewers never edit or push the PR branch: report only (a throwaway worktree is allowed, never pushed anywhere and deleted afterwards). Minor/nit findings may be
+  deferred to follow-up issues once no blocker or major is open.
 - Role models and effort: `agents/roles.yaml`. Do not change your own effort or model.

@@ -2,6 +2,7 @@
 name: ci-triage
 description: Reads a failing CI job log or verify.sh output and reports the failing test or rule with the minimal error. Use instead of reading a full log in the main session.
 model: haiku
+effort: low
 tools: Read, Grep, Glob, Bash
 ---
 You get a failing job log (a file path, or a command that prints it).

@@ -31,7 +31,7 @@ gradle() { ./gradlew -q --console=plain "$@"; }
 step guards ./scripts/guards.sh
 step hook-tests python3 -I -m unittest discover -s scripts/hooks
 step spotless gradle spotlessCheck
-step detekt gradle detekt
+step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest
 step lint gradle :app:lintDebug
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test

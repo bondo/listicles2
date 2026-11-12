@@ -14,7 +14,7 @@ fail=0
 bad() { echo "guard: $*"; fail=1; }
 
 # Everything tracked except prose, generated and third-party files, and this script (it names the patterns).
-EXCL=(':!docs' ':!handoff' ':!*.md' ':!scripts/guards.sh' ':!*package-lock.json' ':!*.lock' ':!*.png' ':!*.jar'
+EXCL=(':!docs' ':!handoff' ':!*.md' ':!scripts/guards.sh' ':!scripts/hooks/test_guards_sh.py' ':!*package-lock.json' ':!*.lock' ':!*.png' ':!*.jar'
   ':!gradle/wrapper' ':!gradlew' ':!gradlew.bat' ':!**/node_modules/**' ':!**/build/**')
 GREP=(git grep -nHI -E)
 [ "$STAGED" = 1 ] && GREP=(git grep --cached -nHI -E)
@@ -32,8 +32,12 @@ TESTSRC=('*/src/*[Tt]est*/*.kt' '*/src/*[Tt]est*/*.js' '*/src/*[Tt]est*/*.ts' 'f
 CFGSRC=('*.gradle.kts' '*.gradle' '*package.json' '*jest.config.*' '*.properties' '*/src/*[Tt]est*/resources/*')
 
 # 1. Disabled or focused tests (anywhere), and test-only forms (test sources only, so production code may use enabled = false).
-out=$(gg '@([A-Za-z]+\.)*Ignored?\b|@Disabled[A-Za-z]*|@Enabled(If|On)[A-Za-z]*|\.(only|skip)\(' -- "${EXCL[@]}")
+# Also aliased imports, typealiases and backticked names of those annotations.
+out=$(gg '@([A-Za-z]+\.)*`?(Ignored?\b|Disabled[A-Za-z]*|Enabled(If|On)[A-Za-z]*)|\.(only|skip)\(|import +[A-Za-z0-9_.]*\.(Ignored?|Disabled[A-Za-z]*|Enabled(If|On)[A-Za-z]*) +as +|typealias +[A-Za-z0-9_]+ *= *([A-Za-z0-9_]+\.)*(Ignored?|Disabled((If|On|In|For)[A-Za-z]*)?|Enabled(If|On)[A-Za-z]*)\b' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled test: /'; fail=1; }
+# Skipped Python tests in the hook suites (a CI gate). This includes test_guards_sh.py, which builds its fixtures by concatenation.
+out=$(gg '@unittest\.skip|\bskip(If|Unless|Test)\b|SkipTest\b|expectedFailure|from +unittest +import .*\bskip|@skip\b' -- 'scripts/hooks/test_*.py')
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: skipped python test: /'; fail=1; }
 out=$(gg 'enabled(If|OrReasonIf)? *[=(]|\bx(it|test|describe|context|should|expect|when|then|given|feature|scenario|and|[A-Z][A-Za-z]*)\(|\bfit\(|assume(True|False)\(|"(!|f:)[A-Za-z]|passWithNoTests|testPathIgnorePatterns' -- "${TESTSRC[@]}" "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled or focused test: /'; fail=1; }
 
@@ -66,7 +70,7 @@ if [ "$STAGED" = 0 ]; then
     if [ "${CI:-}" = true ]; then bad "no base/merge-base '$BASE' (CI checkout needs fetch-depth: 0)"
     else echo "guard: note: base '$BASE' not found, skipped diff-based checks"; fi
   else
-    DSPEC=(. ':!docs' ':!handoff' ':!scripts/guards.sh' ':!*package-lock.json')
+    DSPEC=(. ':!docs' ':!handoff' ':!scripts/guards.sh' ':!scripts/hooks/test_guards_sh.py' ':!*package-lock.json')
     # Lowered or removed thresholds and severities.
     git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }

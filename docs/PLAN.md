@@ -20,7 +20,7 @@ that combine into scaled trip checklists). Changes sync in real time between mem
 | i18n | English + Danish; all strings in resources; CI fails on missing translations |
 | AI at runtime | No AI code apart from on-device ML Kit. No LLM or cloud AI calls |
 | Distribution | Signed APK on GitHub Releases on each `v*` tag; Play internal-testing pipeline prepared but turned off until the $25 account exists |
-| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits remain (max 4 rounds per batch, then the owner decides) → the owner squash-merges |
+| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then the owner decides) → the owner squash-merges |
 | Repo | **Public** (unlimited free GitHub Actions minutes). No secrets in the repo; secrets live in GitHub secrets |
 
 ## 2. Repository layout
@@ -208,7 +208,8 @@ enforce the rules rather than goodwill.
    only this.
 2. **Git hooks** (installed by `scripts/install-hooks.sh`, which a session-start hook
    runs automatically): pre-commit runs spotless and detekt on the changed modules,
-   and pre-push runs the unit tests.
+   and pre-push runs the guards, the hook tests and the unit tests (it skips the Gradle unit tests for pushes that only touch
+   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build).
 3. **Claude Code hooks** in `.claude/settings.json`, which agents can't skip:
    * PreToolUse denies `git commit --no-verify`, `git push --force`, `git reset --hard`
      on shared branches, and pushes to `main`.
@@ -265,14 +266,15 @@ enforce the rules rather than goodwill.
 3. Findings are posted as one PR comment containing a JSON block (format in
    `REVIEW.md`; `docs/ORCHESTRATION.md` §7.2 says how it is used): each finding has a stable ID (`R1-03`; rounds are
    numbered per PR and never reset per batch), a severity (`blocker | major | minor | nit`), a file and line,
-   and a status (`open | fixed | disputed | withdrawn`). This makes the round-over-round
+   and a status (`open | fixed | disputed | withdrawn | deferred`). This makes the round-over-round
    metrics in section 9.4 possible.
-4. The author fixes everything above nit, or marks it `disputed` with a reason, and pushes.
+4. The author fixes everything above nit, or marks it `disputed` with a reason, and pushes. Once no blocker or major is
+   open, minor and nit findings may be `deferred` to follow-up issues instead of another round.
 5. Each later round runs in a **new** reviewer session that sees only the commits since the
    last round, the open findings, and `REVIEW.md`. It re-checks open findings and reviews
    the new code. It doesn't re-review unchanged code, so the loop converges.
-6. When only nits remain, the reviewer posts "ready (nits only)" and you squash-merge.
-   If round 4 of a batch still has findings above nit, the loop stops and you decide.
+6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and you squash-merge.
+   If round 4 of a batch still has open findings above nit (deferred minors do not count), the loop stops and you decide.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 

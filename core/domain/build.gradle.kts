@@ -1,6 +1,13 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kover)
+    alias(libs.plugins.detekt)
+}
+
+detekt {
+    // Type-resolved tasks (detektMain, detektTest); the root task covers all sources without types.
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
 }
 
 java {
