@@ -30,6 +30,7 @@ gradle() { ./gradlew -q --console=plain "$@"; }
 
 step guards ./scripts/guards.sh
 step hook-tests python3 -I -m unittest discover -s scripts/hooks
+step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
 step tasks-tests python3 -I scripts/test_tasks.py
 step tasks-validate python3 -I scripts/tasks.py validate
 step spotless gradle spotlessCheck
