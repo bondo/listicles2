@@ -19,3 +19,9 @@
 /gradle/libs.versions.toml   @bondo
 /firebase/                   @bondo
 /gradle.properties           @bondo
+# Process docs and the task graph (explicit entries: docs/ has no directory rule)
+/docs/ORCHESTRATION.md       @bondo
+/docs/orchestrator-state.md  @bondo
+/docs/tasks.toml             @bondo
+/docs/FOLLOW-UPS.md          @bondo
+/scripts/tasks.py            @bondo
