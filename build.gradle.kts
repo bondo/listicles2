@@ -74,7 +74,7 @@ kover {
 }
 
 // M0.5-09: every Kotlin compile task (all modules, all variants, tests included) must treat warnings as errors.
-// Run: ./gradlew checkWarningsAsErrors (wired into detekt, so verify.sh and CI, in the next commit).
+// Run: ./gradlew checkWarningsAsErrors (wired into detekt, so verify.sh and CI run it).
 val checkWarningsAsErrors by tasks.registering {
     group = "verification"
     description = "Fails if any Kotlin compile task does not set allWarningsAsErrors."
@@ -99,3 +99,5 @@ val checkWarningsAsErrors by tasks.registering {
         }
     }
 }
+
+tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
