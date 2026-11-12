@@ -15,6 +15,7 @@ unless you are the orchestrator named below; comment instead.
 
 **Orchestrator:** `{session_id}` since {UTC} · predecessor `{session_id}` · lineage depth {n}
 **Updated:** {UTC}, after {event}
+**Inbox since:** {UTC} (collaborator comments and issues are read from here, ORCHESTRATION.md §7.6; only owner comments on #15 become state, §3.2)
 **Tasks ref:** `{branch}` (the one ref that carries `docs/tasks.toml`: `claude/orchestration-review` until M0-O8, then `main`)
 
 ## Now
@@ -57,6 +58,9 @@ Don't pick work any other way. Re-schedule the 45-minute check-in on every wake,
 |---|---|---|---|
 | `trig_…` | `session_…` | remind: {to-do #n} | {UTC} |
 | PR #{n} | `session_…` | review/CI events | n/a |
+
+## Collaborator
+- Accident check at the last wake: {clean / hit: what, who, link}; CI-steering labels recorded: {none / list}
 
 ## Open questions for the owner
 - {question}: options {a} / {b}; recommendation {a}
