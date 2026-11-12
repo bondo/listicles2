@@ -74,7 +74,7 @@ Each fact has exactly one canonical location. Everything else links to it and do
 | Fact | Canonical location | Written by | Read by |
 |---|---|---|---|
 | Current milestone, batches, running sessions, branch locks, next steps | **State issue** body (currently #15, label `orchestrator-state`), format in [`orchestrator-state.md`](orchestrator-state.md) | Orchestrator only | Orchestrator, successor, owner |
-| History: metrics rows, incidents, owner decisions, handovers | **State issue comments** (append-only, §6) | Orchestrator only | Successor, retro, `scripts/agent-metrics` |
+| History: metrics rows, incidents, owner decisions, handovers | **State issue comments** (append-only, §6) | Orchestrator only | Successor, retro, `scripts/agent_metrics.py` |
 | Tasks, dependencies, done/todo (agent and owner work alike) | **`docs/tasks.toml` on the tasks ref only** (§4.2), queried with `scripts/tasks.py`. No other branch carries an edited copy | Planner (adds), the PR that finishes a task or a status-sync commit on the tasks ref (sets `done`, §4.4), process PRs | Orchestrator (`ready`, `review`), everyone |
 | Who is working on a task right now (claims) | **State issue** Sessions table, `Task ids` column | Orchestrator | `scripts/tasks.py --claimed` |
 | Which tasks are committed and awaiting review or merge | **State issue** Branches table, `Tasks awaiting review/merge` column | Orchestrator | `scripts/tasks.py --in-review` |
@@ -415,7 +415,8 @@ date,batch,pr,tasks,role,session_id,model,effort,env,result,cost_usd,input_token
 ```
 
 `cost_usd` and the token fields come from `get_session` → `external_metadata.usage`.
-`model` is `last_served_model`. `env` is the environment kind. `post_cap_commits` counts commits pushed after the 4-round cap; `owner_interventions` counts owner decisions the batch needed. Unknown values stay empty; `env`, `post_cap_commits` and `owner_interventions` may be absent from older comments. If it differs from `configured_model`, say so in an incident row.
+`model` is `last_served_model`. If it differs from `configured_model`, say so in an incident row.
+`env` is the environment kind. `post_cap_commits` counts commits this session pushed after the 4-round cap; `owner_interventions` counts owner decisions this session's work needed. Both are per session, so sums over rows do not double-count. Unknown values stay empty; `env`, `post_cap_commits` and `owner_interventions` may be absent from older comments.
 
 ### 6.2 Round row (one per review round)
 

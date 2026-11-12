@@ -28,7 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MARKER = re.compile(r"^\s*#\s*metrics:(\S*)\s*$")
-INT = re.compile(r"^\d+$")
+INT = re.compile(r"^(0|[1-9]\d*)$")
 MONEY = re.compile(r"^\d+(\.\d+)?$")
 
 # kind -> (required columns, optional columns). Optional ones came later; older comments may omit them.
@@ -68,6 +68,14 @@ def _check_values(kind, row):
         except ValueError:
             problems.append(f"date {date!r} is not YYYY-MM-DD")
     for field, value in row.items():
+        if re.search(r"[\x00-\x1f\x7f]", value):
+            problems.append(f"{field} contains a control character")
+            continue
+        if value != value.strip():
+            problems.append(f"{field} has leading or trailing whitespace")
+            continue
+        if field not in INT_FIELDS and field != "cost_usd" and value and value[0] in "=+-@":
+            problems.append(f"{field} starts with {value[0]!r} (spreadsheet formula risk)")
         if field in INT_FIELDS and value and not INT.match(value):
             problems.append(f"{field} {value!r} is not a whole number")
     cost = row.get("cost_usd", "")
@@ -87,9 +95,14 @@ def _parse_block(kind, lines, start, name, errors):
     if i >= len(lines) or not lines[i].strip() or lines[i].lstrip().startswith(("```", "#")):
         errors.append(f"{name}:{start}: metrics:{kind} block has no header line")
         return [], i
-    header = next(csv.reader([lines[i]]))
+    try:
+        header = next(csv.reader([lines[i]]))
+    except csv.Error as e:
+        errors.append(f"{name}:{start + 1}: malformed header ({e})")
+        header = None
     i += 1
-    ok = True
+    ok = header is not None
+    header = header or []
     for col in dict.fromkeys(c for c in header if header.count(c) > 1):
         errors.append(f"{name}:{start + 1}: duplicate column {col!r}")
         ok = False
@@ -110,7 +123,11 @@ def _parse_block(kind, lines, start, name, errors):
         i += 1
         if not ok:
             continue
-        fields = next(csv.reader([line]))
+        try:
+            fields = next(csv.reader([line]))
+        except csv.Error as e:
+            errors.append(f"{name}:{lineno}: malformed row ({e})")
+            continue
         if len(fields) != len(header):
             errors.append(f"{name}:{lineno}: row has {len(fields)} fields, header has {len(header)}")
             continue

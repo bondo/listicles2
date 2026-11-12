@@ -4,4 +4,4 @@ session,,M0-1,1,,,,,,,,4.28,,,,,,,,,,,,,,,,,,,,,,,,,
 session,,PR16-merge-review,16,,implementer,,,,,,2.43,,,,,,,,,,,,,,,,,,,,,,,,,
 session,,PR16-merge-review,16,,reviewer,,,,,,2.23,,,,,,,,,,,,,,,,,,,,,,,,,
 round,,PR16-merge-review,16,,,,,,,,,,,,,,,,,,5,,,,0,0,4,1,,,,,,,,
-incident,2026-11-10,M0-1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,destructive-git,uncommitted work lost,reflog,PreToolUse deny hook (M0 step 5)
+incident,,M0-1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,destructive-git,,recovered,

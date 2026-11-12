@@ -1,6 +1,8 @@
 Backfill of the M0 metrics from the state issue (#15) table. Only values the table states exactly are filled;
 "~" estimates and unknown fields are left empty (ORCHESTRATION section 6: never estimates). Session ids and dates
-were not recorded then.
+were not recorded then. The M0-1 and M0-2 costs are batch totals over several sessions (listed as one session row
+each, role unknown); #15 also gives 4 review rounds for M0-1 and 1 for M0-2, which are not split into round rows
+because no per-round data was kept.
 
 # metrics:session
 date,batch,pr,tasks,role,session_id,model,effort,env,result,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,handoffs,verify_fails_before_push,ci_red_runs,post_cap_commits,owner_interventions
@@ -15,4 +17,4 @@ date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,d
 
 # metrics:incident
 date,batch,session_id,kind,impact,recovery,prevention
-2026-11-10,M0-1,,destructive-git,uncommitted work lost,reflog,PreToolUse deny hook (M0 step 5)
+,M0-1,,destructive-git,,recovered,
