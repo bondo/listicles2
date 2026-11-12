@@ -1,0 +1,18 @@
+Backfill of the M0 metrics from the state issue (#15) table. Only values the table states exactly are filled;
+"~" estimates and unknown fields are left empty (ORCHESTRATION section 6: never estimates). Session ids and dates
+were not recorded then.
+
+# metrics:session
+date,batch,pr,tasks,role,session_id,model,effort,env,result,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,handoffs,verify_fails_before_push,ci_red_runs,post_cap_commits,owner_interventions
+,M0-1,1,,,,,,,,4.28,,,,,,,,,
+,M0-2,,,,,,,,,5.02,,,,,,,,,
+,PR16-merge-review,16,,reviewer,,,,,,2.23,,,,,,,,,
+,PR16-merge-review,16,,implementer,,,,,,2.43,,,,,,,,,
+
+# metrics:round
+date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,disputed,withdrawn,deferred,verdict
+,PR16-merge-review,16,5,,,,0,0,4,1,,,,
+
+# metrics:incident
+date,batch,session_id,kind,impact,recovery,prevention
+2026-11-10,M0-1,,destructive-git,uncommitted work lost,reflog,PreToolUse deny hook (M0 step 5)
