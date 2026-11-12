@@ -5,6 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
+        This is public: please leave out addresses, phone numbers, real names and photos of your home.
+
         Write in English or Danish. The owner reads this and will reply here.
   - type: textarea
     id: question

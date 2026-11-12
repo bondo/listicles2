@@ -5,6 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
+        This is public: please leave out addresses, phone numbers, real names and photos of your home.
+
         Thanks for taking the time. Write in English or Danish, whichever is easier. No special format needed.
   - type: textarea
     id: feedback

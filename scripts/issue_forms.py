@@ -1,24 +1,45 @@
 """Validate GitHub issue forms in .github/ISSUE_TEMPLATE. Run: python3 -I scripts/issue_forms.py"""
 
+import re
 import sys
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    sys.exit("PyYAML required: apt install python3-yaml or pip install pyyaml")
 
 # The only labels forms may apply: the five the owner created (collaborator-workflow report, D4).
 ALLOWED_LABELS = {"feedback", "idea", "decision", "needs-collaborator", "needs-owner"}
 INPUT_TYPES = {"textarea", "input", "dropdown", "checkboxes"}
+BODY_TYPES = INPUT_TYPES | {"markdown"}
+ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _check_body(name, body):
     if not isinstance(body, list) or not body:
         return [f"{name}: body must be a non-empty list"]
-    errs, required = [], False
+    errs, required, seen = [], False, set()
     for i, item in enumerate(body):
         if not isinstance(item, dict) or not isinstance(item.get("type"), str):
             errs.append(f"{name}: body[{i}] needs a type")
             continue
+        if item["type"] not in BODY_TYPES:
+            errs.append(f"{name}: body[{i}] has unknown type {item['type']!r}")
+            continue
         attrs = item.get("attributes")
+        if "id" in item:
+            bid = item["id"]
+            if not isinstance(bid, str) or not ID_RE.match(bid):
+                errs.append(f"{name}: body[{i}] id must match [A-Za-z0-9_-]+")
+            elif bid in seen:
+                errs.append(f"{name}: body[{i}] duplicate id {bid!r}")
+            else:
+                seen.add(bid)
+        if item["type"] == "markdown":
+            if not isinstance(attrs, dict) or not str(attrs.get("value", "")).strip():
+                errs.append(f"{name}: body[{i}] (markdown) needs attributes.value")
+            continue
         if item["type"] in INPUT_TYPES:
             if not isinstance(attrs, dict) or not attrs.get("label"):
                 errs.append(f"{name}: body[{i}] ({item['type']}) needs attributes.label")
