@@ -214,12 +214,79 @@ class RepoTests(unittest.TestCase):
                         *map(str, sorted((ROOT / "docs/metrics").glob("*.txt")))])
         self.assertEqual(code, 0)
 
-    def test_backfill_has_no_estimates(self):
+    def test_backfill_exact_rows(self):
         text = (ROOT / "docs/metrics/m0-backfill.txt").read_text()
         rows, errors = am.build([text])
         self.assertEqual(errors, [])
-        self.assertTrue(rows)
-        self.assertNotIn("~", "".join(r["cost_usd"] for r in rows))
+        got = sorted((r["row_type"], r["batch"], r["pr"], r["role"], r["cost_usd"], r["incident_kind"],
+                      r["recovery"], r["impact"], r["date"]) for r in rows)
+        self.assertEqual(got, sorted([
+            ("session", "M0-1", "1", "", "4.28", "", "", "", ""),
+            ("session", "M0-2", "", "", "5.02", "", "", "", ""),
+            ("session", "PR16-merge-review", "16", "reviewer", "2.23", "", "", "", ""),
+            ("session", "PR16-merge-review", "16", "implementer", "2.43", "", "", "", ""),
+            ("round", "PR16-merge-review", "16", "", "", "", "", "", ""),
+            ("incident", "M0-1", "", "", "", "destructive-git", "recovered", "", ""),
+        ]))
+
+    def test_backfill_says_batch_totals(self):
+        text = (ROOT / "docs/metrics/m0-backfill.txt").read_text()
+        self.assertIn("batch totals", text)
+
+    def test_docs_use_the_script_name_and_no_stale_wording(self):
+        for f in ("ORCHESTRATION.md", "PLAN.md"):
+            text = (ROOT / "docs" / f).read_text()
+            self.assertNotIn("scripts/agent-metrics", text, f)
+            self.assertNotIn("Until the script exists", text, f)
+
+    def test_per_session_definitions_documented(self):
+        text = (ROOT / "docs/ORCHESTRATION.md").read_text()
+        self.assertIn("`post_cap_commits` counts commits this session pushed", text)
+        self.assertIn("`owner_interventions` counts owner decisions this session", text)
+
+
+class HardeningTests(unittest.TestCase):
+    def one(self, row):
+        return run(block("session", SESSION_HDR, row))
+
+    def test_huge_field_is_an_error_not_a_traceback(self):
+        _, errors = self.one(S1.replace(",tooling,", "," + "x" * 200000 + ","))
+        self.assertEqual(len(errors), 1, errors)
+        self.assertRegex(errors[0], r"^input1:3: ")
+        self.assertIn("malformed", errors[0])
+
+    def test_formula_injection_rejected(self):
+        for bad in ("=HYPERLINK(1)", "+1", "-1", "@SUM(A1)", "\tx", "\rx"):
+            quoted = '"' + bad + '"'
+            _, errors = self.one(S1.replace(",tooling,", "," + quoted + ","))
+            self.assertTrue(any("env" in e for e in errors), (bad, errors))
+        _, errors = run(block("incident", INCIDENT_HDR, '2026-11-10,M0-1,s,k,"=1+1",r,p'))
+        self.assertTrue(any("impact" in e for e in errors), errors)
+
+    def test_control_characters_rejected(self):
+        for bad in ("a\x00b", "a\x07b", "a\x7fb", "a\tb"):
+            _, errors = self.one(S1.replace(",tooling,", "," + bad + ","))
+            self.assertTrue(any("control" in e for e in errors), (bad, errors))
+
+    def test_surrounding_whitespace_rejected(self):
+        for bad in (" session_a", "session_a "):
+            _, errors = self.one(S1.replace("session_a", bad))
+            self.assertTrue(any("whitespace" in e for e in errors), (bad, errors))
+
+    def test_leading_zero_integers_rejected(self):
+        _, errors = self.one(S1.replace(",60,M0.5-13,", ",060,M0.5-13,"))
+        self.assertTrue(any("pr" in e for e in errors), errors)
+        _, errors = run(block("round", ROUND_HDR, R1, R1.replace(",60,1,", ",060,1,")))
+        self.assertTrue(errors, errors)
+
+    def test_zero_is_a_valid_integer(self):
+        _, errors = self.one(S1)
+        self.assertEqual(errors, [])
+
+    def test_ordinary_text_with_inner_symbols_ok(self):
+        inc = "2026-11-10,M0-1,s,k,a = b - c @ d,r,p"
+        rows, errors = run(block("incident", INCIDENT_HDR, inc))
+        self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":
