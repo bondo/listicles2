@@ -192,6 +192,163 @@ class Suppressions(GuardsCase):
                 self.assertFails("guard: unjustified suppression:")
 
 
+# (path, unjustified line, same line with the language's justification). The justified form must pass, the bare one must fail.
+SUPPRESSION_SYNTAX = [
+    ("a.py", "import os  # noqa: F401", "import os  # noqa: F401  # justified: re-export for callers"),
+    ("a.py", "import os  # NOQA", "import os  # NOQA  # justified: re-export for callers"),
+    ("a.py", "# ruff: noqa: E402", "# ruff: noqa: E402  # justified: path set up first"),
+    ("a.py", "# flake8: noqa", "# flake8: noqa  # justified: generated file"),
+    ("a.py", "x: int = f()  # type: ignore[attr-defined]", "x: int = f()  # type: ignore[attr-defined]  # justified: stub lacks attr"),
+    ("a.py", "# mypy: ignore-errors", "# mypy: ignore-errors  # justified: vendored module"),
+    ("a.py", "if x:  # pragma: no cover", "if x:  # pragma: no cover  # justified: debug only"),
+    ("a.py", "if x:  # pragma: no branch", "if x:  # pragma: no branch  # justified: loop always runs"),
+    ("a.py", "# fmt: off", "# fmt: off  # justified: aligned table"),
+    ("a.py", "y = 1  # fmt: skip", "y = 1  # fmt: skip  # justified: aligned table"),
+    ("a.py", "# yapf: disable", "# yapf: disable  # justified: aligned table"),
+    ("a.py", "import b  # isort: skip", "import b  # isort: skip  # justified: order matters"),
+    ("a.ts", "// eslint-disable-next-line no-console", "// eslint-disable-next-line no-console -- justified: CLI output"),
+    ("a.ts", "foo(); // eslint-disable-line no-console", "foo(); // eslint-disable-line no-console // justified: CLI output"),
+    ("a.js", "/* eslint-disable */", "/* eslint-disable -- justified: generated file */"),
+    ("a.ts", "// @ts-ignore", "// @ts-ignore justified: upstream typing bug"),
+    ("a.ts", "// @ts-expect-error", "// @ts-expect-error justified: upstream typing bug"),
+    ("a.ts", "// @ts-nocheck", "// @ts-nocheck justified: generated file"),
+    ("a.js", "/* c8 ignore next */", "/* c8 ignore next -- justified: unreachable guard */"),
+    ("a.ts", "/* istanbul ignore next */", "/* istanbul ignore next -- justified: unreachable guard */"),
+    ("a.ts", "/* v8 ignore next */", "/* v8 ignore next -- justified: unreachable guard */"),
+    ("a.ts", "// prettier-ignore", "// prettier-ignore justified: aligned table"),
+    ("a.ts", "// biome-ignore lint/suspicious/noExplicitAny: ok", "// biome-ignore lint/suspicious/noExplicitAny: ok // justified: JSON boundary"),
+    ("app/src/main/kotlin/F.kt", "// @formatter:off", "// @formatter:off // justified: aligned table"),
+]
+
+# (path, unjustified line, same line with a justification)
+CONFIG_RELAXATIONS = [
+    ("pyproject.toml", "[tool.ruff.lint.per-file-ignores]", "[tool.ruff.lint.per-file-ignores]  # justified: tests may assert"),
+    ("ruff.toml", "extend-per-file-ignores = {}", "extend-per-file-ignores = {}  # justified: tests may assert"),
+    ("pyproject.toml", "ignore = [\"E501\"]", "ignore = [\"E501\"]  # justified: long URLs"),
+    ("ruff.toml", "extend-ignore = [\"E501\"]", "extend-ignore = [\"E501\"]  # justified: long URLs"),
+    ("ruff.toml", "exclude = [\"gen\"]", "exclude = [\"gen\"]  # justified: generated code"),
+    ("ruff.toml", "extend-exclude = [\"gen\"]", "extend-exclude = [\"gen\"]  # justified: generated code"),
+    (".flake8", "ignore = E501", "ignore = E501  # justified: long URLs"),
+    ("mypy.ini", "ignore_errors = True", "ignore_errors = True  # justified: vendored module"),
+    ("pyproject.toml", "ignore_errors = true", "ignore_errors = true  # justified: vendored module"),
+    ("mypy.ini", "ignore_missing_imports = True", "ignore_missing_imports = True  # justified: untyped dependency"),
+    ("mypy.ini", "strict = False", "strict = False  # justified: migration in progress"),
+    ("pyproject.toml", "strict = false", "strict = false  # justified: migration in progress"),
+    ("mypy.ini", "disallow_untyped_defs = False", "disallow_untyped_defs = False  # justified: migration in progress"),
+    ("mypy.ini", "check_untyped_defs = false", "check_untyped_defs = false  # justified: migration in progress"),
+    ("mypy.ini", "warn_unused_ignores = False", "warn_unused_ignores = False  # justified: migration in progress"),
+    ("mypy.ini", "follow_imports = skip", "follow_imports = skip  # justified: untyped dependency"),
+    ("mypy.ini", "disable_error_code = attr-defined", "disable_error_code = attr-defined  # justified: stub lacks attr"),
+    ("mypy.ini", "allow_untyped_defs = True", "allow_untyped_defs = True  # justified: migration in progress"),
+    ("tsconfig.json", "\"strict\": false,", "\"strict\": false, // justified: migration in progress"),
+    ("firebase/test/tsconfig.json", "\"noImplicitAny\": false,", "\"noImplicitAny\": false, // justified: migration in progress"),
+    ("tsconfig.json", "\"noUncheckedIndexedAccess\": false", "\"noUncheckedIndexedAccess\": false // justified: migration in progress"),
+    ("tsconfig.json", "\"exactOptionalPropertyTypes\": false", "\"exactOptionalPropertyTypes\": false // justified: migration in progress"),
+    ("tsconfig.base.json", "\"checkJs\": false", "\"checkJs\": false // justified: migration in progress"),
+    ("eslint.config.js", "'no-console': 'off',", "'no-console': 'off', // justified: CLI output"),
+    ("eslint.config.mjs", "\"no-console\": 0,", "\"no-console\": 0, // justified: CLI output"),
+    ("eslint.config.js", "'no-console': ['off'],", "'no-console': ['off'], // justified: CLI output"),
+    ("eslint.config.js", "'no-console': 'warn',", "'no-console': 'warn', // justified: CLI output"),
+    ("eslint.config.js", "ignores: ['gen/**'],", "ignores: ['gen/**'], // justified: generated code"),
+    (".eslintrc.json", "\"ignorePatterns\": [\"gen\"],", "\"ignorePatterns\": [\"gen\"], // justified: generated code"),
+    ("eslint.config.js", "reportUnusedDisableDirectives: false,", "reportUnusedDisableDirectives: false, // justified: legacy"),
+    (".coveragerc", "omit = */tests/*", "omit = */tests/*  # justified: test code"),
+    (".coveragerc", "exclude_lines =", "exclude_lines =  # justified: debug only"),
+    ("pyproject.toml", "exclude_also = [\"if x:\"]", "exclude_also = [\"if x:\"]  # justified: debug only"),
+    ("vitest.config.ts", "coveragePathIgnorePatterns: ['gen'],", "coveragePathIgnorePatterns: ['gen'], // justified: generated code"),
+    ("jest.config.js", "coveragePathIgnorePatterns: ['gen'],", "coveragePathIgnorePatterns: ['gen'], // justified: generated code"),
+]
+
+# Valid, strict settings in the same files must not fire.
+CONFIG_CLEAN = [
+    ("pyproject.toml", "[tool.ruff.lint]\nselect = [\"E\", \"F\", \"B\"]\n[tool.mypy]\nstrict = true\nwarn_unused_ignores = true\n"),
+    ("mypy.ini", "[mypy]\nstrict = True\ndisallow_untyped_defs = True\nignore_errors = False\n"),
+    ("tsconfig.json", "{\n  \"compilerOptions\": {\"strict\": true, \"noImplicitAny\": true, \"skipLibCheck\": true}\n}\n"),
+    ("eslint.config.js", "export default [{rules: {'no-console': 'error', 'eqeqeq': ['error', 'always'], 'max-len': [2, 120]}}];\n"),
+]
+
+
+class LinterSuppressions(GuardsCase):
+    def check_pair(self, path, bad, good):
+        self.repo.write(path, bad + "\n")
+        self.repo.commit()
+        self.assertFails("guard: unjustified suppression:")
+        self.repo.write(path, good + "\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_each_linter_suppression_needs_a_justification(self):
+        for path, bad, good in SUPPRESSION_SYNTAX:
+            with self.subTest(line=bad):
+                self.check_pair(path, bad, good)
+
+    def test_each_config_relaxation_needs_a_justification(self):
+        for path, bad, good in CONFIG_RELAXATIONS:
+            with self.subTest(path=path, line=bad):
+                self.check_pair(path, bad, good)
+
+    def test_empty_justification_in_a_block_comment_fails(self):
+        self.repo.write("a.js", "/* eslint-disable justified: */\n")
+        self.repo.commit()
+        self.assertFails("guard: unjustified suppression:")
+
+    def test_justification_on_another_line_does_not_count(self):
+        self.repo.write("a.py", "# justified: because\nimport os  # noqa: F401\n")
+        self.repo.commit()
+        self.assertFails("guard: unjustified suppression:")
+
+    def test_strict_settings_do_not_fire(self):
+        for path, text in CONFIG_CLEAN:
+            with self.subTest(path=path):
+                self.repo.write(path, text)
+                self.repo.commit()
+                self.assertPasses()
+
+    def test_config_patterns_only_apply_to_config_files(self):
+        # `ignore = x`, `strict = false` and rules set to 'off' are ordinary text outside linter config files.
+        self.repo.write("app/src/main/kotlin/K.kt", "val a = mapOf(\"no-console\" to \"off\")\nval ignores = listOf(1)\nval strict = false\n")
+        self.repo.write("config/data.txt", "ignore = x\nstrict = false\nexclude = y\n")
+        self.repo.write("a.py", "ignore = 1\nstrict = False\nexclude = [1]\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_staged_mode_catches_them_too(self):
+        self.repo.write("a.ts", "// @ts-ignore\n")
+        self.repo.git("add", "-A")
+        self.assertFails("guard: unjustified suppression:", "--staged")
+
+    def test_formatter_ignore_files_fail_without_escape_hatch(self):
+        for name in (".prettierignore", ".eslintignore", ".stylelintignore", "web/.prettierignore"):
+            with self.subTest(name=name):
+                self.repo.write(name, "gen/ # justified: generated code\n")
+                self.repo.commit()
+                self.assertFails("guard: ignore file:")
+                self.repo.git("rm", "-q", "-f", name)
+                self.repo.commit()
+
+    def test_prose_may_mention_the_directives(self):
+        self.repo.write("docs/x.md", "Never write # noqa or // @ts-ignore or eslint-disable or .prettierignore\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_existing_repo_files_do_not_trip_the_guard(self):
+        # False-positive check: the guard run on this repository itself (content checks only) must pass.
+        env = {k: v for k, v in os.environ.items() if k not in ("CI", "GOLDEN_UPDATE", "GUARD_MAX_DIFF")}
+        env["GUARD_BASE"] = "refs/none/missing"
+        r = subprocess.run(["bash", GUARDS], capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("guards: ok", r.stdout)
+
+    def test_every_noqa_in_the_repo_is_justified(self):
+        root = os.path.join(HERE, "..", "..")
+        r = subprocess.run(["git", "grep", "-nI", "-i", "noqa", "--", "*.py", ":!scripts/hooks/test_guards_sh.py"],
+                           cwd=root, capture_output=True, text=True)
+        lines = r.stdout.splitlines()
+        self.assertTrue(lines, "expected the repository to carry noqa lines")
+        bare = [ln for ln in lines if "justified:" not in ln]
+        self.assertEqual(bare, [])
+
+
 class Baselines(GuardsCase):
     def test_baseline_file_name_fails(self):
         self.repo.write("config/detekt/baseline.xml", "<x/>\n")
