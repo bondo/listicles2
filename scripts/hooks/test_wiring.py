@@ -37,17 +37,17 @@ def roles():
 
 
 class DiffCap(unittest.TestCase):
-    """The guards job caps diff size: 600 by default, 6000 with the big-pr label (owner decision)."""
+    """The guards job caps diff size: 600 by default, 1500 with the big-pr label (owner decision)."""
 
     def cap_expr(self):
         m = re.search(r"GUARD_MAX_DIFF:\s*\$\{\{(.*?)\}\}", ci_job("guards"))
         self.assertIsNotNone(m, "guards job must set GUARD_MAX_DIFF")
         return m.group(1)
 
-    def test_big_pr_cap_is_6000(self):
+    def test_big_pr_cap_is_1500(self):
         m = re.search(r"'big-pr'\)\s*&&\s*'(\d+)'\s*\|\|\s*'(\d+)'", self.cap_expr())
         self.assertIsNotNone(m, "GUARD_MAX_DIFF must be `big-pr label && '<cap>' || '<default>'`")
-        self.assertEqual(m.group(1), "6000")
+        self.assertEqual(m.group(1), "1500")
 
     def test_default_cap_stays_600(self):
         m = re.search(r"&&\s*'(\d+)'\s*\|\|\s*'(\d+)'", self.cap_expr())
@@ -56,6 +56,9 @@ class DiffCap(unittest.TestCase):
 
     def test_no_stale_3000_cap(self):
         self.assertNotIn("3000", self.cap_expr())
+
+    def test_no_stale_6000_cap(self):
+        self.assertNotIn("6000", self.cap_expr())
 
 
 class TypeResolvedDetekt(unittest.TestCase):
