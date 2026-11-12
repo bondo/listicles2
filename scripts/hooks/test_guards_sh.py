@@ -218,11 +218,24 @@ SUPPRESSION_SYNTAX = [
     ("a.ts", "// prettier-ignore", "// prettier-ignore justified: aligned table"),
     ("a.ts", "// biome-ignore lint/suspicious/noExplicitAny: ok", "// biome-ignore lint/suspicious/noExplicitAny: ok // justified: JSON boundary"),
     ("app/src/main/kotlin/F.kt", "// @formatter:off", "// @formatter:off // justified: aligned table"),
+    # R1-03: inline ESLint rule config and mypy per-file flags
+    ("a.js", "/* eslint no-console: \"off\" */", "/* eslint no-console: \"off\" -- justified: CLI output */"),
+    ("a.js", "/* eslint no-console: 0 */", "/* eslint no-console: 0 -- justified: CLI output */"),
+    ("a.ts", "/*eslint eqeqeq: 0*/", "/*eslint eqeqeq: 0 -- justified: legacy */"),
+    ("a.py", "# mypy: no-strict-optional", "# mypy: no-strict-optional  # justified: migration in progress"),
+    ("a.py", "# mypy: no-warn-unused-ignores", "# mypy: no-warn-unused-ignores  # justified: migration in progress"),
+    ("a.py", "# mypy: disallow-untyped-defs=False", "# mypy: disallow-untyped-defs=False  # justified: migration in progress"),
+    ("a.py", "# mypy: check-untyped-defs=False", "# mypy: check-untyped-defs=False  # justified: migration in progress"),
+    ("a.py", "# mypy: ignore-missing-imports", "# mypy: ignore-missing-imports  # justified: untyped dependency"),
+    ("a.py", "# mypy: follow-imports=skip", "# mypy: follow-imports=skip  # justified: untyped dependency"),
+    # R1-04: coverage.py accepts these spellings of its default exclude regex
+    ("a.py", "if x:  # pragma no cover", "if x:  # pragma no cover  # justified: debug only"),
+    ("a.py", "if x:  # PRAGMA: NO COVER", "if x:  # PRAGMA: NO COVER  # justified: debug only"),
+    ("a.py", "for i in y:  # pragma nobranch", "for i in y:  # pragma nobranch  # justified: loop always runs"),
 ]
 
 # (path, unjustified line, same line with a justification)
 CONFIG_RELAXATIONS = [
-    ("pyproject.toml", "[tool.ruff.lint.per-file-ignores]", "[tool.ruff.lint.per-file-ignores]  # justified: tests may assert"),
     ("ruff.toml", "extend-per-file-ignores = {}", "extend-per-file-ignores = {}  # justified: tests may assert"),
     ("pyproject.toml", "ignore = [\"E501\"]", "ignore = [\"E501\"]  # justified: long URLs"),
     ("ruff.toml", "extend-ignore = [\"E501\"]", "extend-ignore = [\"E501\"]  # justified: long URLs"),
@@ -257,6 +270,82 @@ CONFIG_RELAXATIONS = [
     ("pyproject.toml", "exclude_also = [\"if x:\"]", "exclude_also = [\"if x:\"]  # justified: debug only"),
     ("vitest.config.ts", "coveragePathIgnorePatterns: ['gen'],", "coveragePathIgnorePatterns: ['gen'], // justified: generated code"),
     ("jest.config.js", "coveragePathIgnorePatterns: ['gen'],", "coveragePathIgnorePatterns: ['gen'], // justified: generated code"),
+    # R1-02: dotted and quoted keys, inline tables, configparser booleans
+    ("pyproject.toml", "lint.ignore = [\"E501\"]", "lint.ignore = [\"E501\"]  # justified: long URLs"),
+    ("pyproject.toml", "tool.ruff.lint.extend-ignore = [\"E501\"]", "tool.ruff.lint.extend-ignore = [\"E501\"]  # justified: long URLs"),
+    ("ruff.toml", "lint.extend-ignore = [\"E501\"]", "lint.extend-ignore = [\"E501\"]  # justified: long URLs"),
+    ("ruff.toml", "lint = { ignore = [\"E501\"] }", "lint = { ignore = [\"E501\"] }  # justified: long URLs"),
+    ("ruff.toml", "lint = { extend-ignore = [\"E501\"] }", "lint = { extend-ignore = [\"E501\"] }  # justified: long URLs"),
+    ("ruff.toml", "\"ignore\" = [\"E501\"]", "\"ignore\" = [\"E501\"]  # justified: long URLs"),
+    ("pyproject.toml", "'extend-ignore' = [\"E501\"]", "'extend-ignore' = [\"E501\"]  # justified: long URLs"),
+    ("ruff.toml", "lint.exclude = [\"gen\"]", "lint.exclude = [\"gen\"]  # justified: generated code"),
+    ("pyproject.toml", "\"exclude_also\" = [\"if x:\"]", "\"exclude_also\" = [\"if x:\"]  # justified: debug only"),
+    ("mypy.ini", "ignore_errors = yes", "ignore_errors = yes  # justified: vendored module"),
+    ("mypy.ini", "ignore_errors=on", "ignore_errors=on  # justified: vendored module"),
+    ("mypy.ini", "ignore_errors = ON", "ignore_errors = ON  # justified: vendored module"),
+    ("mypy.ini", "ignore_missing_imports = Yes", "ignore_missing_imports = Yes  # justified: untyped dependency"),
+    ("mypy.ini", "strict = off", "strict = off  # justified: migration in progress"),
+    ("mypy.ini", "strict=No", "strict=No  # justified: migration in progress"),
+    ("mypy.ini", "disallow_untyped_defs = no", "disallow_untyped_defs = no  # justified: migration in progress"),
+    ("mypy.ini", "warn_unused_ignores = OFF", "warn_unused_ignores = OFF  # justified: migration in progress"),
+    ("pyproject.toml", "\"strict\" = false", "\"strict\" = false  # justified: migration in progress"),
+    ("pyproject.toml", "tool.mypy.ignore_errors = true", "tool.mypy.ignore_errors = true  # justified: vendored module"),
+    ("pyproject.toml", "mypy = { strict = false }", "mypy = { strict = false }  # justified: migration in progress"),
+    # R1-05: noCheck turns type checking off, and a base config outside *tsconfig*.json is not scanned
+    ("tsconfig.json", "\"noCheck\": true", "\"noCheck\": true // justified: migration in progress"),
+    ("tsconfig.json", "\"extends\": \"./base.json\",", "\"extends\": \"./base.json\", // justified: base is a strict preset"),
+    ("tsconfig.json", "\"extends\": [\"./tsconfig.a.json\", \"./base.json\"],",
+     "\"extends\": [\"./tsconfig.a.json\", \"./base.json\"], // justified: base is a strict preset"),
+    # R1-06: prettier skips files without a pragma
+    (".prettierrc.json", "\"requirePragma\": true,", "\"requirePragma\": true, // justified: legacy repo"),
+    (".prettierrc", "requirePragma: true", "requirePragma: true  # justified: legacy repo"),
+    ("prettier.config.js", "requirePragma: true,", "requirePragma: true, // justified: legacy repo"),
+    (".prettierrc.toml", "requirePragma = true", "requirePragma = true  # justified: legacy repo"),
+    (".prettierrc.json", "\"ignorePath\": \".gitignore\",", "\"ignorePath\": \".gitignore\", // justified: generated code"),
+]
+
+# R1-01: a justification on a table header or an array opener must not waive the entry lines after it. Every relaxing entry line
+# carries its own justification. (path, text with an unjustified entry, same text with every entry justified)
+MULTILINE_RELAXATIONS = [
+    ("pyproject.toml",
+     "[tool.ruff.lint.per-file-ignores]  # justified: tests may assert\n\"src/*\" = [\"ALL\"]",
+     "[tool.ruff.lint.per-file-ignores]  # justified: tests may assert\n\"src/*\" = [\"ALL\"]  # justified: generated code"),
+    ("pyproject.toml",
+     "[tool.ruff.lint.per-file-ignores]\n\"src/*\" = [\"ALL\"]  # justified: generated code",
+     "[tool.ruff.lint.per-file-ignores]  # justified: tests may assert\n\"src/*\" = [\"ALL\"]  # justified: generated code"),
+    ("ruff.toml",
+     "[lint.per-file-ignores]  # justified: tests\n\"tests/*\" = [\"S101\"]  # justified: asserts\n\"gen/*\" = [\"ALL\"]",
+     "[lint.per-file-ignores]  # justified: tests\n\"tests/*\" = [\"S101\"]  # justified: asserts\n\"gen/*\" = [\"ALL\"]  # justified: generated"),
+    ("pyproject.toml",
+     "[tool.ruff.lint]\nignore = [  # justified: long URLs\n  \"E501\",\n]",
+     "[tool.ruff.lint]\nignore = [  # justified: long URLs\n  \"E501\",  # justified: long URLs\n]"),
+    ("ruff.toml",
+     "[lint]\nextend-ignore = [  # justified: long URLs\n  \"E501\",  # justified: long URLs\n  \"F401\",\n]",
+     "[lint]\nextend-ignore = [  # justified: long URLs\n  \"E501\",  # justified: long URLs\n  \"F401\",  # justified: re-exports\n]"),
+    ("ruff.toml",
+     "lint.ignore = [  # justified: long URLs\n  \"E501\", \"F401\"\n]",
+     "lint.ignore = [  # justified: long URLs\n  \"E501\", \"F401\"  # justified: long URLs and re-exports\n]"),
+    ("pyproject.toml",
+     "[tool.coverage.report]\nexclude_lines = [  # justified: debug only\n  \"if TYPE_CHECKING:\",\n]",
+     "[tool.coverage.report]\nexclude_lines = [  # justified: debug only\n  \"if TYPE_CHECKING:\",  # justified: typing only\n]"),
+    (".coveragerc",
+     "[report]\nexclude_lines =  # justified: debug only\n    if TYPE_CHECKING:",
+     "[report]\nexclude_lines =  # justified: debug only\n    if TYPE_CHECKING:  # justified: typing only"),
+    (".flake8",
+     "[flake8]\nignore =  # justified: legacy\n    E501\n    W503",
+     "[flake8]\nignore =  # justified: legacy\n    E501  # justified: long URLs\n    W503  # justified: black style"),
+    ("eslint.config.js",
+     "export default [{\n  ignores: [  // justified: generated\n    'gen/**',\n  ],\n}];",
+     "export default [{\n  ignores: [  // justified: generated\n    'gen/**', // justified: generated\n  ],\n}];"),
+    ("eslint.config.js",
+     "export default [{rules: {\n  'no-console': [\n    'warn',\n    { allow: ['error'] },\n  ],\n}}];",
+     "export default [{rules: {\n  'no-console': [\n    'warn', // justified: CLI output\n    { allow: ['error'] },\n  ],\n}}];"),
+    ("eslint.config.js",
+     "export default [{rules: {\n  'no-console': [\n    0,\n  ],\n}}];",
+     "export default [{rules: {\n  'no-console': [\n    0, // justified: CLI output\n  ],\n}}];"),
+    ("jest.config.js",
+     "module.exports = {\n  coveragePathIgnorePatterns: [  // justified: generated\n    'gen',\n  ],\n};",
+     "module.exports = {\n  coveragePathIgnorePatterns: [  // justified: generated\n    'gen', // justified: generated\n  ],\n};"),
 ]
 
 # Valid, strict settings in the same files must not fire.
@@ -265,17 +354,41 @@ CONFIG_CLEAN = [
     ("mypy.ini", "[mypy]\nstrict = True\ndisallow_untyped_defs = True\nignore_errors = False\n"),
     ("tsconfig.json", "{\n  \"compilerOptions\": {\"strict\": true, \"noImplicitAny\": true, \"skipLibCheck\": true}\n}\n"),
     ("eslint.config.js", "export default [{rules: {'no-console': 'error', 'eqeqeq': ['error', 'always'], 'max-len': [2, 120]}}];\n"),
+    # R1-09: option objects hold numbers that are not rule severities
+    ("eslint.config.js", "export default [{rules: {'max-params': ['error', { max: 1 }], 'max-depth': ['error', { max: 0 }]}}];\n"),
+    (".eslintrc.json", "{\"rules\": {\"max-params\": [\"error\", {\"max\": 1}]}}\n"),
+    ("eslint.config.js", "export default [{rules: {\n  'max-params': [\n    'error',\n    { max: 1 },\n  ],\n}}];\n"),
+    # multi-line strict settings, other keys that merely contain the words, indented TOML keys
+    ("pyproject.toml", "[tool.ruff.lint]\nselect = [\n  \"E\",\n  \"F\",\n]\nignore-init-module-imports = true\n[tool.ruff.format]\nquote-style = \"double\"\n"),
+    ("pyproject.toml", "[tool.ruff]\n  ignore = [\"E501\"]  # justified: long URLs\n  line-length = 100\n  target-version = \"py311\"\n"),
+    ("pyproject.toml", "[tool.ruff.lint.per-file-ignores]  # justified: tests\n\"tests/*\" = [\"S101\"]  # justified: asserts\n[tool.mypy]\nstrict = true\nenable_error_code = [\"ignore-without-code\"]\n"),
+    ("eslint.config.js", "export default [{rules: {\n  'eqeqeq': [\n    'error',\n    'always',\n  ],\n}}];\n"),
+    ("mypy.ini", "[mypy]\nignore_errors = off\nignore_missing_imports = no\nstrict = on\nwarn_unused_ignores = yes\ndisallow_untyped_defs = 1\n"),
+    ("tsconfig.json", "{\n  \"extends\": \"./tsconfig.base.json\",\n  \"compilerOptions\": {\"noCheck\": false}\n}\n"),
+    ("tsconfig.app.json", "{\n  \"extends\": \"@tsconfig/node20/tsconfig.json\"\n}\n"),
+    ("tsconfig.web.json", "{\n  \"extends\": [\"./tsconfig.a.json\", \"./tsconfig.b.json\"]\n}\n"),
+    (".prettierrc.json", "{\"semi\": true, \"requirePragma\": false}\n"),
+    ("a.py", "# mypy: disallow-untyped-defs=True\n# mypy: warn-unused-ignores\n# mypy: enable-error-code=ignore-without-code\n# pragma: once\n"),
+    ("a.js", "/* eslint-env node */\n"),
 ]
 
 
 class LinterSuppressions(GuardsCase):
+    def drop(self, path):
+        """Remove a fixture so that one failing case cannot make the cases after it fail too."""
+        self.repo.git("rm", "-q", "-f", "--ignore-unmatch", path)
+        self.repo.commit("drop")
+
     def check_pair(self, path, bad, good):
-        self.repo.write(path, bad + "\n")
-        self.repo.commit()
-        self.assertFails("guard: unjustified suppression:")
-        self.repo.write(path, good + "\n")
-        self.repo.commit()
-        self.assertPasses()
+        try:
+            self.repo.write(path, bad + "\n")
+            self.repo.commit()
+            self.assertFails("guard: unjustified suppression:")
+            self.repo.write(path, good + "\n")
+            self.repo.commit()
+            self.assertPasses()
+        finally:
+            self.drop(path)
 
     def test_each_linter_suppression_needs_a_justification(self):
         for path, bad, good in SUPPRESSION_SYNTAX:
@@ -286,6 +399,30 @@ class LinterSuppressions(GuardsCase):
         for path, bad, good in CONFIG_RELAXATIONS:
             with self.subTest(path=path, line=bad):
                 self.check_pair(path, bad, good)
+
+    def test_a_justification_must_sit_on_each_relaxing_entry_line(self):
+        for path, bad, good in MULTILINE_RELAXATIONS:
+            with self.subTest(path=path, text=bad):
+                self.check_pair(path, bad, good)
+
+    def test_multiline_relaxations_are_checked_in_staged_mode_from_the_index(self):
+        self.repo.write("pyproject.toml", "[tool.ruff.lint]\nignore = [  # justified: long URLs\n  \"E501\",\n]\n")
+        self.repo.git("add", "-A")
+        self.repo.write("pyproject.toml", "[tool.ruff.lint]\nignore = [  # justified: long URLs\n  \"E501\",  # justified: long URLs\n]\n")
+        self.assertFails("guard: unjustified suppression:", "--staged")  # index still has the unjustified entry
+        self.repo.git("add", "-A")
+        self.assertPasses("--staged")
+
+    def test_a_justified_path_does_not_waive_suppressions_inside_it(self):
+        """R1-08: the justification is read from the line, not from `path:line:` in front of it."""
+        self.repo.write("justified:x/a.py", "import os  # noqa\n")
+        self.repo.commit()
+        self.assertFails("guard:")
+
+    def test_a_justified_path_is_refused_in_staged_mode_too(self):
+        self.repo.write("justified:x/a.py", "import os  # noqa\n")
+        self.repo.git("add", "-A")
+        self.assertFails("guard:", "--staged")
 
     def test_empty_justification_in_a_block_comment_fails(self):
         self.repo.write("a.js", "/* eslint-disable justified: */\n")
@@ -299,10 +436,13 @@ class LinterSuppressions(GuardsCase):
 
     def test_strict_settings_do_not_fire(self):
         for path, text in CONFIG_CLEAN:
-            with self.subTest(path=path):
+            with self.subTest(path=path, text=text):
                 self.repo.write(path, text)
                 self.repo.commit()
-                self.assertPasses()
+                try:
+                    self.assertPasses()
+                finally:
+                    self.drop(path)
 
     def test_config_patterns_only_apply_to_config_files(self):
         # `ignore = x`, `strict = false` and rules set to 'off' are ordinary text outside linter config files.
