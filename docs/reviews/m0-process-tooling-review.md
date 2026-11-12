@@ -166,6 +166,7 @@ itself and reads with the image-capable Read tool, plus mechanical checks for ev
 | R9 | Rounds spent on minor findings | Round 4 is almost all minor and nit findings | Default: once a round has no blocker or major, the orchestrator defers the remaining minors (FOLLOW-UPS) instead of running another round, unless the minor is in a gate. Saves about $2–3 per round |
 | R10 | Environment prerequisites discovered by workers | SDK licences (#18, #29) | Before spawning, a "fresh-session smoke" task checks the env (SDK present, `verify.sh --fast` passes) whenever the env setup script changes |
 | R11 | The pre-commit hook runs Gradle for docs-only commits | `.githooks/pre-commit:5` runs spotless and detekt unconditionally. In this session, two commits of this one Markdown file failed on a cold cache (Maven Central `429 Too Many Requests`) and passed on retry | Skip Gradle when the staged paths cannot affect the build: reuse the `prepush_scope.py` logic, test-first **[P]**. Warm the Gradle cache in the env setup script (`./gradlew help`) |
+| R12 | Orchestrator context saving outweighs early failure detection | #15 "Context hygiene" and ORCHESTRATION §7.1 ("Never read whole transcripts", cheapest-first collection) and §7.4 (one nudge, then wait a whole check-in). Meanwhile the context_guard stall, the wrong-env block and the stuck CI run each cost at least one check-in cycle | Owner guidance (2026-11-12): orchestrator context is a minor cost because it hands over at about 50%. On a stall or red CI, the orchestrator reads targeted `list_events` (`kinds` filter) and job logs (via `ci-triage`) at the first check instead of waiting. Keep the short (about 8 min) worker check after each spawn. Do not add new compact-format rituals for the orchestrator. Worker context hygiene is unchanged |
 
 ## 7. Prioritised proposals
 
@@ -194,7 +195,7 @@ itself and reads with the image-capable Read tool, plus mechanical checks for ev
 | P21 | markdownlint; mutmut on the hooks; `explicitApi()`; emulator screenshots for agents | L | – | – | – | Reject |
 | P22 | `design/tokens.json` plus parity and contrast tests | H | S–M | $5–10 / +5 s | none | Adopt: JSON in M0.5-03, tests in M1 |
 | P23 | Design-review role, prompt and checklist **[P]** | H | S | $3–5 per UI PR | none | Adopt in M0.5 |
-| C1 | ORCHESTRATION.md: R3, R4, R8, R9, F18 (R1), metrics rules (R5), smoke task (R10) | H | S | $3–5 | none | Adopt |
+| C1 | ORCHESTRATION.md: R3, R4, R8, R9, R12, F18 (R1), metrics rules (R5), smoke task (R10) | H | S | $3–5 | none | Adopt |
 | C2 | Prompts: R6 (refresh the PR body), environment pick, delta review, design reviewer **[P]** | M | S | fold into M0-11 | none | Adopt |
 
 Estimated total for "adopt before M1" (P1–P8, P11–P13, P23, C1, C2): about $70–110 in agent cost, and about 1 min of added
@@ -298,7 +299,7 @@ notes = "Normal env unless CI wiring is added (then tooling). Effort M. Backfill
 
 [[task]]
 id = "M0.5-12"
-title = "ORCHESTRATION.md retro changes: delta review, one batch per PR, env pick, default deferral, F18 tripwire, smoke task (C1)"
+title = "ORCHESTRATION.md retro changes: delta review, one batch per PR, env pick, default deferral, early stall diagnosis, F18 tripwire, smoke task (C1)"
 milestone = "M0.5"
 status = "todo"
 assignee = "process"
