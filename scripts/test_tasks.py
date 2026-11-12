@@ -13,7 +13,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import tasks  # noqa: E402
+import tasks  # noqa: E402  # justified: must follow the sys.path insert above
 
 HEADER = 'milestones = ["M0", "M1"]\n'
 
