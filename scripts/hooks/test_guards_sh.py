@@ -417,6 +417,37 @@ ROUND2_CLEAN = [
 ]
 
 
+# Round 3 (R3-01..R3-03). (path, text with an unjustified relaxation, same text fully justified)
+ROUND3_RELAXATIONS = [
+    # R3-01: mypy reads inline flags with underscores too
+    ("a.py", "# mypy: ignore_errors", "# mypy: ignore_errors  # justified: vendored"),
+    ("a.py", "# mypy: disable_error_code=\"assignment\"", "# mypy: disable_error_code=\"assignment\"  # justified: stubs"),
+    ("a.py", "# mypy: allow_untyped_defs", "# mypy: allow_untyped_defs  # justified: migration"),
+    ("a.py", "# mypy: no_strict_optional", "# mypy: no_strict_optional  # justified: migration"),
+    ("a.py", "# mypy: ignore_missing_imports", "# mypy: ignore_missing_imports  # justified: untyped dependency"),
+    ("a.py", "# mypy: follow_imports=skip", "# mypy: follow_imports=skip  # justified: untyped dependency"),
+    ("a.py", "# mypy: no_warn_unused_ignores", "# mypy: no_warn_unused_ignores  # justified: migration"),
+    # R3-02: flake8 underscore spellings
+    ("setup.cfg", "[flake8]\nper_file_ignores = a.py: E501", "[flake8]\nper_file_ignores = a.py: E501  # justified: long URLs"),
+    ("tox.ini", "[flake8]\nextend_per_file_ignores =  # justified: tests\n    a.py: E501", "[flake8]\nextend_per_file_ignores =  # justified: tests\n    a.py: E501  # justified: long URLs"),
+    ("tox.ini", "[flake8]\nper_file_ignores =  # justified: tests\n    a.py: E501\n    b.py: F401",
+     "[flake8]\nper_file_ignores =  # justified: tests\n    a.py: E501  # justified: urls\n    b.py: F401  # justified: re-exports"),
+    # R3-03: implicit_optional = True relaxes mypy
+    ("pyproject.toml", "[tool.mypy]\nimplicit_optional = true", "[tool.mypy]\nimplicit_optional = true  # justified: migration"),
+    ("mypy.ini", "[mypy]\nimplicit_optional = True", "[mypy]\nimplicit_optional = True  # justified: migration"),
+    ("a.py", "# mypy: implicit-optional", "# mypy: implicit-optional  # justified: migration"),
+    ("a.py", "# mypy: implicit_optional", "# mypy: implicit_optional  # justified: migration"),
+]
+
+# Strict forms stay clean (R3-07: no-implicit-reexport and no-implicit-optional are strict, not relaxing).
+ROUND3_CLEAN = [
+    ("a.py", "# mypy: no-implicit-reexport\n# mypy: no-implicit-optional\n# mypy: no_implicit_optional\n# mypy: no_implicit_reexport\n"),
+    ("a.py", "# mypy: strict_optional, warn_unused_ignores\n# mypy: disallow_untyped_defs=True\n# mypy: enable_error_code=ignore-without-code\n"),
+    ("mypy.ini", "[mypy]\nimplicit_optional = False\nno_implicit_optional = True\n"),
+    ("tox.ini", "[flake8]\nper_file_ignores =  # justified: tests\n    a.py: E501  # justified: urls\nmax-line-length = 100\n"),
+]
+
+
 class LinterSuppressions(GuardsCase):
     def drop(self, path):
         """Remove a fixture so that one failing case cannot make the cases after it fail too."""
@@ -456,6 +487,21 @@ class LinterSuppressions(GuardsCase):
 
     def test_round2_legitimate_settings_do_not_fire(self):
         for path, text in ROUND2_CLEAN:
+            with self.subTest(path=path, text=text):
+                self.repo.write(path, text)
+                self.repo.commit()
+                try:
+                    self.assertPasses()
+                finally:
+                    self.drop(path)
+
+    def test_round3_relaxations_need_a_justification(self):
+        for path, bad, good in ROUND3_RELAXATIONS:
+            with self.subTest(path=path, text=bad):
+                self.check_pair(path, bad, good)
+
+    def test_round3_strict_forms_do_not_fire(self):
+        for path, text in ROUND3_CLEAN:
             with self.subTest(path=path, text=text):
                 self.repo.write(path, text)
                 self.repo.commit()
