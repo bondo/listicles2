@@ -31,6 +31,14 @@ BAD = {
     "suppress-warnings-property": "compilerOptions.suppressWarnings.set(true)",
     "warning-level-split-arg": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level', 'DEPRECATION:disabled'])",
     "suppress-warning-split-arg": "compilerOptions.freeCompilerArgs.addAll(['-Xsuppress-warning', 'DEPRECATION'])",
+    "warning-level-comma-list": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:disabled,UNUSED_VARIABLE:error')",
+    "warning-level-comma-list-split": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level', 'DEPRECATION:disabled,UNUSED_VARIABLE:error'])",
+    "warning-level-comma-list-spaces": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:disabled , UNUSED_VARIABLE:error')",
+    "warning-level-trailing-comma": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:disabled,')",
+    "warning-level-repeated-then-error": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level=DEPRECATION:disabled', '-Xwarning-level=DEPRECATION:error'])",
+    "warning-level-empty-value": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=')",
+    "warning-level-bare-last": "compilerOptions.freeCompilerArgs.add('-Xwarning-level')",
+    "warning-level-uppercase-error": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:ERROR')",
     "xsuppress-warning": "compilerOptions.freeCompilerArgs.add('-Xsuppress-warning=DEPRECATION')",
 }
 
@@ -60,6 +68,13 @@ def gradle(*args, init=None):
 class WarningsGateTest(unittest.TestCase):
     def test_clean_build_passes(self):
         rc, out = gradle("checkWarningsAsErrors")
+        self.assertEqual(rc, 0, out)
+
+    def test_all_error_levels_are_accepted(self):
+        rc, out = gradle(
+            "checkWarningsAsErrors",
+            init="compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:error, UNUSED_VARIABLE:error')",
+        )
         self.assertEqual(rc, 0, out)
 
     def test_broken_injection_is_not_mistaken_for_gate_rejection(self):
