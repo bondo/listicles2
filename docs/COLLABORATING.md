@@ -27,7 +27,7 @@ and opinions are what we need. Danish or English is fine everywhere.
 * **Delete branch**
 * **Resolve conversation**
 
-Also please do not change labels, push to any `claude/...` branch, or edit someone else's issue, comment or PR.
+Also please do not change labels, add changes to a pull request the assistants are working on, or edit someone else's issue, comment or PR.
 These are easy to press by accident and hard to notice. Only the owner merges and decides when something is ready.
 If you pressed one by mistake, tell the owner; nothing is lost.
 
@@ -37,8 +37,8 @@ thoughts on the issue or PR they are about, or open a new issue from a form.
 ## How to give feedback
 
 1. **Issue forms:** New issue, then pick a form. Short is fine.
-2. **Comments** on any issue or PR. No special syntax. On a `decision` issue you may start a line with
-   `Decision:` to say which option you vote for.
+2. **Comments** on any issue or PR. No special syntax. When the team is choosing between options, you may start a line with
+   `Decision:` to say which one you vote for.
 3. **PR reviews** on design and docs PRs. Comments are welcome. The "Approve" button is not needed: the owner signs
    off (see below).
 
