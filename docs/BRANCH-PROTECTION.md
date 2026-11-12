@@ -117,13 +117,25 @@ Try these in order; stop at the first that works.
 2. Open a throwaway PR touching `.github/` or `scripts/`; confirm it requests your review as Code Owner
    but does **not** block the merge.
 3. Prove the server-side rules from a clone. First save the current head so you can undo a wrong success:
-   `git fetch origin && git rev-parse origin/main` (write the SHA down: `<saved-sha>`). Then:
-   - plain push: `git commit --allow-empty -m "protection test" && git push origin HEAD:main` must be rejected;
-   - force push: `git push --force origin origin/main~1:main` must be rejected;
-   - deletion: `git push origin :main` must be rejected.
-4. **If any of those pushes succeeded**, the ruleset is wrong. Fix the ruleset first, then restore `main`
-   (owner only; temporarily satisfy the ruleset as needed): `git push --force-with-lease origin <saved-sha>:main`.
-   Confirm with `git rev-parse origin/main` that it equals `<saved-sha>`.
+   `git fetch origin && git rev-parse origin/main` (write the SHA down: `<saved-sha>`). Then detach onto
+   `origin/main` so the test commit is a child of the real tip (on any other HEAD, a client-side
+   non-fast-forward rejection would look like a pass): `git checkout --detach origin/main`. Then:
+   - plain push: `git commit --allow-empty -m "protection test" && git push origin HEAD:main` must be
+     rejected by the server: expect `remote: error: GH013: Repository rule violations found` and
+     `! [remote rejected] HEAD -> main (push declined due to repository rule violations)`. A
+     `! [rejected] ... (non-fast-forward)` or `fetch first` message is a client-side rejection and proves
+     nothing; recheck that you are on the detached `origin/main` commit;
+   - force push: `git push --force origin origin/main~1:main` must be rejected with the same
+     `remote rejected` / `GH013` message;
+   - deletion: `git push origin :main` must be rejected with the same message.
+4. **If any of those pushes succeeded**, the ruleset is wrong and `main` is damaged. Restore first, then
+   fix. A corrected ruleset blocks the restoring force push and the bypass list is empty, so: (a) add
+   yourself to the bypass list with mode **Always** (not "For pull requests only", which does not cover
+   direct pushes) and make sure no agent session is running; (b) restore:
+   `git push --force-with-lease=main:<bad-sha> origin <saved-sha>:main`, where `<bad-sha>` is the current
+   `origin/main`; (c) confirm `git rev-parse origin/main` equals `<saved-sha>` (a deleted `main` has to be
+   re-created from `<saved-sha>` instead, `git push origin <saved-sha>:refs/heads/main`); (d) remove
+   yourself from the bypass list so it is empty again, then fix the ruleset per section 2 and re-run step 3.
 5. Delete the throwaway branches/PRs.
 
 ## 6. Keep in sync
