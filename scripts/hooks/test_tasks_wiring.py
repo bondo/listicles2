@@ -33,6 +33,10 @@ def runs(text, command):
     return any(command in ln for ln in active_lines(text))
 
 
+def top_level_step(text, command):
+    return runs(text, command)
+
+
 def job(text, name):
     m = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z][\w-]*:\n|\Z)", text, re.S | re.M)
     return m.group(1) if m else None
@@ -64,12 +68,36 @@ class HelperNegativeCases(unittest.TestCase):
         self.assertEqual(explicit_owners("/docs/tasks.toml\n", "docs/tasks.toml"), [])
 
 
+class RunsNegativeCases(unittest.TestCase):
+    def test_masked_exit_status_does_not_count(self):
+        self.assertFalse(runs(f"step tasks-validate {TASKS_VALIDATE} || true\n", TASKS_VALIDATE))
+        self.assertFalse(runs(f"        run: {TASKS_VALIDATE} || true\n", TASKS_VALIDATE))
+        self.assertFalse(runs(f"        run: {TASKS_VALIDATE} ; true\n", TASKS_VALIDATE))
+        self.assertFalse(runs(f"step t {TASKS_VALIDATE} && true\n", TASKS_VALIDATE))
+
+    def test_extra_arguments_or_prefix_do_not_count(self):
+        self.assertFalse(runs(f"step t echo {TASKS_VALIDATE}\n", TASKS_VALIDATE))
+        self.assertFalse(runs(f"step t {TASKS_VALIDATE} --dry\n", TASKS_VALIDATE))
+
+    def test_plain_forms_count(self):
+        self.assertTrue(runs(f"step tasks-validate {TASKS_VALIDATE}\n", TASKS_VALIDATE))
+        self.assertTrue(runs(f"      - run: {TASKS_VALIDATE}\n", TASKS_VALIDATE))
+        self.assertTrue(runs(f"        run: {TASKS_VALIDATE}\n", TASKS_VALIDATE))
+
+    def test_step_inside_a_branch_is_not_top_level(self):
+        nested = f"if [ \"$FAST\" = 0 ]; then\n  step t {TASKS_VALIDATE}\nelse\n  echo skip\nfi\n"
+        self.assertFalse(top_level_step(nested, TASKS_VALIDATE))
+        self.assertTrue(top_level_step(f"step t {TASKS_VALIDATE}\n", TASKS_VALIDATE))
+        self.assertFalse(top_level_step(f"# step t {TASKS_VALIDATE}\n", TASKS_VALIDATE))
+        self.assertFalse(top_level_step(f"step t {TASKS_VALIDATE} || true\n", TASKS_VALIDATE))
+
+
 class VerifyRunsTasks(unittest.TestCase):
     def test_verify_runs_tasks_tests(self):
-        self.assertTrue(runs(read("scripts", "verify.sh"), TASKS_TESTS))
+        self.assertTrue(top_level_step(read("scripts", "verify.sh"), TASKS_TESTS))
 
     def test_verify_runs_tasks_validate(self):
-        self.assertTrue(runs(read("scripts", "verify.sh"), TASKS_VALIDATE))
+        self.assertTrue(top_level_step(read("scripts", "verify.sh"), TASKS_VALIDATE))
 
     def test_verify_runs_them_even_in_fast_mode(self):
         """They take under a second; --fast only skips the slow Gradle tests."""
