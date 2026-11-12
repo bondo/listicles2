@@ -80,6 +80,26 @@ class Settings(unittest.TestCase):
         bad = f'google {{ }}\nmaven("{c.MIRROR}")\nmavenCentral()\n'
         self.assertEqual(c.check_settings(settings(plugin_repos=bad)), ["pluginManagement: google() needs a content filter"])
 
+    def test_second_outer_block_with_unfiltered_google(self):
+        bad = settings() + "dependencyResolutionManagement {\n    repositories {\n        google()\n    }\n}\n"
+        self.assertEqual(c.check_settings(bad), ["dependencyResolutionManagement: google() needs a content filter"])
+
+    def test_second_repositories_block_with_unfiltered_google(self):
+        bad = settings(dep_repos=GOOD_REPOS + "    }\n    repositories {\n        google()\n")
+        self.assertEqual(c.check_settings(bad), ["dependencyResolutionManagement: google() needs a content filter"])
+
+    def test_qualified_unfiltered_google(self):
+        bad = GOOD_REPOS + "        this.google()\n"
+        self.assertEqual(c.check_settings(settings(plugin_repos=bad)), ["pluginManagement: google() needs a content filter"])
+
+    def test_central_before_mirror_across_repositories_blocks(self):
+        first = 'google { content { includeGroup("androidx") } }\nmavenCentral()\n'
+        bad = settings(dep_repos=first + f'    }}\n    repositories {{\n        maven("{c.MIRROR}")\n')
+        self.assertEqual(
+            c.check_settings(bad),
+            ["dependencyResolutionManagement: Maven Central mirror must come before mavenCentral()"],
+        )
+
     def test_missing_block(self):
         self.assertIn("pluginManagement: no repositories block", c.check_settings("rootProject.name = \"x\"\n"))
 
