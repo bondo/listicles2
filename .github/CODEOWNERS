@@ -24,4 +24,5 @@
 /docs/orchestrator-state.md  @bondo
 /docs/tasks.toml             @bondo
 /docs/FOLLOW-UPS.md          @bondo
+# Also covered by /scripts/; kept explicit so test_tasks_wiring.py can assert it
 /scripts/tasks.py            @bondo

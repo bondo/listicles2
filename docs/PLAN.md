@@ -244,13 +244,18 @@ enforce the rules rather than goodwill.
      * changed screenshot reference images, unless the PR has the `golden-update` label
      * a diff over 600 changed lines outside generated files
    * `secrets`: gitleaks
+   * `tasks`: `scripts/test_tasks.py` and `scripts/tasks.py validate` (the task graph in
+     `docs/tasks.toml`); also run by `scripts/verify.sh`, including `--fast`
    * Unit tests run with network access blocked (a JUnit extension that fails if a
      socket opens), so tests can't silently depend on the internet.
 5. **CODEOWNERS**: the owner is required reviewer for `.github/`, `scripts/`, `.claude/`,
-   `agents/`, `CLAUDE.md`, `REVIEW.md`, `firebase/firestore.rules`, and screenshot
+   `agents/`, `CLAUDE.md`, `REVIEW.md`, `firebase/firestore.rules`, the process docs
+   (`docs/ORCHESTRATION.md`, `docs/orchestrator-state.md`, `docs/tasks.toml`,
+   `docs/FOLLOW-UPS.md`, listed explicitly because `docs/` has no directory rule), and screenshot
    reference images. Labels that agents could set themselves are not trusted on
    their own; CODEOWNERS is the real control.
-6. **Branch protection** on `main`: PR required, all checks green, CODEOWNERS review
+6. **Branch protection** on `main`: PR required, all checks green (required checks: `static`,
+   `unit`, `firebase`, `ui`, `guards`, `secrets`, `tasks`), CODEOWNERS review
    required, **squash merge only**, no force-push. You set this in GitHub settings
    (step-by-step guide in the foundation PR).
 7. **Dependency hygiene**: Gradle version catalog, Dependabot, Gradle wrapper validation.

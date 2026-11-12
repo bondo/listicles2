@@ -30,11 +30,16 @@ def active_lines(text):
 
 
 def runs(text, command):
-    return any(command in ln for ln in active_lines(text))
+    """True if an active line is exactly the command, as a verify.sh `step <name> <cmd>` or a workflow `run: <cmd>`.
+    Anything after the command (`|| true`, `; true`, extra arguments) or before it makes the line not match."""
+    pattern = re.compile(rf"^(?:step\s+[\w-]+\s+|(?:-\s+)?run:\s+){re.escape(command)}$")
+    return any(pattern.match(ln) for ln in active_lines(text))
 
 
 def top_level_step(text, command):
-    return runs(text, command)
+    """Like runs(), but the line must not be indented, so a step moved into an if/else branch does not count."""
+    top = "\n".join(ln for ln in text.splitlines() if ln == ln.lstrip())
+    return runs(top, command)
 
 
 def job(text, name):
