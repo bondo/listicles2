@@ -95,10 +95,20 @@ jobs:
         env:
           GUARD_BASE: origin/${{ github.base_ref || 'main' }}
           GOLDEN_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'golden-update') && '1' || '0' }}
-          GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '6000' || '600' }}
+          GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '1500' || '600' }}
         run: ./scripts/guards.sh
       - name: hook tests
         run: python3 -I -m unittest discover -s scripts/hooks
+
+  tasks:
+    name: tasks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tasks.py tests
+        run: python3 -I scripts/test_tasks.py
+      - name: docs/tasks.toml validates
+        run: python3 -I scripts/tasks.py validate
 
   secrets:
     name: secrets

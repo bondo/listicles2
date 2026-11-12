@@ -1,0 +1,615 @@
+# Listicles task graph: the single source of truth for tasks and their dependencies.
+# Process and field meanings: docs/ORCHESTRATION.md section 4. Check: scripts/tasks.py validate
+#
+# status:     todo | done | dropped   ("in progress" is not stored: it is a claim in the state issue)
+# assignee:   owner | implementer | planner | process | retro
+# risk:       normal | high           (high = PLAN 9.1 risk:high: higher effort, max-effort review)
+# depends_on: task ids, or "milestone:<M>" = every task of milestone <M> is done or dropped
+# ids:        <milestone>-NN for agent tasks, <milestone>-O<n> for owner tasks
+# A dropped dependency counts as satisfied. Order within a milestone = priority.
+# Mx-FU = the milestone's follow-up burn-down (docs/FOLLOW-UPS.md): every milestone with agent work
+#         has one, it depends on all of that work, and validate enforces both.
+
+milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]
+
+# ---------------------------------------------------------------- M0 foundation (PRs #1 and #16, both merged)
+# M0 landed as PR #1 (foundation) and then PR #16 (process docs, this file, scripts/tasks.py), both squash-merged
+# to main (owner decision, M0-O5). The tasks ref is now main (docs/ORCHESTRATION.md 4.2). The remaining M0 work
+# (tooling sessions M0-10/M0-11, the M0-08 guide, the #20 review chain, the M0-FU burn-down) is delivered by new
+# PRs against main, and each PR sets its own tasks to done (4.4).
+
+[[task]]
+id = "M0-01"
+title = "Implementation plan (docs/PLAN.md), 4 review rounds"
+milestone = "M0"
+status = "done"
+assignee = "planner"
+risk = "normal"
+depends_on = []
+pr = 1
+
+[[task]]
+id = "M0-02"
+title = "Gradle skeleton, version catalog, spotless/detekt/lint/Kover"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-01"]
+pr = 1
+
+[[task]]
+id = "M0-03"
+title = "Batch 1: verify/guards/hooks, Firebase emulator + deny tests, CI, Dependabot, PR template, CODEOWNERS"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-02"]
+pr = 1
+notes = "Reviewed R5-R8; c1b54ff unreviewed, accepted by the owner"
+
+[[task]]
+id = "M0-04"
+title = "REVIEW.md and CLAUDE.md"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 1
+notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round cap was reached and the owner accepted the post-cap fixes. Done is set by the status-sync session (ORCHESTRATION 4.4)"
+
+[[task]]
+id = "M0-05"
+title = "Agent setup: roles.yaml, prompts, .claude settings and hooks, status line, handoff template, metrics spike"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 1
+notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round cap was reached and the owner accepted the post-cap fixes. Done is set by the status-sync session (ORCHESTRATION 4.4)"
+
+[[task]]
+id = "M0-06"
+title = "detekt 2.x vs 1.23 ADR, Kover on :app, dark theme"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 1
+notes = "Batch M0-2 (M0-04, M0-05, M0-06). Reviewed R9-R12 on PR #1; the round cap was reached and the owner accepted the post-cap fixes. Done is set by the status-sync session (ORCHESTRATION 4.4)"
+
+[[task]]
+id = "M0-07"
+title = "Prove the gates: CI green on GitHub, a deliberately broken commit fails CI, then revert"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-04", "M0-05", "M0-06", "M0-O1"]
+pr = 1
+notes = "Batch M0-3. guards failed on the first GitHub run (diff size) until the big-pr label is set. Also refresh handoff/claude-sleepy-mccarthy-z2paqx.md on the PR #1 branch (steps 4-5 are done; it still lists them as next)"
+
+[[task]]
+id = "M0-08"
+title = "Branch-protection guide for the owner"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-03"]
+pr = 34
+notes = "Delivered by PR #34 (squash-merged to main): docs/BRANCH-PROTECTION.md. PR #1 had merged without the guide. Needed for M0-O6"
+
+[[task]]
+id = "M0-09"
+title = "Orchestration process: docs/ORCHESTRATION.md, state template, task graph + scripts/tasks.py"
+milestone = "M0"
+status = "done"
+assignee = "process"
+risk = "normal"
+depends_on = []
+pr = 16
+notes = "Delivered by PR #16 (squash-merged to main): docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py + scripts/test_tasks.py"
+
+[[task]]
+id = "M0-10"
+title = "Tooling session A: run tasks.py and its tests in CI and verify.sh; CODEOWNERS for the process docs"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = """Delivered by PR #35 (squash-merged to main). Needed LISTICLES_TASK=tooling (process files are hook-protected). Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
+(1) CI and scripts/verify.sh: run `python3 -I scripts/test_tasks.py` and `python3 -I scripts/tasks.py validate`; \
+(2) CODEOWNERS: docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py, docs/FOLLOW-UPS.md; \
+(3) the pre-push hook should skip the Android build for docs/scripts-only diffs (it blocked pushing PR #16 from a container without the SDK)"""
+
+[[task]]
+id = "M0-11"
+title = "Tooling session B: align REVIEW.md, CLAUDE.md, agents/prompts, handoff template with ORCHESTRATION.md; fix hook false positives"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-04", "M0-05", "M0-10", "M0-12"]
+notes = """Still open on main (agents/prompts/orchestrator.md still mentions docs/status.md). Needs LISTICLES_TASK=tooling, on a new branch from main; this PR sets status = done. M0-04 and M0-05 are done, so protected files are current. Test-first with negative cases (ORCHESTRATION 2.0). Needed changes: \
+(1) REVIEW.md:70 and the round-cap line in the root CLAUDE.md (:40): the 4-round cap is per batch (a one-batch PR: per PR), see ORCHESTRATION 6.2; \
+(2) agents/prompts/reviewer.md: reviewers never edit or push to the PR branch, they only report findings (severity, file:line, recommendation), \
+and may test only in a throwaway branch or worktree that is never pushed to the PR branch and is deleted afterwards; flag code changes lacking tests; \
+(3) agents/prompts/orchestrator.md: drop docs/status.md and handoff/orchestrator.md, add the autonomy rules (ORCHESTRATION 1.1), \
+the 45-minute check-in, the handover, lock check and takeover protocol (5); agents/prompts/implementer.md: write the failing test first, done-status goes on the tasks ref only (4.4); \
+(4) handoff/TEMPLATE.md: refer to owner to-dos by issue number, never restate them; \
+(5) hook false positives: largely done on PR #1 in review rounds R10-R12. Re-check the current PreToolUse guard first; only the cases still failing are in scope (a harmless command that merely mentions a protected path, or the word git inside a heredoc or quoted string), each with a test for the blocked-but-harmless case and the allowed-but-harmful case; \
+(6) REVIEW.md severity for missing tests (test-first is a standing owner rule, ORCHESTRATION 2.0); \
+(7) follow-ups: apply the protected-file list in docs/FOLLOW-UPS.md section 8 (REVIEW.md findings format and cap wording, role prompts, the follow-up issue template, PR template Deferred column)"""
+
+[[task]]
+id = "M0-12"
+title = "Follow-ups process: docs/FOLLOW-UPS.md, tasks.py follow-up counts and burn-down checks"
+milestone = "M0"
+status = "done"
+assignee = "process"
+risk = "normal"
+depends_on = []
+pr = 16
+notes = "Delivered by PR #16 (squash-merged to main): docs/FOLLOW-UPS.md, follow-up counts and burn-down checks in scripts/tasks.py. Protected-file edits are listed for M0-11"
+
+[[task]]
+id = "M0-13"
+title = "Process and tooling review (#20): written review in docs/, prioritised proposals with effort and cost"
+milestone = "M0"
+status = "done"
+assignee = "process"
+risk = "normal"
+depends_on = []
+pr = 33
+notes = """Issue #20 lists the six questions (static checks, TypeScript, linting, test automation, design and visual review for agents, M0 process retrospective). Fresh Opus reviewers, report-only (CLAUDE.md, ORCHESTRATION 7.2). Output: docs/reviews/process-tooling.md with findings, a prioritised proposal, effort and cost estimates. Must finish before M0.5 starts (M0.5-01 depends on milestone:M0). Findings above nit are fixed or deferred to M1: M0 already holds 8 open follow-ups (the FOLLOW-UPS.md limit). Protected-file changes go through the tooling environment. Delivered by PR #33 (squash-merged): docs/reviews/m0-process-tooling-review.md (not process-tooling.md). The dependency on M0-11 was dropped: the review ran before M0-11 and does not need its protected-file changes"""
+
+[[task]]
+id = "M0-14"
+title = "Turn the proposals the owner adopts (M0-O11) into PR-sized tasks with dependencies; open follow-up issues for the deferred ones"
+milestone = "M0"
+status = "done"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M0-13", "M0-O11"]
+notes = "Adds the adopted tasks to this file in the milestone they belong to (tooling work that must precede M0.5 goes in M0 and into M0-FU depends_on; validate enforces it). Tooling tasks are test-first with negative cases (ORCHESTRATION 2.0). Done by the PR that adds M0-15, M0-16, M0.5-05..15 and M1-03..07 (the id mapping and the rejected/deferred items are in the comment block above M0.5-05). Follow-up issues for the deferred items are open: P9 = #38, P18 = #39, P20 = #40 (labels follow-up, severity, target:M1; the deferred-tooling label was not used)"
+
+[[task]]
+id = "M0-15"
+title = "Lower the big-pr diff cap in ci.yml from 6000 to 1500 (D2)"
+milestone = "M0"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-O11"]
+pr = 36
+notes = "Delivered by PR #36 (squash-merged to main). Owner decision D2 (logged on #15). Tooling env (.github/ is protected). Test-first with a negative case (a 1501-line diff without the label fails). big-pr stays for generated or mechanical diffs only (review R3)"
+
+[[task]]
+id = "M0-16"
+title = "Close follow-ups #21-#26 as by-design once branch protection is confirmed on (D1)"
+milestone = "M0"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = ["M0-O6"]
+notes = "Owner decision D1 (logged on #15): freeze the PreToolUse shell model; the boundary is branch protection, CODEOWNERS review and squash-only. Gated on M0-O6: do not close before the owner confirms protection is on. Close #21-#26 as not planned with a comment linking the decision. The tripwire wording (ORCHESTRATION F18) is M0.5-14. #27 and #28 stay open for the M0-FU burn-down"
+
+[[task]]
+id = "M0-FU"
+title = "Follow-up burn-down for M0 (close or re-defer each open follow-up targeting M0)"
+milestone = "M0"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-01", "M0-02", "M0-03", "M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-09", "M0-10", "M0-11", "M0-12", "M0-13", "M0-14", "M0-15", "M0-16"]
+notes = "Issue #19 was split into follow-up issues #21-#28 (target:M0, exactly the limit of 8 open follow-ups per milestone, so no further deferral to M0: fix it or target M1). Close or re-defer each of #21-#28 (#21-#26 are closed as by-design by M0-16, owner decision D1; #27 and #28 remain). Findings deferred from PRs after #16 target M1 (docs/FOLLOW-UPS.md section 3)"
+
+[[task]]
+id = "M0-O1"
+title = "Add the big-pr label to PR #1"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 12
+
+[[task]]
+id = "M0-O2"
+title = "Set the default branch to main"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 13
+
+[[task]]
+id = "M0-O3"
+title = "Make the repository public"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 14
+
+[[task]]
+id = "M0-O4"
+title = "Confirm the CODEOWNERS handle"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-03"]
+
+[[task]]
+id = "M0-O5"
+title = "Decide how the orchestration branch lands (merge into the PR #1 branch or a separate PR)"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Decided by the owner: a separate stacked PR (#16), merged after #1. Marked done here; no issue needed"
+
+[[task]]
+id = "M0-O6"
+title = "Turn on branch protection for main using the guide"
+milestone = "M0"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-08", "M0-O2"]
+
+[[task]]
+id = "M0-O10"
+title = "Create the follow-up labels (follow-up, severity:*, target:*, area:*, owner-ok)"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Exact label names: docs/FOLLOW-UPS.md section 7. Done: labels created 2026-11-12"
+
+[[task]]
+id = "M0-O7"
+title = "Squash-merge PR #1 (M0)"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-O1", "M0-O4", "M0-O5"]
+pr = 1
+notes = "PR #1 is merged (squash)"
+
+[[task]]
+id = "M0-O8"
+title = "Retarget PR #16 to main after #1 merges, then squash-merge it"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-O7", "M0-09", "M0-10", "M0-11", "M0-12", "M0-FU"]
+pr = 16
+notes = "PR #16 is merged (squash). The tasks ref is now main (ORCHESTRATION 4.2)"
+
+[[task]]
+id = "M0-O11"
+title = "Decide which proposals from the #20 process and tooling review to adopt"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0-13"]
+issue = 20
+notes = "Decisions are taken in the orchestrator session, one at a time with a recommendation; the owner closes issue #20 as completed when done. Adopted items become tasks in M0-14. All six decisions (D1-D6) were taken by the owner on 2026-11-12 and logged on #15 (comments 6819250795 and 6819352344): D1 yes, D2 yes, D3 yes, D4 approved as a whole, D5 yes, D6 no ruff format now. Evidence for done: the decisions are logged on #15. Issue #20 stays open until this PR merges; the orchestrator then closes it as completed, so drift flags M0-O11 only until then"
+
+[[task]]
+id = "M0-O9"
+title = "Create the GitHub labels orchestrator-state and owner-todo"
+milestone = "M0"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "The GitHub tools available to agents cannot create labels. Repo, Issues, Labels, New label; names exactly as written. Done: both labels created 2026-11-12"
+
+# ---------------------------------------------------------------- M0.5 product design (no code)
+
+[[task]]
+id = "M0.5-01"
+title = "User stories with acceptance criteria (docs/product/stories.md)"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["milestone:M0"]
+
+[[task]]
+id = "M0.5-02"
+title = "App-flow diagram (docs/product/flow.md, Mermaid)"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M0.5-01"]
+
+[[task]]
+id = "M0.5-03"
+title = "Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M0.5-01"]
+notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1"
+
+[[task]]
+id = "M0.5-04"
+title = "App and repo name shortlist (#17): 5-8 candidates with Play Store, GitHub and domain availability, one recommendation"
+milestone = "M0.5"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["milestone:M0"]
+notes = "The name appears in the applicationId/package, app label (en and da), Firebase project, repo name and docs, and is costly to change after M1. Output: docs/product/naming.md. No agent renames anything without the owner's sign-off"
+
+# ---- Tasks adopted from the #20 process and tooling review (docs/reviews/m0-process-tooling-review.md, M0-14)
+# They run alongside the M0.5 design work (design is docs only), so M1 coding starts with the gates in place.
+# Owner decisions D1-D6 (logged on #15, 2026-11-12) are in M0-O11. Environment and effort are in each task's notes.
+#
+# Review section 8 ids -> ids here (section 8 ids M0.5-04 and M0.5-O2 collided with the naming tasks M0.5-04 and M0.5-O2):
+#   O2 (adoption decision) -> M0-O11 (done); 04 -> M0.5-05; 05 -> M0.5-06; 06 -> M0.5-07; 07 -> M0.5-08;
+#   08 -> M0.5-09 (P6) and M0.5-10 (P8, split so the licensee allowlist from D3 is its own PR); 09 -> M0.5-11;
+#   10 -> M0.5-12; 11 -> M0.5-13; 12 -> M0.5-14; 13 -> M0.5-15. M1-03..M1-07 keep their ids.
+# Not tasks, per the section 7 recommendations (approved as a whole, D4):
+#   rejected: P10 (Gradle dependency verification), P21 (markdownlint, mutmut, explicitApi, emulator screenshots);
+#   R11 (pre-commit skips Gradle for docs-only commits): not in review section 7, so not adopted here; the owner may add a task.
+#   deferred: P9 (#38, Compose detekt rules, M2), P18 (#39, sync/merge simulation tests, M2/M3 planner input),
+#             P20 (#40, ruff format and mypy --strict; D6: not now, revisit when the hooks next change substantially).
+# Not a task, owner action: D5 branch protection (M0-08 guide, M0-O6).
+
+[[task]]
+id = "M0.5-05"
+title = "guards.sh: suppressions of new linters (noqa, type: ignore, eslint-disable, @ts-*, coverage, formatter) and their config files (P1)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-O11"]
+notes = "Tooling env. Effort S, implementer high (gate). Test-first: one negative case per syntax in test_guards_sh.py. Justify the 10 existing # noqa lines."
+
+[[task]]
+id = "M0.5-06"
+title = "CI: shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-05"]
+notes = "Tooling env. Effort S. Pinned binaries with checksums like gitleaks. Fix .githooks/pre-push:6 SC2046 with a justified disable."
+
+[[task]]
+id = "M0.5-07"
+title = "ruff check (E,F,W,B,UP,SIM) and mypy (default) for scripts/, in verify.sh and CI (P3)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-05", "M0-10"]
+notes = "Tooling env. Effort S-M. Root ruff.toml/mypy.ini plus CODEOWNERS entry. No ruff format: deferred (D6)."
+
+[[task]]
+id = "M0.5-08"
+title = "Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-05"]
+notes = "Tooling env (ci.yml gets tsc and lint steps). Effort S. ts-jest if it supports the installed TS major, else Vitest."
+
+[[task]]
+id = "M0.5-09"
+title = "Kotlin allWarningsAsErrors in all modules (P6)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-O11"]
+notes = "Normal env (Gradle files, CODEOWNERS review). Effort S. Dependabot bumps that add deprecations will fail: intended."
+
+[[task]]
+id = "M0.5-10"
+title = "licensee with the owner's allowlist (P8, D3): Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause; Google/Android SDK terms per artifact"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-09"]
+notes = "Normal env (Gradle files). Effort S. Owner decision D3 (logged on #15): the SPDX ids above are allowed now; Google/Android SDK terms (Firebase, ML Kit) are approved per artifact as each is first added, so list each artifact explicitly and never allow the terms globally. Negative test: an artifact with any other licence fails the check. After M0.5-09 so the two do not fight over the same Gradle files. Must land before the first M1 dependencies"
+
+[[task]]
+id = "M0.5-11"
+title = "Konsist: no floating point in core/domain, no raw colors/dp in UI; network-blocking JUnit extension (P7, P13, P25)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-O11"]
+notes = "Normal env. Effort S. Fallback if Konsist does not support Kotlin 2.4: a guards.sh grep (then tooling env)."
+
+[[task]]
+id = "M0.5-12"
+title = "Docs check: relative links and backticked repo paths exist, planned paths allowlisted (P12)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-05", "M0-11"]
+notes = "Tooling env (CI wiring). Effort S. Stdlib Python, test-first."
+
+[[task]]
+id = "M0.5-13"
+title = "Metrics: orchestrator CSV comments per ORCHESTRATION 6 and scripts/agent_metrics.py to docs/agent-metrics.csv (P11, R5)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-O11"]
+notes = "Normal env unless CI wiring is added (then tooling). Effort M. Backfill M0 rows from #15 with empty fields where unknown."
+
+[[task]]
+id = "M0.5-14"
+title = "ORCHESTRATION.md retro changes: delta review, one batch per PR, env pick, default deferral, early stall diagnosis, F18 tripwire, smoke task, PR-body refresh and squash checks before a merge request (C1)"
+milestone = "M0.5"
+status = "done"
+assignee = "process"
+risk = "normal"
+depends_on = ["M0-O11"]
+notes = "Normal env (docs only). Effort S. Orchestrator checks added to the merge-request step (review R2, R6): the PR body is refreshed and the request says squash. F18 records the frozen shell model of D1 (a tripwire, not a security boundary). Protected prompt parts go to M0.5-15."
+
+[[task]]
+id = "M0.5-15"
+title = "Prompts: design-reviewer role and checklist, PR-body refresh, delta review, environment pick (P23, C2)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0-11", "M0.5-14"]
+notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet. The environment pick (tooling vs normal) is part of the prompt work (C2)."
+
+[[task]]
+id = "M0.5-FU"
+title = "Follow-up burn-down for M0.5"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15"]
+
+[[task]]
+id = "M0.5-O1"
+title = "Approve stories, flow and design"
+milestone = "M0.5"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
+
+[[task]]
+id = "M0.5-O2"
+title = "Pick the app and repo name from the shortlist"
+milestone = "M0.5"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0.5-04"]
+issue = 17
+notes = "Must be decided before M1 (M1 tasks depend on milestone:M0.5). Then the rename of the repo, applicationId and labels is a task for M1-01 to plan"
+
+# ---------------------------------------------------------------- M1 auth + households
+# The planner (M1-01) breaks M1 into PR-sized tasks and adds them here in its PR.
+
+[[task]]
+id = "M1-01"
+title = "Plan M1: docs/milestones/M1.md and PR-sized tasks in this file"
+milestone = "M1"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["milestone:M0.5"]
+
+[[task]]
+id = "M1-02"
+title = "Start the Firestore emulator in the ui CI job (known gap R6-09), with the first Firebase-backed UI test"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+
+[[task]]
+id = "M1-03"
+title = "Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff artifact, ATF and enableAccessibilityChecks (P14, P15)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env (CI). Effort M. Exact-match goldens (no tolerance)."
+
+[[task]]
+id = "M1-04"
+title = "Design tokens: Theme.kt parity test against design/tokens.json and WCAG AA contrast test (P22)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-03", "M1-03"]
+notes = "Normal env. Effort S. M0.5-03 must emit design/tokens.json."
+
+[[task]]
+id = "M1-05"
+title = "PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Normal env plus a CI step (tooling) if it is not inside the unit job's Gradle call. Effort S."
+
+[[task]]
+id = "M1-06"
+title = "Rules fuzzing: fast-check against a TS reference model of PLAN 3.1 (P17)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-01", "M0.5-08"]
+notes = "Normal env. Effort M. Depends on the first real rules task from the M1 plan; the planner wires that dependency."
+
+[[task]]
+id = "M1-07"
+title = "Test-impact summary: uncovered changed lines to the step summary and verify.sh (P19)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env (CI). Effort M."
+
+[[task]]
+id = "M1-FU"
+title = "Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07"]
+
+[[task]]
+id = "M1-O1"
+title = "Create the Firebase project (Spark), enable Google sign-in and Firestore, add google-services.json as a GitHub secret"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["milestone:M0", "M0.5-O2"]
+notes = "Waits for the name decision (M0.5-O2): the Firebase project name and applicationId derive from it"
+
+[[task]]
+id = "M1-O2"
+title = "Register the debug and release SHA-1 fingerprints in Firebase"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
