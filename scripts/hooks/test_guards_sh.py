@@ -237,6 +237,27 @@ class DiffChecks(GuardsCase):
         self.assertFails("changed lines (limit 10)", CI="true", GUARD_MAX_DIFF="10")
         self.assertPasses(CI="true", GUARD_MAX_DIFF="100")
 
+    def test_big_pr_cap_6000_boundaries(self):
+        # CI passes GUARD_MAX_DIFF=6000 for PRs labelled big-pr: between the old 3000 cap and 6000 passes, above fails.
+        self.repo.write("notes.txt", "x\n" * 3500)
+        self.repo.commit()
+        self.assertFails("changed lines (limit 3000)", CI="true", GUARD_MAX_DIFF="3000")
+        self.assertPasses(CI="true", GUARD_MAX_DIFF="6000")
+        self.repo.write("notes.txt", "x\n" * 6000)
+        self.repo.commit()
+        self.assertPasses(CI="true", GUARD_MAX_DIFF="6000")  # exactly at the cap
+        self.repo.write("notes.txt", "x\n" * 6001)
+        self.repo.commit()
+        self.assertFails("changed lines (limit 6000)", CI="true", GUARD_MAX_DIFF="6000")
+
+    def test_default_cap_is_600_without_override(self):
+        self.repo.write("notes.txt", "x\n" * 601)
+        self.repo.commit()
+        self.assertFails("changed lines (limit 600)", CI="true")
+        self.repo.write("notes.txt", "x\n" * 600)
+        self.repo.commit()
+        self.assertPasses(CI="true")
+
     def test_non_numeric_diff_limit_fails(self):
         self.assertFails("GUARD_MAX_DIFF is not a number", CI="true", GUARD_MAX_DIFF="lots")
 
