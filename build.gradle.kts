@@ -88,10 +88,15 @@ val checkWarningsAsErrors =
             }
 
         // Flags that turn warnings off or hide them, which would bypass allWarningsAsErrors.
-        fun isHidingFlag(arg: String) =
-            arg == "-nowarn" ||
-                arg.startsWith("-Xsuppress-warning") ||
-                (arg.startsWith("-Xwarning-level=") && !arg.endsWith(":error"))
+        // A bare flag takes the next element as its value, so check the list as a sequence.
+        fun hidesWarnings(args: List<String>): Boolean =
+            args.withIndex().any { (i, arg) ->
+                val value =
+                    if (arg.contains('=')) arg.substringAfter('=') else args.getOrNull(i + 1).orEmpty()
+                arg == "-nowarn" ||
+                    arg.startsWith("-Xsuppress-warning") ||
+                    (arg.startsWith("-Xwarning-level") && !value.endsWith(":error"))
+            }
         val offenders =
             compileTasks.map { all ->
                 all
@@ -99,7 +104,7 @@ val checkWarningsAsErrors =
                         val o = it.compilerOptions
                         !o.allWarningsAsErrors.getOrElse(false) ||
                             o.suppressWarnings.getOrElse(false) ||
-                            o.freeCompilerArgs.getOrElse(emptyList()).any(::isHidingFlag)
+                            hidesWarnings(o.freeCompilerArgs.getOrElse(emptyList()))
                     }.map { it.path }
             }
         val taskCount = compileTasks.map { it.size }
