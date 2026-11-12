@@ -1,5 +1,6 @@
 """Tests for scripts/issue_forms.py. Run: python3 -I scripts/test_issue_forms.py"""
 
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -88,11 +89,54 @@ class IssueFormTests(unittest.TestCase):
             (Path(d) / "config.yml").write_text("blank_issues_enabled: true\n")
             self.assertEqual(issue_forms.validate_dir(Path(d), LABELS), [])
 
+    def test_duplicate_ids_rejected(self):
+        extra = "  - type: input\n    id: what\n    attributes:\n      label: Again\n"
+        errs = check(GOOD + extra)
+        self.assertTrue(any("duplicate id" in e for e in errs), errs)
+
+    def test_bad_id_characters_rejected(self):
+        errs = check(GOOD.replace("id: what", "id: has space"))
+        self.assertTrue(any("id" in e for e in errs), errs)
+
+    def test_id_is_optional(self):
+        self.assertEqual(check(GOOD.replace("    id: what\n", "")), [])
+
+    def test_unknown_body_type_rejected(self):
+        errs = check(GOOD.replace("type: textarea", "type: textare"))
+        self.assertTrue(any("unknown type" in e for e in errs), errs)
+
+    def test_markdown_without_value_rejected(self):
+        extra = "  - type: markdown\n    attributes:\n      label: oops\n"
+        errs = check(GOOD + extra)
+        self.assertTrue(any("attributes.value" in e for e in errs), errs)
+
+    def test_markdown_without_attributes_rejected(self):
+        errs = check(GOOD + "  - type: markdown\n")
+        self.assertTrue(any("attributes.value" in e for e in errs), errs)
+
+    def test_missing_pyyaml_exits_1_with_hint(self):
+        script = Path(__file__).resolve().parent / "issue_forms.py"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "yaml.py").write_text("raise ImportError('no yaml')\n")
+            r = subprocess.run(
+                [sys.executable, "-S", str(script)], cwd=d, capture_output=True, text=True,
+                env={"PYTHONPATH": d},
+            )
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("PyYAML required", r.stderr + r.stdout)
+        self.assertNotIn("Traceback", r.stderr)
+
 
 class RealFormsTests(unittest.TestCase):
     def test_repo_forms_valid(self):
         d = ROOT / ".github" / "ISSUE_TEMPLATE"
         self.assertEqual(issue_forms.validate_dir(d, LABELS), [])
+
+    def test_repo_forms_say_issues_are_public(self):
+        d = ROOT / ".github" / "ISSUE_TEMPLATE"
+        for p in d.glob("*.yml"):
+            if p.name != "config.yml":
+                self.assertIn("This is public", p.read_text(encoding="utf-8"), p.name)
 
     def test_repo_has_three_forms_and_config(self):
         d = ROOT / ".github" / "ISSUE_TEMPLATE"
