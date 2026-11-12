@@ -93,9 +93,14 @@ val checkWarningsAsErrors =
             args.withIndex().any { (i, arg) ->
                 val value =
                     if (arg.contains('=')) arg.substringAfter('=') else args.getOrNull(i + 1).orEmpty()
+                // The value is a comma-separated list; every entry must raise its diagnostic to an error.
+                val allErrors =
+                    value.split(',').map { it.trim() }.filter { it.isNotEmpty() }.let { entries ->
+                        entries.isNotEmpty() && entries.all { it.endsWith(":error") }
+                    }
                 arg == "-nowarn" ||
                     arg.startsWith("-Xsuppress-warning") ||
-                    (arg.startsWith("-Xwarning-level") && !value.endsWith(":error"))
+                    (arg.startsWith("-Xwarning-level") && !allErrors)
             }
         val offenders =
             compileTasks.map { all ->
