@@ -45,51 +45,109 @@ out=$(gg 'enabled(If|OrReasonIf)? *[=(]|\bx(it|test|describe|context|should|expe
 out=$(gg '[Ee]nabled *(= *|\() *(false|!)|onlyIf *(\([^)]*\))? *\{ *false|excludeTest(s|sMatching)?\b|exclude(Tags|Engines)\(|exclude\("[^"]*[Tt]est|passWithNoTests|testPathIgnorePatterns|testMatch|testRegex|"roots"|testNamePattern|testPathPattern| -t |kotest\.(tags|filter)' -- "${CFGSRC[@]}" "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled tests via build config: /'; fail=1; }
 
+LS=(git ls-files)
+[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AM)
+
 # 2. Suppressions and weakened settings need "justified: <reason>" on the same line.
+# The justification is looked for in the whole `path:line:text` grep output, so a tracked path containing it would waive every hit
+# inside that path. Such paths are refused.
+out=$("${LS[@]}" | grep -F 'justified:')
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: justified: in a path: /'; fail=1; }
 PAT='Suppress[A-Za-z]*\(|tools:ignore|ktlint-disable|detekt:|lint\.disable|noinspection|disable *\+?=|disable\.add|disable\(|'
 PAT+='ktlint_[A-Za-z0-9_-]+ *= *disabled|to *"disabled"|ij_[a-z_]*ktlint[a-z_]*|(informational|warning|ignore) *\+?= *["(s]|'
 PAT+='severity *[=:] *["'"'"']?(ignore|informational|info)|warningsAsErrors *[=:] *false|ignoreWarnings|ignoreFailures *= *true|'
 PAT+='abortOnError *= *false|checkReleaseBuilds *= *false|maxIssues: *[1-9]|active: *false|excludes:|checkOnly|ignoreTestSources|'
 PAT+='disableDefaultRuleSets|<ignore |failOnNoDiscoveredTests *= *false|'
 # Linter, type-checker, coverage and formatter directives (ruff/flake8, mypy, ESLint, TypeScript, coverage.py, c8/istanbul/v8, prettier, black, biome).
-PAT+='[Nn][Oo][Qq][Aa]|type: *ignore|mypy: *(ignore-errors|allow-|disable-error-code)|eslint-disable|@ts-(ignore|expect-error|nocheck)|'
-PAT+='pragma: *no (cover|branch)|(c8|v8|istanbul) ignore|prettier-ignore|biome-ignore|dprint-ignore|fmt: *(off|skip)|yapf: *disable|isort: *(skip|off)|@formatter:off'
+PAT+='[Nn][Oo][Qq][Aa]|type: *ignore|eslint-disable|@ts-(ignore|expect-error|nocheck)|/\*[[:space:]]*eslint[[:space:]]+[@A-Za-z]|'
+# mypy inline flags that relax (ignore-*, allow-*, no-*, =False, follow-imports=skip); ignore-without-code and =True are strict.
+PAT+='mypy:.*(ignore-(errors|missing-imports)|[[:space:]]allow-|disable-error-code|[[:space:]]no-|follow-imports[[:space:]]*=[[:space:]]*(skip|silent)|=[[:space:]]*([Ff]alse|0))|'
+PAT+='[Pp][Rr][Aa][Gg][Mm][Aa][:[:space:]]?[[:space:]]*[Nn][Oo][[:space:]]*([Cc][Oo][Vv][Ee][Rr]|[Bb][Rr][Aa][Nn][Cc][Hh])|(c8|v8|istanbul) ignore|prettier-ignore|biome-ignore|dprint-ignore|fmt: *(off|skip)|yapf: *disable|isort: *(skip|off)|@formatter:off'
 JUST='justified:[[:space:]]*[^[:space:]*/]'
 out=$(gg "$PAT" -- "${EXCL[@]}" | grep -vE "$JUST")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
 
 # 2b. Relaxed settings in the linter config files themselves (same justification rule). Each pattern only applies to the files
 # named with it, so ordinary code and data (`ignore = x`, "off") never match.
+# The checks above are line by line, so a justification on a TOML table header or an array opener would waive every entry after it.
+# entrycheck therefore reads the config files itself and requires the justification on every entry line of a relaxing multi-line
+# table (per-file-ignores), array/object (ignore = [, exclude_lines = [, ignores: [) or INI continuation (ignore =<newline>  E501),
+# and on the first element of an ESLint rule array that sets off/warn/0/1.
+ENTRY_AWK='
+function strip(l) { sub(/[ \t]*(#|\/\/).*$/, "", l); return l }
+function blank(l) { gsub(/"[^"]*"/, "\"\"", l); gsub(/\047[^\047]*\047/, "\047\047", l); return l }
+function nest(l,   t, o) { t = l; gsub(/[^[({]/, "", t); o = length(t); t = l; gsub(/[^])}]/, "", t); return o - length(t) }
+function check() { if (line !~ JUSTRE) printf "%s:%d:%s\n", F, NR, line }
+BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
+{
+  line = $0; nc = strip(line); c = blank(nc); lc = tolower(nc)
+  if (c ~ /^[ \t]*$/) next
+  closer = (c ~ /^[ \t]*[])},;]*[ \t]*$/)
+  if (mode == 1 && c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/) mode = 0
+  if (mode == 3 && line !~ /^[ \t]/) mode = 0
+  if (mode == 1 || mode == 3) { if (!closer) check(); next }
+  if (mode == 2) { depth += nest(c); if (!closer) check(); if (depth <= 0) mode = 0; next }
+  if (first) { first = 0; if (nc ~ /^[ \t]*["\047]?(off|warn|0|1)["\047]?[ \t]*,?[ \t]*$/) check() }
+  if (c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/ && lc ~ /per-file-(ignores|target-version)/) { mode = 1; next }
+  if (lc ~ /(ignore|exclude|omit|per-file|collectcoveragefrom)[a-z_.-]*["\047]?[ \t]*[:=(][ \t]*[[{(]+[ \t]*$/) { depth = nest(c); if (depth > 0) mode = 2; next }
+  if (ini && line ~ /^[A-Za-z]/ && lc ~ /^(extend-|force-)?(ignore|exclude|omit|per-file-ignores|per-file-target-version|exclude_lines|exclude_also)[ \t]*[=:]/) { mode = 3; next }
+  if (es && nc ~ /:[ \t]*\[[ \t]*$/) first = 1
+}'
+entrycheck() { # entrycheck <pathspec>...
+  local f
+  while IFS= read -r f; do
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$ENTRY_AWK"
+    else awk -v F="$f" "$ENTRY_AWK" "$f" 2>/dev/null; fi
+  done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified suppression: /'
+}
 cfgcheck() { # cfgcheck <pattern> <pathspec>...
   local pat="$1" o; shift
   o=$(gg "$pat" -- "$@" "${EXCL[@]}" | grep -vE "$JUST")
   [ -n "$o" ] && echo "$o" | sed 's/^/guard: unjustified suppression: /'
+  entrycheck "$@"
+  return 0
+}
+# tsconfig: a base named by "extends" is only scanned when it matches *tsconfig*.json, so any other base needs a justification.
+extcheck() {
+  local ok='"extends"[[:space:]]*:[[:space:]]*("[^"]*(tsconfig|jsconfig)[^"]*"[[:space:]]*(,|$|//)|'
+  ok+='\[[[:space:]]*"[^"]*(tsconfig|jsconfig)[^"]*"([[:space:]]*,[[:space:]]*"[^"]*(tsconfig|jsconfig)[^"]*")*[[:space:]]*\])'
+  local o
+  o=$(gg '"extends"[[:space:]]*:' -- '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}" | grep -vE "$ok" | grep -vE "$JUST")
+  [ -n "$o" ] && echo "$o" | sed 's/^/guard: unjustified suppression: /'
   return 0
 }
 # ruff, flake8, mypy, coverage.py
-PYPAT='per-file-ignores|per-file-target-version|^[[:space:]]*(extend-|force-)?(ignore|exclude)[[:space:]]*=|^[[:space:]]*(omit|exclude_lines|exclude_also)[[:space:]]*=|'
-PYPAT+='(^|[^a-z_])(ignore_errors|ignore_missing_imports|implicit_reexport|allow_[a-z_]+)[[:space:]]*=[[:space:]]*(true|True|1)|'
-PYPAT+='(strict|strict_optional|strict_equality|check_untyped_defs|no_implicit_optional|(disallow|warn)_[a-z_]+)[[:space:]]*=[[:space:]]*(false|False|0)|'
+# A key may be bare, quoted, dotted (lint.ignore) or inside an inline table (lint = { ignore = [...] }); INI booleans are yes/on/1 and no/off/0.
+KEYB='(^|[^A-Za-z0-9_-])["'"'"']?'
+TRUE='([Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]|[Oo][Nn]|1)([^A-Za-z0-9_.]|$)'
+FALSE='([Ff][Aa][Ll][Ss][Ee]|[Nn][Oo]|[Oo][Ff][Ff]|0)([^A-Za-z0-9_.]|$)'
+PYPAT='per-file-ignores|per-file-target-version|'"$KEYB"'(extend-|force-)?(ignore|exclude)["'"'"']?[[:space:]]*=|'"$KEYB"'(omit|exclude_lines|exclude_also)["'"'"']?[[:space:]]*=|'
+PYPAT+='(^|[^a-z_])(ignore_errors|ignore_missing_imports|implicit_reexport|allow_[a-z_]+)["'"'"']?[[:space:]]*=[[:space:]]*'"$TRUE"'|'
+PYPAT+='(strict|strict_optional|strict_equality|check_untyped_defs|no_implicit_optional|(disallow|warn)_[a-z_]+)["'"'"']?[[:space:]]*=[[:space:]]*'"$FALSE"'|'
 PYPAT+='follow_imports[[:space:]]*=[[:space:]]*.?(skip|silent)|disable_error_code'
 # tsconfig
 TSPAT='"(strict|noImplicitAny|strictNullChecks|strictFunctionTypes|strictBindCallApply|strictPropertyInitialization|noImplicitThis|alwaysStrict|'
 TSPAT+='useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noImplicitReturns|noImplicitOverride|noFallthroughCasesInSwitch|'
 TSPAT+='noUnusedLocals|noUnusedParameters|noPropertyAccessFromIndexSignature|checkJs)"[[:space:]]*:[[:space:]]*false|'
-TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors)"[[:space:]]*:[[:space:]]*true'
+TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors|noCheck)"[[:space:]]*:[[:space:]]*true'
 # ESLint (rules off or downgraded to warn, ignored files, unused-directive reporting off) and biome
-ESPAT=':[[:space:]]*(\[[[:space:]]*)?(.?(off|warn).?|0|1)[[:space:]]*([],}]|$|//)|\bignores[[:space:]]*:|ignorePatterns|globalIgnores|'
+# Numbers only count as severities after a rule key (line start or first key of `rules: {`), so option objects like { max: 1 } do not.
+ESPAT=':[[:space:]]*(\[[[:space:]]*)?.?(off|warn).?[[:space:]]*([],}]|$|//)|'
+ESPAT+='(^|rules["'"'"']?[[:space:]]*:[[:space:]]*\{)[[:space:]]*["'"'"']?[@A-Za-z0-9/_$-]+["'"'"']?[[:space:]]*:[[:space:]]*(\[[[:space:]]*)?[01][[:space:]]*([],}]|$|//)|'
+ESPAT+='\bignores[[:space:]]*:|ignorePatterns|globalIgnores|'
 ESPAT+='reportUnusedDisableDirectives[[:space:]]*:[[:space:]]*(false|.?off.?|0)'
 # coverage exclusions in jest, vitest, nyc and c8 config
 COVPAT='coveragePathIgnorePatterns|collectCoverageFrom|exclude[^A-Za-z0-9_:]{0,2}:'
 out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' '*tox.ini' '*.flake8' '*.coveragerc'
   cfgcheck "$TSPAT" '*tsconfig*.json' '*jsconfig*.json'
+  extcheck
   cfgcheck "$ESPAT" '*eslint.config.*' '*eslintrc*' '*biome.json*'
-  cfgcheck "$COVPAT" '*vitest.config.*' '*jest.config.*' '*nycrc*' '*c8rc*')
+  cfgcheck "$COVPAT" '*vitest.config.*' '*jest.config.*' '*nycrc*' '*c8rc*'
+  # prettier: requirePragma makes it skip every file without the pragma; ignorePath points it at another ignore file
+  cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
 [ -n "$out" ] && { echo "$out"; fail=1; }
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
-LS=(git ls-files)
-[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AM)
 out=$("${LS[@]}" | grep -iE 'baseline')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline file: /'; fail=1; }
 # Formatter and linter ignore files cannot carry a same-line justification, so they are refused outright (ask the owner).
