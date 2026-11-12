@@ -97,11 +97,12 @@ notes = "Batch M0-3. guards failed on the first GitHub run (diff size) until the
 id = "M0-08"
 title = "Branch-protection guide for the owner"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-03"]
-notes = "Not delivered: PR #1 merged without a branch-protection guide (PLAN section 5 item 6 and the M0 row list one; none exists under docs/ on main). Needed for M0-O6"
+pr = 34
+notes = "Delivered by PR #34 (squash-merged to main): docs/BRANCH-PROTECTION.md. PR #1 had merged without the guide. Needed for M0-O6"
 
 [[task]]
 id = "M0-09"
@@ -166,7 +167,7 @@ assignee = "process"
 risk = "normal"
 depends_on = []
 pr = 33
-notes = """Issue #20 lists the six questions (static checks, TypeScript, linting, test automation, design and visual review for agents, M0 process retrospective). Fresh Opus reviewers, report-only (CLAUDE.md, ORCHESTRATION 7.2). Output: docs/reviews/process-tooling.md with findings, a prioritised proposal, effort and cost estimates. Must finish before M0.5 starts (M0.5-01 depends on milestone:M0). Findings above nit are fixed or deferred to M1: M0 already holds 8 open follow-ups (the FOLLOW-UPS.md limit). Protected-file changes go through the tooling environment Delivered by PR #33 (squash-merged): docs/reviews/m0-process-tooling-review.md (not process-tooling.md). The dependency on M0-11 was dropped: the review ran before M0-11 and does not need its protected-file changes"""
+notes = """Issue #20 lists the six questions (static checks, TypeScript, linting, test automation, design and visual review for agents, M0 process retrospective). Fresh Opus reviewers, report-only (CLAUDE.md, ORCHESTRATION 7.2). Output: docs/reviews/process-tooling.md with findings, a prioritised proposal, effort and cost estimates. Must finish before M0.5 starts (M0.5-01 depends on milestone:M0). Findings above nit are fixed or deferred to M1: M0 already holds 8 open follow-ups (the FOLLOW-UPS.md limit). Protected-file changes go through the tooling environment. Delivered by PR #33 (squash-merged): docs/reviews/m0-process-tooling-review.md (not process-tooling.md). The dependency on M0-11 was dropped: the review ran before M0-11 and does not need its protected-file changes"""
 
 [[task]]
 id = "M0-14"
@@ -176,17 +177,18 @@ status = "done"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0-13", "M0-O11"]
-notes = "Adds the adopted tasks to this file in the milestone they belong to (tooling work that must precede M0.5 goes in M0 and into M0-FU depends_on; validate enforces it). Tooling tasks are test-first with negative cases (ORCHESTRATION 2.0) Done by the PR that adds M0-15, M0-16, M0.5-05..15 and M1-03..07 (the id mapping and the rejected/deferred items are in the comment block above M0.5-05). Follow-up issues for the deferred items (P9, P18, P20) are NOT opened: the GitHub tools cannot create the suggested deferred-tooling label, so the orchestrator decides whether to file them"
+notes = "Adds the adopted tasks to this file in the milestone they belong to (tooling work that must precede M0.5 goes in M0 and into M0-FU depends_on; validate enforces it). Tooling tasks are test-first with negative cases (ORCHESTRATION 2.0). Done by the PR that adds M0-15, M0-16, M0.5-05..15 and M1-03..07 (the id mapping and the rejected/deferred items are in the comment block above M0.5-05). Follow-up issues for the deferred items are open: P9 = #38, P18 = #39, P20 = #40 (labels follow-up, severity, target:M1; the deferred-tooling label was not used)"
 
 [[task]]
 id = "M0-15"
 title = "Lower the big-pr diff cap in ci.yml from 6000 to 1500 (D2)"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-O11"]
-notes = "Owner decision D2 (logged on #15). Tooling env (.github/ is protected). A PR is in progress elsewhere; it sets this to done. Test-first with a negative case (a 1501-line diff without the label fails). big-pr stays for generated or mechanical diffs only (review R3)"
+pr = 36
+notes = "Delivered by PR #36 (squash-merged to main). Owner decision D2 (logged on #15). Tooling env (.github/ is protected). Test-first with a negative case (a 1501-line diff without the label fails). big-pr stays for generated or mechanical diffs only (review R3)"
 
 [[task]]
 id = "M0-16"
@@ -307,7 +309,7 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M0-13"]
 issue = 20
-notes = "Decisions are taken in the orchestrator session, one at a time with a recommendation; the owner closes issue #20 as completed when done. Adopted items become tasks in M0-14. All six decisions (D1-D6) were taken by the owner on 2026-11-12 and logged on #15 (comments 6819250795 and 6819352344): D1 yes, D2 yes, D3 yes, D4 approved as a whole, D5 yes, D6 no ruff format now. Issue #20 is still open: the owner closes it as completed"
+notes = "Decisions are taken in the orchestrator session, one at a time with a recommendation; the owner closes issue #20 as completed when done. Adopted items become tasks in M0-14. All six decisions (D1-D6) were taken by the owner on 2026-11-12 and logged on #15 (comments 6819250795 and 6819352344): D1 yes, D2 yes, D3 yes, D4 approved as a whole, D5 yes, D6 no ruff format now. Evidence for done: the decisions are logged on #15. Issue #20 stays open until this PR merges; the orchestrator then closes it as completed, so drift flags M0-O11 only until then"
 
 [[task]]
 id = "M0-O9"
@@ -347,6 +349,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0.5-01"]
+notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1"
 
 [[task]]
 id = "M0.5-04"
@@ -368,8 +371,9 @@ notes = "The name appears in the applicationId/package, app label (en and da), F
 #   10 -> M0.5-12; 11 -> M0.5-13; 12 -> M0.5-14; 13 -> M0.5-15. M1-03..M1-07 keep their ids.
 # Not tasks, per the section 7 recommendations (approved as a whole, D4):
 #   rejected: P10 (Gradle dependency verification), P21 (markdownlint, mutmut, explicitApi, emulator screenshots);
-#   deferred: P9 (Compose detekt rules, M2), P18 (sync/merge simulation tests, M2/M3 planner input),
-#             P20 (ruff format and mypy --strict; D6: not now, revisit when the hooks next change substantially).
+#   R11 (pre-commit skips Gradle for docs-only commits): not in review section 7, so not adopted here; the owner may add a task.
+#   deferred: P9 (#38, Compose detekt rules, M2), P18 (#39, sync/merge simulation tests, M2/M3 planner input),
+#             P20 (#40, ruff format and mypy --strict; D6: not now, revisit when the hooks next change substantially).
 # Not a task, owner action: D5 branch protection (M0-08 guide, M0-O6).
 
 [[task]]
@@ -474,13 +478,13 @@ notes = "Normal env (docs only). Effort S. Orchestrator checks added to the merg
 
 [[task]]
 id = "M0.5-15"
-title = "Prompts: design-reviewer role and checklist, PR-body refresh, delta review (P23, C2)"
+title = "Prompts: design-reviewer role and checklist, PR-body refresh, delta review, environment pick (P23, C2)"
 milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-11", "M0.5-14"]
-notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet."
+notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet. The environment pick (tooling vs normal) is part of the prompt work (C2)."
 
 [[task]]
 id = "M0.5-FU"
