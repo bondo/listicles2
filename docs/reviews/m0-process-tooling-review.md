@@ -165,6 +165,7 @@ itself and reads with the image-capable Read tool, plus mechanical checks for ev
 | R8 | Wrong-environment spawns | 1 blocked worker; the rule lives only in #15 "habits" | Move the "pick the environment by touched paths" rule into ORCHESTRATION §7.1, with the protected path list. Every task's `notes` names its environment (§8 below does) |
 | R9 | Rounds spent on minor findings | Round 4 is almost all minor and nit findings | Default: once a round has no blocker or major, the orchestrator defers the remaining minors (FOLLOW-UPS) instead of running another round, unless the minor is in a gate. Saves about $2–3 per round |
 | R10 | Environment prerequisites discovered by workers | SDK licences (#18, #29) | Before spawning, a "fresh-session smoke" task checks the env (SDK present, `verify.sh --fast` passes) whenever the env setup script changes |
+| R11 | The pre-commit hook runs Gradle for docs-only commits | `.githooks/pre-commit:5` runs spotless and detekt unconditionally. In this session, two commits of this one Markdown file failed on a cold cache (Maven Central `429 Too Many Requests`) and passed on retry | Skip Gradle when the staged paths cannot affect the build: reuse the `prepush_scope.py` logic, test-first **[P]**. Warm the Gradle cache in the env setup script (`./gradlew help`) |
 
 ## 7. Prioritised proposals
 
