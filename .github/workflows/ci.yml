@@ -100,6 +100,16 @@ jobs:
       - name: hook tests
         run: python3 -I -m unittest discover -s scripts/hooks
 
+  tasks:
+    name: tasks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tasks.py tests
+        run: python3 -I scripts/test_tasks.py
+      - name: docs/tasks.toml validates
+        run: python3 -I scripts/tasks.py validate
+
   secrets:
     name: secrets
     runs-on: ubuntu-latest
