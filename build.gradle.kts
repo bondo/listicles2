@@ -75,29 +75,43 @@ kover {
 
 // M0.5-09: every Kotlin compile task (all modules, all variants, tests included) must treat warnings as errors.
 // Run: ./gradlew checkWarningsAsErrors (wired into detekt, so verify.sh and CI run it).
-val checkWarningsAsErrors by tasks.registering {
-    group = "verification"
-    description = "Fails if any Kotlin compile task does not set allWarningsAsErrors."
-    // Evaluated lazily (when the task graph is built), after every project has been configured.
-    val compileTasks =
-        provider {
-            allprojects.flatMap { p ->
-                p.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().toList()
+val checkWarningsAsErrors =
+    tasks.register("checkWarningsAsErrors") {
+        group = "verification"
+        description = "Fails if any Kotlin compile task does not set allWarningsAsErrors or hides warnings."
+        // Evaluated lazily (when the task graph is built), after every project has been configured.
+        val compileTasks =
+            provider {
+                allprojects.flatMap { p ->
+                    p.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().toList()
+                }
+            }
+
+        // Flags that turn warnings off or hide them, which would bypass allWarningsAsErrors.
+        fun isHidingFlag(arg: String) =
+            arg == "-nowarn" ||
+                arg.startsWith("-Xsuppress-warning") ||
+                (arg.startsWith("-Xwarning-level=") && !arg.endsWith(":error"))
+        val offenders =
+            compileTasks.map { all ->
+                all
+                    .filter {
+                        val o = it.compilerOptions
+                        !o.allWarningsAsErrors.getOrElse(false) ||
+                            o.suppressWarnings.getOrElse(false) ||
+                            o.freeCompilerArgs.getOrElse(emptyList()).any(::isHidingFlag)
+                    }.map { it.path }
+            }
+        val taskCount = compileTasks.map { it.size }
+        inputs.property("offenders", offenders)
+        inputs.property("taskCount", taskCount)
+        doLast {
+            check(taskCount.get() > 0) { "checkWarningsAsErrors found no Kotlin compile tasks; the check is broken" }
+            check(offenders.get().isEmpty()) {
+                "warnings are not all errors (allWarningsAsErrors off, suppressWarnings, -nowarn, " +
+                    "-Xsuppress-warning, -Xwarning-level=...:disabled/warning/info) for: ${offenders.get().joinToString()}"
             }
         }
-    val offenders =
-        compileTasks.map { all ->
-            all.filter { !it.compilerOptions.allWarningsAsErrors.getOrElse(false) }.map { it.path }
-        }
-    val taskCount = compileTasks.map { it.size }
-    inputs.property("offenders", offenders)
-    inputs.property("taskCount", taskCount)
-    doLast {
-        check(taskCount.get() > 0) { "checkWarningsAsErrors found no Kotlin compile tasks; the check is broken" }
-        check(offenders.get().isEmpty()) {
-            "allWarningsAsErrors is not enabled for: ${offenders.get().joinToString()}"
-        }
     }
-}
 
 tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
