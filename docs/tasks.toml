@@ -349,7 +349,8 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-16"]
-notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1 Review packet for the collaborator (docs/reviews/collaborator-workflow.md section 7): docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
+notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1. Review packet for the collaborator (docs/reviews/collaborator-workflow.md section 7): docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
+
 [[task]]
 id = "M0.5-04"
 title = "App and repo name shortlist (#17): 5-8 candidates with Play Store, GitHub and domain availability, one recommendation"
@@ -504,6 +505,7 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
 notes = "Sign-off is owner only (D5): the collaborator comments or reviews but does not formally approve. Done when the owner approves the M0.5-03 PR."
+
 [[task]]
 id = "M0.5-O2"
 title = "Pick the app and repo name from the shortlist"
@@ -571,7 +573,7 @@ notes = "Tooling env (agents/prompts). Effort S. Links follow-up #44: agents nev
 
 [[task]]
 id = "M0.5-O4"
-title = "Record the collaborator, invite them, confirm 2FA and run the live test"
+title = "Invite the collaborator (Write) once COLLABORATING.md and the wake steps exist, confirm 2FA, run the live test"
 milestone = "M0.5"
 status = "todo"
 assignee = "owner"
