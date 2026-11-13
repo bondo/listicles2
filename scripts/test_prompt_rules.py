@@ -3,6 +3,7 @@
 The checker must find each rule in the real prompts and fail when a rule is deleted or weakened.
 """
 
+import itertools
 import re
 import shutil
 import subprocess
@@ -326,7 +327,7 @@ class M025Tests(unittest.TestCase):
         start = text.index("`send_later`")
         pos = [text.index(x, start) for x in steps]
         self.assertEqual(pos, sorted(pos))
-        for a, b in zip(steps, steps[1:], strict=False):
+        for a, b in itertools.pairwise(steps):
             swapped = text.replace(a, "@@A@@").replace(b, a).replace("@@A@@", b)
             with self.subTest(swap=(a, b)):
                 self.assertIn("usage-pause-protocol", ids(prompt_rules.check_text("orchestrator", swapped)))
