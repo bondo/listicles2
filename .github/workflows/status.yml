@@ -7,8 +7,6 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
-  pull_request:
-    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed, labeled, unlabeled]
   issues:
     types: [opened, closed, reopened, labeled, unlabeled]
   push:
@@ -26,10 +24,14 @@ jobs:
     name: publish
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Fork PRs and Dependabot get a read-only token and could not push; skip them. Event text is never read.
-    if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    # No pull_request trigger (fork PRs would get a read-only token, and every PR would carry a status check);
+    # PR changes are picked up by the schedule. Dependabot gets a read-only token. Event text is never read.
+    if: github.actor != 'dependabot[bot]'
     permissions:
       contents: write
+      pull-requests: read
+      issues: read
+      checks: read
     steps:
       - uses: actions/checkout@v4
         with:

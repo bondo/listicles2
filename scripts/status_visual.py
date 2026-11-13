@@ -24,7 +24,8 @@ from xml.sax.saxutils import escape
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tasks  # noqa: E402  # justified: must follow the sys.path insert above
 
-MAX_TITLE = 70
+MAX_TITLE = 60
+WIDE_LATIN = "WMwm@"
 MAX_CHAIN = 8
 MAX_QUEUE = 8
 MAX_BLOCKERS = 14
@@ -40,13 +41,26 @@ class StatusError(Exception):
     pass
 
 
+def text_width(text):
+    """Display width in units: East Asian wide and fullwidth characters and the widest Latin glyphs count 2, the rest 1."""
+    return sum(2 if unicodedata.east_asian_width(c) in "WF" or c in WIDE_LATIN else 1 for c in text)
+
+
 def clip(text, n):
-    """Plain text safe to show: no control, format, surrogate or private characters; one line; at most n characters."""
+    """Plain text safe to show: no control, format, surrogate or private characters; one line; at most n width units."""
     if not isinstance(text, str):
         return ""
     kept = "".join(" " if c.isspace() else c for c in text if c.isspace() or unicodedata.category(c)[0] != "C")
     kept = " ".join(kept.split())
-    return kept if len(kept) <= n else kept[: n - 1] + "…"
+    if text_width(kept) <= n:
+        return kept
+    out, used = [], 0
+    for c in kept:
+        used += text_width(c)
+        if used > n - 1:
+            break
+        out.append(c)
+    return "".join(out) + "…"
 
 
 def label(text, n=MAX_TITLE):
@@ -77,7 +91,7 @@ def _checked_input(data):
     for p in data["prs"]:
         ci = p.get("ci") if isinstance(p, dict) else None
         prs.append({"number": _number(p, "pr"), "title": p.get("title", ""), "draft": p.get("draft") is True,
-                    "behind": p.get("behind") is True, "ci": ci if ci in CI_STATES else "none"})
+                    "behind": p.get("behind") is True, "merge_unknown": p.get("merge_unknown") is True, "ci": ci if ci in CI_STATES else "none"})
     for i in data["issues"]:
         labels = i.get("labels") if isinstance(i, dict) else None
         issues.append({"number": _number(i, "issue"), "title": i.get("title", ""), "state": i.get("state", "open"),
@@ -114,7 +128,7 @@ def build_model(tasks_text, data, now):
               "pr": review_pr.get(t.id)} for t in open_tasks]
 
     open_prs = sorted((p for p in prs if not p["draft"]), key=lambda p: p["number"])
-    queue = [{k: p[k] for k in ("number", "title", "ci", "behind")} for p in open_prs]
+    queue = [{k: p[k] for k in ("number", "title", "ci", "behind", "merge_unknown")} for p in open_prs]
 
     blockers, seen = [], set()
     for iss in sorted(issues, key=lambda i: (i["created_at"] or "", i["number"])):
@@ -126,7 +140,7 @@ def build_model(tasks_text, data, now):
             age = max((now_dt - _ts(iss["created_at"], f"issue #{iss['number']} created_at")).days, 0)
             blockers.append({"kind": kind, "ref": f"#{iss['number']}", "text": iss["title"], "age": age})
     blockers += [{"kind": "pr-waiting", "ref": f"#{p['number']}", "text": p["title"], "age": None}
-                 for p in open_prs if p["ci"] == "passing" and not p["behind"]]
+                 for p in open_prs if p["ci"] == "passing" and not p["behind"] and not p["merge_unknown"]]
     for c in chain:
         if c["state"] == "blocked":
             more = f" +{len(c['unmet']) - 3}" if len(c["unmet"]) > 3 else ""
@@ -173,13 +187,13 @@ def render_svg(model):
     def heading(title, note=""):
         nonlocal y
         y += 34
-        text(24, y, escape(title), "h")
+        text(24, y, escape(title), "fg h")
         if note:
             text(WIDTH - 24, y, escape(note), "muted s", "end")
         out.append(f'<line x1="24" y1="{y + 8}" x2="{WIDTH - 24}" y2="{y + 8}" class="rule"/>')
         y += 10
 
-    text(24, 36, "Listicles status", "t")
+    text(24, 36, "Listicles status", "fg t")
     text(WIDTH - 24, 36, escape(stamp_text(model["generated"])), "muted", "end", f' id="{STAMP_ID}"')
     text(24, 56, "Checked every 30 minutes; the picture is rewritten only when something changes. "
          f"Open follow-ups: {int(model['followups'])}.", "muted s")
@@ -221,8 +235,8 @@ def render_svg(model):
         y += 22
         text(24, y, f"#{int(p['number'])}", "fg h")
         text(80, y, label(p["title"]), "fg")
-        text(WIDTH - 24, y, escape(f"CI {p['ci']}" + ("  behind main" if p["behind"] else "")),
-             "warn" if p["behind"] and p["ci"] == "passing" else CI_CLASS[p["ci"]], "end")
+        note = "  behind main" if p["behind"] else "  merge state unknown" if p["merge_unknown"] else ""
+        text(WIDTH - 24, y, escape(f"CI {p['ci']}" + note), "warn" if note and p["ci"] == "passing" else CI_CLASS[p["ci"]], "end")
     if model["queue_more"]:
         y += 22
         text(24, y, f"+{int(model['queue_more'])} more", "muted")

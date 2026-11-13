@@ -117,6 +117,12 @@ class Clip(unittest.TestCase):
         self.assertTrue(out.endswith("\u2026"))
         self.assertEqual(status_visual.text_width("a\u6f22\uff21"), 5)
 
+    def test_wide_latin_letters_count_double(self):
+        self.assertEqual(status_visual.text_width("WMwm@"), 10)
+        self.assertEqual(status_visual.text_width("abc"), 3)
+        out = status_visual.clip("W" * 100, 20)
+        self.assertLessEqual(status_visual.text_width(out), 20)
+
     def test_short_text_is_untouched(self):
         self.assertEqual(status_visual.clip("short", 20), "short")
 
@@ -274,9 +280,10 @@ class RenderSvg(unittest.TestCase):
 
     def test_wide_characters_cannot_overflow_the_columns(self):
         svg = self.svg(prs=[pr(20, "\u6f22" * 70)], issues=[issue(8, "\u6f22" * 70, ["blocked"])])
-        for t in texts(svg):
-            self.assertLessEqual(status_visual.text_width(t), 160, t)  # a whole row, never a 70-wide title
-        self.assertLessEqual(status_visual.text_width(max(texts(svg), key=status_visual.text_width)), status_visual.MAX_TITLE + 40)
+        titles = [t for t in texts(svg) if "\u6f22" in t]
+        self.assertEqual(len(titles), 3)  # queue row, PR-to-merge blocker, blocked issue
+        for t in titles:
+            self.assertLessEqual(status_visual.text_width(t), status_visual.MAX_TITLE, t)
 
     def test_unknown_merge_state_is_shown_and_never_ready_to_merge(self):
         m = model(prs=[pr(20, merge_unknown=True)])

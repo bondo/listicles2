@@ -13,10 +13,13 @@ import json
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 ISSUE_LABELS = (("owner-todo", "all"), ("needs-owner", "open"), ("blocked", "open"), ("follow-up", "open"))
+TRUSTED = ("OWNER", "MEMBER", "COLLABORATOR")
+OWN_CHECK = "publish"  # the status workflow's own job: it must not decide a PR's CI state
 FAILED = ("failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale")
 
 
@@ -33,12 +36,17 @@ def gh_api(path):
         data = json.loads(res.stdout)
     except json.JSONDecodeError:
         raise FetchError(f"gh api {path}: not JSON") from None
-    if isinstance(data, list) and data and all(isinstance(p, list) for p in data):
+    if isinstance(data, list) and all(isinstance(p, list) for p in data):
         return [x for page in data for x in page]
-    return data[0] if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict) else data
+    if isinstance(data, list) and data and all(isinstance(p, dict) for p in data):
+        if any("check_runs" in p for p in data):
+            return {"check_runs": [r for p in data for r in p.get("check_runs", [])]}
+        return data[0] if len(data) == 1 else data
+    return data
 
 
 def ci_state(runs):
+    runs = [r for r in runs if r.get("name") != OWN_CHECK]
     if not runs:
         return "none"
     if any(r.get("conclusion") in FAILED for r in runs):
@@ -48,16 +56,26 @@ def ci_state(runs):
     return "passing"
 
 
-def fetch(api, repo):
+def trusted(pr, repo):
+    """Same-repository PRs, or PRs whose author has Write-or-better: an outsider's fork PR never reaches the README."""
+    head = (pr.get("head") or {}).get("repo") or {}
+    return str(head.get("full_name", "")).lower() == repo.lower() or pr.get("author_association") in TRUSTED
+
+
+def fetch(api, repo, sleep=time.sleep):
     if not isinstance(repo, str) or not REPO.fullmatch(repo) or ".." in repo:
         raise FetchError("--repo must look like OWNER/NAME")
     prs = []
-    for p in api(f"repos/{repo}/pulls?state=open&per_page=100"):
+    for p in (p for p in api(f"repos/{repo}/pulls?state=open&per_page=100") if trusted(p, repo)):
         n, sha = int(p["number"]), p["head"]["sha"]
         detail = api(f"repos/{repo}/pulls/{n}")
+        if detail.get("mergeable_state") == "unknown":  # GitHub computes it lazily: ask once more
+            sleep(2)
+            detail = api(f"repos/{repo}/pulls/{n}")
         runs = api(f"repos/{repo}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
         prs.append({"number": n, "title": p.get("title", ""), "draft": p.get("draft") is True,
-                    "behind": detail.get("mergeable_state") == "behind", "ci": ci_state(runs)})
+                    "behind": detail.get("mergeable_state") == "behind",
+                    "merge_unknown": detail.get("mergeable_state") == "unknown", "ci": ci_state(runs)})
     issues = {}
     for label, state in ISSUE_LABELS:
         for i in api(f"repos/{repo}/issues?state={state}&labels={label}&per_page=100"):

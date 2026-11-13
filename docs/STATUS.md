@@ -6,15 +6,23 @@ renders it and pushes it to the `status` branch (task M0.5-27). The README embed
 
 ## How it works
 1. `scripts/status_fetch.py` reads the GitHub REST API with `GITHUB_TOKEN` (open PRs with draft, behind-main and CI
-   state; issues labelled `owner-todo`, `needs-owner`, `blocked`, `follow-up`) into one JSON file.
+   state; issues labelled `owner-todo`, `needs-owner`, `blocked`, `follow-up`) into one JSON file. PRs from forks are
+   dropped unless their author has Write-or-better (an outsider's title never reaches the README), the workflow's own
+   `publish` check run is ignored when judging CI, and an unknown merge state is retried once and then never shown as
+   ready to merge.
 2. `scripts/status_visual.py render` turns that JSON plus `docs/tasks.toml` into `status.svg` and a tiny `status.json`.
    It is offline and deterministic. Every title is stripped of control characters, clipped and XML-escaped.
 3. `scripts/status_publish.py` pushes both files to the `status` branch with a plain push (creates the orphan branch
    if missing, never force-pushes). It makes no commit when the SVG is unchanged apart from the "updated" stamp, so the
    stamp shows the time of the last change, not of the last check.
 
-Runs: every 30 minutes, on `workflow_dispatch`, on `pull_request` and `issues` events from this repository, and on push to
-`main`. The job has `contents: write` and nothing else; fork and Dependabot pull requests are skipped.
+Runs: every 30 minutes, on `workflow_dispatch`, on `issues` events and on push to `main`. There is no `pull_request`
+trigger (it would put a status check on every PR and give fork PRs a read-only token), so PR changes show up within
+30 minutes. The job has `contents: write` plus read on pull requests, issues and checks, and nothing else.
+
+Dark mode: the SVG follows the viewer's operating-system or browser colour scheme (`prefers-color-scheme` inside an
+`<img>` cannot see GitHub's own theme setting). It has an opaque background in both schemes, so it stays readable on
+a light or a dark GitHub page, but it may not match the page's theme.
 
 ## What counts as a blocker
 - Tasks of the current milestone whose `depends_on` are not done.
