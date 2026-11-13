@@ -25,11 +25,13 @@ lease that must be renewed on every wake, and §5.3 says how to arbitrate and ta
 
 The orchestrator runs **unattended until usage limits stop it**. There is no dollar spend cap; usage limits are handled
 by the early warning and pause protocol of §7.7. It keeps one
-`send_later` check-in of **45 minutes** and **re-schedules it on every wake**, so a missed wake never ends the loop.
+`send_later` check-in of **45 minutes** and **re-schedules it on every wake**, so a missed wake never ends the loop
+(except while paused, §7.7.2, when the single resume reminder replaces it).
 
 **Without asking**, it may:
 * start workers for tasks the ready query lists (§4.3) and run review rounds (max 4 per batch, §6.2);
 * keep the state issue and the metrics comments current;
+* run the usage-limit pause and resume protocol (§7.7), including interrupting sessions and posting `PAUSED`/`RESUMED`;
 * open draft PRs, and spawn fix rounds, escalation respawns and status-sync sessions (§7.1);
 * close individual Dependabot PRs once the grouped Dependabot PR has merged (§7.5; §9 F6);
 * create issues for owner-only tasks (§4.5).
@@ -133,7 +135,7 @@ goes to comments, not the body.
   `get_session` → `lineage.depth`).
 * `Updated:` UTC timestamp of the last edit, and what triggered it.
 * `Tasks ref:` the git ref whose `docs/tasks.toml` is canonical (§4.2).
-* `Usage:` one line, `ok | near limit | paused until HH:MM UTC`, with when it was read (§7.7.1). The owner reads this line first.
+* `Usage:` one line, `ok | near limit (5-hour) | near limit (7-day) | paused until HH:MM UTC`, with when it was read (§7.7.1). The owner reads this line first.
 * **Sessions**: one row per live worker: id, role, tags, branch, **task ids** (the claims), spawned-at,
   expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived`).
 * **Branches**: one row per active branch: holder (session id or `none`),
@@ -548,6 +550,8 @@ handoff: <path to handoff file, or "none">
 Every worker's **last action** is a `send_message` to its spawning session with a compact one-line WORKER-RESULT (PR number,
 head SHA, what was done, checks run/skipped), so the orchestrator is woken without polling.
 
+Ignore a findings comment that still starts with `ROUND IN PROGRESS`: the round is not finished (§8.3), and its findings are partial.
+
 The orchestrator collects results in this order, from cheapest to most expensive:
 1. Read PR comments (durable, and visible to a successor too).
 2. `get_session` status bucket.
@@ -612,15 +616,25 @@ handle it without the owner asking (issue #60).
 
 **§7.7.1 Early warning (every wake, first step).** `get_session` on the orchestrator's own session (omit `session_id`) and read
 `external_metadata.rate_limit_info`: `status`, `rateLimitType`, `resetsAt` (epoch seconds; `date -u -d @<resetsAt>`) and
-`isUsingOverage`. Set the state issue's `Usage:` line (§3.1):
+`isUsingOverage`. Decide from **`rateLimitType` and `status` together**, never from `status` alone: a warning on the 7-day limit
+can be days from its reset and must not stop work. Observed live (2026-11-13): `status` `allowed` and `allowed_warning`,
+`rateLimitType` `five_hour` and `seven_day`, `isUsingOverage` false, `resetsAt` in epoch seconds. Any other `status` value (for
+example a rejected status) is from #60 and **not yet observed**. Set the state issue's `Usage:` line (§3.1):
 * **ok**: `status` is `allowed` and `isUsingOverage` is false.
-* **near limit**: `status` is anything other than `allowed`, or `isUsingOverage` is true, or one worker reported a limit failure (§7.7.3).
-  Then: **start no new worker and no review round**, let the running ones finish their current step, and set one extra check-in
-  about 10 minutes out. If the next look is still near limit, or any session failed on the limit, run the pause protocol (§7.7.2).
-  A brief warning that clears does not pause.
+* **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning` (or `isUsingOverage` is true). **Do not
+  pause.** Keep to the parallelism cap (§7.7.5) and block batched extras (no optional sessions, no several tasks started at once
+  beyond the cap); required work (ready tasks, review rounds for open PRs) goes on. Name the reset time in the `Usage:` line.
+* **near limit (5-hour)**: `rateLimitType` is `five_hour` and `status` is not `allowed`, or one worker reported a limit failure
+  (§7.7.3). **Start no new worker and no review round**, let the running ones finish their current step, and set one extra
+  check-in about 10 minutes out. If the next look still shows it, or any session failed on the limit, run the pause protocol
+  (§7.7.2). A 5-hour warning that clears does not pause.
+* **limit reached**: a `status` that says the limit is rejected or exhausted (any value other than `allowed` and `allowed_warning`, any
+  `rateLimitType`), or a limit failure (§7.7.3): run the pause protocol (§7.7.2) at once. For a `seven_day` limit the reset can be days
+  away: say so in the `PAUSED` comment and ask the owner whether to wait.
 * **paused until HH:MM UTC**: set by §7.7.2, cleared by §7.7.4.
 
-Cost is a forecast aid, not a trigger (§7.7.5). If `rate_limit_info` is missing, treat the state as `ok` but say so in the `Usage:` line.
+Cost can only raise a state to **near limit** (§7.7.5), never cause a pause. If `rate_limit_info` is missing, treat the state as `ok`
+but say so in the `Usage:` line.
 
 **§7.7.2 Pause protocol.** Run in this order, so that a limit hit in the middle still leaves a wake-up behind:
 1. **One resume reminder first.** `send_later` into the orchestrator session at `resetsAt + 5 minutes` (UTC, RFC3339), message:
@@ -642,8 +656,8 @@ Cost is a forecast aid, not a trigger (§7.7.5). If `rate_limit_info` is missing
 5. End the turn. While paused, do no spawning, no review rounds and no merge requests; owner questions already asked stay open.
 
 **§7.7.3 A limit failure is not a stall.** When a worker's `status_bucket` is failed, or a worker stalls, read its `get_session`:
-`post_turn_summary.status_detail` (the failed-turn summary reads "hit your 5-hour limit" for a limit failure). If it says so, or
-`rate_limit_info.status` is not `allowed` and the failure has no other cause on a targeted `list_events` read (`kinds: ["result"]`, §7.3):
+`post_turn_summary.status_detail` (the failed-turn summary reads "hit your 5-hour limit" for a limit failure; shape and text from #60, not yet observed). If it says so, or
+`rate_limit_info` shows a five-hour warning or a rejected status (§7.7.1) and the failure has no other cause on a targeted `list_events` read (`kinds: ["result"]`, §7.3):
 * it is a **limit failure**. It does **not** count toward the two-consecutive-failures stop rule (§1.1, §7.4), it is not a
   `dead-session`, there is **no respawn and no handoff-based replacement**; the worker resumes after the reset (§7.7.4);
 * log one `usage-limit` incident row (§6.3) for the pause, not one per session; start the pause protocol (§7.7.2) if not already paused;
@@ -665,14 +679,16 @@ Cost is a forecast aid, not a trigger (§7.7.5). If `rate_limit_info` is missing
 **§7.7.5 Spend control.** There is no dollar cap, but limits can be forecast and made less likely:
 * **Parallelism cap:** at most 3 worker sessions at once (§7.1), writers and reviewers together. Raise it only by editing this line
   in a reviewed PR, after the metrics show room.
-* **Fewer review sessions for small docs PRs:** when several docs-only PRs are ready (each about 100 changed lines or fewer, no
-  process file, no gate or threshold) one Opus reviewer session reviews them one after another in one session
-  (one round row and one findings comment per PR, §6.2). Gate, hook, guard, threshold and `risk:high` PRs always get their own reviewer.
+* **Fewer review sessions for small docs PRs. Pending a CLAUDE.md tooling change, not in effect until then:** CLAUDE.md says one
+  review round per reviewer session, so today every PR round has its own reviewer. Once CLAUDE.md allows it, one Opus reviewer
+  session may review several ready docs-only PRs (each about 100 changed lines or fewer, no process file, no gate or threshold) one
+  after another (one round row and one findings comment per PR, §6.2); gate, hook, guard, threshold and `risk:high` PRs would
+  always keep their own reviewer.
 * **Track cost per round and per window:** the session row (§6.1, reviewer sessions are one per round) carries `cost_usd`. Once
-  `scripts/agent_metrics.py` (M0.5-13) produces `docs/agent-metrics.csv`, sum it; until then sum the `metrics:session` comments.
+  `scripts/agent_metrics.py` (M0.5-13) has produced `docs/agent-metrics.csv`, sum it; for rounds not saved there yet sum the `metrics:session` comments.
   At each pause, put the cost of the sessions active in the closing window (summed from `get_session` usage, never estimated) in the
   `usage-limit` incident row's `impact`. Compare the running window cost with the last two such rows at every wake: when it passes the
-  smaller one, treat the state as **near limit** early (§7.7.1). The numbers are a rough forecast; `rate_limit_info` decides.
+  smaller one, set `Usage:` to **near limit (5-hour)** early (§7.7.1: no new workers, an extra check-in, never a pause by itself). The numbers are a rough forecast; `rate_limit_info` decides.
 
 ## 8. Spawn messages
 
@@ -719,7 +735,7 @@ recommendation). You may reproduce a problem in a throwaway branch or worktree t
 branch and that you delete afterwards.
 Write findings incrementally: post the one PR comment as soon as the first finding exists, starting with the line `ROUND IN PROGRESS`,
 and edit that same comment as findings accumulate (still ONE comment), so a usage-limit interruption (§7.7) loses nothing.
-When the round is done, remove that line. Post ONE PR comment: the REVIEW.md json block, then a WORKER-RESULT block
+When the round is done, remove that line: the final edit of that one comment holds the REVIEW.md json block, then a WORKER-RESULT block
 (docs/ORCHESTRATION.md §7.3). Orchestrator session: {orchestrator_session}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT.
 ```
 
