@@ -63,14 +63,28 @@ RULES = (
     Rule(
         "trust-by-role",
         ("orchestrator",),
-        (r"author_association", r"write or better", r"never a name"),
+        (r"author_association", r"write or better", r"never a name", r"counted, never quoted"),
         "trust is the repo role from API fields, never a name in text (D2)",
     ),
     Rule(
         "inbox-script",
         ("orchestrator",),
-        (r"scripts/collab_inbox\.py", r"every wake", r"7\.6"),
-        "the inbox is read with scripts/collab_inbox.py on every wake (ORCHESTRATION 7.6)",
+        (
+            r"scripts/collab_inbox\.py",
+            r"every wake",
+            r"7\.6",
+            r"--collaborators",
+            r"required if the repo moves to an organisation",
+            r"reviews of open prs",
+            r"the script filters by submitted_at",
+        ),
+        "the inbox is read with scripts/collab_inbox.py on every wake (ORCHESTRATION 7.6), with the documented flags",
+    ),
+    Rule(
+        "paused-wake",
+        ("orchestrator",),
+        (r"except while paused under §7\.7",),
+        "the every-wake inbox and accident check do not run while paused under the usage protocol (§7.7)",
     ),
     Rule(
         "inbox-cursor",
@@ -86,9 +100,19 @@ RULES = (
             r"merged_by",
             r"\[owner\]",
             r"foreign commit",
-            r"pause[^.]*tell the owner[^.]*never self-revert",
+            r"ask the owner.{0,120}never self-revert",
         ),
-        "the light accident check on every wake; a hit means pause, tell the owner, never self-revert",
+        "the light accident check on every wake; a hit means ask the owner, never self-revert",
+    ),
+    Rule(
+        "accident-not-usage-pause",
+        ("orchestrator",),
+        (
+            r"stop spawning and pushing on the affected PR and ask the owner",
+            r"this is not the §7\.7 usage pause",
+            r"the 45-min check-in stays",
+        ),
+        "an accident hit is not the §7.7 usage pause; the 45-minute check-in stays",
     ),
     Rule(
         "tiers",
@@ -109,6 +133,21 @@ RULES = (
         ("orchestrator",),
         (r"tier 2[^.]*code[^.]*tooling[^.]*docs/tasks\.toml[^.]*merges[^.]*closing owner issues",),
         "Tier 2 (code, tooling, tasks file, merges, closing owner issues) needs the owner",
+    ),
+    Rule(
+        "review-packet",
+        ("orchestrator",),
+        (
+            r"review packet[^.]*the owner and the collaborator together",
+            r"collaborator input is advisory[^.]*sign-off is owner only",
+        ),
+        "the M0.5-03 review packet goes to the owner and the collaborator together; input is advisory (D5)",
+    ),
+    Rule(
+        "tier-bullets-labels",
+        ("orchestrator",),
+        (r"tier 0, no ask:", r"tier 1, no ask:"),
+        "no never-apply label is named in the Tier 0 or Tier 1 bullets (only the never list may name them)",
     ),
     Rule(
         "signoff-owner-only",
@@ -136,7 +175,7 @@ RULES = (
     ),
     Rule(
         "worker-foreign-commits",
-        ("implementer",),
+        ("implementer", "planner"),
         (r"before each push", r"foreign commit", r"noreply@anthropic\.com", r"stop and report"),
         "check for foreign commits on the PR branch before each push; if any, stop and report",
     ),
@@ -162,6 +201,25 @@ def parse_label_list(text, line_pattern):
     return [x.strip().strip("`").lower() for x in m.group(1).split(",") if x.strip()]
 
 
+def tier_bullet_labels(text):
+    """Never-apply labels named in the Tier 0 and Tier 1 bullets (outside the label lists), as a sorted list."""
+    segments = []
+    m0 = re.search(r"tier 0, no ask:(.*?)never apply:", text, re.I)
+    if m0:
+        segments.append(m0.group(1))
+    m1 = re.search(r"never apply:[^.]*\.(.*?)tier 2 needs", text, re.I)
+    if m1:
+        segments.append(m1.group(1))
+    found = set()
+    for label in NEVER_LABELS:
+        token = label[:-1] if label.endswith("*") else label  # severity:* -> severity:
+        for seg in segments:
+            tail = "" if token.endswith(":") else r"(?![\w-])"
+            if re.search(r"(?<![\w-])" + re.escape(token) + tail, seg, re.I):
+                found.add(label)
+    return sorted(found)
+
+
 def check_text(role, text):
     """Problems for one prompt, as `<rule id>: <what is missing>` strings (empty if it passes)."""
     if role not in ROLES:
@@ -179,6 +237,10 @@ def check_text(role, text):
             if rule.id == "tier0-labels":
                 got = parse_label_list(norm, TIER0_LINE)
                 if got is None or sorted(got) != sorted(TIER0_LABELS):
+                    problems.append(f"{rule.id}: {rule.message}; found {got}")
+            elif rule.id == "tier-bullets-labels":
+                got = tier_bullet_labels(norm)
+                if got:
                     problems.append(f"{rule.id}: {rule.message}; found {got}")
             elif rule.id == "never-labels":
                 got = parse_label_list(norm, NEVER_LINE)

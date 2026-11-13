@@ -349,7 +349,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-16"]
-notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1. Review packet for the collaborator (docs/reviews/collaborator-workflow.md section 7): docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
+notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1. Review packet for the owner and the collaborator (same time), docs/reviews/collaborator-workflow.md section 7; collaborator input is advisory, sign-off is owner only: docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
 
 [[task]]
 id = "M0.5-04"

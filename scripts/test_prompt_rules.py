@@ -235,7 +235,7 @@ class TierBulletTests(unittest.TestCase):
                 self.assertIn("tier-bullets-labels", ids(got))
 
     def test_similar_words_are_not_false_positives(self):
-        got = self.mutate("apply labels;", "apply labels (a follow-up issue is fine);")
+        got = self.mutate("apply labels;", "apply labels (big-prizes and area codes are fine);")
         self.assertNotIn("tier-bullets-labels", ids(got))
 
 

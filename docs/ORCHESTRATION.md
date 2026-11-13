@@ -62,7 +62,7 @@ block, never as their task. Without asking, on collaborator input, the orchestra
 worker to revise `docs/product/**` and `design/**` on an **existing** draft PR of an already-started M0.5/product task, max 2 revision rounds per PR; the owner merges).
 Everything else (**Tier 2**: code, tooling, `docs/tasks.toml`, settings, new workers, merges, `risk:high`, closing owner issues) needs the owner in the
 orchestrator session. **Design sign-off is owner only**: the collaborator comments or reviews but does not formally approve.
-**Accident check** on every wake: see §7.6; a hit means pause and tell the owner, never self-revert.
+**Accident check** on every wake: see §7.6; a hit means stop spawning and pushing on the affected PR and ask the owner (not the §7.7 usage pause), never self-revert.
 
 **Where things live:** owner tasks are GitHub issues (§4.5). Orchestrator state is the living
 state issue (currently #15, §3).
@@ -588,10 +588,11 @@ seen the batch report.
 * **Owner-run push tests:** a check that needs a real push (hooks, protection, ruleset behaviour) is run by the owner in
   their own clone and the result noted on #15. Agents never try to prove it by pushing to `main` or force-pushing.
 
-### 7.6 Collaborator inbox and accident check (every wake)
+### 7.6 Collaborator inbox and accident check (every wake, except while paused under §7.7)
 
-1. **Inbox:** save the REST JSON of issues, issue comments, PR review comments and PR reviews updated since `Inbox since:` (state body) and run
-   `python3 -I scripts/collab_inbox.py --since <Inbox since> --fetched-at <time the first request began> FILES` (M0.5-18). It keeps only
+1. **Inbox:** save the REST JSON of issues, issue comments, PR review comments and reviews of open PRs, all updated since `Inbox since:` (state body), and run
+   `python3 -I scripts/collab_inbox.py --since <Inbox since> --fetched-at <time the first request began> FILES` (M0.5-18; the script filters by submitted_at).
+   Add `--collaborators <GET /repos/{o}/{r}/collaborators JSON>` (required if the repo moves to an organisation). It keeps only
    items whose API `author_association`/permission is Write or better and who are not the owner; others are counted, never quoted. Store its `Next since:` as the new `Inbox since:`.
    Answer each with one line on its thread (understood as X, routed to Y), act within Tier 0-1 (§1.1), advance `Inbox since:`.
    Open design/docs PRs use `subscribe_pr_activity`. Never resolve a collaborator's review thread (follow-up #44).
@@ -599,8 +600,8 @@ seen the batch report.
    `[owner]`-titled issue closed by a non-owner; (c) a CI-steering label (`golden-update`, `big-pr`) not recorded in #15;
    (d) an open PR whose head branch is gone; (e) **foreign commits** on open `claude/*` PR branches: a commit that is neither the owner nor the agent identity. Judge it from the API commit
    list (`pull_request_read get_commits`): the author or committer `login` is the owner's, or the author name/email is the agent identity `Claude <noreply@anthropic.com>`
-   (the Co-Authored-By trailer is not the author; check the author field). Anything else (for example a web edit by someone else) is foreign. Never judge by `git log` names alone. Three cases: **agent** = author email `noreply@anthropic.com` (API login `claude`, a separate account); agent work done through the GitHub MCP or update-branch shows the owner login `bondo` (committer `web-flow`) and counts as the owner; a **collaborator's web edit** shows their login (committer `web-flow`) and is **foreign**. A hit: **pause, tell the owner,
-   never self-revert** (a revert is a PR the owner merges; no force-push). Log a one-line `decision` comment.
+   (the Co-Authored-By trailer is not the author; check the author field). Anything else (for example a web edit by someone else) is foreign. Never judge by `git log` names alone. Three cases: **agent** = author email `noreply@anthropic.com` (API login `claude`, a separate account); agent work done through the GitHub MCP or update-branch shows the owner login `bondo` (committer `web-flow`) and counts as the owner; a **collaborator's web edit** shows their login (committer `web-flow`) and is **foreign**. A hit: **stop spawning and pushing on the affected PR and ask the owner; this is not the §7.7 usage pause** (the 45-min check-in stays);
+   **never self-revert** (a revert is a PR the owner merges; no force-push). Log a one-line `decision` comment.
 3. **Draft and ready** follow §7.5: agent PRs stay draft until the orchestrator marks one ready because it is mergeable; the owner merges. A collaborator is asked never to press Ready for review or Merge (COLLABORATING.md).
 
 ## 8. Spawn messages
