@@ -442,10 +442,11 @@ notes = "Normal env (Gradle files). Effort S. Owner decision D3 (logged on #15):
 id = "M0.5-11"
 title = "Konsist: no floating point in core/domain, no raw colors/dp in UI; network-blocking JUnit extension (P7, P13, P25)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-O11"]
+pr = 59
 notes = "Normal env. Effort S. Fallback if Konsist does not support Kotlin 2.4: a guards.sh grep (then tooling env)."
 
 [[task]]
@@ -502,10 +503,11 @@ depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", 
 id = "M0.5-27"
 title = "Status picture on the README: scripts render docs/tasks.toml plus PR and issue state to an SVG, a workflow pushes it to the status branch"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 71
 notes = "Tooling env, test-first (renderer, fetch, publisher and workflow wiring tests). The workflow has contents: write plus read scopes on its one job and only GITHUB_TOKEN; never pushes to main. Id 27 because M0.5-21..26 are taken or proposed on issue #65. Design and owner notes: docs/STATUS.md. Live test only after merge: run the status workflow by hand"
 
 [[task]]
