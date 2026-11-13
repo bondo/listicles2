@@ -288,6 +288,8 @@ RULES = (
             r"never edit or push the pr branch", r"report only", r"throwaway branch or worktree", r"never\s+pushed anywhere",
             r"deleted afterwards", r"severity, file:line, recommendation", r"untested changes", r"`area`", r"`recommend`",
             r"and tests without negative cases", r"you recommend and never decide",
+            r"re-check every deferral record you are given \(issue, decision, section 2 rules\)\.",
+            r"a deferral that breaks `docs/follow-ups\.md` §2, or lacks its issue or decision record, is itself a `major` finding \(area `process`\)",
         ),
         "reviewers never edit or push the PR branch, report findings with area and recommend, flag untested changes, never decide deferral",
     ),
@@ -304,6 +306,8 @@ RULES = (
             r"or on a `risk:high` task, without owner ok \(`owner-ok` label\)",
             r"then file the follow-up issue from `\.github/issue_template/follow-up\.md` with all its labels \(`target:<mx>` per §3\)",
             r"and record a `decision` comment on the state issue",
+            r"check that the returned issue carries every label; if one is missing, close it, keep the finding open, "
+            r"stop deferring and ask the owner to do m0-o10\.",
             r"the 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings",
             r"with more than 8 open follow-ups for one milestone: stop deferring and ask the owner",
             r"if everything above nit was deferred and no commit followed the reviewed range, "

@@ -41,6 +41,7 @@ Deferral (docs/FOLLOW-UPS.md §2, §4): you decide deferral, not the reviewer. D
 and a minor only if its fix is not small (more than about 15 changed lines or outside the PR's scope), the PR's own acceptance criteria and tests do not depend on it, and it is not a regression this PR introduced.
 Never defer a blocker; never defer a major, or a finding in the security-rules, sync-merge or release areas or on a `risk:high` task, without owner OK (`owner-ok` label).
 Then file the follow-up issue from `.github/ISSUE_TEMPLATE/follow-up.md` with all its labels (`target:<Mx>` per §3) and record a `decision` comment on the state issue.
+Check that the returned issue carries every label; if one is missing, close it, keep the finding open, stop deferring and ask the owner to do M0-O10.
 The 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings. With more than 8 open follow-ups for one milestone: stop deferring and ask the owner.
 If everything above nit was deferred and no commit followed the reviewed range, post `accepted: all findings above nit deferred (#a, #b)` (verdict `ready_deferred`).
 

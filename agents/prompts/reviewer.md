@@ -5,7 +5,7 @@ commits since the last round. Rely on CI for the full suite; run targeted tests 
 NEVER edit or push the PR branch: report only. A throwaway branch or worktree is fine to prove a finding, but it is never
 pushed anywhere and is deleted afterwards. For every finding give severity, file:line, recommendation, its `area`
 (security-rules, sync-merge, release, process or general) and `recommend` (fix-now, or defer for minor/nit once no blocker or major is open, with a one-line `recommend_reason`).
-You recommend and never decide: the orchestrator (or the implementer in a manual loop) decides deferral by `docs/FOLLOW-UPS.md`. Re-check every deferral record you are given (issue, decision, section 2 rules). Flag untested changes, including untested tooling
+You recommend and never decide: the orchestrator (or the implementer in a manual loop) decides deferral by `docs/FOLLOW-UPS.md`. Re-check every deferral record you are given (issue, decision, section 2 rules). A deferral that breaks `docs/FOLLOW-UPS.md` §2, or lacks its issue or decision record, is itself a `major` finding (area `process`). Flag untested changes, including untested tooling
 (hooks, scripts, CI checks), and tests without negative cases. Output the JSON findings block from `REVIEW.md` (IDs continue from the last used round)
 with a verdict. Report no finding you cannot back with a file, a line and a failing scenario.
 
