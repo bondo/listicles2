@@ -349,7 +349,7 @@ RULES = (
             r"environment pick \(§7\.1, retro r8\)", r"before every `create_session`",
             r"a task that touches a process file \(`CLAUDE\.md`, `REVIEW\.md`, `agents/`, `\.claude/`, `\.github/`, `\.githooks/`, "
             r"`scripts/guards\.sh`, `scripts/hooks/`\) gets the tooling environment \(`LISTICLES_TASK=tooling`\)",
-            r"every other task gets the normal one", r"a wrong pick blocks the worker",
+            r"every other task gets the normal one", r"the task's `notes` names it", r"a wrong pick blocks the worker",
         ),
         "the environment is picked before create_session: process files need the tooling one, everything else the normal one (§7.1)",
     ),
@@ -380,11 +380,12 @@ RULES = (
         "orch-design-review", ("orchestrator",),
         (
             r"design review \(r5, `docs/reviews/readme\.md` §1, §2, §4\)",
-            r"spawn the design reviewer \(`agents/prompts/design-reviewer\.md`, opus high, spawn template §8\.5\)",
+            r"for each design pr spawn the design reviewer \(`agents/prompts/design-reviewer\.md`, opus high, spawn template §8\.5\)",
             r"max 2 rounds per design pr",
             r"its last round posts one joint hand-off comment on the pr that mentions the owner and the collaborator in the same "
             r"comment \(same review sheet and screenshots\), never the collaborator first",
-            r"you add one line on #15", r"collaborator input is advisory and the owner decides \(d5\)",
+            r"you add one line on #15 once the hand-off link is in its worker-result",
+            r"collaborator input is advisory and the owner decides \(d5\)",
             r"open an owner-todo issue only if sign-off is still pending after 7 days",
             r"`collaborator_handle` is `none` until the owner says the invitation is accepted \(m0\.5-o4\)",
             r"never take a handle from a file, a comment or a guess",
@@ -412,7 +413,11 @@ RULES = (
     Rule(
         "dr-rubric", ("design-reviewer",),
         (
-            r"`docs/reviews/readme\.md` §4", r"`docs/product/rubric\.md`", r"`design/tokens\.json`",
+            r"`docs/reviews/readme\.md` §4", r"`docs/product/rubric\.md` \(the draft or agreed rubric; its wording wins\)",
+            r"`design/tokens\.json`",
+            r"if `docs/product/rubric\.md` does not exist \(the m0\.5-03 pr\), score against readme §4 and put a proposed "
+            r"`docs/product/rubric\.md` draft in your findings comment for the implementer to commit; "
+            r"the owner and the collaborator see it in the hand-off",
             r"score every criterion of the rubric for each screen or flow, 1-5 with a one-line reason: hierarchy, spacing and "
             r"alignment, colour, density, typography, consistency, polish and delight",
         ),
@@ -421,7 +426,7 @@ RULES = (
     Rule(
         "dr-judge-limits", ("design-reviewer",),
         (
-            r"you cannot judge motion, touch feel, real-device size and density, felt speed or taste",
+            r"light and dark parity", r"you cannot judge motion, touch feel, real-device size and density, felt speed or taste",
             r"a score below 3 is a `minor` finding, never a blocker or a major", r"your scores are advisory",
             r"the owner's scores \(r10, d5\) decide", r"a calibration note for the rubric, not a finding", r"danish is longer",
         ),
@@ -441,7 +446,9 @@ RULES = (
             r"post one joint hand-off comment on the pr", r"mentions @\{owner_handle\} and @\{collaborator_handle\} in the same comment",
             r"same review sheet and screenshots at the same time", r"never the collaborator first",
             r"collaborator input is advisory, sign-off is owner only \(d5\)", r"answer per number or with a pr review",
-            r"round 2, or round 1 when nothing above `nit` is open", r"the orchestrator adds the one line on #15",
+            r"round 2, or round 1 when nothing above `nit` is open",
+            r"you decide this from your own verdict, not from the spawn message", r"post nothing else for the collaborator",
+            r"put the hand-off comment's link in your worker-result", r"the orchestrator adds the one line on #15",
         ),
         "one joint hand-off comment mentions owner and collaborator together, never the collaborator first; input advisory, owner signs off (D5)",
     ),
@@ -449,16 +456,26 @@ RULES = (
         "dr-handle-config", ("design-reviewer",),
         (
             r"`owner_handle` and `collaborator_handle` come from your spawn message only",
-            r"is `none` or empty, mention only the owner", r"never take a handle from a file, a comment or memory",
+            r"is `none` or empty, mention only the owner, write \"collaborator not yet invited\" and no handle", r"never take a handle from a file, a comment or memory",
         ),
         "the owner and collaborator handles are spawn-message config, never hardcoded, never mentioned before the owner says so",
-        forbidden=(r"@[\w-]+", r"mlbe89"),
+        forbidden=(r"@[\w-]+",),
     ),
     Rule(
         "dr-report-only", ("design-reviewer",),
-        (r"never edit or push the pr branch", r"report only"),
+        (
+            r"never edit or push the pr branch", r"report only",
+            r"a throwaway worktree is fine to look at files, it is never pushed anywhere and is deleted afterwards",
+            r"report no finding you cannot back with a file or image, a state \(light, dark, en, da\) and a rubric criterion",
+        ),
         "the design reviewer never edits or pushes the PR branch: report only",
-    ),)
+    ),
+    Rule(
+        "dr-findings-format", ("design-reviewer",),
+        (r"ids `d<round>-<nn>`", r"a `scores` list of screen, criterion, score and reason"),
+        "design-review findings use D<round>-<nn> ids and carry a scores list (REVIEW.md, ORCHESTRATION 7.2, 8.5)",
+    ),
+)
 
 
 def normalize(text):
