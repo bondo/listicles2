@@ -35,6 +35,9 @@ step tasks-tests python3 -I scripts/test_tasks.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
 step collab-inbox-tests python3 -I scripts/test_collab_inbox.py
+step status-visual-tests python3 -I scripts/test_status_visual.py
+step status-publish-tests python3 -I scripts/test_status_publish.py
+step status-workflow-tests python3 -I scripts/test_status_workflow.py
 step prompt-rules-tests python3 -I scripts/test_prompt_rules.py
 step prompt-rules python3 -I scripts/prompt_rules.py
 step tasks-validate python3 -I scripts/tasks.py validate

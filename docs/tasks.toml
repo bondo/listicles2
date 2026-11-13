@@ -496,7 +496,17 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26", "M0.5-27"]
+
+[[task]]
+id = "M0.5-27"
+title = "Status picture on the README: scripts render docs/tasks.toml plus PR and issue state to an SVG, a workflow pushes it to the status branch"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "Tooling env, test-first (renderer, fetch, publisher and workflow wiring tests). The workflow has contents: write plus read scopes on its one job and only GITHUB_TOKEN; never pushes to main. Id 27 because M0.5-21..26 are taken or proposed on issue #65. Design and owner notes: docs/STATUS.md. Live test only after merge: run the status workflow by hand"
 
 [[task]]
 id = "M0.5-O1"
