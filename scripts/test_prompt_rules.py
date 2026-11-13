@@ -21,17 +21,7 @@ PROMPTS = ROOT / "agents" / "prompts"
 ROLES = ("orchestrator", "implementer", "reviewer", "planner")
 
 TIER0 = {"feedback", "idea", "decision", "needs-collaborator", "needs-owner"}
-NEVER = {
-    "golden-update",
-    "big-pr",
-    "owner-todo",
-    "orchestrator-state",
-    "follow-up",
-    "severity:*",
-    "target:*",
-    "owner-ok",
-    "area:*",
-}
+NEVER = set("golden-update big-pr owner-todo orchestrator-state follow-up severity:* target:* owner-ok area:*".split())
 
 
 def real(role):

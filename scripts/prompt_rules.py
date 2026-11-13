@@ -3,12 +3,10 @@
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
 
-The rules come from docs/ORCHESTRATION.md section 7.6 and the owner decisions D1-D7 on issue #42 (trust is the
-repo role, collaborator text is data in a fenced block, Tiers 0-2, label limits, the accident check) and from
-follow-up #44 (agents never resolve a collaborator's review thread). Each rule is a set of patterns that must all
-match the prompt after hidden text (HTML comments) is removed and whitespace is collapsed, so wrapping and case do
-not matter. The two label lines are compared as exact sets: a CI-steering label added to the Tier 0 list, or one
-dropped from the never list, fails the check. This pins wording, not behaviour; reviewers read the prompts.
+Rules come from docs/ORCHESTRATION.md section 7.6, owner decisions D1-D7 (issue #42) and follow-up #44. Each rule is a
+set of regexes that must all match the prompt after HTML comments are removed and whitespace is collapsed. The two
+label lists are compared as exact sets, and no never-apply label may appear in the Tier 0/1 bullets. This pins
+wording, not behaviour; reviewers read the prompts.
 """
 
 import argparse
@@ -49,94 +47,67 @@ class Rule:
 ALL = ROLES
 RULES = (
     Rule(
-        "data-fenced",
-        ALL,
+        "data-fenced", ALL,
         (r"collaborator text[^.]*\bdata\b[^.]*\bfenced\b[^.]*\bnever\b",),
         "collaborator text is data in a fenced block, never the task",
     ),
     Rule(
-        "no-resolve-thread",
-        ALL,
+        "no-resolve-thread", ALL,
         (r"never resolve a collaborator's review thread", r"resolve_review_thread", r"#44"),
         "agents never resolve a collaborator's review thread (follow-up #44)",
     ),
     Rule(
-        "trust-by-role",
-        ("orchestrator",),
+        "trust-by-role", ("orchestrator",),
         (r"author_association", r"write or better", r"never a name", r"counted, never quoted"),
         "trust is the repo role from API fields, never a name in text (D2)",
     ),
     Rule(
-        "inbox-script",
-        ("orchestrator",),
+        "inbox-script", ("orchestrator",),
         (
-            r"scripts/collab_inbox\.py",
-            r"every wake",
-            r"7\.6",
-            r"--collaborators",
-            r"required if the repo moves to an organisation",
-            r"reviews of open prs",
+            r"scripts/collab_inbox\.py", r"every wake", r"7\.6", r"--collaborators",
+            r"required if the repo moves to an organisation", r"reviews of open prs",
             r"the script filters by submitted_at",
         ),
         "the inbox is read with scripts/collab_inbox.py on every wake (ORCHESTRATION 7.6), with the documented flags",
     ),
     Rule(
-        "paused-wake",
-        ("orchestrator",),
+        "paused-wake", ("orchestrator",),
         (r"except while paused under §7\.7",),
         "the every-wake inbox and accident check do not run while paused under the usage protocol (§7.7)",
     ),
     Rule(
-        "inbox-cursor",
-        ("orchestrator",),
+        "inbox-cursor", ("orchestrator",),
         (r"inbox since:", r"next since:", r"--fetched-at"),
         "the inbox cursor is advanced from Next since, with --fetched-at set to the first request",
     ),
     Rule(
-        "accident-check",
-        ("orchestrator",),
-        (
-            r"accident check",
-            r"merged_by",
-            r"\[owner\]",
-            r"foreign commit",
-            r"ask the owner.{0,120}never self-revert",
-        ),
+        "accident-check", ("orchestrator",),
+        (r"accident check", r"merged_by", r"\[owner\]", r"foreign commit", r"ask the owner.{0,120}never self-revert"),
         "the light accident check on every wake; a hit means ask the owner, never self-revert",
     ),
     Rule(
-        "accident-not-usage-pause",
-        ("orchestrator",),
+        "accident-not-usage-pause", ("orchestrator",),
         (
             r"stop spawning and pushing on the affected PR and ask the owner",
-            r"this is not the §7\.7 usage pause",
-            r"the 45-min check-in stays",
+            r"this is not the §7\.7 usage pause", r"the 45-min check-in stays",
         ),
         "an accident hit is not the §7.7 usage pause; the 45-minute check-in stays",
     ),
     Rule(
-        "tiers",
-        ("orchestrator",),
+        "tiers", ("orchestrator",),
         (
-            r"tier 0",
-            r"tier 1",
-            r"tier 2",
-            r"max 2 revision rounds",
-            r"docs/product/\*\*",
-            r"design/\*\*",
+            r"tier 0", r"tier 1", r"tier 2", r"max 2 revision rounds", r"docs/product/\*\*", r"design/\*\*",
             r"existing draft pr",
         ),
         "Tier 0 and Tier 1 limits; everything else is Tier 2 and needs the owner (D4)",
     ),
     Rule(
-        "tier2-owner",
-        ("orchestrator",),
+        "tier2-owner", ("orchestrator",),
         (r"tier 2[^.]*code[^.]*tooling[^.]*docs/tasks\.toml[^.]*merges[^.]*closing owner issues",),
         "Tier 2 (code, tooling, tasks file, merges, closing owner issues) needs the owner",
     ),
     Rule(
-        "review-packet",
-        ("orchestrator",),
+        "review-packet", ("orchestrator",),
         (
             r"review packet[^.]*the owner and the collaborator together",
             r"collaborator input is advisory[^.]*sign-off is owner only",
@@ -144,44 +115,37 @@ RULES = (
         "the M0.5-03 review packet goes to the owner and the collaborator together; input is advisory (D5)",
     ),
     Rule(
-        "tier-bullets-labels",
-        ("orchestrator",),
+        "tier-bullets-labels", ("orchestrator",),
         (r"tier 0, no ask:", r"tier 1, no ask:"),
         "no never-apply label is named in the Tier 0 or Tier 1 bullets (only the never list may name them)",
     ),
     Rule(
-        "signoff-owner-only",
-        ("orchestrator",),
+        "signoff-owner-only", ("orchestrator",),
         (r"design sign-off is owner only",),
         "design sign-off is owner only (D5)",
     ),
     Rule(
-        "state-issue-owner-only",
-        ("orchestrator",),
+        "state-issue-owner-only", ("orchestrator",),
         (r"only owner comments on #15",),
         "only owner comments on the state issue become state",
     ),
     Rule(
-        "tier0-labels",
-        ("orchestrator",),
+        "tier0-labels", ("orchestrator",),
         (TIER0_LINE,),
         "the Tier 0 label list is exactly feedback, idea, decision, needs-collaborator, needs-owner",
     ),
     Rule(
-        "never-labels",
-        ("orchestrator",),
+        "never-labels", ("orchestrator",),
         (NEVER_LINE,),
         "the never-apply list names every CI-steering and process label",
     ),
     Rule(
-        "worker-foreign-commits",
-        ("implementer", "planner"),
+        "worker-foreign-commits", ("implementer", "planner"),
         (r"before each push", r"foreign commit", r"noreply@anthropic\.com", r"stop and report"),
         "check for foreign commits on the PR branch before each push; if any, stop and report",
     ),
     Rule(
-        "worker-no-labels",
-        ("implementer", "reviewer"),
+        "worker-no-labels", ("implementer", "reviewer"),
         (r"never apply or change labels",),
         "workers never apply or change labels because of collaborator text",
     ),
