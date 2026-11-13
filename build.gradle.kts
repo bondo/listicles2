@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.spotless)
     alias(libs.plugins.kover)
+    alias(libs.plugins.licensee) apply false
 }
 
 spotless {
@@ -137,3 +138,101 @@ subprojects {
         )
     }
 }
+
+// M0.5-10: the licensee policy (config/licensee/policy.gradle.kts) is tested against a fixture build whose
+// artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's
+// allowlist and fail, naming the artifact, for any other licence. Wired into detekt, so verify.sh and CI run it.
+// A case is one string, "name|deps|approved|pass or fail|text the output must contain", so the task stays
+// configuration-cache friendly (no script object references).
+fun licenseeCase(
+    name: String,
+    deps: String,
+    approved: String = "",
+    passes: Boolean,
+    message: String = "",
+) = listOf(name, deps, approved, if (passes) "pass" else "fail", message).joinToString("|")
+
+val testLicenseeGate =
+    tasks.register("testLicenseeGate") {
+        group = "verification"
+        description = "Runs the licensee policy against fixture artifacts with allowed and disallowed licences."
+        val fixture = layout.projectDirectory.dir("config/licensee/fixture").asFile
+        val wrapper = layout.projectDirectory.file("gradlew").asFile
+        val pluginVersion = libs.versions.licensee.get()
+        inputs.dir(layout.projectDirectory.dir("config/licensee"))
+        val marker = layout.buildDirectory.file("licensee-gate.ok")
+        outputs.file(marker)
+        val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
+        val cases =
+            listOf(
+                licenseeCase("allowed SPDX ids", allowed, passes = true),
+                licenseeCase("google terms, listed artifact", "fixture:google-a:1.0", "approved-a1.txt", passes = true),
+                licenseeCase("google terms, not listed", "fixture:google-a:1.0", passes = false, message = "google-a"),
+                licenseeCase(
+                    "google terms, other artifact",
+                    "fixture:google-b:1.0",
+                    "approved-a1.txt",
+                    passes = false,
+                    message = "google-b",
+                ),
+                licenseeCase(
+                    "google terms, other version",
+                    "fixture:google-a:2.0",
+                    "approved-a1.txt",
+                    passes = false,
+                    message = "google-a",
+                ),
+                licenseeCase(
+                    "listed entry without reason",
+                    "fixture:google-a:1.0",
+                    "approved-no-reason.txt",
+                    passes = false,
+                    message = "reason",
+                ),
+                licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl3"),
+            ) +
+                listOf("gpl3", "lgpl21", "agpl3", "epl2", "mpl2", "proprietary", "nolicense").map {
+                    licenseeCase("disallowed licence: $it", "fixture:$it:1.0", passes = false, message = it)
+                }
+
+        doLast {
+            val problems = mutableListOf<String>()
+            for (line in cases) {
+                val (name, deps, approved, expected, message) = line.split('|')
+                val passes = expected == "pass"
+                val command =
+                    mutableListOf(
+                        wrapper.path,
+                        "-q",
+                        "--console=plain",
+                        "--no-daemon",
+                        "-p",
+                        fixture.path,
+                        "-Dlicensee.version=$pluginVersion",
+                        "-Pdeps=$deps",
+                    )
+                if (approved.isNotEmpty()) command += "-Papproved=$approved"
+                command += "licensee"
+                var out = ""
+                var code = 0
+                // Retry only Maven 429 (rate limit), so a throttled plugin download is not read as a result.
+                for (attempt in 1..5) {
+                    val process = ProcessBuilder(command).directory(fixture).redirectErrorStream(true).start()
+                    out = process.inputStream.bufferedReader().readText()
+                    code = process.waitFor()
+                    if (!(out.contains("429") && out.contains("Too Many Requests")) || attempt == 5) break
+                    Thread.sleep(10_000L * attempt)
+                }
+                val ok = (code == 0) == passes && out.contains(message)
+                if (!ok) {
+                    val shown = out.lines().filter { it.isNotBlank() && !it.startsWith("Picked up") }.take(8)
+                    problems += "$name: expected $expected, exit $code\n" +
+                        shown.joinToString("\n") { "    $it" }
+                }
+            }
+            check(
+                problems.isEmpty(),
+            ) { "licensee gate: ${problems.size} case(s) wrong:\n" + problems.joinToString("\n") }
+            marker.get().asFile.writeText("ok\n")
+        }
+    }
