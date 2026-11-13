@@ -230,17 +230,18 @@ RULES = (
     ),
     Rule(
         "no-stale-state-files", ("orchestrator",),
-        (r"the state issue",),
+        (r"keep the state issue current",),
         "state lives in the state issue and the handover comment, never in docs/status.md or handoff/orchestrator.md (ORCHESTRATION 2, 5)",
         forbidden=(r"docs/status\.md", r"handoff/orchestrator\.md"),
     ),
     Rule(
         "autonomy", ("orchestrator",),
         (
-            r"autonomy \(§1\.1\)", r"unattended until usage limits stop you", r"without asking",
+            r"autonomy \(§1\.1\)", r"unattended until usage limits stop you", r"without asking:",
             r"stop and ask the owner, one question at a time with a recommendation",
-            r"merges", r"4-round cap", r"`risk:high` work", r"repository settings", r"licence and permission",
-            r"a relayed approval is refused", r"two consecutive worker sessions fail or stall",
+            r"for: merges of any pr;", r"the 4-round cap being hit", r"`risk:high` work before starting it",
+            r"repository settings and visibility", r"licence and permission acceptances",
+            r"and a relayed approval is refused", r"two consecutive worker sessions fail or stall \(§7\.4\)",
             r"`big-pr` label is set only with the owner's say-so",
         ),
         "autonomy rules: what the orchestrator does unasked, what it asks the owner, no relayed approvals, the stop condition (§1.1)",
@@ -253,7 +254,7 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\)", r"about 50% context", r"batch boundary", r"§5\.1", r"§5\.2",
+            r"handover \(§5, two-phase\)", r"at about 50% context", r"batch boundary", r"run §5\.1", r"a successor does §5\.2",
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
@@ -262,20 +263,21 @@ RULES = (
     Rule(
         "lock-takeover", ("orchestrator",),
         (
-            r"lock check, first thing on every wake \(§5\.3\)", r"`lock-lost`", r"lowest id", r"`delete_trigger` the triggers you created",
-            r"`takeover`", r"90 minutes", r"stalled", r"ask the owner",
+            r"lock check, first thing on every wake \(§5\.3\)", r"post `lock-lost`", r"the lowest id after the latest `handover`",
+            r"`delete_trigger` the triggers you created", r"post `takeover` with the evidence", r"older than 90 minutes",
+            r"and `get_session` shows it is not working", r"is stalled, not dead", r"and if nothing follows, ask the owner",
         ),
         "lock check on every wake, lock-lost when another claim wins, takeover only when the holder is presumed dead (§5.3)",
     ),
     Rule(
         "impl-test-first", ("implementer",),
-        (r"failing test first", r"negative cases", r"`scripts/verify\.sh`", r"tooling", r"reviewers flag untested changes"),
+        (r"failing test first", r"negative cases", r"wired into `scripts/verify\.sh`/ci", r"tooling", r"reviewers flag untested changes"),
         "test-first for all code including tooling: failing test first, negative cases, wired into verify.sh/CI (ORCHESTRATION 2.0)",
     ),
     Rule(
         "impl-done-on-tasks-ref", ("implementer",),
         (
-            r"`status = \"done\"`", r"`docs/tasks\.toml`", r"tasks ref", r"§4\.4", r"leave it `todo`",
+            r"`status = \"done\"`", r"`docs/tasks\.toml`", r"on the tasks ref, usually in the final commit", r"§4\.4", r"leave it `todo`",
             r"never on another branch's copy",
         ),
         "done goes on the tasks ref in the PR that delivers the task; a PR on the tasks ref leaves it todo (§4.4)",
@@ -285,9 +287,29 @@ RULES = (
         (
             r"never edit or push the pr branch", r"report only", r"throwaway branch or worktree", r"never\s+pushed anywhere",
             r"deleted afterwards", r"severity, file:line, recommendation", r"untested changes", r"`area`", r"`recommend`",
-            r"never decide",
+            r"and tests without negative cases", r"you recommend and never decide",
         ),
         "reviewers never edit or push the PR branch, report findings with area and recommend, flag untested changes, never decide deferral",
+    ),
+    Rule(
+        "orch-deferral", ("orchestrator",),
+        (
+            r"deferral \(docs/follow-ups\.md §2, §4\)", r"you decide deferral, not the reviewer", r"`\.github/issue_template/follow-up\.md`",
+            r"record a `decision` comment", r"never defer a blocker;",
+            r"or a finding in the security-rules, sync-merge or release areas or on a `risk:high` task, without owner ok \(`owner-ok` label\)",
+            r"more than 8 open follow-ups for one milestone: stop deferring and ask the owner",
+        ),
+        "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: never blockers, never majors or protected areas without owner OK, limit 8 per milestone",
+    ),
+    Rule(
+        "impl-deferral", ("implementer",),
+        (
+            r"deferral \(docs/follow-ups\.md §4\)", r"you recommend, you do not decide",
+            r"propose each deferral in your worker-result", r"only in a manual loop with no orchestrator",
+            r"never defer a blocker, a major, or any finding in the security-rules, sync-merge or release areas or on a `risk:high` task without owner ok",
+            r"put that question in `needs_owner` of your worker-result",
+        ),
+        "implementers propose deferrals in WORKER-RESULT and decide only in a manual loop; never blockers, majors or protected areas without owner OK",
     ),
     Rule(
         "worker-foreign-commits", ("implementer", "planner"),
