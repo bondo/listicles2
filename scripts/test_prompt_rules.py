@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import prompt_rules  # noqa: E402  # justified: must follow the sys.path insert above
+import tasks
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPTS = ROOT / "agents" / "prompts"
@@ -269,8 +270,6 @@ class M025Tests(unittest.TestCase):
             self.assert_fails("orchestrator", "r10-owner-todo", old, new)
 
     def test_r10_title_cannot_complete_a_task(self):  # R1-02: scripts/tasks.py maps `[owner] <id>` titles to task ids
-        import tasks  # noqa: PLC0415  # justified: scripts/ is on sys.path (inserted above); only this test needs it
-
         title = "[owner] R10-M2: device notes"
         m = tasks.OWNER_TITLE.match(title)
         self.assertIsNotNone(m)
@@ -282,10 +281,13 @@ class M025Tests(unittest.TestCase):
         self.assertNotRegex(prompt_rules.normalize(real("orchestrator")), r"; [A-Z][a-z]")
 
     def test_m025_row_is_done_in_tasks_toml(self):  # R1-01: ORCHESTRATION 4.4, the PR that finishes a task sets it done
-        import tasks  # noqa: PLC0415  # justified: scripts/ is on sys.path (inserted above); only this test needs it
-
         row = tasks.parse((ROOT / "docs" / "tasks.toml").read_text(encoding="utf-8")).by_id["M0.5-25"]
         self.assertEqual(row.status, "done")
+
+    def test_no_new_suppression_in_this_file(self):  # R2-02: only the sys.path E402 one, which carries its reason
+        marks = [ln for ln in Path(__file__).read_text(encoding="utf-8").splitlines() if re.search(r"#\s*no" + "qa", ln)]
+        self.assertEqual(len(marks), 1, marks)
+        self.assertIn("justified:", marks[0])
 
     def test_usage_resume_weakened(self):  # R1-03
         for old, new in (
@@ -293,14 +295,18 @@ class M025Tests(unittest.TestCase):
             ("`send_later` again at the new reset time plus 5 minutes", "x"),
             ("delete the spent reminder and stop", "delete the spent reminder"),
             ("resume implementers before reviewers", "resume reviewers first"),
-            ("re-arm the 45-minute check-in", "x"),
+            ("re-arm the 45-minute check-in", "x"), ("post one line", "x"),
+            ("a session that has gone is a normal dead worker (§7.4): respawn it from `handoff/<branch>.md`", "x"),
+            ("respawn it from `handoff/<branch>.md`", "leave it"),
         ):
             self.assert_fails("orchestrator", "usage-resume", old, new)
 
     def test_usage_read_unknown_type_and_overage_weakened(self):  # R1-03
         for old, new in (
             ("an unknown or missing `rateLimitType` counts as 5-hour", "an unknown `rateLimitType` counts as ok"),
-            ("`isUsingOverage` is true, near limit (overage), never pauses", "`isUsingOverage` is true, pause"),
+            ("`isUsingOverage` is true the state is near limit (overage): it never pauses either (same cap, no batched extras)",
+             "`isUsingOverage` is true the state is near limit (overage): pause"),
+            ("never pauses either (same cap, no batched extras)", "never pauses either"),
         ):
             self.assert_fails("orchestrator", "usage-read", old, new)
 
