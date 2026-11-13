@@ -1,5 +1,5 @@
 # Paths that docs mention but that do not exist (yet). Checked by scripts/docs_check.py (M0.5-12).
-# Format: `path  # reason`. A reason is required. An entry is stale, and fails the check, once the path exists
+# Format: `path  # reason` or `path @file @file  # reason` (scoped). A reason is required. An entry is stale, and fails the check, once the path exists
 # or no doc mentions it any more: delete it then. Paths are relative to the repository root.
 
 # Planned: owned by a task in docs/tasks.toml.
@@ -10,11 +10,12 @@ design/tokens.json  # planned: emitted by M0.5-03, consumed by M1-04
 agents/prompts/design-reviewer.md  # planned: design-reviewer prompt, M0.5-15
 scripts/screenshots.sh  # planned: Roborazzi screenshots, M1
 docs/agent-tuning.md  # planned: end-of-M0.5 retro output (docs/reviews/README.md R6, PLAN section 9.4)
-.github/ISSUE_TEMPLATE/follow-up.md  # planned: FOLLOW-UPS.md section 8, with the follow-up labels (M0-O10)
 docs/milestones/Mx.md  # placeholder: the planner writes docs/milestones/M1.md and so on (M1-01)
 
-# Named as absent on purpose (stale names the docs warn about, or things decided against).
-docs/status.md  # stale name that older role prompts still use; ORCHESTRATION section 2 and F14 say it is gone
-handoff/orchestrator.md  # stale name; the orchestrator hand-over note is a state-issue comment (ORCHESTRATION section 5)
-.github/collaborators.toml  # decided against (D2): trust is the GitHub repo role only
-scripts/agent-metrics  # review quotes it as a PLAN 5.4 gate that does not exist; the real script is scripts/agent_metrics.py
+# Named as absent on purpose (stale names the docs warn about, or things decided against). Scoped with @file: only those
+# files may mention them, so a new mention anywhere else (a role prompt, say) still fails.
+docs/status.md @docs/ORCHESTRATION.md @docs/reviews/m0-process-tooling-review.md  # stale name that older role prompts still use; ORCHESTRATION section 2 and F14 say it is gone
+handoff/orchestrator.md @docs/ORCHESTRATION.md @docs/reviews/m0-process-tooling-review.md  # stale name; the orchestrator hand-over note is a state-issue comment (ORCHESTRATION section 5)
+.github/collaborators.toml @docs/reviews/collaborator-workflow.md  # decided against (D2): trust is the GitHub repo role only
+scripts/agent-metrics @docs/reviews/m0-process-tooling-review.md  # review quotes it as a PLAN 5.4 gate that does not exist; the real script is scripts/agent_metrics.py
+path/File.kt @.github/ISSUE_TEMPLATE/follow-up.md  # placeholder file name in the follow-up issue template
