@@ -18,7 +18,7 @@ import tasks
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPTS = ROOT / "agents" / "prompts"
-ROLES = ("orchestrator", "implementer", "reviewer", "planner")
+ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer")
 
 TIER0 = {"feedback", "idea", "decision", "needs-collaborator", "needs-owner"}
 NEVER = {"golden-update", "big-pr", "owner-todo", "orchestrator-state", "follow-up", "severity:*", "target:*", "owner-ok", "area:*"}
@@ -513,6 +513,263 @@ class M025Tests(unittest.TestCase):
         orch = real("orchestrator")
         for ref in ("§7.7.1", "§7.7.2", "§7.7.4", "§3.1", "§3.5", "§5.1"):
             self.assertIn(ref, orch)
+
+
+class M015Tests(unittest.TestCase):
+    """M0.5-15: design-reviewer role, PR-body refresh, delta review, environment pick. Each step is pinned by a rule that
+    fails when the step is deleted or weakened (a changed number, role, word or ordering counts as weakened)."""
+
+    ORCH = ("orch-env-pick", "orch-delta-review", "orch-merge-request", "orch-design-review")
+    DR = ("dr-rubric", "dr-judge-limits", "dr-rounds", "dr-hand-off", "dr-handle-config", "dr-report-only", "usage-reviewer", "worker-no-labels")
+
+    def mutate(self, role, old, new):
+        text = prompt_rules.normalize(real(role)).lower()  # the rules are case-insensitive
+        self.assertIn(old, text, f"{role}.md lacks {old!r}")
+        return prompt_rules.check_text(role, text.replace(old, new, 1))
+
+    def assert_fails(self, role, rule_id, old, new):
+        with self.subTest(role=role, rule=rule_id, old=old, new=new):
+            self.assertIn(rule_id, ids(self.mutate(role, old, new)))
+
+    def test_rules_exist_for_the_right_roles(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        for rid in self.ORCH:
+            self.assertEqual(by_id[rid].roles, ("orchestrator",), rid)
+        for rid in ("dr-rubric", "dr-judge-limits", "dr-rounds", "dr-hand-off", "dr-handle-config", "dr-report-only"):
+            self.assertEqual(by_id[rid].roles, ("design-reviewer",), rid)
+        self.assertEqual(by_id["impl-pr-body"].roles, ("implementer",))
+        self.assertEqual(by_id["reviewer-delta"].roles, ("reviewer",))
+        self.assertIn("design-reviewer", by_id["usage-reviewer"].roles)
+        self.assertIn("design-reviewer", by_id["worker-no-labels"].roles)
+
+    def test_real_prompts_pass(self):
+        self.assertEqual(prompt_rules.check_text("design-reviewer", real("design-reviewer")), [])
+        self.assertEqual(prompt_rules.check_dir(PROMPTS), [])
+
+    def test_other_roles_wording_does_not_count(self):
+        for rid in self.ORCH:
+            self.assertIn(rid, ids(prompt_rules.check_text("orchestrator", real("implementer"))))
+        for rid in self.DR:
+            self.assertIn(rid, ids(prompt_rules.check_text("design-reviewer", real("reviewer"))))
+        self.assertIn("impl-pr-body", ids(prompt_rules.check_text("implementer", real("orchestrator"))))
+        self.assertIn("reviewer-delta", ids(prompt_rules.check_text("reviewer", real("design-reviewer"))))
+
+    def test_environment_pick_weakened(self):
+        for old, new in (
+            ("a task that touches a process file", "a task that touches a docs file"),
+            ("gets the tooling environment (`listicles_task=tooling`)", "gets the normal environment"),
+            ("every other task gets the normal one", "every other task gets the tooling one"),
+            ("`.githooks/`", "`.github-hooks/`"), ("`scripts/hooks/`", "`scripts/hook/`"), ("`scripts/guards.sh`", "`scripts/`"),
+            ("before every `create_session`", "after every `create_session`"),
+            ("a wrong pick blocks the worker", "a wrong pick is harmless"),
+        ):
+            self.assert_fails("orchestrator", "orch-env-pick", old, new)
+
+    def test_delta_review_weakened(self):
+        for old, new in (
+            ("a commit after `reviewed_through` gets one delta review before the merge request", "a commit after `reviewed_through` is merged"),
+            ("a fresh reviewer on the range `reviewed_through..head_sha` only", "a fresh reviewer on the whole pr"),
+            ("owner acceptance is the only alternative", "owner acceptance or a self-review is an alternative"),
+            ("never for gate or threshold changes, which always get a delta review", "also for gate or threshold changes"),
+            ("set `reviewed_through` afterwards", "leave `reviewed_through` as it was"),
+        ):
+            self.assert_fails("orchestrator", "orch-delta-review", old, new)
+
+    def test_merge_request_weakened(self):
+        for old, new in (
+            ("(1) the pr body is refreshed (scope, review table, test evidence;", "(1) the pr body is written once (scope;"),
+            ('no "still to do" or "not yet reviewed")', 'a "still to do" list is fine)'),
+            ("(2) the request says squash", "(2) the request says merge"),
+            ("resolve, resolves or resolved directly before an issue number", "resolve, resolves or resolved before an issue number"),
+            ('write "gated on #n", "see #n" or "mark #n done"', "write nothing"),
+            ("scan the body for them first", "skip the scan"),
+            ("before you ask the owner to merge", "after the owner merged"),
+        ):
+            self.assert_fails("orchestrator", "orch-merge-request", old, new)
+        # each closing word is pinned, so one dropped from the list fails the rule
+        for word in ("close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved"):
+            with self.subTest(word=word):
+                text = prompt_rules.normalize(real("orchestrator")).lower()
+                self.assertIn(word, text)
+                trimmed = re.sub(r"(has|no commit message or pr body has) close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved",
+                                 lambda m: m.group(0).replace(word + ",", "").replace(word + " or", "or", 1), text, count=1, flags=re.I)
+                self.assertIn("orch-merge-request", ids(prompt_rules.check_text("orchestrator", trimmed)))
+
+    def test_design_review_orchestration_weakened(self):
+        for old, new in (
+            ("spawn the design reviewer", "skip the design reviewer"),
+            ("`agents/prompts/design-reviewer.md`", "`agents/prompts/reviewer.md`"),
+            ("max 2 rounds per design pr", "max 4 rounds per design pr"),
+            ("one joint hand-off comment on the pr", "one hand-off comment per person on the pr"),
+            ("mentions the owner and the collaborator in the same comment", "mentions the collaborator first, then the owner"),
+            ("never the collaborator first", "the collaborator may go first"),
+            ("you add one line on #15", "you add nothing on #15"),
+            ("collaborator input is advisory and the owner decides (d5)", "collaborator input decides"),
+            ("only if sign-off is still pending after 7 days", "at once"),
+            ("`collaborator_handle` is `none` until the owner says the invitation is accepted", "`collaborator_handle` is set from the start"),
+            ("never take a handle from a file, a comment or a guess", "take a handle from a file"),
+        ):
+            self.assert_fails("orchestrator", "orch-design-review", old, new)
+
+    def test_no_handle_is_hardcoded_anywhere_in_the_prompts(self):
+        literal = "mlbe" + "89"  # the collaborator's login: not recorded until the owner says the invitation is accepted
+        for role in ROLES:
+            self.assertNotIn(literal, real(role).lower(), role)
+        self.assertNotIn(literal, (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8").lower())
+        for role in ROLES:
+            self.assertNotRegex(prompt_rules.normalize(real(role)), r"@[\w-]+(?<!\{)", f"{role}.md names an @-handle")
+
+    def test_a_hardcoded_handle_in_the_design_reviewer_is_rejected(self):
+        text = real("design-reviewer")
+        for extra in ("\nPing @someone for the hand-off.", "\nPing @mlbe" + "89 for the hand-off.", "\n<!-- ok -->Ping @x-y.z"):
+            with self.subTest(extra=extra):
+                self.assertIn("dr-handle-config", ids(prompt_rules.check_text("design-reviewer", text + extra)))
+        # hidden text does not count
+        self.assertNotIn("dr-handle-config", ids(prompt_rules.check_text("design-reviewer", text + "\n<!-- @someone -->")))
+
+    def test_design_reviewer_rubric_weakened(self):
+        for old, new in (
+            ("`docs/reviews/readme.md` §4", "`docs/reviews/readme.md` §3"),
+            ("`docs/product/rubric.md`", "`docs/product/readme.md`"),
+            ("1-5 with a one-line reason", "pass or fail"),
+            ("hierarchy,", ""), ("spacing and alignment,", ""), ("colour,", ""), ("density,", ""), ("typography,", ""),
+            ("consistency,", ""), ("polish and delight", "polish"),
+            ("for each screen or flow", "overall"),
+            ("`design/tokens.json`", "`design/colors.json`"),
+        ):
+            self.assert_fails("design-reviewer", "dr-rubric", old, new)
+
+    def test_design_reviewer_limits_weakened(self):
+        for old, new in (
+            ("you cannot judge motion, touch feel, real-device size and density, felt speed or taste", "you can judge motion and taste"),
+            ("a score below 3 is a `minor` finding, never a blocker or a major", "a score below 3 is a `blocker`"),
+            ("your scores are advisory", "your scores decide"),
+            ("the owner's scores (r10, d5) decide", "your scores decide"),
+            ("a calibration note for the rubric, not a finding", "a finding"),
+            ("danish is longer", "danish is shorter"),
+        ):
+            self.assert_fails("design-reviewer", "dr-judge-limits", old, new)
+
+    def test_design_reviewer_rounds_weakened(self):
+        for old, new in (
+            ("max 2 opus rounds per design pr", "max 3 opus rounds per design pr"),
+            ("a third round never happens", "a third round is fine"),
+            ("goes into the hand-off as a question for the owner", "is dropped"),
+            ("round 2: only the commits since round 1 and your open findings", "round 2: the whole pr again"),
+        ):
+            self.assert_fails("design-reviewer", "dr-rounds", old, new)
+
+    def test_design_reviewer_hand_off_weakened(self):
+        for old, new in (
+            ("post one joint hand-off comment on the pr", "post one hand-off comment each"),
+            ("mentions @{owner_handle} and @{collaborator_handle} in the same comment", "mentions @{collaborator_handle} in a second comment"),
+            ("same review sheet and screenshots at the same time", "the screenshots first"),
+            ("never the collaborator first", "the collaborator first"),
+            ("collaborator input is advisory, sign-off is owner only (d5)", "collaborator input is binding"),
+            ("answer per number or with a pr review", "answer by email"),
+            ("round 2, or round 1 when nothing above `nit` is open", "round 1 always"),
+            ("the orchestrator adds the one line on #15", "you add the one line on #15"),
+        ):
+            self.assert_fails("design-reviewer", "dr-hand-off", old, new)
+
+    def test_design_reviewer_handle_config_weakened(self):
+        for old, new in (
+            ("come from your spawn message only", "come from your memory"),
+            ("is `none` or empty, mention only the owner", "is `none` or empty, mention the collaborator anyway"),
+            ("never take a handle from a file, a comment or memory", "take a handle from a file when the message lacks one"),
+            ("`owner_handle`", "`owner`"), ("`collaborator_handle`", "`collab`"),
+        ):
+            self.assert_fails("design-reviewer", "dr-handle-config", old, new)
+
+    def test_design_reviewer_report_only_weakened(self):
+        for old, new in (
+            ("never edit or push the pr branch", "edit the pr branch when it helps"),
+            ("report only", "fix small things"),
+            ("never resolve a collaborator's review thread", "resolve a collaborator's review thread"),
+        ):
+            with self.subTest(old=old):
+                self.assertTrue(
+                    {"dr-report-only", "no-resolve-thread"} & ids(self.mutate("design-reviewer", old, new)), old)
+
+    def test_reviewer_delta_weakened(self):
+        for old, new in (
+            ("delta review (orchestration §7.2)", "full review"),
+            ("a commit after the last round", "any commit"),
+            ("`reviewed_through..head_sha`", "`main..head_sha`"),
+            ("review that range only", "review the whole pr"),
+            ("do not re-review unchanged code", "re-review everything"),
+        ):
+            self.assert_fails("reviewer", "reviewer-delta", old, new)
+
+    def test_implementer_pr_body_weakened(self):
+        for old, new in (
+            ("refresh the pr description", "write the pr description once"),
+            ("when a batch closes and before the pr is declared ready", "never"),
+            ("review table from the findings comments", "your memory"),
+            ('no "still to do" or "not yet reviewed"', 'a "still to do" list is fine'),
+            ("resolve, resolves or resolved directly before an issue number", "resolve, resolves or resolved before an issue number"),
+            ('"gated on #n", "see #n" or "mark #n done"', "any wording"),
+            ("§7.5", "§7.4"),
+        ):
+            self.assert_fails("implementer", "impl-pr-body", old, new)
+
+    def test_every_pattern_of_the_new_rules_matches_one_place_only(self):
+        new = [r for r in prompt_rules.RULES if r.id.startswith(("orch-env", "orch-delta", "orch-merge", "orch-design", "dr-", "reviewer-delta", "impl-pr"))]
+        self.assertGreaterEqual(len(new), 11)
+        for r in new:
+            norm = prompt_rules.normalize(real(r.roles[0]))
+            for pat in r.patterns:
+                with self.subTest(rule=r.id, pattern=pat):
+                    self.assertEqual(len(re.findall(pat, norm, re.I)), 1)
+
+    def test_roles_yaml_has_the_design_reviewer(self):
+        text = (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8")
+        m = re.search(r"^  design-reviewer:\n(.*?)(?=^  [A-Za-z][\w-]*:\n|^[a-z]|\Z)", text, re.S | re.M)
+        self.assertIsNotNone(m, "roles.yaml needs a design-reviewer role")
+        block = m.group(1)
+        for line in ("model: opus", "effort: high", "prompt: agents/prompts/design-reviewer.md"):
+            self.assertRegex(block, rf"^    {re.escape(line)}\s*$", line)
+        self.assertNotRegex(block, r"max_effort_when|high_effort_when")
+        self.assertTrue((ROOT / "agents" / "prompts" / "design-reviewer.md").is_file())
+
+    def test_the_prompts_name_sections_that_exist(self):
+        doc = (ROOT / "docs" / "ORCHESTRATION.md").read_text(encoding="utf-8")
+        for head in ("### 7.1 Spawning", "### 7.2 Review rounds", "### 7.5 Pull requests and the merge request", "### 8.5 Design reviewer"):
+            self.assertIn(head, doc)
+        orch = real("orchestrator")
+        for ref in ("§7.1", "§7.2", "§7.5", "§8.5"):
+            self.assertIn(ref, orch)
+        reviews = (ROOT / "docs" / "reviews" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("## 4. Visual-quality rubric", reviews)
+
+    def test_the_spawn_template_carries_the_handles_as_config(self):
+        doc = (ROOT / "docs" / "ORCHESTRATION.md").read_text(encoding="utf-8")
+        m = re.search(r"### 8\.5 Design reviewer\n(.*?)(?=\n## |\n### |\Z)", doc, re.S)
+        self.assertIsNotNone(m)
+        sec = m.group(1)
+        for needle in ("{owner_handle}", "{collaborator_handle}", "none", "agents/prompts/design-reviewer.md", "round {round}"):
+            self.assertIn(needle, sec)
+        self.assertNotRegex(sec, r"@[\w-]+")
+
+    def test_m015_row_is_done_in_tasks_toml(self):  # ORCHESTRATION 4.4: the PR that finishes a task sets it done
+        row = tasks.parse((ROOT / "docs" / "tasks.toml").read_text(encoding="utf-8")).by_id["M0.5-15"]
+        self.assertEqual(row.status, "done")
+
+    def test_no_closing_keyword_before_an_issue_number_in_the_new_text(self):  # CLAUDE.md-level rule of ORCHESTRATION 7.5 (3)
+        for role in ROLES:
+            self.assertNotRegex(
+                prompt_rules.normalize(real(role)),
+                r"\b(close[sd]?|fix(es|ed)?|resolve[sd]?)\s+#\d+", role)
+
+    def test_cli_fails_when_the_design_reviewer_prompt_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / "prompts"
+            shutil.copytree(PROMPTS, d)
+            (d / "design-reviewer.md").unlink()
+            r = subprocess.run([sys.executable, "-I", str(ROOT / "scripts" / "prompt_rules.py"), "--prompts", str(d)],
+                               capture_output=True, text=True, check=False)
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("design-reviewer.md", r.stdout)
 
 
 class TierBulletTests(unittest.TestCase):
