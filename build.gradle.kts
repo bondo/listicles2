@@ -125,3 +125,15 @@ val checkWarningsAsErrors =
     }
 
 tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
+
+// Every test JVM blocks network access (core/testing: NoNetwork). NIO sockets need the JDK's selector provider
+// replaced, which is only possible through a system property read when the JVM first needs one.
+subprojects {
+    tasks.withType<Test>().configureEach {
+        jvmArgs(
+            "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+            "-Djava.nio.channels.spi.SelectorProvider=dev.listicles.testing.BlockingSelectorProvider",
+            "-Djava.nio.channels.spi.AsynchronousChannelProvider=dev.listicles.testing.BlockingAsynchronousChannelProvider",
+        )
+    }
+}
