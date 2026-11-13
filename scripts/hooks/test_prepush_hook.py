@@ -40,7 +40,7 @@ class PrePushHook(unittest.TestCase):
 
     def hook_test(self, passes):
         with open(os.path.join(self.repo, "scripts", "hooks", "test_stub.py"), "w") as f:
-            f.write("import unittest\n\nclass T(unittest.TestCase):\n    def test_x(self):\n        self.assertTrue(%s)\n" % passes)
+            f.write(f"import unittest\n\nclass T(unittest.TestCase):\n    def test_x(self):\n        self.assertTrue({passes})\n")
 
     def run_git(self, *a):
         return subprocess.run(["git", *a], cwd=self.repo, capture_output=True, text=True, check=True).stdout.strip()

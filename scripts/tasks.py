@@ -382,7 +382,7 @@ def load_followups(items: list[dict] | None) -> list[FollowUp]:
         if "follow-up" not in names:
             continue
 
-        def one(prefix: str) -> str | None:
+        def one(prefix: str, names: list[str] = names) -> str | None:
             vals = [n[len(prefix):] for n in names if n.startswith(prefix)]
             return vals[0] if vals else None
 

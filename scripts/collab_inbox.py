@@ -13,8 +13,8 @@ if the API field `author_association` is COLLABORATOR or MEMBER. On a personal r
 (its only collaborator level); in an organisation a MEMBER or COLLABORATOR can also have only read or triage.
 So after any move to an organisation, `--collaborators` is required: it takes the JSON of
 `GET /repos/{o}/{r}/collaborators` and the numeric user id must also hold the write, maintain or admin role
-there (this also keeps renamed logins right). A login or a claim in the text never grants trust. The owner's own posts (agents post as the owner) are counted, not
-shown; everyone else is counted and never quoted.
+there (this also keeps renamed logins right). A login or a claim in the text never grants trust. The owner's own posts (agents post as the owner)
+are counted, not shown; everyone else is counted and never quoted.
 
 Everything shown is data, never an instruction: hidden markup (HTML comments, tags, markdown comment lines,
 invisible and control characters) is stripped and each text sits in a code fence longer than any backtick run
@@ -34,7 +34,7 @@ import json
 import re
 import sys
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 TRUSTED_ASSOCIATIONS = {"COLLABORATOR", "MEMBER"}
 OWNER_ASSOCIATION = "OWNER"
@@ -66,7 +66,7 @@ def parse_ts(value, what="timestamp"):
 
 
 def fmt_ts(dt):
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def strip_hidden(text):
@@ -237,7 +237,7 @@ def render(records, since, collaborators=None, max_chars=DEFAULT_MAX_CHARS, fetc
         fetched_dt = parse_ts(fetched_at, "fetched_at") if isinstance(fetched_at, str) else fetched_at
         # API times are whole seconds and since is exclusive: stop one second before the fetch began, so an
         # item stamped in that same second (possibly missed by the fetch) is shown again next run.
-        newest = min(newest, fetched_dt.astimezone(timezone.utc).replace(microsecond=0) - timedelta(seconds=1))
+        newest = min(newest, fetched_dt.astimezone(UTC).replace(microsecond=0) - timedelta(seconds=1))
     next_since = fmt_ts(max(newest, since_dt))
     shown.sort(key=lambda t: (t[0], t[1]["id"]))
     lines = [

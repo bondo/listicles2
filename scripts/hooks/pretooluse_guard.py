@@ -602,10 +602,9 @@ def check_git(words, state, assigns_dirty=False):
                     deny("could not parse this git alias; write the command out")
             return
 
-    if sub in ("commit", "push", "merge", "am", "cherry-pick", "rebase"):
-        if any(opt(f, "--no-verify", 6) for f in flags) or (
-                sub in ("commit", "am") and has_short(args, "n", "mFCctS")):
-            deny(f"git {sub} --no-verify skips the hooks; fix what the hook reports instead")
+    if sub in ("commit", "push", "merge", "am", "cherry-pick", "rebase") and (
+            any(opt(f, "--no-verify", 6) for f in flags) or (sub in ("commit", "am") and has_short(args, "n", "mFCctS"))):
+        deny(f"git {sub} --no-verify skips the hooks; fix what the hook reports instead")
     if sub == "config":
         read_only = any(opt(f, n, 4) for f in flags for n in ("--get", "--get-all", "--get-regexp", "--list", "--get-urlmatch")) or "-l" in flags
         read_only = read_only or (len(pos) <= 1 and not any(f in ("--add", "--replace-all") or opt(f, "--replace-all", 4) for f in flags))
@@ -665,9 +664,8 @@ def check_git(words, state, assigns_dirty=False):
         worktree = any(f == "-W" or opt(f, "--worktree", 4) for f in flags)
         if not staged or worktree:
             destructive = True
-    elif sub == "clean" and any(re.fullmatch(r"-[a-zA-Z]*[fx][a-zA-Z]*", f) or opt(f, "--force", 4) for f in flags):
-        destructive = True
-    elif sub == "rm" and any(f == "-f" or opt(f, "--force", 4) for f in flags):
+    elif (sub == "clean" and any(re.fullmatch(r"-[a-zA-Z]*[fx][a-zA-Z]*", f) or opt(f, "--force", 4) for f in flags)) or (
+            sub == "rm" and any(f == "-f" or opt(f, "--force", 4) for f in flags)):
         destructive = True
     elif sub == "stash" and not (args and args[0] in ("list", "show", "apply", "branch")):
         if args and args[0] in ("drop", "clear"):
@@ -921,9 +919,9 @@ def check_simple(cmd, state, depth):
         code = " ".join(args + texts)
         if CODE_WRITES.search(code):
             for pat in PROTECTED + ALWAYS:
-                if re.search(r"(^|[\s'\"=/])" + re.escape(pat.rstrip("/")) + (r"(/|\b)" if pat.endswith("/") else r"\b"), code):
-                    if pat in ALWAYS or not TOOLING:
-                        deny(f"inline code looks like it writes to the protected path {pat}")
+                hit = re.search(r"(^|[\s'\"=/])" + re.escape(pat.rstrip("/")) + (r"(/|\b)" if pat.endswith("/") else r"\b"), code)
+                if hit and (pat in ALWAYS or not TOOLING):
+                    deny(f"inline code looks like it writes to the protected path {pat}")
         if PROCESS_CALLS.search(code):
             check_literals(code, state, depth)
     for t in write_targets(prog, args):
