@@ -132,11 +132,12 @@ notes = """Delivered by PR #35 (squash-merged to main). Needed LISTICLES_TASK=to
 id = "M0-11"
 title = "Tooling session B: align REVIEW.md, CLAUDE.md, agents/prompts, handoff template with ORCHESTRATION.md; fix hook false positives"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-04", "M0-05", "M0-10", "M0-12"]
-notes = """Still open on main (agents/prompts/orchestrator.md still mentions docs/status.md). Needs LISTICLES_TASK=tooling, on a new branch from main; this PR sets status = done. M0-04 and M0-05 are done, so protected files are current. Test-first with negative cases (ORCHESTRATION 2.0). Needed changes: \
+pr = 80
+notes = """Delivered by PR #80. Original brief: needs LISTICLES_TASK=tooling, on a new branch from main; this PR sets status = done. M0-04 and M0-05 are done, so protected files are current. Test-first with negative cases (ORCHESTRATION 2.0). Needed changes: \
 (1) REVIEW.md:70 and the round-cap line in the root CLAUDE.md (:40): the 4-round cap is per batch (a one-batch PR: per PR), see ORCHESTRATION 6.2; \
 (2) agents/prompts/reviewer.md: reviewers never edit or push to the PR branch, they only report findings (severity, file:line, recommendation), \
 and may test only in a throwaway branch or worktree that is never pushed to the PR branch and is deleted afterwards; flag code changes lacking tests; \

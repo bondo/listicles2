@@ -108,8 +108,7 @@ Every code change is preceded by a failing test (only purely documentation chang
 Show this in commit order and messages (test commit first, or test and fix in one commit with the red run noted).
 It covers tooling as much as app code: hooks, guards, scripts, CI checks and `tasks.py`. Every tool has automated
 tests that run in `verify.sh` and CI, including **negative cases** (the tool must fail on a bad input). Reviewers flag
-code changes that lack tests (severity per `REVIEW.md`, which owns severities; M0-11 aligns it). Implementer prompt wording for the tooling
-session: task M0-11 notes in `docs/tasks.toml`.
+code changes that lack tests (severity per `REVIEW.md`, which owns severities: an untested gate, guard or other tooling check is `major`, other untested changes `minor`).
 
 ### 2.1 Session tags
 
@@ -264,7 +263,7 @@ python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T
 | Add tasks | Planner (per milestone), process PRs | In the same PR as `docs/milestones/Mx.md`. New work found mid-flight (a deferred finding, say) is added by the PR that finds it, or noted in the state issue under "pending task additions" for the next PR |
 | Claim (start) | Orchestrator | Add the task id to the worker's row in the Sessions table, then spawn. Release the claim when the worker ends |
 | Delivered, awaiting review or merge | Orchestrator | When a worker's result reports commits for a task, move its id from the Sessions claim to the Branches table's `Tasks awaiting review/merge`. It then shows in `review`, not in `ready`, so a cold successor can't re-spawn finished work |
-| `todo` → `done` (agent task) | The implementer, in the PR that delivers it, **on the tasks ref** | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. **Exception: tasks whose PR branch is the tasks ref (M0-09, M0-10, M0-11, M0-12 and M0-FU on PR #16)** are set `done` only by the status-sync session below, after the review; an implementer on them leaves `status = "todo"` (else the task would leave `review` and unblock dependents before review). When the PR's branch is not the tasks ref (PR #1 before M0-O8), a **status-sync commit** on the tasks ref sets `done` for its finished tasks once the batch's latest round has verdict `ready_nits_only` and `reviewed_through` equals the branch head (or the owner accepted it). The orchestrator spawns a **one-off status-sync process session** (§8.4) for that, on the tasks-ref branch, holding its branch lock (§7.1); it changes only `docs/tasks.toml`. A reviewer doesn't flag such a commit for marking other PRs' tasks done. Status-sync is not picked from `ready`. Batches are sliced so a task's dependencies are synced before it starts: batch M0-2 covers M0-04, M0-05, M0-06; M0-07 and M0-08 are batch M0-3 |
+| `todo` → `done` (agent task) | The implementer, in the PR that delivers it, **on the tasks ref** | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. **Exception: tasks whose PR branch is the tasks ref (M0-09, M0-10, M0-12 and M0-FU on PR #16)** are set `done` only by the status-sync session below, after the review; an implementer on them leaves `status = "todo"` (else the task would leave `review` and unblock dependents before review). When the PR's branch is not the tasks ref (PR #1 before M0-O8), a **status-sync commit** on the tasks ref sets `done` for its finished tasks once the batch's latest round has verdict `ready_nits_only` and `reviewed_through` equals the branch head (or the owner accepted it). The orchestrator spawns a **one-off status-sync process session** (§8.4) for that, on the tasks-ref branch, holding its branch lock (§7.1); it changes only `docs/tasks.toml`. A reviewer doesn't flag such a commit for marking other PRs' tasks done. Status-sync is not picked from `ready`. Batches are sliced so a task's dependencies are synced before it starts: batch M0-2 covers M0-04, M0-05, M0-06; M0-07 and M0-08 are batch M0-3 |
 | Owner task finished | Owner | Close the issue (or merge the PR). This takes effect at once through `--issues`/`--prs`. The next PR that touches the file sets `status = "done"`; `drift` lists what is outstanding |
 | `dropped` | Owner decision, recorded by the next PR | Add `notes` with the reason and a link to the decision comment |
 | Edits to ids or dependencies | Planner or process PR | Ids are never reused or renumbered **once published**. The renumbering when the follow-ups work was merged into this branch was a one-off, mapped below; do not repeat it |
@@ -435,8 +434,7 @@ Rounds are numbered **per PR**, globally and monotonically (1, 2, … giving IDs
 The 4-round cap is **per batch** (the accepted plan: "max 4 rounds per batch"). A batch is the unit one implementer
 delivers and one review loop covers; a PR of a single batch is capped per PR, and a multi-batch PR such as M0 #1 gets
 a fresh 4 per batch. Round 4 with findings above `nit`: stop and ask the owner. Blockers follow §1.1 (escalate first).
-`REVIEW.md:70`, `CLAUDE.md:40` and `PLAN.md` §6 say just "max 4 rounds"; read them as per batch (M0-11 aligns the
-protected ones). A finding ID is `R<round>-<nn>` (e.g. `R8-01`).
+`REVIEW.md`, `CLAUDE.md` and `PLAN.md` §6 say "max 4 rounds per batch" (aligned by M0-11). A finding ID is `R<round>-<nn>` (e.g. `R8-01`).
 `verdict` is the reviewer's (`changes_requested | ready_nits_only`), or `cap_reached`, which the orchestrator
 sets after round 4 of a batch, or one the decider sets (the orchestrator; in a manual loop the implementer, in its PR comment): `ready_deferred`
 when every finding above nit was deferred and no commit followed (FOLLOW-UPS.md §4; it takes precedence over `cap_reached`).
@@ -502,9 +500,8 @@ total cost, incidents. Then refresh the PR description's review table from the r
   PR comment with the fenced `json` block defined in `REVIEW.md` (`round` as a number,
   `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>`, `verdict`
   `changes_requested | ready_nits_only`), followed by its `WORKER-RESULT` block (§7.3).
-  `REVIEW.md` owns the format; this file does not repeat it. **Until M0-11 aligns `REVIEW.md`**, each finding also
-  carries `area`, `recommend` (`fix-now | defer`) and `recommend_reason`, and `status` may be `deferred`
-  ([`FOLLOW-UPS.md`](FOLLOW-UPS.md) §5). The reviewer recommends only. The orchestrator decides deferral (§7.2.1).
+  `REVIEW.md` owns the format; this file does not repeat it. Each finding carries `area`, `recommend` (`fix-now | defer`) and
+  `recommend_reason`, and `status` may be `deferred` ([`FOLLOW-UPS.md`](FOLLOW-UPS.md) §5). The reviewer recommends only. The orchestrator decides deferral (§7.2.1).
 * **Reviewers never edit or push to the PR branch.** They only report findings (severity, `file:line`, recommendation).
   A reviewer may reproduce a problem in a throwaway branch or worktree that is never pushed to the PR branch and is deleted
   afterwards. Every reviewer prompt says so (§8.3).
@@ -722,9 +719,8 @@ but say so in the `Usage:` line.
 
 The role rules live in `agents/prompts/<role>.md` (models and effort in `agents/roles.yaml`).
 A spawn message points at the role prompt and adds only the per-task parameters below, so
-rules are never copied into prompts. Until task M0-11 aligns `agents/prompts/*`, the bodies
-below win where they disagree (the prompts still mention `docs/status.md`,
-`handoff/orchestrator.md` and an older summary format). Placeholders are `{…}`.
+rules are never copied into prompts. `scripts/prompt_rules.py` pins the rules the prompts must carry (M0-11). Where a prompt and the bodies
+below still disagree, the bodies win. Placeholders are `{…}`.
 
 ### 8.1 Orchestrator bootstrap (successor, or owner-started)
 
@@ -798,7 +794,7 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 | F11 | Two orchestrators alive at once overwrite the body, or a dead holder blocks everyone | The `Orchestrator:` lease, renewed every wake, with lowest-comment-id arbitration and a takeover path (§5.3) |
 | F12 | "What's next" is decided from memory, so dependencies get skipped or work gets started twice | `scripts/tasks.py ready` (implementer work) and `review` (review rounds), with claims and `--in-review`, are the only ways to pick work (§4.3) |
 | F13 | Task status drifts from GitHub (closed owner issue, merged PR) | Status is derived from GitHub on every query. `drift` lists what the next PR must fix in the file (§4.4) |
-| F14 | Role prompts and this file disagree (e.g. `agents/prompts/orchestrator.md` still says to write `docs/status.md`) | This file wins until task M0-11 aligns the prompts. Reviewers flag the disagreement |
+| F14 | Role prompts and this file disagree (e.g. `agents/prompts/orchestrator.md` still says to write `docs/status.md`) | This file wins; `scripts/prompt_rules.py` rejects the stale `docs/status.md` and `handoff/orchestrator.md` wording (M0-11). Reviewers flag any other disagreement |
 | F15 | Finished-but-unmerged work looks ready again to a cold orchestrator, or a task file exists in two branches with different status | `--in-review` from the Branches table (§4.4); one canonical tasks ref (§4.2) |
 | F16 | A reviewer "helpfully" fixes the PR and so is both author and reviewer | Reviewers never edit or push to the PR branch (§7.2, §8.3) |
 | F17 | Minor findings block acceptance, or are deferred and forgotten | Follow-up issues with a mandatory burn-down task per milestone that the ready query enforces ([`FOLLOW-UPS.md`](FOLLOW-UPS.md)) |

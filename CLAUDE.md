@@ -39,7 +39,7 @@ lists app: Kotlin, Compose, Firebase (Firestore + Auth), no Cloud Functions, Eng
 - One PR per implementer session; one review round per reviewer session.
 
 ## Reviews
-- Process and finding format: `REVIEW.md`. Max 4 rounds; then stop and report to the owner.
+- Process and finding format: `REVIEW.md`. Max 4 rounds per batch (a one-batch PR: per PR); then stop and report to the owner.
 - Reviewers never edit or push the PR branch: report only (a throwaway worktree is allowed, never pushed anywhere and deleted afterwards). Minor/nit findings may be
   deferred to follow-up issues once no blocker or major is open.
 - Role models and effort: `agents/roles.yaml`. Do not change your own effort or model.
