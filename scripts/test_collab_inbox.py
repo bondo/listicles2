@@ -1,4 +1,5 @@
 """Tests for scripts/collab_inbox.py. Run: python3 -I scripts/test_collab_inbox.py"""
+# ruff: noqa: B005  # justified: .strip() here is the test helper HiddenMarkupTests.strip (wraps collab_inbox.strip_hidden), not str.strip
 
 import json
 import re
