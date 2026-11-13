@@ -133,6 +133,7 @@ subprojects {
         jvmArgs(
             "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
             "-Djava.nio.channels.spi.SelectorProvider=dev.listicles.testing.BlockingSelectorProvider",
+            "-Djava.nio.channels.spi.AsynchronousChannelProvider=dev.listicles.testing.BlockingAsynchronousChannelProvider",
         )
     }
 }

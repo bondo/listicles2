@@ -44,6 +44,16 @@ class BlockingSelectorProvider : SelectorProvider() {
         return delegate.openServerSocketChannel()
     }
 
+    override fun openServerSocketChannel(family: ProtocolFamily): ServerSocketChannel {
+        check("server socket channel")
+        return delegate.openServerSocketChannel(family)
+    }
+
+    override fun openSocketChannel(family: ProtocolFamily): SocketChannel {
+        check("socket channel")
+        return delegate.openSocketChannel(family)
+    }
+
     override fun openSocketChannel(): SocketChannel {
         check("socket channel")
         return delegate.openSocketChannel()

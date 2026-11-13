@@ -19,11 +19,14 @@ class NetworkAccessBlockedException(
  *
  * Covered: `java.net.Socket` and `ServerSocket` (so `HttpURLConnection` too), `DatagramSocket` and
  * `MulticastSocket`, NIO `SocketChannel`, `ServerSocketChannel` and `DatagramChannel`
- * ([BlockingSelectorProvider], needs the JVM arguments set in the root `build.gradle.kts`), and DNS lookups of
- * anything but loopback names ([BlockingInetAddressResolverProvider]).
+ * ([BlockingSelectorProvider]), `AsynchronousSocketChannel` and `AsynchronousServerSocketChannel`
+ * ([BlockingAsynchronousChannelProvider]; both providers need the JVM arguments set in the root
+ * `build.gradle.kts`), and DNS lookups of anything but loopback names ([BlockingInetAddressResolverProvider]).
  *
  * Not covered, by design of the JDK or because it is not JVM code: processes a test starts (`ProcessBuilder`),
- * native libraries, and connections opened before the block was installed (the Gradle worker's own).
+ * native libraries, connections opened before the block was installed (the Gradle worker's own),
+ * `Socket(Proxy)` with a SOCKS proxy (the JDK skips the socket factory; pinned by a test), and
+ * `InetAddress.isReachable` (native ICMP or echo probe, not a `java.net` socket).
  * Loopback names and address literals resolve, because they are not network traffic.
  */
 object NoNetwork {
