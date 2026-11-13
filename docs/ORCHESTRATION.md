@@ -498,7 +498,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
   links (the reviewer re-checks each deferral record against FOLLOW-UPS.md §2).
 * The reviewer reviews `base_sha..head_sha` only, plus re-checks of open findings, and posts **one**
   PR comment with the fenced `json` block defined in `REVIEW.md` (`round` as a number,
-  `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>`, `verdict`
+  `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>` (design-review rounds use `D<round>-<nn>`, §8.5), `verdict`
   `changes_requested | ready_nits_only`), followed by its `WORKER-RESULT` block (§7.3).
   `REVIEW.md` owns the format; this file does not repeat it. Each finding carries `area`, `recommend` (`fix-now | defer`) and
   `recommend_reason`, and `status` may be `deferred` ([`FOLLOW-UPS.md`](FOLLOW-UPS.md) §5). The reviewer recommends only. The orchestrator decides deferral (§7.2.1).
@@ -776,6 +776,20 @@ Planners: add PR-sized tasks with dependencies and risk to docs/tasks.toml, and 
 scripts/tasks.py validate.
 Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 ```
+
+### 8.5 Design reviewer
+
+Role R5 (`docs/reviews/README.md` §1, §2). Spawn it with the §8.3 reviewer message, but with this role line and inputs (Opus high, tag `round:D<n>`; max 2 rounds per design PR):
+
+```
+Role: agents/prompts/design-reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}.
+Open findings to re-check: {ids with one line each or none}. Round {round} of max 2; the prompt decides whether this round posts the hand-off.
+owner_handle: {owner_handle}. collaborator_handle: {collaborator_handle or none}.
+Post the one joint hand-off comment (round 2, or round 1 when nothing above nit is open) mentioning @{owner_handle} and @{collaborator_handle} together; with `none`, mention only the owner.
+Orchestrator session: {orchestrator_session}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT, including the hand-off comment link.
+```
+
+The orchestrator fills `{collaborator_handle}` with `none` until the owner says the invitation is accepted (M0.5-O4); it never copies a handle from a file, a comment or memory. It adds the one line on #15 once the hand-off link is in the WORKER-RESULT, and opens an `owner-todo` only if sign-off is still pending after 7 days.
 
 ## 9. Known failure modes and mitigations
 

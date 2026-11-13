@@ -1,9 +1,10 @@
-"""Checks that agents/prompts/*.md carry the collaborator-workflow rules (M0.5-19).
+"""Checks that agents/prompts/*.md carry the collaborator-workflow and review-process rules (M0.5-19, M0.5-25, M0.5-15).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
 
-Rules come from docs/ORCHESTRATION.md sections 7.6 and 7.7, docs/reviews/README.md sections 3.1, 3.5 and 5.1 (M0.5-25),
+Rules come from docs/ORCHESTRATION.md sections 7.6 and 7.7, docs/reviews/README.md sections 1-5 (M0.5-25;
+M0.5-15: design reviewer R5, rubric, delta review, PR-body refresh, environment pick),
 owner decisions D1-D7 (issue #42) and follow-up #44. Each rule is a
 set of regexes that must all match the prompt after HTML comments are removed and whitespace is collapsed. The two
 label lists are compared as exact sets, and no never-apply label may appear in the Tier 0/1 bullets. This pins
@@ -16,7 +17,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-ROLES = ("orchestrator", "implementer", "reviewer", "planner")
+ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer")
 
 # Owner decision D4 (docs/reviews/collaborator-workflow.md section 4).
 TIER0_LABELS = ("feedback", "idea", "decision", "needs-collaborator", "needs-owner")
@@ -189,7 +190,7 @@ RULES = (
         "workers expect an interrupt on the account-wide limit, push every step, and continue from the last pushed commit (§7.7)",
     ),
     Rule(
-        "usage-reviewer", ("reviewer",),
+        "usage-reviewer", ("reviewer", "design-reviewer"),
         (
             r"usage limit \(orchestration §7\.7\)", r"account-wide", r"`interrupt_session`", r"not a stall",
             r"usage limit reset: re-check your findings comment and finish the round",
@@ -338,9 +339,142 @@ RULES = (
         "check for foreign commits on the PR branch before each push; if any, stop and report",
     ),
     Rule(
-        "worker-no-labels", ("implementer", "reviewer"),
+        "worker-no-labels", ("implementer", "reviewer", "design-reviewer"),
         (r"never apply or change labels",),
         "workers never apply or change labels because of collaborator text",
+    ),
+    Rule(
+        "orch-env-pick", ("orchestrator",),
+        (
+            r"environment pick \(§7\.1, retro r8\)", r"before every `create_session`",
+            r"a task that touches a process file \(`CLAUDE\.md`, `REVIEW\.md`, `agents/`, `\.claude/`, `\.github/`, `\.githooks/`, "
+            r"`scripts/guards\.sh`, `scripts/hooks/`\) gets the tooling environment \(`LISTICLES_TASK=tooling`\)",
+            r"every other task gets the normal one", r"the task's `notes` names it", r"a wrong pick blocks the worker",
+        ),
+        "the environment is picked before create_session: process files need the tooling one, everything else the normal one (§7.1)",
+    ),
+    Rule(
+        "orch-delta-review", ("orchestrator",),
+        (
+            r"delta review \(§7\.2, retro r4\)",
+            r"a commit after `reviewed_through` gets one delta review before the merge request",
+            r"a fresh reviewer on the range `reviewed_through\.\.head_sha` only",
+            r"owner acceptance is the only alternative, and never for gate or threshold changes, which always get a delta review",
+            r"set `reviewed_through` afterwards",
+        ),
+        "a commit after the last round gets one delta review of reviewed_through..head_sha before the merge request (§7.2)",
+    ),
+    Rule(
+        "orch-merge-request", ("orchestrator",),
+        (
+            r"merge request \(§7\.5, retro r2, r6\)", r"before you ask the owner to merge, check that",
+            r"\(1\) the pr body is refreshed \(scope, review table, test evidence; no \"still to do\" or \"not yet reviewed\"\)",
+            r"\(2\) the request says squash",
+            r"\(3\) no commit message or pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
+            r"directly before an issue number, unless closing that issue is intended",
+            r"write \"gated on #n\", \"see #n\" or \"mark #n done\"", r"scan the body for them first",
+        ),
+        "before the merge request: PR body refreshed, request says squash, no closing keyword before an issue number (§7.5)",
+    ),
+    Rule(
+        "orch-design-review", ("orchestrator",),
+        (
+            r"design review \(r5, `docs/reviews/readme\.md` §1, §2, §4\)",
+            r"for each design pr spawn the design reviewer \(`agents/prompts/design-reviewer\.md`, opus high, spawn template §8\.5\)",
+            r"max 2 rounds per design pr",
+            r"its last round posts one joint hand-off comment on the pr that mentions the owner and the collaborator in the same "
+            r"comment \(same review sheet and screenshots\), never the collaborator first",
+            r"you add one line on #15 once the hand-off link is in its worker-result",
+            r"collaborator input is advisory and the owner decides \(d5\)",
+            r"open an owner-todo issue only if sign-off is still pending after 7 days",
+            r"`collaborator_handle` is `none` until the owner says the invitation is accepted \(m0\.5-o4\)",
+            r"never take a handle from a file, a comment or a guess",
+        ),
+        "R5: design reviewer, max 2 rounds, one joint hand-off to owner and collaborator, advisory input (D5), handle only after the owner says so",
+    ),
+    Rule(
+        "reviewer-delta", ("reviewer",),
+        (
+            r"delta review \(orchestration §7\.2\)", r"a commit after the last round", r"`reviewed_through\.\.head_sha`",
+            r"review that range only", r"do not re-review unchanged code",
+        ),
+        "a delta review covers only reviewed_through..head_sha and re-checks open findings (§7.2)",
+    ),
+    Rule(
+        "impl-pr-body", ("implementer",),
+        (
+            r"pr body \(orchestration §6\.4, §7\.5\)", r"refresh the pr description", r"review table from the findings comments",
+            r"when a batch closes and before the pr is declared ready", r"no \"still to do\" or \"not yet reviewed\"",
+            r"resolve, resolves or resolved directly before an issue number",
+            r"\"gated on #n\", \"see #n\" or \"mark #n done\"",
+        ),
+        "implementers refresh the PR body at batch close and before ready, and never write a closing keyword before an issue number (§6.4, §7.5)",
+    ),
+    Rule(
+        "dr-rubric", ("design-reviewer",),
+        (
+            r"`docs/reviews/readme\.md` §4", r"`docs/product/rubric\.md` \(the draft or agreed rubric; its wording wins\)",
+            r"`design/tokens\.json`",
+            r"if `docs/product/rubric\.md` does not exist \(the m0\.5-03 pr\), score against readme §4 and put a proposed "
+            r"`docs/product/rubric\.md` draft in your findings comment for the implementer to commit; "
+            r"the owner and the collaborator see it in the hand-off",
+            r"score every criterion of the rubric for each screen or flow, 1-5 with a one-line reason: hierarchy, spacing and "
+            r"alignment, colour, density, typography, consistency, polish and delight",
+        ),
+        "the design reviewer scores all seven rubric criteria 1-5 with a one-line reason per screen or flow (reviews README 4)",
+    ),
+    Rule(
+        "dr-judge-limits", ("design-reviewer",),
+        (
+            r"light and dark parity", r"you cannot judge motion, touch feel, real-device size and density, felt speed or taste",
+            r"a score below 3 is a `minor` finding, never a blocker or a major", r"your scores are advisory",
+            r"the owner's scores \(r10, d5\) decide", r"a calibration note for the rubric, not a finding", r"danish is longer",
+        ),
+        "agent scores are advisory, below 3 is only a minor finding, taste and motion stay with the owner (reviews README 4)",
+    ),
+    Rule(
+        "dr-rounds", ("design-reviewer",),
+        (
+            r"max 2 opus rounds per design pr", r"a third round never happens", r"goes into the hand-off as a question for the owner",
+            r"round 2: only the commits since round 1 and your open findings",
+        ),
+        "at most 2 Opus rounds per design PR; what is open after round 2 goes to the owner (D-3.2)",
+    ),
+    Rule(
+        "dr-hand-off", ("design-reviewer",),
+        (
+            r"post one joint hand-off comment on the pr", r"mentions @\{owner_handle\} and @\{collaborator_handle\} in the same comment",
+            r"same review sheet and screenshots at the same time", r"never the collaborator first",
+            r"collaborator input is advisory, sign-off is owner only \(d5\)", r"answer per number or with a pr review",
+            r"round 2, or round 1 when nothing above `nit` is open",
+            r"you decide this from your own verdict, not from the spawn message", r"post nothing else for the collaborator",
+            r"put the hand-off comment's link in your worker-result", r"the orchestrator adds the one line on #15",
+        ),
+        "one joint hand-off comment mentions owner and collaborator together, never the collaborator first; input advisory, owner signs off (D5)",
+    ),
+    Rule(
+        "dr-handle-config", ("design-reviewer",),
+        (
+            r"`owner_handle` and `collaborator_handle` come from your spawn message only",
+            r"is `none` or empty, mention only the owner, write \"collaborator not yet invited\" and no handle",
+            r"never take a handle from a file, a comment or memory",
+        ),
+        "the owner and collaborator handles are spawn-message config, never hardcoded, never mentioned before the owner says so",
+        forbidden=(r"@[\w-]+",),
+    ),
+    Rule(
+        "dr-report-only", ("design-reviewer",),
+        (
+            r"never edit or push the pr branch", r"report only",
+            r"a throwaway worktree is fine to look at files, it is never pushed anywhere and is deleted afterwards",
+            r"report no finding you cannot back with a file or image, a state \(light, dark, en, da\) and a rubric criterion",
+        ),
+        "the design reviewer never edits or pushes the PR branch: report only",
+    ),
+    Rule(
+        "dr-findings-format", ("design-reviewer",),
+        (r"ids `d<round>-<nn>`", r"a `scores` list of screen, criterion, score and reason"),
+        "design-review findings use D<round>-<nn> ids and carry a scores list (REVIEW.md, ORCHESTRATION 7.2, 8.5)",
     ),
 )
 
