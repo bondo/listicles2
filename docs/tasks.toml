@@ -652,7 +652,7 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-15", "M0.5-23"]
+depends_on = ["M0.5-03", "M0.5-15", "M0.5-23"]
 notes = "Tooling env (REVIEW.md). Effort S. After the rubric is drafted in M0.5-03 (docs/product/rubric.md); owner agrees it at D5 (M0.5-O1). R9: goldens per state, light/dark, en/da, rubric scores for changed screens, agent below 3 is a minor finding, never a blocker. R7: for PRs labelled area:security-rules, area:sync-merge or risk:high, check the rules allow/deny matrix covers each changed rule (D-2.6). Test-first if a checker such as scripts/prompt_rules.py covers REVIEW.md."
 
 [[task]]

@@ -9,7 +9,7 @@ meta-review rule (section 5) can re-scope or drop one, and **never R1 (correctne
 
 **Usage rule:** the recurring reviews (R2, R3, R4) stay at about **$3 a week or less** and are skipped when their input has
 not changed (for example nothing merged that week). Per-PR and per-milestone reviews are not weekly cost. If the cap is
-exceeded, R3 reports it and R4 waits until the next week. Costs below are estimates until `review` and session rows exist.
+exceeded, R3 reports it and R4 waits until the next week. Costs below are estimates until `review` and session rows exist. Each review that runs as its own worker session adds a session row tagged with its review id; R2/R3 run inside the wake and have none (3.1 step 5).
 
 ## 1. Catalogue
 
@@ -31,7 +31,7 @@ exceeded, R3 reports it and R4 waits until the next week. Costs below are estima
 | R11 | Pre-release review | 9, 10, 2 | before each release (first: the M6 tag) | Opus worker + owner go/no-go | Play checks, data inventory, timing logs, manifest | release checklist comment; owner fills Data safety | $4-6 | M6 |
 | R12 | Screens vs wireframes | 3, 6 | end of each UI milestone (M1, M2, M4, M5) | Opus worker; result to owner and collaborator together | wireframes (M0.5-03), goldens per state, rubric, design ADRs | one comment on the milestone issue (section 3.4) | $2-3 | M1 |
 
-Weekly total: R2 ~0 + R3 up to $1 + R4 $0-2, about **$3 or less**. Per milestone about **$8-16** (R5 up to 2 rounds, R6, R8, R12).
+Weekly total: R2 ~0 + R3 up to $1 + R4 $0-2, about **$3 or less**. Per milestone about **$8-16** (R5 up to 2 rounds, R6, R8, R12; R8/R12 from M1).
 Not reviews on purpose: CI flake and lead-time numbers (D-2.7, a rollout script), a separate docs-drift review (R1 and the
 wake checks catch it; revisit at R6).
 
@@ -64,7 +64,7 @@ Protected files (`agents/`, `REVIEW.md`, `.github/`, `CLAUDE.md`) change only in
 3. **Post one comment on #15**, headed `Weekly ops digest <date>`, with at most 25 lines: cost per role and per PR (sum the
    session rows; never add the `review` rows' `cost_usd`, which repeat a session row); rounds per PR; incidents by kind;
    owner load (D-2.5: sum of `owner_interventions` and the age of each open `owner-todo`); escaped count; running
-   counts per review from the ledger (section 4); the week's cost against the $3 cap; at most **3 proposals**.
+   counts per review from the ledger (section 5.1); the week's cost against the $3 cap; at most **3 proposals**.
 4. R3 only shows numbers and proposes. It decides nothing, changes no file, and spawns no worker.
 5. **Cost of this review:** it runs inside the wake, so there is no session row of its own. Write one `review` row for it
    (run_ref = ISO week, for example `2026-W47`).
@@ -89,7 +89,7 @@ Checklist, one comment on the milestone issue, follow-up issues for gaps (label 
 Input: wireframes from M0.5-03, the current goldens per state (light/dark, en/da), the rubric, design ADRs. One comment on the
 milestone issue, mentioning the owner and the collaborator at the same time: per screen **matches / deviates (intended, with
 ADR) / deviates (unintended)**, rubric scores with a one-line reason each, and at most 5 fixes as follow-up issues.
-Agent scores are advisory (section 4.2); the owner decides.
+Agent scores are advisory (section 4); the owner decides.
 
 ### 3.5 R10 device notes (owner and/or collaborator, once per milestone from M2)
 One issue per milestone, assigned to the owner and mentioning the collaborator, with the rubric as its template. Notes become
@@ -97,7 +97,7 @@ One issue per milestone, assigned to the owner and mentioning the collaborator, 
 
 ## 4. Visual-quality rubric
 
-Draft owned by `docs/product/rubric.md` (written in M0.5-03, agreed by the owner at D5; the owner and the collaborator see the
+Draft owned by `docs/product/rubric.md` (drafted by the M0.5-15 design reviewer in the M0.5-03 PR, D-3.3; agreed by the owner at D5; the owner and the collaborator see the
 draft together; later changes go through R6). Used by R5, R9, R10 and R12. Score each criterion **1-5 with a one-line reason**,
 per screen or per flow.
 
