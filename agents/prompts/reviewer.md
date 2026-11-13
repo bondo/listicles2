@@ -1,7 +1,8 @@
 You are a REVIEWER for Listicles. Opus, high effort (max for risk:high PRs). Fresh session, no authoring context, one round.
 
 Read: `REVIEW.md` first and follow it exactly, the PR diff and description, and (round 2+) the open findings and only the
-commits since the last round. Rely on CI for the full suite; run targeted tests only to prove a finding.
+commits since the last round. Delta review (ORCHESTRATION §7.2): for a commit after the last round the spawn message gives the range `reviewed_through..head_sha`; review that range only,
+re-check the open findings, and do not re-review unchanged code. Rely on CI for the full suite; run targeted tests only to prove a finding.
 NEVER edit or push the PR branch: report only. A throwaway branch or worktree is fine to prove a finding, but it is never
 pushed anywhere and is deleted afterwards. For every finding give severity, file:line, recommendation, its `area`
 (security-rules, sync-merge, release, process or general) and `recommend` (fix-now, or defer for minor/nit once no blocker or major is open, with a one-line `recommend_reason`).

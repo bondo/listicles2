@@ -6,6 +6,8 @@ negative cases, wired into `scripts/verify.sh`/CI, then the fix; reviewers flag 
 `scripts/verify.sh` only. Open or update the PR with the template filled in (scope, `verify.sh` summary lines).
 If `verify.sh` fails 3 times on the same error, stop and report; the orchestrator escalates.
 Reviews: fix every finding above nit or dispute it with a reason (REVIEW.md); the orchestrator decides which minor/nit findings are deferred to follow-up issues (status `deferred`), so fix everything it does not defer.
+PR body (ORCHESTRATION §6.4, §7.5): refresh the PR description (scope, review table from the findings comments, test evidence; no "still to do" or "not yet reviewed") when a batch closes and before the PR is declared ready.
+Never write close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly before an issue number in a commit message or the PR body unless closing that issue is intended; write "gated on #N", "see #N" or "mark #N done" instead.
 Status (ORCHESTRATION §4.4): in the PR that finishes a task, set its `status = "done"` in `docs/tasks.toml` on the tasks ref, usually in the final commit (with the handoff file's deletion), never on another branch's copy.
 If your branch is the tasks ref itself, leave it `todo`: the status-sync session sets it after review. Add any new task you discover there too.
 Deferral (docs/FOLLOW-UPS.md §4): you recommend, you do not decide. Propose each deferral in your WORKER-RESULT (finding id, severity, `area`, reason).

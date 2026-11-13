@@ -32,6 +32,12 @@ roles:
     prompt: agents/prompts/reviewer.md
     max_effort_when:
       - the PR is tagged risk:high in the milestone doc
+  design-reviewer:
+    model: opus
+    effort: high
+    session: fresh, one per design PR round (max 2 rounds per design PR)
+    token_budget: 100000
+    prompt: agents/prompts/design-reviewer.md
   explorer:
     model: haiku
     effort: low

@@ -777,6 +777,20 @@ scripts/tasks.py validate.
 Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 ```
 
+### 8.5 Design reviewer
+
+Role R5 (`docs/reviews/README.md` §1, §2). Spawn it with the §8.3 reviewer message, but with this role line and inputs (Opus high, tag `round:D<n>`; max 2 rounds per design PR):
+
+```
+Role: agents/prompts/design-reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}.
+Open findings to re-check: {ids with one line each or none}. This is the last round: {yes or no}.
+owner_handle: {owner_handle}. collaborator_handle: {collaborator_handle or none}.
+If this is the last round, post the one joint hand-off comment mentioning @{owner_handle} and @{collaborator_handle} together; with `none`, mention only the owner.
+Orchestrator session: {orchestrator_session}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT, including the hand-off comment link.
+```
+
+The orchestrator fills `{collaborator_handle}` with `none` until the owner says the invitation is accepted (M0.5-O4); it never copies a handle from a file, a comment or memory. It adds the one line on #15 and opens an `owner-todo` only if sign-off is still pending after 7 days.
+
 ## 9. Known failure modes and mitigations
 
 | ID | Failure | Mitigation in this process |

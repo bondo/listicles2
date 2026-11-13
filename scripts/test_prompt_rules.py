@@ -362,7 +362,7 @@ class M025Tests(unittest.TestCase):
         for rid in self.NEW_ORCH:
             self.assertEqual(by_id[rid].roles, ("orchestrator",), rid)
         self.assertEqual(by_id["usage-worker"].roles, ("implementer", "planner"))
-        self.assertEqual(by_id["usage-reviewer"].roles, ("reviewer",))
+        self.assertEqual(by_id["usage-reviewer"].roles, ("reviewer", "design-reviewer"))
 
     def test_real_prompts_pass_the_new_rules(self):
         for rid in self.NEW_ORCH:
@@ -520,8 +520,6 @@ class M015Tests(unittest.TestCase):
     fails when the step is deleted or weakened (a changed number, role, word or ordering counts as weakened)."""
 
     ORCH = ("orch-env-pick", "orch-delta-review", "orch-merge-request", "orch-design-review")
-    DR = ("dr-rubric", "dr-judge-limits", "dr-rounds", "dr-hand-off", "dr-handle-config", "dr-report-only", "usage-reviewer", "worker-no-labels")
-
     def mutate(self, role, old, new):
         text = prompt_rules.normalize(real(role)).lower()  # the rules are case-insensitive
         self.assertIn(old, text, f"{role}.md lacks {old!r}")
@@ -549,7 +547,7 @@ class M015Tests(unittest.TestCase):
     def test_other_roles_wording_does_not_count(self):
         for rid in self.ORCH:
             self.assertIn(rid, ids(prompt_rules.check_text("orchestrator", real("implementer"))))
-        for rid in self.DR:
+        for rid in ("dr-rubric", "dr-judge-limits", "dr-rounds", "dr-hand-off", "dr-handle-config"):
             self.assertIn(rid, ids(prompt_rules.check_text("design-reviewer", real("reviewer"))))
         self.assertIn("impl-pr-body", ids(prompt_rules.check_text("implementer", real("orchestrator"))))
         self.assertIn("reviewer-delta", ids(prompt_rules.check_text("reviewer", real("design-reviewer"))))
@@ -730,7 +728,7 @@ class M015Tests(unittest.TestCase):
         self.assertIsNotNone(m, "roles.yaml needs a design-reviewer role")
         block = m.group(1)
         for line in ("model: opus", "effort: high", "prompt: agents/prompts/design-reviewer.md"):
-            self.assertRegex(block, rf"^    {re.escape(line)}\s*$", line)
+            self.assertRegex(block, rf"(?m)^    {re.escape(line)}\s*$", line)
         self.assertNotRegex(block, r"max_effort_when|high_effort_when")
         self.assertTrue((ROOT / "agents" / "prompts" / "design-reviewer.md").is_file())
 

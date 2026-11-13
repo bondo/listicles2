@@ -384,7 +384,7 @@ RULES = (
             r"its last round posts one joint hand-off comment on the pr that mentions the owner and the collaborator in the same "
             r"comment \(same review sheet and screenshots\), never the collaborator first",
             r"you add one line on #15", r"collaborator input is advisory and the owner decides \(d5\)",
-            r"open an `owner-todo` issue only if sign-off is still pending after 7 days",
+            r"open an owner-todo issue only if sign-off is still pending after 7 days",
             r"`collaborator_handle` is `none` until the owner says the invitation is accepted \(m0\.5-o4\)",
             r"never take a handle from a file, a comment or a guess",
         ),
