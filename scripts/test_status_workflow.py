@@ -11,7 +11,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 IMAGE_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status.svg"
 TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_status_publish.py",
          "python3 -I scripts/test_status_workflow.py")
-FORK_GUARD = "github.event.pull_request.head.repo.full_name == github.repository"
+JOB_PERMISSIONS = ["checks: read", "contents: write", "issues: read", "pull-requests: read"]
 USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)\s*$")
 
 
@@ -82,25 +82,23 @@ def problems(text):
         found.append("workflow-level permissions must be exactly `contents: read`")
     job = block(text, "publish", 2)
     perms = block("\n".join(job or []), "permissions", 4) if job else None
-    if perms is None or [x.strip() for x in perms if x.strip()] != ["contents: write"]:
-        found.append("the job's permissions must be exactly `contents: write`")
-    for trigger in ("schedule:", "workflow_dispatch:", "pull_request:", "issues:", "push:"):
+    if perms is None or sorted(x.strip() for x in perms if x.strip()) != JOB_PERMISSIONS:
+        found.append("the job's permissions must be exactly contents: write plus read on pull-requests, issues and checks")
+    for trigger in ("schedule:", "workflow_dispatch:", "issues:", "push:"):
         if not re.search(rf"^  {trigger}", text, re.M):
             found.append(f"missing trigger {trigger}")
     if "*/30 * * * *" not in text:
         found.append("schedule must be every 30 minutes")
     if "branches: [main]" not in text:
         found.append("push trigger must be limited to branches: [main]")
-    if re.search(r"pull_request_target|issue_comment|workflow_run", text):
-        found.append("pull_request_target, issue_comment and workflow_run are not allowed")
+    if re.search(r"^  (pull_request\w*|issue_comment|workflow_run):", text, re.M):
+        found.append("pull_request, pull_request_target, issue_comment and workflow_run are not allowed")
     for script in run_scripts(text):
         if "${{" in script:
             found.append("a run step interpolates an expression: pass it through env")
     for m in re.finditer(r"secrets\.(\w+)", text):
         if m.group(1) != "GITHUB_TOKEN":
             found.append(f"secret {m.group(1)}: only GITHUB_TOKEN is allowed")
-    if FORK_GUARD not in text:
-        found.append("the job must skip pull requests from forks")
     if "github.actor != 'dependabot[bot]'" not in text:
         found.append("the job must skip Dependabot (read-only token)")
     conc = block(text, "concurrency", 0) or []
@@ -132,22 +130,27 @@ class StatusWorkflow(unittest.TestCase):
         self.assertTrue(any(keyword in p for p in problems(mutated)), problems(mutated))
 
     def test_extra_job_permission_is_flagged(self):
-        self.flagged(self.text.replace("contents: write", "contents: write\n      issues: write"), "job's permissions")
+        self.flagged(self.text.replace("contents: write", "contents: write\n      actions: write"), "job's permissions")
 
     def test_write_at_workflow_level_is_flagged(self):
         self.flagged(self.text.replace("permissions:\n  contents: read", "permissions:\n  contents: write", 1), "workflow-level")
 
-    def test_pull_request_target_is_flagged(self):
-        self.flagged(self.text.replace("  pull_request:", "  pull_request_target:\n  pull_request:", 1), "pull_request_target")
+    def test_pull_request_triggers_are_flagged(self):
+        for trigger in ("pull_request", "pull_request_target"):
+            with self.subTest(trigger):
+                self.flagged(self.text.replace("  issues:", f"  {trigger}:\n  issues:", 1), "not allowed")
+
+    def test_write_on_another_scope_is_flagged(self):
+        self.flagged(self.text.replace("issues: read", "issues: write"), "job's permissions")
+
+    def test_dropping_a_read_scope_is_flagged(self):
+        self.flagged(self.text.replace("      checks: read\n", ""), "job's permissions")
 
     def test_event_text_in_a_shell_step_is_flagged(self):
         self.flagged(self.text.replace("python3 -I scripts/status_fetch.py", "echo ${{ github.event.issue.title }}\n          python3 -I scripts/status_fetch.py", 1), "interpolates")
 
     def test_other_secrets_are_flagged(self):
         self.flagged(self.text.replace("secrets.GITHUB_TOKEN", "secrets.MY_PAT", 1), "only GITHUB_TOKEN")
-
-    def test_missing_fork_guard_is_flagged(self):
-        self.flagged(self.text.replace(FORK_GUARD, "true"), "forks")
 
     def test_force_push_is_flagged(self):
         self.flagged(self.text + "\n      - run: git push --force origin status\n", "force-push")

@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import status_fetch  # noqa: E402  # justified: must follow the sys.path insert above
@@ -75,8 +76,8 @@ depends_on = ["milestone:A"]
 """
 
 
-def pr(number, title="A-02: do the thing", draft=False, ci="passing", behind=False):
-    return {"number": number, "title": title, "draft": draft, "ci": ci, "behind": behind}
+def pr(number, title="A-02: do the thing", draft=False, ci="passing", behind=False, merge_unknown=False):
+    return {"number": number, "title": title, "draft": draft, "ci": ci, "behind": behind, "merge_unknown": merge_unknown}
 
 
 def issue(number, title, labels, created="2026-11-10T12:00:00Z", state="open", reason=None):
@@ -109,6 +110,12 @@ class Clip(unittest.TestCase):
         out = status_visual.clip("x" * 500, 20)
         self.assertEqual(len(out), 20)
         self.assertTrue(out.endswith("…"))
+
+    def test_wide_characters_count_double(self):
+        out = status_visual.clip("\u6f22" * 50, 20)
+        self.assertLessEqual(status_visual.text_width(out), 20)
+        self.assertTrue(out.endswith("\u2026"))
+        self.assertEqual(status_visual.text_width("a\u6f22\uff21"), 5)
 
     def test_short_text_is_untouched(self):
         self.assertEqual(status_visual.clip("short", 20), "short")
@@ -256,6 +263,26 @@ class RenderSvg(unittest.TestCase):
                 self.assertNotIn("onload", svg.replace("onload=alert(1)&gt;", ""))
                 self.assertLess(len(svg), 40_000)
 
+    def test_every_text_has_a_fill_class_so_dark_mode_is_legible(self):
+        svg = self.svg(prs=[pr(20), pr(21, ci="failing", behind=True)], issues=[
+            issue(7, "[owner] A-O1: do it", ["owner-todo"]), issue(8, "b", ["blocked"]), issue(9, "n", ["needs-owner"])])
+        fills = {"fg", "muted", "ok", "info", "warn", "bad"}
+        els = list(ET.fromstring(svg).iter("{http://www.w3.org/2000/svg}text"))
+        self.assertGreater(len(els), 20)
+        for el in els:
+            self.assertTrue(fills & set(el.get("class", "").split()), ET.tostring(el, encoding="unicode"))
+
+    def test_wide_characters_cannot_overflow_the_columns(self):
+        svg = self.svg(prs=[pr(20, "\u6f22" * 70)], issues=[issue(8, "\u6f22" * 70, ["blocked"])])
+        for t in texts(svg):
+            self.assertLessEqual(status_visual.text_width(t), 160, t)  # a whole row, never a 70-wide title
+        self.assertLessEqual(status_visual.text_width(max(texts(svg), key=status_visual.text_width)), status_visual.MAX_TITLE + 40)
+
+    def test_unknown_merge_state_is_shown_and_never_ready_to_merge(self):
+        m = model(prs=[pr(20, merge_unknown=True)])
+        self.assertEqual([b for b in m["blockers"] if b["kind"] == "pr-waiting"], [])
+        self.assertIn("merge state unknown", "\n".join(texts(status_visual.render_svg(m))))
+
     def test_long_titles_are_clipped(self):
         svg = self.svg(prs=[pr(20, "y" * 400)])
         self.assertNotIn("y" * (status_visual.MAX_TITLE + 1), svg)
@@ -323,6 +350,7 @@ class FakeApi:
     def __init__(self, pulls=(), mergeable=None, runs=None, issues=None):
         self.pulls, self.mergeable, self.runs, self.issues = list(pulls), mergeable or {}, runs or {}, issues or {}
         self.paths = []
+        self.mergeable = {k: list(v) if isinstance(v, list) else [v] for k, v in self.mergeable.items()}
 
     def __call__(self, path):
         self.paths.append(path)
@@ -331,7 +359,8 @@ class FakeApi:
             return {"check_runs": self.runs.get(sha, [])}
         if "/pulls/" in path:
             n = int(path.split("/pulls/")[1].split("?")[0])
-            return {"number": n, "mergeable_state": self.mergeable.get(n, "clean")}
+            seq = self.mergeable.get(n, ["clean"])
+            return {"number": n, "mergeable_state": seq.pop(0) if len(seq) > 1 else seq[0]}
         if "/pulls?" in path:
             return self.pulls
         if "/issues?" in path:
@@ -340,12 +369,13 @@ class FakeApi:
         raise AssertionError(f"unexpected path {path}")
 
 
-def api_pr(number, sha, draft=False, title="t"):
-    return {"number": number, "title": title, "draft": draft, "head": {"sha": sha}, "state": "open"}
+def api_pr(number, sha, draft=False, title="t", repo="o/r", assoc="OWNER"):
+    head = {"sha": sha, "repo": {"full_name": repo} if repo else None}
+    return {"number": number, "title": title, "draft": draft, "head": head, "state": "open", "author_association": assoc}
 
 
-def run(status, conclusion=None):
-    return {"status": status, "conclusion": conclusion}
+def run(status, conclusion=None, name="unit"):
+    return {"name": name, "status": status, "conclusion": conclusion}
 
 
 def api_issue(number, labels, title="t", state="open", pull=False):
@@ -357,8 +387,8 @@ def api_issue(number, labels, title="t", state="open", pull=False):
 
 
 class Fetch(unittest.TestCase):
-    def fetch(self, api):
-        return status_fetch.fetch(api, "o/r")
+    def fetch(self, api, sleeps=None):
+        return status_fetch.fetch(api, "o/r", sleep=(sleeps if sleeps is not None else []).append)
 
     def ci(self, runs):
         api = FakeApi(pulls=[api_pr(1, "sha1")], runs={"sha1": runs})
@@ -380,6 +410,38 @@ class Fetch(unittest.TestCase):
 
     def test_ci_is_none_without_runs(self):
         self.assertEqual(self.ci([]), "none")
+
+    def test_the_status_workflows_own_check_run_never_counts(self):
+        ok = run("completed", "success")
+        self.assertEqual(self.ci([ok, run("in_progress", name="publish")]), "passing")
+        self.assertEqual(self.ci([ok, run("completed", "failure", name="publish")]), "passing")
+        self.assertEqual(self.ci([ok, run("completed", "cancelled", name="publish")]), "passing")
+        self.assertEqual(self.ci([run("in_progress", name="publish")]), "none")
+        self.assertEqual(self.ci([run("completed", "failure"), run("in_progress", name="publish")]), "failing")
+
+    def test_fork_prs_from_outsiders_are_dropped_before_any_other_call(self):
+        api = FakeApi(pulls=[api_pr(1, "s1"), api_pr(2, "s2", repo="evil/r", assoc="NONE"),
+                             api_pr(3, "s3", repo=None, assoc="CONTRIBUTOR"), api_pr(4, "s4", repo="x/r", assoc="FIRST_TIME_CONTRIBUTOR"),
+                             api_pr(5, "s5", repo="friend/r", assoc="COLLABORATOR"), api_pr(6, "s6", repo="o/r", assoc="NONE")])
+        self.assertEqual([p["number"] for p in self.fetch(api)["prs"]], [1, 5, 6])
+        self.assertFalse(any(f"/pulls/{n}" in p or f"s{n}/" in p for p in api.paths for n in (2, 3, 4)), api.paths)
+
+    def test_unknown_merge_state_is_retried_once(self):
+        api = FakeApi(pulls=[api_pr(1, "s1")], mergeable={1: ["unknown", "behind"]})
+        sleeps = []
+        pr1 = self.fetch(api, sleeps)["prs"][0]
+        self.assertEqual((pr1["behind"], pr1["merge_unknown"], len(sleeps)), (True, False, 1))
+
+    def test_still_unknown_after_the_retry_is_flagged(self):
+        api = FakeApi(pulls=[api_pr(1, "s1")], mergeable={1: "unknown"})
+        sleeps = []
+        pr1 = self.fetch(api, sleeps)["prs"][0]
+        self.assertEqual((pr1["behind"], pr1["merge_unknown"], len(sleeps)), (False, True, 1))
+
+    def test_known_merge_state_is_not_retried(self):
+        sleeps = []
+        pr1 = self.fetch(FakeApi(pulls=[api_pr(1, "s1")]), sleeps)["prs"][0]
+        self.assertEqual((pr1["merge_unknown"], sleeps), (False, []))
 
     def test_pr_fields_and_behind(self):
         api = FakeApi(pulls=[api_pr(1, "s1", draft=True, title="T1"), api_pr(2, "s2")], mergeable={2: "behind"})
@@ -426,6 +488,37 @@ class Fetch(unittest.TestCase):
             with self.subTest(bad):
                 with self.assertRaises(status_fetch.FetchError):
                     status_fetch.fetch(FakeApi(), bad)
+
+
+class GhApi(unittest.TestCase):
+    """gh_api against a fake `gh` process: --paginate --slurp output shapes."""
+
+    def call(self, stdout, returncode=0, stderr=""):
+        done = subprocess.CompletedProcess([], returncode, stdout, stderr)
+        with mock.patch.object(status_fetch.subprocess, "run", return_value=done) as m:
+            result = status_fetch.gh_api("repos/o/r/x")
+        self.assertEqual(m.call_args.args[0][:2], ["gh", "api"])
+        return result
+
+    def test_pages_of_arrays_are_flattened(self):
+        self.assertEqual(self.call('[[{"n": 1}, {"n": 2}], [{"n": 3}]]'), [{"n": 1}, {"n": 2}, {"n": 3}])
+
+    def test_one_object_comes_back_as_the_object(self):
+        self.assertEqual(self.call('[{"mergeable_state": "clean"}]'), {"mergeable_state": "clean"})
+
+    def test_pages_of_check_runs_are_merged(self):
+        pages = [{"total_count": 3, "check_runs": [{"name": "a"}, {"name": "b"}]}, {"total_count": 3, "check_runs": [{"name": "c"}]}]
+        self.assertEqual([r["name"] for r in self.call(json.dumps(pages))["check_runs"]], ["a", "b", "c"])
+
+    def test_an_empty_array_stays_empty(self):
+        self.assertEqual(self.call("[]"), [])
+        self.assertEqual(self.call("[[]]"), [])
+
+    def test_failures_raise_fetch_error(self):
+        with self.assertRaises(status_fetch.FetchError):
+            self.call("", returncode=1, stderr="HTTP 403")
+        with self.assertRaises(status_fetch.FetchError):
+            self.call("not json")
 
 
 if __name__ == "__main__":
