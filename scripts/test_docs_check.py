@@ -193,8 +193,8 @@ class ScopedAllowlist(Base):
         self.assertIn("docs/B.md", p.note)
 
     def test_scoped_entry_covers_links_too(self):
-        r = self.repo({"docs/A.md": "[x](old.md)\n"}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
-        self.assertEqual(r.check(), [])
+        r = self.repo({"docs/A.md": "[x](old.md)\n", "agents/p.md": "[x](../docs/old.md)\n"}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
+        self.assertEqual([(p.kind, p.file) for p in r.check()], [("broken-link", "agents/p.md")])
 
     def test_scope_without_at_sign_is_bad(self):
         r = self.repo({"docs/A.md": "`docs/old.md`\n"}, allow="docs/old.md docs/A.md  # reason\n")
