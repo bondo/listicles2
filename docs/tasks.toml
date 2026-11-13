@@ -603,7 +603,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-21"]
-notes = "Tooling env (CLAUDE.md). Effort S. CLAUDE.md says one review round per reviewer session; change it only if the owner agrees, then drop 'pending' from 7.7.5. Reviewers still never edit or push."
+notes = "Tooling env (CLAUDE.md). Effort S. CLAUDE.md says one review round per reviewer session; change it only if the owner agrees, then drop 'pending' from 7.7.5. Reviewers still never edit or push. If the owner declines, delete the pending bullet of 7.7.5 and set this task done."
 
 [[task]]
 id = "M0.5-O4"
