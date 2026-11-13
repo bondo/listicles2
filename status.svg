@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="562" viewBox="0 0 880 562" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones, 0 PRs waiting, 1 blockers</desc><style>.bg{fill:#fff}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="562" class="bg"/>
+<text x="24" y="36" class="fg t">Listicles status</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-13 09:54 UTC</text>
+<text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 17. Outside questions: 0.</text>
+<text x="24" y="90" class="fg h">Milestones</text>
+<line x1="24" y1="98" x2="856" y2="98" class="rule"/>
+<text x="24" y="124" class="fg h">M0</text>
+<rect x="90" y="113" width="560" height="12" rx="3" class="track"/>
+<rect x="90" y="113" width="500" height="12" rx="3" class="bar"/>
+<text x="666" y="124" class="fg">89%  25/28  current</text>
+<text x="24" y="148" class="fg">M0.5</text>
+<rect x="90" y="137" width="560" height="12" rx="3" class="track"/>
+<rect x="90" y="137" width="220" height="12" rx="3" class="bar"/>
+<text x="666" y="148" class="fg">39%  11/28</text>
+<text x="24" y="172" class="fg">M1</text>
+<rect x="90" y="161" width="560" height="12" rx="3" class="track"/>
+<text x="666" y="172" class="fg">0%  0/10</text>
+<text x="24" y="196" class="fg">M2</text>
+<rect x="90" y="185" width="560" height="12" rx="3" class="track"/>
+<text x="666" y="196" class="muted">not planned yet</text>
+<text x="24" y="220" class="fg">M3</text>
+<rect x="90" y="209" width="560" height="12" rx="3" class="track"/>
+<text x="666" y="220" class="muted">not planned yet</text>
+<text x="24" y="244" class="fg">M4</text>
+<rect x="90" y="233" width="560" height="12" rx="3" class="track"/>
+<text x="666" y="244" class="muted">not planned yet</text>
+<text x="24" y="268" class="fg">M5</text>
+<rect x="90" y="257" width="560" height="12" rx="3" class="track"/>
+<text x="666" y="268" class="muted">not planned yet</text>
+<text x="24" y="292" class="fg">M6</text>
+<rect x="90" y="281" width="560" height="12" rx="3" class="track"/>
+<text x="666" y="292" class="muted">not planned yet</text>
+<text x="24" y="326" class="fg h">Current chain: M0</text>
+<text x="856" y="326" class="muted s" text-anchor="end">open tasks in order</text>
+<line x1="24" y1="334" x2="856" y2="334" class="rule"/>
+<text x="24" y="358" class="ok">ready</text>
+<text x="150" y="358" class="fg h">M0-11</text>
+<text x="220" y="358" class="fg">Tooling session B: align REVIEW.md, CLAUDE.md, agents/pr…</text>
+<text x="24" y="380" class="warn">blocked</text>
+<text x="150" y="380" class="fg h">M0-FU</text>
+<text x="220" y="380" class="fg">Follow-up burn-down for M0 (close or re-defer each open …</text>
+<text x="24" y="402" class="ok">ready</text>
+<text x="150" y="402" class="fg h">M0-O4</text>
+<text x="220" y="402" class="fg">Confirm the CODEOWNERS handle</text>
+<text x="24" y="436" class="fg h">Owner queue</text>
+<text x="856" y="436" class="muted s" text-anchor="end">open PRs that are not drafts</text>
+<line x1="24" y1="444" x2="856" y2="444" class="rule"/>
+<text x="24" y="468" class="muted">No open PRs waiting for the owner.</text>
+<text x="24" y="502" class="fg h">BLOCKERS</text>
+<text x="856" y="502" class="muted s" text-anchor="end">1 open</text>
+<line x1="24" y1="510" x2="856" y2="510" class="rule"/>
+<text x="24" y="534" class="warn">task</text>
+<text x="120" y="534" class="fg h">M0-FU</text>
+<text x="190" y="534" class="fg">waits on M0-11</text>
+</svg>

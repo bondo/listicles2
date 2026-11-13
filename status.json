@@ -1,0 +1,50 @@
+{
+  "blockers": 1,
+  "current_milestone": "M0",
+  "followups": 17,
+  "generated_at": "2026-11-13T09:54:30Z",
+  "milestones": [
+    {
+      "done": 25,
+      "id": "M0",
+      "total": 28
+    },
+    {
+      "done": 11,
+      "id": "M0.5",
+      "total": 28
+    },
+    {
+      "done": 0,
+      "id": "M1",
+      "total": 10
+    },
+    {
+      "done": 0,
+      "id": "M2",
+      "total": 0
+    },
+    {
+      "done": 0,
+      "id": "M3",
+      "total": 0
+    },
+    {
+      "done": 0,
+      "id": "M4",
+      "total": 0
+    },
+    {
+      "done": 0,
+      "id": "M5",
+      "total": 0
+    },
+    {
+      "done": 0,
+      "id": "M6",
+      "total": 0
+    }
+  ],
+  "outside_questions": 0,
+  "owner_queue": 0
+}
