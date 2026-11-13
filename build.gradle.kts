@@ -306,5 +306,4 @@ val testLicenseeGate =
     }
 
 // Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
-// TEMP: testLicenseeGate is re-wired in the next commit (with the R1-01 fix), so this failing-test commit passes the pre-commit hook.
-tasks.named("detekt") { dependsOn(":app:licensee", ":core:domain:licensee") }
+tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }
