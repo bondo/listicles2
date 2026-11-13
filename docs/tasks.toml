@@ -495,7 +495,7 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21"]
 
 [[task]]
 id = "M0.5-O1"
@@ -582,6 +582,16 @@ assignee = "process"
 risk = "normal"
 depends_on = []
 notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11)."
+
+[[task]]
+id = "M0.5-21"
+title = "Usage-limit handling: ORCHESTRATION pause protocol, early warning, limit failures are not stalls, push after each step, spend control, usage line in the state template (see #60)"
+milestone = "M0.5"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = ["M0.5-13"]
+notes = "Normal env (docs only: ORCHESTRATION.md, orchestrator-state.md). Effort S. Owner approved items 1-6 of #60 on 2026-11-12. The docs part is delivered before M0.5-13 on purpose; set done in the first PR after M0.5-13 merges (validate rejects done while a dependency is todo). Protected parts (agents/prompts/*, REVIEW.md reviewer incremental-findings rule) go to M0.5-19 or a tooling PR."
 
 [[task]]
 id = "M0.5-O4"
