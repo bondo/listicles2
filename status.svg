@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="880" height="562" viewBox="0 0 880 562" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones, 0 PRs waiting, 1 blockers</desc><style>.bg{fill:#fff}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="562" class="bg"/>
 <text x="24" y="36" class="fg t">Listicles status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-13 12:32 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-13 17:31 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 18. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -33,7 +33,7 @@
 <text x="24" y="326" class="fg h">Current chain: M0</text>
 <text x="856" y="326" class="muted s" text-anchor="end">open tasks in order</text>
 <line x1="24" y1="334" x2="856" y2="334" class="rule"/>
-<text x="24" y="358" class="ok">ready</text>
+<text x="24" y="358" class="info">in review #80</text>
 <text x="150" y="358" class="fg h">M0-11</text>
 <text x="220" y="358" class="fg">Tooling session B: align REVIEW.md, CLAUDE.md, agents/pr…</text>
 <text x="24" y="380" class="warn">blocked</text>
