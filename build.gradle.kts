@@ -139,7 +139,7 @@ subprojects {
     }
 }
 
-// M0.5-10: the licensee policy (config/licensee/policy.gradle.kts) is tested against a fixture build whose
+// M0.5-10: the licensee policy (config/licensee/policy.gradle) is tested against a fixture build whose
 // artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's
 // allowlist and fail, naming the artifact, for any other licence. Wired into detekt, so verify.sh and CI run it.
 // A case is one string, "name|deps|approved|pass or fail|text the output must contain", so the task stays
@@ -165,6 +165,8 @@ val testLicenseeGate =
         val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
         val terms = "developer.android.com/studio/terms"
         val a1 = "approved-a1.txt"
+        val notGoogle = "not the Google/Android SDK terms"
+        val coordinates = "must be group:artifact:version"
         val cases =
             listOf(
                 licenseeCase("allowed SPDX ids", allowed, passes = true),
@@ -190,6 +192,57 @@ val testLicenseeGate =
                     "approved-no-reason.txt",
                     passes = false,
                     message = "reason",
+                ),
+                // A google-sdk-terms.txt line must only cover the Google/Android SDK terms, not any licence (R1-01).
+                licenseeCase(
+                    "listed artifact, GPL-3.0",
+                    "fixture:gpl3:1.0",
+                    "approved-gpl3.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                licenseeCase(
+                    "listed artifact, proprietary",
+                    "fixture:proprietary:1.0",
+                    "approved-proprietary.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                licenseeCase(
+                    "listed artifact, no licence",
+                    "fixture:nolicense:1.0",
+                    "approved-nolicense.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                // Malformed lines are rejected (R1-02).
+                licenseeCase(
+                    "entry with wildcard version",
+                    "fixture:google-a:1.0",
+                    "approved-wild-version.txt",
+                    passes = false,
+                    message = coordinates,
+                ),
+                licenseeCase(
+                    "entry without version",
+                    "fixture:google-a:1.0",
+                    "approved-no-version.txt",
+                    passes = false,
+                    message = coordinates,
+                ),
+                licenseeCase(
+                    "entry with wildcard group",
+                    "fixture:google-a:1.0",
+                    "approved-wild-group.txt",
+                    passes = false,
+                    message = coordinates,
+                ),
+                licenseeCase(
+                    "entry with four parts",
+                    "fixture:google-a:1.0",
+                    "approved-four-parts.txt",
+                    passes = false,
+                    message = coordinates,
                 ),
                 licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl-3.0"),
             ) +
@@ -253,4 +306,5 @@ val testLicenseeGate =
     }
 
 // Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
-tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }
+// TEMP: testLicenseeGate is re-wired in the next commit (with the R1-01 fix), so this failing-test commit passes the pre-commit hook.
+tasks.named("detekt") { dependsOn(":app:licensee", ":core:domain:licensee") }

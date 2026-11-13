@@ -1,5 +1,5 @@
 // Fixture build for the licensee gate (:testLicenseeGate in the root build). Not part of the app build.
-// It applies the real policy (../policy.gradle.kts) to local POM-only artifacts with chosen licences.
+// It applies the real policy (../policy.gradle) to local POM-only artifacts with chosen licences.
 pluginManagement {
     repositories {
         maven("https://maven-central.storage-download.googleapis.com/maven2")
