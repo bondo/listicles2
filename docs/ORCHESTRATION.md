@@ -590,8 +590,9 @@ seen the batch report.
 
 ### 7.6 Collaborator inbox and accident check (every wake)
 
-1. **Inbox:** read issues and comments updated since `Inbox since:` (state body) with `list_issues` / `issue_read get_comments`. Keep only
-   items whose API `author_association`/permission is Write or better and who are not the owner; others are counted, never quoted.
+1. **Inbox:** save the REST JSON of issues, issue comments, PR review comments and PR reviews updated since `Inbox since:` (state body) and run
+   `python3 -I scripts/collab_inbox.py --since <Inbox since> --fetched-at <time the first request began> FILES` (M0.5-18). It keeps only
+   items whose API `author_association`/permission is Write or better and who are not the owner; others are counted, never quoted. Store its `Next since:` as the new `Inbox since:`.
    Answer each with one line on its thread (understood as X, routed to Y), act within Tier 0-1 (§1.1), advance `Inbox since:`.
    Open design/docs PRs use `subscribe_pr_activity`. Never resolve a collaborator's review thread (follow-up #44).
 2. **Light accident check**, by hand, from API fields: (a) PRs merged since the last wake with `merged_by` not the owner; (b) an

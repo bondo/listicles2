@@ -43,12 +43,12 @@ def ids(problems):
 
 
 def delete_match(role, rule_id, pattern_index=0):
-    """The real prompt with the text that satisfies one pattern of one rule removed."""
+    """The real prompt with every match of one pattern of one rule removed."""
     rule = next(r for r in prompt_rules.RULES if r.id == rule_id)
     text = prompt_rules.normalize(real(role))
-    m = re.search(rule.patterns[pattern_index], text, re.I)
-    assert m, f"{rule_id} does not match {role}.md"
-    return text[: m.start()] + text[m.end() :]
+    out, n = re.subn(rule.patterns[pattern_index], "", text, flags=re.I)
+    assert n, f"{rule_id} does not match {role}.md"
+    return out
 
 
 class RealPromptsTests(unittest.TestCase):
