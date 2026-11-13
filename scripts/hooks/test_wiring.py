@@ -235,6 +235,20 @@ class M011Alignment(unittest.TestCase):
         self.assertIn("untested", rows["minor"].lower())
         self.has(rows["minor"], "docs/FOLLOW-UPS.md")
 
+    def test_status_exception_no_longer_lists_m0_11(self):
+        """R1-03: M0-11 is delivered by its own PR to main (the tasks ref), so 4.4's leave-it-todo exception must not name it."""
+        rows = lines_containing(read("docs", "ORCHESTRATION.md"), "Exception: tasks whose PR branch is the tasks ref")
+        self.assertEqual(len(rows), 1)
+        self.assertNotIn("M0-11", rows[0])
+        self.assertIn("M0-12", rows[0])
+
+    def test_delivered_m0_11_notes_say_so(self):
+        """R1-04: a done task's notes do not start with 'Still open'."""
+        m = re.search(r'id = "M0-11"\n.*?\nnotes = """(.*?)"""', read("docs", "tasks.toml"), re.S)
+        self.assertTrue(m)
+        self.assertTrue(m.group(1).startswith("Delivered by PR #80."), m.group(1)[:40])
+        self.assertNotIn("Still open", m.group(1))
+
     def test_handoff_template_refers_to_owner_work_by_number_only(self):
         self.has(read("handoff", "TEMPLATE.md"), "issue number only", "never restate")
 

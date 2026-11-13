@@ -140,8 +140,8 @@ class M011AlignmentTests(unittest.TestCase):
     """M0-11: the role prompts match ORCHESTRATION (1.1 autonomy, 4.4 done on the tasks ref, 5 handover, 7.2 reviewers)."""
 
     NEW_RULES = {
-        "orchestrator": {"no-stale-state-files", "autonomy", "checkin", "handover", "lock-takeover"},
-        "implementer": {"impl-test-first", "impl-done-on-tasks-ref"},
+        "orchestrator": {"no-stale-state-files", "autonomy", "checkin", "handover", "lock-takeover", "orch-deferral"},
+        "implementer": {"impl-test-first", "impl-done-on-tasks-ref", "impl-deferral"},
         "reviewer": {"reviewer-report-only"},
     }
 
@@ -174,6 +174,46 @@ class M011AlignmentTests(unittest.TestCase):
         self.assertIn("tasks ref", norm)
         self.assertIn("status = \"done\"", norm)
         self.assertIn("\u00a74.4", norm)
+
+    def test_every_pattern_of_the_new_rules_matches_one_place_only(self):
+        """R1-02: a pattern that matches several places is vacuous (deleting one clause still passes). Anchor it to its clause."""
+        for role, want in self.NEW_RULES.items():
+            norm = prompt_rules.normalize(real(role))
+            for rule in prompt_rules.RULES:
+                if rule.id in want:
+                    for pattern in rule.patterns:
+                        with self.subTest(rule=rule.id, pattern=pattern):
+                            self.assertEqual(len(re.findall(pattern, norm, re.I)), 1)
+
+    def weakened(self, role, rule_id, old, new=""):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old, norm)
+        self.assertIn(rule_id, ids(prompt_rules.check_text(role, norm.replace(old, new, 1))))
+
+    def test_deleting_one_clause_fails_its_rule(self):
+        for role, rule_id, old in (
+            ("orchestrator", "autonomy", "merges of any PR; "),
+            ("orchestrator", "autonomy", "and a relayed approval is refused"),
+            ("orchestrator", "lock-takeover", "and if nothing follows, ask the owner"),
+            ("orchestrator", "lock-takeover", "and `get_session` shows it is not working"),
+            ("orchestrator", "lock-takeover", "A holder that is working but has a stale `Updated:` is stalled, not dead:"),
+            ("reviewer", "reviewer-report-only", ", and tests without negative cases"),
+            ("orchestrator", "orch-deferral", "Never defer a blocker;"),
+            ("orchestrator", "orch-deferral", "without owner OK (`owner-ok` label)"),
+            ("orchestrator", "orch-deferral", "more than 8 open follow-ups for one milestone: stop deferring and ask the owner"),
+            ("implementer", "impl-deferral", "you do not decide"),
+            ("implementer", "impl-deferral", "put that question in `needs_owner` of your WORKER-RESULT"),
+        ):
+            with self.subTest(role=role, rule=rule_id, old=old):
+                self.weakened(role, rule_id, old)
+
+    def test_an_implementer_prompt_that_lets_it_defer_alone_is_rejected(self):
+        """R1-01: the old wording let an implementer defer a protected-area minor itself."""
+        old = ("once no blocker or major is open, minor/nit findings may be deferred to follow-up issues "
+               "(status `deferred`, link the issue)")
+        text = prompt_rules.normalize(real("implementer"))
+        self.assertNotIn(old, text)
+        self.assertIn("impl-deferral", ids(prompt_rules.check_text("implementer", old)))
 
     def test_reviewer_rule_rejects_a_prompt_that_lets_the_reviewer_push(self):
         text = real("reviewer").replace("NEVER edit or push the PR branch", "You may fix the PR branch")
