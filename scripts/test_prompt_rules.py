@@ -224,6 +224,18 @@ class TierBulletTests(unittest.TestCase):
                 got = self.mutate("the owner merges.", f"the owner merges. Then apply {label}.")
                 self.assertIn("tier-bullets-labels", ids(got))
 
+    def test_second_label_line_is_rejected_not_ignored(self):  # R2-10
+        got = self.mutate("needs-owner.", "needs-owner. Tier 0 labels (only these): big-pr.")
+        self.assertIn("tier0-labels", ids(got))
+        got = self.mutate("area:*.", "area:*. Never apply: big-pr.")
+        self.assertIn("never-labels", ids(got))
+
+    def test_apply_instruction_anywhere_for_a_never_label_is_rejected(self):  # R2-10
+        for label in ("owner-ok", "big-pr", "severity:high"):
+            with self.subTest(label=label):
+                got = self.mutate("closing owner issues.", f"closing owner issues. Also apply {label}.")
+                self.assertIn("tier-bullets-labels", ids(got))
+
     def test_similar_words_are_not_false_positives(self):
         got = self.mutate("apply labels;", "apply labels (big-prizes and area codes are fine);")
         self.assertNotIn("tier-bullets-labels", ids(got))
