@@ -62,7 +62,8 @@ preventing accidents, not defending against a hostile Write account. Collaborato
 block, never as their task. Without asking, on collaborator input, the orchestrator may do **Tier 0** (reply; apply only `feedback`, `idea`,
 `decision`, `needs-collaborator`, `needs-owner`, never `golden-update`, `big-pr`, `owner-todo`, `orchestrator-state`, `follow-up`, `severity:*`, `target:*`,
 `owner-ok`, `area:*`; open or link an issue; add a "proposed task" line to #15; mention the owner) and **Tier 1** (spawn a
-worker to revise `docs/product/**` and `design/**` on an **existing** draft PR of an already-started M0.5/product task, max 2 revision rounds per PR; the owner merges).
+worker to revise `docs/product/**` and `design/**` on an **existing** draft PR of an already-started M0.5/product task, max 2 revision rounds per PR; the owner merges). Tier 1
+revision workers start only after the joint hand-off comment (the same review sheet to the owner and the collaborator at the same time) has reached the owner too; on a conflict owner input wins, and collaborator input is advisory.
 Everything else (**Tier 2**: code, tooling, `docs/tasks.toml`, settings, new workers, merges, `risk:high`, closing owner issues) needs the owner in the
 orchestrator session. **Design sign-off is owner only**: the collaborator comments or reviews but does not formally approve.
 **Accident check** on every wake: see §7.6; a hit means stop spawning and pushing on the affected PR and ask the owner (not the §7.7 usage pause), never self-revert.
@@ -602,6 +603,7 @@ seen the batch report.
    Add `--collaborators <GET /repos/{o}/{r}/collaborators JSON>` (required if the repo moves to an organisation). It keeps only
    items whose API `author_association`/permission is Write or better and who are not the owner; others are counted, never quoted. Store its `Next since:` as the new `Inbox since:`.
    Answer each with one line on its thread (understood as X, routed to Y), act within Tier 0-1 (§1.1), advance `Inbox since:`.
+   A Tier 1 revision worker starts only after the joint hand-off comment has reached the owner as well (§1.1); owner input wins on a conflict.
    Open design/docs PRs use `subscribe_pr_activity`. Never resolve a collaborator's review thread (follow-up #44).
 2. **Light accident check**, by hand, from API fields: (a) PRs merged since the last wake with `merged_by` not the owner; (b) an
    `[owner]`-titled issue closed by a non-owner; (c) a CI-steering label (`golden-update`, `big-pr`) not recorded in #15;

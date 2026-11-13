@@ -487,7 +487,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-11", "M0.5-14"]
-notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet. The environment pick (tooling vs normal) is part of the prompt work (C2)."
+notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet. The environment pick (tooling vs normal) is part of the prompt work (C2). Design-reviewer role (review R5, docs/reviews/README.md): scores the rubric, max 2 Opus rounds per design PR, then one joint hand-off comment on the PR that mentions the owner and the collaborator at the same time (same review sheet and screenshots, plus a #15 line); collaborator input is advisory, the owner decides (D5); `owner-todo` only after 7 days pending."
 
 [[task]]
 id = "M0.5-FU"

@@ -40,7 +40,7 @@ thoughts on the issue or PR they are about, or open a new issue from a form.
 2. **Comments** on any issue or PR. No special syntax. When the team is choosing between options, you may start a line with
    `Decision:` to say which one you vote for.
 3. **PR reviews** on design and docs PRs. Comments are welcome. The "Approve" button is not needed: the owner signs
-   off (see below).
+   off (see below). The owner sees the same review sheet at the same time, and your input is advice: the owner decides.
 
 ## What happens next
 
