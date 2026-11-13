@@ -462,7 +462,8 @@ notes = "Tooling env (CI wiring). Effort S. Stdlib Python, test-first."
 id = "M0.5-13"
 title = "Metrics: orchestrator CSV comments per ORCHESTRATION 6 and scripts/agent_metrics.py to docs/agent-metrics.csv (P11, R5)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
+pr = 58
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-O11"]
@@ -495,7 +496,7 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22"]
 
 [[task]]
 id = "M0.5-O1"
@@ -587,12 +588,22 @@ notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before 
 id = "M0.5-21"
 title = "Usage-limit handling: ORCHESTRATION pause protocol, early warning, limit failures are not stalls, push after each step, spend control, usage line in the state template (see #60)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = ["M0.5-13"]
 pr = 63
-notes = "Normal env (docs only: ORCHESTRATION.md, orchestrator-state.md). Effort S. Owner approved items 1-6 of #60 on 2026-11-12. The docs part is delivered before M0.5-13 on purpose; set done in the first PR after M0.5-13 merges (validate rejects done while a dependency is todo). Protected parts (agents/prompts/*, REVIEW.md reviewer incremental-findings rule) go to M0.5-19 or a tooling PR."
+notes = "Normal env (docs only: ORCHESTRATION.md, orchestrator-state.md). Effort S. Owner approved items 1-6 of #60 on 2026-11-12. Protected parts (agents/prompts/*, REVIEW.md reviewer incremental-findings rule) go to M0.5-19 or a tooling PR; the CLAUDE.md change that 7.7.5 waits on is M0.5-22."
+
+[[task]]
+id = "M0.5-22"
+title = "CLAUDE.md: allow one reviewer session to review several small docs-only PRs (the pending bullet of ORCHESTRATION 7.7.5)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-21"]
+notes = "Tooling env (CLAUDE.md). Effort S. CLAUDE.md says one review round per reviewer session; change it only if the owner agrees, then drop 'pending' from 7.7.5. Reviewers still never edit or push."
 
 [[task]]
 id = "M0.5-O4"

@@ -135,9 +135,9 @@ goes to comments, not the body.
   `get_session` → `lineage.depth`).
 * `Updated:` UTC timestamp of the last edit, and what triggered it.
 * `Tasks ref:` the git ref whose `docs/tasks.toml` is canonical (§4.2).
-* `Usage:` one line, `ok | near limit (5-hour) | near limit (7-day) | paused until HH:MM UTC`, with when it was read (§7.7.1). The owner reads this line first.
+* `Usage:` one line, `ok | near limit (5-hour) | near limit (7-day) | near limit (overage) | paused until HH:MM UTC`, with when it was read (§7.7.1). The owner reads this line first.
 * **Sessions**: one row per live worker: id, role, tags, branch, **task ids** (the claims), spawned-at,
-  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived`).
+  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived | interrupted (usage)`; the last is set by §7.7.2 and cleared by §7.7.4).
 * **Branches**: one row per active branch: holder (session id or `none`),
   **tasks awaiting review/merge** (committed, not yet `done` in the file),
   `reviewed_through` SHA, unreviewed commits since then and their disposition.
@@ -481,7 +481,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
 * **Branch lock**: before spawning a writer, set the branch's holder in the state body.
   Only one writer per branch at a time. Reviewers hold no lock and never push.
 * **Parallelism cap** (§7.7.5): at most 3 worker sessions run at once, writers and reviewers together.
-* The orchestrator's own **45-minute check-in** (`send_later`, §1.1) is re-scheduled on every wake, and it is
+* The orchestrator's own **45-minute check-in** (`send_later`, §1.1) is re-scheduled on every wake (except while paused, §7.7.2), and it is
   the check-in for all workers too. **Every wake starts with the usage read of §7.7.1**, before anything is spawned. A reviewer or short worker may get an extra earlier one (about 30 min). Record the
   trigger ids in the body and delete finished ones.
 
@@ -563,7 +563,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
 |---|---|
 | First check shows a stall, a block or red CI (retro R12) | Diagnose at once, do not wait a check-in: read targeted `list_events` (`kinds` filter, small `limit`) and the job log (via `ci-triage`). Orchestrator context is a minor cost: orchestrators hand over themselves (§5). |
 | Worker idle, no `WORKER-RESULT` (the R12 row above comes first: diagnose, then nudge) | `send_message` once: "post your WORKER-RESULT". If there is still nothing at the next check-in, treat it as dead. |
-| `status_bucket` failed, or no progress across two check-ins | Mark the row `failed` and log an incident. Read `handoff/<branch>.md` and `git ls-remote` HEAD. Interrupt the session if it might still push. Only then release the lock and spawn a fresh worker from the handoff file. |
+| `status_bucket` failed, or no progress across two check-ins | **First apply §7.7.3**: a limit failure goes to the usage-limit row below, not here. Otherwise mark the row `failed` and log an incident. Read `handoff/<branch>.md` and `git ls-remote` HEAD. Interrupt the session if it might still push. Only then release the lock and spawn a fresh worker from the handoff file. |
 | Branch HEAD moved but no session holds the lock | Stop spawning on that branch. Identify the commit's author (`git log`). Log a `concurrent-push` incident and ask the owner. |
 | Model fallback (`last_served_model` ≠ `configured_model`) | Log an incident. For a reviewer, rerun the round on the intended model before trusting a "ready" verdict. |
 | Escalation (PLAN §9.1: 3 identical verify failures, any blocker in 2 consecutive rounds) | Spawn a fresh implementer at high effort from the handoff file. |
@@ -621,13 +621,15 @@ can be days from its reset and must not stop work. Observed live (2026-11-13): `
 `rateLimitType` `five_hour` and `seven_day`, `isUsingOverage` false, `resetsAt` in epoch seconds. Any other `status` value (for
 example a rejected status) is from #60 and **not yet observed**. Set the state issue's `Usage:` line (§3.1):
 * **ok**: `status` is `allowed` and `isUsingOverage` is false.
-* **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning` (or `isUsingOverage` is true). **Do not
-  pause.** Keep to the parallelism cap (§7.7.5) and block batched extras (no optional sessions, no several tasks started at once
-  beyond the cap); required work (ready tasks, review rounds for open PRs) goes on. Name the reset time in the `Usage:` line.
-* **near limit (5-hour)**: `rateLimitType` is `five_hour` and `status` is not `allowed`, or one worker reported a limit failure
-  (§7.7.3). **Start no new worker and no review round**, let the running ones finish their current step, and set one extra
-  check-in about 10 minutes out. If the next look still shows it, or any session failed on the limit, run the pause protocol
-  (§7.7.2). A 5-hour warning that clears does not pause.
+* **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning`. **Do not pause.** Keep to the
+  parallelism cap (§7.7.5) and block batched extras (no optional sessions, no several tasks started at once beyond the cap);
+  required work (ready tasks, review rounds for open PRs) goes on. Name the reset time in the `Usage:` line.
+* **near limit (overage)**: `isUsingOverage` is true, whatever `rateLimitType` and `status` say. Handled like the 7-day state:
+  no pause, the cap, no batched extras.
+* **near limit (5-hour)**: `rateLimitType` is `five_hour` and `status` is `allowed_warning`. **Start no new worker and no review
+  round**, let the running ones finish their current step, and set one extra check-in about 10 minutes out. If the next look
+  still shows it, run the pause protocol (§7.7.2). A 5-hour warning that clears does not pause. (A limit failure is not this
+  state: it is **limit reached** below.)
 * **limit reached**: a `status` that says the limit is rejected or exhausted (any value other than `allowed` and `allowed_warning`, any
   `rateLimitType`), or a limit failure (§7.7.3): run the pause protocol (§7.7.2) at once. For a `seven_day` limit the reset can be days
   away: say so in the `PAUSED` comment and ask the owner whether to wait.
@@ -645,7 +647,8 @@ but say so in the `Usage:` line.
    (`git ls-remote`) and whether it already posted a `WORKER-RESULT`. Set its Sessions row to `interrupted (usage)`.
 3. **Delete the pending check-ins**: the 45-minute check-in and every extra or post-spawn check (`delete_trigger`). A check-in that
    fires during the pause only burns usage or fails. Keep the resume reminder of step 1.
-4. **Post one `PAUSED` comment on the state issue** (#15), then set `Usage:` to `paused until HH:MM UTC` and rewrite the body:
+4. **Post one `PAUSED` comment on the state issue** (#15), set `Usage:` to `paused until HH:MM UTC` and rewrite the body (Sessions and
+   Scheduled tasks rows). The comment reads:
    ```
    PAUSED (usage limit)
    limit: {rateLimitType}, status {status}, resets {UTC}; resume reminder {trigger id} at {UTC}
@@ -664,7 +667,7 @@ but say so in the `Usage:` line.
 * a failure whose detail names something else still counts as a failure, limit or no limit.
 
 **§7.7.4 Resume** (the reminder wake, or a successor that finds a `PAUSED` comment with no `RESUMED` after it):
-1. `get_session` (own): if `status` is still not `allowed`, post one line, `send_later` at the new `resetsAt + 5 minutes` (delete the
+1. `get_session` (own) and redo §7.7.1: if the state is still **limit reached** or **near limit (5-hour)**, post one line, `send_later` at the new `resetsAt + 5 minutes` (delete the
    spent reminder) and stop. Otherwise continue.
 2. For each interrupted or limit-failed session in the newest `PAUSED` comment: `get_session`, then `send_message`
    "usage limit reset: continue from your last pushed commit and finish your task" (priority `later`). Reviewers: "re-check your
@@ -672,14 +675,14 @@ but say so in the `Usage:` line.
    respawned from `handoff/<branch>.md` and the pushed branch. Resume implementers before reviewers.
 3. **Re-arm the 45-minute check-in** and the post-spawn checks of anything resumed; record the trigger ids; delete the spent
    resume reminder.
-4. Post a `RESUMED` comment (one line: time, who was resumed, who was respawned), set `Usage:` to `ok`, then run the
+4. Post a `RESUMED` comment (one line: time, who was resumed, who was respawned), set `Usage:` from a fresh §7.7.1 read (it may well be `near limit (7-day)`), then run the
    normal wake steps (§4.3 ready query, §7.6 inbox and accident check). The PRs listed as open in `PAUSED` are re-read from GitHub,
    not trusted from the comment.
 
 **§7.7.5 Spend control.** There is no dollar cap, but limits can be forecast and made less likely:
 * **Parallelism cap:** at most 3 worker sessions at once (§7.1), writers and reviewers together. Raise it only by editing this line
   in a reviewed PR, after the metrics show room.
-* **Fewer review sessions for small docs PRs. Pending a CLAUDE.md tooling change, not in effect until then:** CLAUDE.md says one
+* **Fewer review sessions for small docs PRs. Pending a CLAUDE.md tooling change (task M0.5-22), not in effect until then:** CLAUDE.md says one
   review round per reviewer session, so today every PR round has its own reviewer. Once CLAUDE.md allows it, one Opus reviewer
   session may review several ready docs-only PRs (each about 100 changed lines or fewer, no process file, no gate or threshold) one
   after another (one round row and one findings comment per PR, §6.2); gate, hook, guard, threshold and `risk:high` PRs would

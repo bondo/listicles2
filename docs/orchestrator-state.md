@@ -17,7 +17,7 @@ unless you are the orchestrator named below; comment instead.
 **Updated:** {UTC}, after {event}
 **Inbox since:** {UTC} (collaborator comments and issues are read from here, ORCHESTRATION.md §7.6; only owner comments on #15 become state, §3.2)
 **Tasks ref:** `{branch}` (the one ref that carries `docs/tasks.toml`: `claude/orchestration-review` until M0-O8, then `main`)
-**Usage:** {ok | near limit (5-hour) | near limit (7-day) | paused until HH:MM UTC} (read {UTC} from `rate_limit_info`, ORCHESTRATION.md §7.7.1; the owner reads this line first. Issue #15's older "Current" section carries the same line until the body is rewritten into this shape)
+**Usage:** {ok | near limit (5-hour) | near limit (7-day) | near limit (overage) | paused until HH:MM UTC} (read {UTC} from `rate_limit_info`, ORCHESTRATION.md §7.7.1; the owner reads this line first. Issue #15's older "Current" section carries the same line until the body is rewritten into this shape)
 
 ## Now
 - Milestone: {Mx}, PR #{n} ({draft/ready}), batch {id}: {one line}
