@@ -1,0 +1,31 @@
+// M0.5-10 licensee policy (owner decision D3, issue #15). Applied by :app, :core:domain and the test fixture.
+// Groovy, not Kotlin: a Kotlin script plugin cannot see the licensee plugin's types.
+//
+// Allowed everywhere: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause. Any other licence, an unknown licence URL or a
+// missing licence fails `licensee`. Google/Android SDK terms (Firebase, ML Kit) are NOT allowed as a licence: the
+// owner approves each artifact when it is first added, as one line in google-sdk-terms.txt. A line allows exactly
+// that group:artifact:version, so another artifact, or the same artifact at a new version, fails until it is listed.
+
+def googleTermsFile = project.ext.has('licenseeGoogleTermsFile') ?
+        project.ext.get('licenseeGoogleTermsFile') as File :
+        rootProject.file('config/licensee/google-sdk-terms.txt')
+
+licensee {
+    allow('Apache-2.0')
+    allow('MIT')
+    allow('BSD-2-Clause')
+    allow('BSD-3-Clause')
+
+    googleTermsFile.readLines().collect { it.trim() }.findAll { !it.isEmpty() && !it.startsWith('#') }.each { line ->
+        def coordinates = line.contains('#') ? line.substring(0, line.indexOf('#')).trim() : line
+        def reason = line.contains('#') ? line.substring(line.indexOf('#') + 1).trim() : ''
+        def parts = coordinates.split(':') as List
+        if (parts.size() != 3 || parts.any { it.isEmpty() || it.contains('*') }) {
+            throw new GradleException("${googleTermsFile.name}: '${line}' must be group:artifact:version (exact, no wildcards)")
+        }
+        if (reason.isEmpty()) {
+            throw new GradleException("${googleTermsFile.name}: '${line}' needs a reason after '#' (why the owner approved these terms)")
+        }
+        allowDependency(parts[0], parts[1], parts[2]) { because(reason) }
+    }
+}

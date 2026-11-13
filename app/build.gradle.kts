@@ -2,7 +2,11 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
+    alias(libs.plugins.licensee)
 }
+
+// M0.5-10: shipped dependencies must be on the owner's licence allowlist.
+apply(from = rootProject.file("config/licensee/policy.gradle"))
 
 android {
     namespace = "dev.listicles.app"

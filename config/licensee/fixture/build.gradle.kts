@@ -7,7 +7,7 @@ plugins {
 
 // The Google/Android SDK terms list the policy reads. Without -Papproved it is empty.
 extra["licenseeGoogleTermsFile"] = file(providers.gradleProperty("approved").getOrElse("none.txt"))
-apply(from = "../policy.gradle.kts")
+apply(from = "../policy.gradle")
 
 dependencies {
     providers

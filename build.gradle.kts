@@ -163,36 +163,51 @@ val testLicenseeGate =
         val marker = layout.buildDirectory.file("licensee-gate.ok")
         outputs.file(marker)
         val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
+        val terms = "developer.android.com/studio/terms"
+        val a1 = "approved-a1.txt"
         val cases =
             listOf(
                 licenseeCase("allowed SPDX ids", allowed, passes = true),
-                licenseeCase("google terms, listed artifact", "fixture:google-a:1.0", "approved-a1.txt", passes = true),
-                licenseeCase("google terms, not listed", "fixture:google-a:1.0", passes = false, message = "google-a"),
+                licenseeCase("google terms, listed artifact", "fixture:google-a:1.0", a1, passes = true),
+                licenseeCase("google terms, not listed", "fixture:google-a:1.0", passes = false, message = terms),
                 licenseeCase(
                     "google terms, other artifact",
                     "fixture:google-b:1.0",
-                    "approved-a1.txt",
+                    a1,
                     passes = false,
-                    message = "google-b",
+                    message = terms,
                 ),
                 licenseeCase(
                     "google terms, other version",
                     "fixture:google-a:2.0",
-                    "approved-a1.txt",
+                    a1,
                     passes = false,
-                    message = "google-a",
+                    message = terms,
                 ),
                 licenseeCase(
-                    "listed entry without reason",
+                    "entry without reason",
                     "fixture:google-a:1.0",
                     "approved-no-reason.txt",
                     passes = false,
                     message = "reason",
                 ),
-                licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl3"),
+                licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl-3.0"),
             ) +
-                listOf("gpl3", "lgpl21", "agpl3", "epl2", "mpl2", "proprietary", "nolicense").map {
-                    licenseeCase("disallowed licence: $it", "fixture:$it:1.0", passes = false, message = it)
+                listOf(
+                    "gpl3" to "gpl-3.0",
+                    "lgpl21" to "lgpl-2.1",
+                    "agpl3" to "agpl-3.0",
+                    "epl2" to "EPL-2.0",
+                    "mpl2" to "MPL/2.0",
+                    "proprietary" to "example.com/license",
+                    "nolicense" to "declares no licenses",
+                ).map { (artifact, message) ->
+                    licenseeCase(
+                        "disallowed licence: $artifact",
+                        "fixture:$artifact:1.0",
+                        passes = false,
+                        message = message,
+                    )
                 }
 
         doLast {
@@ -236,3 +251,6 @@ val testLicenseeGate =
             marker.get().asFile.writeText("ok\n")
         }
     }
+
+// Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
+tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }
