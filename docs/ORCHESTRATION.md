@@ -454,6 +454,13 @@ date,batch,session_id,kind,impact,recovery,prevention
 Suggested values for `kind`: `destructive-git`, `wrong-branch-push`, `concurrent-push`, `dead-session`,
 `stale-state`, `model-fallback`, `unreviewed-merge`, `budget-over`, `guard-bypass`, `task-drift`, `usage-limit` (§7.7).
 
+### 6.3a Review row (one per review run, at its `window_end`)
+
+`# metrics:review` block, columns `date,review_id,run_ref,findings,acted_on,ignored,disputed,deferred,cost_usd,window_end`;
+meaning, window rules and the usefulness rule are in `docs/reviews/README.md` §5. The script rejects an unknown `review_id`
+(`R1`..`R12`, not R2), a bad `run_ref` (PR number, ISO week or milestone), counts that do not add up to `findings`,
+`window_end` before `date`, non-whole-number counts, over-long fields and a repeated `(review_id, run_ref)`.
+
 ### 6.4 Batch summary
 
 When a batch closes, update the batch table in the state body: rounds, findings per round,
