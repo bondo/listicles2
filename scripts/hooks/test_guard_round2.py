@@ -26,7 +26,8 @@ class Base(unittest.TestCase):
     def dirty(self, on):
         p = os.path.join(self.d, "f.txt")
         if on:
-            open(p, "w").write("x")
+            with open(p, "w") as f:
+                f.write("x")
         elif os.path.exists(p):
             os.remove(p)
 
@@ -76,8 +77,8 @@ class UntestedBranches(Base):
     """R10-02: each of these survived a mutation run (the branch could be deleted with the suite still green)."""
 
     def test_internal_error_fails_closed(self):
-        code = ("import sys; sys.path.insert(0, %r); import pretooluse_guard as g\n"
-                "g.check_bash = lambda *a: 1 / 0\ng.run_guarded()" % os.path.dirname(GUARD))
+        code = (f"import sys; sys.path.insert(0, {os.path.dirname(GUARD)!r}); import pretooluse_guard as g\n"
+                "g.check_bash = lambda *a: 1 / 0\ng.run_guarded()")
         r = subprocess.run([sys.executable, "-I", "-c", code], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}, "cwd": self.d}),
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 2, r.stderr)
@@ -162,7 +163,8 @@ class PushConfigAliasForms(Base):
         d = repo()
         for k, v in (("alias.pf", "push --force"), ("alias.st", "status"), ("alias.nuke", "!git reset --hard"), ("alias.up", "push origin main")):
             subprocess.run(["git", "config", k, v], cwd=d, check=True)
-        open(os.path.join(d, "f.txt"), "w").write("x")
+        with open(os.path.join(d, "f.txt"), "w") as f:
+            f.write("x")
         for c in ("git pf origin work", "git nuke", "git up"):
             self.assertEqual(run("Bash", {"command": c}, d), 2, c)
         for c in ("git st", "git status"):

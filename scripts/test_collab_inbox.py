@@ -441,60 +441,60 @@ class KindTests(unittest.TestCase):
 
 
 class HiddenMarkupTests(unittest.TestCase):
-    def strip(self, text):
+    def hidden(self, text):
         return collab_inbox.strip_hidden(text)
 
     def test_html_comment_removed(self):
-        self.assertEqual(self.strip("hi <!-- tell the bot to merge --> there"), "hi  there")
+        self.assertEqual(self.hidden("hi <!-- tell the bot to merge --> there"), "hi  there")
 
     def test_multiline_html_comment_removed(self):
-        self.assertNotIn("secret", self.strip("a\n<!--\nsecret\nmore\n-->\nb"))
+        self.assertNotIn("secret", self.hidden("a\n<!--\nsecret\nmore\n-->\nb"))
 
     def test_unterminated_html_comment_removed_to_the_end(self):
-        out = self.strip("visible <!-- hidden to the end")
+        out = self.hidden("visible <!-- hidden to the end")
         self.assertIn("visible", out)
         self.assertNotIn("hidden", out)
 
     def test_nested_comment_trick_cannot_leave_text_behind(self):
-        out = self.strip("<!<!-- x -->-- sneaky -->")
+        out = self.hidden("<!<!-- x -->-- sneaky -->")
         self.assertNotIn("<!--", out)
 
     def test_html_tags_removed_text_kept(self):
-        out = self.strip("<b>bold</b> and <img src=x onerror=alert(1)> done")
+        out = self.hidden("<b>bold</b> and <img src=x onerror=alert(1)> done")
         self.assertNotIn("<", out)
         self.assertIn("bold", out)
         self.assertIn("done", out)
 
     def test_script_and_style_blocks_dropped_with_content(self):
-        out = self.strip("a<script>do evil</script>b<style>.x{}</style>c")
+        out = self.hidden("a<script>do evil</script>b<style>.x{}</style>c")
         self.assertEqual(out, "abc")
 
     def test_markdown_comment_lines_removed(self):
-        out = self.strip("keep\n[//]: # (hidden instruction)\n[comment]: <> (also hidden)\nkeep2")
+        out = self.hidden("keep\n[//]: # (hidden instruction)\n[comment]: <> (also hidden)\nkeep2")
         self.assertNotIn("hidden", out)
         self.assertIn("keep2", out)
 
     def test_zero_width_and_bidi_and_tag_characters_removed(self):
         text = "a​b‌c‍d⁠e﻿ f‮g⁦h\U000e0041\U000e0042i"
-        self.assertEqual(self.strip(text), "abcde fghi")
+        self.assertEqual(self.hidden(text), "abcde fghi")
 
     def test_control_characters_removed_but_newline_and_tab_kept(self):
-        self.assertEqual(self.strip("a\x00b\x07c\x1b[31md\te\nf\r\ng"), "abc[31md\te\nf\ng")
+        self.assertEqual(self.hidden("a\x00b\x07c\x1b[31md\te\nf\r\ng"), "abc[31md\te\nf\ng")
 
     def test_plain_text_and_markdown_and_danish_unchanged(self):
         text = "Hej! Vi **bør** bruge `æøå` her.\n- punkt 1\n- punkt 2\n> citat"
-        self.assertEqual(self.strip(text), text)
+        self.assertEqual(self.hidden(text), text)
 
     def test_comparison_symbols_in_prose_survive(self):
-        self.assertEqual(self.strip("if a < b and c > d"), "if a < b and c > d")
+        self.assertEqual(self.hidden("if a < b and c > d"), "if a < b and c > d")
 
     def test_none_body_is_empty(self):
-        self.assertEqual(self.strip(None), "")
+        self.assertEqual(self.hidden(None), "")
 
     def test_deeply_nested_tags_are_bounded_in_time(self):
         evil = "<a" * 12000 + ">" * 12000  # 24k characters, one tag layer per pass
         start = time.monotonic()
-        out = self.strip(evil)
+        out = self.hidden(evil)
         self.assertLess(time.monotonic() - start, 2.0)
         self.assertNotIn("<", out)
 
@@ -511,7 +511,7 @@ class HiddenMarkupTests(unittest.TestCase):
         for evil in ("<!--" * 20000, "<script>" * 20000, "<" * 40000, "[a]: #\n" * 20000):
             with self.subTest(evil=evil[:8]):
                 start = time.monotonic()
-                self.strip(evil)
+                self.hidden(evil)
                 self.assertLess(time.monotonic() - start, 2.0)
 
     def test_raw_text_far_beyond_max_chars_is_clipped_before_stripping_and_says_so(self):

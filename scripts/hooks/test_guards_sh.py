@@ -359,9 +359,11 @@ CONFIG_CLEAN = [
     (".eslintrc.json", "{\"rules\": {\"max-params\": [\"error\", {\"max\": 1}]}}\n"),
     ("eslint.config.js", "export default [{rules: {\n  'max-params': [\n    'error',\n    { max: 1 },\n  ],\n}}];\n"),
     # multi-line strict settings, other keys that merely contain the words, indented TOML keys
-    ("pyproject.toml", "[tool.ruff.lint]\nselect = [\n  \"E\",\n  \"F\",\n]\nignore-init-module-imports = true\n[tool.ruff.format]\nquote-style = \"double\"\n"),
+    ("pyproject.toml", "[tool.ruff.lint]\nselect = [\n  \"E\",\n  \"F\",\n]\nignore-init-module-imports = true\n"
+     "[tool.ruff.format]\nquote-style = \"double\"\n"),
     ("pyproject.toml", "[tool.ruff]\n  ignore = [\"E501\"]  # justified: long URLs\n  line-length = 100\n  target-version = \"py311\"\n"),
-    ("pyproject.toml", "[tool.ruff.lint.per-file-ignores]  # justified: tests\n\"tests/*\" = [\"S101\"]  # justified: asserts\n[tool.mypy]\nstrict = true\nenable_error_code = [\"ignore-without-code\"]\n"),
+    ("pyproject.toml", "[tool.ruff.lint.per-file-ignores]  # justified: tests\n\"tests/*\" = [\"S101\"]  # justified: asserts\n"
+     "[tool.mypy]\nstrict = true\nenable_error_code = [\"ignore-without-code\"]\n"),
     ("eslint.config.js", "export default [{rules: {\n  'eqeqeq': [\n    'error',\n    'always',\n  ],\n}}];\n"),
     ("mypy.ini", "[mypy]\nignore_errors = off\nignore_missing_imports = no\nstrict = on\nwarn_unused_ignores = yes\ndisallow_untyped_defs = 1\n"),
     ("tsconfig.json", "{\n  \"extends\": \"./tsconfig.base.json\",\n  \"compilerOptions\": {\"noCheck\": false}\n}\n"),
@@ -429,7 +431,8 @@ ROUND3_RELAXATIONS = [
     ("a.py", "# mypy: no_warn_unused_ignores", "# mypy: no_warn_unused_ignores  # justified: migration"),
     # R3-02: flake8 underscore spellings
     ("setup.cfg", "[flake8]\nper_file_ignores = a.py: E501", "[flake8]\nper_file_ignores = a.py: E501  # justified: long URLs"),
-    ("tox.ini", "[flake8]\nextend_per_file_ignores =  # justified: tests\n    a.py: E501", "[flake8]\nextend_per_file_ignores =  # justified: tests\n    a.py: E501  # justified: long URLs"),
+    ("tox.ini", "[flake8]\nextend_per_file_ignores =  # justified: tests\n    a.py: E501",
+     "[flake8]\nextend_per_file_ignores =  # justified: tests\n    a.py: E501  # justified: long URLs"),
     ("tox.ini", "[flake8]\nper_file_ignores =  # justified: tests\n    a.py: E501\n    b.py: F401",
      "[flake8]\nper_file_ignores =  # justified: tests\n    a.py: E501  # justified: urls\n    b.py: F401  # justified: re-exports"),
     # R3-03: implicit_optional = True relaxes mypy

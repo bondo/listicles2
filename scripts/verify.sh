@@ -44,6 +44,8 @@ step tasks-validate python3 -I scripts/tasks.py validate
 step metrics-tests python3 -I scripts/test_agent_metrics.py
 step metrics-check python3 -I scripts/agent_metrics.py --check
 step gradle-repos python3 -I scripts/test_check_gradle_repos.py
+step python-lint-tests python3 -I scripts/test_lint_python.py
+step python-lint ./scripts/lint_python.sh
 step spotless gradle spotlessCheck
 step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest
 step lint gradle :app:lintDebug

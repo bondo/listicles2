@@ -1,0 +1,5 @@
+# Python lint tools, exact versions (update by hand; lint_python.sh fails if the installed ruff or mypy differs).
+# types-PyYAML supplies the stubs for scripts/issue_forms.py, so mypy needs no ignore_missing_imports.
+ruff==0.17.5
+mypy==2.4.1
+types-PyYAML==6.0.12.20261113

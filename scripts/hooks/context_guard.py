@@ -10,6 +10,7 @@ the reminder at ~100k tokens). Set LISTICLES_CONTEXT_WINDOW at spawn for a small
 Calls made inside subagents (hook input has agent_id) are ignored.
 Env: LISTICLES_CONTEXT_THRESHOLD (percent, default 50). Output: hookSpecificOutput.additionalContext. Never fails."""
 
+import contextlib
 import json
 import os
 import re
@@ -68,10 +69,8 @@ def main():
         return
     base = os.path.join(os.environ.get("TMPDIR", "/tmp"), "listicles-ctx")
     pcts = []
-    try:
-        pcts.append(int(open(os.path.join(base, sid)).read().strip()))
-    except (OSError, ValueError):
-        pass
+    with contextlib.suppress(OSError, ValueError), open(os.path.join(base, sid)) as f:
+        pcts.append(int(f.read().strip()))
     tp = data.get("transcript_path")
     found = last_usage(tp) if isinstance(tp, str) and tp else None
     if found:

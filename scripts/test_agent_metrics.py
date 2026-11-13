@@ -295,7 +295,7 @@ V1 = "2026-11-12,R1,65,10,4,3,2,1,1.50,2026-11-20"
 
 def review_row(**over):
     cols = REVIEW_HDR.split(",")
-    row = dict(zip(cols, V1.split(",")))
+    row = dict(zip(cols, V1.split(","), strict=True))
     row.update(over)
     return ",".join(row[c] for c in cols)
 
@@ -316,7 +316,7 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(rows[0]["row_type"], "review")
         for col in REVIEW_HDR.split(","):
-            self.assertEqual(rows[0][col], dict(zip(REVIEW_HDR.split(","), V1.split(",")))[col])
+            self.assertEqual(rows[0][col], dict(zip(REVIEW_HDR.split(","), V1.split(","), strict=True))[col])
 
     def test_run_ref_forms(self):
         for ref in ("65", "2026-W47", "2026-W01", "2026-W53", "M1", "M0.5"):

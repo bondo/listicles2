@@ -174,7 +174,7 @@ def _parse_block(kind, lines, start, name, errors):
         if len(fields) != len(header):
             errors.append(f"{name}:{lineno}: row has {len(fields)} fields, header has {len(header)}")
             continue
-        row = dict(zip(header, fields))
+        row = dict(zip(header, fields, strict=True))
         for col in optional:
             row.setdefault(col, "")
         problems = _check_values(kind, row)
@@ -190,7 +190,7 @@ def build(texts, names=None):
     names = names or [f"input{n + 1}" for n in range(len(texts))]
     errors, out = [], []
     sessions, rounds, reviews = {}, {}, {}
-    for text, name in zip(texts, names):
+    for text, name in zip(texts, names, strict=True):
         lines = text.splitlines()
         i = 0
         while i < len(lines):
