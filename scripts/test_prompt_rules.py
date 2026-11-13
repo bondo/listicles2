@@ -220,6 +220,11 @@ class M011AlignmentTests(unittest.TestCase):
         ("orchestrator", "orch-deferral", "the PR's own acceptance criteria and tests do not depend on it, ", ""),
         ("orchestrator", "orch-deferral", "The 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings.", ""),
         ("orchestrator", "orch-deferral", "and record a `decision` comment on the state issue", ""),
+        ("orchestrator", "orch-deferral", "Check that the returned issue carries every label; if one is missing, close it, keep the finding open, "
+         "stop deferring and ask the owner to do M0-O10.", ""),
+        ("reviewer", "reviewer-report-only", "A deferral that breaks `docs/FOLLOW-UPS.md` §2, or lacks its issue or decision record, "
+         "is itself a `major` finding (area `process`).", ""),
+        ("reviewer", "reviewer-report-only", "Re-check every deferral record you are given (issue, decision, section 2 rules).", ""),
         ("implementer", "impl-deferral", "the orchestrator decides which minor/nit findings are deferred to follow-up issues (status `deferred`), "
          "so fix everything it does not defer", "you may defer minor findings"),
         ("implementer", "impl-deferral", " (finding id, severity, `area`, reason)", ""),
