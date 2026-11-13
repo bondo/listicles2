@@ -591,6 +591,7 @@ status = "todo"
 assignee = "process"
 risk = "normal"
 depends_on = ["M0.5-13"]
+pr = 63
 notes = "Normal env (docs only: ORCHESTRATION.md, orchestrator-state.md). Effort S. Owner approved items 1-6 of #60 on 2026-11-12. The docs part is delivered before M0.5-13 on purpose; set done in the first PR after M0.5-13 merges (validate rejects done while a dependency is todo). Protected parts (agents/prompts/*, REVIEW.md reviewer incremental-findings rule) go to M0.5-19 or a tooling PR."
 
 [[task]]
