@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.spotless)
     alias(libs.plugins.kover)
+    alias(libs.plugins.licensee) apply false
 }
 
 spotless {
@@ -137,3 +138,172 @@ subprojects {
         )
     }
 }
+
+// M0.5-10: the licensee policy (config/licensee/policy.gradle) is tested against a fixture build whose
+// artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's
+// allowlist and fail, naming the artifact, for any other licence. Wired into detekt, so verify.sh and CI run it.
+// A case is one string, "name|deps|approved|pass or fail|text the output must contain", so the task stays
+// configuration-cache friendly (no script object references).
+fun licenseeCase(
+    name: String,
+    deps: String,
+    approved: String = "",
+    passes: Boolean,
+    message: String = "",
+) = listOf(name, deps, approved, if (passes) "pass" else "fail", message).joinToString("|")
+
+val testLicenseeGate =
+    tasks.register("testLicenseeGate") {
+        group = "verification"
+        description = "Runs the licensee policy against fixture artifacts with allowed and disallowed licences."
+        val fixture = layout.projectDirectory.dir("config/licensee/fixture").asFile
+        val wrapper = layout.projectDirectory.file("gradlew").asFile
+        val pluginVersion = libs.versions.licensee.get()
+        inputs.dir(layout.projectDirectory.dir("config/licensee"))
+        val marker = layout.buildDirectory.file("licensee-gate.ok")
+        outputs.file(marker)
+        val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
+        val terms = "developer.android.com/studio/terms"
+        val a1 = "approved-a1.txt"
+        val notGoogle = "not the Google/Android SDK terms"
+        val coordinates = "must be group:artifact:version"
+        val cases =
+            listOf(
+                licenseeCase("allowed SPDX ids", allowed, passes = true),
+                licenseeCase("google terms, listed artifact", "fixture:google-a:1.0", a1, passes = true),
+                licenseeCase("google terms, not listed", "fixture:google-a:1.0", passes = false, message = terms),
+                licenseeCase(
+                    "google terms, other artifact",
+                    "fixture:google-b:1.0",
+                    a1,
+                    passes = false,
+                    message = terms,
+                ),
+                licenseeCase(
+                    "google terms, other version",
+                    "fixture:google-a:2.0",
+                    a1,
+                    passes = false,
+                    message = terms,
+                ),
+                licenseeCase(
+                    "entry without reason",
+                    "fixture:google-a:1.0",
+                    "approved-no-reason.txt",
+                    passes = false,
+                    message = "reason",
+                ),
+                // A google-sdk-terms.txt line must only cover the Google/Android SDK terms, not any licence (R1-01).
+                licenseeCase(
+                    "listed artifact, GPL-3.0",
+                    "fixture:gpl3:1.0",
+                    "approved-gpl3.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                licenseeCase(
+                    "listed artifact, proprietary",
+                    "fixture:proprietary:1.0",
+                    "approved-proprietary.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                licenseeCase(
+                    "listed artifact, no licence",
+                    "fixture:nolicense:1.0",
+                    "approved-nolicense.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                // Malformed lines are rejected (R1-02).
+                licenseeCase(
+                    "entry with wildcard version",
+                    "fixture:google-a:1.0",
+                    "approved-wild-version.txt",
+                    passes = false,
+                    message = coordinates,
+                ),
+                licenseeCase(
+                    "entry without version",
+                    "fixture:google-a:1.0",
+                    "approved-no-version.txt",
+                    passes = false,
+                    message = coordinates,
+                ),
+                licenseeCase(
+                    "entry with wildcard group",
+                    "fixture:google-a:1.0",
+                    "approved-wild-group.txt",
+                    passes = false,
+                    message = coordinates,
+                ),
+                licenseeCase(
+                    "entry with four parts",
+                    "fixture:google-a:1.0",
+                    "approved-four-parts.txt",
+                    passes = false,
+                    message = coordinates,
+                ),
+                licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl-3.0"),
+            ) +
+                listOf(
+                    "gpl3" to "gpl-3.0",
+                    "lgpl21" to "lgpl-2.1",
+                    "agpl3" to "agpl-3.0",
+                    "epl2" to "EPL-2.0",
+                    "mpl2" to "MPL/2.0",
+                    "proprietary" to "example.com/license",
+                    "nolicense" to "declares no licenses",
+                ).map { (artifact, message) ->
+                    licenseeCase(
+                        "disallowed licence: $artifact",
+                        "fixture:$artifact:1.0",
+                        passes = false,
+                        message = message,
+                    )
+                }
+
+        doLast {
+            val problems = mutableListOf<String>()
+            for (line in cases) {
+                val (name, deps, approved, expected, message) = line.split('|')
+                val passes = expected == "pass"
+                val command =
+                    mutableListOf(
+                        wrapper.path,
+                        "-q",
+                        "--console=plain",
+                        "--no-daemon",
+                        "-p",
+                        fixture.path,
+                        "-Dlicensee.version=$pluginVersion",
+                        "-Pdeps=$deps",
+                    )
+                if (approved.isNotEmpty()) command += "-Papproved=$approved"
+                command += "licensee"
+                var out = ""
+                var code = 0
+                // Retry only Maven 429 (rate limit), so a throttled plugin download is not read as a result.
+                for (attempt in 1..5) {
+                    val process = ProcessBuilder(command).directory(fixture).redirectErrorStream(true).start()
+                    out = process.inputStream.bufferedReader().readText()
+                    code = process.waitFor()
+                    if (!(out.contains("429") && out.contains("Too Many Requests")) || attempt == 5) break
+                    Thread.sleep(10_000L * attempt)
+                }
+                val ok = (code == 0) == passes && out.contains(message)
+                if (!ok) {
+                    val shown = out.lines().filter { it.isNotBlank() && !it.startsWith("Picked up") }.take(8)
+                    problems += "$name: expected $expected, exit $code\n" +
+                        shown.joinToString("\n") { "    $it" }
+                }
+            }
+            check(
+                problems.isEmpty(),
+            ) { "licensee gate: ${problems.size} case(s) wrong:\n" + problems.joinToString("\n") }
+            marker.get().asFile.writeText("ok\n")
+        }
+    }
+
+// Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
+tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }

@@ -1,0 +1,79 @@
+// M0.5-10 licensee policy (owner decision D3, issue #15). Applied by :app, :core:domain and the test fixture.
+// Groovy, not Kotlin: a Kotlin script plugin cannot see the licensee plugin's types.
+//
+// Allowed everywhere: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause. Any other licence, an unknown licence URL or a
+// missing licence fails `licensee`. Google/Android SDK terms (Firebase, ML Kit) are NOT allowed as a licence: the
+// owner approves each artifact when it is first added, as one line in google-sdk-terms.txt. A line allows exactly
+// that group:artifact:version, so another artifact, or the same artifact at a new version, fails until it is listed.
+//
+// licensee itself skips the licence check for a listed artifact (allowDependency), so GoogleTermsCheck below re-reads
+// licensee's artifacts.json and fails when a listed artifact has any licence other than the Google/Android SDK terms
+// (or one of the four allowed SPDX ids). A line therefore cannot be used to wave through a GPL or proprietary artifact.
+import groovy.json.JsonSlurper
+
+class GoogleTermsCheck implements Action<Task>, Serializable {
+    List<String> approved       // group:artifact:version of every listed artifact
+    List<String> termsUrls      // the Google/Android SDK terms URLs
+    List<String> spdxIds        // the allowed SPDX ids
+    String listName
+
+    @Override
+    void execute(Task task) {
+        def file = task.jsonOutput.get().asFile
+        if (!file.exists()) {
+            return
+        }
+        def problems = []
+        new JsonSlurper().parse(file).each { artifact ->
+            def coordinates = "${artifact.groupId}:${artifact.artifactId}:${artifact.version}".toString()
+            if (!approved.contains(coordinates)) {
+                return
+            }
+            def spdx = (artifact.spdxLicenses ?: []).collect { it.identifier }
+            def unknown = (artifact.unknownLicenses ?: []).collect { it.url }
+            def ok = !(spdx.isEmpty() && unknown.isEmpty()) &&
+                    spdx.every { spdxIds.contains(it) } && unknown.every { termsUrls.contains(it) }
+            if (!ok) {
+                problems << "${coordinates} is listed in ${listName} but its licence is not the Google/Android SDK terms: " +
+                        (spdx + unknown).join(', ')
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new GradleException(problems.join('\n'))
+        }
+    }
+}
+
+def googleTermsFile = project.ext.has('licenseeGoogleTermsFile') ?
+        project.ext.get('licenseeGoogleTermsFile') as File :
+        rootProject.file('config/licensee/google-sdk-terms.txt')
+
+def allowedSpdxIds = ['Apache-2.0', 'MIT', 'BSD-2-Clause', 'BSD-3-Clause']
+def googleTermsUrls = ['https://developer.android.com/studio/terms.html', 'https://developer.android.com/studio/terms']
+def approvedCoordinates = []
+
+licensee {
+    allowedSpdxIds.each { allow(it) }
+
+    googleTermsFile.readLines().collect { it.trim() }.findAll { !it.isEmpty() && !it.startsWith('#') }.each { line ->
+        def coordinates = line.contains('#') ? line.substring(0, line.indexOf('#')).trim() : line
+        def reason = line.contains('#') ? line.substring(line.indexOf('#') + 1).trim() : ''
+        def parts = coordinates.split(':') as List
+        if (parts.size() != 3 || parts.any { it.isEmpty() || it.contains('*') }) {
+            throw new GradleException("${googleTermsFile.name}: '${line}' must be group:artifact:version (exact, no wildcards)")
+        }
+        if (reason.isEmpty()) {
+            throw new GradleException("${googleTermsFile.name}: '${line}' needs a reason after '#' (why the owner approved these terms)")
+        }
+        approvedCoordinates << coordinates
+        allowDependency(parts[0], parts[1], parts[2]) { because(reason) }
+    }
+}
+
+// Runs after every licensee task (one per Android variant, or one per JVM project), only when licensee itself passed.
+tasks.configureEach { licenseeTask ->
+    if (licenseeTask.class.name.startsWith('app.cash.licensee.LicenseeTask')) {
+        licenseeTask.doLast(new GoogleTermsCheck(
+                approved: approvedCoordinates, termsUrls: googleTermsUrls, spdxIds: allowedSpdxIds, listName: googleTermsFile.name))
+    }
+}

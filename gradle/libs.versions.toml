@@ -14,6 +14,7 @@ detekt = "1.23.8"
 spotless = "8.11.0"
 ktlint = "1.8.0"
 kover = "0.9.11"
+licensee = "1.14.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -43,3 +44,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+licensee = { id = "app.cash.licensee", version.ref = "licensee" }

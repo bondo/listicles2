@@ -1,0 +1,2 @@
+# Test list: only google-a 1.0 is approved.
+fixture:google-a:1.0  # fixture: approved for the gate test
