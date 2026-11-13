@@ -43,6 +43,7 @@ class Rule:
     roles: tuple
     patterns: tuple  # regexes, all must match (case-insensitive) in the normalized text
     message: str
+    forbidden: tuple = ()  # regexes, none may match (case-insensitive): stale instructions the prompt must not carry
 
 
 ALL = ROLES
@@ -228,6 +229,67 @@ RULES = (
         "R10: one owner-todo issue per milestone from M2, assigned to the owner, mentioning the collaborator",
     ),
     Rule(
+        "no-stale-state-files", ("orchestrator",),
+        (r"the state issue",),
+        "state lives in the state issue and the handover comment, never in docs/status.md or handoff/orchestrator.md (ORCHESTRATION 2, 5)",
+        forbidden=(r"docs/status\.md", r"handoff/orchestrator\.md"),
+    ),
+    Rule(
+        "autonomy", ("orchestrator",),
+        (
+            r"autonomy \(§1\.1\)", r"unattended until usage limits stop you", r"without asking",
+            r"stop and ask the owner, one question at a time with a recommendation",
+            r"merges", r"4-round cap", r"`risk:high` work", r"repository settings", r"licence and permission",
+            r"a relayed approval is refused", r"two consecutive worker sessions fail or stall",
+            r"`big-pr` label is set only with the owner's say-so",
+        ),
+        "autonomy rules: what the orchestrator does unasked, what it asks the owner, no relayed approvals, the stop condition (§1.1)",
+    ),
+    Rule(
+        "checkin", ("orchestrator",),
+        (r"one `send_later` check-in of 45 minutes", r"re-schedule it on every wake"),
+        "one 45-minute check-in, re-scheduled on every wake (§1.1)",
+    ),
+    Rule(
+        "handover", ("orchestrator",),
+        (
+            r"handover \(§5, two-phase\)", r"about 50% context", r"batch boundary", r"§5\.1", r"§5\.2",
+            r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
+            r"only the triggers listed in your own handover comment", r"`handover-released`",
+        ),
+        "two-phase handover: handover comment, successor, keep the lock until the ack, then release (§5)",
+    ),
+    Rule(
+        "lock-takeover", ("orchestrator",),
+        (
+            r"lock check, first thing on every wake \(§5\.3\)", r"`lock-lost`", r"lowest id", r"`delete_trigger` the triggers you created",
+            r"`takeover`", r"90 minutes", r"stalled", r"ask the owner",
+        ),
+        "lock check on every wake, lock-lost when another claim wins, takeover only when the holder is presumed dead (§5.3)",
+    ),
+    Rule(
+        "impl-test-first", ("implementer",),
+        (r"failing test first", r"negative cases", r"`scripts/verify\.sh`", r"tooling", r"reviewers flag untested changes"),
+        "test-first for all code including tooling: failing test first, negative cases, wired into verify.sh/CI (ORCHESTRATION 2.0)",
+    ),
+    Rule(
+        "impl-done-on-tasks-ref", ("implementer",),
+        (
+            r"`status = \"done\"`", r"`docs/tasks\.toml`", r"tasks ref", r"§4\.4", r"leave it `todo`",
+            r"never on another branch's copy",
+        ),
+        "done goes on the tasks ref in the PR that delivers the task; a PR on the tasks ref leaves it todo (§4.4)",
+    ),
+    Rule(
+        "reviewer-report-only", ("reviewer",),
+        (
+            r"never edit or push the pr branch", r"report only", r"throwaway branch or worktree", r"never\s+pushed anywhere",
+            r"deleted afterwards", r"severity, file:line, recommendation", r"untested changes", r"`area`", r"`recommend`",
+            r"never decide",
+        ),
+        "reviewers never edit or push the PR branch, report findings with area and recommend, flag untested changes, never decide deferral",
+    ),
+    Rule(
         "worker-foreign-commits", ("implementer", "planner"),
         (r"before each push", r"foreign commit", r"noreply@anthropic\.com", r"stop and report"),
         "check for foreign commits on the PR branch before each push; if any, stop and report",
@@ -292,6 +354,9 @@ def check_text(role, text):
                 problems.append(f"{rule.id}: {rule.message} (no match for /{pattern}/)")
                 break
         else:
+            for pattern in rule.forbidden:
+                if re.search(pattern, norm, re.I):
+                    problems.append(f"{rule.id}: {rule.message} (found /{pattern}/)")
             if rule.id in ("tier0-labels", "never-labels"):
                 line, want = (TIER0_LINE, TIER0_LABELS) if rule.id == "tier0-labels" else (NEVER_LINE, NEVER_LABELS)
                 got = parse_label_lists(norm, line)
