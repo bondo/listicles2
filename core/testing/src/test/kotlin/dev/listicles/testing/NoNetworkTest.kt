@@ -1,19 +1,25 @@
 package dev.listicles.testing
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
+import java.net.Proxy
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.StandardProtocolFamily
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.channels.AsynchronousServerSocketChannel
+import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.DatagramChannel
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
@@ -53,6 +59,38 @@ class NoNetworkTest {
 
     @Test
     fun blocksNioDatagramChannel() = shouldBeBlocked { DatagramChannel.open().close() }
+
+    @Test
+    fun blocksAsynchronousServerChannel() =
+        shouldBeBlocked { AsynchronousServerSocketChannel.open().use { it.bind(InetSocketAddress("127.0.0.1", 0)) } }
+
+    @Test
+    fun blocksAsynchronousClientChannel() = shouldBeBlocked { AsynchronousSocketChannel.open().close() }
+
+    @Test
+    fun blocksNioClientChannelWithProtocolFamily() =
+        shouldBeBlocked {
+            SocketChannel.open(StandardProtocolFamily.INET).close()
+        }
+
+    @Test
+    fun blocksNioServerChannelWithProtocolFamily() =
+        shouldBeBlocked { ServerSocketChannel.open(StandardProtocolFamily.INET).close() }
+
+    @Test
+    fun blocksNioDatagramChannelWithProtocolFamily() =
+        shouldBeBlocked {
+            DatagramChannel.open(StandardProtocolFamily.INET).close()
+        }
+
+    // Known gap, pinned so that a change in the JDK or in the block shows up: a Socket given a SOCKS proxy skips
+    // the socket factory and makes a real TCP connect (here to a closed loopback port).
+    @Test
+    fun socksProxiedSocketIsNotBlocked() {
+        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", DISCARD_PORT))
+        // A real connection failure (an IOException), not NetworkAccessBlockedException (a RuntimeException).
+        shouldThrow<IOException> { Socket(proxy).use { it.connect(InetSocketAddress("127.0.0.1", DISCARD_PORT + 1)) } }
+    }
 
     @Test
     fun blocksUdpSend() =
