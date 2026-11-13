@@ -1,0 +1,21 @@
+name: Idea / user story
+description: Suggest something the app should do, in your own words.
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is public: please leave out addresses, phone numbers, real names and photos of your home.
+
+        Write in English or Danish. You do not need technical words; just describe what you would like to be able to do.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to be able to do?
+      description: For example "As someone who shops, I want to tick off items so that I can see what is left."
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would that help? (optional)
