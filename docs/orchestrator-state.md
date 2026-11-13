@@ -5,7 +5,7 @@ owner task M0-O9; until then the issue has no label). Rules: [`ORCHESTRATION.md`
 Only the active orchestrator edits it. **Every field is mandatory**, including `Tasks ref:`: the ready query
 (§4.3) reads its ref from that line. Issue #15 predates this template: the orchestrator rewrites its body
 into this shape on its first wake and logs a `correction` comment.
-History goes into comments (`metrics:*`, `incident`, `decision`, `handover`, `handover-ack`,
+History goes into comments (`metrics:*`, `incident`, `PAUSED`/`RESUMED` (§7.7), `decision`, `handover`, `handover-ack`,
 `todo-done`, `correction`, `takeover`, `lock-lost`, `handover-released`; deferrals are `decision` comments), not into this body.
 
 ---
@@ -17,6 +17,7 @@ unless you are the orchestrator named below; comment instead.
 **Updated:** {UTC}, after {event}
 **Inbox since:** {UTC} (collaborator comments and issues are read from here, ORCHESTRATION.md §7.6; only owner comments on #15 become state, §3.2)
 **Tasks ref:** `{branch}` (the one ref that carries `docs/tasks.toml`: `claude/orchestration-review` until M0-O8, then `main`)
+**Usage:** {ok | near limit | paused until HH:MM UTC} (read {UTC} from `rate_limit_info`, ORCHESTRATION.md §7.7.1; the owner reads this line first. Issue #15's older "Current" section carries the same line until the body is rewritten into this shape)
 
 ## Now
 - Milestone: {Mx}, PR #{n} ({draft/ready}), batch {id}: {one line}
