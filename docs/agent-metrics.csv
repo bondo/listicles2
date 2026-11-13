@@ -1,0 +1,7 @@
+row_type,date,batch,pr,tasks,role,session_id,model,effort,env,result,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,handoffs,verify_fails_before_push,ci_red_runs,post_cap_commits,owner_interventions,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,disputed,withdrawn,deferred,verdict,incident_kind,impact,recovery,prevention
+session,,M0-2,,,,,,,,,5.02,,,,,,,,,,,,,,,,,,,,,,,,,
+session,,M0-1,1,,,,,,,,4.28,,,,,,,,,,,,,,,,,,,,,,,,,
+session,,PR16-merge-review,16,,implementer,,,,,,2.43,,,,,,,,,,,,,,,,,,,,,,,,,
+session,,PR16-merge-review,16,,reviewer,,,,,,2.23,,,,,,,,,,,,,,,,,,,,,,,,,
+round,,PR16-merge-review,16,,,,,,,,,,,,,,,,,,5,,,,0,0,4,1,,,,,,,,
+incident,,M0-1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,destructive-git,,recovered,

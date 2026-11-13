@@ -372,14 +372,14 @@ Role definitions are checked in, so they get reviewed and versioned like code:
 ### 9.4 Performance reviews
 
 Each metric must have a data source proven in M0; a metric whose source can't be
-proven is dropped, not guessed. The candidate sources are a SessionEnd hook that
-writes token usage from the transcript to `metrics/sessions/<id>.json`, the
-reviewer's JSON findings comment, and `get_session` → `external_metadata.usage` (cost and
-tokens per session; confirmed to work on 2026-11-10). Until the script exists, rows are logged on the
-state issue in the format of `docs/ORCHESTRATION.md` §6.
+proven is dropped, not guessed. The sources are the orchestrator's CSV comments on the state issue
+(`docs/ORCHESTRATION.md` §6), filled from `get_session` → `external_metadata.usage` (cost and tokens per
+session; confirmed to work on 2026-11-10) and from the reviewer's findings. The SessionEnd hook writes to the
+gitignored `metrics/sessions/` inside ephemeral containers, so it is not a source for cloud sessions (it stays
+for local runs).
 
-`scripts/agent-metrics` pulls the sessions linked to each PR, using PR or branch
-tags set at spawn time, and appends a row to `docs/agent-metrics.csv`:
+`scripts/agent_metrics.py` parses those comments, saved under `docs/metrics/`, with no network access, and
+writes `docs/agent-metrics.csv` (a row per session, review round and incident):
 
 | Metric | Why |
 |---|---|
