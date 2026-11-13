@@ -401,10 +401,11 @@ notes = "Tooling env. Effort S. Pinned binaries with checksums like gitleaks. Fi
 id = "M0.5-07"
 title = "ruff check (E,F,W,B,UP,SIM) and mypy (default) for scripts/, in verify.sh and CI (P3)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-05", "M0-10"]
+pr = 79
 notes = "Tooling env. Effort S-M. Root ruff.toml/mypy.ini plus CODEOWNERS entry. No ruff format: deferred (D6)."
 
 [[task]]

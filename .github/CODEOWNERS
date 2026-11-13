@@ -26,3 +26,8 @@
 /docs/FOLLOW-UPS.md          @bondo
 # Also covered by /scripts/; kept explicit so test_tasks_wiring.py can assert it
 /scripts/tasks.py            @bondo
+# Python lint config and its pinned tools (also covered by /scripts/ for the last two; explicit so test_lint_python.py can assert it)
+/ruff.toml                   @bondo
+/mypy.ini                    @bondo
+/scripts/requirements-lint.txt @bondo
+/scripts/lint_python.sh      @bondo

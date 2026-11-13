@@ -33,7 +33,8 @@ class Metrics(unittest.TestCase):
         r = subprocess.run([sys.executable, "-I", HOOK], input=json.dumps(
             {"session_id": "s1", "transcript_path": tp, "cwd": d, "reason": "other"}), env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
-        j = json.load(open(os.path.join(out, "s1.json")))
+        with open(os.path.join(out, "s1.json")) as f:
+            j = json.load(f)
         self.assertEqual(j["main"]["messages"], 2)
         self.assertEqual(j["main"]["total"]["output_tokens"], 57)
         self.assertEqual(j["main"]["total"]["cache_read_input_tokens"], 200)
@@ -52,7 +53,8 @@ class OutputDir(unittest.TestCase):
     def run_hook(self, cwd, env=None):
         d = tempfile.mkdtemp()
         tp = os.path.join(d, "s.jsonl")
-        open(tp, "w").write(json.dumps(rec("a", 1)) + "\n")
+        with open(tp, "w") as f:
+            f.write(json.dumps(rec("a", 1)) + "\n")
         e = {k: v for k, v in os.environ.items() if k not in ("LISTICLES_METRICS_DIR", "CLAUDE_PROJECT_DIR")}
         e.update(env or {})
         r = subprocess.run([sys.executable, "-I", HOOK], input=json.dumps(

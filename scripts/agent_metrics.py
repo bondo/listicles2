@@ -174,7 +174,7 @@ def _parse_block(kind, lines, start, name, errors):
         if len(fields) != len(header):
             errors.append(f"{name}:{lineno}: row has {len(fields)} fields, header has {len(header)}")
             continue
-        row = dict(zip(header, fields))
+        row = dict(zip(header, fields, strict=True))
         for col in optional:
             row.setdefault(col, "")
         problems = _check_values(kind, row)
@@ -190,7 +190,7 @@ def build(texts, names=None):
     names = names or [f"input{n + 1}" for n in range(len(texts))]
     errors, out = [], []
     sessions, rounds, reviews = {}, {}, {}
-    for text, name in zip(texts, names):
+    for text, name in zip(texts, names, strict=True):
         lines = text.splitlines()
         i = 0
         while i < len(lines):
@@ -247,15 +247,16 @@ def main(argv=None):
     ap.add_argument("--check", action="store_true", help="fail if the output file is not up to date")
     args = ap.parse_args(argv)
     paths = args.inputs or sorted(str(p) for p in (ROOT / "docs/metrics").glob("*.txt"))
-    texts, errors = [], []
+    texts, names, errors = [], [], []
     for p in paths:
         try:
             texts.append(Path(p).read_text(encoding="utf-8"))
+            names.append(p)
         except OSError as e:
             errors.append(f"{p}: cannot read input ({e.strerror})")
     if not paths:
         errors.append("no input files")
-    rows, parse_errors = build(texts, [p for p in paths if Path(p).is_file()])
+    rows, parse_errors = build(texts, names)
     errors += parse_errors
     if errors:
         print("\n".join(errors), file=sys.stderr)
