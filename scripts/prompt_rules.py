@@ -294,20 +294,37 @@ RULES = (
     Rule(
         "orch-deferral", ("orchestrator",),
         (
-            r"deferral \(docs/follow-ups\.md §2, §4\)", r"you decide deferral, not the reviewer", r"`\.github/issue_template/follow-up\.md`",
-            r"record a `decision` comment", r"never defer a blocker;",
-            r"or a finding in the security-rules, sync-merge or release areas or on a `risk:high` task, without owner ok \(`owner-ok` label\)",
-            r"more than 8 open follow-ups for one milestone: stop deferring and ask the owner",
+            r"deferral \(docs/follow-ups\.md §2, §4\): you decide deferral, not the reviewer",
+            r"decide each recommendation by §2 from the finding's severity, `area` and `recommend`",
+            r"a minor or nit only once no blocker or major is open on the pr",
+            r"and a minor only if its fix is not small \(more than about 15 changed lines or outside the pr's scope\)",
+            r"the pr's own acceptance criteria and tests do not depend on it",
+            r"and it is not a regression this pr introduced",
+            r"never defer a blocker; never defer a major, or a finding in the security-rules, sync-merge or release areas "
+            r"or on a `risk:high` task, without owner ok \(`owner-ok` label\)",
+            r"then file the follow-up issue from `\.github/issue_template/follow-up\.md` with all its labels \(`target:<mx>` per §3\)",
+            r"and record a `decision` comment on the state issue",
+            r"the 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings",
+            r"with more than 8 open follow-ups for one milestone: stop deferring and ask the owner",
+            r"if everything above nit was deferred and no commit followed the reviewed range, "
+            r"post `accepted: all findings above nit deferred \(#a, #b\)` \(verdict `ready_deferred`\)",
         ),
         "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: never blockers, never majors or protected areas without owner OK, limit 8 per milestone",
     ),
     Rule(
         "impl-deferral", ("implementer",),
         (
-            r"deferral \(docs/follow-ups\.md §4\)", r"you recommend, you do not decide",
-            r"propose each deferral in your worker-result", r"only in a manual loop with no orchestrator",
-            r"never defer a blocker, a major, or any finding in the security-rules, sync-merge or release areas or on a `risk:high` task without owner ok",
-            r"put that question in `needs_owner` of your worker-result",
+            r"the orchestrator decides which minor/nit findings are deferred to follow-up issues \(status `deferred`\), "
+            r"so fix everything it does not defer",
+            r"deferral \(docs/follow-ups\.md §4\): you recommend, you do not decide",
+            r"propose each deferral in your worker-result \(finding id, severity, `area`, reason\)",
+            r"only in a manual loop with no orchestrator may you decide, by the same §2 limits",
+            r"a minor or nit only once no blocker or major is open and the fix is not small; never a blocker;",
+            r"never a major, or a finding in the security-rules, sync-merge or release areas or on a `risk:high` task, without owner ok",
+            r"then file the issue from the template, post the `decision` comment and any `accepted:` comment "
+            r"\(with its `metrics:round` block, verdict `ready_deferred`\) on the pr \(§4, §6\), "
+            r"and with more than 8 open follow-ups for the milestone ask the owner",
+            r"put every owner-ok question in `needs_owner` of your worker-result",
         ),
         "implementers propose deferrals in WORKER-RESULT and decide only in a manual loop; never blockers, majors or protected areas without owner OK",
     ),

@@ -214,7 +214,7 @@ class M011AlignmentTests(unittest.TestCase):
         ("orchestrator", "orch-deferral", "with all its labels (`target:<Mx>` per §3)", ""),
         ("orchestrator", "orch-deferral", "If everything above nit was deferred and no commit followed the reviewed range, "
          "post `accepted: all findings above nit deferred (#a, #b)` (verdict `ready_deferred`).", ""),
-        ("orchestrator", "orch-deferral", "decide each recommendation by §2 from the finding's severity, `area` and `recommend`", ""),
+        ("orchestrator", "orch-deferral", "Decide each recommendation by §2 from the finding's severity, `area` and `recommend`", ""),
         ("orchestrator", "orch-deferral", "a minor or nit only once no blocker or major is open on the PR, and", ""),
         ("orchestrator", "orch-deferral", "and it is not a regression this PR introduced", ""),
         ("orchestrator", "orch-deferral", "the PR's own acceptance criteria and tests do not depend on it, ", ""),
@@ -250,11 +250,11 @@ class M011AlignmentTests(unittest.TestCase):
                         self.assertIn(rule_id, ids(prompt_rules.check_text(role, norm.replace(frag, "", 1))))
 
     def test_deferral_paragraphs_carry_the_follow_ups_section_2_and_4_limits(self):
-        for role in ("orchestrator", "implementer"):
+        for role, blocker in (("orchestrator", "never defer a blocker; never defer a major"), ("implementer", "never a blocker; never a major")):
             norm = prompt_rules.normalize(real(role))
-            for needle in ("never defer a blocker; never defer a major", "security-rules, sync-merge or release", "`risk:high`", "owner OK",
+            for needle in (blocker, "security-rules, sync-merge or release", "`risk:high`", "owner OK",
                            "more than 8 open follow-ups", "`decision` comment", "`ready_deferred`", "not small", "no blocker or major is open"):
-                self.assertIn(needle, norm, f"{role}: {needle}")
+                self.assertIn(needle.lower(), norm.lower(), f"{role}: {needle}")
 
     def test_deferral_with_owner_ok_for_a_blocker_is_rejected(self):
         """R2-02: FOLLOW-UPS 2 says blockers are never deferred, owner OK or not."""
