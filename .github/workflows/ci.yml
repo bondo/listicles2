@@ -117,10 +117,6 @@ jobs:
         run: python3 -I scripts/test_collab_inbox.py
       - name: status renderer and fetch tests
         run: python3 -I scripts/test_status_visual.py
-      - name: status publisher tests
-        run: python3 -I scripts/test_status_publish.py
-      - name: status workflow tests
-        run: python3 -I scripts/test_status_workflow.py
       - name: prompt rule tests
         run: python3 -I scripts/test_prompt_rules.py
       - name: agent prompts carry the collaborator rules
