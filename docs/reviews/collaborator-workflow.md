@@ -124,7 +124,11 @@ guard; the owner decides whether to add a Restrict-updates ruleset later (sectio
 * M0.5-03 produces a **review packet** on its draft PR: `docs/product/wireframes/*.png` (per screen, light and dark,
   outside `screenshots/`/`golden/` so the golden guard does not fire), `docs/product/flow.md` (Mermaid), a **tokens
   sheet** image. The PR body starts with a plain-language **review sheet**: numbered screens, 2-3 questions each.
-* They answer per number or with a PR review (comments welcome). **Sign-off (D5): owner only.** The collaborator
+* **Hand-off: one comment on the PR that mentions the owner and the collaborator, so both get the same review sheet and
+  screenshots at the same time** (plus one line in #15). Whatever goes to the collaborator goes to the owner in that
+  same comment, never collaborator first. The `owner-todo` issue is opened only if sign-off is still pending after 7 days.
+* They answer per number or with a PR review (comments welcome). The collaborator's input is **advisory**; if it
+  conflicts with the owner's, the owner's wins. **Sign-off (D5): owner only.** The collaborator
   comments but does not formally approve; M0.5-O1 is done when the owner approves.
 
 ## 8. If the threat model changes (later)

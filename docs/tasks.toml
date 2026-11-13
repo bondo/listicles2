@@ -349,7 +349,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-16"]
-notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1. Review packet for the owner and the collaborator (same time), docs/reviews/collaborator-workflow.md section 7; collaborator input is advisory, sign-off is owner only: docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
+notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1. It also drafts docs/product/rubric.md, the visual-quality rubric of docs/reviews/README.md section 4 (D-3.3); the owner edits and agrees it at D5. Review packet for the owner and the collaborator (same time), docs/reviews/collaborator-workflow.md section 7; collaborator input is advisory, sign-off is owner only: docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
 
 [[task]]
 id = "M0.5-04"
@@ -486,8 +486,8 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0-11", "M0.5-14"]
-notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet. The environment pick (tooling vs normal) is part of the prompt work (C2)."
+depends_on = ["M0-11", "M0.5-14", "M0.5-23"]
+notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet. The environment pick (tooling vs normal) is part of the prompt work (C2). Design-reviewer role (review R5, docs/reviews/README.md): scores the rubric, max 2 Opus rounds per design PR, then one joint hand-off comment on the PR that mentions the owner and the collaborator at the same time (same review sheet and screenshots, plus a #15 line); collaborator input is advisory, the owner decides (D5); `owner-todo` only after 7 days pending."
 
 [[task]]
 id = "M0.5-FU"
@@ -496,7 +496,7 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-27"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26", "M0.5-27"]
 
 [[task]]
 id = "M0.5-27"
@@ -516,7 +516,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
-notes = "Sign-off is owner only (D5): the collaborator comments or reviews but does not formally approve. Done when the owner approves the M0.5-03 PR."
+notes = "Sign-off is owner only (D5): the collaborator comments or reviews but does not formally approve. Done when the owner approves the M0.5-03 PR, which includes agreeing the visual-quality rubric (docs/product/rubric.md, D5)."
 
 [[task]]
 id = "M0.5-O2"
@@ -614,6 +614,46 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-21"]
 notes = "Tooling env (CLAUDE.md). Effort S. CLAUDE.md says one review round per reviewer session; change it only if the owner agrees, then drop 'pending' from 7.7.5. Reviewers still never edit or push. If the owner declines, delete the pending bullet of 7.7.5 and set this task done."
+
+[[task]]
+id = "M0.5-23"
+title = "docs/reviews/README.md: review catalogue R1-R12, procedures, visual-quality rubric, meta-review rule and ledger format (issue #65, rollout step 3)"
+milestone = "M0.5"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-21"]
+notes = "Normal env (docs only). Effort S. Also carries the four docs fixes for the joint hand-off to the owner and the collaborator (collaborator-workflow 7, M0.5-15 notes, ORCHESTRATION 1.1 and 7.6, COLLABORATING item 3). Ids 23-26 are the rollout rows of #65; 27 belongs to the status picture."
+
+[[task]]
+id = "M0.5-24"
+title = "scripts/agent_metrics.py: `review` row type (ledger of docs/reviews/README.md section 5), failing test first (issue #65, rollout step 4)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-23"]
+notes = "Tooling env (scripts/, CI wiring). Effort M. Test-first: commit the failing test first, wired into scripts/verify.sh and CI. Columns: date, review_id (R1..R12), run_ref, findings, acted_on, ignored, disputed, deferred, cost_usd, window_end. Negatives: unknown review_id, counts that do not add up to findings, window_end before date, non-integer counts, formula-looking text. Replaces the by-hand R3 digest numbers (D-4.4) once the first two digests are done."
+
+[[task]]
+id = "M0.5-25"
+title = "Orchestrator prompt: R3 weekly digest step, ledger row after each review, R10 owner-todo per milestone, and the usage-read and pause text for agents/prompts/* that ORCHESTRATION 7.7.5 deferred (issue #65, rollout step 6)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-19", "M0.5-21", "M0.5-23"]
+notes = "Tooling env (agents/prompts). Effort S. Test-first through scripts/prompt_rules.py (a rule per new step; fails when the step is deleted or weakened). R3: Mondays, first wake after 10:00 UTC, skipped if nothing merged (docs/reviews/README.md 3.1). Ledger: post the `review` row at window_end. R10: one owner-todo per milestone from M2. Usage text: read usage at each wake, the pause protocol steps of ORCHESTRATION 7.7 in the orchestrator, worker and reviewer prompts. Separate from M0.5-19 so that task stays small."
+
+[[task]]
+id = "M0.5-26"
+title = "REVIEW.md: R9 visual-rubric item (agent score below 3 is a minor finding) and R7 rules allow/deny matrix item (issue #65, rollout step 9)"
+milestone = "M0.5"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M0.5-03", "M0.5-15", "M0.5-23"]
+notes = "Tooling env (REVIEW.md). Effort S. After the rubric is drafted in M0.5-03 (docs/product/rubric.md); owner agrees it at D5 (M0.5-O1). R9: goldens per state, light/dark, en/da, rubric scores for changed screens, agent below 3 is a minor finding, never a blocker. R7: for PRs labelled area:security-rules, area:sync-merge or risk:high, check the rules allow/deny matrix covers each changed rule (D-2.6). Test-first if a checker such as scripts/prompt_rules.py covers REVIEW.md."
 
 [[task]]
 id = "M0.5-O4"
