@@ -611,17 +611,14 @@ class M015Tests(unittest.TestCase):
         ):
             self.assert_fails("orchestrator", "orch-design-review", old, new)
 
-    def test_no_handle_is_hardcoded_anywhere_in_the_prompts(self):
-        literal = "mlbe" + "89"  # the collaborator's login: not recorded until the owner says the invitation is accepted
-        for role in ROLES:
-            self.assertNotIn(literal, real(role).lower(), role)
-        self.assertNotIn(literal, (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8").lower())
-        # the design reviewer names no @-handle at all (the placeholders have braces); other prompts carry noreply@anthropic.com
-        self.assertNotRegex(prompt_rules.normalize(real("design-reviewer")), r"@[\w-]+")
+    def test_no_handle_is_hardcoded_in_the_design_reviewer_or_its_rule(self):  # R1-01: no login is named anywhere
+        self.assertNotRegex(prompt_rules.normalize(real("design-reviewer")), r"@[\w-]+")  # placeholders have braces
+        rule = next(r for r in prompt_rules.RULES if r.id == "dr-handle-config")
+        self.assertEqual(rule.forbidden, (r"@[\w-]+",))  # a generic deny pattern, no login in the rule
 
     def test_a_hardcoded_handle_in_the_design_reviewer_is_rejected(self):
         text = real("design-reviewer")
-        for extra in ("\nPing @someone for the hand-off.", "\nPing @mlbe" + "89 for the hand-off.", "\n<!-- ok -->Ping @x-y.z"):
+        for extra in ("\nPing @someone for the hand-off.", "\n<!-- ok -->Ping @x-y.z"):
             with self.subTest(extra=extra):
                 self.assertIn("dr-handle-config", ids(prompt_rules.check_text("design-reviewer", text + extra)))
         # hidden text does not count
@@ -770,6 +767,79 @@ class M015Tests(unittest.TestCase):
                                capture_output=True, text=True, check=False)
             self.assertEqual(r.returncode, 1)
             self.assertIn("design-reviewer.md", r.stdout)
+
+
+class M015Round1Tests(unittest.TestCase):
+    """Review round 1 of PR 83: one source for the hand-off round (R1-02), D ids written down (R1-03), no rubric yet (R1-04),
+    clauses pinned (R1-05), docs say the role exists (R1-06), tuple style (R1-07)."""
+
+    def assert_fails(self, role, rule_id, old, new):
+        text = prompt_rules.normalize(real(role)).lower()
+        self.assertIn(old, text, f"{role}.md lacks {old!r}")
+        with self.subTest(rule=rule_id, old=old):
+            self.assertIn(rule_id, ids(prompt_rules.check_text(role, text.replace(old, new, 1))))
+
+    def doc(self, *parts):
+        return (ROOT.joinpath(*parts)).read_text(encoding="utf-8")
+
+    def test_r1_02_one_source_for_the_hand_off_round(self):
+        sec = re.search(r"### 8\.5 Design reviewer\n(.*?)(?=\n### |\n## |\Z)", self.doc("docs", "ORCHESTRATION.md"), re.S).group(1)
+        self.assertIn("Round {round} of max 2", sec)
+        self.assertNotRegex(sec, r"(?i)last round: \{")
+        self.assertNotIn("If this is the last round", sec)
+        self.assertIn("the prompt decides", sec)
+        for old, new in (
+            ("you decide this from your own verdict, not from the spawn message", "the spawn message decides"),
+            ("round 2, or round 1 when nothing above `nit` is open", "round 1 always"),
+        ):
+            self.assert_fails("design-reviewer", "dr-hand-off", old, new)
+        self.assert_fails("orchestrator", "orch-design-review", "once the hand-off link is in its worker-result",
+                          "at once")
+
+    def test_r1_03_d_ids_are_written_down(self):
+        self.assertIn("`D<round>-<nn>`", self.doc("REVIEW.md"))
+        orch = self.doc("docs", "ORCHESTRATION.md")
+        self.assertRegex(orch, r"(?s)### 7\.2 Review rounds.*?`D<round>-<nn>`.*?### 7\.2\.1")
+        self.assert_fails("design-reviewer", "dr-findings-format", "ids `d<round>-<nn>`", "ids anything")
+        self.assert_fails("design-reviewer", "dr-findings-format", "a `scores` list of screen, criterion, score and reason", "scores")
+
+    def test_r1_04_no_rubric_file_yet(self):
+        for old, new in (
+            ("if `docs/product/rubric.md` does not exist (the m0.5-03 pr)", "if you like"),
+            ("score against readme §4", "score nothing"),
+            ("put a proposed `docs/product/rubric.md` draft in your findings comment for the implementer to commit",
+             "ignore it"),
+            ("the owner and the collaborator see it in the hand-off", "nobody sees it"),
+        ):
+            self.assert_fails("design-reviewer", "dr-rubric", old, new)
+
+    def test_r1_05_clauses_are_pinned(self):
+        cases = (
+            ("design-reviewer", "dr-hand-off", "post nothing else for the collaborator", "also dm the collaborator first"),
+            ("design-reviewer", "dr-hand-off", "put the hand-off comment's link in your worker-result", "keep the link"),
+            ("design-reviewer", "dr-handle-config", 'write "collaborator not yet invited" and no handle', "mention them anyway"),
+            ("design-reviewer", "dr-report-only",
+             "a throwaway worktree is fine to look at files, it is never pushed anywhere and is deleted afterwards",
+             "push a fix branch if useful"),
+            ("design-reviewer", "dr-report-only",
+             "report no finding you cannot back with a file or image, a state (light, dark, en, da) and a rubric criterion", ""),
+            ("design-reviewer", "dr-judge-limits", "light and dark parity", ""),
+            ("orchestrator", "orch-design-review", "for each design pr spawn", "for some design prs spawn"),
+            ("orchestrator", "orch-env-pick", "the task's `notes` names it", ""),
+        )
+        for role, rule, old, new in cases:
+            self.assert_fails(role, rule, old, new)
+
+    def test_r1_06_docs_say_the_role_exists(self):
+        row = next(ln for ln in self.doc("docs", "reviews", "README.md").splitlines() if ln.startswith("| R5 |") and "Opus design reviewer" in ln)
+        self.assertIn("exists (M0.5-15)", row)
+        self.assertNotIn("to write", row)
+        plan = self.doc("docs", "PLAN.md")
+        self.assertRegex(plan, r"\| \*\*Design reviewer\*\* \| Opus / high \|")
+        self.assertIn("agents/prompts/{orchestrator,planner,implementer,reviewer,design-reviewer}.md", plan)
+
+    def test_r1_07_rules_tuple_closes_on_its_own_line(self):
+        self.assertNotRegex(self.doc("scripts", "prompt_rules.py"), r"(?m)^\s*\),\)\s*$")
 
 
 class TierBulletTests(unittest.TestCase):
