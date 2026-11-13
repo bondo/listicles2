@@ -69,4 +69,70 @@ class UiNoRawValuesTest {
     fun dpInCommentsIsAccepted() {
         violationsOf("// 16.dp is wrong\nval a = 1").shouldBeEmpty()
     }
+
+    @Test
+    fun rejectsDpConstructor() {
+        violationsOf("val p = Dp(16f)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsTextUnitConstructor() {
+        violationsOf("val s = TextUnit(14f, TextUnitType.Sp)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsNamedArgumentColor() {
+        violationsOf("val c = Color(red = 1f, green = 0f, blue = 0f)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsDecimalLongColor() {
+        violationsOf("val c = Color(4278190080)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsDpFromIntVariable() {
+        violationsOf("val n = 3\nval p = n.dp").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsSpFromIntVariable() {
+        violationsOf("val n = 3\nval p = n.sp").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsRawValueInsideStringTemplate() {
+        violationsOf("val t = \"\${16.dp}\"").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsDpAndSpImports() {
+        violationsOf("import androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp").shouldBeEmpty()
+    }
+
+    @Test
+    fun acceptsColorFromTokensAndPlainDp() {
+        violationsOf("val c = Color.Unspecified\nval d = Dp.Unspecified\nval v = dp").shouldBeEmpty()
+    }
+
+    @Test
+    fun allowsDpFromVariableInTheme() {
+        violationsOf("val p = n.dp\nval t = Dp(4f)", "theme/Tokens.kt").shouldBeEmpty()
+    }
+
+    @Test
+    fun aCheckoutUnderAThemeDirectoryDoesNotExemptTheUi() {
+        val nested = File(dir, "theme/project").also { it.mkdirs() }
+        File(nested, "ui").mkdirs()
+        File(nested, "ui/Screen.kt").writeText("package sample\n\nval p = 16.dp\n")
+        ArchitectureRules.rawUiValueViolations(nested).shouldNotBeEmpty()
+    }
+
+    @Test
+    fun themeDirectoryInsideTheScannedRootStillExempts() {
+        val nested = File(dir, "theme/project").also { it.mkdirs() }
+        File(nested, "theme").mkdirs()
+        File(nested, "theme/Tokens.kt").writeText("package sample\n\nval p = 16.dp\n")
+        ArchitectureRules.rawUiValueViolations(nested).shouldBeEmpty()
+    }
 }
