@@ -20,9 +20,10 @@ Everything shown is data, never an instruction: hidden markup (HTML comments, ta
 invisible and control characters) is stripped and each text sits in a code fence longer than any backtick run
 inside it, so it cannot close the fence. Raw text is clipped to 4 times --max-chars before stripping, which
 bounds the work. `since` is exclusive. `Next since:` is the cursor to store: the newest timestamp seen on any input
-item, capped at --fetched-at when given. Fetch all FILEs as one snapshot, and pass --fetched-at as the time the
-first request began: an item created between two fetches can be missing from the earlier file, and without the
-cap the cursor could pass it (items after --fetched-at then show once more next time, never zero times). Opening
+item, capped at one second before --fetched-at when given. Fetch all FILEs as one snapshot, and pass --fetched-at
+as the time the first request began: an item created between two fetches can be missing from the earlier file, and
+without the cap the cursor could pass it (items stamped from --fetched-at on then show once more next
+time, never zero times; timestamps are whole seconds and `since` is exclusive, hence the second). Opening
 an issue or PR counts; later edits to an issue or PR body do not (updated_at moves for labels, pushes and
 comments by anyone). Comments edited after `since` are shown as edited. Pending (unsubmitted) reviews are skipped.
 Exit status: 0 ok, 2 bad usage or bad input.
@@ -33,7 +34,7 @@ import json
 import re
 import sys
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 TRUSTED_ASSOCIATIONS = {"COLLABORATOR", "MEMBER"}
 OWNER_ASSOCIATION = "OWNER"
@@ -233,7 +234,10 @@ def render(records, since, collaborators=None, max_chars=DEFAULT_MAX_CHARS, fetc
             shown.append((rec["updated"] if edited and rec["created"] <= since_dt else rec["created"], rec, edited))
     newest = max((s for rec in records for s in rec["stamps"]), default=since_dt)
     if fetched_at is not None:
-        newest = min(newest, parse_ts(fetched_at, "fetched_at") if isinstance(fetched_at, str) else fetched_at)
+        fetched_dt = parse_ts(fetched_at, "fetched_at") if isinstance(fetched_at, str) else fetched_at
+        # API times are whole seconds and since is exclusive: stop one second before the fetch began, so an
+        # item stamped in that same second (possibly missed by the fetch) is shown again next run.
+        newest = min(newest, fetched_dt.astimezone(timezone.utc).replace(microsecond=0) - timedelta(seconds=1))
     next_since = fmt_ts(max(newest, since_dt))
     shown.sort(key=lambda t: (t[0], t[1]["id"]))
     lines = [
