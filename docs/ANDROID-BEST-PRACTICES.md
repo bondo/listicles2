@@ -26,7 +26,7 @@ Sources: [Guide to app architecture](https://developer.android.com/topic/archite
 | Composables and ViewModels never touch a data source (Firestore, DataStore, ...) directly; only repositories do | review (M1); Konsist rule proposed, see follow-ups |
 | Single source of truth per data type: the owner exposes immutable types and takes events or function calls to change them | review (M1) |
 | Unidirectional data flow: state down, events up | review (M1) |
-| ViewModel at screen level only; no `Context`, `Activity`, `Resources` or `AndroidViewModel` in it; `ViewModel` instances are not passed down to child composables | review (M1) |
+| ViewModel at screen level only; no `Context`, `Activity`, `Resources` or `AndroidViewModel` in it; `ViewModel` instances are not passed down to child composables (State hoisting page) | review (M1) |
 | Expose one `uiState: StateFlow<...>` (`stateIn(..., WhileSubscribed(5_000), ...)` for streams); `MutableStateFlow` stays private | review (M1) |
 | Collect with `collectAsStateWithLifecycle`; do not send one-off events from the ViewModel to the UI, update state instead | review (M1) |
 | Reusable UI components use plain state holder classes, not ViewModels | review (M1) |
@@ -55,7 +55,7 @@ row of the architecture recommendations above. Single Activity is already in PLA
 | Rule | Status |
 |---|---|
 | Single Activity; screens are destinations; routes are serializable types (type safe) | later (M1) |
-| The architecture recommendations page names Navigation 3 for multi-screen apps, while the Navigation page I fetched documents Navigation Compose 2.x. **Open question for the owner: which one?** | open question |
+| **Owner decision 2026-11-13: Navigation 3.** The architecture recommendations page names it for multi-screen apps (the Navigation page documents Navigation Compose 2.x, so the Navigation 3 docs must be read before M1 navigation work) | later (M1) |
 | Handle back with `BackHandler` or `PredictiveBackHandler`, not `onBackPressed` or `KEYCODE_BACK`; state-driven enabled flag | review (M1) |
 
 ## 4. Data and offline-first
@@ -64,7 +64,7 @@ Source: [Offline-first](https://developer.android.com/topic/architecture/data-la
 | Rule | Status |
 |---|---|
 | Reads come from the local source and are observable (`Flow`); writes are `suspend` functions | review (M1) |
-| The page names Cloud Firestore as a managed offline cache (disk cache, offline write queue, sync). This project uses it, so Room is **not** needed; a Room database would be a deviation that needs a decision | decision recorded here, review |
+| The page names Cloud Firestore as a managed offline cache (disk cache, offline write queue, sync). This project uses it, so Room is **not** needed; a Room database would be a deviation that needs a decision | PLAN §1 decision; **owner confirmed 2026-11-13 (Q2): Firestore offline persistence only, no Room**; review |
 | Keep network or Firestore document models internal to the data layer and expose a separate model to other layers | review (M1) |
 | Model loading and errors as UI state (a sealed `Loading` / `Success` / `Error`) and catch flow errors in the ViewModel | review (M1) |
 
@@ -82,7 +82,8 @@ Source: [Coroutines best practices](https://developer.android.com/kotlin/corouti
 ## 6. Testing
 Sources: [Testing fundamentals](https://developer.android.com/training/testing/fundamentals),
 [Test doubles](https://developer.android.com/training/testing/fundamentals/test-doubles),
-[Compose testing](https://developer.android.com/develop/ui/compose/testing).
+[Compose testing](https://developer.android.com/develop/ui/compose/testing) and
+[Architecture recommendations](https://developer.android.com/topic/architecture/recommendations).
 
 | Rule | Status |
 |---|---|
@@ -124,7 +125,7 @@ Sources: [Security best practices](https://developer.android.com/topic/security/
 | Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding) |
 | Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change) |
 | Request the fewest permissions; validate input; keep data minimal (also Firestore rules, covered in REVIEW.md item 2) | review |
-| Play Data safety form must match what the app collects | **not sourced**: its page is on `support.google.com`, which this session's network blocks. Not cited until fetched |
+| Play Data safety form must match what the app collects | **not sourced**: its page is on `support.google.com`, which this session's proxy refuses (403). **Owner decision 2026-11-13: `support.google.com` stays blocked for now**, so this item remains not sourced and is not cited |
 
 ## 10. Play quality
 Sources: [Target API requirement](https://developer.android.com/google/play/requirements/target-sdk),
@@ -138,7 +139,7 @@ Sources: [Target API requirement](https://developer.android.com/google/play/requ
 | From 2026-08-31 new apps and updates must target API 36 or higher. `targetSdk` is 37 | review (nothing fails if someone lowers it; guard proposed) |
 | Edge-to-edge: handle `WindowInsets` (a `Scaffold` helps); it is enforced when targeting SDK 35+ | review |
 | Predictive back: do not intercept back with `onBackPressed` or `KEYCODE_BACK`; do not opt out | review |
-| Adaptive layouts by window size class (compact under 600dp, medium to 840dp, expanded from 840dp); do not use "is tablet" logic; state survives configuration changes | review (M1+) |
+| Adaptive layouts by window size class (compact under 600dp, medium 600 to 840dp, expanded 840 to 1200dp, large 1200 to 1600dp, extra-large from 1600dp; large and extra-large need the `supportLargeAndXLargeWidth` opt-in); do not use "is tablet" logic; state survives configuration changes | review (M1+) |
 | All strings in resources, with a complete default `values/strings.xml` and `values-da/` | tooling: lint `MissingTranslation` is an error and `warningsAsErrors` is on (`app/build.gradle.kts`); `<plurals>` and "no hardcoded text" are CLAUDE.md rules checked by review plus lint |
 | Give translators context comments; mark non-translatable parts with `xliff:g` | review |
 
@@ -164,7 +165,9 @@ Each would be its own PR, test-first, per CLAUDE.md.
 7. **Release smoke build** with R8 on, run in CI, once M1 has a release variant.
 8. **Roborazzi and accessibility checks** are already in PLAN section 5; make sure their tasks cite sections 6 and 7 above.
 
-## Open questions for the owner
-1. Navigation 3 or Navigation Compose (section 3)?
-2. Confirm Firestore as the offline store and no Room (section 4).
-3. Allow `support.google.com` in the session network settings so the Play Data safety and Play policy pages can be read and added.
+## Owner decisions (2026-11-13)
+1. Navigation 3 (section 3).
+2. Firestore offline persistence only, no Room (section 4).
+3. `support.google.com` is not allowed now; the Play Data safety item stays not sourced (section 9). Revisit if the owner changes the network setting.
+
+No open questions remain; the checklist still needs the owner's approval before M1 (status line above).
