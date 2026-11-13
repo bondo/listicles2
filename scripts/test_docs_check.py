@@ -192,6 +192,10 @@ class ScopedAllowlist(Base):
         self.assertEqual((p.kind, p.target), ("stale-allow", "docs/old.md"))
         self.assertIn("docs/B.md", p.note)
 
+    def test_scoped_entry_covers_links_too(self):
+        r = self.repo({"docs/A.md": "[x](old.md)\n"}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
+        self.assertEqual(r.check(), [])
+
     def test_scope_without_at_sign_is_bad(self):
         r = self.repo({"docs/A.md": "`docs/old.md`\n"}, allow="docs/old.md docs/A.md  # reason\n")
         self.assertIn("bad-allow", r.kinds())
@@ -205,6 +209,9 @@ class Fences(Base):
 
     def test_longer_fence_may_contain_a_shorter_one(self):
         self.assertEqual(self.repo({"docs/A.md": "````\n```\n`docs/nope.md`\n```\n`docs/nope2.md`\n````\n"}).check(), [])
+
+    def test_text_after_fence_closes_nothing(self):
+        self.assertEqual(self.repo({"docs/A.md": "```\n``` text\n`docs/nope.md`\n```\n"}).check(), [])
 
     def test_checking_resumes_after_the_fence_closes(self):
         (p,) = self.repo({"docs/A.md": "```\n`docs/nope.md`\n```\n`docs/after.md`\n"}).check()
