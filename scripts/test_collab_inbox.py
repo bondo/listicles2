@@ -482,7 +482,9 @@ class HiddenMarkupTests(unittest.TestCase):
         start = time.monotonic()
         out = digest([comment(1, "alex", 7, "COLLABORATOR", evil)])
         self.assertLess(time.monotonic() - start, 2.0)
-        self.assertNotIn("<a", out)
+        # Clipped before stripping: what is left has lost its closing brackets, so it is inert text.
+        self.assertIn("truncated", out)
+        self.assertNotIn(">", out.split("```text\n", 1)[1])
 
     def test_many_unterminated_openers_are_bounded_in_time(self):
         for evil in ("<!--" * 20000, "<script>" * 20000, "<" * 40000, "[a]: #\n" * 20000):
