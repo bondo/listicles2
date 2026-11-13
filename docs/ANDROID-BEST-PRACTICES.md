@@ -140,7 +140,7 @@ Sources: [Target API requirement](https://developer.android.com/google/play/requ
 | Edge-to-edge: handle `WindowInsets` (a `Scaffold` helps); it is enforced when targeting SDK 35+ | review |
 | Predictive back: do not intercept back with `onBackPressed` or `KEYCODE_BACK`; do not opt out | review |
 | Adaptive layouts by window size class (compact under 600dp, medium 600 to 840dp, expanded 840 to 1200dp, large 1200 to 1600dp, extra-large from 1600dp; large and extra-large need the `supportLargeAndXLargeWidth` opt-in); do not use "is tablet" logic; state survives configuration changes | review (M1+) |
-| All strings in resources, with a complete default `values/strings.xml` and `values-da/` | tooling: lint `MissingTranslation` is an error and `warningsAsErrors` is on (`app/build.gradle.kts`); `<plurals>` and "no hardcoded text" are CLAUDE.md rules checked by review plus lint |
+| All strings in resources, with a complete default `app/src/main/res/values/strings.xml` and `app/src/main/res/values-da/` | tooling: lint `MissingTranslation` is an error and `warningsAsErrors` is on (`app/build.gradle.kts`); `<plurals>` and "no hardcoded text" are CLAUDE.md rules checked by review plus lint |
 | Give translators context comments; mark non-translatable parts with `xliff:g` | review |
 
 ## 11. Dependency and Gradle hygiene
