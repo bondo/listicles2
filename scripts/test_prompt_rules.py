@@ -200,7 +200,7 @@ class M025Tests(unittest.TestCase):
     """M0.5-25: usage-read and pause text, R3 digest, review ledger row, R10 owner-todo. Each step is pinned by a rule that
     fails when the step is deleted or weakened (a changed day, hour, window or limit counts as weakened)."""
 
-    NEW_ORCH = ("usage-read", "usage-pause-protocol", "usage-limit-failure", "r3-digest", "review-ledger", "r10-owner-todo")
+    NEW_ORCH = ("usage-read", "usage-pause-protocol", "usage-limit-failure", "usage-resume", "r3-digest", "review-ledger", "r10-owner-todo")
 
     def mutate(self, role, old, new):
         text = prompt_rules.normalize(real(role))
@@ -236,7 +236,7 @@ class M025Tests(unittest.TestCase):
             ("if nothing merged in the last 7 days", "if nothing merged in the last 30 days"),
             ("at most 25 lines", "at most 40 lines"), ("at most 3 proposals", "at most 5 proposals"),
             ("decides nothing, edits no file, spawns no worker", "decides what it likes"),
-            ("Never add the `review` rows' `cost_usd`", "Add the `review` rows' `cost_usd`"),
+            ("never add the `review` rows' `cost_usd`", "add the `review` rows' `cost_usd`"),
             ("`Weekly ops digest <date>` comment on #15", "comment on #15"),
         ):
             self.assert_fails("orchestrator", "r3-digest", old, new)
@@ -263,8 +263,46 @@ class M025Tests(unittest.TestCase):
             ("from M2 on, never before", "from M1 on"), ("once per milestone", "now and then"),
             ("assigned to the owner", "assigned to nobody"), ("mentioning the collaborator", "mentioning no one"),
             ("the owner's scores decide", "the average score decides"), ("`owner-todo`", "`todo`"),
+            ("`[owner] R10-<milestone>: device notes`", "`[owner] <task id>: device notes`"),
+            ("never an id from `docs/tasks.toml`", "an id from `docs/tasks.toml`"),
         ):
             self.assert_fails("orchestrator", "r10-owner-todo", old, new)
+
+    def test_r10_title_cannot_complete_a_task(self):  # R1-02: scripts/tasks.py maps `[owner] <id>` titles to task ids
+        import tasks  # noqa: PLC0415  # justified: scripts/ is on sys.path (inserted above); only this test needs it
+
+        title = "[owner] R10-M2: device notes"
+        m = tasks.OWNER_TITLE.match(title)
+        self.assertIsNotNone(m)
+        ids_in_file = set(tasks.parse((ROOT / "docs" / "tasks.toml").read_text(encoding="utf-8")).by_id)
+        self.assertNotIn(m.group(1), ids_in_file)
+        self.assertIn("`[owner] R10-<milestone>: device notes`", prompt_rules.normalize(real("orchestrator")))
+
+    def test_no_capital_after_a_semicolon_in_the_orchestrator_prompt(self):  # R1-04
+        self.assertNotRegex(prompt_rules.normalize(real("orchestrator")), r"; [A-Z][a-z]")
+
+    def test_m025_row_is_done_in_tasks_toml(self):  # R1-01: ORCHESTRATION 4.4, the PR that finishes a task sets it done
+        import tasks  # noqa: PLC0415  # justified: scripts/ is on sys.path (inserted above); only this test needs it
+
+        row = tasks.parse((ROOT / "docs" / "tasks.toml").read_text(encoding="utf-8")).by_id["M0.5-25"]
+        self.assertEqual(row.status, "done")
+
+    def test_usage_resume_weakened(self):  # R1-03
+        for old, new in (
+            ("if the read still shows limit reached or a 5-hour warning, set a new `paused until` time", "carry on"),
+            ("`send_later` again at the new reset time plus 5 minutes", "x"),
+            ("delete the spent reminder and stop", "delete the spent reminder"),
+            ("resume implementers before reviewers", "resume reviewers first"),
+            ("re-arm the 45-minute check-in", "x"),
+        ):
+            self.assert_fails("orchestrator", "usage-resume", old, new)
+
+    def test_usage_read_unknown_type_and_overage_weakened(self):  # R1-03
+        for old, new in (
+            ("an unknown or missing `rateLimitType` counts as 5-hour", "an unknown `rateLimitType` counts as ok"),
+            ("`isUsingOverage` is true, near limit (overage), never pauses", "`isUsingOverage` is true, pause"),
+        ):
+            self.assert_fails("orchestrator", "usage-read", old, new)
 
     def test_usage_read_weakened(self):
         for old, new in (

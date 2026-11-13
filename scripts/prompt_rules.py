@@ -146,6 +146,8 @@ RULES = (
             r"usage, every wake, first step", r"`get_session` on your own session", r"rate_limit_info",
             r"`rateLimitType` and `status` together, never from `status` alone", r"`Usage:` line", r"§7\.7\.1",
             r"7-day warning never pauses", r"missing `rate_limit_info` counts as ok",
+            r"an unknown or missing `rateLimitType` counts as 5-hour",
+            r"`isUsingOverage` is true[^.;]*never pauses",
         ),
         "the first step of every wake reads rate_limit_info and sets Usage:; a 7-day warning never pauses (§7.7.1)",
     ),
@@ -164,6 +166,16 @@ RULES = (
         "usage-limit-failure", ("orchestrator",),
         (r"a limit failure is not a stall", r"no respawn", r"two-failure stop", r"§7\.7\.4", r"`RESUMED`"),
         "a limit failure is not a stall (no respawn, not counted); resume per §7.7.4 and post RESUMED (§7.7.3)",
+    ),
+    Rule(
+        "usage-resume", ("orchestrator",),
+        (
+            r"if the read still shows limit reached or a 5-hour warning, set a new `paused until` time",
+            r"`send_later` again at the new reset time plus 5 minutes", r"delete the spent reminder and stop",
+            r"`send_message` each interrupted or limit-failed session", r"resume implementers before reviewers",
+            r"re-arm the 45-minute check-in",
+        ),
+        "resume re-checks the limit first (re-pause, new reminder, stop), then resumes implementers before reviewers (§7.7.4)",
     ),
     Rule(
         "usage-worker", ("implementer", "planner"),
@@ -208,7 +220,8 @@ RULES = (
         "r10-owner-todo", ("orchestrator",),
         (
             r"r10 device notes", r"from m2 on, never before", r"once per milestone",
-            r"one `\[owner\] <task id>: …` issue", r"`owner-todo`", r"assigned to the owner",
+            r"`\[owner\] R10-<milestone>: device notes`", r"never an id from `docs/tasks\.toml`",
+            r"`owner-todo`", r"assigned to the owner",
             r"mentioning the collaborator", r"the owner's scores decide",
         ),
         "R10: one owner-todo issue per milestone from M2, assigned to the owner, mentioning the collaborator",
