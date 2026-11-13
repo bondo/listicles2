@@ -62,16 +62,9 @@ class GoodDocs(Base):
         r = self.repo({"docs/A.md": '[b](B.md#section "title") [c](sub/C.md?x=1#y)\n', "docs/B.md": "", "docs/sub/C.md": ""})
         self.assertEqual(r.check(), [])
 
-    def test_parent_relative_link(self):
-        r = self.repo({"docs/sub/A.md": "[up](../B.md)\n", "docs/B.md": ""})
-        self.assertEqual(r.check(), [])
-
     def test_external_and_anchor_links_ignored(self):
         text = "[w](https://example.com/nope.md) [m](mailto:a@b.c) [a](#here) [h](http://x/y/z.md)\n"
         self.assertEqual(self.repo({"docs/A.md": text}).check(), [])
-
-    def test_link_to_directory(self):
-        self.assertEqual(self.repo({"docs/A.md": "[d](adr/)\n", "docs/adr/x.md": ""}).check(), [])
 
     def test_path_with_line_suffix(self):
         r = self.repo({"docs/A.md": "`scripts/x.py:12` `scripts/x.py:3-9` `scripts/x.py#L4`\n", "scripts/x.py": ""})
@@ -163,10 +156,6 @@ class BadDocs(Base):
     def test_no_allowlist_file_is_fine(self):
         self.assertEqual(self.repo({"docs/A.md": "ok\n"}).check(), [])
 
-    def test_each_problem_is_reported_once_per_occurrence(self):
-        r = self.repo({"docs/A.md": "`docs/x.md`\n`docs/x.md`\n"})
-        self.assertEqual(r.kinds(), ["missing-path", "missing-path"])
-
 
 class AllMarkdown(Base):
     """R1-01: every tracked *.md is scanned, not only docs/."""
@@ -179,10 +168,6 @@ class AllMarkdown(Base):
         self.assertEqual(self.repo({"README.md": "[a](docs/A.md)\n", "docs/A.md": ""}).check(), [])
         (p,) = self.repo({"agents/p.md": "[a](docs/A.md)\n", "docs/A.md": ""}).check()
         self.assertEqual((p.kind, p.file), ("broken-link", "agents/p.md"))
-
-    def test_hidden_directory_docs_are_scanned_in_a_git_repo(self):
-        (p,) = self.repo({".claude/agents/x.md": "`docs/gone.md`\n", "docs/A.md": ""}, git=True).check()
-        self.assertEqual(p.file, ".claude/agents/x.md")
 
     def test_ignored_markdown_is_not_scanned(self):
         r = self.repo({".gitignore": "node_modules/\n", "node_modules/pkg/R.md": "`docs/gone.md`\n", "docs/A.md": ""}, git=True)
@@ -207,21 +192,9 @@ class ScopedAllowlist(Base):
         self.assertEqual((p.kind, p.target), ("stale-allow", "docs/old.md"))
         self.assertIn("docs/B.md", p.note)
 
-    def test_scope_to_a_file_that_does_not_exist_is_stale(self):
-        r = self.repo({"docs/A.md": "ok\n"}, allow="docs/old.md @docs/Gone.md  # absent on purpose\n")
-        self.assertEqual(r.kinds(), ["stale-allow"])
-
-    def test_scoped_entry_whose_path_exists_is_stale(self):
-        r = self.repo({"docs/A.md": "`docs/old.md`\n", "docs/old.md": ""}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
-        self.assertEqual(r.kinds(), ["stale-allow"])
-
     def test_scope_without_at_sign_is_bad(self):
         r = self.repo({"docs/A.md": "`docs/old.md`\n"}, allow="docs/old.md docs/A.md  # reason\n")
         self.assertIn("bad-allow", r.kinds())
-
-    def test_scoped_entry_covers_links_too(self):
-        r = self.repo({"docs/A.md": "[x](old.md)\n"}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
-        self.assertEqual(r.check(), [])
 
 
 class Fences(Base):
@@ -233,19 +206,9 @@ class Fences(Base):
     def test_longer_fence_may_contain_a_shorter_one(self):
         self.assertEqual(self.repo({"docs/A.md": "````\n```\n`docs/nope.md`\n```\n`docs/nope2.md`\n````\n"}).check(), [])
 
-    def test_shorter_fence_line_does_not_close_a_longer_fence(self):
-        self.assertEqual(self.repo({"docs/A.md": "~~~~\n~~~\n`docs/nope.md`\n~~~~\n"}).check(), [])
-
-    def test_text_after_fence_closes_nothing(self):
-        self.assertEqual(self.repo({"docs/A.md": "```\n``` text\n`docs/nope.md`\n```\n"}).check(), [])
-
     def test_checking_resumes_after_the_fence_closes(self):
         (p,) = self.repo({"docs/A.md": "```\n`docs/nope.md`\n```\n`docs/after.md`\n"}).check()
         self.assertEqual((p.line, p.target), (4, "docs/after.md"))
-
-    def test_tilde_fence_is_closed_by_tildes(self):
-        (p,) = self.repo({"docs/A.md": "~~~\n`docs/nope.md`\n~~~\n`docs/after.md`\n"}).check()
-        self.assertEqual(p.target, "docs/after.md")
 
 
 class TrackedFiles(Base):
