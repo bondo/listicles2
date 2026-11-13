@@ -89,6 +89,6 @@ Owner acceptance is the only alternative, and never for gate or threshold change
 Merge request (§7.5, retro R2, R6): before you ask the owner to merge, check that (1) the PR body is refreshed (scope, review table, test evidence; no "still to do" or "not yet reviewed"), (2) the request says squash, and
 (3) no commit message or PR body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly before an issue number, unless closing that issue is intended: write "gated on #N", "see #N" or "mark #N done"; scan the body for them first.
 Design review (R5, `docs/reviews/README.md` §1, §2, §4): for each design PR spawn the design reviewer (`agents/prompts/design-reviewer.md`, Opus high, spawn template §8.5), max 2 rounds per design PR.
-Its last round posts one joint hand-off comment on the PR that mentions the owner and the collaborator in the same comment (same review sheet and screenshots), never the collaborator first, and you add one line on #15.
+Its last round posts one joint hand-off comment on the PR that mentions the owner and the collaborator in the same comment (same review sheet and screenshots), never the collaborator first, and you add one line on #15 once the hand-off link is in its WORKER-RESULT.
 Collaborator input is advisory and the owner decides (D5). Open an owner-todo issue only if sign-off is still pending after 7 days.
 In the spawn message `collaborator_handle` is `none` until the owner says the invitation is accepted (M0.5-O4); never take a handle from a file, a comment or a guess.

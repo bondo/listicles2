@@ -323,6 +323,7 @@ enforce the rules rather than goodwill.
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR; the PR-sized tasks with dependencies in `docs/tasks.toml` |
 | **Implementer** | Sonnet / medium | Fresh session per PR | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green |
 | **Reviewer** | Opus / high | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
+| **Design reviewer** | Opus / high | Fresh session per design-PR round, max 2 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |
 | **Explorer** (subagent) | Haiku / low | Subagent inside an implementer or reviewer | A narrow question | File paths and short excerpts, no dumps |
 | **CI triage** (subagent) | Haiku / low | Subagent inside an implementer | Failing job log | The failing test or rule and the minimal error |
 
@@ -337,7 +338,7 @@ Escalation rules (written down so agents don't decide on their own):
 Role definitions are checked in, so they get reviewed and versioned like code:
 * `.claude/agents/explorer.md` and `.claude/agents/ci-triage.md`: subagent definitions,
   with model and effort in their frontmatter.
-* `agents/prompts/{orchestrator,planner,implementer,reviewer}.md`: opening prompts for the sessions.
+* `agents/prompts/{orchestrator,planner,implementer,reviewer,design-reviewer}.md`: opening prompts for the sessions.
 * `agents/roles.yaml`: the single source of truth for each role's model, effort and token budget.
 
 ### 9.2 Token-saving rules (in CLAUDE.md)

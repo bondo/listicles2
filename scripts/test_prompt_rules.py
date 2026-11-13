@@ -831,7 +831,7 @@ class M015Round1Tests(unittest.TestCase):
             self.assert_fails(role, rule, old, new)
 
     def test_r1_06_docs_say_the_role_exists(self):
-        row = next(ln for ln in self.doc("docs", "reviews", "README.md").splitlines() if ln.startswith("| R5 |") and "Opus design reviewer" in ln)
+        row = next(ln for ln in self.doc("docs", "reviews", "README.md").splitlines() if ln.startswith("| R5 |") and "design-reviewer role (M0.5-15)" in ln)
         self.assertIn("exists (M0.5-15)", row)
         self.assertNotIn("to write", row)
         plan = self.doc("docs", "PLAN.md")

@@ -45,7 +45,7 @@ Protected files (`agents/`, `REVIEW.md`, `.github/`, `CLAUDE.md`) change only in
 | R2 | inside every orchestrator wake | ORCHESTRATION 7.7 (pause protocol, usage line); prompt text: M0.5-25 | protocol exists |
 | R3 | inside one orchestrator wake (D-3.1), no separate session | section 3.1; prompt step: M0.5-25 | by hand until then (D-4.4) |
 | R4 | Sonnet worker, only if Dependabot PRs are open | ORCHESTRATION 7.5 | exists |
-| R5 | Opus design reviewer (max 2 rounds), then **one** hand-off comment on the PR to the owner and the collaborator (same review sheet and screenshots) plus one line in #15; `owner-todo` only if sign-off is still pending after 7 days (D-4.5) | design-reviewer role (M0.5-15), `docs/product/rubric.md` drafted in M0.5-03 | to write |
+| R5 | Opus design reviewer (max 2 rounds), then **one** hand-off comment on the PR to the owner and the collaborator (same review sheet and screenshots) plus one line in #15; `owner-todo` only if sign-off is still pending after 7 days (D-4.5) | design-reviewer role (M0.5-15), `docs/product/rubric.md` drafted in M0.5-03 | exists (M0.5-15) |
 | R6 | Sonnet medium worker | PLAN 9.4 + section 5 | exists, extended here |
 | R7 | Opus worker, max effort | reviewer prompt + a `REVIEW.md` allow/deny-matrix item (M0.5-26) | M1 |
 | R8 | Opus worker, one-off prompt (ORCHESTRATION 8.4) | section 3.2 | M1 |
