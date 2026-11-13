@@ -250,13 +250,34 @@ class TimeTests(unittest.TestCase):
         ]
         self.assertIn("Next since: 2026-11-12T14:00:00Z", digest(items))
 
-    def test_next_since_is_capped_at_fetched_at(self):
+    def test_next_since_is_capped_one_second_before_fetched_at(self):
         # Files fetched one after another: an item made between the fetches can be missing from the
-        # earlier file, so the cursor must not pass the time the first fetch began.
-        items = [comment(1, "alex", 7, "COLLABORATOR", "a", created=LATER)]
+        # earlier file. API times are whole seconds and since is exclusive, so the cursor stops one
+        # second before the first fetch began.
+        items = [comment(1, "alex", 7, "COLLABORATOR", "CAPPEDITEMBODY", created=LATER)]
         out = digest(items, fetched_at="2026-11-12T13:30:00Z")
-        self.assertIn("Next since: 2026-11-12T13:30:00Z", out)
-        self.assertIn("a", out)  # the item itself is still shown now
+        self.assertIn("Next since: 2026-11-12T13:29:59Z", out)
+        # The item itself is still shown now, inside its fence.
+        inner = "\n".join(FenceTests.fenced_blocks(out)[0][1])
+        self.assertIn("CAPPEDITEMBODY", inner)
+
+    def test_item_stamped_at_fetched_at_is_shown_in_the_next_run(self):
+        # Created in the same second the fetch began, so it may have missed the fetch.
+        fetched = "2026-11-12T13:30:00Z"
+        item = comment(1, "alex", 7, "COLLABORATOR", "SAMESECOND", created=fetched)
+        first = digest([], fetched_at=fetched)  # an earlier file without it
+        self.assertNotIn("SAMESECOND", first)
+        cursor = re.search(r"Next since: (\S+)", digest([item], fetched_at=fetched)).group(1)
+        nxt = collab_inbox.build_digest([item], cursor)
+        self.assertIn("SAMESECOND", nxt)
+
+    def test_fractional_seconds_in_fetched_at_are_floored_before_the_second_is_taken_off(self):
+        out = digest([comment(1, "alex", 7, "COLLABORATOR", "a", created=LATER)], fetched_at="2026-11-12T13:30:00.900Z")
+        self.assertIn("Next since: 2026-11-12T13:29:59Z", out)
+
+    def test_fetched_at_with_an_offset_is_taken_as_an_instant(self):
+        out = digest([comment(1, "alex", 7, "COLLABORATOR", "a", created=LATER)], fetched_at="2026-11-12T15:30:00+02:00")
+        self.assertIn("Next since: 2026-11-12T13:29:59Z", out)
 
     def test_next_since_is_the_newest_stamp_when_older_than_fetched_at(self):
         items = [comment(1, "alex", 7, "COLLABORATOR", "a", created=AFTER)]
@@ -650,7 +671,7 @@ class CliTests(unittest.TestCase):
             f = self.write(d, "c.json", [comment(1, "alex", 7, "COLLABORATOR", "a", created=LATER)])
             r = self.run_cli("--since", SINCE, "--fetched-at", "2026-11-12T13:30:00Z", f)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("Next since: 2026-11-12T13:30:00Z", r.stdout)
+        self.assertIn("Next since: 2026-11-12T13:29:59Z", r.stdout)
 
     def test_bad_fetched_at_exits_2(self):
         r = self.run_cli("--since", SINCE, "--fetched-at", "soon", "-", stdin="[]")
