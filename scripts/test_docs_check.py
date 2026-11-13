@@ -3,6 +3,7 @@
 The checker must pass on good docs, fail on each kind of bad input, and pass on the real repository docs.
 """
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -19,7 +20,7 @@ SCRIPT = ROOT / "scripts" / "docs_check.py"
 class Repo:
     """A throwaway repo tree: files maps relative path to text; an empty-string file is created empty."""
 
-    def __init__(self, files, allow=None):
+    def __init__(self, files, allow=None, git=False):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         for rel, text in files.items():
@@ -30,6 +31,10 @@ class Repo:
         if allow is not None:
             self.allow.parent.mkdir(parents=True, exist_ok=True)
             self.allow.write_text(allow, encoding="utf-8")
+        if git:  # stage everything: existence then follows `git ls-files`, so ignored files do not count
+            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+            subprocess.run(["git", "init", "-q"], cwd=self.root, env=env, check=True)
+            subprocess.run(["git", "add", "-A"], cwd=self.root, env=env, check=True)
 
     def check(self):
         return docs_check.check(self.root, self.allow)
@@ -42,8 +47,8 @@ class Repo:
 
 
 class Base(unittest.TestCase):
-    def repo(self, files, allow=None):
-        r = Repo(files, allow)
+    def repo(self, files, allow=None, git=False):
+        r = Repo(files, allow, git)
         self.addCleanup(r.close)
         return r
 
@@ -161,6 +166,132 @@ class BadDocs(Base):
     def test_each_problem_is_reported_once_per_occurrence(self):
         r = self.repo({"docs/A.md": "`docs/x.md`\n`docs/x.md`\n"})
         self.assertEqual(r.kinds(), ["missing-path", "missing-path"])
+
+
+class AllMarkdown(Base):
+    """R1-01: every tracked *.md is scanned, not only docs/."""
+
+    def test_root_and_prompt_files_are_scanned(self):
+        r = self.repo({"README.md": "`docs/gone.md`\n", "agents/prompts/p.md": "`docs/gone.md`\n", "docs/A.md": ""})
+        self.assertEqual(sorted((p.file, p.target) for p in r.check()), [("README.md", "docs/gone.md"), ("agents/prompts/p.md", "docs/gone.md")])
+
+    def test_link_in_root_file_is_relative_to_that_file(self):
+        self.assertEqual(self.repo({"README.md": "[a](docs/A.md)\n", "docs/A.md": ""}).check(), [])
+        (p,) = self.repo({"agents/p.md": "[a](docs/A.md)\n", "docs/A.md": ""}).check()
+        self.assertEqual((p.kind, p.file), ("broken-link", "agents/p.md"))
+
+    def test_hidden_directory_docs_are_scanned_in_a_git_repo(self):
+        (p,) = self.repo({".claude/agents/x.md": "`docs/gone.md`\n", "docs/A.md": ""}, git=True).check()
+        self.assertEqual(p.file, ".claude/agents/x.md")
+
+    def test_ignored_markdown_is_not_scanned(self):
+        r = self.repo({".gitignore": "node_modules/\n", "node_modules/pkg/R.md": "`docs/gone.md`\n", "docs/A.md": ""}, git=True)
+        self.assertEqual(r.check(), [])
+
+
+class ScopedAllowlist(Base):
+    """R1-01: an entry can be limited to the files that may mention the path."""
+
+    def test_scoped_entry_covers_listed_file(self):
+        r = self.repo({"docs/A.md": "`docs/old.md`\n"}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
+        self.assertEqual(r.check(), [])
+
+    def test_same_path_in_another_file_still_fails(self):
+        r = self.repo({"docs/A.md": "`docs/old.md`\n", "agents/p.md": "write `docs/old.md`\n"}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
+        (p,) = r.check()
+        self.assertEqual((p.kind, p.file, p.target), ("missing-path", "agents/p.md", "docs/old.md"))
+
+    def test_scoped_file_that_no_longer_mentions_the_path_is_stale(self):
+        r = self.repo({"docs/A.md": "`docs/old.md`\n", "docs/B.md": "clean\n"}, allow="docs/old.md @docs/A.md @docs/B.md  # absent on purpose\n")
+        (p,) = r.check()
+        self.assertEqual((p.kind, p.target), ("stale-allow", "docs/old.md"))
+        self.assertIn("docs/B.md", p.note)
+
+    def test_scope_to_a_file_that_does_not_exist_is_stale(self):
+        r = self.repo({"docs/A.md": "ok\n"}, allow="docs/old.md @docs/Gone.md  # absent on purpose\n")
+        self.assertEqual(r.kinds(), ["stale-allow"])
+
+    def test_scoped_entry_whose_path_exists_is_stale(self):
+        r = self.repo({"docs/A.md": "`docs/old.md`\n", "docs/old.md": ""}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
+        self.assertEqual(r.kinds(), ["stale-allow"])
+
+    def test_scope_without_at_sign_is_bad(self):
+        r = self.repo({"docs/A.md": "`docs/old.md`\n"}, allow="docs/old.md docs/A.md  # reason\n")
+        self.assertIn("bad-allow", r.kinds())
+
+    def test_scoped_entry_covers_links_too(self):
+        r = self.repo({"docs/A.md": "[x](old.md)\n"}, allow="docs/old.md @docs/A.md  # absent on purpose\n")
+        self.assertEqual(r.check(), [])
+
+
+class Fences(Base):
+    """R1-02: a fence closes only on the same character with at least the same length (CommonMark)."""
+
+    def test_other_fence_character_inside_a_fence_does_not_close_it(self):
+        self.assertEqual(self.repo({"docs/A.md": "```\n`nope/a.md`\n~~~\n`nope/b.md`\n```\n"}).check(), [])
+
+    def test_longer_fence_may_contain_a_shorter_one(self):
+        self.assertEqual(self.repo({"docs/A.md": "````\n```\n`docs/nope.md`\n```\n`docs/nope2.md`\n````\n"}).check(), [])
+
+    def test_shorter_fence_line_does_not_close_a_longer_fence(self):
+        self.assertEqual(self.repo({"docs/A.md": "~~~~\n~~~\n`docs/nope.md`\n~~~~\n"}).check(), [])
+
+    def test_text_after_fence_closes_nothing(self):
+        self.assertEqual(self.repo({"docs/A.md": "```\n``` text\n`docs/nope.md`\n```\n"}).check(), [])
+
+    def test_checking_resumes_after_the_fence_closes(self):
+        (p,) = self.repo({"docs/A.md": "```\n`docs/nope.md`\n```\n`docs/after.md`\n"}).check()
+        self.assertEqual((p.line, p.target), (4, "docs/after.md"))
+
+    def test_tilde_fence_is_closed_by_tildes(self):
+        (p,) = self.repo({"docs/A.md": "~~~\n`docs/nope.md`\n~~~\n`docs/after.md`\n"}).check()
+        self.assertEqual(p.target, "docs/after.md")
+
+
+class TrackedFiles(Base):
+    """R1-03: existence follows git (tracked or untracked-but-not-ignored), so a local pass matches CI."""
+
+    def test_ignored_file_does_not_count_as_existing(self):
+        r = self.repo({".gitignore": "build/\n", "build/x.txt": "", "docs/A.md": "`build/x.txt`\n"}, git=True)
+        (p,) = r.check()
+        self.assertEqual((p.kind, p.target), ("missing-path", "build/x.txt"))
+
+    def test_ignored_link_target_does_not_count_as_existing(self):
+        r = self.repo({".gitignore": "out.md\n", "out.md": "", "docs/A.md": "[o](../out.md)\n"}, git=True)
+        self.assertEqual(r.kinds(), ["broken-link"])
+
+    def test_ignored_top_level_directory_is_not_a_repo_directory(self):
+        r = self.repo({".gitignore": "build/\n", "build/x.txt": "", "docs/A.md": "`build/out` and `build/`\n"}, git=True)
+        self.assertEqual(r.check(), [])
+
+    def test_allowlist_entry_for_an_ignored_existing_file_is_not_stale(self):
+        files = {".gitignore": "build/\n", "build/x.txt": "", "docs/A.md": "`build/x.txt`\n"}
+        r = self.repo(files, allow="build/x.txt  # generated, never tracked\n", git=True)
+        self.assertEqual(r.check(), [])
+
+    def test_untracked_but_not_ignored_file_counts(self):
+        r = self.repo({"docs/A.md": "`docs/new.md`\n"}, git=True)
+        (r.root / "docs" / "new.md").write_text("", encoding="utf-8")
+        self.assertEqual(r.check(), [])
+
+    def test_directory_of_tracked_files_exists(self):
+        r = self.repo({"docs/A.md": "`scripts/hooks/` [d](../scripts/hooks)\n", "scripts/hooks/h.py": ""}, git=True)
+        self.assertEqual(r.check(), [])
+
+
+class ReferenceDefinitions(Base):
+    """R1-04: `[label]: target` definitions are checked like inline links."""
+
+    def test_broken_reference_definition(self):
+        (p,) = self.repo({"docs/A.md": "see [x]\n\n[x]: ../gone.md\n"}).check()
+        self.assertEqual((p.kind, p.line, p.target), ("broken-link", 3, "../gone.md"))
+
+    def test_good_and_external_reference_definitions(self):
+        text = "[a]: B.md#s\n[b]: <B.md>\n[c]: https://example.com/x.md\n[d]: #here\n"
+        self.assertEqual(self.repo({"docs/A.md": text, "docs/B.md": ""}).check(), [])
+
+    def test_definition_inside_a_fence_is_ignored(self):
+        self.assertEqual(self.repo({"docs/A.md": "```\n[x]: gone.md\n```\n"}).check(), [])
 
 
 class Cli(Base):
