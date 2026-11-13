@@ -74,7 +74,7 @@ Each fact has exactly one canonical location. Everything else links to it and do
 | Fact | Canonical location | Written by | Read by |
 |---|---|---|---|
 | Current milestone, batches, running sessions, branch locks, next steps | **State issue** body (currently #15, label `orchestrator-state`), format in [`orchestrator-state.md`](orchestrator-state.md) | Orchestrator only | Orchestrator, successor, owner |
-| History: metrics rows, incidents, owner decisions, handovers | **State issue comments** (append-only, §6) | Orchestrator only | Successor, retro, `scripts/agent-metrics` |
+| History: metrics rows, incidents, owner decisions, handovers | **State issue comments** (append-only, §6) | Orchestrator only | Successor, retro, `scripts/agent_metrics.py` |
 | Tasks, dependencies, done/todo (agent and owner work alike) | **`docs/tasks.toml` on the tasks ref only** (§4.2), queried with `scripts/tasks.py`. No other branch carries an edited copy | Planner (adds), the PR that finishes a task or a status-sync commit on the tasks ref (sets `done`, §4.4), process PRs | Orchestrator (`ready`, `review`), everyone |
 | Who is working on a task right now (claims) | **State issue** Sessions table, `Task ids` column | Orchestrator | `scripts/tasks.py --claimed` |
 | Which tasks are committed and awaiting review or merge | **State issue** Branches table, `Tasks awaiting review/merge` column | Orchestrator | `scripts/tasks.py --in-review` |
@@ -397,8 +397,12 @@ and stops. A session that finds a lower-id claim than its own does the same.
 
 ## 6. Metrics and incidents
 
-Source of truth: the state-issue log comments, in fixed CSV blocks that `scripts/agent-metrics`
-(PLAN §9.4) can later turn into `docs/agent-metrics.csv` without reading transcripts.
+Source of truth: the state-issue log comments, in fixed CSV blocks that `scripts/agent_metrics.py`
+turns into `docs/agent-metrics.csv` without reading transcripts or the network. At milestone end (or when a
+batch closes) save the comment bodies unchanged as `docs/metrics/<milestone>.txt` and run
+`python3 -I scripts/agent_metrics.py` (it reads `docs/metrics/*.txt`; `--check` runs in verify.sh and CI).
+The script rejects malformed rows, missing or unknown columns, duplicate `session_id`s and duplicate
+`(pr, round)`s, and non-numeric cost or token fields; one single-line CSV row per line, quote fields with commas.
 Numbers come from tools, never from memory or estimates. If a value is unknown, write
 an empty field, not a guess.
 
@@ -406,12 +410,13 @@ an empty field, not a guess.
 
 ```csv
 # metrics:session
-date,batch,pr,tasks,role,session_id,model,effort,result,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,handoffs,verify_fails_before_push,ci_red_runs
-{date},{batch},{pr},{task ids space-separated},reviewer,{session_id},{last_served_model},high,done,{cost},{in},{out},{cache_r},{cache_w},0,,
+date,batch,pr,tasks,role,session_id,model,effort,env,result,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,handoffs,verify_fails_before_push,ci_red_runs,post_cap_commits,owner_interventions
+{date},{batch},{pr},{task ids space-separated},reviewer,{session_id},{last_served_model},high,{normal|tooling},done,{cost},{in},{out},{cache_r},{cache_w},0,,,,
 ```
 
 `cost_usd` and the token fields come from `get_session` → `external_metadata.usage`.
 `model` is `last_served_model`. If it differs from `configured_model`, say so in an incident row.
+`env` is the environment kind. `post_cap_commits` counts commits this session pushed after the 4-round cap; `owner_interventions` counts owner decisions this session's work needed. Both are per session, so sums over rows do not double-count. Unknown values stay empty; `env`, `post_cap_commits` and `owner_interventions` may be absent from older comments.
 
 ### 6.2 Round row (one per review round)
 
