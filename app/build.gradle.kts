@@ -76,6 +76,7 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotest.assertions)
+    testImplementation(project(":core:testing"))
     testRuntimeOnly(libs.junit.platform.launcher)
 
     androidTestImplementation(platform(libs.compose.bom))
