@@ -202,10 +202,65 @@ class M011AlignmentTests(unittest.TestCase):
             ("orchestrator", "orch-deferral", "without owner OK (`owner-ok` label)"),
             ("orchestrator", "orch-deferral", "more than 8 open follow-ups for one milestone: stop deferring and ask the owner"),
             ("implementer", "impl-deferral", "you do not decide"),
-            ("implementer", "impl-deferral", "put that question in `needs_owner` of your WORKER-RESULT"),
+            ("implementer", "impl-deferral", "Put every owner-OK question in `needs_owner` of your WORKER-RESULT"),
         ):
             with self.subTest(role=role, rule=rule_id, old=old):
                 self.weakened(role, rule_id, old)
+
+    # R2-01: every clause of the two deferral rules is pinned; each change below must fail its rule.
+    DEFERRAL_MUTATIONS = (
+        ("orchestrator", "orch-deferral", "never defer a major, ", ""),
+        ("orchestrator", "orch-deferral", "file the follow-up issue from", "maybe file an issue from"),
+        ("orchestrator", "orch-deferral", "with all its labels (`target:<Mx>` per §3)", ""),
+        ("orchestrator", "orch-deferral", "If everything above nit was deferred and no commit followed the reviewed range, "
+         "post `accepted: all findings above nit deferred (#a, #b)` (verdict `ready_deferred`).", ""),
+        ("orchestrator", "orch-deferral", "decide each recommendation by §2 from the finding's severity, `area` and `recommend`", ""),
+        ("orchestrator", "orch-deferral", "a minor or nit only once no blocker or major is open on the PR, and", ""),
+        ("orchestrator", "orch-deferral", "and it is not a regression this PR introduced", ""),
+        ("orchestrator", "orch-deferral", "the PR's own acceptance criteria and tests do not depend on it, ", ""),
+        ("orchestrator", "orch-deferral", "The 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings.", ""),
+        ("orchestrator", "orch-deferral", "and record a `decision` comment on the state issue", ""),
+        ("implementer", "impl-deferral", "the orchestrator decides which minor/nit findings are deferred to follow-up issues (status `deferred`), "
+         "so fix everything it does not defer", "you may defer minor findings"),
+        ("implementer", "impl-deferral", " (finding id, severity, `area`, reason)", ""),
+        ("implementer", "impl-deferral", ", by the same §2 limits", ""),
+        ("implementer", "impl-deferral", "never a blocker; never a major, or a finding in the security-rules, sync-merge or release areas "
+         "or on a `risk:high` task, without owner OK",
+         "never a blocker, a major, or any finding in the security-rules, sync-merge or release areas or on a `risk:high` task without owner OK"),
+        ("implementer", "impl-deferral", "a minor or nit only once no blocker or major is open and the fix is not small; ", ""),
+        ("implementer", "impl-deferral", ", and with more than 8 open follow-ups for the milestone ask the owner", ""),
+        ("implementer", "impl-deferral", "post the `decision` comment and any `accepted:` comment (with its `metrics:round` block, "
+         "verdict `ready_deferred`) on the PR (§4, §6)", ""),
+    )
+
+    def test_each_deferral_clause_is_pinned(self):
+        for role, rule_id, old, new in self.DEFERRAL_MUTATIONS:
+            with self.subTest(role=role, old=old[:50]):
+                self.weakened(role, rule_id, old, new)
+
+    def test_deleting_any_sentence_of_a_deferral_paragraph_fails_its_rule(self):
+        """R2-01: no sentence or clause of the paragraph may be free text that nothing pins."""
+        for role, rule_id, end in (("orchestrator", "orch-deferral", " Collaborator inbox"), ("implementer", "impl-deferral", " Finish with")):
+            norm = prompt_rules.normalize(real(role))
+            m = re.search(r"Deferral \(.*?(?=" + re.escape(end) + ")", norm)
+            self.assertTrue(m, role)
+            for frag in re.split(r"[;:.]\s+", m.group(0)):
+                if len(frag.split()) >= 3:
+                    with self.subTest(role=role, fragment=frag[:60]):
+                        self.assertIn(rule_id, ids(prompt_rules.check_text(role, norm.replace(frag, "", 1))))
+
+    def test_deferral_paragraphs_carry_the_follow_ups_section_2_and_4_limits(self):
+        for role in ("orchestrator", "implementer"):
+            norm = prompt_rules.normalize(real(role))
+            for needle in ("never defer a blocker; never defer a major", "security-rules, sync-merge or release", "`risk:high`", "owner OK",
+                           "more than 8 open follow-ups", "`decision` comment", "`ready_deferred`", "not small", "no blocker or major is open"):
+                self.assertIn(needle, norm, f"{role}: {needle}")
+
+    def test_deferral_with_owner_ok_for_a_blocker_is_rejected(self):
+        """R2-02: FOLLOW-UPS 2 says blockers are never deferred, owner OK or not."""
+        for role in ("orchestrator", "implementer"):
+            norm = prompt_rules.normalize(real(role))
+            self.assertNotRegex(norm, r"never defer a blocker, a major")
 
     def test_an_implementer_prompt_that_lets_it_defer_alone_is_rejected(self):
         """R1-01: the old wording let an implementer defer a protected-area minor itself."""
