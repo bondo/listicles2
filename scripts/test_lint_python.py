@@ -62,6 +62,24 @@ def explicit_owners(codeowners, path):
     return None
 
 
+def ruff_config_problems(cfg):
+    """Allowlist check of a parsed ruff.toml: anything other than the agreed settings is a problem
+    (a denylist would miss include, exclude, force-exclude, a huge line-length and whatever ruff adds next)."""
+    problems = []
+    if set(cfg) != {"line-length", "target-version", "lint"}:
+        problems.append(f"top-level keys are {sorted(cfg)}")
+    if cfg.get("line-length") != 160:
+        problems.append(f"line-length is {cfg.get('line-length')!r}, not 160")
+    if cfg.get("target-version") != "py312":
+        problems.append(f"target-version is {cfg.get('target-version')!r}, not py312")
+    lint_cfg = cfg.get("lint", {})
+    if set(lint_cfg) != {"select"}:
+        problems.append(f"[lint] keys are {sorted(lint_cfg)}")
+    if lint_cfg.get("select") != RULES:
+        problems.append(f"lint.select is {lint_cfg.get('select')!r}")
+    return problems
+
+
 def lint(source, requirements=None):
     """Run lint_python.sh on a temp file holding `source`; returns (exit code, combined output)."""
     env = dict(os.environ)
@@ -93,19 +111,42 @@ class HelperNegativeCases(unittest.TestCase):
 
 
 class Config(unittest.TestCase):
-    def test_ruff_selects_exactly_the_agreed_rules(self):
-        cfg = tomllib.loads(read("ruff.toml"))
-        self.assertEqual(cfg.get("lint", {}).get("select"), RULES)
+    def test_ruff_config_is_exactly_the_agreed_settings(self):
+        self.assertEqual(ruff_config_problems(tomllib.loads(read("ruff.toml"))), [])
 
-    def test_ruff_config_relaxes_nothing_and_has_no_formatter(self):
-        text = read("ruff.toml")
-        cfg = tomllib.loads(text)
-        lint_cfg = cfg.get("lint", {})
-        for key in ("ignore", "extend-ignore", "per-file-ignores", "extend-select", "fixable", "unfixable"):
-            self.assertNotIn(key, lint_cfg, key)
-        for key in ("exclude", "extend-exclude", "format", "preview", "unsafe-fixes"):
-            self.assertNotIn(key, cfg, key)
-        self.assertNotRegex(text, r"(?m)^\s*(ignore|exclude|extend-exclude|per-file-ignores)\b")
+    def test_ruff_config_allowlist_rejects_every_other_change(self):
+        good = {"line-length": 160, "target-version": "py312", "lint": {"select": RULES}}
+        self.assertEqual(ruff_config_problems(good), [])
+        mutations = {
+            "include": {**good, "include": ["nothing_here.py"]},
+            "huge line-length": {**good, "line-length": 10000},
+            "lower line-length": {**good, "line-length": 120},
+            "exclude": {**good, "exclude": ["scripts"]},
+            "force-exclude": {**good, "force-exclude": True},
+            "format section": {**good, "format": {"quote-style": "double"}},
+            "target-version": {**good, "target-version": "py39"},
+            "lint.exclude": {**good, "lint": {"select": RULES, "exclude": ["a.py"]}},
+            "lint.ignore": {**good, "lint": {"select": RULES, "ignore": ["E501"]}},
+            "extend-per-file-ignores": {**good, "lint": {"select": RULES, "extend-per-file-ignores": {"a.py": ["F"]}}},
+            "fewer rules": {**good, "lint": {"select": ["E", "F"]}},
+            "extra rule": {**good, "lint": {"select": [*RULES, "ANN"]}},
+            "no lint table": {"line-length": 160, "target-version": "py312"},
+        }
+        for name, cfg in mutations.items():
+            with self.subTest(name):
+                self.assertNotEqual(ruff_config_problems(cfg), [])
+
+    def test_ruff_default_target_covers_every_python_file_in_scripts(self):
+        done = subprocess.run(["ruff", "check", "--config", "ruff.toml", "--show-files", "scripts"], cwd=ROOT,
+                              capture_output=True, text=True, check=False)
+        listed = {os.path.relpath(ln.strip(), ROOT) for ln in done.stdout.splitlines() if ln.strip()}
+        expected = set()
+        for base, dirs, files in os.walk(os.path.join(ROOT, "scripts")):
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            expected |= {os.path.relpath(os.path.join(base, f), ROOT) for f in files if f.endswith(".py")}
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertGreater(len(expected), 30)
+        self.assertEqual(expected - listed, set())
 
     def test_mypy_is_default_and_relaxes_nothing(self):
         text = read("mypy.ini")

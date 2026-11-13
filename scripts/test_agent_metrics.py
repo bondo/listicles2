@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agent_metrics as am  # noqa: E402  # justified: must follow the sys.path insert above
@@ -418,6 +419,27 @@ class ReviewTests(unittest.TestCase):
             self.assertIn("in.txt:3: ", err.getvalue())
             self.assertNotIn("Traceback", err.getvalue())
             self.assertFalse(dst.exists())
+
+    def test_unreadable_input_gives_the_clean_error_not_a_traceback(self):
+        with tempfile.TemporaryDirectory() as d:
+            bad, good, dst = Path(d, "bad.txt"), Path(d, "good.txt"), Path(d, "out.csv")
+            bad.write_text("x")
+            good.write_text(block("session", SESSION_HDR, "bad row"))
+            real = Path.read_text
+
+            def read_text(self, *args, **kwargs):
+                if self.name == "bad.txt":
+                    raise PermissionError(13, "Permission denied")
+                return real(self, *args, **kwargs)
+
+            out, err = io.StringIO(), io.StringIO()
+            with mock.patch.object(Path, "read_text", read_text), redirect_stdout(out), redirect_stderr(err):
+                code = am.main(["-o", str(dst), str(bad), str(good)])
+        self.assertEqual(code, 1)
+        self.assertIn("bad.txt: cannot read input (Permission denied)", err.getvalue())
+        self.assertIn("good.txt:", err.getvalue())  # the other file is still named correctly in its own error
+        self.assertNotIn("bad.txt:3", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
 
 
 if __name__ == "__main__":
