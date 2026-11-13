@@ -294,6 +294,22 @@ class RenderSvg(unittest.TestCase):
         svg = self.svg(prs=[pr(20, "y" * 400)])
         self.assertNotIn("y" * (status_visual.MAX_TITLE + 1), svg)
 
+    def test_outside_questions_are_a_count_without_titles(self):
+        d = data()
+        d["outside_questions"] = 3
+        svg = status_visual.render_svg(status_visual.build_model(TASKS, d, NOW))
+        self.assertIn("Outside questions: 3", "\n".join(texts(svg)))
+        self.assertEqual(json.loads(status_visual.status_json(status_visual.build_model(TASKS, d, NOW)))["outside_questions"], 3)
+
+    def test_bad_outside_count_is_zero_or_an_error(self):
+        for bad in (-1, "3", None, True, 1.5):
+            with self.subTest(bad):
+                d = data()
+                d["outside_questions"] = bad
+                with self.assertRaises(status_visual.StatusError):
+                    status_visual.build_model(TASKS, d, NOW)
+        self.assertEqual(model()["outside"], 0)
+
     def test_lists_state_empty_messages(self):
         svg = status_visual.render_svg(model(tasks=TASKS.split('[[task]]\nid = "A-O1"')[0]))
         joined = "\n".join(texts(svg))
@@ -385,8 +401,8 @@ def run(status, conclusion=None, name="unit"):
     return {"name": name, "status": status, "conclusion": conclusion}
 
 
-def api_issue(number, labels, title="t", state="open", pull=False):
-    d = {"number": number, "title": title, "state": state, "state_reason": None,
+def api_issue(number, labels, title="t", state="open", pull=False, assoc="OWNER"):
+    d = {"number": number, "title": title, "state": state, "state_reason": None, "author_association": assoc,
          "created_at": "2026-11-10T12:00:00Z", "labels": [{"name": x} for x in labels]}
     if pull:
         d["pull_request"] = {"url": "x"}
@@ -467,6 +483,42 @@ class Fetch(unittest.TestCase):
         self.assertEqual(sorted(issues), [7, 8, 9, 10])
         self.assertEqual(issues[7]["labels"], ["owner-todo", "needs-owner"])
         self.assertEqual(issues[8]["state"], "closed")
+
+    def test_issues_from_outsiders_never_reach_the_output(self):
+        for label in ("owner-todo", "needs-owner", "blocked", "follow-up"):
+            for assoc in ("NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN"):
+                with self.subTest(label=label, assoc=assoc):
+                    api = FakeApi(issues={label: [api_issue(99, [label], title="BUY CHEAP STUFF at evil.example", assoc=assoc),
+                                                  api_issue(5, [label], title="mine")]})
+                    out = self.fetch(api)
+                    self.assertEqual([i["number"] for i in out["issues"]], [5])
+                    self.assertNotIn("evil.example", json.dumps(out))
+
+    def test_write_access_authors_are_trusted(self):
+        api = FakeApi(issues={"blocked": [api_issue(n, ["blocked"], assoc=a) for n, a in ((1, "OWNER"), (2, "MEMBER"), (3, "COLLABORATOR"))]})
+        self.assertEqual([i["number"] for i in self.fetch(api)["issues"]], [1, 2, 3])
+
+    def test_outside_questions_are_only_counted(self):
+        api = FakeApi(issues={"needs-owner": [
+            api_issue(10, ["needs-owner"], title="outside one", assoc="NONE"),
+            api_issue(11, ["needs-owner"], title="outside two", assoc="CONTRIBUTOR"),
+            api_issue(12, ["needs-owner"], title="trusted", assoc="OWNER"),
+            api_issue(13, ["needs-owner"], title="closed", assoc="NONE", state="closed"),
+            api_issue(14, ["needs-owner"], title="a pull", assoc="NONE", pull=True)],
+            "blocked": [api_issue(15, ["blocked"], assoc="NONE")]})
+        out = self.fetch(api)
+        self.assertEqual(out["outside_questions"], 2)
+        self.assertEqual([i["number"] for i in out["issues"]], [12])
+        self.assertNotIn("outside one", json.dumps(out))
+
+    def test_an_outsider_issue_titled_like_an_owner_task_cannot_change_the_task(self):
+        real = api_issue(7, ["owner-todo"], title="[owner] A-O1: do it", state="closed")
+        real["state_reason"] = "completed"
+        fake = api_issue(99, ["needs-owner"], title="[owner] A-O1 x", assoc="NONE")
+        out = self.fetch(FakeApi(issues={"owner-todo": [real], "needs-owner": [fake]}))
+        chain = {t["id"]: t for t in status_visual.build_model(TASKS, out, NOW)["chain"]}
+        self.assertNotIn("A-O1", chain)
+        self.assertEqual(chain["A-04"]["state"], "ready")
 
     def test_owner_todo_includes_closed_issues_others_only_open(self):
         api = FakeApi()
