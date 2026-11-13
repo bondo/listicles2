@@ -150,6 +150,95 @@ class LabelLineTests(unittest.TestCase):
             self.assertNotIn("tier0-labels", ids(prompt_rules.check_text(role, real(role))))
 
 
+class Round1Tests(unittest.TestCase):
+    """PR #67 review round 1 (R1-01..R1-08): each phrase must be in the prompt AND pinned by a rule."""
+
+    def without(self, role, *phrases):
+        text = prompt_rules.normalize(real(role))
+        for ph in phrases:
+            self.assertIn(ph, text, f"{role}.md lacks {ph!r}")
+            text = text.replace(ph, "")
+        return text
+
+    def assert_pinned(self, rule_id, *phrases, role="orchestrator"):
+        for ph in phrases:
+            with self.subTest(rule=rule_id, phrase=ph):
+                problems = prompt_rules.check_text(role, self.without(role, ph))
+                self.assertIn(rule_id, ids(problems))
+
+    def test_r1_01_paused_wake_exception(self):
+        self.assert_pinned("paused-wake", "except while paused under §7.7")
+
+    def test_r1_02_accident_hit_is_not_the_usage_pause(self):
+        self.assert_pinned(
+            "accident-not-usage-pause",
+            "stop spawning and pushing on the affected PR and ask the owner",
+            "this is not the §7.7 usage pause",
+            "the 45-min check-in stays",
+        )
+
+    def test_r1_03_counted_never_quoted_is_pinned(self):
+        self.assert_pinned("trust-by-role", "Others are counted, never quoted.")
+
+    def test_r1_04_collaborators_flag_is_pinned(self):
+        self.assert_pinned("inbox-script", "--collaborators", "required if the repo moves to an organisation")
+
+    def test_r1_05_review_packet_goes_to_owner_and_collaborator(self):
+        self.assert_pinned(
+            "review-packet",
+            "the owner and the collaborator together",
+            "collaborator input is advisory",
+        )
+
+    def test_r1_05_tasks_toml_says_the_same(self):
+        notes = (ROOT / "docs" / "tasks.toml").read_text(encoding="utf-8")
+        self.assertIn("Review packet for the owner and the collaborator (same time)", notes)
+        self.assertNotIn("Review packet for the collaborator (", notes)
+
+    def test_r1_07_reviews_of_open_prs_filtered_by_submitted_at(self):
+        self.assert_pinned("inbox-script", "reviews of open PRs", "the script filters by submitted_at")
+
+    def test_r1_08_planner_checks_foreign_commits_before_push(self):
+        self.assertIn("worker-foreign-commits", ids(prompt_rules.check_text("planner", "")))
+        self.assert_pinned("worker-foreign-commits", "foreign commit", "stop and report", role="planner")
+
+    def test_orchestration_section_76_matches_the_prompt(self):
+        doc = prompt_rules.normalize((ROOT / "docs" / "ORCHESTRATION.md").read_text(encoding="utf-8"))
+        start = doc.index("### 7.6 Collaborator inbox")
+        sec = doc[start : doc.index("## 8. Spawn messages", start)]
+        for ph in ("--collaborators", "reviews of open PRs", "submitted_at", "this is not the §7.7 usage pause"):
+            with self.subTest(phrase=ph):
+                self.assertIn(ph, sec)
+
+
+class TierBulletTests(unittest.TestCase):
+    """R1-06: a never-apply label must not appear in the Tier 0 or Tier 1 bullets either."""
+
+    def mutate(self, old, new):
+        text = real("orchestrator")
+        self.assertIn(old, text)
+        return prompt_rules.check_text("orchestrator", text.replace(old, new, 1))
+
+    def test_real_prompt_passes(self):
+        self.assertNotIn("tier-bullets-labels", ids(prompt_rules.check_text("orchestrator", real("orchestrator"))))
+
+    def test_never_label_in_tier0_bullet_is_rejected(self):
+        for label in ("big-pr", "golden-update", "owner-todo", "severity:high", "area:ui"):
+            with self.subTest(label=label):
+                got = self.mutate("apply labels;", f"apply labels, {label};")
+                self.assertIn("tier-bullets-labels", ids(got))
+
+    def test_never_label_in_tier1_bullet_is_rejected(self):
+        for label in ("big-pr", "golden-update", "owner-ok"):
+            with self.subTest(label=label):
+                got = self.mutate("the owner merges.", f"the owner merges. Then apply {label}.")
+                self.assertIn("tier-bullets-labels", ids(got))
+
+    def test_similar_words_are_not_false_positives(self):
+        got = self.mutate("apply labels;", "apply labels (a follow-up issue is fine);")
+        self.assertNotIn("tier-bullets-labels", ids(got))
+
+
 class CliTests(unittest.TestCase):
     SCRIPT = str(ROOT / "scripts" / "prompt_rules.py")
 
