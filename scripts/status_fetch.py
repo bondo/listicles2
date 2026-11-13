@@ -3,6 +3,7 @@
 
 Usage: python3 -I scripts/status_fetch.py --repo OWNER/NAME --out input.json   (GH_TOKEN or GITHUB_TOKEN in the environment)
 
+Only issues and PRs by OWNER, MEMBER or COLLABORATOR authors are kept (outsiders' needs-owner questions are only counted).
 Fetches open PRs (draft flag, behind main, CI state from check runs of the head commit) and issues labelled
 owner-todo (open and closed), needs-owner, blocked and follow-up (open). Arguments reach `gh` as a list, never a shell.
 Exit 2 on any API or usage error: a failed fetch must not render an empty status.
@@ -76,16 +77,22 @@ def fetch(api, repo, sleep=time.sleep):
         prs.append({"number": n, "title": p.get("title", ""), "draft": p.get("draft") is True,
                     "behind": detail.get("mergeable_state") == "behind",
                     "merge_unknown": detail.get("mergeable_state") == "unknown", "ci": ci_state(runs)})
-    issues = {}
+    issues, outside = {}, set()
     for label, state in ISSUE_LABELS:
         for i in api(f"repos/{repo}/issues?state={state}&labels={label}&per_page=100"):
-            if "pull_request" not in i:
+            if "pull_request" in i:
+                continue
+            if i.get("author_association") not in TRUSTED:
+                # The question issue form labels every outsider's issue needs-owner: count those, never show or use them.
+                if label == "needs-owner" and i.get("state", "open") == "open":
+                    outside.add(int(i["number"]))
+            else:
                 issues[int(i["number"])] = {
                     "number": int(i["number"]), "title": i.get("title", ""), "state": i.get("state", "open"),
                     "state_reason": i.get("state_reason"), "created_at": i.get("created_at"),
                     "labels": [x["name"] if isinstance(x, dict) else x for x in i.get("labels", [])]}
     return {"fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "prs": prs,
-            "issues": [issues[k] for k in sorted(issues)]}
+            "outside_questions": len(outside), "issues": [issues[k] for k in sorted(issues)]}
 
 
 def main(argv=None):

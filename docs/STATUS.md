@@ -7,7 +7,10 @@ renders it and pushes it to the `status` branch (task M0.5-27). The README embed
 ## How it works
 1. `scripts/status_fetch.py` reads the GitHub REST API with `GITHUB_TOKEN` (open PRs with draft, behind-main and CI
    state; issues labelled `owner-todo`, `needs-owner`, `blocked`, `follow-up`) into one JSON file. PRs from forks are
-   dropped unless their author has Write-or-better (an outsider's title never reaches the README), the workflow's own
+   dropped unless their author has Write-or-better, and so are issues by anyone without Write (OWNER, MEMBER or
+   COLLABORATOR only): the question issue form (`.github/ISSUE_TEMPLATE/question.yml`) puts `needs-owner` on every issue
+   an outsider opens, so a label alone proves nothing. Outsiders' open `needs-owner` questions are shown as a count
+   ("Outside questions: N"), never with a title, and never feed task states. The workflow's own
    `publish` check run is ignored when judging CI, and an unknown merge state is retried once and then never shown as
    ready to merge.
 2. `scripts/status_visual.py render` turns that JSON plus `docs/tasks.toml` into `status.svg` and a tiny `status.json`.

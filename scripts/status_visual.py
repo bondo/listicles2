@@ -87,6 +87,9 @@ def _number(item, what):
 def _checked_input(data):
     if not isinstance(data, dict) or not isinstance(data.get("prs"), list) or not isinstance(data.get("issues"), list):
         raise StatusError('input must be {"prs": [...], "issues": [...]}')
+    outside = data.get("outside_questions", 0)
+    if not isinstance(outside, int) or isinstance(outside, bool) or outside < 0:
+        raise StatusError("outside_questions must be a whole number, 0 or more")
     prs, issues = [], []
     for p in data["prs"]:
         ci = p.get("ci") if isinstance(p, dict) else None
@@ -97,12 +100,12 @@ def _checked_input(data):
         issues.append({"number": _number(i, "issue"), "title": i.get("title", ""), "state": i.get("state", "open"),
                        "state_reason": i.get("state_reason"), "created_at": i.get("created_at"),
                        "labels": [x for x in labels if isinstance(x, str)] if isinstance(labels, list) else []})
-    return prs, issues
+    return prs, issues, outside
 
 
 def build_model(tasks_text, data, now):
     now_dt = _ts(now, "now")
-    prs, issues = _checked_input(data)
+    prs, issues, outside = _checked_input(data)
     try:
         graph = tasks.parse(tasks_text, burn_down=False)
     except tasks.TaskFileError as e:
@@ -153,7 +156,7 @@ def build_model(tasks_text, data, now):
         "chain": chain[:MAX_CHAIN], "chain_more": max(len(chain) - MAX_CHAIN, 0),
         "queue": queue[:MAX_QUEUE], "queue_more": max(len(queue) - MAX_QUEUE, 0), "queue_total": len(queue),
         "blockers": blockers[:MAX_BLOCKERS], "blockers_more": max(len(blockers) - MAX_BLOCKERS, 0),
-        "blockers_total": len(blockers), "followups": followups,
+        "blockers_total": len(blockers), "followups": followups, "outside": outside,
     }
 
 
@@ -196,7 +199,7 @@ def render_svg(model):
     text(24, 36, "Listicles status", "fg t")
     text(WIDTH - 24, 36, escape(stamp_text(model["generated"])), "muted", "end", f' id="{STAMP_ID}"')
     text(24, 56, "Checked every 30 minutes; the picture is rewritten only when something changes. "
-         f"Open follow-ups: {int(model['followups'])}.", "muted s")
+         f"Open follow-ups: {int(model['followups'])}. Outside questions: {int(model['outside'])}.", "muted s")
     y = 56
     heading("Milestones")
     for m in model["milestones"]:
@@ -282,6 +285,7 @@ def status_json(model):
         "generated_at": model["generated"], "current_milestone": model["current"],
         "milestones": [{"id": m["id"], "done": m["done"], "total": m["total"]} for m in model["milestones"]],
         "owner_queue": model["queue_total"], "blockers": model["blockers_total"], "followups": model["followups"],
+        "outside_questions": model["outside"],
     }, indent=2, sort_keys=True) + "\n"
 
 
