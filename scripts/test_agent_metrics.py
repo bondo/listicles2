@@ -289,5 +289,136 @@ class HardeningTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
 
+REVIEW_HDR = "date,review_id,run_ref,findings,acted_on,ignored,disputed,deferred,cost_usd,window_end"
+V1 = "2026-11-12,R1,65,10,4,3,2,1,1.50,2026-11-20"
+
+
+def review_row(**over):
+    cols = REVIEW_HDR.split(",")
+    row = dict(zip(cols, V1.split(",")))
+    row.update(over)
+    return ",".join(row[c] for c in cols)
+
+
+class ReviewTests(unittest.TestCase):
+    def errors(self, row):
+        rows, errors = run(block("review", REVIEW_HDR, row))
+        return rows, errors
+
+    def assertRejected(self, row, needle):
+        rows, errors = self.errors(row)
+        self.assertEqual(rows, [], errors)
+        self.assertTrue(any(needle in e for e in errors), f"{needle!r} not in {errors}")
+        self.assertTrue(all(e.startswith("input1:3:") for e in errors), errors)
+
+    def test_valid_row(self):
+        rows, errors = self.errors(V1)
+        self.assertEqual(errors, [])
+        self.assertEqual(rows[0]["row_type"], "review")
+        for col in REVIEW_HDR.split(","):
+            self.assertEqual(rows[0][col], dict(zip(REVIEW_HDR.split(","), V1.split(",")))[col])
+
+    def test_run_ref_forms(self):
+        for ref in ("65", "2026-W47", "2026-W01", "2026-W53", "M1", "M0.5"):
+            self.assertEqual(self.errors(review_row(run_ref=ref))[1], [], ref)
+
+    def test_review_ids_r1_to_r12_except_r2(self):
+        for n in [1] + list(range(3, 13)):
+            self.assertEqual(self.errors(review_row(review_id=f"R{n}"))[1], [], n)
+
+    def test_unknown_review_id(self):
+        for bad in ("R0", "R13", "R01", "r1", "X1", "R", "1", "R1 ", "R2"):
+            _, errors = self.errors(review_row(review_id=bad))
+            self.assertTrue(any("review_id" in e for e in errors), (bad, errors))
+
+    def test_bad_run_ref(self):
+        for bad in ("", "pr65", "065", "2026-W00", "2026-W54", "2026-47", "26-W47", "m1", "M", "M1."):
+            _, errors = self.errors(review_row(run_ref=bad))
+            self.assertTrue(any("run_ref" in e for e in errors), (bad, errors))
+
+    def test_counts_must_add_up(self):
+        self.assertRejected(review_row(findings="11"), "findings")
+        self.assertRejected(review_row(findings="9"), "findings")
+        self.assertRejected(review_row(deferred="0"), "add up")
+
+    def test_zero_findings_row(self):
+        row = review_row(findings="0", acted_on="0", ignored="0", disputed="0", deferred="0")
+        self.assertEqual(self.errors(row)[1], [])
+
+    def test_window_end_before_date(self):
+        self.assertRejected(review_row(window_end="2026-11-11"), "window_end")
+
+    def test_window_end_same_day_is_ok(self):
+        self.assertEqual(self.errors(review_row(window_end="2026-11-12"))[1], [])
+
+    def test_bad_dates(self):
+        for field in ("date", "window_end"):
+            for bad in ("", "12/11/2026", "2026-13-40", "2026-11-1"):
+                _, errors = self.errors(review_row(**{field: bad}))
+                self.assertTrue(any(field in e for e in errors), (field, bad, errors))
+
+    def test_non_integer_counts(self):
+        for field in ("findings", "acted_on", "ignored", "disputed", "deferred"):
+            for bad in ("1.5", "x", "-1", "01", "1e1", "\u0663", "", "+1"):
+                _, errors = self.errors(review_row(**{field: bad}))
+                self.assertTrue(any(field in e for e in errors), (field, bad, errors))
+
+    def test_cost_is_optional_but_plain(self):
+        self.assertEqual(self.errors(review_row(cost_usd=""))[1], [])
+        for bad in ("~4", "$4", "-1", "1e3", "abc"):
+            self.assertRejected(review_row(cost_usd=bad), "cost_usd")
+
+    def test_formula_looking_text(self):
+        for field in ("review_id", "run_ref", "date", "window_end"):
+            for lead in "=+-@":
+                _, errors = self.errors(review_row(**{field: lead + "1"}))
+                self.assertTrue(errors, (field, lead))
+
+    def test_control_characters(self):
+        for bad in ("a\x00b", "a\x07b", "a\x7fb", "a\tb"):
+            self.assertRejected(review_row(run_ref=bad), "control")
+
+    def test_over_long_fields(self):
+        self.assertRejected(review_row(run_ref="M" + "1" * 80), "too long")
+        self.assertRejected(review_row(findings="1" * 40), "too long")
+
+    def test_duplicate_review_and_run(self):
+        _, errors = run(block("review", REVIEW_HDR, V1, V1))
+        self.assertTrue(any("duplicate review" in e for e in errors), errors)
+
+    def test_same_review_different_run_ok(self):
+        _, errors = run(block("review", REVIEW_HDR, V1, review_row(run_ref="66")))
+        self.assertEqual(errors, [])
+
+    def test_missing_or_unknown_column(self):
+        hdr = REVIEW_HDR.replace(",window_end", "")
+        _, errors = run(block("review", hdr, V1.rsplit(",", 1)[0]))
+        self.assertTrue(any("missing column 'window_end'" in e for e in errors), errors)
+        _, errors = run(block("review", REVIEW_HDR + ",bogus", V1 + ",x"))
+        self.assertTrue(any("unknown column" in e for e in errors), errors)
+
+    def test_sorted_after_other_types_and_rendered(self):
+        rows, errors = run(block("review", REVIEW_HDR, V1), block("incident", INCIDENT_HDR, I1),
+                           block("session", SESSION_HDR, S1))
+        self.assertEqual(errors, [])
+        self.assertEqual([r["row_type"] for r in rows], ["session", "incident", "review"])
+        out = list(csv.DictReader(io.StringIO(am.render(rows))))
+        self.assertEqual(out[2]["review_id"], "R1")
+        self.assertEqual(out[2]["window_end"], "2026-11-20")
+        self.assertEqual(out[2]["cost_usd"], "1.50")
+
+    def test_cli_error_has_file_line_exit_1_no_traceback(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, dst = Path(d, "in.txt"), Path(d, "out.csv")
+            src.write_text(block("review", REVIEW_HDR, review_row(review_id="R99")))
+            out, err = io.StringIO(), io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                code = am.main(["-o", str(dst), str(src)])
+            self.assertEqual(code, 1)
+            self.assertIn("in.txt:3: ", err.getvalue())
+            self.assertNotIn("Traceback", err.getvalue())
+            self.assertFalse(dst.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
