@@ -105,7 +105,7 @@ class AgentEffort(unittest.TestCase):
             self.assertEqual(m.group(1), efforts[name], name)
 
     def test_roles_parser_sees_all_roles(self):
-        self.assertEqual(set(roles()), {"orchestrator", "planner", "implementer", "reviewer", "explorer", "ci-triage"})
+        self.assertEqual(set(roles()), {"orchestrator", "planner", "implementer", "reviewer", "design-reviewer", "explorer", "ci-triage"})
 
 
 class GitEnvImports(unittest.TestCase):

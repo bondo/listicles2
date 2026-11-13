@@ -3,7 +3,8 @@
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
 
-Rules come from docs/ORCHESTRATION.md sections 7.6 and 7.7, docs/reviews/README.md sections 1-5 (M0.5-25, M0.5-15: design reviewer R5, rubric, delta review, PR-body refresh, environment pick),
+Rules come from docs/ORCHESTRATION.md sections 7.6 and 7.7, docs/reviews/README.md sections 1-5 (M0.5-25;
+M0.5-15: design reviewer R5, rubric, delta review, PR-body refresh, environment pick),
 owner decisions D1-D7 (issue #42) and follow-up #44. Each rule is a
 set of regexes that must all match the prompt after HTML comments are removed and whitespace is collapsed. The two
 label lists are compared as exact sets, and no never-apply label may appear in the Tier 0/1 bullets. This pins
