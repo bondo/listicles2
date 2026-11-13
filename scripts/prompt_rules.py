@@ -157,12 +157,15 @@ def normalize(text):
     return " ".join(_HTML_COMMENT.sub(" ", text).split())
 
 
+def parse_label_lists(text, line_pattern):
+    """Every `<line_pattern> a, b, c.` marker in normalized text, as a list of label lists."""
+    found = re.finditer(line_pattern + r"\s*([^.]*)\.", text, re.I)
+    return [[x.strip().strip("`").lower() for x in m.group(1).split(",") if x.strip()] for m in found]
+
+
 def parse_label_list(text, line_pattern):
-    """The labels after a `<line_pattern> a, b, c.` marker in normalized text, or None if the marker is absent."""
-    m = re.search(line_pattern + r"\s*([^.]*)\.", text, re.I)
-    if not m:
-        return None
-    return [x.strip().strip("`").lower() for x in m.group(1).split(",") if x.strip()]
+    """The labels of the first marker, or None if the marker is absent."""
+    return (parse_label_lists(text, line_pattern) or [None])[0]
 
 
 def tier_bullet_labels(text):
@@ -174,6 +177,9 @@ def tier_bullet_labels(text):
     m1 = re.search(r"never apply:[^.]*\.(.*?)tier 2 needs", text, re.I)
     if m1:
         segments.append(m1.group(1))
+    # An instruction to apply a never label anywhere else (outside the never list) counts too.
+    rest = re.sub(r"never apply:[^.]*\.", "", text, flags=re.I)
+    segments.append(" ".join(re.findall(r"\bapply\b[^.]{0,80}", rest, re.I)))
     found = set()
     for label in NEVER_LABELS:
         token = label[:-1] if label.endswith("*") else label  # severity:* -> severity:
@@ -198,17 +204,14 @@ def check_text(role, text):
                 problems.append(f"{rule.id}: {rule.message} (no match for /{pattern}/)")
                 break
         else:
-            if rule.id == "tier0-labels":
-                got = parse_label_list(norm, TIER0_LINE)
-                if got is None or sorted(got) != sorted(TIER0_LABELS):
-                    problems.append(f"{rule.id}: {rule.message}; found {got}")
+            if rule.id in ("tier0-labels", "never-labels"):
+                line, want = (TIER0_LINE, TIER0_LABELS) if rule.id == "tier0-labels" else (NEVER_LINE, NEVER_LABELS)
+                got = parse_label_lists(norm, line)
+                if len(got) != 1 or sorted(got[0]) != sorted(want):
+                    problems.append(f"{rule.id}: {rule.message}; found {got} (exactly one line expected)")
             elif rule.id == "tier-bullets-labels":
                 got = tier_bullet_labels(norm)
                 if got:
-                    problems.append(f"{rule.id}: {rule.message}; found {got}")
-            elif rule.id == "never-labels":
-                got = parse_label_list(norm, NEVER_LINE)
-                if got is None or sorted(got) != sorted(NEVER_LABELS):
                     problems.append(f"{rule.id}: {rule.message}; found {got}")
     return problems
 

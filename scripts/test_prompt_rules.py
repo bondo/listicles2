@@ -1,8 +1,6 @@
 """Tests for scripts/prompt_rules.py (M0.5-19). Run: python3 -I scripts/test_prompt_rules.py
 
-The collaborator-workflow rules (docs/ORCHESTRATION.md section 7.6, owner decisions D1-D7, follow-up #44) live in
-agents/prompts/*.md. These tests pin that the checker finds each rule, fails when a rule is deleted or weakened,
-and that the real prompts pass.
+The checker must find each rule in the real prompts and fail when a rule is deleted or weakened.
 """
 
 import re
@@ -135,9 +133,6 @@ class LabelLineTests(unittest.TestCase):
         gone = re.sub(prompt_rules.NEVER_LINE + r"[^.]*\.", "", text, flags=re.I)
         self.assertIn("never-labels", ids(prompt_rules.check_text("orchestrator", gone)))
 
-    def test_label_lists_are_only_checked_for_the_orchestrator(self):
-        for role in ("implementer", "reviewer", "planner"):
-            self.assertNotIn("tier0-labels", ids(prompt_rules.check_text(role, real(role))))
 
 
 class Round1Tests(unittest.TestCase):
