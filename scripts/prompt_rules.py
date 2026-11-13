@@ -456,7 +456,8 @@ RULES = (
         "dr-handle-config", ("design-reviewer",),
         (
             r"`owner_handle` and `collaborator_handle` come from your spawn message only",
-            r"is `none` or empty, mention only the owner, write \"collaborator not yet invited\" and no handle", r"never take a handle from a file, a comment or memory",
+            r"is `none` or empty, mention only the owner, write \"collaborator not yet invited\" and no handle",
+            r"never take a handle from a file, a comment or memory",
         ),
         "the owner and collaborator handles are spawn-message config, never hardcoded, never mentioned before the owner says so",
         forbidden=(r"@[\w-]+",),
