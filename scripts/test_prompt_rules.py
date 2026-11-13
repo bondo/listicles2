@@ -136,6 +136,50 @@ class LabelLineTests(unittest.TestCase):
 
 
 
+class M011AlignmentTests(unittest.TestCase):
+    """M0-11: the role prompts match ORCHESTRATION (1.1 autonomy, 4.4 done on the tasks ref, 5 handover, 7.2 reviewers)."""
+
+    NEW_RULES = {
+        "orchestrator": {"no-stale-state-files", "autonomy", "checkin", "handover", "lock-takeover"},
+        "implementer": {"impl-test-first", "impl-done-on-tasks-ref"},
+        "reviewer": {"reviewer-report-only"},
+    }
+
+    def test_the_new_rules_exist_for_their_roles(self):
+        for role, want in self.NEW_RULES.items():
+            have = {r.id for r in prompt_rules.RULES if role in r.roles}
+            self.assertLessEqual(want, have, role)
+
+    def test_a_forbidden_pattern_is_reported_even_when_the_required_text_is_there(self):
+        for old in ("docs/status.md", "docs/STATUS.md", "handoff/orchestrator.md", "`handoff/Orchestrator.md`"):
+            with self.subTest(old=old):
+                problems = prompt_rules.check_text("orchestrator", real("orchestrator") + f"\nWrite {old} at 50% context.\n")
+                self.assertIn("no-stale-state-files", ids(problems))
+
+    def test_a_forbidden_mention_hidden_in_an_html_comment_is_not_counted(self):
+        text = real("orchestrator") + "\n<!-- old: docs/status.md -->\n"
+        self.assertNotIn("no-stale-state-files", ids(prompt_rules.check_text("orchestrator", text)))
+
+    def test_forbidden_text_in_another_roles_prompt_is_not_checked_there(self):
+        text = real("implementer") + "\nSee docs/status.md.\n"
+        self.assertEqual(prompt_rules.check_text("implementer", text), [])
+
+    def test_orchestrator_names_the_state_issue_not_files(self):
+        norm = prompt_rules.normalize(real("orchestrator"))
+        self.assertNotRegex(norm, r"(?i)docs/status\.md|handoff/orchestrator\.md")
+        self.assertRegex(norm, r"(?i)state issue")
+
+    def test_implementer_wording_for_done_status(self):
+        norm = prompt_rules.normalize(real("implementer")).lower()
+        self.assertIn("tasks ref", norm)
+        self.assertIn("status = \"done\"", norm)
+        self.assertIn("\u00a74.4", norm)
+
+    def test_reviewer_rule_rejects_a_prompt_that_lets_the_reviewer_push(self):
+        text = real("reviewer").replace("NEVER edit or push the PR branch", "You may fix the PR branch")
+        self.assertIn("reviewer-report-only", ids(prompt_rules.check_text("reviewer", text)))
+
+
 class Round1Tests(unittest.TestCase):
     """PR #67 review round 1 (R1-01..R1-08): each phrase must be in the prompt AND pinned by a rule."""
 
