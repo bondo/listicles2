@@ -1,0 +1,47 @@
+name: status
+
+# Renders docs/tasks.toml plus open PRs and labelled issues to status.svg and pushes it to the `status` branch,
+# which the README embeds. Tests: scripts/test_status_workflow.py. Owner notes: docs/STATUS.md.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+  issues:
+    types: [opened, closed, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: status
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No pull_request trigger (fork PRs would get a read-only token, and every PR would carry a status check);
+    # PR changes are picked up by the schedule. Dependabot gets a read-only token. Event text is never read.
+    if: github.actor != 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: fetch GitHub data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: python3 -I scripts/status_fetch.py --repo "$REPO" --out "$RUNNER_TEMP/input.json"
+      - name: render
+        run: python3 -I scripts/status_visual.py render --tasks docs/tasks.toml --input "$RUNNER_TEMP/input.json" --svg "$RUNNER_TEMP/status.svg" --json "$RUNNER_TEMP/status.json"
+      - name: push to the status branch (plain push, no commit if unchanged)
+        run: python3 -I scripts/status_publish.py --svg "$RUNNER_TEMP/status.svg" --json "$RUNNER_TEMP/status.json"
