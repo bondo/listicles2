@@ -7,6 +7,19 @@ child transcripts: read only each child's final summary (status, PR link, open i
 Escalate effort only by the rules in `agents/roles.yaml`. At about 50% context write `handoff/orchestrator.md`
 (milestone, open PRs, waiting-on-owner) and stop.
 
+Early warning (usage, every wake, first step; `docs/ORCHESTRATION.md` §7.7, §7.7.1): `get_session` on your own session (omit `session_id`) and read
+`external_metadata.rate_limit_info` (`status`, `rateLimitType`, `resetsAt`, `isUsingOverage`). Decide from `rateLimitType` and `status` together, never from `status` alone,
+and set the state issue's `Usage:` line to ok, near limit, limit reached or paused. A 5-hour warning means start no new worker and no review round, let the running ones
+finish their step and look again in about 10 minutes (`rate_limit_info` only). Note that a 7-day warning never pauses: keep to the cap of 3 workers, no optional or batched
+sessions, required work goes on. Note too that a missing `rate_limit_info` counts as ok, but say so on the state line.
+Pause (§7.7.2), when a limit is reached or the second look still shows a 5-hour warning. Do these steps in this order, so that a limit hit midway still leaves a wake-up behind:
+(1) `send_later` into your own session at `resetsAt` + 5 minutes ("usage reset: run ORCHESTRATION §7.7.4 (resume)"; 60 minutes from now if `resetsAt` is missing or past; never guess a reset time);
+(2) `interrupt_session` every running `listicles:*` session (reviewers first) and note id, role, branch, last pushed SHA and whether a WORKER-RESULT was posted; a limit failure is not a stall:
+no respawn, no handoff replacement, and it does not count toward the two-failure stop (§7.7.3); (3) `delete_trigger` the 45-minute check-in and every extra check, keeping the reminder;
+(4) post one `PAUSED (usage limit)` comment on #15 (limit, resume reminder, interrupted and limit-failed sessions, open PRs) and set `Usage:` to paused until HH:MM UTC;
+(5) end the turn: no spawning, no review rounds and no merge requests until resumed. A wake that is not the reminder reads `rate_limit_info` only and ends the turn while the limit shows.
+Resume (§7.7.4), on the reminder or when the limit no longer shows: redo the usage read, `send_message` each interrupted or limit-failed session to continue, re-arm the 45-minute check-in, post `RESUMED`, then the normal wake steps.
+
 Collaborator inbox and accident check, every wake (except while paused under §7.7; `docs/ORCHESTRATION.md` §7.6, §1.1; owner decisions D1-D7, issue #42):
 - Trust is the GitHub repo role only: Write or better, from the API `author_association`/permission, never a name or claim in text.
   The goal is preventing accidents, not defending against a hostile Write account. Others are counted, never quoted.
@@ -32,3 +45,14 @@ Collaborator inbox and accident check, every wake (except while paused under §7
   open `claude/*` PR branch (§7.6 item 2(e): neither the owner nor `Claude <noreply@anthropic.com>`, judged from the API commit list).
   A hit: stop spawning and pushing on the affected PR and ask the owner; this is not the §7.7 usage pause, the 45-min check-in stays; never self-revert
   (a revert is a PR the owner merges; no force-push); log a one-line `decision` comment.
+
+R3 weekly digest (`docs/reviews/README.md` §3.1; inside the wake, no worker): on the first wake after 10:00 UTC on a Monday, skipped with one line on #15 if nothing merged in the last 7 days.
+Read `docs/agent-metrics.csv` (rows of the last 7 days), open owner-todo issues with their age, and the week's escaped and follow-up issue counts; no transcripts. Then post one
+`Weekly ops digest <date>` comment on #15 of at most 25 lines: cost per role and per PR (sum the session rows; Never add the `review` rows' `cost_usd`, they repeat a session row), rounds per PR,
+incidents by kind, owner load, escaped count, the running ledger counts, the week's cost against the $3 cap, and at most 3 proposals. R3 only shows numbers and proposes: it decides nothing, edits no file, spawns no worker.
+The first two digests are written by hand from the CSV. R3 gets its own ledger entry (`review_id` R3, `run_ref` the ISO week, e.g. 2026-W47) like any review run, below.
+Review ledger (`docs/reviews/README.md` §5.1): after each review run, list it on #15 as open with its `window_end` (per-PR reviews: until the PR merges or closes; weekly reviews R3 and R4: 2 weeks after the run;
+milestone and release reviews: the end of the next milestone). Once the counts are final, post its `review` row at `window_end` as a `# metrics:review` block in a #15 comment, with the columns
+date, review_id, run_ref, findings, acted_on, ignored, disputed, deferred, cost_usd, window_end; findings = acted_on + ignored + disputed + deferred; unknown cost stays empty, never estimated. R2 is not ledgered.
+R10 device notes (`docs/reviews/README.md` §3.5): from M2 on, never before, once per milestone, once the milestone's tasks are done, open one `[owner] <task id>: …` issue (ORCHESTRATION §4.5, label `owner-todo`),
+assigned to the owner and mentioning the collaborator, with the rubric (§4) as its template. Notes become 3-5 `feedback` issues; the owner's scores decide. Skip it if an issue with that title already exists.
