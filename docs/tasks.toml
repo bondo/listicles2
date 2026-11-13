@@ -495,7 +495,7 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20"]
 
 [[task]]
 id = "M0.5-O1"
@@ -572,6 +572,16 @@ risk = "normal"
 depends_on = ["M0.5-16", "M0.5-18"]
 issue = 44
 notes = "Tooling env (agents/prompts). Effort S. Links follow-up #44: agents never resolve a collaborator's review thread"
+
+[[task]]
+id = "M0.5-20"
+title = "docs/ANDROID-BEST-PRACTICES.md: checklist from Google's Android guidance, enforced vs reviewer-checked"
+milestone = "M0.5"
+status = "done"
+assignee = "process"
+risk = "normal"
+depends_on = []
+notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11)."
 
 [[task]]
 id = "M0.5-O4"
