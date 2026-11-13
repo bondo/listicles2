@@ -115,6 +115,12 @@ jobs:
         run: python3 -I scripts/issue_forms.py
       - name: collab inbox tests
         run: python3 -I scripts/test_collab_inbox.py
+      - name: status renderer and fetch tests
+        run: python3 -I scripts/test_status_visual.py
+      - name: status publisher tests
+        run: python3 -I scripts/test_status_publish.py
+      - name: status workflow tests
+        run: python3 -I scripts/test_status_workflow.py
       - name: docs/tasks.toml validates
         run: python3 -I scripts/tasks.py validate
       - name: agent_metrics.py tests
