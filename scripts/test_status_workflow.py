@@ -9,8 +9,9 @@ import unittest
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 IMAGE_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status.svg"
-TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_status_publish.py",
-         "python3 -I scripts/test_status_workflow.py")
+TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_status_page.py",
+         "python3 -I scripts/test_status_publish.py", "python3 -I scripts/test_status_workflow.py")
+PAGE_URL = "https://github.com/bondo/listicles2/blob/status/status.md"
 JOB_PERMISSIONS = ["checks: read", "contents: write", "issues: read", "pull-requests: read"]
 USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)\s*$")
 
@@ -184,6 +185,13 @@ class Wiring(unittest.TestCase):
 
     def test_readme_embeds_the_image_from_the_status_branch(self):
         self.assertIn(f"]({IMAGE_URL})", read("README.md"))
+
+    def test_readme_links_the_detail_page_on_the_status_branch(self):
+        self.assertIn(f"]({PAGE_URL})", read("README.md"))
+
+    def test_the_workflow_needs_no_change_for_the_page(self):
+        text = read(".github", "workflows", "status.yml")
+        self.assertNotIn("status.md", text)  # render writes it next to the svg and publish picks it up from there
 
 
 if __name__ == "__main__":

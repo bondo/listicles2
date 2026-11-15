@@ -33,7 +33,7 @@ CFGSRC=('*.gradle.kts' '*.gradle' '*package.json' '*jest.config.*' '*.properties
 
 # 1. Disabled or focused tests (anywhere), and test-only forms (test sources only, so production code may use enabled = false).
 # Also aliased imports, typealiases and backticked names of those annotations.
-out=$(gg '@([A-Za-z]+\.)*`?(Ignored?\b|Disabled[A-Za-z]*|Enabled(If|On)[A-Za-z]*)|\.(only|skip)\(|import +[A-Za-z0-9_.]*\.(Ignored?|Disabled[A-Za-z]*|Enabled(If|On)[A-Za-z]*) +as +|typealias +[A-Za-z0-9_]+ *= *([A-Za-z0-9_]+\.)*(Ignored?|Disabled((If|On|In|For)[A-Za-z]*)?|Enabled(If|On)[A-Za-z]*)\b' -- "${EXCL[@]}")
+out=$(gg '@([A-Za-z]+\.)*`?(Ignored?\b|Disabled[A-Za-z]*|Enabled(If|On)[A-Za-z]*)|\.(only|skip)\(|import +[A-Za-z0-9_.]*\.(Ignored?|Disabled[A-Za-z]*|Enabled(If|On)[A-Za-z]*) +as +|typealias +[A-Za-z0-9_]+ *= *([A-Za-z0-9_]+\.)*(Ignored?|Disabled(If(EnvironmentVariables?|SystemPropert(y|ies))?|On(Os|Jre(Range)?)|ForJreRange|InNativeImage)?|Enabled(If|On)[A-Za-z]*)\b' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled test: /'; fail=1; }
 # Skipped Python tests in the hook suites (a CI gate). This includes test_guards_sh.py, which builds its fixtures by concatenation.
 out=$(gg '@unittest\.skip|\bskip(If|Unless|Test)\b|SkipTest\b|expectedFailure|from +unittest +import .*\bskip|@skip\b' -- 'scripts/hooks/test_*.py')

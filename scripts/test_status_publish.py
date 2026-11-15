@@ -42,9 +42,11 @@ class Publish(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.svg, self.json = root / "status.svg", root / "status.json"
 
-    def publish(self, stamp="2026-11-13 12:00 UTC", body="one"):
+    def publish(self, stamp="2026-11-13 12:00 UTC", body="one", md=None):
         self.svg.write_text(svg(stamp, body))
         self.json.write_text(f'{{"generated_at": "{stamp}"}}\n')
+        if md is not None:
+            (self.svg.parent / "status.md").write_text(md)
         return status_publish.publish(str(self.work), str(self.svg), str(self.json))
 
     def count(self):
@@ -59,6 +61,57 @@ class Publish(unittest.TestCase):
         self.assertEqual(git(self.origin, "log", "-1", "--format=%P", "refs/heads/status"), "")
         self.assertEqual(sorted(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split()),
                          ["status.json", "status.svg"])
+
+    def test_publishes_the_detail_page_found_next_to_the_svg(self):
+        self.assertEqual(self.publish(md="# page\n"), "created")
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status.md"), "# page")
+        self.assertEqual(sorted(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split()),
+                         ["status.json", "status.md", "status.svg"])
+
+    def test_an_explicit_md_path_is_used(self):
+        other = Path(self.tmp.name) / "elsewhere.md"
+        other.write_text("# other\n")
+        self.svg.write_text(svg())
+        self.json.write_text("{}")
+        self.assertEqual(status_publish.publish(str(self.work), str(self.svg), str(self.json), md_path=str(other)), "created")
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status.md"), "# other")
+
+    def test_an_explicit_md_path_that_cannot_be_read_is_an_error(self):
+        self.svg.write_text(svg())
+        self.json.write_text("{}")
+        with self.assertRaises(status_publish.PublishError):
+            status_publish.publish(str(self.work), str(self.svg), str(self.json), md_path="/nonexistent.md")
+
+    def test_without_a_page_nothing_changes_for_the_old_layout(self):
+        self.assertEqual(self.publish(), "created")
+        self.assertEqual(self.publish(stamp="2026-11-13 12:30 UTC"), "unchanged")
+
+    def test_stamp_only_change_with_the_same_page_makes_no_commit(self):
+        self.publish(md="# page\n")
+        self.assertEqual(self.publish(stamp="2026-11-13 12:30 UTC", md="# page\n"), "unchanged")
+        self.assertEqual(self.count(), 1)
+
+    def test_a_changed_page_alone_is_a_real_change(self):
+        self.publish(md="# page\n")
+        self.assertEqual(self.publish(md="# page two\n"), "updated")
+        self.assertEqual(self.count(), 2)
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status.md"), "# page two")
+
+    def test_adding_a_page_to_a_branch_that_has_none_is_a_real_change(self):
+        self.publish()
+        self.assertEqual(self.publish(md="# page\n"), "updated")
+
+    def test_publishing_without_a_page_keeps_the_page_already_on_the_branch(self):
+        self.publish(md="# page\n")
+        (self.svg.parent / "status.md").unlink()
+        self.assertEqual(self.publish(body="two"), "updated")
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status.md"), "# page")
+        self.assertEqual(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split(), ["status.json", "status.md", "status.svg"])
+
+    def test_without_a_page_anywhere_the_branch_still_has_no_page(self):
+        self.publish()
+        self.assertEqual(self.publish(body="two"), "updated")
+        self.assertEqual(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split(), ["status.json", "status.svg"])
 
     def test_stamp_only_change_makes_no_commit(self):
         self.publish()
