@@ -1,61 +1,38 @@
 """actionlint runs the executable named by -shellcheck / -pyflakes and -init-config writes under .github/; the allow rule
-Bash(.tools/bin/actionlint *) would approve them, so the guard denies them in every spelling and wrapper (review R1-01, PR #95)."""
+Bash(.tools/bin/actionlint *) would approve them, so the guard denies them in every spelling and wrapper (review R1-01, R2-01, R2-02)."""
 
 import unittest
 
 from test_pretooluse_guard import repo, run
 
+A = ".tools/bin/actionlint"
 HOSTILE = [
-    ".tools/bin/actionlint -shellcheck=./x.sh .github/workflows/ci.yml",
-    ".tools/bin/actionlint -shellcheck ./x.sh .github/workflows/ci.yml",
-    ".tools/bin/actionlint --shellcheck=./x.sh f.yml",
-    ".tools/bin/actionlint --shellcheck ./x.sh f.yml",
-    ".tools/bin/actionlint -pyflakes=/bin/sh f.yml",
-    ".tools/bin/actionlint -pyflakes /bin/sh f.yml",
-    ".tools/bin/actionlint --pyflakes=./x f.yml",
-    ".tools/bin/actionlint -shellcheck= -shellcheck=./x.sh f.yml",
-    ".tools/bin/actionlint -shellcheck=.tools/bin/shellcheck -pyflakes= -pyflakes=./x f.yml",
-    ".tools/bin/actionlint f.yml -shellcheck=./x.sh",
-    ".tools/bin/actionlint -color -shellcheck=./x.sh f.yml",
-    ".tools/bin/actionlint '-shellcheck=./x.sh' f.yml",
-    '.tools/bin/actionlint "-pyflakes=./x" f.yml',
-    '.tools/bin/actionlint -shell""check=./x f.yml',
-    ".tools/bin/actionlint -shell\\check=./x f.yml",
-    ".tools/bin/actionlint -init-config",
-    ".tools/bin/actionlint --init-config",
-    "actionlint -shellcheck=./x.sh f.yml",
-    "/home/user/listicles2/.tools/bin/actionlint -shellcheck=./x f.yml",
-    "./.tools/bin/actionlint -pyflakes=./x f.yml",
-    "env X=1 .tools/bin/actionlint -shellcheck=./x f.yml",
-    "timeout 5 .tools/bin/actionlint -pyflakes=./x f.yml",
-    "nohup .tools/bin/actionlint -shellcheck=./x f.yml",
-    "echo f.yml | xargs .tools/bin/actionlint -shellcheck=./x",
-    "bash -c '.tools/bin/actionlint -shellcheck=./x f.yml'",
-    "sh -c \".tools/bin/actionlint -pyflakes=./x f.yml\"",
-    "cd /tmp && .tools/bin/actionlint -pyflakes=./x f.yml",
-    "true; .tools/bin/actionlint -shellcheck=./x f.yml",
-    "find . -name '*.yml' -exec .tools/bin/actionlint -shellcheck=./x {} +",
-    "eval '.tools/bin/actionlint -shellcheck=./x f.yml'",
-    ".tools/bin/actionlint $(echo -shellcheck=./x) f.yml",
-    ".tools/bin/actionlint `echo -shellcheck=./x` f.yml",
-    ".tools/bin/actionlint $FLAG f.yml",
-    ".tools/bin/actionlint ${FLAG} f.yml",
-    ".tools/bin/actionlint -shellcheck=$X f.yml",
-    "F=-shellcheck=./x.sh; .tools/bin/actionlint $F f.yml",
+    f"{A} -shellcheck=./x.sh .github/workflows/ci.yml", f"{A} -shellcheck ./x.sh f.yml", f"{A} --shellcheck=./x.sh f.yml",
+    f"{A} --shellcheck ./x.sh f.yml", f"{A} -pyflakes=/bin/sh f.yml", f"{A} -pyflakes /bin/sh f.yml", f"{A} --pyflakes=./x f.yml",
+    f"{A} -shellcheck= -shellcheck=./x.sh f.yml", f"{A} -shellcheck=.tools/bin/shellcheck -pyflakes= -pyflakes=./x f.yml",
+    f"{A} f.yml -shellcheck=./x.sh", f"{A} -color -shellcheck=./x.sh f.yml", f"{A} '-shellcheck=./x.sh' f.yml", f'{A} "-pyflakes=./x" f.yml',
+    f'{A} -shell""check=./x f.yml', f"{A} -shell\\check=./x f.yml", f"{A} -init-config", f"{A} --init-config",
+    "actionlint -shellcheck=./x.sh f.yml", f"/home/user/listicles2/{A} -shellcheck=./x f.yml", f"./{A} -pyflakes=./x f.yml",
+    f"env X=1 {A} -shellcheck=./x f.yml", f"timeout 5 {A} -pyflakes=./x f.yml", f"nohup {A} -shellcheck=./x f.yml",
+    f"echo f.yml | xargs {A} -shellcheck=./x", f"bash -c '{A} -shellcheck=./x f.yml'", f'sh -c "{A} -pyflakes=./x f.yml"',
+    f"cd /tmp && {A} -pyflakes=./x f.yml", f"true; {A} -shellcheck=./x f.yml", f"find . -name '*.yml' -exec {A} -shellcheck=./x {{}} +",
+    f"eval '{A} -shellcheck=./x f.yml'", f"{A} $(echo -shellcheck=./x) f.yml", f"{A} `echo -shellcheck=./x` f.yml",
+    f"{A} $FLAG f.yml", f"{A} ${{FLAG}} f.yml", f"{A} -shellcheck=$X f.yml", f"F=-shellcheck=./x.sh; {A} $F f.yml",
+    # R2-01: brace expansion and globs that bash expands into -shellcheck / -pyflakes after the guard has looked
+    f"{A} {{-shellcheck=./x,f.yml}}", f"{A} {{-pyflakes,/bin/sh}} f.yml", f"bash -c '{A} {{-shellcheck=./x,f.yml}}'", f"{A} -s*/x",
+    f"{A} -?hellcheck=./x f.yml", f"{A} [-]shellcheck=./x f.yml", f"{A} {{,-shellcheck=./x}} f.yml", f"{A} {{{{-shellcheck=./x,a}},b}}",
+    f"{A} '-s'*/x", f"{A} \\-s*/x", f"{A} -shellcheck={{a,b}}", f"{A} f.yml {{-pyflakes,x}}", f"eval '{A} -s*/x'", f"echo f | xargs {A} {{-pyflakes,x}}",
+    # R2-02: actionlint finds shellcheck and pyflakes on PATH, so any PATH change in the command line is denied
+    f"PATH=./evil {A} f.yml", f"export PATH=./evil:$PATH; {A} f.yml", f"env -i PATH=./e {A} f.yml", f"env PATH=./e {A} f.yml",
+    f"PATH=./e; {A} f.yml", f"declare -x PATH=./e; {A} f.yml", f"export PATH=./e && bash -c '{A} f.yml'", f"(PATH=./e; {A} f.yml)",
 ]
 ALLOWED = [
-    ".tools/bin/actionlint",
-    ".tools/bin/actionlint .github/workflows/ci.yml",
-    ".tools/bin/actionlint -color -oneline .github/workflows/ci.yml .github/workflows/other.yml",
-    ".tools/bin/actionlint -format '{{.Message}}' f.yml",
-    ".tools/bin/actionlint -ignore 'shellcheck reported' f.yml",
-    ".tools/bin/actionlint -config-file .github/actionlint.yaml f.yml",
-    ".tools/bin/actionlint -verbose f.yml 2>/dev/null",
-    ".tools/bin/shellcheck -s bash scripts/verify.sh",
-    ".tools/bin/zizmor --offline .github/workflows",
-    "echo -shellcheck=./x",
-    "grep -n -- -shellcheck docs/x.md",
-    "cat .github/workflows/ci.yml | .tools/bin/actionlint -stdin-filename ci.yml -",
+    A, f"{A} .github/workflows/ci.yml", f"{A} -color -oneline .github/workflows/ci.yml .github/workflows/other.yml",
+    f"{A} -format '{{{{.Message}}}}' f.yml", f"{A} -ignore 'shellcheck reported' f.yml", f"{A} -config-file .github/actionlint.yaml f.yml",
+    f"{A} -verbose f.yml 2>/dev/null", ".tools/bin/shellcheck -s bash scripts/verify.sh", ".tools/bin/zizmor --offline .github/workflows",
+    "echo -shellcheck=./x", "grep -n -- -shellcheck docs/x.md", f"cat .github/workflows/ci.yml | {A} -stdin-filename ci.yml -",
+    f"{A} .github/workflows/*.yml", f"{A} .github/workflows/ci.y?ml", f"{A} .github/workflows/[a-c]*.yml", f"{A} ./f{{1,2}}.yml",
+    "PATH=/usr/bin true", "export PATH=/usr/bin:$PATH", f"{A} -format \"{{{{.Message}}}}\" f.yml",
 ]
 
 
