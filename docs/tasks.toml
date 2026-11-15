@@ -659,11 +659,11 @@ notes = "Normal env (docs only: ORCHESTRATION.md, orchestrator-state.md). Effort
 id = "M0.5-22"
 title = "CLAUDE.md: allow one reviewer session to review several small docs-only PRs (the pending bullet of ORCHESTRATION 7.7.5)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-21"]
-notes = "Tooling env (CLAUDE.md). Effort S. CLAUDE.md says one review round per reviewer session; change it only if the owner agrees, then drop 'pending' from 7.7.5. Reviewers still never edit or push. If the owner declines, delete the pending bullet of 7.7.5 and set this task done."
+notes = "Tooling env. Effort S. Owner decision 2026-11-15: CLAUDE.md stays unchanged and reviewers stay one round per session, so the pending bullet of ORCHESTRATION 7.7.5 was deleted instead."
 
 [[task]]
 id = "M0.5-23"
