@@ -1,6 +1,14 @@
 # App and repo name shortlist (M0.5-04, issue #17)
 
-Status: proposal for the owner's decision in M0.5-O2. No agent renames anything. Research date: **2026-11-13**.
+## Decision
+
+**The name is Tally.** Decided by the owner on **2026-11-15** (owner comment on PR #77: "We have decided on the name Tally"). Task M0.5-O2 is the owner's pick; M0.5-04 delivered this document.
+
+- The earlier recommendation (**Nestlist**, section 4) is **superseded**. Sections 1 to 6 below are kept unchanged as history of how the shortlist was made. Tally was candidate 7 ("Tallyhome") in spirit only; it was not itself researched in sections 1 to 6, so see "Tally: availability and risks" at the end.
+- **Nothing is renamed by this document.** Renaming the repo, `applicationId` and app labels is planned by task M1-01.
+- Open items for the owner are listed in "Tally: availability and risks" (Play listing title, distinctive `applicationId`, trademark search, domains).
+
+Status: decided (Tally, 2026-11-15); the text below is the original proposal, kept as history. No agent renames anything. Research date: **2026-11-13**.
 
 The app: shared household lists for Android (inventories, packing templates that merge into trip checklists), real-time sync,
 English and Danish UI. Working name: **Listicles**.
@@ -73,3 +81,42 @@ Renaming is a task for M1-01 to plan after the owner decides; nothing is renamed
 1. Register-check the domains (.com, .dk, .app) and a Play title, and run a trademark search for the chosen name.
 2. Same name for the English and Danish app label, or a Danish variant?
 3. Keep `bondo/listicles2` as the repo name and rename later, or rename at M1-01?
+
+## 7. Tally: availability and risks
+
+Checked **2026-11-15**, public sources only, no personal details in any request. Marker: **verified** = a source was read; **not verified** = not checked or not checkable from this environment.
+
+| Check | Result | Marker |
+|---|---|---|
+| GitHub user/org `Tally` | Search (`search/users`, `tally in:login`) returned 1904 accounts, and `Tally` itself is the first hit, so the exact login is taken. A repo `bondo/tally` is still possible (repos are per owner), only an org named `tally` is not | verified (search; not a direct reservation check) |
+| GitHub repos named like it | 12220 repos match `tally in:name` (loose match). Well-known: davidfowl/tally, uber-go/tally (Go metrics), josephdadams/TallyArbiter, xiaojinzi123/TallyApp, dtolnay/cargo-tally. Crowded, no conflict for an own-owner repo | verified |
+| Google Play | Web search shows many apps with Tally in the title: Tally Counter (several developers), "Tally - drinks counter", "Tally Counter & Tracker Daily", "Tally Mobile - Forms" (the tally.so forms service), "Tally Invoice GST Billing App" (Tally Solutions). Results come from third-party aggregators, not Play itself | verified that the name is **heavily used**; exact `Tally` title and package ids **not verified** (`play.google.com` not reachable from here; Play Console is the real check) |
+| Apple App Store (for context) | Search listed "Tally: The Anything Tracker" and "Tally - Quick Counter" | verified (listing titles only) |
+| npm / PyPI package `tally` | Registry URLs return HTTP 200, i.e. packages named `tally` exist. Irrelevant for an Android app unless we publish libraries under that name | verified |
+| crates.io, Maven Central | crates.io returned 403 and Maven Central did not respond | not verified |
+| Tally.so (online form builder, has an Android app) | Exists, a well-known product named Tally | verified (web search) |
+| TallyPrime / Tally Solutions (Indian accounting software; trademark filings for TALLY PRIME listed on Justia, owner Tally Solutions Private Limited) | Exists; large, long-established company, with Android apps in the same store | verified (web search); scope of its trademark in Denmark/EU **not verified** |
+| "Tally" credit app | The search did not identify a separate credit app named Tally (the UK/US consumer credit app may or may not exist today) | **not verified** |
+| Domains (.com, .dk, .app) | Not checkable from the sandbox | not verified |
+| Trademarks (EUIPO, DKPTO, USPTO) | Not searched | **not verified** |
+
+**Plain summary:** Tally is a common name. Several unrelated products use it, some in the same app store and in adjacent categories (forms, accounting, counters, trackers). Nothing found proves a conflict for a shared household lists app, and nothing proves availability.
+
+### Open items for the owner (not decided)
+
+1. **Play Store listing title.** Probably "Tally" alone is already taken or too crowded; a descriptive title (for example "Tally: shared household lists") is safer. Check in Play Console.
+2. **Distinctive `applicationId`**, permanent once published. Candidates, none decided: under the owner's own reverse domain once a domain is chosen (`<owner-domain>.tally`), or a GitHub-based namespace (`io.github.bondo.tally`), or keep a product namespace (`dev.tally.app`, which only works if the owner controls `tally.dev`; not verified). Avoid `com.tally.*` (collides with the forms service's `com.tally.so`).
+3. **Trademark search** (EUIPO, DKPTO, USPTO) in the relevant classes (software, class 9 and 42), including the Tally Solutions and tally.so marks.
+4. **Domains** at a registrar (.com, .dk, .app), and the **GitHub org name**, if an org is wanted.
+5. Same app label in English and Danish, or a Danish variant?
+
+### Consequences by site (planning is task M1-01; nothing is renamed here)
+
+| Place | Consequence |
+|---|---|
+| `applicationId` / `namespace` (`app/build.gradle.kts`), package directories | Change from `dev.listicles.app` to the chosen distinctive id; permanent after Play publication |
+| App label en and da (`app_name` in `values/` and `values-da/`) | `Tally`, possibly with a descriptor; both languages |
+| Firebase project and Android app registration | Project id cannot change later; create it after the `applicationId` is decided; `google-services.json` package must match (never committed) |
+| Repo `bondo/listicles2` | Rename optional; GitHub redirects, but CI, README badges, CODEOWNERS and docs links need updating |
+| Docs, README, `docs/PLAN.md`, `CLAUDE.md` | Replace "Listicles"; `CLAUDE.md` is a process file (tooling session only) |
+| Signing key alias, Play listing, domain, invite-link host | Name after the final decisions |
