@@ -36,6 +36,7 @@ step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
 step collab-inbox-tests python3 -I scripts/test_collab_inbox.py
 step status-visual-tests python3 -I scripts/test_status_visual.py
+step status-page-tests python3 -I scripts/test_status_page.py
 step status-publish-tests python3 -I scripts/test_status_publish.py
 step status-workflow-tests python3 -I scripts/test_status_workflow.py
 step prompt-rules-tests python3 -I scripts/test_prompt_rules.py
