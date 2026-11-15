@@ -6,4 +6,6 @@ Shared household lists for Android. See docs/PLAN.md for the plan. Run `scripts/
 
 ![Project status: milestone progress, current tasks, owner queue and blockers](https://raw.githubusercontent.com/bondo/listicles2/status/status.svg)
 
-Updated by a workflow every 30 minutes and when issues change or `main` is pushed; how it works: docs/STATUS.md.
+Each milestone is a card with its name (like "M0.5 Product design and guardrails"), a progress bar and its open tasks,
+with what each one waits on; blockers and the owner queue are at the bottom. Updated by a workflow every 30 minutes and
+when issues change or `main` is pushed; how it works and what the markers mean: docs/STATUS.md.

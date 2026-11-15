@@ -297,7 +297,7 @@ class RenderSvg(unittest.TestCase):
 
     def test_each_milestone_is_a_card_with_id_prefixed_name_purpose_and_counts(self):
         lines = texts(self.svg())
-        for needle in ("A Alpha name", "Build the alpha.", "40%  2/5", "B Beta name", "0%  0/1", "C Gamma name", "Build the gamma."):
+        for needle in ("A Alpha name", "Build the alpha.", "40% 2/5", "B Beta name", "0% 0/1", "C Gamma name", "Build the gamma."):
             self.assertIn(needle, lines)
         self.assertEqual(sum(1 for line in lines if line.endswith("current")), 1)
 
@@ -334,7 +334,7 @@ class RenderSvg(unittest.TestCase):
                              'status = "done"\nassignee = "implementer"\nrisk = "normal"\ndepends_on = []')
         lines = texts(status_visual.render_svg(model(tasks=text)))
         self.assertIn("1 done", lines)
-        self.assertIn("100%  1/1", lines)
+        self.assertIn("100% 1/1", lines)
 
     def test_big_milestones_show_a_capped_number_of_open_tasks_and_count_the_rest(self):
         extra = "".join(
@@ -342,7 +342,7 @@ class RenderSvg(unittest.TestCase):
             f'assignee = "implementer"\nrisk = "normal"\ndepends_on = []\n' for n in range(10, 40))
         lines = texts(status_visual.render_svg(model(tasks=TASKS + extra)))
         shown = [line for line in lines if line.startswith("Extra ")]
-        self.assertEqual(len(shown), status_visual.MAX_OPEN_PER_MILESTONE)
+        self.assertEqual(len(shown), status_visual.MAX_OPEN_PER_MILESTONE - 3)  # A-02, A-O1 and A-04 come first
         self.assertIn(f"+{3 + 30 - status_visual.MAX_OPEN_PER_MILESTONE} more open tasks", lines)
 
     def test_the_svg_has_an_accessible_title_and_description(self):
@@ -358,8 +358,10 @@ class RenderSvg(unittest.TestCase):
         css = status_visual.CSS
         light, dark = css.split("@media (prefers-color-scheme: dark){")
         def fills(block):
-            return {m.group(1): m.group(2) for m in re.finditer(r"\.(\w+)\{fill:(#[0-9a-f]{6})\}", block)}
+            return {m.group(1): m.group(2) for m in re.finditer(r"\.(\w+)\{fill:(#[0-9a-f]{3,6})\}", block)}
         def lum(hexcolor):
+            if len(hexcolor) == 4:
+                hexcolor = "#" + "".join(c * 2 for c in hexcolor[1:])
             ch = [int(hexcolor[i:i + 2], 16) / 255 for i in (1, 3, 5)]
             ch = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in ch]
             return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
@@ -381,8 +383,10 @@ class RenderSvg(unittest.TestCase):
         self.assertIn('class="card"', svg)
 
     def test_task_states_have_distinct_marker_shapes(self):
-        svg = self.svg(prs=[pr(20)], issues=[issue(8, "A-02: x", ["blocked"])])
-        for shape in ("mk-ready", "mk-progress", "mk-blocked", "mk-owner"):
+        extra = ('\n[[task]]\nid = "A-05"\ntitle = "Another ready thing"\nmilestone = "A"\nstatus = "todo"\n'
+                 'assignee = "implementer"\nrisk = "normal"\ndepends_on = []\n')
+        svg = self.svg(prs=[pr(20)], tasks=TASKS + extra)
+        for shape in ("mk-ready", "mk-progress", "mk-blocked", "mk-owner", "mk-done"):
             self.assertIn(shape, svg)
 
     def test_is_deterministic(self):
@@ -421,7 +425,7 @@ class RenderSvg(unittest.TestCase):
     def test_hostile_task_and_milestone_text_is_escaped_clipped_and_well_formed(self):
         nasty = ['<script>alert(1)</script>', '"><svg onload=alert(1)>', "a&b&amp;c", "</text></svg><svg>", "\u202eevil",
                  "x" * 3000, "\u6f22" * 300, "<![CDATA[ x ]]>"]
-        for n, title in enumerate(nasty):
+        for title in nasty:
             with self.subTest(title=title[:20]):
                 text = (TASKS.replace('title = "Ready thing"', f"title = {json.dumps(title)}")
                         .replace('title = "Alpha name"', f"title = {json.dumps(title[:30])}")
@@ -694,9 +698,8 @@ class Fetch(unittest.TestCase):
         real["state_reason"] = "completed"
         fake = api_issue(99, ["needs-owner"], title="[owner] A-O1 x", assoc="NONE")
         out = self.fetch(FakeApi(issues={"owner-todo": [real], "needs-owner": [fake]}))
-        chain = {t["id"]: t for t in status_visual.build_model(TASKS, out, NOW)["chain"]}
-        self.assertNotIn("A-O1", chain)
-        self.assertEqual(chain["A-04"]["state"], "ready")
+        tasks_a = {t["id"]: t for t in status_visual.build_model(TASKS, out, NOW)["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-O1"]["state"], tasks_a["A-04"]["state"]), ("done", "ready"))
 
     def test_owner_todo_includes_closed_issues_others_only_open(self):
         api = FakeApi()

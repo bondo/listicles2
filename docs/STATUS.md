@@ -1,7 +1,8 @@
 # Status picture (README front page)
 
-The README shows `status.svg`, a picture of the milestone progress, the current task chain, the owner queue (open PRs
-that are not drafts) and a BLOCKERS panel. It is not stored on `main`: the workflow `.github/workflows/status.yml`
+The README shows `status.svg`: one card per milestone with its human-friendly name (the id stays as a prefix, like
+"M0.5 Product design and guardrails"), purpose, progress bar and done/total, then the milestone's open tasks, the owner
+queue (open PRs that are not drafts) and a BLOCKERS panel. It is not stored on `main`: the workflow `.github/workflows/status.yml`
 renders it and pushes it to the `status` branch (task M0.5-27). The README embeds the raw file from that branch.
 
 ## How it works
@@ -26,6 +27,30 @@ trigger (it would put a status check on every PR and give fork PRs a read-only t
 Dark mode: the SVG follows the viewer's operating-system or browser colour scheme (`prefers-color-scheme` inside an
 `<img>` cannot see GitHub's own theme setting). It has an opaque background in both schemes, so it stays readable on
 a light or a dark GitHub page, but it may not match the page's theme.
+
+## Milestone names and what a card shows
+Names and one-line purposes are data: one `[[milestone]]` table per milestone in `docs/tasks.toml` (`id`, `title` up to
+40 characters, `purpose` up to 110). `scripts/tasks.py validate` fails when a milestone has no table, a table names an
+unknown milestone, or a title or purpose is missing, empty or too long. The first names were derived from `docs/PLAN.md`
+section 7; edit them in `docs/tasks.toml` (a normal PR). A milestone with no tasks yet shows its planned name and
+"not planned yet".
+
+Inside a card, finished tasks (done or dropped) collapse into "N done". Open tasks are listed in `tasks.toml` order, at
+most 12 per card ("+N more open tasks" after that), each with a marker shape and a status word, so colour is never the
+only signal:
+
+| Marker | Word | Meaning |
+|---|---|---|
+| circle | ready | all dependencies met, nobody has delivered it |
+| triangle | in progress #N | an open PR (draft or not) is titled `<task id>: ...` |
+| square | blocked | unmet dependencies, or an open `blocked`-labelled issue or PR titled `<task id>: ...` |
+| diamond | owner to-do | owner task not done (it may also wait on other tasks) |
+| tick | N done | finished tasks, collapsed |
+
+Under an open task a line says what it waits on: unmet `depends_on` ids, `(owner)` after an owner-only task, "all of Mx"
+for a `milestone:Mx` dependency, and "blocked by #N" for a labelled issue or PR. Lines about owner-only or labelled
+blockers are red; ordinary waits are grey. The images use theme classes only (light and dark, contrast at least 4.5:1,
+checked by a test).
 
 ## What counts as a blocker
 - Tasks of the current milestone whose `depends_on` are not done.
