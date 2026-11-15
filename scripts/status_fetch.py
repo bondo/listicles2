@@ -76,7 +76,8 @@ def fetch(api, repo, sleep=time.sleep):
         runs = api(f"repos/{repo}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
         prs.append({"number": n, "title": p.get("title", ""), "draft": p.get("draft") is True,
                     "behind": detail.get("mergeable_state") == "behind",
-                    "merge_unknown": detail.get("mergeable_state") == "unknown", "ci": ci_state(runs)})
+                    "merge_unknown": detail.get("mergeable_state") == "unknown", "ci": ci_state(runs),
+                    "labels": [x["name"] if isinstance(x, dict) else x for x in p.get("labels", [])]})
     issues, outside = {}, set()
     for label, state in ISSUE_LABELS:
         for i in api(f"repos/{repo}/issues?state={state}&labels={label}&per_page=100"):

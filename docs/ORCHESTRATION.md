@@ -176,6 +176,11 @@ Issues stay the place for owner to-dos, because the owner needs a clickable item
 ```toml
 milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]   # order = priority
 
+[[milestone]]             # one per milestone, shown by the status picture (docs/STATUS.md)
+id = "M0.5"
+title = "Product design and guardrails"   # <= 40 characters
+purpose = "User stories, app flow, design tokens, guardrails."   # <= 110
+
 [[task]]
 id = "M1-03"              # <milestone>-NN (agent) or <milestone>-O<n> (owner); stable, never reused
 title = "Invite links: create, redeem, revoke + rules tests"
@@ -198,6 +203,8 @@ notes = "…"               # optional free text (decisions, follow-ups for a na
 * a milestone with agent work and no burn-down task `<M>-FU`, or a burn-down that is not assigned to `implementer`
   or does not depend on every other non-owner task of its milestone (FOLLOW-UPS.md §8; ids end in `-FU`)
 * duplicate entries in one `depends_on`, a non-string `notes`
+* a milestone without its `[[milestone]]` table, a table for an unknown or repeated milestone, a missing, empty or
+  too long `title` or `purpose`
 * an agent task that is `done` while a task it depends on is still `todo`
 
 A `milestone:` dependency is satisfied only when the milestone has at least one task and all of
