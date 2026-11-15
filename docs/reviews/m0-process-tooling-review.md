@@ -61,7 +61,7 @@ index into `CLIENTS` (lines 57, 62). These are exactly the untyped seams that wo
 
 Recommendation: adopt (P4). Rename to `.ts`; `tsconfig.json` with `strict`, `noUncheckedIndexedAccess` and
 `exactOptionalPropertyTypes`; `tsc --noEmit` as its own step; ES modules. For the runner, keep Jest via ts-jest if ts-jest
-supports the installed TypeScript major (TS is at 6.0), otherwise switch to Vitest (native TS, same `describe/test.each` API).
+supports the installed TypeScript major (TS is at 6.0), otherwise switch to Vitest (native TS, same `describe` and `test.each` API).
 The implementer checks this in the PR, so the owner does not need to decide it. `guards.sh` already covers `*.ts` tests
 (`TESTSRC`, line 31). Add `tsconfig*.json` and `vitest.config.*` to `CFGSRC` (line 32) so `"strict": false` or test
 filters get caught (part of P1).
