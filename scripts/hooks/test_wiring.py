@@ -84,15 +84,23 @@ class TypeResolvedDetekt(unittest.TestCase):
 
 class TestsAreWired(unittest.TestCase):
     def test_ci_guards_job_runs_the_hook_tests(self):
-        self.assertIn("unittest discover -s scripts/hooks", ci_job("guards"))
+        self.assertIn("scripts/hooks/run_hook_tests.py", ci_job("guards"))
 
     def test_verify_runs_the_hook_tests(self):
-        self.assertIn("unittest discover -s scripts/hooks", read("scripts", "verify.sh"))
+        self.assertIn("scripts/hooks/run_hook_tests.py", read("scripts", "verify.sh"))
 
     def test_pre_push_uses_the_scope_script_and_runs_hook_tests(self):
         hook = read(".githooks", "pre-push")
         self.assertIn("prepush_scope.py", hook)
-        self.assertIn("unittest discover -s scripts/hooks", hook)
+        self.assertIn("scripts/hooks/run_hook_tests.py", hook)
+
+
+class HookTestsRunThroughTheSkipGate(unittest.TestCase):
+    """R12-04 (#28): a bare `unittest discover` lets a skipped hook test pass; every entry point must use the runner."""
+
+    def test_no_entry_point_runs_bare_unittest_discover_on_the_hook_tests(self):
+        for name, text in (("ci.yml guards", ci_job("guards")), ("verify.sh", read("scripts", "verify.sh")), ("pre-push", read(".githooks", "pre-push"))):
+            self.assertNotIn("-m unittest discover -s scripts/hooks", text, name)
 
 
 class AgentEffort(unittest.TestCase):
