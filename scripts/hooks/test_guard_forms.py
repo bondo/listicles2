@@ -24,7 +24,8 @@ class Forms(unittest.TestCase):
     def dirty(self, on):
         p = os.path.join(self.d, "f.txt")
         if on:
-            open(p, "w").write("x")
+            with open(p, "w") as f:
+                f.write("x")
         elif os.path.exists(p):
             os.remove(p)
 

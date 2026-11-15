@@ -44,7 +44,7 @@ class Publish(unittest.TestCase):
 
     def publish(self, stamp="2026-11-13 12:00 UTC", body="one"):
         self.svg.write_text(svg(stamp, body))
-        self.json.write_text('{"generated_at": "%s"}\n' % stamp)
+        self.json.write_text(f'{{"generated_at": "{stamp}"}}\n')
         return status_publish.publish(str(self.work), str(self.svg), str(self.json))
 
     def count(self):

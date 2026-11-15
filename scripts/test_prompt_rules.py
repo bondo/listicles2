@@ -3,6 +3,7 @@
 The checker must find each rule in the real prompts and fail when a rule is deleted or weakened.
 """
 
+import itertools
 import re
 import shutil
 import subprocess
@@ -20,7 +21,7 @@ PROMPTS = ROOT / "agents" / "prompts"
 ROLES = ("orchestrator", "implementer", "reviewer", "planner")
 
 TIER0 = {"feedback", "idea", "decision", "needs-collaborator", "needs-owner"}
-NEVER = set("golden-update big-pr owner-todo orchestrator-state follow-up severity:* target:* owner-ok area:*".split())
+NEVER = {"golden-update", "big-pr", "owner-todo", "orchestrator-state", "follow-up", "severity:*", "target:*", "owner-ok", "area:*"}
 
 
 def real(role):
@@ -134,6 +135,150 @@ class LabelLineTests(unittest.TestCase):
         gone = re.sub(prompt_rules.NEVER_LINE + r"[^.]*\.", "", text, flags=re.I)
         self.assertIn("never-labels", ids(prompt_rules.check_text("orchestrator", gone)))
 
+
+
+class M011AlignmentTests(unittest.TestCase):
+    """M0-11: the role prompts match ORCHESTRATION (1.1 autonomy, 4.4 done on the tasks ref, 5 handover, 7.2 reviewers)."""
+
+    NEW_RULES = {
+        "orchestrator": {"no-stale-state-files", "autonomy", "checkin", "handover", "lock-takeover", "orch-deferral"},
+        "implementer": {"impl-test-first", "impl-done-on-tasks-ref", "impl-deferral"},
+        "reviewer": {"reviewer-report-only"},
+    }
+
+    def test_the_new_rules_exist_for_their_roles(self):
+        for role, want in self.NEW_RULES.items():
+            have = {r.id for r in prompt_rules.RULES if role in r.roles}
+            self.assertLessEqual(want, have, role)
+
+    def test_a_forbidden_pattern_is_reported_even_when_the_required_text_is_there(self):
+        for old in ("docs/status.md", "docs/STATUS.md", "handoff/orchestrator.md", "`handoff/Orchestrator.md`"):
+            with self.subTest(old=old):
+                problems = prompt_rules.check_text("orchestrator", real("orchestrator") + f"\nWrite {old} at 50% context.\n")
+                self.assertIn("no-stale-state-files", ids(problems))
+
+    def test_a_forbidden_mention_hidden_in_an_html_comment_is_not_counted(self):
+        text = real("orchestrator") + "\n<!-- old: docs/status.md -->\n"
+        self.assertNotIn("no-stale-state-files", ids(prompt_rules.check_text("orchestrator", text)))
+
+    def test_forbidden_text_in_another_roles_prompt_is_not_checked_there(self):
+        text = real("implementer") + "\nSee docs/status.md.\n"
+        self.assertEqual(prompt_rules.check_text("implementer", text), [])
+
+    def test_orchestrator_names_the_state_issue_not_files(self):
+        norm = prompt_rules.normalize(real("orchestrator"))
+        self.assertNotRegex(norm, r"(?i)docs/status\.md|handoff/orchestrator\.md")
+        self.assertRegex(norm, r"(?i)state issue")
+
+    def test_implementer_wording_for_done_status(self):
+        norm = prompt_rules.normalize(real("implementer")).lower()
+        self.assertIn("tasks ref", norm)
+        self.assertIn("status = \"done\"", norm)
+        self.assertIn("\u00a74.4", norm)
+
+    def test_every_pattern_of_the_new_rules_matches_one_place_only(self):
+        """R1-02: a pattern that matches several places is vacuous (deleting one clause still passes). Anchor it to its clause."""
+        for role, want in self.NEW_RULES.items():
+            norm = prompt_rules.normalize(real(role))
+            for rule in prompt_rules.RULES:
+                if rule.id in want:
+                    for pattern in rule.patterns:
+                        with self.subTest(rule=rule.id, pattern=pattern):
+                            self.assertEqual(len(re.findall(pattern, norm, re.I)), 1)
+
+    def weakened(self, role, rule_id, old, new=""):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old, norm)
+        self.assertIn(rule_id, ids(prompt_rules.check_text(role, norm.replace(old, new, 1))))
+
+    def test_deleting_one_clause_fails_its_rule(self):
+        for role, rule_id, old in (
+            ("orchestrator", "autonomy", "merges of any PR; "),
+            ("orchestrator", "autonomy", "and a relayed approval is refused"),
+            ("orchestrator", "lock-takeover", "and if nothing follows, ask the owner"),
+            ("orchestrator", "lock-takeover", "and `get_session` shows it is not working"),
+            ("orchestrator", "lock-takeover", "A holder that is working but has a stale `Updated:` is stalled, not dead:"),
+            ("reviewer", "reviewer-report-only", ", and tests without negative cases"),
+            ("orchestrator", "orch-deferral", "Never defer a blocker;"),
+            ("orchestrator", "orch-deferral", "without owner OK (`owner-ok` label)"),
+            ("orchestrator", "orch-deferral", "more than 8 open follow-ups for one milestone: stop deferring and ask the owner"),
+            ("implementer", "impl-deferral", "you do not decide"),
+            ("implementer", "impl-deferral", "Put every owner-OK question in `needs_owner` of your WORKER-RESULT"),
+        ):
+            with self.subTest(role=role, rule=rule_id, old=old):
+                self.weakened(role, rule_id, old)
+
+    # R2-01: every clause of the two deferral rules is pinned; each change below must fail its rule.
+    DEFERRAL_MUTATIONS = (
+        ("orchestrator", "orch-deferral", "never defer a major, ", ""),
+        ("orchestrator", "orch-deferral", "file the follow-up issue from", "maybe file an issue from"),
+        ("orchestrator", "orch-deferral", "with all its labels (`target:<Mx>` per §3)", ""),
+        ("orchestrator", "orch-deferral", "If everything above nit was deferred and no commit followed the reviewed range, "
+         "post `accepted: all findings above nit deferred (#a, #b)` (verdict `ready_deferred`).", ""),
+        ("orchestrator", "orch-deferral", "Decide each recommendation by §2 from the finding's severity, `area` and `recommend`", ""),
+        ("orchestrator", "orch-deferral", "a minor or nit only once no blocker or major is open on the PR, and", ""),
+        ("orchestrator", "orch-deferral", "and it is not a regression this PR introduced", ""),
+        ("orchestrator", "orch-deferral", "the PR's own acceptance criteria and tests do not depend on it, ", ""),
+        ("orchestrator", "orch-deferral", "The 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings.", ""),
+        ("orchestrator", "orch-deferral", "and record a `decision` comment on the state issue", ""),
+        ("orchestrator", "orch-deferral", "Check that the returned issue carries every label; if one is missing, close it, keep the finding open, "
+         "stop deferring and ask the owner to do M0-O10.", ""),
+        ("reviewer", "reviewer-report-only", "A deferral that breaks `docs/FOLLOW-UPS.md` §2, or lacks its issue or decision record, "
+         "is itself a `major` finding (area `process`).", ""),
+        ("reviewer", "reviewer-report-only", "Re-check every deferral record you are given (issue, decision, section 2 rules).", ""),
+        ("implementer", "impl-deferral", "the orchestrator decides which minor/nit findings are deferred to follow-up issues (status `deferred`), "
+         "so fix everything it does not defer", "you may defer minor findings"),
+        ("implementer", "impl-deferral", " (finding id, severity, `area`, reason)", ""),
+        ("implementer", "impl-deferral", ", by the same §2 limits", ""),
+        ("implementer", "impl-deferral", "never a blocker; never a major, or a finding in the security-rules, sync-merge or release areas "
+         "or on a `risk:high` task, without owner OK",
+         "never a blocker, a major, or any finding in the security-rules, sync-merge or release areas or on a `risk:high` task without owner OK"),
+        ("implementer", "impl-deferral", "a minor or nit only once no blocker or major is open and the fix is not small; ", ""),
+        ("implementer", "impl-deferral", ", and with more than 8 open follow-ups for the milestone ask the owner", ""),
+        ("implementer", "impl-deferral", "post the `decision` comment and any `accepted:` comment (with its `metrics:round` block, "
+         "verdict `ready_deferred`) on the PR (§4, §6)", ""),
+    )
+
+    def test_each_deferral_clause_is_pinned(self):
+        for role, rule_id, old, new in self.DEFERRAL_MUTATIONS:
+            with self.subTest(role=role, old=old[:50]):
+                self.weakened(role, rule_id, old, new)
+
+    def test_deleting_any_sentence_of_a_deferral_paragraph_fails_its_rule(self):
+        """R2-01: no sentence or clause of the paragraph may be free text that nothing pins."""
+        for role, rule_id, end in (("orchestrator", "orch-deferral", " Collaborator inbox"), ("implementer", "impl-deferral", " Finish with")):
+            norm = prompt_rules.normalize(real(role))
+            m = re.search(r"Deferral \(.*?(?=" + re.escape(end) + ")", norm)
+            self.assertTrue(m, role)
+            for frag in re.split(r"[;:.]\s+", m.group(0)):
+                if len(frag.split()) >= 3:
+                    with self.subTest(role=role, fragment=frag[:60]):
+                        self.assertIn(rule_id, ids(prompt_rules.check_text(role, norm.replace(frag, "", 1))))
+
+    def test_deferral_paragraphs_carry_the_follow_ups_section_2_and_4_limits(self):
+        for role, blocker in (("orchestrator", "never defer a blocker; never defer a major"), ("implementer", "never a blocker; never a major")):
+            norm = prompt_rules.normalize(real(role))
+            for needle in (blocker, "security-rules, sync-merge or release", "`risk:high`", "owner OK",
+                           "more than 8 open follow-ups", "`decision` comment", "`ready_deferred`", "not small", "no blocker or major is open"):
+                self.assertIn(needle.lower(), norm.lower(), f"{role}: {needle}")
+
+    def test_deferral_with_owner_ok_for_a_blocker_is_rejected(self):
+        """R2-02: FOLLOW-UPS 2 says blockers are never deferred, owner OK or not."""
+        for role in ("orchestrator", "implementer"):
+            norm = prompt_rules.normalize(real(role))
+            self.assertNotRegex(norm, r"never defer a blocker, a major")
+
+    def test_an_implementer_prompt_that_lets_it_defer_alone_is_rejected(self):
+        """R1-01: the old wording let an implementer defer a protected-area minor itself."""
+        old = ("once no blocker or major is open, minor/nit findings may be deferred to follow-up issues "
+               "(status `deferred`, link the issue)")
+        text = prompt_rules.normalize(real("implementer"))
+        self.assertNotIn(old, text)
+        self.assertIn("impl-deferral", ids(prompt_rules.check_text("implementer", old)))
+
+    def test_reviewer_rule_rejects_a_prompt_that_lets_the_reviewer_push(self):
+        text = real("reviewer").replace("NEVER edit or push the PR branch", "You may fix the PR branch")
+        self.assertIn("reviewer-report-only", ids(prompt_rules.check_text("reviewer", text)))
 
 
 class Round1Tests(unittest.TestCase):
@@ -326,7 +471,7 @@ class M025Tests(unittest.TestCase):
         start = text.index("`send_later`")
         pos = [text.index(x, start) for x in steps]
         self.assertEqual(pos, sorted(pos))
-        for a, b in zip(steps, steps[1:]):
+        for a, b in itertools.pairwise(steps):
             swapped = text.replace(a, "@@A@@").replace(b, a).replace("@@A@@", b)
             with self.subTest(swap=(a, b)):
                 self.assertIn("usage-pause-protocol", ids(prompt_rules.check_text("orchestrator", swapped)))

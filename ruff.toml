@@ -1,0 +1,7 @@
+# ruff check only (no ruff format: deferred, D6). Owner-controlled; see .github/CODEOWNERS.
+# 160 columns: the longest existing Python lines (docstrings, long asserts) are about 190, almost all under 120.
+line-length = 160
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "B", "UP", "SIM"]

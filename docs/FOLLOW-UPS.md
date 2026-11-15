@@ -5,7 +5,7 @@ real but not worth blocking the merge becomes a **follow-up**: a GitHub issue th
 burn-down task must clear before the milestone closes.
 
 Canonical for this process. `docs/ORCHESTRATION.md` links here; `REVIEW.md` and the role prompts are
-aligned to it by task M0-11 (section 8). Until then this file wins where they disagree.
+aligned to it by task M0-11 (section 8, delivered). This file wins where they still disagree.
 
 ## 1. Design, and what changed from the first proposal
 
@@ -139,8 +139,8 @@ label (the API can drop labels silently, e.g. without push access). If any is mi
 | `area:security-rules`, `area:sync-merge`, `area:release` | Only when the finding has that area |
 | `owner-ok` | Owner approved the deferral (required for majors and protected areas) |
 
-Body template (copy exactly; `.github/` is a protected path, so the template lives here until M0-11 adds
-it as `.github/ISSUE_TEMPLATE/follow-up.md`, section 8):
+Body template (copy exactly; `.github/` is a protected path, so it is mirrored in
+`.github/ISSUE_TEMPLATE/follow-up.md` (M0-11; `scripts/hooks/test_wiring.py` checks its fields), section 8):
 
 ```markdown
 **Finding:** R9-03 (<severity>, area: <general|security-rules|sync-merge|release|process>)
@@ -178,7 +178,7 @@ with its milestone's own count. `tasks.py followups` lists them by severity; `dr
 
 **State issue**: one line `Follow-ups: <summary from tasks.py followups>` (template updated in `orchestrator-state.md`).
 
-**Protected files for task M0-11** (a `LISTICLES_TASK=tooling` session; this PR does not touch them):
+**Protected files for task M0-11** (a `LISTICLES_TASK=tooling` session; delivered by M0-11, except that the PreToolUse guard already allowed the read-only mentions below, so it needed no change, only regression tests):
 
 | File | Change |
 |---|---|

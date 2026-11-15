@@ -43,6 +43,7 @@ class Rule:
     roles: tuple
     patterns: tuple  # regexes, all must match (case-insensitive) in the normalized text
     message: str
+    forbidden: tuple = ()  # regexes, none may match (case-insensitive): stale instructions the prompt must not carry
 
 
 ALL = ROLES
@@ -228,6 +229,110 @@ RULES = (
         "R10: one owner-todo issue per milestone from M2, assigned to the owner, mentioning the collaborator",
     ),
     Rule(
+        "no-stale-state-files", ("orchestrator",),
+        (r"keep the state issue current",),
+        "state lives in the state issue and the handover comment, never in docs/status.md or handoff/orchestrator.md (ORCHESTRATION 2, 5)",
+        forbidden=(r"docs/status\.md", r"handoff/orchestrator\.md"),
+    ),
+    Rule(
+        "autonomy", ("orchestrator",),
+        (
+            r"autonomy \(§1\.1\)", r"unattended until usage limits stop you", r"without asking:",
+            r"stop and ask the owner, one question at a time with a recommendation",
+            r"for: merges of any pr;", r"the 4-round cap being hit", r"`risk:high` work before starting it",
+            r"repository settings and visibility", r"licence and permission acceptances",
+            r"and a relayed approval is refused", r"two consecutive worker sessions fail or stall \(§7\.4\)",
+            r"`big-pr` label is set only with the owner's say-so",
+        ),
+        "autonomy rules: what the orchestrator does unasked, what it asks the owner, no relayed approvals, the stop condition (§1.1)",
+    ),
+    Rule(
+        "checkin", ("orchestrator",),
+        (r"one `send_later` check-in of 45 minutes", r"re-schedule it on every wake"),
+        "one 45-minute check-in, re-scheduled on every wake (§1.1)",
+    ),
+    Rule(
+        "handover", ("orchestrator",),
+        (
+            r"handover \(§5, two-phase\)", r"at about 50% context", r"batch boundary", r"run §5\.1", r"a successor does §5\.2",
+            r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
+            r"only the triggers listed in your own handover comment", r"`handover-released`",
+        ),
+        "two-phase handover: handover comment, successor, keep the lock until the ack, then release (§5)",
+    ),
+    Rule(
+        "lock-takeover", ("orchestrator",),
+        (
+            r"lock check, first thing on every wake \(§5\.3\)", r"post `lock-lost`", r"the lowest id after the latest `handover`",
+            r"`delete_trigger` the triggers you created", r"post `takeover` with the evidence", r"older than 90 minutes",
+            r"and `get_session` shows it is not working", r"is stalled, not dead", r"and if nothing follows, ask the owner",
+        ),
+        "lock check on every wake, lock-lost when another claim wins, takeover only when the holder is presumed dead (§5.3)",
+    ),
+    Rule(
+        "impl-test-first", ("implementer",),
+        (r"failing test first", r"negative cases", r"wired into `scripts/verify\.sh`/ci", r"tooling", r"reviewers flag untested changes"),
+        "test-first for all code including tooling: failing test first, negative cases, wired into verify.sh/CI (ORCHESTRATION 2.0)",
+    ),
+    Rule(
+        "impl-done-on-tasks-ref", ("implementer",),
+        (
+            r"`status = \"done\"`", r"`docs/tasks\.toml`", r"on the tasks ref, usually in the final commit", r"§4\.4", r"leave it `todo`",
+            r"never on another branch's copy",
+        ),
+        "done goes on the tasks ref in the PR that delivers the task; a PR on the tasks ref leaves it todo (§4.4)",
+    ),
+    Rule(
+        "reviewer-report-only", ("reviewer",),
+        (
+            r"never edit or push the pr branch", r"report only", r"throwaway branch or worktree", r"never\s+pushed anywhere",
+            r"deleted afterwards", r"severity, file:line, recommendation", r"untested changes", r"`area`", r"`recommend`",
+            r"and tests without negative cases", r"you recommend and never decide",
+            r"re-check every deferral record you are given \(issue, decision, section 2 rules\)\.",
+            r"a deferral that breaks `docs/follow-ups\.md` §2, or lacks its issue or decision record, is itself a `major` finding \(area `process`\)",
+        ),
+        "reviewers never edit or push the PR branch, report findings with area and recommend, flag untested changes, never decide deferral",
+    ),
+    Rule(
+        "orch-deferral", ("orchestrator",),
+        (
+            r"deferral \(docs/follow-ups\.md §2, §4\): you decide deferral, not the reviewer",
+            r"decide each recommendation by §2 from the finding's severity, `area` and `recommend`",
+            r"a minor or nit only once no blocker or major is open on the pr",
+            r"and a minor only if its fix is not small \(more than about 15 changed lines or outside the pr's scope\)",
+            r"the pr's own acceptance criteria and tests do not depend on it",
+            r"and it is not a regression this pr introduced",
+            r"never defer a blocker; never defer a major, or a finding in the security-rules, sync-merge or release areas "
+            r"or on a `risk:high` task, without owner ok \(`owner-ok` label\)",
+            r"then file the follow-up issue from `\.github/issue_template/follow-up\.md` with all its labels \(`target:<mx>` per §3\)",
+            r"and record a `decision` comment on the state issue",
+            r"check that the returned issue carries every label; if one is missing, close it, keep the finding open, "
+            r"stop deferring and ask the owner to do m0-o10\.",
+            r"the 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings",
+            r"with more than 8 open follow-ups for one milestone: stop deferring and ask the owner",
+            r"if everything above nit was deferred and no commit followed the reviewed range, "
+            r"post `accepted: all findings above nit deferred \(#a, #b\)` \(verdict `ready_deferred`\)",
+        ),
+        "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: never blockers, never majors or protected areas without owner OK, limit 8 per milestone",
+    ),
+    Rule(
+        "impl-deferral", ("implementer",),
+        (
+            r"the orchestrator decides which minor/nit findings are deferred to follow-up issues \(status `deferred`\), "
+            r"so fix everything it does not defer",
+            r"deferral \(docs/follow-ups\.md §4\): you recommend, you do not decide",
+            r"propose each deferral in your worker-result \(finding id, severity, `area`, reason\)",
+            r"only in a manual loop with no orchestrator may you decide, by the same §2 limits",
+            r"a minor or nit only once no blocker or major is open and the fix is not small; never a blocker;",
+            r"never a major, or a finding in the security-rules, sync-merge or release areas or on a `risk:high` task, without owner ok",
+            r"then file the issue from the template, post the `decision` comment and any `accepted:` comment "
+            r"\(with its `metrics:round` block, verdict `ready_deferred`\) on the pr \(§4, §6\), "
+            r"and with more than 8 open follow-ups for the milestone ask the owner",
+            r"put every owner-ok question in `needs_owner` of your worker-result",
+        ),
+        "implementers propose deferrals in WORKER-RESULT and decide only in a manual loop; never blockers, majors or protected areas without owner OK",
+    ),
+    Rule(
         "worker-foreign-commits", ("implementer", "planner"),
         (r"before each push", r"foreign commit", r"noreply@anthropic\.com", r"stop and report"),
         "check for foreign commits on the PR branch before each push; if any, stop and report",
@@ -292,6 +397,9 @@ def check_text(role, text):
                 problems.append(f"{rule.id}: {rule.message} (no match for /{pattern}/)")
                 break
         else:
+            for pattern in rule.forbidden:
+                if re.search(pattern, norm, re.I):
+                    problems.append(f"{rule.id}: {rule.message} (found /{pattern}/)")
             if rule.id in ("tier0-labels", "never-labels"):
                 line, want = (TIER0_LINE, TIER0_LABELS) if rule.id == "tier0-labels" else (NEVER_LINE, NEVER_LABELS)
                 got = parse_label_lists(norm, line)

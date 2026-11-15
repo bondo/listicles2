@@ -544,9 +544,8 @@ class Fetch(unittest.TestCase):
 
     def test_repo_must_look_like_owner_slash_name(self):
         for bad in ("", "noslash", "a/b/c", "a/b; rm -rf /", "../x", "a b/c"):
-            with self.subTest(bad):
-                with self.assertRaises(status_fetch.FetchError):
-                    status_fetch.fetch(FakeApi(), bad)
+            with self.subTest(bad), self.assertRaises(status_fetch.FetchError):
+                status_fetch.fetch(FakeApi(), bad)
 
 
 class GhApi(unittest.TestCase):

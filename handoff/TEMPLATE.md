@@ -29,4 +29,4 @@ scripts/verify.sh
 - <gotchas, environment quirks>
 
 ## Waiting on the owner
-- <owner task id / issue number only; details live in the issue (docs/ORCHESTRATION.md §4.5)>
+- <owner task id / issue number only; details live in the issue (docs/ORCHESTRATION.md §4.5). Never restate an owner to-do here>

@@ -8,8 +8,9 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 - Round N>1: only the commits since the last round, the open findings, and this file. Re-check each
   open finding, then review the new code. Do not re-review unchanged code.
 - Rely on CI for the full suite. Run targeted tests only when a finding needs proof.
-- **Reviewers never edit or push the PR branch.** Report only: severity, file:line, recommendation, and a recommended
-  disposition (`fix-now` or `defer`) per finding. The author fixes. A reviewer may use a throwaway branch or worktree to
+- **Reviewers never edit or push the PR branch.** Report only: severity, file:line, recommendation, and per finding an
+  `area` and a `recommend` (`fix-now` or `defer`, see Findings format). The reviewer recommends and never decides deferral:
+  the orchestrator (or the implementer in a manual loop) decides by `docs/FOLLOW-UPS.md`. The author fixes. A reviewer may use a throwaway branch or worktree to
   prove a finding; it is never pushed anywhere and is deleted afterwards.
 
 ## What to check
@@ -28,16 +29,16 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 10. **Test-first**: every code change, tooling included (hooks, scripts, guards, CI checks, metrics, status line), needs
     automated tests wired into `scripts/verify.sh` and CI, including negative cases (the check must fail on bad input).
     The commit order must show the failing test first, then the fix. Flag any untested change or untested tooling
-    (`major` when it is a gate or guard, otherwise `minor`).
+    (`major` when it is a gate or guard, otherwise `minor`; see Severity).
 11. **Android guidance**: code under `app/` follows `docs/ANDROID-BEST-PRACTICES.md` (implementers too); a deviation needs a recorded decision, otherwise `minor`.
 
 ## Severity
 | Severity | Meaning | Author must |
 |---|---|---|
 | `blocker` | Data loss or corruption, security hole, crash on a main path, or a broken build/gate. Must not merge. | Fix |
-| `major` | Wrong behavior in a realistic case, a test that cannot catch the bug it claims to, a weakened gate. | Fix |
-| `minor` | Real but low-impact: edge case, unclear code that invites bugs, missing non-critical test. | Fix, mark `disputed` with a reason, or `deferred` with an issue link (see Loop and cap) |
-| `nit` | Style, naming, wording, taste. | Optional |
+| `major` | Wrong behavior in a realistic case, a test that cannot catch the bug it claims to, a weakened gate, an untested gate, guard or other tooling check (item 10). | Fix, or `deferred` only with owner OK (`docs/FOLLOW-UPS.md`) |
+| `minor` | Real but low-impact: edge case, unclear code that invites bugs, other untested change or missing non-critical test (item 10). | Fix, mark `disputed` with a reason, or `deferred` per `docs/FOLLOW-UPS.md` with an issue link (see Loop and cap) |
+| `nit` | Style, naming, wording, taste. | Optional, or `deferred` per `docs/FOLLOW-UPS.md` |
 
 When unsure between two levels, choose the lower and say why. Do not pad: no findings is a valid result.
 Every finding must be checkable: cite file and line, and describe the failing input or scenario.
@@ -58,8 +59,10 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
       "title": "Short statement of the defect",
       "detail": "Failing scenario: input, expected, actual.",
       "recommendation": "What to change.",
-      "disposition": "fix-now",
-      "status": "open"
+      "status": "open",
+      "area": "general",
+      "recommend": "fix-now",
+      "recommend_reason": ""
     }
   ],
   "verdict": "changes_requested"
@@ -68,18 +71,23 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 
 - IDs are `R<round>-<nn>` and are stable; a finding keeps its ID in later rounds. When the repository has
   earlier review rounds recorded in commit messages or comments, continue the numbering from the last used.
-- `disposition` (recommended by the reviewer): `fix-now`, or `defer` (only for `minor`/`nit`, see below).
-- `status`: `open | fixed | disputed | withdrawn | deferred` (`deferred` = minor/nit moved to a follow-up issue; the author links it). The reviewer sets `fixed` or `withdrawn` after checking;
+- `area`: `security-rules | sync-merge | release | process | general`. Use the first three whenever the finding concerns Firestore
+  rules and their tests, offline/last-write-wins merge, or the release workflow (never deferred without owner OK, `docs/FOLLOW-UPS.md`).
+- `recommend` (the reviewer's advice, never a decision): `fix-now`, or `defer` (only for `minor`/`nit`, see below; blockers and majors are always `fix-now`).
+  `recommend_reason` is one line, required for `defer`. The decider (orchestrator, or the implementer in a manual loop) may still say fix-now.
+- `status`: `open | fixed | disputed | withdrawn | deferred` (`deferred` = moved to a follow-up issue by the decider, who links it). The reviewer sets `fixed` or `withdrawn` after checking;
   the author may set `disputed` with a reason in the PR, never `fixed`.
 - `verdict`: `changes_requested`, or `ready_nits_only` when nothing above `nit` is open, or every remaining minor is deferred.
+  `ready_deferred` and `cap_reached` are set by the decider, never by the reviewer.
 
 ## Loop and cap
 1. Author fixes everything above `nit` (or disputes with a reason; minors may be deferred, see below) and pushes.
 2. A new reviewer session runs the next round.
 3. When only nits or deferred minors remain the reviewer posts `ready_nits_only` and the owner squash-merges.
    Deferral: once no blocker or major is open, `minor` and `nit` findings may be deferred to follow-up issues instead of
-   another round. The author opens one issue per deferred finding (title, file:line, scenario) and links it in the PR.
-   Blockers and majors are never deferred.
-4. **Maximum 4 rounds.** If round 4 still has open findings above `nit` (deferred minors do not count), stop and report to the owner, who decides.
+   another round, by the rules and issue template of `docs/FOLLOW-UPS.md` (one issue per deferred finding: title, file:line, scenario; linked in the PR and its review table).
+   Blockers are never deferred; majors and protected areas only with owner OK. If every finding above `nit` was deferred and no commit
+   followed the reviewed range, the decider accepts the PR without another round (`ready_deferred`, `accepted:` comment): a second signal for the owner to merge.
+4. **Maximum 4 rounds per batch** (a one-batch PR: per PR; `docs/ORCHESTRATION.md` 6.2). The cap and the "only nits remain" test count only unresolved, non-deferred findings. If round 4 still has open findings above `nit` (deferred minors do not count), stop and report to the owner, who decides.
    Fixes made after round 4 are not re-reviewed unless the owner asks.
 5. Disputes: the reviewer either withdraws or restates with new evidence; the owner breaks ties.

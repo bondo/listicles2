@@ -147,7 +147,8 @@ class StatusWorkflow(unittest.TestCase):
         self.flagged(self.text.replace("      checks: read\n", ""), "job's permissions")
 
     def test_event_text_in_a_shell_step_is_flagged(self):
-        self.flagged(self.text.replace("python3 -I scripts/status_fetch.py", "echo ${{ github.event.issue.title }}\n          python3 -I scripts/status_fetch.py", 1), "interpolates")
+        injected = "echo ${{ github.event.issue.title }}\n          python3 -I scripts/status_fetch.py"
+        self.flagged(self.text.replace("python3 -I scripts/status_fetch.py", injected, 1), "interpolates")
 
     def test_other_secrets_are_flagged(self):
         self.flagged(self.text.replace("secrets.GITHUB_TOKEN", "secrets.MY_PAT", 1), "only GITHUB_TOKEN")

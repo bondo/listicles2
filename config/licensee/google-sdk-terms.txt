@@ -1,0 +1,6 @@
+# Google/Android SDK terms, approved per artifact (owner decision D3, issue #15).
+#
+# One line per artifact, added by the PR that first adds the dependency, and reviewed by the owner (CODEOWNERS covers config/).
+#   group:artifact:version  # reason the owner approved these terms
+# Exact coordinates only: no wildcards, and a version bump needs its own line. An unlisted artifact with these terms fails `licensee`.
+# Apache-2.0, MIT, BSD-2-Clause and BSD-3-Clause need no line.

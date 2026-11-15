@@ -15,7 +15,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 ISSUE_LABELS = (("owner-todo", "all"), ("needs-owner", "open"), ("blocked", "open"), ("follow-up", "open"))
@@ -91,7 +91,7 @@ def fetch(api, repo, sleep=time.sleep):
                     "number": int(i["number"]), "title": i.get("title", ""), "state": i.get("state", "open"),
                     "state_reason": i.get("state_reason"), "created_at": i.get("created_at"),
                     "labels": [x["name"] if isinstance(x, dict) else x for x in i.get("labels", [])]}
-    return {"fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "prs": prs,
+    return {"fetched_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), "prs": prs,
             "outside_questions": len(outside), "issues": [issues[k] for k in sorted(issues)]}
 
 

@@ -47,7 +47,8 @@ class Guard(unittest.TestCase):
     def dirty(self, on):
         p = os.path.join(self.d, "f.txt")
         if on:
-            open(p, "w").write("x")
+            with open(p, "w") as f:
+                f.write("x")
         elif os.path.exists(p):
             os.remove(p)
 
@@ -118,6 +119,26 @@ class Guard(unittest.TestCase):
             self.assertEqual(self.bash(c), 2, c)
         for c in ["cat CLAUDE.md", "grep -n x REVIEW.md", "ls .claude", "git log -- agents/"]:
             self.assertEqual(self.bash(c), 0, c)
+
+    def test_m011_harmless_mentions_are_allowed(self):
+        """M0-11 item 5: a harmless command that merely names a protected path, or says git inside quotes or a heredoc."""
+        self.dirty(False)
+        for c in ["ls .github", "wc -l REVIEW.md", "find .github -name '*.yml'", "tar czf /tmp/a.tgz agents/", "diff REVIEW.md /tmp/x",
+                  "cp REVIEW.md /tmp/x", "echo x > /tmp/CLAUDE.md", "echo x | tee /tmp/REVIEW.md", "git add CLAUDE.md",
+                  "git commit -m 'edit REVIEW.md and git push rules'", "echo 'use git push --force on main'", "grep -rn 'git stash' docs/",
+                  "cat <<'EOF' > /tmp/n.md\nit's the git workflow, \"unbalanced\nEOF",
+                  "git commit -m \"$(cat <<'EOF'\nUpdate REVIEW.md (git push rules)\nEOF\n)\"",
+                  "cd agents && ls", "for f in agents/prompts/*.md; do wc -l \"$f\"; done"]:
+            self.assertEqual(self.bash(c), 0, c)
+
+    def test_m011_harmful_forms_stay_blocked(self):
+        """The same paths and words, used to write or to run a forbidden git command, are still denied."""
+        self.dirty(False)
+        for c in ["perl -pi -e s/a/b/ REVIEW.md", "sed -i.bak s/a/b/ agents/prompts/reviewer.md", "dd if=/tmp/x of=CLAUDE.md",
+                  "echo x >> agents/roles.yaml", "bash -c 'echo x > REVIEW.md'", "cd agents && echo x > roles.yaml", "cd .github && touch x",
+                  "ln -sf /tmp/x CLAUDE.md", "git checkout main -- REVIEW.md", "git restore REVIEW.md",
+                  "python3 -c \"open('REVIEW.md','w').write('x')\"", "git push --force origin work", "git commit --no-verify -m x"]:
+            self.assertEqual(self.bash(c), 2, c)
 
     def test_other_tools_and_garbage(self):
         self.assertEqual(run("Read", {"file_path": "CLAUDE.md"}, self.d), 0)

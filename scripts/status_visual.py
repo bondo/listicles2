@@ -17,7 +17,7 @@ import json
 import re
 import sys
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -74,7 +74,7 @@ def _ts(value, what):
         raise StatusError(f"{what} must be an ISO 8601 time with a zone, like 2026-11-13T12:00:00Z") from None
     if dt.tzinfo is None:
         raise StatusError(f"{what} needs a time zone")
-    return dt.astimezone(timezone.utc)
+    return dt.astimezone(UTC)
 
 
 def _number(item, what):
@@ -316,7 +316,7 @@ def main(argv=None):
             data = json.loads(_read(args.input))
         except json.JSONDecodeError as e:
             raise StatusError(f"{args.input}: invalid JSON ({e.msg}, line {e.lineno})") from None
-        now = args.now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        now = args.now or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         model = build_model(_read(args.tasks), data, now)
         svg, js = render_svg(model), status_json(model)
         Path(args.svg).write_text(svg, encoding="utf-8")

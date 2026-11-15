@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agent_metrics as am  # noqa: E402  # justified: must follow the sys.path insert above
@@ -295,7 +296,7 @@ V1 = "2026-11-12,R1,65,10,4,3,2,1,1.50,2026-11-20"
 
 def review_row(**over):
     cols = REVIEW_HDR.split(",")
-    row = dict(zip(cols, V1.split(",")))
+    row = dict(zip(cols, V1.split(","), strict=True))
     row.update(over)
     return ",".join(row[c] for c in cols)
 
@@ -316,7 +317,7 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(rows[0]["row_type"], "review")
         for col in REVIEW_HDR.split(","):
-            self.assertEqual(rows[0][col], dict(zip(REVIEW_HDR.split(","), V1.split(",")))[col])
+            self.assertEqual(rows[0][col], dict(zip(REVIEW_HDR.split(","), V1.split(","), strict=True))[col])
 
     def test_run_ref_forms(self):
         for ref in ("65", "2026-W47", "2026-W01", "2026-W53", "M1", "M0.5"):
@@ -418,6 +419,27 @@ class ReviewTests(unittest.TestCase):
             self.assertIn("in.txt:3: ", err.getvalue())
             self.assertNotIn("Traceback", err.getvalue())
             self.assertFalse(dst.exists())
+
+    def test_unreadable_input_gives_the_clean_error_not_a_traceback(self):
+        with tempfile.TemporaryDirectory() as d:
+            bad, good, dst = Path(d, "bad.txt"), Path(d, "good.txt"), Path(d, "out.csv")
+            bad.write_text("x")
+            good.write_text(block("session", SESSION_HDR, "bad row"))
+            real = Path.read_text
+
+            def read_text(self, *args, **kwargs):
+                if self.name == "bad.txt":
+                    raise PermissionError(13, "Permission denied")
+                return real(self, *args, **kwargs)
+
+            out, err = io.StringIO(), io.StringIO()
+            with mock.patch.object(Path, "read_text", read_text), redirect_stdout(out), redirect_stderr(err):
+                code = am.main(["-o", str(dst), str(bad), str(good)])
+        self.assertEqual(code, 1)
+        self.assertIn("bad.txt: cannot read input (Permission denied)", err.getvalue())
+        self.assertIn("good.txt:", err.getvalue())  # the other file is still named correctly in its own error
+        self.assertNotIn("bad.txt:3", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
 
 
 if __name__ == "__main__":

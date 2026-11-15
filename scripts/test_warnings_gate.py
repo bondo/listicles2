@@ -35,7 +35,8 @@ BAD = {
     "warning-level-comma-list-split": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level', 'DEPRECATION:disabled,UNUSED_VARIABLE:error'])",
     "warning-level-comma-list-spaces": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:disabled , UNUSED_VARIABLE:error')",
     "warning-level-trailing-comma": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:disabled,')",
-    "warning-level-repeated-then-error": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level=DEPRECATION:disabled', '-Xwarning-level=DEPRECATION:error'])",
+    "warning-level-repeated-then-error": ("compilerOptions.freeCompilerArgs.addAll("
+                                         "['-Xwarning-level=DEPRECATION:disabled', '-Xwarning-level=DEPRECATION:error'])"),
     "warning-level-empty-value": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=')",
     "warning-level-bare-last": "compilerOptions.freeCompilerArgs.add('-Xwarning-level')",
     "warning-level-uppercase-error": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:ERROR')",
@@ -47,9 +48,8 @@ def gradle(*args, init=None):
     cmd = [os.path.join(ROOT, "gradlew"), "-q", "--console=plain", "--no-daemon", *args]
     tmp = None
     if init is not None:
-        tmp = tempfile.NamedTemporaryFile("w", suffix=".init.gradle", delete=False)
-        tmp.write(INIT % (TASK, init))
-        tmp.close()
+        with tempfile.NamedTemporaryFile("w", suffix=".init.gradle", delete=False) as tmp:
+            tmp.write(INIT % (TASK, init))
         cmd += ["-I", tmp.name]
     try:
         # Retry only Maven/Gradle 429 (rate limit) so a throttled download is not read as a test failure.
