@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 21/32 (65%) | 11 |
+| M0.5 | Product design and guardrails | 23/32 (71%) | 9 |
 | M1 | Accounts and households | 0/10 (0%) | 10 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,7 +62,7 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 21/32 done (65%), 11 open.
+**Progress:** 23/32 done (71%), 9 open.
 
 ### Tasks
 
@@ -71,7 +71,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | ready | all of M0 | planner |  |
 | M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | blocked | M0.5-01 | planner |  |
 | M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | blocked | M0.5-01, M0.5-16 | planner |  |
-| M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | in progress | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
+| M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | done | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
 | M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | ready | M0.5-05 | implementer |  |
 | M0.5-07 | ruff check (E,F,W,B,UP,SIM) and mypy (default) for scripts/, in verify.sh and CI (P3) | done | M0.5-05, M0-10 | implementer | [#79](https://github.com/bondo/listicles2/issues/79) |
@@ -86,7 +86,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-FU | Follow-up burn-down for M0.5 | blocked | M0.5-01, M0.5-02, M0.5-03, M0.5-04, M0.5-05, M0.5-06, M0.5-07, M0.5-08, M0.5-09, M0.5-10, M0.5-11, M0.5-12, M0.5-13, M0.5-14, M0.5-15, M0.5-16, M0.5-17, M0.5-18, M0.5-19, M0.5-20, M0.5-21, M0.5-22, M0.5-23, M0.5-24, M0.5-25, M0.5-26, M0.5-27 | implementer |  |
 | M0.5-27 | Status picture on the README&#58; scripts render docs/tasks.toml plus PR and issue state to an SVG, a… | done | none | implementer | [#71](https://github.com/bondo/listicles2/issues/71) |
 | M0.5-O1 | Approve stories, flow and design | owner to-do | M0.5-01, M0.5-02, M0.5-03 | owner |  |
-| M0.5-O2 | Pick the app and repo name from the shortlist | owner to-do | M0.5-04 | owner |  |
+| M0.5-O2 | Pick the app and repo name from the shortlist | done | M0.5-04 | owner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-O3 | Log collaborator decisions D1-D7, create the five labels, check Actions settings (C5) | done | none | owner |  |
 | M0.5-16 | COLLABORATING.md plus ORCHESTRATION, PLAN and orchestrator-state changes for the collaborator | done | M0.5-O3 | process | [#55](https://github.com/bondo/listicles2/issues/55) |
 | M0.5-17 | Issue forms for feedback, ideas and questions, with a test that parses them | done | M0.5-O3 | implementer |  |
@@ -110,28 +110,24 @@ flowchart LR
     n0["M0.5-01 User stories with acceptance criteria … (ready)"]:::ready
     n1["M0.5-02 App-flow diagram (docs/product/flow.… (blocked)"]:::blocked
     n2["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::blocked
-    n3["M0.5-04 App and repo name shortlist (#35;17): 5-8… (in progress)"]:::progress
-    n4["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (ready)"]:::ready
-    n5["M0.5-08 Firebase rules tests to strict TypeScri… (ready)"]:::ready
-    n6["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
-    n7["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
-    n8["M0.5-O2 Pick the app and repo name from the s… (owner to-do)"]:::owner
-    n9["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
-    n10["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
+    n3["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (ready)"]:::ready
+    n4["M0.5-08 Firebase rules tests to strict TypeScri… (ready)"]:::ready
+    n5["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
+    n6["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
+    n7["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
+    n8["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
     n0 --> n1
     n0 --> n2
+    n0 --> n5
+    n1 --> n5
+    n2 --> n5
+    n3 --> n5
+    n4 --> n5
+    n7 --> n5
     n0 --> n6
     n1 --> n6
     n2 --> n6
-    n3 --> n6
-    n4 --> n6
-    n5 --> n6
-    n9 --> n6
-    n0 --> n7
-    n1 --> n7
     n2 --> n7
-    n3 --> n8
-    n2 --> n9
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -179,7 +175,6 @@ flowchart LR
     n10["all of M0.5"]:::ext
     n11["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::ext
     n12["M0.5-08 Firebase rules tests to strict TypeScri… (ready)"]:::ext
-    n13["M0.5-O2 Pick the app and repo name from the s… (owner to-do)"]:::ext
     n10 --> n0
     n0 --> n1
     n0 --> n2
@@ -196,7 +191,6 @@ flowchart LR
     n4 --> n7
     n5 --> n7
     n6 --> n7
-    n13 --> n8
     n8 --> n9
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
@@ -239,7 +233,6 @@ Not planned yet.
 
 - **task** M0.5-02: waits on M0.5-01
 - **task** M0.5-03: waits on M0.5-01
-- **task** M0.5-FU: waits on M0.5-01, M0.5-02, M0.5-03 +4
+- **task** M0.5-FU: waits on M0.5-01, M0.5-02, M0.5-03 +3
 - **task** M0.5-O1: waits on M0.5-01, M0.5-02, M0.5-03
-- **task** M0.5-O2: waits on M0.5-04
 - **task** M0.5-26: waits on M0.5-03
