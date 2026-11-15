@@ -22,6 +22,7 @@ class PrePushHook(unittest.TestCase):
         os.makedirs(os.path.join(self.repo, "scripts", "hooks"))
         shutil.copy(os.path.join(ROOT, ".githooks", "pre-push"), os.path.join(self.repo, ".githooks", "pre-push"))
         shutil.copy(os.path.join(ROOT, "scripts", "hooks", "prepush_scope.py"), os.path.join(self.repo, "scripts", "hooks"))
+        shutil.copy(os.path.join(ROOT, "scripts", "hooks", "run_hook_tests.py"), os.path.join(self.repo, "scripts", "hooks"))
         self.stub("scripts/guards.sh", "exit ${STUB_GUARDS:-0}")
         self.stub("gradlew", 'echo called >> "$STUB_LOG"; exit ${STUB_GRADLE:-0}')
         self.hook_test(passes=True)
@@ -87,6 +88,15 @@ class PrePushHook(unittest.TestCase):
         self.hook_test(passes=False)
         rc, _ = self.push()
         self.assertNotEqual(rc, 0)
+        self.assertFalse(self.gradle_called())
+
+    def test_a_skipped_hook_test_blocks_the_push_and_skips_gradle(self):
+        """R12-04 (#28): the pre-push hook runs the skip gate, not a bare discover."""
+        self.commit("docs/a.md", "x")
+        with open(os.path.join(self.repo, "scripts", "hooks", "test_stub.py"), "w") as f:
+            f.write("import unittest as ut\n\nclass T(ut.TestCase):\n    @ut.sk" + "ip('later')\n    def test_x(self):\n        pass\n")
+        rc, out = self.push()
+        self.assertNotEqual(rc, 0, out)
         self.assertFalse(self.gradle_called())
 
     def test_failing_guards_block_before_anything_else(self):
