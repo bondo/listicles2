@@ -116,6 +116,23 @@ class CleanAndDisabledTests(GuardsCase):
         self.repo.commit()
         self.assertPasses()
 
+    def test_typealias_pattern_does_not_flag_production_types_named_disabled_in_on_for(self):
+        """R12-03 (#27): only the real JUnit Disabled* annotation names count, not any type that starts with them."""
+        self.repo.write("app/src/main/kotlin/Y.kt", "typealias A = DisabledInventory\ntypealias B = DisabledOnboardingStep\ntypealias C = DisabledForecast\n"
+                        "typealias D = DisabledIfaceNotes\ntypealias E = com.example.DisabledInput\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_typealias_pattern_still_flags_every_real_junit_disabled_annotation(self):
+        """R12-03 (#27) negative cases: the aliases the pattern was written for must keep failing."""
+        names = ["Disabled", "DisabledIf", "DisabledIfEnvironmentVariable", "DisabledIfEnvironmentVariables", "DisabledIfSystemProperty",
+                 "DisabledIfSystemProperties", "DisabledOnOs", "DisabledOnJre", "DisabledOnJreRange", "DisabledForJreRange", "DisabledInNativeImage"]
+        for name in names:
+            with self.subTest(name=name):
+                self.repo.write("core/src/test/kotlin/Z.kt", f"typealias Later = org.junit.jupiter.api.condition.{name}\n")
+                self.repo.commit()
+                self.assertFails("guard: disabled test:")
+
     def test_imported_python_skip_decorators_fail(self):
         """R10-10: the plain imported form."""
         for body in ("from unittest imp" + "ort skip\n@" + "skip('x')\n", "from unittest imp" + "ort skip" + "If\n@" + "skip" + "If(True, 'x')\n"):
