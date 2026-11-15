@@ -49,6 +49,20 @@ class Structure(unittest.TestCase):
         rows = [r for r in sec.splitlines() if r.startswith("| A-")]
         self.assertEqual([r.split("|")[1].strip() for r in rows], ["A-01", "A-02", "A-03", "A-O1", "A-04"])
 
+    def test_a_long_depends_on_list_is_never_cut_off(self):
+        # a burn-down task lists every task of its milestone; clipping the cell hid ids the graph only shows for open tasks
+        ids = [f"A-{n:02d}" for n in range(10, 40)]
+        extra = "".join(f'\n[[task]]\nid = "{i}"\ntitle = "t"\nmilestone = "A"\nstatus = "done"\nassignee = "implementer"\n'
+                        f'risk = "normal"\ndepends_on = []\n' for i in ids)
+        extra += ('\n[[task]]\nid = "A-FU"\ntitle = "Burn down"\nmilestone = "A"\nstatus = "todo"\nassignee = "implementer"\n'
+                  'risk = "normal"\ndepends_on = ' + json.dumps(ids) + "\n")
+        row = next(r for r in page(tasks=fx.TASKS + extra).splitlines() if r.startswith("| A-FU "))
+        deps = row.split("|")[4]
+        self.assertGreater(len(deps), 100)
+        for i in ids:
+            self.assertIn(i, deps)
+        self.assertNotIn("\u2026", deps)
+
     def test_rows_show_status_dependencies_and_who(self):
         rows = {r.split("|")[1].strip(): [c.strip() for c in r.strip().strip("|").split("|")]
                 for r in page().splitlines() if re.match(r"\| [AB]-", r)}
