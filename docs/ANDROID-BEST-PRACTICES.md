@@ -2,9 +2,10 @@
 
 Owner rule (issue #15, 2026-11-12): from M1 on, product code follows Google's Android guidance. Implementers cite this
 file in their prompts, reviewers check against it (`REVIEW.md` item 11), and a deviation needs a recorded decision
-(an ADR in `docs/adr/` or a `decision` comment on the state issue). **Status: approved. Approved by the owner 2026-11-15.**
+(an ADR in `docs/adr/` or a `decision` comment on the state issue). **Status: approved. Approved by the owner 2026-11-15.** Decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569
 
-Every item below was taken from a page that was fetched and read on 2026-11-12. Priorities in the architecture
+Every item below was taken from a page that was fetched and read on 2026-11-12, except the Play Data safety item in section 9
+(read 2026-11-15). Priorities in the architecture
 section ("strongly recommended" and so on) are Google's own labels. Google says these are recommendations, not strict requirements.
 
 **Status column**
