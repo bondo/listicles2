@@ -41,7 +41,8 @@ class MarkReadyGuard(unittest.TestCase):
         return run("Bash", {"command": c}, cwd or self.d, env)
 
     def test_exact_call_from_the_project_root_is_allowed(self):
-        for c in ["scripts/mark-ready.sh 1", "scripts/mark-ready.sh 86", "scripts/mark-ready.sh 123456", "scripts/mark-ready.sh 1\n", "  scripts/mark-ready.sh 1  "]:
+        for c in ["scripts/mark-ready.sh 1", "scripts/mark-ready.sh 86", "scripts/mark-ready.sh 123456",
+                  "scripts/mark-ready.sh 1\n", "  scripts/mark-ready.sh 1  "]:
             self.assertEqual(self.bash(c), 0, c)
 
     def test_only_the_whole_command_is_allowed_never_a_compound(self):
