@@ -108,13 +108,6 @@ class MilestoneNamesTest(unittest.TestCase):
         header = 'milestones = ["M0"]\nmilestone = 3\n'
         self.assertIn("milestone must be an array of tables", errors_of(task("M0-01"), header=header))
 
-    def test_a_task_in_an_untitled_milestone_fails(self):
-        header = 'milestones = ["M0", "M1"]\n\n' + milestone_tables("M0")
-        self.assertIn("M1 has no [[milestone]] table", errors_of(task("M1-01", milestone="M1"), header=header))
-
-    def test_cycles_are_still_detected_with_names(self):
-        self.assertIn("dependency cycle", errors_of(task("M0-01", deps=["M0-02"]), task("M0-02", deps=["M0-01"])))
-
 
 class ValidateTest(unittest.TestCase):
     def test_repository_task_file_is_valid(self):

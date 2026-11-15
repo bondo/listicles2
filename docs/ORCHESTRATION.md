@@ -176,10 +176,10 @@ Issues stay the place for owner to-dos, because the owner needs a clickable item
 ```toml
 milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]   # order = priority
 
-[[milestone]]             # one per milestone: the human-friendly name shown by the status picture (docs/STATUS.md)
+[[milestone]]             # one per milestone, shown by the status picture (docs/STATUS.md)
 id = "M0.5"
-title = "Product design and guardrails"   # at most 40 characters
-purpose = "User stories, app flow, design tokens and the guardrails."   # at most 110 characters
+title = "Product design and guardrails"   # <= 40 characters
+purpose = "User stories, app flow, design tokens, guardrails."   # <= 110
 
 [[task]]
 id = "M1-03"              # <milestone>-NN (agent) or <milestone>-O<n> (owner); stable, never reused

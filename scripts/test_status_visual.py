@@ -324,11 +324,9 @@ class RenderSvg(unittest.TestCase):
         for needle in ("A-02", "Ready thing", "in progress #20", "A-O1", "Owner thing", "owner to-do", "A-04", "Waits for the owner",
                        "blocked", "B-01", "Next milestone"):
             self.assertIn(needle, joined)
+        self.assertIn("ready", lines)
         self.assertIn("waits on A-O1 (owner)", lines)
         self.assertIn("waits on all of A", lines)
-
-    def test_ready_tasks_say_ready(self):
-        self.assertIn("ready", texts(self.svg()))
 
     def test_flagged_tasks_say_what_blocks_them(self):
         lines = texts(self.svg(issues=[issue(8, "A-02: waiting for the API", ["blocked"])]))
