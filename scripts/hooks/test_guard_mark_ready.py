@@ -41,8 +41,32 @@ class MarkReadyGuard(unittest.TestCase):
         return run("Bash", {"command": c}, cwd or self.d, env)
 
     def test_exact_call_from_the_project_root_is_allowed(self):
-        for c in ["scripts/mark-ready.sh 1", "scripts/mark-ready.sh 86", "scripts/mark-ready.sh 123456", "cd . && scripts/mark-ready.sh 7"]:
+        for c in ["scripts/mark-ready.sh 1", "scripts/mark-ready.sh 86", "scripts/mark-ready.sh 123456", "scripts/mark-ready.sh 1\n", "  scripts/mark-ready.sh 1  "]:
             self.assertEqual(self.bash(c), 0, c)
+
+    def test_only_the_whole_command_is_allowed_never_a_compound(self):
+        """R4-01: the guard hashes the wrapper before any part of the command runs, so anything that could run before (or beside) the call
+        could rewrite the wrapper after the hash. The call is allowed only as the entire command."""
+        d = repo()
+        install_wrapper(d)  # the pinned wrapper is present, so only the compound shape can cause the denial
+        call = "scripts/mark-ready.sh 1"
+        forms = [  # the review's four forms, then every other way to put something before, after or beside the call
+            "cp /tmp/x/mark-ready.sh scripts/ && " + call, "cp /tmp/x/mark-ready.sh scripts/ ; " + call,
+            "cp -t scripts /tmp/x/mark-ready.sh && " + call,
+            "sed -i 's/^exec gh/echo evil; exec gh/' scripts/*.sh && " + call,
+            "git checkout other && " + call, "git switch other; " + call,
+            "(sleep 1; cp /tmp/x/mark-ready.sh scripts/) & " + call,
+            "tar xf e.tar && " + call, "git apply p.diff && " + call,
+            "cd . && " + call, "true || " + call, "true | " + call, "echo x\n" + call, "echo x &\n" + call, "{ " + call + "; }", "( " + call + " )",
+            "! " + call, "if true; then " + call + "; fi", "sleep 1 & " + call,
+            call + " && cp /tmp/x/mark-ready.sh scripts/", call + " ; true", call + " || true", call + " | cat", call + " &", call + " & sleep 1",
+            call + "\nrm -rf x", call + " # comment", call + " $(true)", call + " `true`", call + " > /dev/null",
+            "bash -c '" + call + "'", "sh -c \"" + call + "\"", "eval '" + call + "'", "echo '" + call + "' | sh", "time " + call,
+        ]
+        for c in forms:
+            self.assertEqual(run("Bash", {"command": c}, d), 2, c)
+            self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 2, c + " (tooling)")
+        self.assertEqual(run("Bash", {"command": call}, d), 0)
 
     def test_any_other_form_is_denied(self):
         for c in ["scripts/mark-ready.sh", "scripts/mark-ready.sh 0", "scripts/mark-ready.sh 012", "scripts/mark-ready.sh 1234567",
