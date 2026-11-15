@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import status_visual  # noqa: E402  # justified: must follow the sys.path insert above
 
 MAX_PAGE_TITLE = 100
+MAX_DEPS_CELL = 2000  # ids are short; a burn-down task lists a whole milestone and must not lose any
 MAX_GRAPH_TITLE = 40
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 WORDS = {"done": "done", "dropped": "dropped", "ready": "ready", "review": "in progress", "blocked": "blocked", "owner": "owner to-do"}
@@ -55,7 +56,7 @@ def _ref(number, repo):
 
 def _deps(t):
     deps = [("all of " + d[len(status_visual.tasks.MILESTONE_DEP):]) if d.startswith(status_visual.tasks.MILESTONE_DEP) else d for d in t["deps"]]
-    return cell(", ".join(deps)) if deps else "none"
+    return cell(", ".join(deps), MAX_DEPS_CELL) if deps else "none"
 
 
 def _status(t, repo):
