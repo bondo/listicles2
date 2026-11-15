@@ -67,7 +67,7 @@ Renaming is a task for M1-01 to plan after the owner decides; nothing is renamed
 | Place | Current value | Cost to change |
 |---|---|---|
 | Android `applicationId` and `namespace` (`app/build.gradle.kts`) | `dev.listicles.app` | Cheap before the first release; **permanent once published on Play**; also changes the package directories and the Firebase Android app registration |
-| App label, English and Danish (`app_name` in `app/src/main/res/values/strings.xml` and `values-da/strings.xml`) | `Listicles` | Trivial; the Danish label may differ from the English one |
+| App label, English and Danish (`app_name` in `app/src/main/res/values/strings.xml` and `app/src/main/res/values-da/strings.xml`) | `Listicles` | Trivial; the Danish label may differ from the English one |
 | Firebase project (and project id) | not created yet in this repo | The project id cannot be changed later; display name can. Pick before creating it |
 | `google-services.json` package name | not committed | Must match `applicationId` |
 | GitHub repo `bondo/listicles2` | `listicles2` | GitHub redirects the old URL, but CI, badge URLs (README status image), CODEOWNERS and docs links must be updated; secrets and branch protection carry over |
