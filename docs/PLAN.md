@@ -229,7 +229,8 @@ enforce the rules rather than goodwill.
      for 0, 1 and many.
    * `unit`: JVM tests + Kover verify + PIT on `core/domain`
    * `firebase`: Firebase emulator (project `demo-listicles`, **no secrets needed**)
-     → Jest rules tests + Kotlin data-layer integration tests
+     → `tsc --noEmit` (strict), ESLint `strictTypeChecked` and Prettier over the TypeScript rules tests, then
+     Jest rules tests + Kotlin data-layer integration tests
    * `ui`: Compose UI tests on an API 34 emulator against the Firebase emulator,
      with accessibility checks turned on (`enableAccessibilityChecks`: touch target
      size, contrast, content descriptions). Roborazzi screenshot tests (JVM) in

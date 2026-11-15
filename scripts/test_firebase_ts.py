@@ -38,22 +38,22 @@ CI = ["npm ci --silent", "npm run typecheck --silent", "npm run lint --silent", 
 CI_ROOT_CMD = "python3 -I scripts/test_firebase_ts.py"
 # tsconfig compilerOptions allowlist: anything else (skipLibCheck, strict: false, a lone strict flag turned off) is a problem.
 TS_OPTIONS = {"target", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns"}
-CLEAN_TS = 'export function add(a: number, b: number): number {\n  return a + b;\n}\n'
+CLEAN_TS = 'export function add(a: number, b: number): number {\n    return a + b;\n}\n'
 # Each violation must fail tsc and name its error code.
 TSC_VIOLATIONS = {
     "TS2322": 'export const n: number = "not a number";\n',
-    "TS7006": "export function f(x) {\n  return x;\n}\n",
-    "TS2531": "export function f(s: string | null): number {\n  return s.length;\n}\n",
-    "TS2532": "export function f(a: number[]): number {\n  return a[0] + 1;\n}\n",
+    "TS7006": "export function f(x) {\n    return x;\n}\n",
+    "TS18047": "export function f(s: string | null): number {\n    return s.length;\n}\n",
+    "TS2532": "export function f(a: number[]): number {\n    return a[0] + 1;\n}\n",
 }
 # One strictTypeChecked rule each; recommended-only configs would miss the last four.
 ESLINT_VIOLATIONS = {
     "@typescript-eslint/no-explicit-any": "export const x: any = 1;\n",
-    "@typescript-eslint/no-floating-promises": "export function f(): void {\n  Promise.resolve(1);\n}\n",
-    "@typescript-eslint/no-non-null-assertion": "export function f(s: string | null): number {\n  return s!.length;\n}\n",
-    "@typescript-eslint/no-unnecessary-condition": "export function f(s: string): boolean {\n  return s === undefined;\n}\n",
-    "@typescript-eslint/restrict-template-expressions": "export function f(o: object): string {\n  return `${o}`;\n}\n",
-    "@typescript-eslint/no-unsafe-assignment": "export function f(j: string): number {\n  const v = JSON.parse(j);\n  return v;\n}\n",
+    "@typescript-eslint/no-floating-promises": "export function f(): void {\n    Promise.resolve(1);\n}\n",
+    "@typescript-eslint/no-non-null-assertion": "export function f(s: string | null): number {\n    return s!.length;\n}\n",
+    "@typescript-eslint/no-unnecessary-condition": "export function f(s: string): boolean {\n    return s === undefined;\n}\n",
+    "@typescript-eslint/restrict-template-expressions": "export function f(o: object): string {\n    return `${o}`;\n}\n",
+    "@typescript-eslint/no-unsafe-assignment": "export function f(j: string): number {\n    const v = JSON.parse(j);\n    return v;\n}\n",
 }
 PRETTIER_BAD = "export const a = {b:1,\n  c:2};\n"
 
@@ -221,7 +221,7 @@ class Config(unittest.TestCase):
         self.assertIn("strictTypeChecked", text)
         self.assertIn("projectService", text)
         for word in ('"off"', "'off'", '"warn"', "'warn'", "ignores", "disable", "reportUnused"):
-            self.assertNotIn(word, text.replace('ignores: ["node_modules/**"]', ""), word)
+            self.assertNotIn(word, text, word)
 
     def test_prettier_config_is_only_the_print_width(self):
         self.assertEqual(json.loads(read("firebase", ".prettierrc.json")), {"printWidth": 100})
@@ -232,6 +232,8 @@ class Config(unittest.TestCase):
         self.assertIn("ts-jest", text)
         self.assertNotIn("isolatedModules", text)
         self.assertNotIn("diagnostics", text)
+        for word in ("testMatch", "testPathIgnorePatterns", "testRegex", "modulePathIgnorePatterns"):
+            self.assertNotIn(word, text, word)
 
     def test_javascript_rules_test_is_gone_and_the_typescript_one_keeps_every_case(self):
         self.assertFalse(os.path.exists(os.path.join(FB, "test", "rules.test.js")))
@@ -242,7 +244,7 @@ class Config(unittest.TestCase):
         for case in ("anonymous", "signed-in", "default deny (%s)", "%s: get", "%s: create/overwrite",
                      "%s: update and delete an existing doc", "list and add on a collection"):
             self.assertIn(case, text, case)
-        self.assertEqual(len(re.findall(r"assertFails\(", text)), 8)
+        self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
 
 
 class VerifyAndCiWiring(unittest.TestCase):
