@@ -176,6 +176,11 @@ Issues stay the place for owner to-dos, because the owner needs a clickable item
 ```toml
 milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]   # order = priority
 
+[[milestone]]             # one per milestone, shown by the status picture (docs/STATUS.md)
+id = "M0.5"
+title = "Product design and guardrails"   # <= 40 characters
+purpose = "User stories, app flow, design tokens, guardrails."   # <= 110
+
 [[task]]
 id = "M1-03"              # <milestone>-NN (agent) or <milestone>-O<n> (owner); stable, never reused
 title = "Invite links: create, redeem, revoke + rules tests"
@@ -198,6 +203,8 @@ notes = "…"               # optional free text (decisions, follow-ups for a na
 * a milestone with agent work and no burn-down task `<M>-FU`, or a burn-down that is not assigned to `implementer`
   or does not depend on every other non-owner task of its milestone (FOLLOW-UPS.md §8; ids end in `-FU`)
 * duplicate entries in one `depends_on`, a non-string `notes`
+* a milestone without its `[[milestone]]` table, a table for an unknown or repeated milestone, a missing, empty or
+  too long `title` or `purpose`
 * an agent task that is `done` while a task it depends on is still `todo`
 
 A `milestone:` dependency is satisfied only when the milestone has at least one task and all of
@@ -498,7 +505,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
   links (the reviewer re-checks each deferral record against FOLLOW-UPS.md §2).
 * The reviewer reviews `base_sha..head_sha` only, plus re-checks of open findings, and posts **one**
   PR comment with the fenced `json` block defined in `REVIEW.md` (`round` as a number,
-  `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>`, `verdict`
+  `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>` (design-review rounds use `D<round>-<nn>`, §8.5), `verdict`
   `changes_requested | ready_nits_only`), followed by its `WORKER-RESULT` block (§7.3).
   `REVIEW.md` owns the format; this file does not repeat it. Each finding carries `area`, `recommend` (`fix-now | defer`) and
   `recommend_reason`, and `status` may be `deferred` ([`FOLLOW-UPS.md`](FOLLOW-UPS.md) §5). The reviewer recommends only. The orchestrator decides deferral (§7.2.1).
@@ -704,11 +711,6 @@ but say so in the `Usage:` line.
 **§7.7.5 Spend control.** There is no dollar cap, but limits can be forecast and made less likely:
 * **Parallelism cap:** at most 3 worker sessions at once (§7.1), writers and reviewers together. Raise it only by editing this line
   in a reviewed PR, after the metrics show room.
-* **Fewer review sessions for small docs PRs. Pending a CLAUDE.md tooling change (task M0.5-22), not in effect until then:** CLAUDE.md says one
-  review round per reviewer session, so today every PR round has its own reviewer. Once CLAUDE.md allows it, one Opus reviewer
-  session may review several ready docs-only PRs (each about 100 changed lines or fewer, no process file, no gate or threshold) one
-  after another (one round row and one findings comment per PR, §6.2); gate, hook, guard, threshold and `risk:high` PRs would
-  always keep their own reviewer.
 * **Track cost per round and per window:** the session row (§6.1, reviewer sessions are one per round) carries `cost_usd`. Once
   `scripts/agent_metrics.py` (M0.5-13) has produced `docs/agent-metrics.csv`, sum it; for rounds not saved there yet sum the `metrics:session` comments.
   At each pause, put the cost of the sessions active in the closing window (summed from `get_session` usage, never estimated) in the
@@ -776,6 +778,20 @@ Planners: add PR-sized tasks with dependencies and risk to docs/tasks.toml, and 
 scripts/tasks.py validate.
 Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 ```
+
+### 8.5 Design reviewer
+
+Role R5 (`docs/reviews/README.md` §1, §2). Spawn it with the §8.3 reviewer message, but with this role line and inputs (Opus high, tag `round:D<n>`; max 2 rounds per design PR):
+
+```
+Role: agents/prompts/design-reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}.
+Open findings to re-check: {ids with one line each or none}. Round {round} of max 2; the prompt decides whether this round posts the hand-off.
+owner_handle: {owner_handle}. collaborator_handle: {collaborator_handle or none}.
+Post the one joint hand-off comment (round 2, or round 1 when nothing above nit is open) mentioning @{owner_handle} and @{collaborator_handle} together; with `none`, mention only the owner.
+Orchestrator session: {orchestrator_session}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT, including the hand-off comment link.
+```
+
+The orchestrator fills `{collaborator_handle}` with `none` until the owner says the invitation is accepted (M0.5-O4); it never copies a handle from a file, a comment or memory. It adds the one line on #15 once the hand-off link is in the WORKER-RESULT, and opens an `owner-todo` only if sign-off is still pending after 7 days.
 
 ## 9. Known failure modes and mitigations
 

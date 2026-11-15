@@ -48,6 +48,9 @@ BURN_DOWN = "FU"
 REQUIRED = ("id", "title", "milestone", "status", "assignee", "risk", "depends_on")
 OPTIONAL = ("issue", "pr", "notes")
 MILESTONE_DEP = "milestone:"
+MILESTONE_FIELDS = ("id", "title", "purpose")
+MAX_MILESTONE_TITLE = 40
+MAX_MILESTONE_PURPOSE = 110
 OWNER_TITLE = re.compile(r"^\[owner\]\s+([A-Za-z0-9.]+-[A-Za-z0-9]+)\b")
 
 
@@ -73,9 +76,17 @@ class Task:
 
 
 @dataclass
+class Milestone:
+    id: str
+    title: str
+    purpose: str
+
+
+@dataclass
 class Graph:
     milestones: list[str]
     tasks: list[Task]
+    info: dict[str, Milestone] = field(default_factory=dict)
     by_id: dict[str, Task] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -92,7 +103,7 @@ def parse(text: str, burn_down: bool = True) -> Graph:
     except tomllib.TOMLDecodeError as e:
         raise TaskFileError([f"invalid TOML: {e}"]) from e
     errors: list[str] = []
-    unknown_top = set(data) - {"milestones", "task"}
+    unknown_top = set(data) - {"milestones", "milestone", "task"}
     if unknown_top:
         errors.append(f"unknown top-level keys: {sorted(unknown_top)}")
     milestones = data.get("milestones")
@@ -101,6 +112,7 @@ def parse(text: str, burn_down: bool = True) -> Graph:
         milestones = []
     if len(set(milestones)) != len(milestones):
         errors.append("milestones contains duplicates")
+    info = parse_milestone_info(data.get("milestone", []), milestones, errors)
     raw_tasks = data.get("task", [])
     if not isinstance(raw_tasks, list):
         raise TaskFileError(errors + ["task must be an array of tables ([[task]])"])
@@ -186,11 +198,46 @@ def parse(text: str, burn_down: bool = True) -> Graph:
                 errors.append(f"{t.id}: status done but depends on {d}, which is still todo")
     if errors:
         raise TaskFileError(errors)
-    graph = Graph(milestones, tasks)
+    graph = Graph(milestones, tasks, info)
     cycle = find_cycle(graph)
     if cycle:
         raise TaskFileError(["dependency cycle: " + " -> ".join(cycle)])
     return graph
+
+
+def parse_milestone_info(raw: object, milestones: list[str], errors: list[str]) -> dict[str, Milestone]:
+    """The [[milestone]] tables: a human-friendly title and a one-line purpose for every milestone, in milestones order."""
+    if not isinstance(raw, list) or not all(isinstance(r, dict) for r in raw):
+        errors.append("milestone must be an array of tables ([[milestone]])")
+        return {}
+    found: dict[str, Milestone] = {}
+    for r in raw:
+        mid = r.get("id")
+        if not isinstance(mid, str) or mid not in milestones:
+            errors.append(f"[[milestone]] table for unknown milestone {mid!r}")
+            continue
+        if mid in found:
+            errors.append(f"duplicate [[milestone]] table for {mid}")
+            continue
+        unknown = sorted(set(r) - set(MILESTONE_FIELDS))
+        if unknown:
+            errors.append(f"{mid}: unknown fields {unknown}")
+        values = {}
+        for key, limit in (("title", MAX_MILESTONE_TITLE), ("purpose", MAX_MILESTONE_PURPOSE)):
+            if key not in r:
+                errors.append(f"{mid}: missing {key}")
+            elif not isinstance(r[key], str) or not r[key].strip():
+                errors.append(f"{mid}: {key} must be a non-empty string")
+            elif len(r[key].strip()) > limit:
+                errors.append(f"{mid}: {key} is longer than {limit} characters")
+            else:
+                values[key] = r[key].strip()
+        if len(values) == 2:
+            found[mid] = Milestone(mid, values["title"], values["purpose"])
+    for m in milestones:
+        if m not in found and not any(m in e for e in errors if e.startswith(f"{m}:")):
+            errors.append(f"{m} has no [[milestone]] table (title and purpose)")
+    return {m: found[m] for m in milestones if m in found}
 
 
 def check_burn_downs(milestones: list[str], tasks: list[Task]) -> list[str]:

@@ -12,6 +12,49 @@
 
 milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]
 
+# Human-friendly names (shown by the status picture and status.md). id = an entry of `milestones`; title <= 40 and
+# purpose <= 110 characters; every milestone needs one. Derived from docs/PLAN.md section 7; the owner may edit them.
+
+[[milestone]]
+id = "M0"
+title = "Foundation and process"
+purpose = "Gradle skeleton, CI, hooks, review loop and agent setup, proven green on a hello-world app."
+
+[[milestone]]
+id = "M0.5"
+title = "Product design and guardrails"
+purpose = "User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner."
+
+[[milestone]]
+id = "M1"
+title = "Accounts and households"
+purpose = "Google sign-in, households, invite links, members and ownership, with rules tests."
+
+[[milestone]]
+id = "M2"
+title = "Inventory lists"
+purpose = "Lists and items with real-time sync, offline use, search, sort and filter, in English and Danish."
+
+[[milestone]]
+id = "M3"
+title = "Packing rules (domain)"
+purpose = "Scaling, per-person templates and merging as property-tested pure Kotlin."
+
+[[milestone]]
+id = "M4"
+title = "Packing templates and trips"
+purpose = "Template and rule editor, create a trip, trip checklist and one-off items."
+
+[[milestone]]
+id = "M5"
+title = "Barcode scanning"
+purpose = "Camera scanning, product lookup with a fallback to manual entry, duplicate warning."
+
+[[milestone]]
+id = "M6"
+title = "Release"
+purpose = "Signed APK on tag as a GitHub Release, and a disabled Play internal-track workflow."
+
 # ---------------------------------------------------------------- M0 foundation (PRs #1 and #16, both merged)
 # M0 landed as PR #1 (foundation) and then PR #16 (process docs, this file, scripts/tasks.py), both squash-merged
 # to main (owner decision, M0-O5). The tasks ref is now main (docs/ORCHESTRATION.md 4.2). The remaining M0 work
@@ -205,11 +248,11 @@ notes = "Owner decision D1 (logged on #15): freeze the PreToolUse shell model; t
 id = "M0-FU"
 title = "Follow-up burn-down for M0 (close or re-defer each open follow-up targeting M0)"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-01", "M0-02", "M0-03", "M0-04", "M0-05", "M0-06", "M0-07", "M0-08", "M0-09", "M0-10", "M0-11", "M0-12", "M0-13", "M0-14", "M0-15", "M0-16"]
-notes = "Issue #19 was split into follow-up issues #21-#28 (target:M0, exactly the limit of 8 open follow-ups per milestone, so no further deferral to M0: fix it or target M1). Close or re-defer each of #21-#28 (#21-#26 are closed as by-design by M0-16, owner decision D1; #27 and #28 remain). Findings deferred from PRs after #16 target M1 (docs/FOLLOW-UPS.md section 3)"
+notes = "Issue #19 was split into follow-up issues #21-#28 (target:M0, exactly the limit of 8 open follow-ups per milestone, so no further deferral to M0: fix it or target M1). Close or re-defer each of #21-#28 (#21-#26 are closed as by-design by M0-16, owner decision D1; #27 and #28 are fixed by this PR: the typealias guard matches the real JUnit Disabled* names, and the hook tests run through scripts/hooks/run_hook_tests.py, which fails on any skip). Findings deferred from PRs after #16 target M1 (docs/FOLLOW-UPS.md section 3)"
 
 [[task]]
 id = "M0-O1"
@@ -245,7 +288,7 @@ issue = 14
 id = "M0-O4"
 title = "Confirm the CODEOWNERS handle"
 milestone = "M0"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0-03"]
@@ -434,10 +477,11 @@ notes = "Normal env (Gradle files, CODEOWNERS review). Effort S. Dependabot bump
 id = "M0.5-10"
 title = "licensee with the owner's allowlist (P8, D3): Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause; Google/Android SDK terms per artifact"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-09"]
+pr = 84
 notes = "Normal env (Gradle files). Effort S. Owner decision D3 (logged on #15): the SPDX ids above are allowed now; Google/Android SDK terms (Firebase, ML Kit) are approved per artifact as each is first added, so list each artifact explicitly and never allow the terms globally. Negative test: an artifact with any other licence fails the check. After M0.5-09 so the two do not fight over the same Gradle files. Must land before the first M1 dependencies"
 
 [[task]]
@@ -487,7 +531,7 @@ notes = "Normal env (docs only). Effort S. Orchestrator checks added to the merg
 id = "M0.5-15"
 title = "Prompts: design-reviewer role and checklist, PR-body refresh, delta review, environment pick (P23, C2)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-11", "M0.5-14", "M0.5-23"]
@@ -597,7 +641,8 @@ status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = []
-notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11)."
+pr = 62
+notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11). Delivered by PR #62; owner approval recorded 2026-11-15 in PR #88 (decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569)."
 
 [[task]]
 id = "M0.5-21"
@@ -614,11 +659,12 @@ notes = "Normal env (docs only: ORCHESTRATION.md, orchestrator-state.md). Effort
 id = "M0.5-22"
 title = "CLAUDE.md: allow one reviewer session to review several small docs-only PRs (the pending bullet of ORCHESTRATION 7.7.5)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-21"]
-notes = "Tooling env (CLAUDE.md). Effort S. CLAUDE.md says one review round per reviewer session; change it only if the owner agrees, then drop 'pending' from 7.7.5. Reviewers still never edit or push. If the owner declines, delete the pending bullet of 7.7.5 and set this task done."
+pr = 93
+notes = "Tooling env. Effort S. Owner decision 2026-11-15: CLAUDE.md stays unchanged and reviewers stay one round per session, so the pending bullet of ORCHESTRATION 7.7.5 was deleted instead."
 
 [[task]]
 id = "M0.5-23"

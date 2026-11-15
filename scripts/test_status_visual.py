@@ -2,6 +2,7 @@
 Run: python3 -I scripts/test_status_visual.py"""
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,21 @@ NOW = "2026-11-13T12:00:00Z"
 
 TASKS = """
 milestones = ["A", "B", "C"]
+
+[[milestone]]
+id = "A"
+title = "Alpha name"
+purpose = "Build the alpha."
+
+[[milestone]]
+id = "B"
+title = "Beta name"
+purpose = "Build the beta."
+
+[[milestone]]
+id = "C"
+title = "Gamma name"
+purpose = "Build the gamma."
 
 [[task]]
 id = "A-01"
@@ -144,35 +160,60 @@ class BuildModel(unittest.TestCase):
     def test_current_milestone_is_the_first_unfinished_one(self):
         self.assertEqual(model()["current"], "A")
 
-    def test_chain_lists_open_tasks_with_state_and_unmet_dependencies(self):
-        chain = {t["id"]: t for t in model()["chain"]}
-        self.assertEqual(set(chain), {"A-02", "A-O1", "A-04"})
-        self.assertEqual(chain["A-02"]["state"], "ready")
-        self.assertEqual(chain["A-04"]["state"], "blocked")
-        self.assertEqual(chain["A-04"]["unmet"], ["A-O1"])
+    def test_milestones_carry_their_human_friendly_names(self):
+        ms = {m["id"]: m for m in model()["milestones"]}
+        self.assertEqual((ms["A"]["title"], ms["A"]["purpose"]), ("Alpha name", "Build the alpha."))
+        self.assertEqual(ms["C"]["title"], "Gamma name")
+        self.assertEqual([m["planned"] for m in model()["milestones"]], [False, False, True])
 
-    def test_open_pr_titled_with_a_task_id_puts_the_task_in_review(self):
-        chain = {t["id"]: t for t in model(prs=[pr(20, "A-02: do the thing")])["chain"]}
-        self.assertEqual(chain["A-02"]["state"], "in-review")
-        self.assertEqual(chain["A-02"]["pr"], 20)
+    def test_tasks_of_a_milestone_are_listed_in_order_with_a_visual_state(self):
+        ms = {m["id"]: m for m in model()["milestones"]}
+        tasks_a = {t["id"]: t for t in ms["A"]["tasks"]}
+        self.assertEqual([t["id"] for t in ms["A"]["tasks"]], ["A-01", "A-02", "A-03", "A-O1", "A-04"])
+        self.assertEqual({k: v["state"] for k, v in tasks_a.items()},
+                         {"A-01": "done", "A-02": "ready", "A-03": "dropped", "A-O1": "owner", "A-04": "blocked"})
+        self.assertEqual(tasks_a["A-04"]["unmet"], [{"ref": "A-O1", "owner": True, "milestone": False}])
+        self.assertEqual(tasks_a["A-04"]["deps"], ["A-O1"])
+        self.assertEqual(tasks_a["A-02"]["title"], "Ready thing")
+        self.assertEqual(tasks_a["A-O1"]["assignee"], "owner")
+
+    def test_milestone_dependencies_are_shown_as_a_milestone(self):
+        b01 = model()["milestones"][1]["tasks"][0]
+        self.assertEqual(b01["state"], "blocked")
+        self.assertEqual(b01["unmet"], [{"ref": "milestone:A", "owner": False, "milestone": True}])
+
+    def test_open_pr_titled_with_a_task_id_puts_the_task_in_progress(self):
+        tasks_a = {t["id"]: t for t in model(prs=[pr(20, "A-02: do the thing")])["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-02"]["state"], tasks_a["A-02"]["pr"]), ("review", 20))
 
     def test_a_draft_or_other_title_still_counts_only_by_leading_task_id(self):
-        chain = {t["id"]: t for t in model(prs=[pr(20, "mention A-02 in passing")])["chain"]}
-        self.assertEqual(chain["A-02"]["state"], "ready")
+        tasks_a = {t["id"]: t for t in model(prs=[pr(20, "mention A-02 in passing")])["milestones"][0]["tasks"]}
+        self.assertEqual(tasks_a["A-02"]["state"], "ready")
 
     def test_closed_completed_owner_issue_finishes_the_owner_task(self):
         closed = issue(7, "[owner] A-O1: do it", ["owner-todo"], state="closed", reason="completed")
-        chain = {t["id"]: t for t in model(issues=[closed])["chain"]}
-        self.assertNotIn("A-O1", chain)
-        self.assertEqual(chain["A-04"]["state"], "ready")
+        tasks_a = {t["id"]: t for t in model(issues=[closed])["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-O1"]["state"], tasks_a["A-04"]["state"]), ("done", "ready"))
 
-    def test_chain_is_capped_with_a_remainder_count(self):
-        extra = "".join(
-            f'\n[[task]]\nid = "A-{n:02d}"\ntitle = "t"\nmilestone = "A"\nstatus = "todo"\n'
-            f'assignee = "implementer"\nrisk = "normal"\ndepends_on = []\n' for n in range(10, 30))
-        m = model(tasks=TASKS + extra)
-        self.assertEqual(len(m["chain"]), status_visual.MAX_CHAIN)
-        self.assertEqual(m["chain_more"], 3 + 20 - status_visual.MAX_CHAIN)
+    def test_an_open_blocked_labelled_issue_or_pr_naming_the_task_flags_it(self):
+        flagged = issue(8, "A-02: waiting for the API", ["blocked"])
+        tasks_a = {t["id"]: t for t in model(issues=[flagged])["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-02"]["state"], tasks_a["A-02"]["flag"]), ("blocked", "#8"))
+        labelled_pr = dict(pr(21, "A-02: do the thing"), labels=["blocked"])
+        tasks_a = {t["id"]: t for t in model(prs=[labelled_pr])["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-02"]["state"], tasks_a["A-02"]["flag"]), ("blocked", "#21"))
+
+    def test_blocked_labels_on_closed_or_unrelated_items_flag_nothing(self):
+        items = [issue(8, "A-02: x", ["blocked"], state="closed", reason="completed"), issue(9, "no task id", ["blocked"]),
+                 issue(10, "A-02: y", ["follow-up"]), issue(11, "Z-99: unknown task", ["blocked"])]
+        tasks_a = {t["id"]: t for t in model(issues=items)["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-02"]["state"], tasks_a["A-02"]["flag"]), ("ready", None))
+
+    def test_an_owner_task_stays_an_owner_task_even_when_it_waits(self):
+        text = TASKS.replace('id = "A-O1"\ntitle = "Owner thing"\nmilestone = "A"\nstatus = "todo"\nassignee = "owner"\nrisk = "normal"\ndepends_on = []',
+                             'id = "A-O1"\ntitle = "Owner thing"\nmilestone = "A"\nstatus = "todo"\nassignee = "owner"\nrisk = "normal"\ndepends_on = ["A-02"]')
+        tasks_a = {t["id"]: t for t in model(tasks=text)["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-O1"]["state"], [u["ref"] for u in tasks_a["A-O1"]["unmet"]]), ("owner", ["A-02"]))
 
     def test_owner_queue_is_non_draft_prs_only(self):
         m = model(prs=[pr(20), pr(21, draft=True, ci="pending"), pr(22, ci="failing", behind=True)])
@@ -215,6 +256,24 @@ class BuildModel(unittest.TestCase):
         with self.assertRaises(status_visual.StatusError):
             status_visual.build_model("milestones = 3", data(), NOW)
 
+    def test_milestone_without_a_title_raises(self):
+        text = TASKS.replace('title = "Gamma name"\n', "")
+        with self.assertRaisesRegex(status_visual.StatusError, "has no title|missing"):
+            status_visual.build_model(text, data(), NOW)
+
+    def test_unknown_milestone_table_raises(self):
+        with self.assertRaisesRegex(status_visual.StatusError, "unknown milestone"):
+            status_visual.build_model(TASKS + '\n[[milestone]]\nid = "Z"\ntitle = "t"\npurpose = "p"\n', data(), NOW)
+
+    def test_dependency_cycles_still_raise(self):
+        text = TASKS.replace('risk = "normal"\ndepends_on = []\n\n[[task]]\nid = "A-04"', 'risk = "normal"\ndepends_on = ["A-04"]\n\n[[task]]\nid = "A-04"')
+        with self.assertRaisesRegex(status_visual.StatusError, "cycle"):
+            status_visual.build_model(text, data(), NOW)
+
+    def test_pr_labels_are_optional_and_must_be_strings(self):
+        d = data(prs=[dict(pr(20), labels=["blocked", 7, None])])
+        self.assertEqual(status_visual.build_model(TASKS, d, NOW)["queue"][0]["number"], 20)
+
     def test_bad_input_shape_raises(self):
         with self.assertRaises(status_visual.StatusError):
             status_visual.build_model(TASKS, {"prs": "nope", "issues": []}, NOW)
@@ -233,8 +292,100 @@ class RenderSvg(unittest.TestCase):
     def test_shows_milestones_chain_queue_blockers_and_stamp(self):
         svg = self.svg(prs=[pr(20)], issues=[issue(7, "[owner] A-O1: do it", ["owner-todo"])])
         joined = "\n".join(texts(svg))
-        for needle in ("A", "40%", "A-02", "A-04", "#20", "BLOCKERS", "#7", "3d", "2026-11-13 12:00 UTC"):
+        for needle in ("40%", "A-02", "A-04", "#20", "BLOCKERS", "#7", "3d", "2026-11-13 12:00 UTC", "Owner queue"):
             self.assertIn(needle, joined)
+
+    def test_each_milestone_is_a_card_with_id_prefixed_name_purpose_and_counts(self):
+        lines = texts(self.svg())
+        for needle in ("A Alpha name", "Build the alpha.", "40% 2/5", "B Beta name", "0% 0/1", "C Gamma name", "Build the gamma."):
+            self.assertIn(needle, lines)
+        self.assertEqual(sum(1 for line in lines if line.endswith("current")), 1)
+        self.assertIn("ready", lines)  # A-02 has no PR
+
+    def test_a_milestone_without_tasks_shows_its_planned_name_and_not_planned_yet(self):
+        lines = texts(self.svg())
+        self.assertEqual(lines.count("not planned yet"), 1)
+        self.assertIn("C Gamma name", lines)
+
+    def test_open_tasks_are_listed_in_full_with_a_status_word_and_what_they_wait_on(self):
+        lines = texts(self.svg(prs=[pr(20)]))
+        joined = "\n".join(lines)
+        for needle in ("A-02", "Ready thing", "in progress #20", "A-O1", "Owner thing", "owner to-do", "A-04", "Waits for the owner",
+                       "blocked", "B-01", "Next milestone"):
+            self.assertIn(needle, joined)
+        self.assertIn("waits on A-O1 (owner)", lines)
+        self.assertIn("waits on all of A", lines)
+
+    def test_flagged_tasks_say_what_blocks_them(self):
+        lines = texts(self.svg(issues=[issue(8, "A-02: waiting for the API", ["blocked"])]))
+        self.assertIn("blocked by #8", lines)
+
+    def test_finished_tasks_are_collapsed_into_a_count(self):
+        lines = texts(self.svg())
+        self.assertIn("2 done", lines)
+        joined = "\n".join(lines)
+        self.assertNotIn("Done thing", joined)
+        self.assertNotIn("Dropped thing", joined)
+
+    def test_a_fully_done_milestone_shows_only_its_count(self):
+        text = TASKS.replace('status = "todo"\nassignee = "implementer"\nrisk = "normal"\ndepends_on = ["milestone:A"]',
+                             'status = "done"\nassignee = "implementer"\nrisk = "normal"\ndepends_on = []')
+        lines = texts(status_visual.render_svg(model(tasks=text)))
+        self.assertIn("1 done", lines)
+        self.assertIn("100% 1/1", lines)
+
+    def test_big_milestones_show_a_capped_number_of_open_tasks_and_count_the_rest(self):
+        extra = "".join(
+            f'\n[[task]]\nid = "A-{n:02d}"\ntitle = "Extra {n}"\nmilestone = "A"\nstatus = "todo"\n'
+            f'assignee = "implementer"\nrisk = "normal"\ndepends_on = []\n' for n in range(10, 40))
+        lines = texts(status_visual.render_svg(model(tasks=TASKS + extra)))
+        shown = [line for line in lines if line.startswith("Extra ")]
+        self.assertEqual(len(shown), status_visual.MAX_OPEN_PER_MILESTONE - 3)  # A-02, A-O1 and A-04 come first
+        self.assertIn(f"+{3 + 30 - status_visual.MAX_OPEN_PER_MILESTONE} more open tasks", lines)
+
+    def test_the_svg_has_an_accessible_title_and_description(self):
+        root = ET.fromstring(self.svg(prs=[pr(20)]))
+        ns = "{http://www.w3.org/2000/svg}"
+        self.assertEqual(root.get("role"), "img")
+        self.assertEqual(root.find(ns + "title").text, "Listicles status")
+        desc = root.find(ns + "desc").text
+        self.assertIn("3 milestones", desc)
+        self.assertIn("Alpha name", desc)
+
+    def test_every_text_color_has_enough_contrast_on_its_background_in_both_schemes(self):
+        css = status_visual.CSS
+        light, dark = css.split("@media (prefers-color-scheme: dark){")
+        def fills(block):
+            return {m.group(1): m.group(2) for m in re.finditer(r"\.(\w+)\{fill:(#[0-9a-f]{3,6})\}", block)}
+        def lum(hexcolor):
+            if len(hexcolor) == 4:
+                hexcolor = "#" + "".join(c * 2 for c in hexcolor[1:])
+            ch = [int(hexcolor[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            ch = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in ch]
+            return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+        def ratio(a, b):
+            hi, lo = sorted((lum(a), lum(b)), reverse=True)
+            return (hi + 0.05) / (lo + 0.05)
+        base = fills(light)
+        scheme_light = dict(base)
+        scheme_dark = dict(base, **fills(dark))
+        for name, scheme in (("light", scheme_light), ("dark", scheme_dark)):
+            for bg in ("bg", "card"):
+                for fg in ("fg", "muted", "ok", "info", "warn", "bad"):
+                    with self.subTest(scheme=name, bg=bg, fg=fg):
+                        self.assertGreaterEqual(ratio(scheme[fg], scheme[bg]), 4.5)
+
+    def test_cards_and_markers_use_theme_classes_only(self):
+        svg = self.svg(prs=[pr(20)])
+        self.assertNotRegex(svg, r'fill="#|stroke="#|style="')
+        self.assertIn('class="card"', svg)
+
+    def test_task_states_have_distinct_marker_shapes(self):
+        extra = ('\n[[task]]\nid = "A-05"\ntitle = "Another ready thing"\nmilestone = "A"\nstatus = "todo"\n'
+                 'assignee = "implementer"\nrisk = "normal"\ndepends_on = []\n')
+        svg = self.svg(prs=[pr(20)], tasks=TASKS + extra)
+        for shape in ("mk-ready", "mk-progress", "mk-blocked", "mk-owner", "mk-done"):
+            self.assertIn(shape, svg)
 
     def test_is_deterministic(self):
         self.assertEqual(self.svg(prs=[pr(20)]), self.svg(prs=[pr(20)]))
@@ -268,6 +419,29 @@ class RenderSvg(unittest.TestCase):
                 self.assertNotIn("<script", svg)
                 self.assertNotIn("onload", svg.replace("onload=alert(1)&gt;", ""))
                 self.assertLess(len(svg), 40_000)
+
+    def test_hostile_task_and_milestone_text_is_escaped_clipped_and_well_formed(self):
+        nasty = ['<script>alert(1)</script>', '"><svg onload=alert(1)>', "a&b&amp;c", "</text></svg><svg>", "\u202eevil",
+                 "x" * 3000, "\u6f22" * 300, "<![CDATA[ x ]]>"]
+        for title in nasty:
+            with self.subTest(title=title[:20]):
+                text = (TASKS.replace('title = "Ready thing"', f"title = {json.dumps(title)}")
+                        .replace('title = "Alpha name"', f"title = {json.dumps(title[:30])}")
+                        .replace('purpose = "Build the alpha."', f"purpose = {json.dumps(title[:100])}"))
+                svg = status_visual.render_svg(model(tasks=text))
+                lines = texts(svg)  # raises unless well-formed
+                self.assertNotIn("<script", svg)
+                self.assertNotIn("<svg onload", svg)
+                self.assertLess(len(svg), 60_000)
+                for line in lines:
+                    self.assertLessEqual(status_visual.text_width(line), 140, line[:40])
+
+    def test_very_long_task_titles_are_truncated_with_an_ellipsis(self):
+        svg = self.svg(tasks=TASKS.replace("Ready thing", "R" * 400))
+        lines = [t for t in texts(svg) if t.startswith("R")]
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].endswith("…"))
+        self.assertLessEqual(status_visual.text_width(lines[0]), status_visual.MAX_TASK_TITLE)
 
     def test_every_text_has_a_fill_class_so_dark_mode_is_legible(self):
         svg = self.svg(prs=[pr(20), pr(21, ci="failing", behind=True)], issues=[
@@ -321,7 +495,7 @@ class RenderSvg(unittest.TestCase):
         self.assertEqual(out["generated_at"], NOW)
         self.assertEqual(out["current_milestone"], "A")
         self.assertEqual(out["owner_queue"], 1)
-        self.assertEqual(out["milestones"][0], {"id": "A", "done": 2, "total": 5})
+        self.assertEqual(out["milestones"][0], {"id": "A", "title": "Alpha name", "done": 2, "total": 5})
         self.assertIn("blockers", out)
 
 
@@ -392,9 +566,10 @@ class FakeApi:
         raise AssertionError(f"unexpected path {path}")
 
 
-def api_pr(number, sha, draft=False, title="t", repo="o/r", assoc="OWNER"):
+def api_pr(number, sha, draft=False, title="t", repo="o/r", assoc="OWNER", labels=()):
     head = {"sha": sha, "repo": {"full_name": repo} if repo else None}
-    return {"number": number, "title": title, "draft": draft, "head": head, "state": "open", "author_association": assoc}
+    return {"number": number, "title": title, "draft": draft, "head": head, "state": "open", "author_association": assoc,
+            "labels": [{"name": x} for x in labels]}
 
 
 def run(status, conclusion=None, name="unit"):
@@ -472,6 +647,11 @@ class Fetch(unittest.TestCase):
         self.assertEqual((prs[1]["draft"], prs[1]["behind"], prs[1]["title"]), (True, False, "T1"))
         self.assertTrue(prs[2]["behind"])
 
+    def test_pr_labels_are_kept_as_names(self):
+        api = FakeApi(pulls=[api_pr(1, "s1", labels=["blocked", "risk:high"]), api_pr(2, "s2")])
+        prs = {p["number"]: p for p in self.fetch(api)["prs"]}
+        self.assertEqual((prs[1]["labels"], prs[2]["labels"]), (["blocked", "risk:high"], []))
+
     def test_issues_are_merged_by_number_without_prs_and_labels_flattened(self):
         api = FakeApi(issues={
             "owner-todo": [api_issue(7, ["owner-todo", "needs-owner"]), api_issue(8, ["owner-todo"], state="closed")],
@@ -516,9 +696,8 @@ class Fetch(unittest.TestCase):
         real["state_reason"] = "completed"
         fake = api_issue(99, ["needs-owner"], title="[owner] A-O1 x", assoc="NONE")
         out = self.fetch(FakeApi(issues={"owner-todo": [real], "needs-owner": [fake]}))
-        chain = {t["id"]: t for t in status_visual.build_model(TASKS, out, NOW)["chain"]}
-        self.assertNotIn("A-O1", chain)
-        self.assertEqual(chain["A-04"]["state"], "ready")
+        tasks_a = {t["id"]: t for t in status_visual.build_model(TASKS, out, NOW)["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-O1"]["state"], tasks_a["A-04"]["state"]), ("done", "ready"))
 
     def test_owner_todo_includes_closed_issues_others_only_open(self):
         api = FakeApi()
