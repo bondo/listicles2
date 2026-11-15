@@ -12,6 +12,8 @@ import subprocess
 import tempfile
 import unittest
 
+import yaml
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 FB = os.path.join(ROOT, "firebase")
 BIN = os.path.join(FB, "node_modules", ".bin")
@@ -95,6 +97,27 @@ def ordered(text, commands):
     return True
 
 
+def casts(source):
+    """Type assertions (`x as T`, not `as const`) in TypeScript source, ignoring comments and `import * as ns` lines."""
+    found = []
+    for ln in source.splitlines():
+        code = ln.split("//")[0]
+        if code.lstrip().startswith("import ") or code.lstrip().startswith("} from"):
+            continue
+        found += re.findall(r"\bas\s+(?!const\b)[A-Za-z_(\[{]", code)
+    return found
+
+
+def dependabot_ignores_typescript_major(cfg):
+    """True if the npm entry for /firebase ignores semver-major updates of typescript."""
+    for entry in cfg.get("updates", []):
+        if entry.get("package-ecosystem") == "npm" and entry.get("directory") == "/firebase":
+            for rule in entry.get("ignore", []):
+                if rule.get("dependency-name") == "typescript" and "version-update:semver-major" in rule.get("update-types", []):
+                    return True
+    return False
+
+
 def tsconfig_problems(cfg):
     problems = []
     opts = cfg.get("compilerOptions", {})
@@ -172,6 +195,32 @@ class HelperNegativeCases(unittest.TestCase):
         self.assertFalse(ordered("step b two\nstep a one\n", ["one", "two"]))
         self.assertFalse(ordered("step a one\n", ["one", "two"]))
 
+    def test_cast_detector_finds_casts_and_ignores_comments_imports_and_as_const(self):
+        self.assertEqual(len(casts("const a = b as Foo;\n")), 1)
+        self.assertEqual(len(casts("const a = (b as unknown) as Foo;\n")), 2)
+        self.assertEqual(len(casts("const a = Object.keys(c) as (keyof T)[];\n")), 1)
+        self.assertEqual(casts("// the same as the modular call\n"), [])
+        self.assertEqual(casts("import * as fs from 'x';\nconst a = [1] as const;\n"), [])
+        self.assertEqual(casts('import {\n  a,\n  type B,\n} from "x";\n'), [])
+
+    def test_dependabot_check_rejects_a_missing_wrong_or_misplaced_ignore(self):
+        rule = {"dependency-name": "typescript", "update-types": ["version-update:semver-major"]}
+        good = {"updates": [{"package-ecosystem": "npm", "directory": "/firebase", "ignore": [rule]}]}
+        self.assertTrue(dependabot_ignores_typescript_major(good))
+        for name, cfg in {
+            "no ignore": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]},
+            "other package": {
+                "updates": [{"package-ecosystem": "npm", "directory": "/firebase", "ignore": [{**rule, "dependency-name": "eslint"}]}]
+            },
+            "minor only": {
+                "updates": [{"package-ecosystem": "npm", "directory": "/firebase", "ignore": [{**rule, "update-types": ["version-update:semver-minor"]}]}]
+            },
+            "other directory": {"updates": [{"package-ecosystem": "npm", "directory": "/", "ignore": [rule]}]},
+            "other ecosystem": {"updates": [{"package-ecosystem": "pip", "directory": "/firebase", "ignore": [rule]}]},
+        }.items():
+            with self.subTest(name):
+                self.assertFalse(dependabot_ignores_typescript_major(cfg))
+
     def test_tsconfig_allowlist_rejects_every_weakening(self):
         good = {
             "compilerOptions": {"strict": True, "noEmit": True, "noUncheckedIndexedAccess": True, "types": ["jest"]},
@@ -246,6 +295,15 @@ class Config(unittest.TestCase):
             self.assertIn(case, text, case)
         self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
 
+    def test_rules_test_has_no_type_assertions(self):
+        self.assertEqual(casts(read("firebase", "test", "rules.test.ts")), [])
+
+    def test_dependabot_ignores_typescript_majors_for_the_firebase_directory(self):
+        self.assertTrue(dependabot_ignores_typescript_major(yaml.safe_load(read(".github", "dependabot.yml"))))
+
+    def test_fixture_directories_are_gitignored(self):
+        self.assertIn("firebase/fixture-tmp-*/", active_lines(read(".gitignore")))
+
 
 class VerifyAndCiWiring(unittest.TestCase):
     def test_verify_runs_install_checks_tests_and_rules_in_order_even_in_fast_mode(self):
@@ -307,6 +365,14 @@ class Behaviour(unittest.TestCase):
             with self.subTest(tool=args[0]):
                 code, out = tool(*args)
                 self.assertEqual(code, 0, out)
+
+
+class NoLeftovers(unittest.TestCase):
+    """unittest loads classes alphabetically, so this one runs after Behaviour, which creates the fixture directories."""
+
+    def test_no_fixture_directory_is_left_behind(self):
+        left = [d for d in os.listdir(FB) if d.startswith("fixture-tmp-")]
+        self.assertEqual(left, [])
 
 
 if __name__ == "__main__":
