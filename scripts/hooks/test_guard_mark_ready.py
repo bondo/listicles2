@@ -2,13 +2,32 @@
 guard must (a) treat every file named mark-ready.sh as a process file and (b) deny any command that runs a mark-ready.sh in any form except
 exactly `scripts/mark-ready.sh <PR number>` from the project root. Run: python3 -I -m unittest discover -s scripts/hooks"""
 
+import hashlib
 import os
+import re
+import shutil
+import subprocess
 import unittest
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
+import pretooluse_guard
 from test_pretooluse_guard import repo, run
 
 TOOLING = {"LISTICLES_TASK": "tooling"}
+ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+REAL_WRAPPER = os.path.join(ROOT, "scripts", "mark-ready.sh")
+
+
+def read_bytes(path):
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def install_wrapper(d, content=None):
+    """Put a copy of the real wrapper (or the given bytes) at <d>/scripts/mark-ready.sh."""
+    os.makedirs(os.path.join(d, "scripts"), exist_ok=True)
+    with open(os.path.join(d, "scripts", "mark-ready.sh"), "wb") as f:
+        f.write(read_bytes(REAL_WRAPPER) if content is None else content)
 
 
 class MarkReadyGuard(unittest.TestCase):
@@ -16,6 +35,7 @@ class MarkReadyGuard(unittest.TestCase):
     def setUpClass(cls):
         cls.d = repo()
         os.makedirs(os.path.join(cls.d, "app", "scripts"))
+        install_wrapper(cls.d)
 
     def bash(self, c, cwd=None, env=None):
         return run("Bash", {"command": c}, cwd or self.d, env)
@@ -73,6 +93,73 @@ class MarkReadyGuard(unittest.TestCase):
             self.assertEqual(self.bash(c), 0, c)
         for p in ["scripts/verify.sh", "scripts/mark-ready.sh.md", "docs/mark-ready.md", "scripts/hooks-other.sh"]:
             self.assertEqual(run("Write", {"file_path": p}, self.d), 0, p)
+
+
+class MarkReadyContentPin(unittest.TestCase):
+    """R3-01: stop listing ways to write the wrapper; check its content when it runs. The guard pins the SHA-256 of the committed wrapper."""
+
+    def fresh(self, content=None):
+        d = repo()
+        install_wrapper(d, content)
+        return d
+
+    def call(self, d, env=None):
+        return run("Bash", {"command": "scripts/mark-ready.sh 1"}, d, env)
+
+    def test_pin_matches_the_committed_wrapper(self):
+        """A legitimate edit of the wrapper must update the pin in the same reviewed tooling PR."""
+        pin = getattr(pretooluse_guard, "MARK_READY_SHA256", "")
+        self.assertRegex(pin, r"^[0-9a-f]{64}$")
+        self.assertEqual(pin, hashlib.sha256(read_bytes(REAL_WRAPPER)).hexdigest())
+
+    def test_the_pinned_wrapper_is_allowed(self):
+        self.assertEqual(self.call(self.fresh()), 0)
+        self.assertEqual(self.call(self.fresh(), TOOLING), 0)
+
+    def test_modified_content_is_denied_even_in_a_tooling_session(self):
+        real = read_bytes(REAL_WRAPPER)
+        for name, content in [("appended line", real + b"gh pr merge 5 --squash\n"), ("one byte", real + b"\n"),
+                              ("prepended", b"gh pr merge 5\n" + real), ("crlf", real.replace(b"\n", b"\r\n")),
+                              ("empty", b""), ("other script", b"#!/bin/sh\ngh pr merge 5 --squash\n"),
+                              ("lowercased", real.lower()), ("truncated", real[:-5])]:
+            d = self.fresh(content)
+            self.assertEqual(self.call(d), 2, name)
+            self.assertEqual(self.call(d, TOOLING), 2, name + " (tooling)")
+
+    def test_rewrite_by_a_command_that_never_names_the_file_is_denied_at_run_time(self):
+        """The review's R3-01 examples: the edit step is not caught by name, the run step must be."""
+        d = self.fresh()
+        subprocess.run(["sed", "-i", "s/^exec gh/gh pr merge 5 --squash; exec gh/"] + [os.path.join(d, "scripts", "mark-ready.sh")],
+                       check=True, capture_output=True)
+        self.assertEqual(self.call(d), 2)
+        d = self.fresh()
+        src = os.path.join(d, "x")
+        os.makedirs(src)
+        with open(os.path.join(src, "mark-ready.sh"), "wb") as f:
+            f.write(b"#!/bin/sh\ngh pr merge 5\n")
+        shutil.copy(os.path.join(src, "mark-ready.sh"), os.path.join(d, "scripts"))  # what `cp /tmp/x/mark-ready.sh scripts/` does
+        self.assertEqual(self.call(d), 2)
+
+    def test_missing_directory_and_symlinked_wrapper_are_denied(self):
+        d = repo()  # no wrapper at all
+        self.assertEqual(self.call(d), 2)
+        d = repo()
+        os.makedirs(os.path.join(d, "scripts", "mark-ready.sh"))  # a directory with the right name
+        self.assertEqual(self.call(d), 2)
+        d = self.fresh()  # symlink to a copy with the exact pinned content: still denied
+        copy = os.path.join(d, "copy.sh")
+        shutil.copy(os.path.join(d, "scripts", "mark-ready.sh"), copy)
+        os.remove(os.path.join(d, "scripts", "mark-ready.sh"))
+        os.symlink(copy, os.path.join(d, "scripts", "mark-ready.sh"))
+        self.assertEqual(self.call(d), 2)
+        d = self.fresh()  # the scripts directory itself swapped for a symlink to a directory holding the exact content
+        shutil.move(os.path.join(d, "scripts"), os.path.join(d, "scripts.real"))
+        os.symlink(os.path.join(d, "scripts.real"), os.path.join(d, "scripts"))
+        self.assertEqual(self.call(d), 2)
+
+    def test_pin_is_a_lowercase_sha256_constant_in_the_guard_source(self):
+        src = read_bytes(os.path.join(os.path.dirname(os.path.abspath(__file__)), "pretooluse_guard.py")).decode("utf-8")
+        self.assertEqual(len(re.findall(r'(?m)^MARK_READY_SHA256 = "[0-9a-f]{64}"', src)), 1)
 
 
 if __name__ == "__main__":

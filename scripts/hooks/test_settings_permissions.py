@@ -101,6 +101,9 @@ class ProjectSettings(unittest.TestCase):
         self.assertIn(ONLY_RULE, bullet)
         self.assertRegex(bullet, r"(?i)merg\w* stays with the (merge agent|owner)")
         self.assertRegex(bullet, r"(?i)orchestrator")
+        self.assertIn("SHA-256", bullet)  # R3-01: the guard pins the wrapper's content
+        self.assertRegex(bullet, r"first word")  # R3-02: say what the run check really covers
+        self.assertNotIn("any command that runs", bullet)
         for stale in ("any agent session", "no wildcard on the repo", "gh api"):
             self.assertNotIn(stale, bullet, stale)
 
