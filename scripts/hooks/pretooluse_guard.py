@@ -315,10 +315,14 @@ def ansi_c(s):
     return re.sub(r"\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|.)", rep, s)
 
 
+class Word(str):
+    glob = False  # the word has an unquoted { } * ? [ that the shell expands after the guard has read it
+
+
 def lex(src):
     """Split a shell command string into simple commands. Raises ValueError when it cannot be parsed."""
     cmds, cur = [], Cmd()
-    word, in_word, quoted, pending = [], False, False, None
+    word, in_word, quoted, pending, ug = [], False, False, None, False
     heredocs = []
     i, n = 0, len(src)
 
@@ -330,11 +334,11 @@ def lex(src):
         cur = Cmd()
 
     def flush():
-        nonlocal word, in_word, quoted, pending
+        nonlocal word, in_word, quoted, pending, ug
         if not in_word:
             return
-        text, q = "".join(word), quoted
-        word, in_word, quoted = [], False, False
+        text, q, g = "".join(word), quoted, ug
+        word, in_word, quoted, ug = [], False, False, False
         if pending:
             kind, pending = pending, None
             if kind == "write":
@@ -345,7 +349,8 @@ def lex(src):
             elif kind[0] == "heredoc":
                 heredocs.append((text, q, kind[1], cur))
             return
-        cur.words.append(text)
+        cur.words.append(Word(text))
+        cur.words[-1].glob = g
 
     while i < n:
         c = src[i]
@@ -485,6 +490,7 @@ def lex(src):
         else:
             word.append(c)
             in_word = True
+            ug = ug or c in "{}*?["
             i += 1
     flush()
     end_cmd()
@@ -739,13 +745,16 @@ def unwrap(words):
 ACTIONLINT_EXEC_FLAGS = re.compile(r"^--?(shellcheck|pyflakes|init-config)(=|$)")
 
 
-def check_actionlint(args):
-    """actionlint runs the executable named by -shellcheck / -pyflakes and -init-config writes under .github/: deny them."""
-    for a in args:
+def check_actionlint(args, globs, state):
+    """actionlint runs the executable named by -shellcheck / -pyflakes (found on PATH by default) and -init-config writes under
+    .github/: deny those flags, shell syntax that could expand into them, and any PATH change in the command line."""
+    if state.get("path_set"):
+        deny("actionlint looks up shellcheck and pyflakes on PATH; do not change PATH in the same command line")
+    for a, g in zip(args, globs, strict=True):
         if ACTIONLINT_EXEC_FLAGS.match(a):
             deny(f"actionlint {a.split('=')[0]} runs or writes things the allow rule does not cover (-shellcheck, -pyflakes, -init-config)")
-        if "$" in a or "`" in a:
-            deny("actionlint arguments built from a variable or substitution cannot be checked for -shellcheck/-pyflakes; write them out")
+        if "$" in a or "`" in a or (g and not re.match(r"[A-Za-z0-9._/]", a)):
+            deny("actionlint arguments built from $, backticks, braces or globs cannot be checked for -shellcheck/-pyflakes; write them out")
 
 
 def check_assign(a):
@@ -861,6 +870,9 @@ def check_simple(cmd, state, depth):
     assigns, words, nested, wrappers = unwrap(cmd.words)
     for a in assigns:
         check_assign(a)
+        if a.startswith("PATH="):
+            state["path_set"] = True
+    globs = [getattr(w, "glob", False) for w in words[1:]]
     for s in nested:
         check_command_string(s, child(state), depth + 1)
     if not words:
@@ -880,7 +892,7 @@ def check_simple(cmd, state, depth):
             deny("the command name is built from a variable or substitution; write it out")
         return
     if prog == "actionlint":
-        check_actionlint(args)
+        check_actionlint(args, globs, state)
     if prog in ("cd", "pushd"):
         tgt = [a for a in args if not a.startswith("-")]
         t = tgt[-1] if tgt else "~"
@@ -898,6 +910,8 @@ def check_simple(cmd, state, depth):
         for a in args:
             if ASSIGN.match(a):
                 check_assign(a)
+                if a.startswith("PATH="):
+                    state["path_set"] = True
         return
     texts = stdin_texts(cmd)
     if prog in SHELLS:

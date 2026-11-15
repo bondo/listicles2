@@ -610,7 +610,8 @@ seen the batch report.
   actionlint v1.7.12, zizmor v1.32.0, Linux x86_64) and checks every sha256 before extracting; a mismatch installs nothing.
   The install directory, the installer and the pins are protected paths in `pretooluse_guard.py` (tooling sessions only), which also
   denies any `actionlint` call with `-shellcheck`, `-pyflakes` or `-init-config` (they run or write what the allow rule does not
-  cover) and actionlint arguments built from `$` or backticks. `test_settings_permissions.py` pins the allow list and models the
+  cover), actionlint arguments built from `$`, backticks, unquoted braces or globs, and a `PATH=` change in the same command line
+  (actionlint finds shellcheck and pyflakes on `PATH`). `test_settings_permissions.py` pins the allow list and models the
   matching: no rule can match merge, push, curl or rm as the program. **Residual risks, accepted by the owner when merging (a rule
   is not a guarantee):** (1) the `*` spans spaces, slashes and shell metacharacters, so an argument such as `$(...)` is not
   modelled (only compound commands are); (2) the paths are relative to the cwd, so a `cd` into a directory holding another
