@@ -3,14 +3,21 @@ It must accept exactly one PR number and make exactly one fixed call. A fake `gh
 Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os
-import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gitenv  # noqa: E402, F401  # justified: after the sys.path insert, imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 WRAPPER = os.path.join(ROOT, "scripts", "mark-ready.sh")
-FAKE_GH = '#!/bin/sh\n{ for a in "$@"; do printf "%s\\n" "$a"; done; printf "GH_HOST=%s\\nGH_REPO=%s\\n" "${GH_HOST-unset}" "${GH_REPO-unset}"; } > "$FAKE_GH_OUT"\n'
+FAKE_GH = (
+    "#!/bin/sh\n"
+    '{ for a in "$@"; do printf "%s\\n" "$a"; done;\n'
+    '  printf "GH_HOST=%s\\nGH_REPO=%s\\n" "${GH_HOST-unset}" "${GH_REPO-unset}"; } > "$FAKE_GH_OUT"\n'
+)
 
 
 class MarkReady(unittest.TestCase):
