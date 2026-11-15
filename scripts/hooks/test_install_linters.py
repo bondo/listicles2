@@ -151,6 +151,35 @@ class Installer(unittest.TestCase):
         self.assertEqual(t.run().returncode, 0)
         self.assertNotIn("evil", t.installed())
 
+    def test_failure_while_staging_leaves_existing_binaries_untouched(self):
+        """R1-02: stage every binary first, then rename into place; an error on the second install must not leave a mixed set."""
+        t = Tree(self)
+        d = os.path.join(t.root, ".tools", "bin")
+        os.makedirs(d)
+        for n in ("shellcheck", "actionlint", "zizmor"):
+            with open(os.path.join(d, n), "w") as f:
+                f.write("old " + n)
+        fake = os.path.join(t.root, "fakebin")
+        os.makedirs(fake)
+        real = shutil.which("install")
+        with open(os.path.join(fake, "install"), "w") as f:
+            f.write(f'#!/bin/sh\nc="{t.root}/count"\nn=$(cat "$c" 2>/dev/null || echo 0)\nn=$((n+1))\necho $n > "$c"\n'
+                    f'[ "$n" -eq 2 ] && exit 1\nexec {real} "$@"\n')
+        os.chmod(os.path.join(fake, "install"), 0o755)
+        env = {"PATH": fake + os.pathsep + os.environ["PATH"], "HOME": t.root, "LINTERS_ALLOW_FILE_URLS": "1"}
+        r = subprocess.run(["bash", os.path.join(t.root, "scripts", "install_linters.sh")], cwd=t.root, env=env, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        for n in ("shellcheck", "actionlint", "zizmor"):
+            with open(os.path.join(d, n)) as f:
+                self.assertEqual(f.read(), "old " + n, n)
+        self.assertEqual(sorted(os.listdir(os.path.join(t.root, ".tools"))), ["bin"], "no staging leftovers")
+
+    def test_no_staging_leftovers_after_success(self):
+        t = Tree(self)
+        self.assertEqual(t.run().returncode, 0)
+        self.assertEqual(sorted(os.listdir(os.path.join(t.root, ".tools"))), ["bin"])
+        self.assertEqual(t.installed(), ["actionlint", "shellcheck", "zizmor"])
+
     def test_script_syntax_and_strict_mode(self):
         self.assertEqual(subprocess.run(["bash", "-n", INSTALLER]).returncode, 0)
         with open(INSTALLER, encoding="utf-8") as f:
@@ -192,6 +221,7 @@ class RepoPins(unittest.TestCase):
             text = f.read()
         self.assertIn("proto='=https'", text)
         self.assertRegex(text, r'--proto "\$proto"')
+        self.assertRegex(text, r'--proto-redir "\$proto"', "redirects must obey the same protocol limit (R1-03)")
 
 
 if __name__ == "__main__":
