@@ -36,6 +36,9 @@ PROTECTED = (
     "scripts/guards.sh",
     "scripts/install-hooks.sh",
     "scripts/hooks/",
+    ".tools/",  # linter binaries that the allow rules in .claude/settings.json run
+    "scripts/install_linters.sh",
+    "scripts/linters.pins",
 )
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}

@@ -16,3 +16,4 @@ metrics/sessions/
 __pycache__/
 .mypy_cache/
 .ruff_cache/
+.tools/

@@ -15,6 +15,8 @@ import tarfile
 import tempfile
 import unittest
 
+import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 INSTALLER = os.path.join(ROOT, "scripts", "install_linters.sh")
 PINS = os.path.join(ROOT, "scripts", "linters.pins")
@@ -189,7 +191,8 @@ class RepoPins(unittest.TestCase):
     def test_installer_uses_https_only_by_default(self):
         with open(INSTALLER, encoding="utf-8") as f:
             text = f.read()
-        self.assertTrue(re.search(r"--proto '=https", text) or re.search(r'--proto "=https', text))
+        self.assertIn("proto='=https'", text)
+        self.assertRegex(text, r'--proto "\$proto"')
 
 
 if __name__ == "__main__":
