@@ -36,8 +36,8 @@ once.
 
 **AUTH-03 Sign out.** As a user, I want to sign out, so that someone else can use this phone without seeing my lists.
 * Given I am signed in, when I sign out, then I see the sign-in screen.
-* Given I signed out, when another person signs in on the same phone, then none of my private lists or my household's
-  lists are shown to them, online or offline (assumed: the local copy is removed at sign-out, OQ-13).
+* Given I signed out, when another person signs in on the same phone, then none of my private lists or the lists
+  shared with me are shown to them, online or offline (assumed: the local copy is removed at sign-out, OQ-13).
 
 **AUTH-04 Delete my account.** As a user, I want to delete my account and my data, so that nothing of mine is kept
 (required by Google Play, PLAN section 3.1).
@@ -75,7 +75,7 @@ lists.
 * Given there is no network, when I confirm, then I see a message that joining needs a connection.
 
 **HH-04 See who is in my household.** As a member, I want to see the members, so that I know who can see my shared lists.
-* Given I am a member, when I open the household screen, then I see each member's display name and who is the owner.
+* Given I am a member, when I open the household screen, then I see each member's display name and who is the household owner.
 
 **HH-05 Leave a household.** As a member who is not the household owner, I want to leave, so that I stop sharing.
 * Given I confirm leaving, then I no longer see lists other members shared, and my open invites are deleted.
@@ -158,15 +158,18 @@ that I know at a glance what I have.
 
 **VIS-01 Private by default.** As a user, I want new lists to be private, so that I decide what others see (Q3).
 * Given I create a list, then only I can see it, even when I am in a household; I need no household to create it (OQ-1).
-* Given a private list of another member, then I cannot see it in the app, and the server refuses to read or change it
-  (to be covered by rules allow and deny tests, PLAN section 3.1).
+* Given a private list of any other user (in my household or not), then I cannot see it in the app, and the server
+  refuses to read or change it (to be covered by rules allow and deny tests, PLAN section 3.1).
+* Given a list shared with a household I am not in, then I cannot see it, and the server refuses to read or change it.
 
 **VIS-02 Share a list with my household.** As a list creator, I want to share one list with my household, so that we can
 use it together (for example a shopping list).
 * Given I created a private list and I am in a household, when I choose "Share with household" and confirm, then every current
   member sees the list in LIST-01.
 * Given a list is shared, when a new member joins, then they see it too (assumed; OQ-16).
-* Given I am not in a household, when I choose to share, then the app explains that I first need to create or join one.
+* Given I am not in a household, when I choose to share, then the app takes me to the household step (create or join
+  one, or one is created for me: decided in M0.5-02 and M1/M2 planning, OQ-1), and the list is shared only once I am in
+  a household.
 * Sharing is per list: sharing one list never shares another.
 
 **VIS-03 Use a shared list.** As a household member, I want to open a list someone shared, so that I see what it
@@ -181,6 +184,8 @@ contains and help keep it up to date.
   and the other members no longer see it (OQ-2, OQ-4).
 * Given a list someone else created is shared with me, then "Stop sharing" is not offered to me, and the server refuses
   the change (to be covered by rules allow and deny tests).
+* Given a list someone else created is shared with me, when I rename it or change its items, then I cannot change who
+  created it or which household it is shared with, and the server refuses such a change (rules allow and deny tests).
 
 ## 6. Offline and sync
 
@@ -200,8 +205,8 @@ so that we never work on an old copy.
   section 1, Sync); changes to different fields are both kept (PLAN section 3.2).
 * Given I edited an item offline and another member deleted it meanwhile, when the network returns, then the item stays
   deleted and I see a short message that it was removed (PLAN section 3.2).
-* Given a list I have open is deleted, stops being shared, or leaves the household with its creator (HH-05), then I
-  leave it and see a short message.
+* Given a list I have open is deleted, stops being shared, or leaves the household with its creator (HH-05, HH-06),
+  then I leave it and see a short message.
 
 **SYNC-03 Actions that need the network.** As a user, I want a clear message when something needs a connection, so that
 I don't wait for nothing.
@@ -245,6 +250,7 @@ These are constraints for the data model and screens; v1 builds none of them (M2
   everyone the list is shared with the creator's rights (except stopping the share).
 * **Keeping shared lists on leaving** (OQ-5): later a person who leaves chooses, per shared list they created, whether
   it stays with the household; in v1 it always goes with them.
+* **Who added an item** (OQ-18): each item records who added it, so OQ-18 can be decided in M2 planning.
 * **Catalogue** (Q1): a list can later be filled from a catalogue, and an item can point at a catalogue entry while
   keeping the user's own check state and edits.
 * **List types** (Q4): a list carries a type (PLAN section 3 has a `kind` field), so a shopping list or a recipe-linked
@@ -285,12 +291,12 @@ which next step needs the answer first; *later* means it blocks no design step.
 | OQ-15 | The plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | PLAN update, M1/M2 scope |
 | OQ-16 | Assumed: a member who joins later sees the lists already shared with the household. Confirm. | VIS-02 | later |
 | OQ-17 | When the household owner deletes the household, do the shared lists go back to being private to their creators (as when a person leaves, OQ-5), or are they deleted? | HH-06 | M0.5-02 |
-| OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? | AUTH-04, HH-05, HH-06 | M2 planning |
+| OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
 | OQ-19 | Two years per item: may an item have a re-release year without a release year, and may it be earlier than the release year? Is "re-release year" the right English word (the owner wrote the Danish "genoblaeg", read as re-release or reissue), and what is the Danish label? | ITEM-01, ITEM-02, ITEM-05 | M0.5-03 |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
 creator (OQ-5), but PLAN section 3 stores every list under a household. Lists need a creator and a sharing state, and new
 security rules: the creator can do everything; members of the household a list is shared with can do everything except
-stop the share (OQ-2, OQ-3, OQ-4); today members can read everything under the household (PLAN section 3.1). These need
+stop the share or change the list's creator or household (OQ-2, OQ-3, OQ-4); today members can read everything under the household (PLAN section 3.1). These need
 allow and deny tests and the `risk:high` tag, and change the M1 and M2 scope in PLAN section 7. The PLAN section 3 item
 has no year fields; the v1 item needs a name, two optional years (1900 to the current year plus 50) and the check.
