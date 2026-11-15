@@ -1,9 +1,5 @@
-"""Tests for scripts/install_linters.sh and scripts/linters.pins (checksum-pinned shellcheck, actionlint, zizmor).
-
-The real archives are never downloaded here: the installer is copied into a temp tree together with a pins file that points at
-local fixture archives (file:// URLs are accepted only with LINTERS_ALLOW_FILE_URLS=1; the repo's pins file is https only).
-
-Run: python3 -I -m unittest discover -s scripts/hooks"""
+"""Tests for scripts/install_linters.sh and scripts/linters.pins. No network: the installer is copied into a temp tree with a pins
+file pointing at local fixture archives (file:// only with LINTERS_ALLOW_FILE_URLS=1; the repo's pins file is https only)."""
 
 import hashlib
 import io
@@ -85,6 +81,7 @@ class Installer(unittest.TestCase):
         r = t.run()
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(t.installed(), ["actionlint", "shellcheck", "zizmor"])
+        self.assertEqual(os.listdir(os.path.join(t.root, ".tools")), ["bin"], "no staging leftovers")
         for n in t.installed():
             p = os.path.join(t.root, ".tools", "bin", n)
             self.assertTrue(os.access(p, os.X_OK))
@@ -173,12 +170,6 @@ class Installer(unittest.TestCase):
             with open(os.path.join(d, n)) as f:
                 self.assertEqual(f.read(), "old " + n, n)
         self.assertEqual(sorted(os.listdir(os.path.join(t.root, ".tools"))), ["bin"], "no staging leftovers")
-
-    def test_no_staging_leftovers_after_success(self):
-        t = Tree(self)
-        self.assertEqual(t.run().returncode, 0)
-        self.assertEqual(sorted(os.listdir(os.path.join(t.root, ".tools"))), ["bin"])
-        self.assertEqual(t.installed(), ["actionlint", "shellcheck", "zizmor"])
 
     def test_script_syntax_and_strict_mode(self):
         self.assertEqual(subprocess.run(["bash", "-n", INSTALLER]).returncode, 0)

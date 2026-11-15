@@ -608,15 +608,16 @@ seen the batch report.
   `Bash(.tools/bin/shellcheck *)`, `Bash(.tools/bin/actionlint *)` and `Bash(.tools/bin/zizmor --offline *)` (zizmor runs offline only).
   `scripts/install_linters.sh` fills `.tools/bin/` (git-ignored) from the pins in `scripts/linters.pins` (shellcheck v0.11.0,
   actionlint v1.7.12, zizmor v1.32.0, Linux x86_64) and checks every sha256 before extracting; a mismatch installs nothing.
-  The install directory, the installer and the pins are protected paths in `pretooluse_guard.py` (tooling sessions only).
-  `pretooluse_guard.py` also denies any `actionlint` call with `-shellcheck`, `-pyflakes` or `-init-config` (any spelling or wrapper; actionlint runs the executable those flags name) and arguments built from `$` or backticks. `test_settings_permissions.py` pins the allow list and models the matching: none of the rules can match merge, push, curl or rm
-  as the program. **Residual risks, accepted by the owner when merging (a rule is not a guarantee):** (1) the `*` spans spaces,
-  slashes and shell metacharacters, so an argument such as `$(...)` is not modelled; the test covers only a compound command
-  (every part must be allowed, as Claude Code documents); (2) the paths are relative to the cwd, so a `cd` into a directory
-  holding another `.tools/bin/` is not excluded; (3) a binary planted or swapped in `.tools/bin/` (by a Bash write the guard does
-  not recognise, or a race) runs under the rule without a prompt, since the guard checks writes best-effort and does not
-  re-hash the binary at run time; (4) the auto-mode classifier still decides independently of allow rules, so whether
-  a run is approved cannot be tested from the repo. Changing the rules, the pins or the installer is an owner-only merge.
+  The install directory, the installer and the pins are protected paths in `pretooluse_guard.py` (tooling sessions only), which also
+  denies any `actionlint` call with `-shellcheck`, `-pyflakes` or `-init-config` (they run or write what the allow rule does not
+  cover) and actionlint arguments built from `$` or backticks. `test_settings_permissions.py` pins the allow list and models the
+  matching: no rule can match merge, push, curl or rm as the program. **Residual risks, accepted by the owner when merging (a rule
+  is not a guarantee):** (1) the `*` spans spaces, slashes and shell metacharacters, so an argument such as `$(...)` is not
+  modelled (only compound commands are); (2) the paths are relative to the cwd, so a `cd` into a directory holding another
+  `.tools/bin/` is not excluded; (3) a binary planted or swapped in `.tools/bin/` runs under the rule without a prompt, since the
+  guard checks writes best-effort and does not re-hash the binary at run time; (4) the auto-mode classifier decides independently of
+  allow rules and cannot be tested from the repo; (5) the actionlint flag check sees only the command text (not arguments read from
+  a file, or a program that starts actionlint itself). Changing the rules, the pins or the installer is an owner-only merge.
 * **Owner-run push tests:** a check that needs a real push (hooks, protection, ruleset behaviour) is run by the owner in
   their own clone and the result noted on #15. Agents never try to prove it by pushing to `main` or force-pushing.
 

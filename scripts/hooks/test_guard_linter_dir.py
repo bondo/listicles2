@@ -1,6 +1,4 @@
-"""The linter install directory and its installer are process files: the allow rules in .claude/settings.json run whatever sits in
-.tools/bin/, so non-tooling sessions must not write there, nor edit the installer or its pins (best effort, like every guard layer).
-Run: python3 -I -m unittest discover -s scripts/hooks"""
+"""The allow rules run whatever sits in .tools/bin/, so non-tooling sessions must not write there, nor edit the installer or its pins."""
 
 import unittest
 

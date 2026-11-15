@@ -1,7 +1,5 @@
-"""actionlint runs any executable named by -shellcheck / -pyflakes (its docs/usage.md), and -init-config writes under .github/.
-The allow rule Bash(.tools/bin/actionlint *) would approve them, so the guard must deny these flags in every spelling and every
-wrapper, in tooling sessions too, and must deny arguments it cannot judge statically ($VAR, substitutions). Review R1-01 of PR #95.
-Run: python3 -I -m unittest discover -s scripts/hooks"""
+"""actionlint runs the executable named by -shellcheck / -pyflakes and -init-config writes under .github/; the allow rule
+Bash(.tools/bin/actionlint *) would approve them, so the guard denies them in every spelling and wrapper (review R1-01, PR #95)."""
 
 import unittest
 

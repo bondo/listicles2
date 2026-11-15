@@ -1,12 +1,6 @@
-"""Pins the project permission rules in .claude/settings.json (owner approval of three checksum-pinned linters, issue #15).
-
-The allow list must be exactly three rules that run one binary each from one fixed directory (.tools/bin/). The test does not
-only compare strings: it also models how a rule matches a command (Claude Code documents `*` as "any characters", spaces and
-slashes included, and compound commands as split so that every part must be allowed) and checks that no rule can match a merge,
-push, curl or rm command as the program. The model is a documented-semantics model: how the real matcher treats quoting,
-substitutions or the classifier is NOT tested here (see the residual risks in docs/ORCHESTRATION.md section 7.5).
-
-Run: python3 -I -m unittest discover -s scripts/hooks"""
+"""Pins .claude/settings.json permissions (owner approval of three checksum-pinned linters, issue #15): exactly three rules, and a
+documented-semantics model of rule matching (`*` spans spaces and slashes; compound commands need every part allowed). How the real
+matcher or the classifier behaves is NOT tested (see the residual risks in docs/ORCHESTRATION.md section 7.5)."""
 
 import json
 import os

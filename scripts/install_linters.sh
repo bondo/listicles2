@@ -2,7 +2,6 @@
 # Installs the owner-approved linters (shellcheck, actionlint, zizmor) into .tools/bin/ (git-ignored).
 # Every archive is downloaded, its sha256 compared with scripts/linters.pins, and only then is anything extracted.
 # Any mismatch or malformed pin aborts with nothing installed. The binaries are never run here.
-# Usage: scripts/install_linters.sh        (Linux x86_64)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

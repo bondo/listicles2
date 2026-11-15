@@ -740,8 +740,7 @@ ACTIONLINT_EXEC_FLAGS = re.compile(r"^--?(shellcheck|pyflakes|init-config)(=|$)"
 
 
 def check_actionlint(args):
-    """actionlint runs the executable named by -shellcheck / -pyflakes and -init-config writes under .github/. The allow rule
-    Bash(.tools/bin/actionlint *) would approve them, so deny them in every spelling (and arguments that cannot be judged)."""
+    """actionlint runs the executable named by -shellcheck / -pyflakes and -init-config writes under .github/: deny them."""
     for a in args:
         if ACTIONLINT_EXEC_FLAGS.match(a):
             deny(f"actionlint {a.split('=')[0]} runs or writes things the allow rule does not cover (-shellcheck, -pyflakes, -init-config)")
