@@ -711,11 +711,6 @@ but say so in the `Usage:` line.
 **§7.7.5 Spend control.** There is no dollar cap, but limits can be forecast and made less likely:
 * **Parallelism cap:** at most 3 worker sessions at once (§7.1), writers and reviewers together. Raise it only by editing this line
   in a reviewed PR, after the metrics show room.
-* **Fewer review sessions for small docs PRs. Pending a CLAUDE.md tooling change (task M0.5-22), not in effect until then:** CLAUDE.md says one
-  review round per reviewer session, so today every PR round has its own reviewer. Once CLAUDE.md allows it, one Opus reviewer
-  session may review several ready docs-only PRs (each about 100 changed lines or fewer, no process file, no gate or threshold) one
-  after another (one round row and one findings comment per PR, §6.2); gate, hook, guard, threshold and `risk:high` PRs would
-  always keep their own reviewer.
 * **Track cost per round and per window:** the session row (§6.1, reviewer sessions are one per round) carries `cost_usd`. Once
   `scripts/agent_metrics.py` (M0.5-13) has produced `docs/agent-metrics.csv`, sum it; for rounds not saved there yet sum the `metrics:session` comments.
   At each pause, put the cost of the sessions active in the closing window (summed from `get_session` usage, never estimated) in the
