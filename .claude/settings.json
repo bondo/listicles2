@@ -5,8 +5,7 @@
   },
   "permissions": {
     "allow": [
-      "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review *)",
-      "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review)"
+      "Bash(scripts/mark-ready.sh *)"
     ]
   },
   "hooks": {

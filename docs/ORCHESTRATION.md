@@ -595,13 +595,15 @@ seen the batch report.
   (3) **Closing keywords:** never write close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly
   before an issue number in a commit or PR body unless closing that issue is intended; write "gated on #N", "see #N" or
   "mark #N done" instead. Scan the PR body for them before asking the owner to merge.
-* **Marking a PR ready:** the orchestrator (or any agent session) marks a draft PR ready after clean review rounds with
-  `gh api -X POST repos/bondo/listicles2/pulls/<N>/ccr/ready_for_review`. The project `.claude/settings.json` pre-allows exactly two
-  rules for it, `Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review *)` and the same without the trailing
-  ` *`, and nothing else: no wildcard on the repo or on other routes, no merge route. The auto-mode classifier may still evaluate
-  the call on its own, so the rule is not a guarantee. Merging stays with the merge agent/owner (§1, §7.5), never with this rule.
-  Changing the allow list is an owner-only, tooling-session change (CODEOWNERS covers `/.claude/`);
-  `scripts/hooks/test_settings_permissions.py` fails if the list holds anything beyond those two rules.
+* **Marking a PR ready:** the orchestrator (or the implementer session when the orchestrator says so) marks a draft PR ready after
+  clean review rounds with `scripts/mark-ready.sh <N>`. Reviewers never mark PRs ready. The script accepts exactly one argument,
+  the PR number as digits only, and makes one fixed POST to the `ready_for_review` route of this repo; it refuses anything else
+  before `gh` runs. The project `.claude/settings.json` pre-allows exactly one rule for it, `Bash(scripts/mark-ready.sh *)`, and
+  no rule for raw `gh` commands, because `*` in a rule also matches spaces and slashes, so a raw rule could be steered to another
+  route (a merge, say). The auto-mode classifier may still evaluate the call on its own, so the rule is not a guarantee.
+  Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
+  tooling-session change (CODEOWNERS covers `/.claude/` and `/scripts/`); `scripts/hooks/test_settings_permissions.py` and
+  `scripts/hooks/test_mark_ready.py` fail if the list holds anything else or the script accepts anything but a PR number.
 * **Strict up-to-date merge procedure:** `main` requires branches to be up to date, so merge one PR at a time. After each
   owner merge, the **orchestrator** updates the next ready PR with `update_pull_request_branch`, passing `expectedHeadSha`
   set to its current head, waits about 4 minutes for CI, and only then tells the owner it is ready. This is the single
