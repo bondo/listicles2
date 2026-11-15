@@ -8,7 +8,6 @@ Run: python3 -I -m unittest discover -s scripts/hooks"""
 import hashlib
 import io
 import os
-import re
 import shutil
 import subprocess
 import tarfile

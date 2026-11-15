@@ -608,7 +608,7 @@ seen the batch report.
   `Bash(.tools/bin/shellcheck *)`, `Bash(.tools/bin/actionlint *)` and `Bash(.tools/bin/zizmor --offline *)` (zizmor runs offline only).
   `scripts/install_linters.sh` fills `.tools/bin/` (git-ignored) from the pins in `scripts/linters.pins` (shellcheck v0.11.0,
   actionlint v1.7.12, zizmor v1.32.0, Linux x86_64) and checks every sha256 before extracting; a mismatch installs nothing.
-  `.tools/`, the installer and the pins are protected paths in `pretooluse_guard.py` (tooling sessions only).
+  The install directory, the installer and the pins are protected paths in `pretooluse_guard.py` (tooling sessions only).
   `test_settings_permissions.py` pins the allow list and models the matching: none of the rules can match merge, push, curl or rm
   as the program. **Residual risks, accepted by the owner when merging (a rule is not a guarantee):** (1) the `*` spans spaces,
   slashes and shell metacharacters, so an argument such as `$(...)` is not modelled; the test covers only a compound command
