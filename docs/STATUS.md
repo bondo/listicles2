@@ -14,10 +14,10 @@ renders it and pushes it to the `status` branch (task M0.5-27). The README embed
    ("Outside questions: N"), never with a title, and never feed task states. The workflow's own
    `publish` check run is ignored when judging CI, and an unknown merge state is retried once and then never shown as
    ready to merge.
-2. `scripts/status_visual.py render` turns that JSON plus `docs/tasks.toml` into `status.svg` and a tiny `status.json`.
+2. `scripts/status_visual.py render` turns that JSON plus `docs/tasks.toml` into `status.svg`, a tiny `status.json` and the detail page `status.md`.
    It is offline and deterministic. Every title is stripped of control characters, clipped and XML-escaped.
-3. `scripts/status_publish.py` pushes both files to the `status` branch with a plain push (creates the orphan branch
-   if missing, never force-pushes). It makes no commit when the SVG is unchanged apart from the "updated" stamp, so the
+3. `scripts/status_publish.py` pushes the files to the `status` branch with a plain push (creates the orphan branch
+   if missing, never force-pushes). It makes no commit when the SVG is unchanged apart from the "updated" stamp and the page is unchanged, so the
    stamp shows the time of the last change, not of the last check.
 
 Runs: every 30 minutes, on `workflow_dispatch`, on `issues` events and on push to `main`. There is no `pull_request`
@@ -45,6 +45,16 @@ Under an open task a line says what it waits on: unmet `depends_on` ids, `(owner
 for a `milestone:Mx` dependency, and "blocked by #N" for a labelled issue or PR. Lines about owner-only or labelled
 blockers are red; ordinary waits are grey. The images use theme classes only (light and dark, contrast at least 4.5:1,
 checked by a test).
+
+## Detail page (`status.md`)
+The same render also writes `status.md` next to the SVG, and the publisher pushes it to the `status` branch with the SVG
+(the workflow needs no change: `status_visual.py render` writes it beside `--svg`, and `status_publish.py` picks up a
+`status.md` beside `--svg`; `--md` overrides both). The README links it. Per milestone it has the name and purpose, a table
+of every task (id, title, status, depends on, who, PR), a Mermaid graph of the open tasks with an arrow from what a task
+waits on to the task (GitHub renders it; dashed grey boxes are outside the milestone), and at the end every blocker, not
+only the first 14 of the picture. It carries no clock or ages, so it is rewritten only when something changes. All titles
+are clipped, stripped of control characters and escaped for table cells and quoted Mermaid labels. Links to PRs and issues
+use `$GITHUB_REPOSITORY` (or `--repo OWNER/NAME`); without a valid value the numbers are plain text.
 
 ## What counts as a blocker
 - Tasks of the current milestone whose `depends_on` are not done.
