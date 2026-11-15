@@ -37,15 +37,9 @@ section 7; edit them in `docs/tasks.toml` (a normal PR). A milestone with no tas
 
 Inside a card, finished tasks (done or dropped) collapse into "N done". Open tasks are listed in `tasks.toml` order, at
 most 12 per card ("+N more open tasks" after that), each with a marker shape and a status word, so colour is never the
-only signal:
-
-| Marker | Word | Meaning |
-|---|---|---|
-| circle | ready | all dependencies met, nobody has delivered it |
-| triangle | in progress #N | an open PR (draft or not) is titled `<task id>: ...` |
-| square | blocked | unmet dependencies, or an open `blocked`-labelled issue or PR titled `<task id>: ...` |
-| diamond | owner to-do | owner task not done (it may also wait on other tasks) |
-| tick | N done | finished tasks, collapsed |
+only signal. Markers: circle = ready (all dependencies met), triangle = in progress (an open PR, draft or not, is titled
+`<task id>: ...`), square = blocked (unmet dependencies, or an open `blocked`-labelled issue or PR titled the same way),
+diamond = owner to-do (it may also wait on other tasks), tick = N done.
 
 Under an open task a line says what it waits on: unmet `depends_on` ids, `(owner)` after an owner-only task, "all of Mx"
 for a `milestone:Mx` dependency, and "blocked by #N" for a labelled issue or PR. Lines about owner-only or labelled
