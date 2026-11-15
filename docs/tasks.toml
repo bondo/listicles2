@@ -663,6 +663,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-21"]
+pr = 93
 notes = "Tooling env. Effort S. Owner decision 2026-11-15: CLAUDE.md stays unchanged and reviewers stay one round per session, so the pending bullet of ORCHESTRATION 7.7.5 was deleted instead."
 
 [[task]]
