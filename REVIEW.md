@@ -69,7 +69,7 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 }
 ```
 
-- IDs are `R<round>-<nn>` and are stable; a finding keeps its ID in later rounds. When the repository has
+- IDs are `R<round>-<nn>` (design-review rounds use `D<round>-<nn>`, `docs/ORCHESTRATION.md` 8.5) and are stable; a finding keeps its ID in later rounds. When the repository has
   earlier review rounds recorded in commit messages or comments, continue the numbering from the last used.
 - `area`: `security-rules | sync-merge | release | process | general`. Use the first three whenever the finding concerns Firestore
   rules and their tests, offline/last-write-wins merge, or the release workflow (never deferred without owner OK, `docs/FOLLOW-UPS.md`).
