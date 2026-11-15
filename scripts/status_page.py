@@ -17,9 +17,11 @@ import status_visual  # noqa: E402  # justified: must follow the sys.path insert
 MAX_PAGE_TITLE = 100
 MAX_DEPS_CELL = 2000  # ids are short; a burn-down task lists a whole milestone and must not lose any
 MAX_GRAPH_TITLE = 40
+WWW = re.compile(r"(?i)\b(www)\.")  # "www.host" autolinks without a scheme
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 WORDS = {"done": "done", "dropped": "dropped", "ready": "ready", "review": "in progress", "blocked": "blocked", "owner": "owner to-do"}
-CELL_ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "|": "&#124;", "`": "&#96;", "[": "&#91;", "]": "&#93;", "\\": "&#92;"}
+CELL_ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "|": "&#124;", "`": "&#96;", "[": "&#91;", "]": "&#93;", "\\": "&#92;",
+                ":": "&#58;", "@": "&#64;"}  # no "scheme:" or "user@host" for GFM to autolink
 LABEL_ESCAPES = {'"': "#quot;", "<": "#lt;", ">": "#gt;", "`": "#96;", "[": "#91;", "]": "#93;", "|": "#124;", "\\": "#92;",
                  "&": "#38;", "#": "#35;", ";": "#59;", "%": "#37;"}
 CLASS_DEFS = (
@@ -42,7 +44,7 @@ def _escape(text, table):
 
 def cell(text, n=MAX_PAGE_TITLE):
     """Text safe inside a Markdown table cell or list item: one line, clipped, no markup characters."""
-    return _escape(status_visual.clip(text, n), CELL_ESCAPES)
+    return WWW.sub(r"\1&#46;", _escape(status_visual.clip(text, n), CELL_ESCAPES))
 
 
 def mermaid_label(text):
@@ -75,7 +77,7 @@ def _task_table(m, repo):
     return out
 
 
-def _graph(m, by_id):
+def _graph(m, by_id, home):
     """Mermaid flowchart of the open tasks of one milestone; an arrow points from what is waited on to the waiting task."""
     open_tasks = [t for t in m["tasks"] if t["state"] not in status_visual.FINISHED]
     nodes, lines, edges = {}, ["flowchart LR"], []
@@ -97,7 +99,7 @@ def _graph(m, by_id):
             if u["milestone"]:
                 src = node(u["ref"], "all of " + mermaid_label(u["ref"][len(status_visual.tasks.MILESTONE_DEP):]), "ext")
             else:
-                src = task_node(by_id[u["ref"]], None if by_id[u["ref"]]["state"] in NODE_CLASS else "ext")
+                src = task_node(by_id[u["ref"]], None if home[u["ref"]] == m["id"] else "ext")  # other milestones: dashed grey, status word kept
             edge = f"    {src} --> {nodes[t['id']]}"
             if edge not in edges:
                 edges.append(edge)
@@ -108,6 +110,7 @@ def render_page(model, repo=None):
     if repo is not None and not (isinstance(repo, str) and REPO.fullmatch(repo) and ".." not in repo):
         raise PageError("repo must look like OWNER/NAME")
     by_id = {t["id"]: t for m in model["milestones"] for t in m["tasks"]}
+    home = {t["id"]: m["id"] for m in model["milestones"] for t in m["tasks"]}
     out = ["# Listicles status detail", "",
            "Milestones, their tasks, what each open task waits on, and every blocker, generated from `docs/tasks.toml` and the open "
            "PRs and issues. The picture on the front page (`status.svg`) shows the same state. Status words: **done**, **ready** (all "
@@ -129,7 +132,7 @@ def render_page(model, repo=None):
             out.append("Nothing open.")
         else:
             out += ["An arrow points from what a task waits on to the task. Dashed grey boxes are outside this milestone.", "",
-                    "```mermaid", *_graph(m, by_id), "```"]
+                    "```mermaid", *_graph(m, by_id, home), "```"]
     out += ["", "## Blockers", ""]
     if not model["all_blockers"]:
         out.append("No blockers.")

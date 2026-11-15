@@ -55,6 +55,9 @@ def _attempt(repo, svg, js, remote, branch, md=None):
             if md is None or (old_md.returncode == 0 and old_md.stdout == md):
                 return "unchanged"
         outcome = "updated"
+    if md is None and parent:  # no page this time: keep the one already on the branch rather than delete it
+        kept = git(repo, "show", f"{parent}:status.md", ok=(0, 128))
+        md = kept.stdout if kept.returncode == 0 else None
     files = [("status.json", js), *([("status.md", md)] if md is not None else []), ("status.svg", svg)]  # sorted by name
     entries = "".join(f"100644 blob {git(repo, 'hash-object', '-w', '--stdin', stdin=content).stdout.strip()}\t{name}\n" for name, content in files)
     tree = git(repo, "mktree", stdin=entries).stdout.strip()
