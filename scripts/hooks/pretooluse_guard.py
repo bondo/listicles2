@@ -49,6 +49,7 @@ MARK_READY_SHA256 = "5f63c355e1513a2d4d1af6fe6dfdb3a89b57de76671126eccec424b8c7d
 MARK_READY = "mark-ready.sh"
 MARK_READY_CALL = "scripts/mark-ready.sh"
 PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")
+WHOLE_CALL = re.compile(re.escape(MARK_READY_CALL) + r" [1-9][0-9]{0,5}")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -868,9 +869,14 @@ def wrapper_is_pinned(root):
 
 
 def check_mark_ready(cmd, assigns, words, wrappers, state):
-    """R2-01/R2-02/R3-01: the exact call only, of the pinned wrapper. Raw words are judged, so $(...), backticks, $VAR, globs and braces never
-    pass the digit check. Runs when the command's first word is a mark-ready.sh; `bash scripts/mark-ready.sh N` is not matched by the allow rule."""
+    """R2-01/R2-02/R3-01/R4-01: the exact call only, as the whole command, of the pinned wrapper. Raw words are judged, so $(...), backticks,
+    $VAR, globs and braces never pass the digit check. Runs when the command's first word is a mark-ready.sh; `bash scripts/mark-ready.sh N`
+    is not matched by the allow rule."""
     here = os.path.realpath(state["cwd"])
+    # R4-01: the hash below is taken before anything else in the line runs
+    if WHOLE_CALL.fullmatch(state.get("whole", "").strip(" \t\n")) is None:
+        deny("run the PR marker only as the whole command, exactly `scripts/mark-ready.sh <PR number>`: nothing before, after or beside it "
+             "(no ; && || | & newline, group, subshell, wrapper or nesting), because the guard checks the script before the rest of the line runs")
     exact = (words[0] == MARK_READY_CALL and len(words) == 2 and PR_NUMBER.fullmatch(words[1]) is not None
              and not assigns and not wrappers and not (cmd.writes or cmd.heredocs or cmd.subs)
              and state["known"] and here in project_roots(state["cwd"]))
@@ -981,7 +987,7 @@ def guard_target(path, state, what="write to"):
 
 
 def check_bash(command, cwd):
-    check_command_string(command, {"cwd": cwd, "known": True, "vars": {}})
+    check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command})
 
 
 def main():

@@ -603,9 +603,13 @@ seen the batch report.
   route (a merge, say). The auto-mode classifier may still evaluate the call on its own, so the rule is not a guarantee.
   The allow rule approves any command that starts with the script's path, so the PreToolUse guard also treats every file named
   `mark-ready.sh` as a process file and checks the command's first word: if it is a `mark-ready.sh`, the command is allowed only as
-  exactly `scripts/mark-ready.sh <N>` from the project root (no `cd`, env prefix, wrapper, redirect or substitution) and only while
+  the **whole command**, exactly `scripts/mark-ready.sh <N>` and nothing before, after or beside it (no `;`, `&&`, `||`, `|`, `&`,
+  newline, group, subshell, `cd`, env prefix, wrapper, redirect or substitution), from the project root, and only while
   the script is a regular file, not a symlink, whose SHA-256 equals the pin in the guard, because edits that never name the file
-  (`sed -i scripts/*.sh`, `cp -t scripts`) cannot all be caught. Interpreter forms such as `bash scripts/mark-ready.sh N` do not match
+  (`sed -i scripts/*.sh`, `cp -t scripts`) cannot all be caught. The hash is taken before the command runs, so a compound could
+  rewrite the script after it (R4-01). Residual risks the owner accepts: a background process started by an earlier tool call can still
+  swap the file between the hash and the `exec`; the guard is loaded from the working tree, so a branch switch replaces guard and pin
+  (owner review of the branch is the control); the auto-mode classifier and Claude Code's matcher semantics cannot be tested here. Interpreter forms such as `bash scripts/mark-ready.sh N` do not match
   the allow rule and go to the normal permission check. A legitimate edit of the script updates the pin in the same tooling PR.
   Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
   tooling-session change (CODEOWNERS covers `/.claude/` and `/scripts/`); `scripts/hooks/test_settings_permissions.py` and
