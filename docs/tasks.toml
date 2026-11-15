@@ -641,7 +641,8 @@ status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = []
-notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11)."
+pr = 62
+notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11). Delivered by PR #62; owner approval recorded 2026-11-15 in PR #88 (decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569)."
 
 [[task]]
 id = "M0.5-21"
