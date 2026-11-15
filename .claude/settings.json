@@ -3,6 +3,12 @@
     "type": "command",
     "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/statusline.sh\""
   },
+  "permissions": {
+    "allow": [
+      "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review *)",
+      "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/install-hooks.sh\" >/dev/null 2>&1 || true" }] }
