@@ -736,6 +736,19 @@ def unwrap(words):
     return assigns, words[i:], nested, seen
 
 
+ACTIONLINT_EXEC_FLAGS = re.compile(r"^--?(shellcheck|pyflakes|init-config)(=|$)")
+
+
+def check_actionlint(args):
+    """actionlint runs the executable named by -shellcheck / -pyflakes and -init-config writes under .github/. The allow rule
+    Bash(.tools/bin/actionlint *) would approve them, so deny them in every spelling (and arguments that cannot be judged)."""
+    for a in args:
+        if ACTIONLINT_EXEC_FLAGS.match(a):
+            deny(f"actionlint {a.split('=')[0]} runs or writes things the allow rule does not cover (-shellcheck, -pyflakes, -init-config)")
+        if "$" in a or "`" in a:
+            deny("actionlint arguments built from a variable or substitution cannot be checked for -shellcheck/-pyflakes; write them out")
+
+
 def check_assign(a):
     name, val = a.split("=", 1)
     if name in CONFIG_FILE_VARS:
@@ -867,6 +880,8 @@ def check_simple(cmd, state, depth):
         if any(a in SENSITIVE_SUBS for a in args[:3]):
             deny("the command name is built from a variable or substitution; write it out")
         return
+    if prog == "actionlint":
+        check_actionlint(args)
     if prog in ("cd", "pushd"):
         tgt = [a for a in args if not a.startswith("-")]
         t = tgt[-1] if tgt else "~"

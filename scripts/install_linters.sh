@@ -36,11 +36,13 @@ while read -r name sha member url extra; do
 done < "$pins"
 [ "${#names[@]}" -gt 0 ] || die "no tools in $pins"
 
-tmp="$(mktemp -d)"
+# Work under .tools (same filesystem as .tools/bin) so the final step is a rename.
+mkdir -p "$root/.tools"
+tmp="$(mktemp -d "$root/.tools/.install.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 
 for i in "${!names[@]}"; do
-  curl -fsSL --retry 5 --proto "$proto" -o "$tmp/$i.archive" "${urls[$i]}" || die "download failed for ${names[$i]}"
+  curl -fsSL --retry 5 --proto "$proto" --proto-redir "$proto" -o "$tmp/$i.archive" "${urls[$i]}" || die "download failed for ${names[$i]}"
   got="$(sha256sum "$tmp/$i.archive" | cut -d' ' -f1)"
   [ "$got" = "${shas[$i]}" ] || die "sha256 mismatch for ${names[$i]}: expected ${shas[$i]}, got $got; nothing installed"
 done
@@ -52,8 +54,12 @@ for i in "${!names[@]}"; do
   [ -f "$tmp/x$i/${members[$i]}" ] && [ ! -L "$tmp/x$i/${members[$i]}" ] || die "'${members[$i]}' is not a regular file"
 done
 
-mkdir -p "$dest"
+# Stage every binary first (an error here leaves .tools/bin untouched), then rename each into place.
+mkdir -p "$tmp/stage" "$dest"
 for i in "${!names[@]}"; do
-  install -m 0755 "$tmp/x$i/${members[$i]}" "$dest/${names[$i]}"
+  install -m 0755 "$tmp/x$i/${members[$i]}" "$tmp/stage/${names[$i]}" || die "staging ${names[$i]} failed; nothing replaced"
+done
+for i in "${!names[@]}"; do
+  mv -f "$tmp/stage/${names[$i]}" "$dest/${names[$i]}"
   echo "installed ${names[$i]} (sha256 ${shas[$i]})"
 done
