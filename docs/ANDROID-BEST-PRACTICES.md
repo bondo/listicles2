@@ -2,9 +2,10 @@
 
 Owner rule (issue #15, 2026-11-12): from M1 on, product code follows Google's Android guidance. Implementers cite this
 file in their prompts, reviewers check against it (`REVIEW.md` item 11), and a deviation needs a recorded decision
-(an ADR in `docs/adr/` or a `decision` comment on the state issue). **Status: draft, the owner approves it before M1.**
+(an ADR in `docs/adr/` or a `decision` comment on the state issue). **Status: approved. Approved by the owner 2026-11-15.** Decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569
 
-Every item below was taken from a page that was fetched and read on 2026-11-12. Priorities in the architecture
+Every item below was taken from a page that was fetched and read on 2026-11-12, except the Play Data safety item in section 9
+(read 2026-11-15). Priorities in the architecture
 section ("strongly recommended" and so on) are Google's own labels. Google says these are recommendations, not strict requirements.
 
 **Status column**
@@ -117,7 +118,8 @@ Sources: [Baseline Profiles](https://developer.android.com/topic/performance/bas
 ## 9. Security and privacy
 Sources: [Security best practices](https://developer.android.com/topic/security/best-practices),
 [Network security config](https://developer.android.com/privacy-and-security/security-config),
-[Auto Backup](https://developer.android.com/identity/data/autobackup).
+[Auto Backup](https://developer.android.com/identity/data/autobackup) and
+[Provide information for Google Play's Data safety section](https://support.google.com/googleplay/android-developer/answer/10787469) (Play Console Help, read 2026-11-15).
 
 | Rule | Status |
 |---|---|
@@ -125,7 +127,7 @@ Sources: [Security best practices](https://developer.android.com/topic/security/
 | Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding) |
 | Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change) |
 | Request the fewest permissions; validate input; keep data minimal (also Firestore rules, covered in REVIEW.md item 2) | review |
-| Play Data safety form must match what the app collects | **not sourced**: its page is on `support.google.com`, which this session's proxy refuses (403). **Owner decision 2026-11-13: `support.google.com` stays blocked for now**, so this item remains not sourced and is not cited |
+| Play Data safety form must match what the app collects. The page states that the developer alone is responsible for complete and accurate declarations, including data handled by third-party libraries and SDKs, and that Google may take enforcement action on a discrepancy between app behaviour and declaration. A privacy policy is required to complete the form, even for an app that collects no user data | review (the form is filled in Play Console, outside the repo) |
 
 ## 10. Play quality
 Sources: [Target API requirement](https://developer.android.com/google/play/requirements/target-sdk),
@@ -140,7 +142,7 @@ Sources: [Target API requirement](https://developer.android.com/google/play/requ
 | Edge-to-edge: handle `WindowInsets` (a `Scaffold` helps); it is enforced when targeting SDK 35+ | review |
 | Predictive back: do not intercept back with `onBackPressed` or `KEYCODE_BACK`; do not opt out | review |
 | Adaptive layouts by window size class (compact under 600dp, medium 600 to 840dp, expanded 840 to 1200dp, large 1200 to 1600dp, extra-large from 1600dp; large and extra-large need the `supportLargeAndXLargeWidth` opt-in); do not use "is tablet" logic; state survives configuration changes | review (M1+) |
-| All strings in resources, with a complete default `values/strings.xml` and `values-da/` | tooling: lint `MissingTranslation` is an error and `warningsAsErrors` is on (`app/build.gradle.kts`); `<plurals>` and "no hardcoded text" are CLAUDE.md rules checked by review plus lint |
+| All strings in resources, with a complete default `app/src/main/res/values/strings.xml` and `app/src/main/res/values-da/` | tooling: lint `MissingTranslation` is an error and `warningsAsErrors` is on (`app/build.gradle.kts`); `<plurals>` and "no hardcoded text" are CLAUDE.md rules checked by review plus lint |
 | Give translators context comments; mark non-translatable parts with `xliff:g` | review |
 
 ## 11. Dependency and Gradle hygiene
@@ -165,9 +167,9 @@ Each would be its own PR, test-first, per CLAUDE.md.
 7. **Release smoke build** with R8 on, run in CI, once M1 has a release variant.
 8. **Roborazzi and accessibility checks** are already in PLAN section 5; make sure their tasks cite sections 6 and 7 above.
 
-## Owner decisions (2026-11-13)
+## Owner decisions (2026-11-13, updated 2026-11-15)
 1. Navigation 3 (section 3).
 2. Firestore offline persistence only, no Room (section 4).
-3. `support.google.com` is not allowed now; the Play Data safety item stays not sourced (section 9). Revisit if the owner changes the network setting.
+3. `support.google.com` is now allowed (2026-11-15); the Play Data safety item is sourced from the Play Console Help page, read 2026-11-15 (section 9).
 
-No open questions remain; the checklist still needs the owner's approval before M1 (status line above).
+No open questions remain; the owner approved the checklist on 2026-11-15 (status line above).

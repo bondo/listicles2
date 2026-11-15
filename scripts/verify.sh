@@ -29,13 +29,14 @@ step() {
 gradle() { ./gradlew -q --console=plain "$@"; }
 
 step guards ./scripts/guards.sh
-step hook-tests python3 -I -m unittest discover -s scripts/hooks
+step hook-tests python3 -I scripts/hooks/run_hook_tests.py
 step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
 step tasks-tests python3 -I scripts/test_tasks.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
 step collab-inbox-tests python3 -I scripts/test_collab_inbox.py
 step status-visual-tests python3 -I scripts/test_status_visual.py
+step status-page-tests python3 -I scripts/test_status_page.py
 step status-publish-tests python3 -I scripts/test_status_publish.py
 step status-workflow-tests python3 -I scripts/test_status_workflow.py
 step prompt-rules-tests python3 -I scripts/test_prompt_rules.py
@@ -43,6 +44,8 @@ step prompt-rules python3 -I scripts/prompt_rules.py
 step tasks-validate python3 -I scripts/tasks.py validate
 step metrics-tests python3 -I scripts/test_agent_metrics.py
 step metrics-check python3 -I scripts/agent_metrics.py --check
+step docs-check-tests python3 -I scripts/test_docs_check.py
+step docs-check python3 -I scripts/docs_check.py
 step gradle-repos python3 -I scripts/test_check_gradle_repos.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
 step python-lint ./scripts/lint_python.sh

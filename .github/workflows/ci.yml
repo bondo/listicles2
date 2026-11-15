@@ -100,7 +100,7 @@ jobs:
           GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '1500' || '600' }}
         run: ./scripts/guards.sh
       - name: hook tests
-        run: python3 -I -m unittest discover -s scripts/hooks
+        run: python3 -I scripts/hooks/run_hook_tests.py
 
   tasks:
     name: tasks
@@ -117,6 +117,8 @@ jobs:
         run: python3 -I scripts/test_collab_inbox.py
       - name: status renderer and fetch tests
         run: python3 -I scripts/test_status_visual.py
+      - name: status detail page tests
+        run: python3 -I scripts/test_status_page.py
       - name: status publisher tests
         run: python3 -I scripts/test_status_publish.py
       - name: status workflow tests
@@ -127,6 +129,10 @@ jobs:
         run: python3 -I scripts/prompt_rules.py
       - name: docs/tasks.toml validates
         run: python3 -I scripts/tasks.py validate
+      - name: docs check tests
+        run: python3 -I scripts/test_docs_check.py
+      - name: docs links and paths exist
+        run: python3 -I scripts/docs_check.py
       - name: agent_metrics.py tests
         run: python3 -I scripts/test_agent_metrics.py
       - name: docs/agent-metrics.csv is up to date
@@ -137,7 +143,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - name: ruff and mypy (versions pinned in scripts/requirements-lint.txt)
         run: pip install -r scripts/requirements-lint.txt
