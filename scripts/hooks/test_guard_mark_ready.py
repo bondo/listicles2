@@ -39,7 +39,7 @@ class MarkReadyGuard(unittest.TestCase):
         """R2-02: the shell runs these before the wrapper can validate anything."""
         for c in ["scripts/mark-ready.sh $(gh pr merge 5)", "scripts/mark-ready.sh `gh pr merge 5`", "scripts/mark-ready.sh $PR",
                   "scripts/mark-ready.sh ${PR}", "scripts/mark-ready.sh <(echo 1)", "scripts/mark-ready.sh $((1+1))", "scripts/mark-ready.sh 1$(id)",
-                  "scripts/mark-ready.sh \"$(id)\"", "scripts/mark-ready.sh $'1'", "scripts/mark-ready.sh 1*", "scripts/mark-ready.sh {1,2}"]:
+                  "scripts/mark-ready.sh \"$(id)\"", "scripts/mark-ready.sh $'1\\n2'","scripts/mark-ready.sh 1*", "scripts/mark-ready.sh {1,2}"]:
             self.assertEqual(self.bash(c), 2, c)
 
     def test_wrong_working_directory_is_denied(self):

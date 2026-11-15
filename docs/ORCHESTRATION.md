@@ -601,7 +601,9 @@ seen the batch report.
   before `gh` runs. The project `.claude/settings.json` pre-allows exactly one rule for it, `Bash(scripts/mark-ready.sh *)`, and
   no rule for raw `gh` commands, because `*` in a rule also matches spaces and slashes, so a raw rule could be steered to another
   route (a merge, say). The auto-mode classifier may still evaluate the call on its own, so the rule is not a guarantee.
-  Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
+  The allow rule approves any command that starts with the script's path, so the PreToolUse guard also treats every file named
+  `mark-ready.sh` as a process file and allows a command that runs one only as exactly `scripts/mark-ready.sh <N>` from the project
+  root (no `cd`, env prefix, wrapper, redirect or substitution). Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
   tooling-session change (CODEOWNERS covers `/.claude/` and `/scripts/`); `scripts/hooks/test_settings_permissions.py` and
   `scripts/hooks/test_mark_ready.py` fail if the list holds anything else or the script accepts anything but a PR number.
 * **Strict up-to-date merge procedure:** `main` requires branches to be up to date, so merge one PR at a time. After each

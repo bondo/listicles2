@@ -35,8 +35,14 @@ PROTECTED = (
     ".githooks/",
     "scripts/guards.sh",
     "scripts/install-hooks.sh",
+    "scripts/mark-ready.sh",  # the project allow rule approves this path; see MARK_READY below
     "scripts/hooks/",
 )
+# The allow rule `Bash(scripts/mark-ready.sh *)` approves any command that starts with that text. So: a file with this name is a process
+# file in every directory, and a command that runs one is allowed only as exactly `scripts/mark-ready.sh <PR number>` from the project root.
+MARK_READY = "mark-ready.sh"
+MARK_READY_CALL = "scripts/mark-ready.sh"
+PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -150,6 +156,8 @@ def protection(path, cwd):
     """'always' (git internals), 'process' (process files) or None."""
     if not path:
         return None
+    if os.path.basename(path.rstrip("/")) == MARK_READY:
+        return "process"
     proj = os.environ.get("CLAUDE_PROJECT_DIR")
     if proj:
         path = path.replace("${CLAUDE_PROJECT_DIR}", proj).replace("$CLAUDE_PROJECT_DIR", proj)
@@ -840,6 +848,17 @@ def check_literals(code, state, depth):
         check_command_string(c, child(state), depth + 1)
 
 
+def check_mark_ready(cmd, assigns, words, wrappers, state):
+    """R2-01/R2-02: the exact call only. Raw words are judged, so $(...), backticks, $VAR, globs and braces never pass the digit check."""
+    here = os.path.realpath(state["cwd"])
+    exact = (words[0] == MARK_READY_CALL and len(words) == 2 and PR_NUMBER.fullmatch(words[1]) is not None
+             and not assigns and not wrappers and not (cmd.writes or cmd.heredocs or cmd.subs)
+             and state["known"] and here in project_roots(state["cwd"]))
+    if not exact:
+        deny("run the PR marker only as exactly `scripts/mark-ready.sh <PR number>` from the project root: no other path, no cd or env prefix, "
+             "no wrapper, redirect or substitution (the project allow rule approves that text, so the guard narrows it)")
+
+
 def check_simple(cmd, state, depth):
     for t in cmd.writes:
         guard_target(expand(t, state), state, "redirect to")
@@ -848,6 +867,9 @@ def check_simple(cmd, state, depth):
         check_assign(a)
     for s in nested:
         check_command_string(s, child(state), depth + 1)
+    if words and os.path.basename(words[0]) == MARK_READY:
+        check_mark_ready(cmd, assigns, words, wrappers, state)
+        return
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values
             name, val = a.split("=", 1)
