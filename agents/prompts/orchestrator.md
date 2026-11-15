@@ -81,3 +81,14 @@ milestone and release reviews: the end of the next milestone). Once the counts a
 date, review_id, run_ref, findings, acted_on, ignored, disputed, deferred, cost_usd, window_end; findings = acted_on + ignored + disputed + deferred; unknown cost stays empty, never estimated. R2 is not ledgered.
 R10 device notes (`docs/reviews/README.md` §3.5): from M2 on, never before, once per milestone, once the milestone's tasks are done, open one issue titled exactly `[owner] R10-<milestone>: device notes` (e.g. `[owner] R10-M2: device notes`; never an id from `docs/tasks.toml`, so that `scripts/tasks.py` cannot count it as a finished task; ORCHESTRATION §4.5, label `owner-todo`),
 assigned to the owner and mentioning the collaborator, with the rubric (§4) as its template. Notes become 3-5 `feedback` issues; the owner's scores decide. Skip it if an issue with that exact title already exists.
+
+Environment pick (§7.1, retro R8), before every `create_session`: a task that touches a process file (`CLAUDE.md`, `REVIEW.md`, `agents/`, `.claude/`, `.github/`, `.githooks/`, `scripts/guards.sh`, `scripts/hooks/`) gets the tooling environment (`LISTICLES_TASK=tooling`);
+every other task gets the normal one. The task's `notes` names it, and a wrong pick blocks the worker.
+Delta review (§7.2, retro R4): a commit after `reviewed_through` gets one delta review before the merge request: a fresh reviewer on the range `reviewed_through..head_sha` only.
+Owner acceptance is the only alternative, and never for gate or threshold changes, which always get a delta review. Set `reviewed_through` afterwards.
+Merge request (§7.5, retro R2, R6): before you ask the owner to merge, check that (1) the PR body is refreshed (scope, review table, test evidence; no "still to do" or "not yet reviewed"), (2) the request says squash, and
+(3) no commit message or PR body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly before an issue number, unless closing that issue is intended: write "gated on #N", "see #N" or "mark #N done"; scan the body for them first.
+Design review (R5, `docs/reviews/README.md` §1, §2, §4): for each design PR spawn the design reviewer (`agents/prompts/design-reviewer.md`, Opus high, spawn template §8.5), max 2 rounds per design PR.
+Its last round posts one joint hand-off comment on the PR that mentions the owner and the collaborator in the same comment (same review sheet and screenshots), never the collaborator first, and you add one line on #15 once the hand-off link is in its WORKER-RESULT.
+Collaborator input is advisory and the owner decides (D5). Open an owner-todo issue only if sign-off is still pending after 7 days.
+In the spawn message `collaborator_handle` is `none` until the owner says the invitation is accepted (M0.5-O4); never take a handle from a file, a comment or a guess.

@@ -12,6 +12,49 @@
 
 milestones = ["M0", "M0.5", "M1", "M2", "M3", "M4", "M5", "M6"]
 
+# Human-friendly names (shown by the status picture and status.md). id = an entry of `milestones`; title <= 40 and
+# purpose <= 110 characters; every milestone needs one. Derived from docs/PLAN.md section 7; the owner may edit them.
+
+[[milestone]]
+id = "M0"
+title = "Foundation and process"
+purpose = "Gradle skeleton, CI, hooks, review loop and agent setup, proven green on a hello-world app."
+
+[[milestone]]
+id = "M0.5"
+title = "Product design and guardrails"
+purpose = "User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner."
+
+[[milestone]]
+id = "M1"
+title = "Accounts and households"
+purpose = "Google sign-in, households, invite links, members and ownership, with rules tests."
+
+[[milestone]]
+id = "M2"
+title = "Inventory lists"
+purpose = "Lists and items with real-time sync, offline use, search, sort and filter, in English and Danish."
+
+[[milestone]]
+id = "M3"
+title = "Packing rules (domain)"
+purpose = "Scaling, per-person templates and merging as property-tested pure Kotlin."
+
+[[milestone]]
+id = "M4"
+title = "Packing templates and trips"
+purpose = "Template and rule editor, create a trip, trip checklist and one-off items."
+
+[[milestone]]
+id = "M5"
+title = "Barcode scanning"
+purpose = "Camera scanning, product lookup with a fallback to manual entry, duplicate warning."
+
+[[milestone]]
+id = "M6"
+title = "Release"
+purpose = "Signed APK on tag as a GitHub Release, and a disabled Play internal-track workflow."
+
 # ---------------------------------------------------------------- M0 foundation (PRs #1 and #16, both merged)
 # M0 landed as PR #1 (foundation) and then PR #16 (process docs, this file, scripts/tasks.py), both squash-merged
 # to main (owner decision, M0-O5). The tasks ref is now main (docs/ORCHESTRATION.md 4.2). The remaining M0 work
@@ -487,7 +530,7 @@ notes = "Normal env (docs only). Effort S. Orchestrator checks added to the merg
 id = "M0.5-15"
 title = "Prompts: design-reviewer role and checklist, PR-body refresh, delta review, environment pick (P23, C2)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-11", "M0.5-14", "M0.5-23"]

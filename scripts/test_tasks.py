@@ -15,7 +15,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tasks  # noqa: E402  # justified: must follow the sys.path insert above
 
-HEADER = 'milestones = ["M0", "M1"]\n'
+def milestone_tables(*ids):
+    return "".join(f'[[milestone]]\nid = "{m}"\ntitle = "Title {m}"\npurpose = "Purpose {m}."\n\n' for m in ids)
+
+
+HEADER = 'milestones = ["M0", "M1"]\n\n' + milestone_tables("M0", "M1")
 
 
 def task(tid, milestone="M0", status="todo", assignee="implementer", deps=(), **extra):
@@ -47,6 +51,62 @@ def fu_issue(number, severity="minor", target="M0", labels=(), state="open"):
 def ready_ids(g, **kw):
     d = tasks.derive(g, **kw)
     return [t.id for t in sorted(g.tasks, key=lambda t: tasks.order_key(g, t)) if d[t.id]["state"] == "ready"]
+
+
+class MilestoneNamesTest(unittest.TestCase):
+    def test_every_milestone_has_a_title_and_purpose(self):
+        g = graph(task("M0-01"))
+        self.assertEqual((g.info["M0"].title, g.info["M0"].purpose), ("Title M0", "Purpose M0."))
+        self.assertEqual(list(g.info), ["M0", "M1"])
+
+    def test_repository_milestones_have_human_friendly_names(self):
+        path = Path(__file__).resolve().parent.parent / tasks.DEFAULT_FILE
+        g = tasks.parse(path.read_text(encoding="utf-8"))
+        self.assertEqual(list(g.info), g.milestones)
+        self.assertEqual(g.info["M0"].title, "Foundation and process")
+        for info in g.info.values():
+            self.assertTrue(info.title and info.purpose)
+            self.assertLessEqual(len(info.title), tasks.MAX_MILESTONE_TITLE)
+
+    def test_a_milestone_without_a_table_fails(self):
+        header = 'milestones = ["M0", "M1"]\n\n' + milestone_tables("M0")
+        self.assertIn("M1 has no [[milestone]] table", errors_of(task("M0-01"), header=header))
+
+    def test_a_table_for_an_unknown_milestone_fails(self):
+        header = HEADER + milestone_tables("M9")
+        self.assertIn("unknown milestone 'M9'", errors_of(task("M0-01"), header=header))
+
+    def test_duplicate_tables_fail(self):
+        header = HEADER + milestone_tables("M0")
+        self.assertIn("duplicate [[milestone]] table for M0", errors_of(task("M0-01"), header=header))
+
+    def test_empty_blank_or_non_string_titles_fail(self):
+        for bad in ('""', '"   "', "3"):
+            with self.subTest(bad):
+                header = f'milestones = ["M0"]\n\n[[milestone]]\nid = "M0"\ntitle = {bad}\npurpose = "p"\n'
+                self.assertIn("M0: title must be a non-empty string", errors_of(task("M0-01"), header=header))
+
+    def test_missing_title_or_purpose_fails(self):
+        for field in ("title", "purpose"):
+            with self.subTest(field):
+                other = "purpose" if field == "title" else "title"
+                header = f'milestones = ["M0"]\n\n[[milestone]]\nid = "M0"\n{other} = "x"\n'
+                self.assertIn(f"M0: missing {field}", errors_of(task("M0-01"), header=header))
+
+    def test_overlong_title_or_purpose_fails(self):
+        header = ('milestones = ["M0"]\n\n[[milestone]]\nid = "M0"\n'
+                  f'title = "{"t" * (tasks.MAX_MILESTONE_TITLE + 1)}"\npurpose = "{"p" * (tasks.MAX_MILESTONE_PURPOSE + 1)}"\n')
+        errs = errors_of(task("M0-01"), header=header)
+        self.assertIn("M0: title is longer than", errs)
+        self.assertIn("M0: purpose is longer than", errs)
+
+    def test_unknown_fields_in_a_table_fail(self):
+        header = 'milestones = ["M0"]\n\n[[milestone]]\nid = "M0"\ntitle = "t"\npurpose = "p"\nowner = "x"\n'
+        self.assertIn("M0: unknown fields ['owner']", errors_of(task("M0-01"), header=header))
+
+    def test_a_milestone_table_must_be_an_array_of_tables(self):
+        header = 'milestones = ["M0"]\nmilestone = 3\n'
+        self.assertIn("milestone must be an array of tables", errors_of(task("M0-01"), header=header))
 
 
 class ValidateTest(unittest.TestCase):
@@ -204,7 +264,7 @@ class DeriveTest(unittest.TestCase):
         self.assertEqual(ready_ids(g, issues=[closed]), ["M0-01"])
 
     def test_empty_milestone_dependency_is_not_satisfied(self):
-        g = tasks.parse('milestones = ["M0", "M1", "M2"]\n' + task("M1-01", milestone="M1", deps=["milestone:M2"]),
+        g = tasks.parse('milestones = ["M0", "M1", "M2"]\n' + milestone_tables("M0", "M1", "M2") + task("M1-01", milestone="M1", deps=["milestone:M2"]),
                      burn_down=False)
         self.assertEqual(ready_ids(g), [])
         self.assertEqual(tasks.derive(g)["M1-01"]["unmet"], ["milestone:M2"])
