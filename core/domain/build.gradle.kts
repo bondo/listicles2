@@ -2,7 +2,11 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.licensee)
 }
+
+// M0.5-10: shipped dependencies must be on the owner's licence allowlist.
+apply(from = rootProject.file("config/licensee/policy.gradle"))
 
 detekt {
     // Type-resolved tasks (detektMain, detektTest); the root task covers all sources without types.
