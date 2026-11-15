@@ -300,6 +300,7 @@ class RenderSvg(unittest.TestCase):
         for needle in ("A Alpha name", "Build the alpha.", "40% 2/5", "B Beta name", "0% 0/1", "C Gamma name", "Build the gamma."):
             self.assertIn(needle, lines)
         self.assertEqual(sum(1 for line in lines if line.endswith("current")), 1)
+        self.assertIn("ready", lines)  # A-02 has no PR
 
     def test_a_milestone_without_tasks_shows_its_planned_name_and_not_planned_yet(self):
         lines = texts(self.svg())
@@ -312,7 +313,6 @@ class RenderSvg(unittest.TestCase):
         for needle in ("A-02", "Ready thing", "in progress #20", "A-O1", "Owner thing", "owner to-do", "A-04", "Waits for the owner",
                        "blocked", "B-01", "Next milestone"):
             self.assertIn(needle, joined)
-        self.assertIn("ready", lines)
         self.assertIn("waits on A-O1 (owner)", lines)
         self.assertIn("waits on all of A", lines)
 
