@@ -68,7 +68,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 
 | Task | Title | Status | Depends on | Who | PR |
 |---|---|---|---|---|---|
-| M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | ready | all of M0 | planner |  |
+| M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | in progress | all of M0 | planner | [#94](https://github.com/bondo/listicles2/issues/94) |
 | M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | blocked | M0.5-01 | planner |  |
 | M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | blocked | M0.5-01, M0.5-16 | planner |  |
 | M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | done | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
@@ -107,7 +107,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M0.5-01 User stories with acceptance criteria … (ready)"]:::ready
+    n0["M0.5-01 User stories with acceptance criteria … (in progress)"]:::progress
     n1["M0.5-02 App-flow diagram (docs/product/flow.… (blocked)"]:::blocked
     n2["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::blocked
     n3["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (ready)"]:::ready
