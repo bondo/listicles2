@@ -153,7 +153,7 @@ class DependencyGraph(unittest.TestCase):
         shape = re.compile(r'^(flowchart LR|\s+n\d+\["[^"\n]*"\](:::\w+)?|\s+n\d+ --> n\d+|\s+classDef \w+ [^\n]*)$')
         for title in nasty:
             with self.subTest(title=title[:25]):
-                text = page(tasks=with_title("A-02", title).replace("Waits for the owner", title))
+                text = page(tasks=with_title("A-02", title).replace('title = "Waits for the owner"', f"title = {json.dumps(title)}"))
                 for line in mermaid(milestone_section(text, "A")):
                     self.assertRegex(line, shape)
                 self.assertEqual(text.count("```mermaid"), 2)  # A and B only; the fence cannot be closed early
@@ -191,7 +191,7 @@ class Escaping(unittest.TestCase):
         self.assertEqual(status_page.cell(None), "")
 
     def test_hostile_blocker_titles_stay_inside_their_list_item(self):
-        issues = [fx.issue(8, t, ["blocked"]) for t in ("<b>x</b>\n- injected", "[a](http://evil.example)", "`x`")]
+        issues = [fx.issue(8 + n, t, ["blocked"]) for n, t in enumerate(("<b>x</b>\n- injected", "[a](http://evil.example)", "`x`"))]
         sec = page(issues=issues).split("## Blockers")[1]
         self.assertNotRegex(sec, r"[<>`\[\]]")
         self.assertEqual(len([ln for ln in sec.splitlines() if ln.startswith("- ")]), 4)  # 3 issues + task blocker A-04

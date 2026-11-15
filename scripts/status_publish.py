@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Publish status.svg and status.json to the `status` branch with a plain push (git plumbing, no working tree).
 
-Usage: python3 -I scripts/status_publish.py --svg status.svg --json status.json [--repo .] [--remote origin] [--branch status]
+Usage: python3 -I scripts/status_publish.py --svg status.svg --json status.json [--md status.md] [--repo .] [--remote origin] [--branch status]
+
+The detail page status.md is published too when --md is given, or when a file named status.md sits next to the SVG.
 
 Creates the orphan branch when the remote has none; builds a new commit on the remote tip otherwise; makes no
-commit when the SVG is unchanged apart from its generated stamp. Never force-pushes: a rejected push is retried once
+commit when the SVG is unchanged apart from its generated stamp and the page is unchanged. Never force-pushes: a rejected push is retried once
 on the fresh tip, then fails. Prints created, updated or unchanged. Exit 2 on any error.
 """
 
@@ -40,7 +42,7 @@ def _read(path):
         raise PublishError(f"{path}: cannot read ({e.strerror})") from None
 
 
-def _attempt(repo, svg, js, remote, branch):
+def _attempt(repo, svg, js, remote, branch, md=None):
     ref = f"refs/heads/{branch}"
     found = git(repo, "ls-remote", "--exit-code", "--heads", remote, ref, ok=(0, 2))
     parent, outcome = None, "created"
@@ -49,10 +51,13 @@ def _attempt(repo, svg, js, remote, branch):
         parent = git(repo, "rev-parse", "FETCH_HEAD").stdout.strip()
         old = git(repo, "show", f"{parent}:status.svg", ok=(0, 128))
         if old.returncode == 0 and status_visual.same_ignoring_stamp(old.stdout, svg):
-            return "unchanged"
+            old_md = git(repo, "show", f"{parent}:status.md", ok=(0, 128)) if md is not None else None
+            if md is None or (old_md.returncode == 0 and old_md.stdout == md):
+                return "unchanged"
         outcome = "updated"
-    blobs = [git(repo, "hash-object", "-w", "--stdin", stdin=content).stdout.strip() for content in (js, svg)]
-    tree = git(repo, "mktree", stdin=f"100644 blob {blobs[0]}\tstatus.json\n100644 blob {blobs[1]}\tstatus.svg\n").stdout.strip()
+    files = [("status.json", js), *([("status.md", md)] if md is not None else []), ("status.svg", svg)]  # sorted by name
+    entries = "".join(f"100644 blob {git(repo, 'hash-object', '-w', '--stdin', stdin=content).stdout.strip()}\t{name}\n" for name, content in files)
+    tree = git(repo, "mktree", stdin=entries).stdout.strip()
     parents = ("-p", parent) if parent else ()
     commit = git(repo, *IDENTITY, "commit-tree", tree, *parents, "-m", "status: update").stdout.strip()
     push = git(repo, "push", "--quiet", remote, f"{commit}:{ref}", ok=(0, 1))
@@ -65,26 +70,30 @@ class _Rejected(PublishError):
     pass
 
 
-def publish(repo, svg_path, json_path, remote="origin", branch="status"):
+def publish(repo, svg_path, json_path, remote="origin", branch="status", md_path=None):
     if branch in PROTECTED or not BRANCH.fullmatch(branch) or not re.fullmatch(r"[A-Za-z0-9._/-]+", remote):
         raise PublishError(f"refusing to publish to branch {branch!r}")
     svg, js = _read(svg_path), _read(json_path)
+    if md_path is None and Path(svg_path).with_name("status.md").is_file():
+        md_path = str(Path(svg_path).with_name("status.md"))
+    md = _read(md_path) if md_path is not None else None
     try:
-        return _attempt(repo, svg, js, remote, branch)
+        return _attempt(repo, svg, js, remote, branch, md)
     except _Rejected:
-        return _attempt(repo, svg, js, remote, branch)  # the tip moved: rebuild on it, still a plain push
+        return _attempt(repo, svg, js, remote, branch, md)  # the tip moved: rebuild on it, still a plain push
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Publish the status image to the status branch.")
     ap.add_argument("--svg", required=True)
     ap.add_argument("--json", required=True)
+    ap.add_argument("--md", help="detail page (default: status.md next to the SVG, when it exists)")
     ap.add_argument("--repo", default=".")
     ap.add_argument("--remote", default="origin")
     ap.add_argument("--branch", default="status")
     args = ap.parse_args(argv)
     try:
-        print(publish(args.repo, args.svg, args.json, args.remote, args.branch))
+        print(publish(args.repo, args.svg, args.json, args.remote, args.branch, args.md))
     except PublishError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
