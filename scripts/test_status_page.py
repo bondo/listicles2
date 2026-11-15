@@ -185,6 +185,29 @@ class DependencyGraph(unittest.TestCase):
         self.assertIsNotNone(re.fullmatch(r'(?:[^&#;"<>`\[\]|\\]|#(?:\d+|[a-z]+);)*', out), out)
 
 
+class CrossMilestone(unittest.TestCase):
+    EXTRA = ('\n[[task]]\nid = "B-02"\ntitle = "Needs an alpha task"\nmilestone = "B"\nstatus = "todo"\nassignee = "implementer"\n'
+             'risk = "normal"\ndepends_on = ["A-O1"]\n')
+
+    def node_lines(self, mid):
+        return [ln for ln in mermaid(milestone_section(page(tasks=fx.TASKS + self.EXTRA), mid)) if ln.strip().startswith("n") and "[" in ln]
+
+    def test_a_dependency_from_another_milestone_is_a_dashed_grey_ext_box_that_keeps_its_status_word(self):
+        line = next(ln for ln in self.node_lines("B") if "A-O1" in ln)
+        self.assertTrue(line.endswith(":::ext"), line)
+        self.assertIn("(owner to-do)", line)
+
+    def test_a_dependency_inside_the_same_milestone_keeps_its_state_class(self):
+        line = next(ln for ln in self.node_lines("A") if "A-O1" in ln)
+        self.assertTrue(line.endswith(":::owner"), line)
+        self.assertFalse([ln for ln in self.node_lines("A") if ln.endswith(":::ext") and "A-" in ln])
+
+    def test_the_milestone_own_open_tasks_are_never_ext(self):
+        for ln in self.node_lines("B"):
+            if "B-02" in ln:
+                self.assertFalse(ln.endswith(":::ext"), ln)
+
+
 class Escaping(unittest.TestCase):
     def test_table_cells_cannot_break_the_row_or_inject_markup(self):
         nasty = ["a|b", "<script>alert(1)</script>", "[x](http://evil.example)", "![i](http://evil.example/p.png)", "line\nbreak",
@@ -196,6 +219,14 @@ class Escaping(unittest.TestCase):
                 self.assertEqual(len(re.findall(r"(?<!\\)\|", row)), 7, row)  # six cells
                 self.assertNotRegex(row, r"[<>`\[\]]")
                 self.assertLessEqual(len(row), 400)
+
+    def test_bare_urls_and_addresses_do_not_autolink(self):
+        for title in ("see https://example.com/x now", "http://a.example", "www.example.com/x", "mail me@example.com", "ftp://h/x"):
+            with self.subTest(title=title):
+                out = status_page.cell(title)
+                self.assertNotRegex(out, r"(?i)(https?|ftp)://|\bwww\.|@")
+                row = next(r for r in page(tasks=with_title("A-02", title)).splitlines() if r.startswith("| A-02 |"))
+                self.assertNotRegex(row, r"(?i)(https?|ftp)://|\bwww\.|[^ ]@[^ ]")
 
     def test_cell_helper_clips_and_escapes(self):
         self.assertEqual(status_page.cell("a|b"), "a&#124;b")

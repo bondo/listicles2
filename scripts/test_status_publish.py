@@ -101,6 +101,18 @@ class Publish(unittest.TestCase):
         self.publish()
         self.assertEqual(self.publish(md="# page\n"), "updated")
 
+    def test_publishing_without_a_page_keeps_the_page_already_on_the_branch(self):
+        self.publish(md="# page\n")
+        (self.svg.parent / "status.md").unlink()
+        self.assertEqual(self.publish(body="two"), "updated")
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status.md"), "# page")
+        self.assertEqual(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split(), ["status.json", "status.md", "status.svg"])
+
+    def test_without_a_page_anywhere_the_branch_still_has_no_page(self):
+        self.publish()
+        self.assertEqual(self.publish(body="two"), "updated")
+        self.assertEqual(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split(), ["status.json", "status.svg"])
+
     def test_stamp_only_change_makes_no_commit(self):
         self.publish()
         self.assertEqual(self.publish(stamp="2026-11-13 12:30 UTC"), "unchanged")
