@@ -4,11 +4,12 @@
 
 **The name is Tally.** Decided by the owner on **2026-11-15** (owner comment on PR #77: "We have decided on the name Tally"). Task M0.5-O2 is the owner's pick; M0.5-04 delivered this document.
 
-- The earlier recommendation (**Nestlist**, section 4) is **superseded**. Sections 1 to 6 below are kept unchanged as history of how the shortlist was made. Tally was candidate 7 ("Tallyhome") in spirit only; it was not itself researched in sections 1 to 6, so see "Tally: availability and risks" at the end.
+- The earlier recommendation (**Nestlist**, section 4) is **superseded**. Sections 1 to 6 below are kept unchanged as history of how the shortlist was made. Tally is close to candidate 7 (Tallyhome) but was not itself researched in sections 1 to 6; see section 7.
 - **Nothing is renamed by this document.** Renaming the repo, `applicationId` and app labels is planned by task M1-01.
-- Open items for the owner are listed in "Tally: availability and risks" (Play listing title, trademark search, domains; the applicationId is decided, see section 7).
+- **`applicationId` is decided: `dk.bjarkebjarke.tally`** (stated by the owner in the orchestrator session on 2026-11-15, relayed by the orchestrator; not in a comment on this PR). The owner owns the domain `bjarkebjarke.dk` and wants the namespace `tally.bjarkebjarke.dk`; in Android reverse-domain form that is `dk.bjarkebjarke.tally`. The applicationId is **permanent once published on Google Play**. It is unique per app, so it cannot collide; the listing title and trademark questions (open items 1 and 2 in section 7) are unaffected. The rename of the current `dev.listicles.app`, repo, app label en/da and Firebase project stays a task for M1-01 planning.
+- Open items for the owner are listed in section 7 (Play listing title, trademark search, domains and org, app label en/da).
 
-Status: decided (Tally, 2026-11-15); the text below is the original proposal, kept as history. No agent renames anything. Research date: **2026-11-13**.
+Status: decided (Tally, 2026-11-15); sections 1 to 6 are the original proposal, kept as history; section 7 is current. No agent renames anything. Research date: **2026-11-13**.
 
 The app: shared household lists for Android (inventories, packing templates that merge into trip checklists), real-time sync,
 English and Danish UI. Working name: **Listicles**.
@@ -96,7 +97,6 @@ Checked **2026-11-15**, public sources only, no personal details in any request.
 | crates.io, Maven Central | crates.io returned 403 and Maven Central did not respond | not verified |
 | Tally.so (online form builder, has an Android app) | Exists, a well-known product named Tally | verified (web search) |
 | TallyPrime / Tally Solutions (Indian accounting software; trademark filings for TALLY PRIME listed on Justia, owner Tally Solutions Private Limited) | Exists; large, long-established company, with Android apps in the same store | verified (web search); scope of its trademark in Denmark/EU **not verified** |
-| "Tally" credit app | The search did not identify a separate credit app named Tally (the UK/US consumer credit app may or may not exist today) | **not verified** |
 | Domains (.com, .dk, .app) | Not checkable from the sandbox | not verified |
 | Trademarks (EUIPO, DKPTO, USPTO) | Not searched | **not verified** |
 
@@ -105,10 +105,9 @@ Checked **2026-11-15**, public sources only, no personal details in any request.
 ### Open items for the owner
 
 1. **Play Store listing title.** "Tally" alone is probably crowded; a descriptive title (for example "Tally: shared household lists") is safer. Check in Play Console.
-2. **`applicationId` (decided, stated by the owner in the orchestrator session, 2026-11-15, relayed by the orchestrator; not in a comment on this PR).** The owner owns the domain `bjarkebjarke.dk` and wants the namespace `tally.bjarkebjarke.dk`; in Android reverse-domain form that is **`dk.bjarkebjarke.tally`**. The applicationId is **permanent once published on Google Play**. Because the package id is unique, a shared "Tally" Play title is less of a concern (the listing title can still be checked in Play Console). The rename of the current `dev.listicles.app`, repo, app label en/da and Firebase project stays a task for M1-01 planning.
-3. **Trademark search** (EUIPO, DKPTO, USPTO) in the relevant classes (software, class 9 and 42), including the Tally Solutions and tally.so marks.
-4. **Domains** at a registrar (.com, .dk, .app), and the **GitHub org name**, if an org is wanted.
-5. Same app label in English and Danish, or a Danish variant?
+2. **Trademark search** (EUIPO, DKPTO, USPTO) in the relevant classes (software, class 9 and 42), including the Tally Solutions and tally.so marks.
+3. **Domains** at a registrar (.com, .dk, .app), and the **GitHub org name**, if an org is wanted.
+4. Same app label in English and Danish, or a Danish variant?
 
 ### Consequences by site (planning is task M1-01; nothing is renamed here)
 
