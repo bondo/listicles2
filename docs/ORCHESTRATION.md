@@ -602,8 +602,12 @@ seen the batch report.
   no rule for raw `gh` commands, because `*` in a rule also matches spaces and slashes, so a raw rule could be steered to another
   route (a merge, say). The auto-mode classifier may still evaluate the call on its own, so the rule is not a guarantee.
   The allow rule approves any command that starts with the script's path, so the PreToolUse guard also treats every file named
-  `mark-ready.sh` as a process file and allows a command that runs one only as exactly `scripts/mark-ready.sh <N>` from the project
-  root (no `cd`, env prefix, wrapper, redirect or substitution). Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
+  `mark-ready.sh` as a process file and checks the command's first word: if it is a `mark-ready.sh`, the command is allowed only as
+  exactly `scripts/mark-ready.sh <N>` from the project root (no `cd`, env prefix, wrapper, redirect or substitution) and only while
+  the script is a regular file, not a symlink, whose SHA-256 equals the pin in the guard, because edits that never name the file
+  (`sed -i scripts/*.sh`, `cp -t scripts`) cannot all be caught. Interpreter forms such as `bash scripts/mark-ready.sh N` do not match
+  the allow rule and go to the normal permission check. A legitimate edit of the script updates the pin in the same tooling PR.
+  Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
   tooling-session change (CODEOWNERS covers `/.claude/` and `/scripts/`); `scripts/hooks/test_settings_permissions.py` and
   `scripts/hooks/test_mark_ready.py` fail if the list holds anything else or the script accepts anything but a PR number.
 * **Strict up-to-date merge procedure:** `main` requires branches to be up to date, so merge one PR at a time. After each
