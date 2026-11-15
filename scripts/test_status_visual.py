@@ -177,6 +177,18 @@ class BuildModel(unittest.TestCase):
         self.assertEqual(tasks_a["A-02"]["title"], "Ready thing")
         self.assertEqual(tasks_a["A-O1"]["assignee"], "owner")
 
+    def test_tasks_carry_the_pr_number_from_the_task_file(self):
+        text = TASKS.replace('title = "Done thing"', 'title = "Done thing"\npr = 5', 1)
+        tasks_a = {t["id"]: t for t in model(tasks=text)["milestones"][0]["tasks"]}
+        self.assertEqual((tasks_a["A-01"]["toml_pr"], tasks_a["A-02"]["toml_pr"]), (5, None))
+
+    def test_all_blockers_are_kept_beyond_the_picture_cap(self):
+        issues = [issue(100 + n, f"Waiting {n}", ["blocked"]) for n in range(status_visual.MAX_BLOCKERS + 6)]
+        m = model(issues=issues)
+        self.assertEqual(len(m["blockers"]), status_visual.MAX_BLOCKERS)
+        self.assertEqual(len(m["all_blockers"]), m["blockers_total"])
+        self.assertEqual(m["blockers_total"], status_visual.MAX_BLOCKERS + 6 + 1)  # plus the task blocker A-04
+
     def test_milestone_dependencies_are_shown_as_a_milestone(self):
         b01 = model()["milestones"][1]["tasks"][0]
         self.assertEqual(b01["state"], "blocked")
@@ -500,8 +512,39 @@ class RenderSvg(unittest.TestCase):
 
 
 class Cli(unittest.TestCase):
-    def run_cli(self, *args):
-        return subprocess.run([sys.executable, "-I", str(SCRIPT), *args], capture_output=True, text=True)
+    def run_cli(self, *args, env=None):
+        return subprocess.run([sys.executable, "-I", str(SCRIPT), *args], capture_output=True, text=True, env=env)
+
+    def render(self, d, *extra, env=None):
+        (d / "t.toml").write_text(TASKS)
+        (d / "in.json").write_text(json.dumps(data(prs=[pr(20)])))
+        return self.run_cli("render", "--tasks", str(d / "t.toml"), "--input", str(d / "in.json"), "--now", NOW,
+                            "--svg", str(d / "s.svg"), "--json", str(d / "s.json"), *extra, env=env)
+
+    def test_render_writes_the_detail_page_next_to_the_svg_by_default(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.render(Path(d))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("## A Alpha name", (Path(d) / "status.md").read_text())
+
+    def test_render_md_path_and_repo_options(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.render(Path(d), "--md", str(Path(d) / "page.md"), "--repo", "o/r")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("](https://github.com/o/r/issues/20)", (Path(d) / "page.md").read_text())
+            self.assertFalse((Path(d) / "status.md").exists())
+
+    def test_render_takes_the_repo_from_github_repository_when_valid(self):
+        with tempfile.TemporaryDirectory() as d:
+            ok = self.render(Path(d), env={"GITHUB_REPOSITORY": "o/r", "PATH": ""})
+            self.assertEqual(ok.returncode, 0, ok.stderr)
+            self.assertIn("github.com/o/r/issues/20", (Path(d) / "status.md").read_text())
+
+    def test_a_bad_repo_exits_2_without_writing_anything(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.render(Path(d), "--repo", "not a repo")
+            self.assertEqual(r.returncode, 2)
+            self.assertFalse((Path(d) / "s.svg").exists() or (Path(d) / "status.md").exists())
 
     def test_render_writes_svg_and_json(self):
         with tempfile.TemporaryDirectory() as d:

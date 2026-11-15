@@ -14,6 +14,7 @@ numbers, label names compared to a fixed list, and task ids from docs/tasks.toml
 
 import argparse
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -146,7 +147,7 @@ def build_model(tasks_text, data, now):
     milestones, current = [], None
     for m in graph.milestones:
         mine = [{"id": t.id, "title": t.title, "state": visual(t), "assignee": t.assignee, "deps": list(t.depends_on),
-                 "unmet": [unmet_ref(d) for d in derived[t.id]["unmet"]], "pr": review_pr.get(t.id), "flag": flagged.get(t.id)}
+                 "unmet": [unmet_ref(d) for d in derived[t.id]["unmet"]], "pr": review_pr.get(t.id), "flag": flagged.get(t.id), "toml_pr": t.pr}
                 for t in graph.tasks if t.milestone == m]
         done = sum(t["state"] in FINISHED for t in mine)
         milestones.append({"id": m, "title": graph.info[m].title, "purpose": graph.info[m].purpose, "done": done,
@@ -179,7 +180,7 @@ def build_model(tasks_text, data, now):
     return {
         "generated": now_dt.strftime("%Y-%m-%dT%H:%M:%SZ"), "milestones": milestones, "current": current,
         "queue": queue[:MAX_QUEUE], "queue_more": max(len(queue) - MAX_QUEUE, 0), "queue_total": len(queue),
-        "blockers": blockers[:MAX_BLOCKERS], "blockers_more": max(len(blockers) - MAX_BLOCKERS, 0),
+        "blockers": blockers[:MAX_BLOCKERS], "all_blockers": blockers, "blockers_more": max(len(blockers) - MAX_BLOCKERS, 0),
         "blockers_total": len(blockers), "followups": followups, "outside": outside,
     }
 
@@ -370,6 +371,8 @@ def main(argv=None):
     r.add_argument("--now", help="ISO 8601 with zone (default: the current time)")
     r.add_argument("--svg", required=True)
     r.add_argument("--json", required=True)
+    r.add_argument("--md", help="detail page path (default: status.md next to the SVG)")
+    r.add_argument("--repo", help="OWNER/NAME for links in the detail page (default: $GITHUB_REPOSITORY when valid)")
     s = sub.add_parser("same")
     s.add_argument("old")
     s.add_argument("new")
@@ -382,10 +385,19 @@ def main(argv=None):
         except json.JSONDecodeError as e:
             raise StatusError(f"{args.input}: invalid JSON ({e.msg}, line {e.lineno})") from None
         now = args.now or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        repo = args.repo
+        if repo is None and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", os.environ.get("GITHUB_REPOSITORY", "")):
+            repo = os.environ["GITHUB_REPOSITORY"]
         model = build_model(_read(args.tasks), data, now)
-        svg, js = render_svg(model), status_json(model)
+        import status_page  # noqa: PLC0415  # justified: status_page imports this module, so it can only be loaded here
+        try:
+            svg, js, page = render_svg(model), status_json(model), status_page.render_page(model, repo)
+        except status_page.PageError as e:
+            raise StatusError(str(e)) from None
+        md_path = Path(args.md) if args.md else Path(args.svg).with_name("status.md")
         Path(args.svg).write_text(svg, encoding="utf-8")
         Path(args.json).write_text(js, encoding="utf-8")
+        md_path.write_text(page, encoding="utf-8")
     except StatusError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
