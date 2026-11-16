@@ -86,6 +86,31 @@ class MarkReadyGuard(unittest.TestCase):
         for c in ["coproc echo hi", "function f { echo hi; }", "trap 'echo bye' EXIT", "trap - EXIT", "trap -p"]:
             self.assertEqual(run("Bash", {"command": c}, d), 0, c + " (other uses stay allowed)")
 
+    def test_quoted_or_escaped_first_words_are_checked(self):
+        """R5-02: after unquoting, `scripts/mark-ready.sh\\ 1` and `"scripts/mark-ready.sh 1"` are one word that only STARTS with the wrapper path;
+        the shell runs a file with that odd name. Nothing but the exact unquoted call is allowed."""
+        d = repo()
+        install_wrapper(d)
+        for c in ["scripts/mark-ready.sh\\ 1", '"scripts/mark-ready.sh 1"', 'scripts/"mark-ready.sh 1"', "'scripts/mark-ready.sh 1'",
+                  "scripts/mark-ready.sh\\\t1", "scripts/mark-ready.sh\\\n1", "./scripts/mark-ready.sh\\ 1", "app/scripts/mark-ready.sh\\ 1",
+                  "cp -t scripts /tmp/x/mark-ready.sh && scripts/mark-ready.sh\\ 1", "nohup scripts/mark-ready.sh\\ 1"]:
+            self.assertEqual(run("Bash", {"command": c}, d), 2, c)
+            self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 2, c + " (tooling)")
+
+    def test_writes_to_files_named_like_the_wrapper_plus_text_are_denied(self):
+        """R5-02: the same odd name as a write target: planting `scripts/mark-ready.sh 1`, then running it as `scripts/mark-ready.sh\\ 1`."""
+        for c in ["printf x > 'scripts/mark-ready.sh 1'", "cp /tmp/e 'scripts/mark-ready.sh 1'", "chmod +x 'scripts/mark-ready.sh 1'",
+                  "touch 'scripts/mark-ready.sh 1'", "mv /tmp/e scripts/mark-ready.sh\\ 1", "tee 'scripts/mark-ready.sh 1' < /tmp/x",
+                  "ln -s /tmp/e 'scripts/mark-ready.sh 1'", "install /tmp/e 'scripts/mark-ready.sh 1'", "echo x > scripts/mark-ready.sh\\ 1",
+                  "cp /tmp/e 'app/scripts/mark-ready.sh 1'", "rm 'scripts/mark-ready.sh 1'", "printf x > 'scripts/mark-ready.sh\t1'"]:
+            self.assertEqual(self.bash(c), 2, c)
+            self.assertEqual(self.bash(c, env=TOOLING), 0, (c, "tooling"))
+        for tool in ["Edit", "Write", "MultiEdit"]:
+            self.assertEqual(run(tool, {"file_path": "scripts/mark-ready.sh 1"}, self.d), 2, tool)
+            self.assertEqual(run(tool, {"file_path": "scripts/mark-ready.sh 1"}, self.d, TOOLING), 0, tool)
+        for c in ["printf x > scripts/mark-ready.sh.md", "cp /tmp/e scripts/mark-ready.shx", "touch scripts/mark-ready.sh.bak", "touch scripts/xmark-ready.sh"]:
+            self.assertEqual(self.bash(c), 0, c + " (names that cannot be the wrapper stay allowed)")
+
     def test_any_other_form_is_denied(self):
         for c in ["scripts/mark-ready.sh", "scripts/mark-ready.sh 0", "scripts/mark-ready.sh 012", "scripts/mark-ready.sh 1234567",
                   "scripts/mark-ready.sh -1", "scripts/mark-ready.sh 1 2", "scripts/mark-ready.sh 1 --input x", "scripts/mark-ready.sh ''",
