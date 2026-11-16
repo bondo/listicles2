@@ -5,7 +5,7 @@ import unittest
 from test_pretooluse_guard import repo, run
 
 PROTECTED_PATHS = [".tools/bin/shellcheck", ".tools/bin/actionlint", ".tools/bin/zizmor", ".tools/x", "scripts/install_linters.sh",
-                   "scripts/linters.pins", "sub/../.tools/bin/shellcheck"]
+                   "scripts/linters.pins", "sub/../.tools/bin/shellcheck", ".tools"]
 WRITES = ["echo x > {p}", "cp /tmp/x {p}", "tee {p} < /tmp/x", "sed -i s/a/b/ {p}", "ln -sf /tmp/x {p}", "mv /tmp/x {p}", "rm -f {p}"]
 
 
@@ -14,16 +14,12 @@ class LinterDir(unittest.TestCase):
     def setUpClass(cls):
         cls.d = repo()
 
-    def test_edit_and_write_denied_for_non_tooling_sessions(self):
+    def test_writes_denied_for_non_tooling_sessions(self):
         for p in PROTECTED_PATHS:
             for tool in ("Write", "Edit"):
                 self.assertEqual(run(tool, {"file_path": p}, self.d), 2, (tool, p))
-
-    def test_bash_writes_denied_for_non_tooling_sessions(self):
-        for p in PROTECTED_PATHS:
             for w in WRITES:
                 self.assertEqual(run("Bash", {"command": w.format(p=p)}, self.d), 2, w.format(p=p))
-        self.assertEqual(run("Bash", {"command": "rm -rf .tools"}, self.d), 2)
 
     def test_tooling_sessions_may_write(self):
         for p in PROTECTED_PATHS:

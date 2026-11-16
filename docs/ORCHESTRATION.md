@@ -605,20 +605,21 @@ seen the batch report.
   into one new branch cut from `main` (never a feature branch, F6), opens a draft PR and posts a "ready" comment on it.
   The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since its bumps then supersede them.
 * **Linter permission (M0.5-06, owner-approved 2026-11-15, issue #15):** `.claude/settings.json` allows exactly three commands:
-  `Bash(.tools/bin/shellcheck *)`, `Bash(.tools/bin/actionlint *)` and `Bash(.tools/bin/zizmor --offline *)` (zizmor runs offline only).
-  `scripts/install_linters.sh` fills `.tools/bin/` (git-ignored) from the pins in `scripts/linters.pins` (shellcheck v0.11.0,
-  actionlint v1.7.12, zizmor v1.32.0, Linux x86_64) and checks every sha256 before extracting; a mismatch installs nothing.
-  The install directory, the installer and the pins are protected paths in `pretooluse_guard.py` (tooling sessions only), which also
-  denies any `actionlint` call with `-shellcheck`, `-pyflakes` or `-init-config` (they run or write what the allow rule does not
-  cover), actionlint arguments built from `$`, backticks, unquoted braces or globs, and a `PATH=` change in the same command line
-  (actionlint finds shellcheck and pyflakes on `PATH`). `test_settings_permissions.py` pins the allow list and models the
-  matching: no rule can match merge, push, curl or rm as the program. **Residual risks, accepted by the owner when merging (a rule
-  is not a guarantee):** (1) the `*` spans spaces, slashes and shell metacharacters, so an argument such as `$(...)` is not
-  modelled (only compound commands are); (2) the paths are relative to the cwd, so a `cd` into a directory holding another
-  `.tools/bin/` is not excluded; (3) a binary planted or swapped in `.tools/bin/` runs under the rule without a prompt, since the
-  guard checks writes best-effort and does not re-hash the binary at run time; (4) the auto-mode classifier decides independently of
-  allow rules and cannot be tested from the repo; (5) the actionlint flag check sees only the command text (not arguments read from
-  a file, or a program that starts actionlint itself). Changing the rules, the pins or the installer is an owner-only merge.
+  `Bash(.tools/bin/shellcheck *)`, `Bash(.tools/bin/actionlint *)` and `Bash(.tools/bin/zizmor --offline *)` (zizmor offline only).
+  `scripts/install_linters.sh` fills `.tools/bin/` (git-ignored) from `scripts/linters.pins` (shellcheck v0.11.0, actionlint v1.7.12,
+  zizmor v1.32.0, Linux x86_64), checking every sha256 before extracting. The install directory, the installer and the pins are
+  protected paths in `pretooluse_guard.py` (tooling sessions only), which also
+  denies `actionlint -shellcheck/-pyflakes/-init-config` and `zizmor --fix/--cache-dir/--lsp` (they run programs, rewrite `.github/`
+  or create directories), `shopt extglob`, and linter arguments built from `$`, backticks, `~` or unquoted braces, globs and extglob.
+  `bin/actionlint` is an installer-written wrapper that passes the pinned shellcheck and disables pyflakes, so `PATH` is irrelevant.
+  `test_settings_permissions.py` pins the allow list and checks no rule can match merge, push, curl or rm. **Residual risks, accepted by the owner when merging (a rule is not a guarantee):** (1) the `*` spans spaces, slashes and
+  shell metacharacters, so `$(...)` in an argument is not modelled (only compound commands are); (2) the paths are relative to the cwd, so a `cd` into a
+  directory holding another `.tools/bin/` is not excluded; (3) a binary planted or swapped in
+  the install directory runs under the rule without a prompt (the guard checks writes best-effort and never re-hashes binaries);
+  (4) the auto-mode classifier decides independently of allow rules and cannot be tested from the repo; (5) the flag checks
+  see only the command text (not arguments read from a file, or a program that starts a linter itself); (6) the linters can read
+  any file (`--rcfile`, `-config-file`, `--config`, file arguments) and `LD_PRELOAD=x` before a command is not blocked.
+  Changing the rules, the pins or the installer is an owner-only merge.
 * **Owner-run push tests:** a check that needs a real push (hooks, protection, ruleset behaviour) is run by the owner in
   their own clone and the result noted on #15. Agents never try to prove it by pushing to `main` or force-pushing.
 

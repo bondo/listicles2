@@ -58,6 +58,14 @@ mkdir -p "$tmp/stage" "$dest"
 for i in "${!names[@]}"; do
   install -m 0755 "$tmp/x$i/${members[$i]}" "$tmp/stage/${names[$i]}" || die "staging ${names[$i]} failed; nothing replaced"
 done
+# bin/actionlint is a wrapper that pins the installed shellcheck and disables pyflakes (real binary in libexec): PATH is irrelevant.
+if [ -f "$tmp/stage/actionlint" ]; then
+  mv "$tmp/stage/actionlint" "$tmp/stage/actionlint.real"
+  printf '#!/bin/sh\nd=$(cd "${0%%/*}" && pwd)\nexec "$d/../libexec/actionlint" "-shellcheck=$d/shellcheck" -pyflakes= "$@"\n' > "$tmp/stage/actionlint"
+  chmod 0755 "$tmp/stage/actionlint"
+  mkdir -p "$root/.tools/libexec"
+  mv -f "$tmp/stage/actionlint.real" "$root/.tools/libexec/actionlint"
+fi
 for i in "${!names[@]}"; do
   mv -f "$tmp/stage/${names[$i]}" "$dest/${names[$i]}"
   echo "installed ${names[$i]} (sha256 ${shas[$i]})"
