@@ -13,7 +13,7 @@ TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_st
          "python3 -I scripts/test_status_publish.py", "python3 -I scripts/test_status_workflow.py")
 PAGE_URL = "https://github.com/bondo/listicles2/blob/status/status.md"
 JOB_PERMISSIONS = ["checks: read", "contents: write", "issues: read", "pull-requests: read"]
-USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)\s*$")
+USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)(?:\s+#\s*(\S.*))?$")
 
 
 def read(*parts):
@@ -76,6 +76,17 @@ def step_after(text, marker):
     return out
 
 
+def publish_step(text):
+    """The lines of the step that runs scripts/status_publish.py (from its `- ` line up to the next step), or []."""
+    lines = text.splitlines()
+    starts = [i for i, ln in enumerate(lines) if re.match(r"^      - ", ln)]
+    for n, start in enumerate(starts):
+        end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+        if any("scripts/status_publish.py" in ln for ln in lines[start:end]):
+            return lines[start:end]
+    return []
+
+
 def problems(text):
     found = []
     top = block(text, "permissions", 0)
@@ -105,12 +116,19 @@ def problems(text):
     conc = block(text, "concurrency", 0) or []
     if not any(re.fullmatch(r"  group: \S+", ln) for ln in conc) or "  cancel-in-progress: false" not in conc:
         found.append("concurrency group with cancel-in-progress: false is required")
-    if "ref: main" not in step_after(text, "uses: actions/checkout@v4"):
+    checkout = step_after(text, "uses: actions/checkout@")
+    if "ref: main" not in checkout:
         found.append("checkout must use ref: main")
+    if "persist-credentials: false" not in checkout:
+        found.append("checkout must set persist-credentials: false")
+    publish = publish_step(text)
+    step_env = block("\n".join(publish), "env", 8) or []
+    if "http.https://github.com/.extraheader" not in "\n".join(publish) or "          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in step_env:
+        found.append("the publish step must authenticate with a step-scoped token header, not a persisted credential")
     for ln in text.splitlines():
         m = USES.match(ln)
-        if m and not re.fullmatch(r"v\d+", m.group(2)):
-            found.append(f"{m.group(1)}@{m.group(2)}: pin like ci.yml (major tag)")
+        if m and not (re.fullmatch(r"[0-9a-f]{40}", m.group(2)) and re.fullmatch(r"v\d+(\.\d+){1,2}", m.group(3) or "")):
+            found.append(f"{m.group(1)}@{m.group(2)}: pin to a commit SHA with a trailing '# vX.Y.Z' comment")
     if re.search(r"--force|force-with-lease|\s-f\s|push\s+\S+\s+\+", text):
         found.append("never force-push")
     for needle in ("scripts/status_fetch.py", "scripts/status_visual.py render", "scripts/status_publish.py"):
@@ -158,7 +176,44 @@ class StatusWorkflow(unittest.TestCase):
         self.flagged(self.text + "\n      - run: git push --force origin status\n", "force-push")
 
     def test_unpinned_action_is_flagged(self):
-        self.flagged(self.text.replace("actions/checkout@v4", "actions/checkout@main", 1), "pin like ci.yml")
+        for ref in ("v4", "main"):
+            with self.subTest(ref):
+                self.flagged(re.sub(r"(actions/checkout)@\w+ # \S+", rf"\1@{ref}", self.text, count=1), "pin to a commit SHA")
+
+    def test_pin_without_a_version_comment_is_flagged(self):
+        self.flagged(re.sub(r"(actions/checkout@[0-9a-f]{40}) # \S+", r"\1", self.text, count=1), "pin to a commit SHA")
+
+    def test_persisted_checkout_credentials_are_flagged(self):
+        self.flagged(self.text.replace("          persist-credentials: false\n", "", 1), "persist-credentials")
+        self.flagged(self.text.replace("persist-credentials: false", "persist-credentials: true", 1), "persist-credentials")
+
+    def test_publish_without_the_token_header_is_flagged(self):
+        self.flagged(self.text.replace("http.https://github.com/.extraheader", "http.extraheader"), "token header")
+
+    PUBLISH_MARKER = "      - name: push to the status branch"
+    PUBLISH_ENV = "        env:\n          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n"
+
+    def split_publish(self):
+        head, sep, tail = self.text.partition(self.PUBLISH_MARKER)
+        self.assertTrue(sep, "publish step not found")
+        self.assertIn(self.PUBLISH_ENV, tail, "publish step env not found")
+        return head, sep + tail
+
+    def test_publish_step_without_its_env_is_flagged(self):
+        head, publish = self.split_publish()
+        self.flagged(head + publish.replace(self.PUBLISH_ENV, "", 1), "token header")
+
+    def test_token_moved_to_job_level_env_is_flagged(self):
+        head, publish = self.split_publish()
+        job_env = "    permissions:\n"
+        self.assertIn(job_env, head)
+        moved = head.replace(job_env, "    env:\n      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n" + job_env, 1)
+        self.flagged(moved + publish.replace(self.PUBLISH_ENV, "", 1), "token header")
+
+    def test_token_only_in_the_fetch_step_is_flagged(self):
+        head, publish = self.split_publish()
+        self.assertIn("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}", head)
+        self.flagged(head + publish.replace(self.PUBLISH_ENV, "        env:\n          REPO: ${{ github.repository }}\n", 1), "token header")
 
     def test_checkout_of_the_event_ref_is_flagged(self):
         self.flagged(self.text.replace("ref: main", "ref: ${{ github.ref }}", 1), "ref: main")

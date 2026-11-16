@@ -33,9 +33,10 @@ jobs:
       issues: read
       checks: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
+          persist-credentials: false
       - name: fetch GitHub data
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,4 +45,11 @@ jobs:
       - name: render
         run: python3 -I scripts/status_visual.py render --tasks docs/tasks.toml --input "$RUNNER_TEMP/input.json" --svg "$RUNNER_TEMP/status.svg" --json "$RUNNER_TEMP/status.json"
       - name: push to the status branch (plain push, no commit if unchanged)
-        run: python3 -I scripts/status_publish.py --svg "$RUNNER_TEMP/status.svg" --json "$RUNNER_TEMP/status.json"
+        # The checkout keeps no credentials (persist-credentials: false); git gets the token for this one step only, through its environment.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader "GIT_CONFIG_VALUE_0=AUTHORIZATION: basic $auth"
+          python3 -I scripts/status_publish.py --svg "$RUNNER_TEMP/status.svg" --json "$RUNNER_TEMP/status.json"
