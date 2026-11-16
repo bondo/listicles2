@@ -2,7 +2,7 @@
   "blockers": 3,
   "current_milestone": "M0.5",
   "followups": 16,
-  "generated_at": "2026-11-16T11:15:32Z",
+  "generated_at": "2026-11-16T13:37:47Z",
   "milestones": [
     {
       "done": 28,
@@ -54,5 +54,5 @@
     }
   ],
   "outside_questions": 0,
-  "owner_queue": 4
+  "owner_queue": 2
 }

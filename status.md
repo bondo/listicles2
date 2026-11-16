@@ -69,7 +69,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | Task | Title | Status | Depends on | Who | PR |
 |---|---|---|---|---|---|
 | M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | done | all of M0 | planner | [#94](https://github.com/bondo/listicles2/issues/94) |
-| M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | ready | M0.5-01 | planner |  |
+| M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | in progress | M0.5-01 | planner | [#103](https://github.com/bondo/listicles2/issues/103) |
 | M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | ready | M0.5-01, M0.5-16 | planner |  |
 | M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | done | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
@@ -107,7 +107,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M0.5-02 App-flow diagram (docs/product/flow.… (ready)"]:::ready
+    n0["M0.5-02 App-flow diagram (docs/product/flow.… (in progress)"]:::progress
     n1["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ready
     n2["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (in progress)"]:::progress
     n3["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
