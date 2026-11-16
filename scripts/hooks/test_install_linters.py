@@ -54,7 +54,7 @@ class Tree:
         self.lines = []
         for name, fname, comp, member in FIXTURE:
             p = os.path.join(self.root, "arch", fname)
-            make_archive(p, comp, member, f"#!/bin/sh\necho fake {name}\n".encode(), extra={"evil": b"#!/bin/sh\necho evil\n"})
+            make_archive(p, comp, member, f"#!/bin/sh\necho fake {name} \"$@\"\n".encode(), extra={"evil": b"#!/bin/sh\necho evil\n"})
             self.lines.append([name, sha(p), member, "file://" + p])
         self.write_pins()
 
@@ -81,14 +81,25 @@ class Installer(unittest.TestCase):
         r = t.run()
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(t.installed(), ["actionlint", "shellcheck", "zizmor"])
-        self.assertEqual(os.listdir(os.path.join(t.root, ".tools")), ["bin"], "no staging leftovers")
-        for n in t.installed():
-            p = os.path.join(t.root, ".tools", "bin", n)
+        self.assertEqual(sorted(os.listdir(os.path.join(t.root, ".tools"))), ["bin", "libexec"], "no staging leftovers")
+        for n, sub in (("shellcheck", "bin"), ("zizmor", "bin"), ("actionlint", "libexec")):
+            p = os.path.join(t.root, ".tools", sub, n)
             self.assertTrue(os.access(p, os.X_OK))
             self.assertEqual(os.stat(p).st_mode & 0o022, 0, "not group/other writable")
             with open(p) as f:
                 self.assertIn(f"fake {n}", f.read())
         self.assertEqual(t.run().returncode, 0, "idempotent")
+
+    def test_actionlint_wrapper_pins_shellcheck_and_ignores_path(self):
+        """R3-03: .tools/bin/actionlint is a wrapper that passes the pinned shellcheck and disables pyflakes, so PATH is irrelevant."""
+        t = Tree(self)
+        self.assertEqual(t.run().returncode, 0)
+        d = os.path.realpath(os.path.join(t.root, ".tools", "bin"))
+        for cwd, exe in ((t.root, os.path.join(d, "actionlint")), (d, "./actionlint"), ("/", os.path.join(d, "..", "bin", "actionlint"))):
+            r = subprocess.run([exe, "a.yml"], cwd=cwd, env={"PATH": "/nonexistent"}, capture_output=True, text=True)
+            self.assertEqual(r.stdout.strip(), f"fake actionlint -shellcheck={d}/shellcheck -pyflakes= a.yml", (cwd, exe, r.stderr))
+        with open(os.path.join(d, "actionlint")) as f:
+            self.assertNotIn("fake actionlint", f.read(), "bin/actionlint is the wrapper, the real binary is in libexec")
 
     def test_checksum_mismatch_refuses_and_installs_nothing(self):
         for which in range(3):

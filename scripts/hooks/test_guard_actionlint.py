@@ -1,11 +1,13 @@
-"""actionlint runs the executable named by -shellcheck / -pyflakes and -init-config writes under .github/; the allow rule
-Bash(.tools/bin/actionlint *) would approve them, so the guard denies them in every spelling and wrapper (review R1-01, R2-01, R2-02)."""
+"""The allow rules would approve actionlint -shellcheck/-pyflakes (run any executable), -init-config and zizmor --fix (rewrite
+.github/), --cache-dir; the guard denies them in every spelling and wrapper, and shell syntax that could expand into them
+(reviews R1-01, R2-01, R3-01..R3-04)."""
 
 import unittest
 
 from test_pretooluse_guard import repo, run
 
 A = ".tools/bin/actionlint"
+Z = ".tools/bin/zizmor --offline"
 HOSTILE = [
     f"{A} -shellcheck=./x.sh .github/workflows/ci.yml", f"{A} -shellcheck ./x.sh f.yml", f"{A} --shellcheck=./x.sh f.yml",
     f"{A} --shellcheck ./x.sh f.yml", f"{A} -pyflakes=/bin/sh f.yml", f"{A} -pyflakes /bin/sh f.yml", f"{A} --pyflakes=./x f.yml",
@@ -22,9 +24,14 @@ HOSTILE = [
     f"{A} {{-shellcheck=./x,f.yml}}", f"{A} {{-pyflakes,/bin/sh}} f.yml", f"bash -c '{A} {{-shellcheck=./x,f.yml}}'", f"{A} -s*/x",
     f"{A} -?hellcheck=./x f.yml", f"{A} [-]shellcheck=./x f.yml", f"{A} {{,-shellcheck=./x}} f.yml", f"{A} {{{{-shellcheck=./x,a}},b}}",
     f"{A} '-s'*/x", f"{A} \\-s*/x", f"{A} -shellcheck={{a,b}}", f"{A} f.yml {{-pyflakes,x}}", f"eval '{A} -s*/x'", f"echo f | xargs {A} {{-pyflakes,x}}",
-    # R2-02: actionlint finds shellcheck and pyflakes on PATH, so any PATH change in the command line is denied
-    f"PATH=./evil {A} f.yml", f"export PATH=./evil:$PATH; {A} f.yml", f"env -i PATH=./e {A} f.yml", f"env PATH=./e {A} f.yml",
-    f"PATH=./e; {A} f.yml", f"declare -x PATH=./e; {A} f.yml", f"export PATH=./e && bash -c '{A} f.yml'", f"(PATH=./e; {A} f.yml)",
+    # R3-01: zizmor --fix rewrites workflow files, --cache-dir creates directories, --lsp starts a server
+    f"{Z} --fix .github/workflows", f"{Z} --fix=all .github/workflows", f"{Z} --fix=safe .", f"{Z} --fix=unsafe-only .", f"{Z} --fix all .",
+    f"{Z} .github/workflows --fix", f"{Z} -fix=all .", f"{Z} --cache-dir /tmp/x .", f"{Z} --cache-dir=/tmp/x .", f"{Z} --lsp",
+    f"{Z} {{--fix,x}} .", f"{Z} --fix=$M .", f"env X=1 {Z} --fix .", f"echo . | xargs {Z} --fix=all", f"bash -c '{Z} --offline --fix=all .'",
+    # R3-02: tilde and extglob words (expanded after the guard has looked) and shopt -s extglob; R3-04: coproc, find -exec with a glob
+    f"HOME=-shellcheck=./x; {A} ~ f.yml", f"OLDPWD=-pyflakes=/bin/sh; {A} ~- f.yml", f"{A} ~root/x", "shopt -s extglob", "shopt -s extglob; true",
+    f"{A} @(-shellcheck=.)/x f.yml", f"{A} +(-shellcheck=.)/x f.yml", f"{A} !(f.yml)/x", f"coproc {A} -shellcheck=./x f.yml",
+    f"find . -exec {A} -s*/x {{}} +",
 ]
 ALLOWED = [
     A, f"{A} .github/workflows/ci.yml", f"{A} -color -oneline .github/workflows/ci.yml .github/workflows/other.yml",
@@ -32,7 +39,7 @@ ALLOWED = [
     f"{A} -verbose f.yml 2>/dev/null", ".tools/bin/shellcheck -s bash scripts/verify.sh", ".tools/bin/zizmor --offline .github/workflows",
     "echo -shellcheck=./x", "grep -n -- -shellcheck docs/x.md", f"cat .github/workflows/ci.yml | {A} -stdin-filename ci.yml -",
     f"{A} .github/workflows/*.yml", f"{A} .github/workflows/ci.y?ml", f"{A} .github/workflows/[a-c]*.yml", f"{A} ./f{{1,2}}.yml",
-    "PATH=/usr/bin true", "export PATH=/usr/bin:$PATH", f"{A} -format \"{{{{.Message}}}}\" f.yml",
+    "PATH=/usr/bin true", f"{A} -format \"{{{{.Message}}}}\" f.yml", f"{Z} --format=plain .github/workflows", f"{Z} --format plain .", "shopt -s globstar",
 ]
 
 

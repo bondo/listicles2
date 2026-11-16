@@ -140,7 +140,7 @@ class ResidualRisksAreDocumented(unittest.TestCase):
         self.assertIsNotNone(m, "section 7.5 needs a 'Linter permission' bullet")
         bullet = m.group(0).lower()
         for needle in ("shellcheck", "actionlint", "zizmor --offline", ".tools/bin", "install_linters.sh", "sha256", "compound",
-                       "planted", "classifier", "owner-only", "`cd`", "-shellcheck", "-pyflakes", "pretooluse_guard"):
+                       "planted", "classifier", "owner-only", "`cd`", "-shellcheck", "-pyflakes", "pretooluse_guard", "--fix", "wrapper"):
             self.assertIn(needle, bullet, needle)
 
 
