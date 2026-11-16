@@ -49,6 +49,9 @@ MARK_READY_SHA256 = "5f63c355e1513a2d4d1af6fe6dfdb3a89b57de76671126eccec424b8c7d
 MARK_READY = "mark-ready.sh"
 MARK_READY_CALL = "scripts/mark-ready.sh"
 PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")
+# R5-02: a word that names the wrapper, also after unquoting (`scripts/mark-ready.sh\\ 1` is the single word "scripts/mark-ready.sh 1"): a path
+# component that is exactly mark-ready.sh, followed by whitespace, a slash or the end. Names such as mark-ready.sh.md or xmark-ready.sh do not match.
+WRAPPER_WORD = re.compile(r"(^|/)" + re.escape(MARK_READY) + r"(\s|/|$)")
 WHOLE_CALL = re.compile(re.escape(MARK_READY_CALL) + r" [1-9][0-9]{0,5}")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
@@ -163,7 +166,7 @@ def protection(path, cwd):
     """'always' (git internals), 'process' (process files) or None."""
     if not path:
         return None
-    if os.path.basename(path.rstrip("/")) == MARK_READY:
+    if WRAPPER_WORD.search(path):
         return "process"
     proj = os.environ.get("CLAUDE_PROJECT_DIR")
     if proj:
@@ -898,7 +901,7 @@ def check_simple(cmd, state, depth):
         check_assign(a)
     for s in nested:
         check_command_string(s, child(state), depth + 1)
-    if words and os.path.basename(words[0]) == MARK_READY:
+    if words and WRAPPER_WORD.search(words[0]):
         check_mark_ready(cmd, assigns, words, wrappers, state)
         return
     if not words:
@@ -994,6 +997,8 @@ def guard_target(path, state, what="write to"):
 
 
 def check_bash(command, cwd):
+    if re.search(re.escape(MARK_READY) + r"\\\r?\n", command):  # R5-02: `mark-ready.sh\<newline>1` joins to a different word; never judge it
+        deny("a line continuation right after mark-ready.sh is not allowed; write the call as exactly `scripts/mark-ready.sh <PR number>`")
     check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command})
 
 
