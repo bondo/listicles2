@@ -227,6 +227,7 @@ Not planned yet.
 
 ## Blockers
 
+- **PR to merge** [#95](https://github.com/bondo/listicles2/issues/95): M0.5-06 prerequisite&#58; narrow permission for three checksum-pinned linters
 - **task** M0.5-02: waits on M0.5-01
 - **task** M0.5-03: waits on M0.5-01
 - **task** M0.5-FU: waits on M0.5-01, M0.5-02, M0.5-03 +2
