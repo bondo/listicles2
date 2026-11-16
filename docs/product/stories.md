@@ -18,7 +18,7 @@ and
   has the same rights as the creator, except that only the creator can stop sharing it (OQ-2, OQ-3, OQ-4).
   *Leaving and household deletion:* when a member leaves, is removed or deletes their account, the lists they created go
   with them (OQ-5); when the household is deleted, each shared list goes back to its creator as a private list (OQ-17).
-  *List type* = chosen when a list is created and never changed (OQ-32): a *plain list* (the default) or a
+  *List type* = chosen when a list is created and not changed in v1 (OQ-32): a *plain list* (the default) or a
   *collection list*. *Item* = one line in a list: in a plain list a name and an "I have it" checkbox; in a collection
   list also an optional release year and an optional re-release year (Q2, OQ-6, list types decided 2026-11-16).
 * The first use case (Q1): a user keeps a collection checklist, for example which Georg Jensen Christmas mobiles they
@@ -185,7 +185,7 @@ ownership or delete the household, so that the household stays under control.
 items.
 * Given I enter a name and confirm, then the list exists, is **private** (Q3), is a plain list unless I chose
   "Collection", and opens empty.
-* Given I created a list, then its type cannot be changed afterwards (assumed, OQ-32).
+* Given I created a list, then its type cannot be changed afterwards (OQ-32).
 * Given the name is empty or only spaces, when I confirm, then no list is created and the field shows an error.
 * Given a name with spaces at the start or end, when I confirm, then they are removed.
 
@@ -348,7 +348,8 @@ These are constraints for the data model and screens; v1 builds none of them (M2
 * **Catalogue** (Q1): a list can later be filled from a catalogue, and an item can point at a catalogue entry while
   keeping the user's own check state and edits.
 * **List types** (Q4): a list carries a type (PLAN section 3 has a `kind` field; v1 has plain and collection), so a shopping list or a recipe-linked
-  list can get its own features later without moving data.
+  list can get its own features later without moving data; turning a plain list into a collection list may come later
+  (OQ-32).
 * **Recipes and meal planning** (Q4): other features must be able to add items to a shared list (a recipe's ingredients
   to the shopping list; a week's meal plan to the shopping list).
 * **Photos**: storing images likely needs Cloud Storage, which may require the paid Firebase plan (PLAN section 1 says
@@ -376,6 +377,7 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-26 | **Decided (2026-11-16):** passwords have at least 12 characters and no other rules; the Firebase password policy in Require mode plus a check in the app. | AUTH-05, AUTH-08 |
 | OQ-27 | **Decided (2026-11-16):** no email-link ("magic link") sign-in in v1; reconsider only on the Blaze plan. | section 8 |
 | Types | **Decided (2026-11-16, issue #15 comment 6927705004):** two list types, chosen at creation: plain (default; name and "I have it", sorted by name) and collection (also the two optional years under OQ-6 and OQ-19; sorted by release year, then name). | LIST-02, ITEM-01, ITEM-02, ITEM-05 |
+| OQ-32 | **Decided (2026-11-16):** a list's type cannot be changed in v1. Turning a plain list into a collection list may come later (section 9). | LIST-02 |
 | OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
@@ -400,7 +402,6 @@ diagram (M0.5-02) any more.
 | OQ-29 | The verification and reset emails and the pages their links open: Firebase's default pages and email texts, or own pages on Firebase Hosting (next to the invite page, OQ-21)? In which language are they sent (English and Danish, LANG-01)? | AUTH-06, AUTH-08 | M1 planning |
 | OQ-30 | The privacy text must say that Google (Firebase Authentication, Identity Platform) stores email addresses and passwords as a processor. Who writes it, and before which release? | AUTH-05 | before release |
 | OQ-31 | For password accounts: are changing the email, changing the password and adding a second sign-in method to an existing account in v1 (each needs a recent sign-in), or later? | AUTH-10 | M1 planning |
-| OQ-32 | Assumed: a list's type (plain or collection) cannot be changed after it is created. Confirm. | LIST-02 | M1 planning |
 | OQ-33 | In a collection list, where do items without a release year go: first or last? And does the plain-list sort by name ignore upper and lower case, with Danish letters (æ, ø, å) after z? | ITEM-05 | M0.5-03 |
 | OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
 

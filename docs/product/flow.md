@@ -156,7 +156,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    lists["Lists<br>LIST-01"] -- "Create list" --> name["Enter name; type Plain (default) or Collection,<br>not changeable later (OQ-32)<br>LIST-02"]
+    lists["Lists<br>LIST-01"] -- "Create list" --> name["Enter name; type Plain (default) or Collection,<br>cannot be changed in v1 (OQ-32)<br>LIST-02"]
     name -- "confirm" --> nvalid{"Empty or<br>only spaces?"}
     nvalid -- "yes" --> nerr["Field error, no list<br>LIST-02"] --> name
     nvalid -- "no" --> newlist["Name trimmed; list is private, has its type and opens empty<br>LIST-02, VIS-01"]
