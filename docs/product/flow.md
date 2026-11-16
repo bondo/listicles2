@@ -1,7 +1,7 @@
 # Tally app flow (v1)
 
 Task M0.5-02. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
-Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19;
+Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19, OQ-23 to OQ-27;
 state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
 open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions). New questions this flow raised are in
 [section 10](#10-new-open-questions).
@@ -12,7 +12,9 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
   wireframes (M0.5-03) and later acceptance tests can trace back to [stories.md](stories.md).
 * Words are the ones of [stories "How to read this"](stories.md#how-to-read-this): *user*, *household*,
   *household owner*, *list creator*, *private list*, *shared list*, *item*, "I have it".
-* Screen names are working names for M0.5-03: **Sign-in**, **Lists** (all lists I can see, LIST-01), **Open list**
+* Screen names are working names for M0.5-03: **Sign-in** (Google first, then "Use email and password", AUTH-01),
+  **Email sign-in** (sign in, create account, reset password: AUTH-05, AUTH-07, AUTH-08), **Verify email** (AUTH-06),
+  **Lists** (all lists I can see, LIST-01), **Open list**
   (one list and its items, ITEM-05), **Household** (HH-04), **Join** (HH-03), **Account** (sign out, delete account,
   language if in the app: OQ-12).
 * A dotted arrow is something that happens later, not a tap. A step marked OQ-n is not decided: the diagram shows
@@ -30,8 +32,12 @@ flowchart TD
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
     signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>order, search, progress: OQ-8, OQ-9"]
     signin -- "Google account picked" --> lists
+    signin -- "Use email and password" --> email["Email sign-in<br>AUTH-05, AUTH-07, AUTH-08, AUTH-10"]
+    email -- "signed in, email verified" --> lists
+    email -- "email not verified" --> verify["Verify email<br>AUTH-06"]
+    verify -- "verified" --> lists
     link(["Invite link opened<br>HH-03"]) --> signed2{"Signed in?"}
-    signed2 -- "no" --> signin2["Sign-in, then Join<br>AUTH-01, HH-03"]
+    signed2 -- "no" --> signin2["Sign-in or create account and verify, then Join<br>AUTH-01, AUTH-05, AUTH-06, HH-03"]
     signed2 -- "yes" --> join["Join<br>HH-03"]
     signin2 --> join
     join --> lists
@@ -45,8 +51,9 @@ flowchart TD
 
 ## 2. Sign-in, first use and account
 
-There is no separate sign-up: the first Google sign-in creates the account (AUTH-01). A new user can make private lists
-at once and needs no household (OQ-1, VIS-01).
+Google is the main button: there is no separate sign-up, the first Google sign-in creates the account (AUTH-01). The
+second button, "Use email and password", leads to [section 2.1](#21-email-and-password). A new user can make private
+lists at once and needs no household (OQ-1, VIS-01).
 
 ```mermaid
 flowchart TD
@@ -64,9 +71,34 @@ flowchart TD
     owner -- "yes" --> transfer["Guide: transfer ownership first, nothing deleted<br>AUTH-04, HH-06"]
     owner -- "no" --> confirm["Confirm: my lists, private and shared, are deleted<br>AUTH-04, OQ-5"]
     confirm -- "cancel" --> acc
-    confirm -- "confirm" --> reauth{"Google wants a<br>recent sign-in?"}
-    reauth -- "yes" --> again["Sign in again, then continue<br>AUTH-04"] --> gone
+    confirm -- "confirm" --> reauth{"Server wants a<br>recent sign-in?"}
+    reauth -- "yes" --> again["Sign in again with the same method,<br>code if two-step is on, then continue<br>AUTH-04, AUTH-09"] --> gone
     reauth -- "no" --> gone["Account and my lists deleted; if I was the last member,<br>the household too (OQ-17)<br>AUTH-04"] --> si
+```
+
+### 2.1 Email and password
+
+Every Firestore read and write needs a verified email (`email_verified`); no rule relies on a two-step claim (stories
+section 1). Password: at least 12 characters, no other rules (OQ-26). Each step needs a connection (SYNC-03).
+
+```mermaid
+flowchart TD
+    si["Sign-in screen<br>AUTH-01"] -- "Use email and password" --> es["Email sign-in<br>AUTH-07"]
+    es -- "Create account" --> ca["Email and password<br>AUTH-05"]
+    ca -- "invalid email or password under 12" --> caerr["Field error, nothing created<br>AUTH-05, OQ-26"] --> ca
+    ca -- "email already has an account" --> same["Message: sign in with the method you used first;<br>never merged by the app<br>AUTH-10"]
+    ca -- "valid" --> ve["Verify email: Continue, Send again, Sign out<br>AUTH-06"]
+    ve -- "Continue, link not opened yet" --> vnot["Message: not verified yet<br>AUTH-06"] --> ve
+    ve -- "Continue, link opened" --> home["Lists, or Join if I came from an invite<br>AUTH-06, HH-03"]
+    es -- "email and password" --> ok{"Right?"}
+    ok -- "no" --> wrong["Wrong email or password;<br>after many tries: try again later<br>AUTH-07"] --> es
+    ok -- "yes, email not verified" --> ve
+    ok -- "yes, two-step on" --> code["Enter 6-digit code<br>AUTH-09, OQ-25"]
+    code -- "right code" --> home
+    ok -- "yes" --> home
+    es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email<br>AUTH-08"]
+    rp -. "link opened" .-> newpw["New password, at least 12;<br>expired or used link: message<br>AUTH-08"] --> es
+    si -- "Google, but the email has a password account" --> same
 ```
 
 ## 3. Household
@@ -107,7 +139,7 @@ flowchart TD
     tap(["Invite link opened"]) --> installed{"App installed?"}
     installed -- "no" --> store["Not decided: OQ-21"]
     installed -- "yes" --> auth{"Signed in?"}
-    auth -- "no" --> si["Sign-in<br>AUTH-01"] --> net
+    auth -- "no" --> si["Sign-in, or create account and verify email<br>AUTH-01, AUTH-05, AUTH-06"] --> net
     auth -- "yes" --> net{"Network?"}
     net -- "no" --> onet["Message: joining needs a connection<br>proposed, OQ-22<br>HH-03, SYNC-03"]
     net -- "yes" --> check{"Link valid?"}
@@ -198,7 +230,8 @@ stateDiagram-v2
     AccessLost --> Online: leave the list, unsent edits dropped, short message (SYNC-02)
     note right of Offline
         Needs a connection, SYNC-03:
-        first sign-in, join, create invite.
+        first sign-in, create account, verify,
+        reset password, join, create invite.
         Opening an invite link: proposed, OQ-22.
         Others: OQ-22. Offline banner: OQ-14.
     end note
@@ -248,6 +281,7 @@ flowchart LR
         f2["List name empty<br>LIST-02, LIST-03"]
         f3["Item name empty<br>ITEM-01, ITEM-02"]
         f4["Year outside 1900 to current year + 50<br>ITEM-01, OQ-6"]
+        f5["Email not valid, or password under 12<br>AUTH-05, AUTH-08"]
     end
     subgraph msg ["Messages"]
         m1["Needs a connection<br>AUTH-01, HH-03, SYNC-03"]
@@ -256,6 +290,10 @@ flowchart LR
         m4["Item was removed by someone else<br>SYNC-02"]
         m5["List no longer available<br>SYNC-02"]
         m6["Household deleted, your lists are private again<br>HH-06"]
+        m7["Wrong email or password; too many tries, try again later<br>AUTH-07, AUTH-09"]
+        m8["If an account exists, we sent an email<br>AUTH-08"]
+        m9["Email not verified yet<br>AUTH-06"]
+        m10["Sign in with the method you used first<br>AUTH-10"]
     end
 ```
 
@@ -268,14 +306,14 @@ Every v1 story appears in at least one diagram above. Each row lists every story
 
 | Section | Stories |
 |---|---|
-| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03, LANG-02 |
-| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, HH-06, LIST-01, VIS-01, SYNC-03 |
-| 3. Household | AUTH-01, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, VIS-02, SYNC-03 |
+| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-10, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03, LANG-02 |
+| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, HH-03, HH-06, LIST-01, VIS-01, SYNC-03 |
+| 3. Household | AUTH-01, AUTH-05, AUTH-06, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, VIS-02, SYNC-03 |
 | 4. Lists and sharing | LIST-01, LIST-02, LIST-03, LIST-04, VIS-01, VIS-02, VIS-03, VIS-04 |
 | 5. Items | ITEM-01, ITEM-02, ITEM-03, ITEM-04, ITEM-05 |
 | 6. Offline and sync | SYNC-01, SYNC-02, SYNC-03 |
 | 7. Language | LANG-01, LANG-02 |
-| 8. Empty and error states | AUTH-01, HH-01, HH-03, HH-06, LIST-01, LIST-02, LIST-03, ITEM-01, ITEM-02, ITEM-05, SYNC-02, SYNC-03, LANG-01 |
+| 8. Empty and error states | AUTH-01, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, HH-01, HH-03, HH-06, LIST-01, LIST-02, LIST-03, ITEM-01, ITEM-02, ITEM-05, SYNC-02, SYNC-03, LANG-01 |
 
 The open questions that block M0.5-03 stay open and are only marked where they plug in: OQ-8, OQ-9 (sections 1 and
 5), OQ-10 (sections 4 and 5), OQ-14 (section 6) and OQ-20 (section 4).

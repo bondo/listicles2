@@ -1,8 +1,9 @@
 # Tally user stories (v1)
 
 Task M0.5-01. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
-Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17 and OQ-19 of
-2026-11-16 (state issue #15), and
+Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17, OQ-19 and
+OQ-23 to OQ-27 of 2026-11-16 (state issue #15; OQ-23 to OQ-27 follow the sign-in security review, comment 6927207374),
+and
 [the plan](../PLAN.md). Decided questions are in [section 10](#10-decided-questions); anything still unsettled is marked
 **OQ-n** and listed in [section 11](#11-open-questions), and nothing here decides it. Later milestones trace their acceptance tests to the story ids below (PLAN section 7).
 
@@ -25,11 +26,21 @@ Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 o
 
 ## 1. Sign-in and account
 
-**AUTH-01 Sign in with Google.** As a new user, I want to sign in with my Google account, so that I don't need a new
-password and my lists follow me to a new phone.
+Two sign-in methods in v1: Google (the main one) and email with password (OQ-23). No email-link ("magic link") sign-in
+(OQ-27). **Server access:** every Firestore read and write needs a signed-in user whose email is verified
+(`email_verified`; Google accounts are verified by Google, password accounts after AUTH-06), invites included. No
+security rule may rely on a two-step (MFA) claim: two-step verification (AUTH-09) protects the sign-in, not the rules.
+Rules allow and deny tests cover both.
+
+**AUTH-01 Sign in.** As a new user, I want to sign in with my Google account, or with an email and password if I
+prefer, so that my lists follow me to a new phone.
 * Given the app is opened for the first time, when it starts, then it shows the sign-in screen and nothing else.
+* Given the sign-in screen, then "Sign in with Google" is the first and main button and "Use email and password" is
+  the second (OQ-23).
 * Given the sign-in screen, when I pick a Google account in the system account picker, then I am signed in and see my
   lists (LIST-01).
+* Given I tap "Use email and password", then I can sign in (AUTH-07), create an account (AUTH-05) or reset my password
+  (AUTH-08).
 * Given the account picker is open, when I cancel it, then I stay on the sign-in screen and no error is shown.
 * Given there is no network, when I try to sign in, then I see a message that the first sign-in needs a connection.
 
@@ -50,8 +61,64 @@ once.
   to transfer ownership (HH-06) and deletes nothing until that is done.
 * Given I am the last member, when I delete my account, then the household is deleted too (my lists are deleted with
   my account, so nothing returns to anyone, OQ-17).
-* Given Google demands a recent sign-in, when I confirm, then the app asks me to sign in again and then continues.
+* Given the server demands a recent sign-in, when I confirm, then the app asks me to sign in again with the method I
+  used (Google, or my password plus a code if two-step verification is on, AUTH-09) and then continues.
 * What happens to items I added to lists other people created: OQ-18.
+
+**AUTH-05 Create an account with email and password.** As a new user without (or not wanting to use) a Google account,
+I want to create an account with my email and a password, so that I can use Tally too.
+* Given I enter a valid email and a password of at least 12 characters, when I confirm, then the account is created, a
+  verification email is sent, and I see the "check your email" screen (AUTH-06).
+* Given a password shorter than 12 characters, when I confirm, then nothing is created and the field shows an error;
+  there are no other password rules (no required digits, symbols or capitals, OQ-26).
+* Given the email is not a valid address, when I confirm, then nothing is created and the field shows an error.
+* Given the email already has an account, when I confirm, then no second account is created (AUTH-10).
+* Given there is no network, when I confirm, then I see a message that this needs a connection.
+
+**AUTH-06 Verify my email.** As a user who created a password account, I want to confirm my email, so that only the
+owner of the address can use the account.
+* Given I created an account (AUTH-05), then I see a screen saying a link was sent to my email, with "Continue",
+  "Send again" and "Sign out".
+* Given I opened the link in the email, when I tap "Continue", then I see my lists (or the join screen, HH-03).
+* Given I have not opened the link yet, when I tap "Continue", then I see a message that the email is not verified yet
+  and stay on the screen.
+* Given I tap "Send again" many times, then I see "Try again later" instead of a new email.
+* Given my email is not verified, when I sign in again later, then I see this screen again, and the server refuses to
+  read or change any data of mine (rules allow and deny tests).
+
+**AUTH-07 Sign in with email and password.** As a user with a password account, I want to sign in with my email and
+password, so that I reach my lists on any phone.
+* Given the right email and password, when I confirm, then I see my lists (or the code step if AUTH-09 is on, or the
+  verify screen if AUTH-06 is not done).
+* Given a wrong email or a wrong password, when I confirm, then I see one message, "Wrong email or password", that does
+  not say which one was wrong or whether the account exists.
+* Given many failed attempts, when I try again, then I see "Too many attempts, try again later".
+* Given there is no network, when I confirm, then I see a message that the first sign-in needs a connection.
+
+**AUTH-08 Reset my password.** As a user who forgot my password, I want a reset email, so that I can get back in.
+* Given I enter an email and confirm, then I always see "If an account exists for this email, we sent an email with a
+  link", whether or not an account exists.
+* Given I open the link and set a new password of at least 12 characters (OQ-26), then I can sign in with it and the
+  old password no longer works.
+* Given the link is expired or already used, when I open it, then I see a message saying so and can ask again.
+* Given two-step verification is on (AUTH-09), then after a reset I still need a code to sign in.
+
+**AUTH-09 Two-step verification (optional).** Depends on the owner's check that the Identity Platform upgrade needs no
+billing (OQ-25 verification). As a password user, I want to add a code from an authenticator app, so that a stolen
+password alone is not enough.
+* Given a verified password account, when I turn on two-step verification in Account, then (after a recent sign-in) I
+  see a QR code and a key for an authenticator app, and it is on only after I enter a correct code.
+* Given it is on, when I sign in with my password (AUTH-07) or sign in again (AUTH-04), then I must also enter a
+  6-digit code; a wrong code shows an error, many wrong codes show "try again later".
+* Given it is on, when I turn it off (after a recent sign-in with a code), then sign-in needs only my password again.
+* Given a Google account, then this is not offered (OQ-24: optional, for password accounts).
+* Losing the authenticator app: OQ-28.
+
+**AUTH-10 Same email, another method.** As a user who signed up one way, I want a clear way back when I use the other
+way, so that I never get two accounts or lose my lists.
+* Given my email has an account with one method, when I try the other method (Google or email and password), then the
+  app never merges or links the accounts by itself; it tells me to sign in with the method I used first.
+* Given I signed in with the method I used first, then I see my lists as before; adding a second method: OQ-31.
 
 ## 2. Household
 
@@ -71,8 +138,9 @@ people I live with.
 
 **HH-03 Join a household.** As an invited person, I want to open the link and join, so that I see the household's shared
 lists.
-* Given I open a valid link and I am not signed in, when the app opens, then I sign in first (AUTH-01) and then see
-  the join screen.
+* Given I open a valid link and I am not signed in, when the app opens, then I sign in first (AUTH-01), or create an
+  account and verify my email (AUTH-05, AUTH-06), and then see the join screen.
+* Given my email is not verified, then the server refuses to read the invite (rules allow and deny tests).
 * Given the join screen shows the household's name, when I confirm, then I am a member and see its shared lists.
 * Given the link is expired, used or revoked, when I open it, then I see a message saying so and join nothing.
 * Given I am already in another household, when I open a link, then the app tells me to leave that household first.
@@ -226,7 +294,8 @@ so that we never work on an old copy.
 
 **SYNC-03 Actions that need the network.** As a user, I want a clear message when something needs a connection, so that
 I don't wait for nothing.
-* Given there is no network, when I sign in the first time, join a household or create an invite, then I see a message
+* Given there is no network, when I sign in the first time, create an account, verify my email, reset my password,
+  join a household or create an invite, then I see a message
   that this needs a connection, and nothing half-done is left behind.
 
 ## 7. Language
@@ -252,6 +321,7 @@ Decided as not in v1 (Q1, Q2, Q4); the ones marked *later* are planned for a lat
 * Recipes, and weekly meal planning (*later*, Q4).
 * Sharing a list with one person, with guests, or with people outside the household (Q3 shares with the household).
 * More than one household per user (PLAN section 3: a user record holds one household id).
+* Sign-in with an email link ("magic link", OQ-27); reconsidered only if the project moves to the paid Blaze plan.
 * Notes and tags on items, barcode scanning and title lookup, packing templates and trips: in [the plan](../PLAN.md)
   (sections 1 and 7, M2-M5), but not in the v1 item of Q2 (OQ-15). Search, sort and filter are also planned for M2
   (PLAN sections 1 and 7); whether any of them is in v1 is OQ-8.
@@ -292,6 +362,11 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-5 | **Decided:** in v1 everything a person created goes with them when they leave the household, are removed, or delete their account, including the shared lists they created (the other members lose those lists). Later the leaver chooses per shared list whether it stays (section 9). | AUTH-04, HH-05, HH-06 |
 | OQ-6 | **Decided:** the year is optional, valid from 1900 to the current year plus 50. An item can have two years: the original release year and, optionally, a re-release year (rules between them: OQ-19). | ITEM-01, ITEM-02, ITEM-05 |
 | OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes what they created with them. | AUTH-04, HH-05, HH-06 |
+| OQ-23 | **Decided (2026-11-16):** email and password sign-in is built together with Google in v1 (M1), not later. Google stays the main button. | AUTH-01, AUTH-05..08, AUTH-10 |
+| OQ-24 | **Decided (2026-11-16):** two-step verification with an authenticator app (TOTP) is optional, for password accounts. | AUTH-09 |
+| OQ-25 | **Decided (2026-11-16):** accept the Identity Platform upgrade for TOTP if it needs no billing; the owner verifies this first, so AUTH-09 depends on it. | AUTH-09 |
+| OQ-26 | **Decided (2026-11-16):** passwords have at least 12 characters and no other rules; the Firebase password policy in Require mode plus a check in the app. | AUTH-05, AUTH-08 |
+| OQ-27 | **Decided (2026-11-16):** no email-link ("magic link") sign-in in v1; reconsider only on the Blaze plan. | section 8 |
 | OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
@@ -312,6 +387,10 @@ diagram (M0.5-02) any more.
 | OQ-14 | Should the app show when it is offline and when changes are waiting to be sent? | SYNC-01 | M0.5-03 |
 | OQ-15 | The plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | PLAN update, M1/M2 scope |
 | OQ-16 | Assumed: a member who joins later sees the lists already shared with the household. Confirm. | VIS-02 | later |
+| OQ-28 | A user with two-step verification loses the authenticator app: how do they get back in? Without Cloud Functions there is no in-app recovery; only the project owner can remove the second step in the Firebase console. | AUTH-09 | M1 planning |
+| OQ-29 | The verification and reset emails and the pages their links open: Firebase's default pages and email texts, or own pages on Firebase Hosting (next to the invite page, OQ-21)? In which language are they sent (English and Danish, LANG-01)? | AUTH-06, AUTH-08 | M1 planning |
+| OQ-30 | The privacy text must say that Google (Firebase Authentication, Identity Platform) stores email addresses and passwords as a processor. Who writes it, and before which release? | AUTH-05 | before release |
+| OQ-31 | For password accounts: are changing the email, changing the password and adding a second sign-in method to an existing account in v1 (each needs a recent sign-in), or later? | AUTH-10 | M1 planning |
 | OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
@@ -323,3 +402,5 @@ everything under a deleted household, but shared lists must go back to their cre
 Functions, so the planner must say who returns them: the security rules and each creator's own client (the creator makes
 their own lists private again, the same way as VIS-04), not the household owner's client. The PLAN section 3 item
 has no year fields; the v1 item needs a name, two optional years (1900 to the current year plus 50) and the check.
+Sign-in (OQ-23 to OQ-27) adds to M1: the rules need an `email_verified` check (also for reading an invite) with allow
+and deny tests, and the password, verification, reset and same-email flows are `risk:high`, in PRs split by concern.
