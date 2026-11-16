@@ -257,6 +257,8 @@ class Config(unittest.TestCase):
         text = read("firebase", "eslint.config.mjs")
         self.assertIn("strictTypeChecked", text)
         self.assertIn("projectService", text)
+        self.assertIn("@typescript-eslint/consistent-type-assertions", text)
+        self.assertRegex(text, r'assertionStyle:\s*"never"')
         for word in ('"off"', "'off'", '"warn"', "'warn'", "ignores", "disable", "reportUnused"):
             self.assertNotIn(word, text, word)
 
@@ -341,6 +343,17 @@ class Behaviour(unittest.TestCase):
                 code, out = eslint(source)
                 self.assertNotEqual(code, 0, out)
                 self.assertIn(rule, out)
+
+    def test_type_assertions_are_rejected_in_both_syntaxes(self):
+        rule = "@typescript-eslint/consistent-type-assertions"
+        angle = "export function f(x: unknown): number {\n    return <number>x;\n}\n"
+        as_form = "export function f(x: unknown): number {\n    return x as number;\n}\n"
+        for name, source in (("angle bracket", angle), ("as", as_form)):
+            with self.subTest(name):
+                code, out = eslint(source)
+                self.assertNotEqual(code, 0, out)
+                self.assertIn(rule, out)
+        self.assertEqual(tsc(angle)[0], 0, "tsc alone accepts the angle-bracket assertion, so only ESLint can reject it")
 
     def test_unformatted_code_fails_prettier(self):
         code, out = prettier(PRETTIER_BAD)
