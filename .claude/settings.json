@@ -1,12 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(.tools/bin/shellcheck *)",
+      "Bash(.tools/bin/actionlint *)",
+      "Bash(.tools/bin/zizmor --offline *)",
+      "Bash(scripts/mark-ready.sh *)"
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/statusline.sh\""
-  },
-  "permissions": {
-    "allow": [
-      "Bash(scripts/mark-ready.sh *)"
-    ]
   },
   "hooks": {
     "SessionStart": [

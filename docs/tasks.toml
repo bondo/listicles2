@@ -457,10 +457,11 @@ notes = "Tooling env. Effort S-M. Root ruff.toml/mypy.ini plus CODEOWNERS entry.
 id = "M0.5-08"
 title = "Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-05"]
+pr = 96
 notes = "Tooling env (ci.yml gets tsc and lint steps). Effort S. ts-jest if it supports the installed TS major, else Vitest."
 
 [[task]]

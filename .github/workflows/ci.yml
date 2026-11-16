@@ -60,11 +60,23 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: firebase/package-lock.json
+      - name: install
+        working-directory: firebase
+        run: npm ci --silent
+      - name: typecheck (tsc strict)
+        working-directory: firebase
+        run: npm run typecheck --silent
+      - name: lint (ESLint strictTypeChecked)
+        working-directory: firebase
+        run: npm run lint --silent
+      - name: format (Prettier)
+        working-directory: firebase
+        run: npm run format:check --silent
+      - name: typescript tooling tests
+        run: python3 -I scripts/test_firebase_ts.py
       - name: rules tests (emulator, no secrets)
         working-directory: firebase
-        run: |
-          npm ci --silent
-          npm test --silent
+        run: npm test --silent
 
   ui:
     name: ui

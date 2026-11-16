@@ -18,3 +18,4 @@ handoff/orchestrator.md @docs/ORCHESTRATION.md @docs/reviews/m0-process-tooling-
 .github/collaborators.toml @docs/reviews/collaborator-workflow.md  # decided against (D2): trust is the GitHub repo role only
 scripts/agent-metrics @docs/reviews/m0-process-tooling-review.md  # review quotes it as a PLAN 5.4 gate that does not exist; the real script is scripts/agent_metrics.py
 path/File.kt @.github/ISSUE_TEMPLATE/follow-up.md  # placeholder file name in the follow-up issue template
+firebase/test/rules.test.js @docs/reviews/m0-process-tooling-review.md  # renamed to rules.test.ts by M0.5-08; the review describes the file as it was
