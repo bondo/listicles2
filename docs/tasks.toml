@@ -596,7 +596,7 @@ status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Decisions are logged and the labels feedback, idea, decision, needs-collaborator, needs-owner were created by the orchestrator. Still open for the owner: check the Actions settings by eye (C5: read-only workflow permissions, no create/approve PRs, auto-merge OFF, no secrets or variables); do it before M0.5-O4"
+notes = "Decisions are logged and the labels feedback, idea, decision, needs-collaborator, needs-owner were created by the orchestrator. Still open for the owner: check the Actions settings by eye (C5: read-only workflow permissions, no create/approve PRs, auto-merge OFF, no secrets or variables); do it before M0.5-O5"
 
 [[task]]
 id = "M0.5-16"
@@ -731,6 +731,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0.5-O4"]
+issue = 119
 notes = "Owner only. Send COLLABORATING.md; confirm 2FA is on. Live test: docs/reviews/collaborator-workflow.md section 6 (comment, PR review, form issue, and what Merge does on a green PR), results noted on #15"
 
 # ---------------------------------------------------------------- M1 auth + households
