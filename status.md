@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 26/32 (81%) | 6 |
+| M0.5 | Product design and guardrails | 27/32 (84%) | 5 |
 | M1 | Accounts and households | 0/10 (0%) | 10 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,7 +62,7 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 26/32 done (81%), 6 open.
+**Progress:** 27/32 done (84%), 5 open.
 
 ### Tasks
 
@@ -73,7 +73,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | ready | M0.5-01, M0.5-16 | planner |  |
 | M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | done | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
-| M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | in progress | M0.5-05 | implementer | [#102](https://github.com/bondo/listicles2/issues/102) |
+| M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | done | M0.5-05 | implementer | [#102](https://github.com/bondo/listicles2/issues/102) |
 | M0.5-07 | ruff check (E,F,W,B,UP,SIM) and mypy (default) for scripts/, in verify.sh and CI (P3) | done | M0.5-05, M0-10 | implementer | [#79](https://github.com/bondo/listicles2/issues/79) |
 | M0.5-08 | Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5) | done | M0.5-05 | implementer | [#96](https://github.com/bondo/listicles2/issues/96) |
 | M0.5-09 | Kotlin allWarningsAsErrors in all modules (P6) | done | M0-O11 | implementer | [#47](https://github.com/bondo/listicles2/issues/47) |
@@ -108,16 +108,14 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 ```mermaid
 flowchart LR
     n0["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ready
-    n1["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (in progress)"]:::progress
-    n2["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
-    n3["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
-    n4["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
-    n5["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
+    n1["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
+    n2["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
+    n3["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
+    n4["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
+    n0 --> n1
+    n3 --> n1
     n0 --> n2
-    n1 --> n2
-    n4 --> n2
     n0 --> n3
-    n0 --> n4
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -219,6 +217,6 @@ Not planned yet.
 
 ## Blockers
 
-- **task** M0.5-FU: waits on M0.5-03, M0.5-06, M0.5-26
+- **task** M0.5-FU: waits on M0.5-03, M0.5-26
 - **task** M0.5-O1: waits on M0.5-03
 - **task** M0.5-26: waits on M0.5-03
