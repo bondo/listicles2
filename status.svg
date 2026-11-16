@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1692" viewBox="0 0 880 1692" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 24/32; M1 Accounts and households 0/10; M2 Inventory lists 0/0; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/0), 5 PRs waiting, 5 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1692" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1578" viewBox="0 0 880 1578" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 25/32; M1 Accounts and households 0/10; M2 Inventory lists 0/0; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/0), 4 PRs waiting, 3 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1578" class="bg"/>
 <text x="24" y="36" class="fg t">Listicles status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-16 09:24 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-16 11:15 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 16. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -12,160 +12,145 @@
 <rect x="40" y="166" width="640" height="8" rx="3" class="full"/>
 <polyline points="40,194 43,197 48,190" class="tick mk-done"/>
 <text x="60" y="198" class="ok">28 done</text>
-<rect x="24" y="222" width="832" height="328" rx="6" class="card"/>
+<rect x="24" y="222" width="832" height="280" rx="6" class="card"/>
 <text x="40" y="246" class="fg h">M0.5 Product design and guardrails</text>
-<text x="840" y="246" class="fg" text-anchor="end">75%  24/32</text>
+<text x="840" y="246" class="fg" text-anchor="end">78%  25/32</text>
 <text x="840" y="264" class="info s" text-anchor="end">current</text>
 <text x="40" y="264" class="muted s">User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.</text>
 <rect x="40" y="276" width="640" height="8" rx="3" class="track"/>
-<rect x="40" y="276" width="480" height="8" rx="3" class="bar"/>
+<rect x="40" y="276" width="500" height="8" rx="3" class="bar"/>
 <polyline points="40,304 43,307 48,300" class="tick mk-done"/>
-<text x="60" y="308" class="ok">24 done</text>
-<polygon points="39,328 49,328 44,319" class="info mk-progress"/>
-<text x="60" y="328" class="info">in progress #94</text>
-<text x="180" y="328" class="fg h">M0.5-01</text>
-<text x="262" y="328" class="fg">User stories with acceptance criteria (docs/product/stories.md)</text>
-<rect x="40" y="340" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="348" class="warn">blocked</text>
-<text x="180" y="348" class="fg h">M0.5-02</text>
-<text x="262" y="348" class="fg">App-flow diagram (docs/product/flow.md, Mermaid)</text>
-<text x="262" y="362" class="muted s">waits on M0.5-01</text>
-<rect x="40" y="374" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="382" class="warn">blocked</text>
-<text x="180" y="382" class="fg h">M0.5-03</text>
-<text x="262" y="382" class="fg">Screen wireframes and design tokens (colors, type, spacing, dark mode) as an…</text>
-<text x="262" y="396" class="muted s">waits on M0.5-01</text>
-<circle cx="44" cy="412" r="4.5" class="ok mk-ready"/>
-<text x="60" y="416" class="ok">ready</text>
-<text x="180" y="416" class="fg h">M0.5-06</text>
-<text x="262" y="416" class="fg">CI: shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false…</text>
-<rect x="40" y="428" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="436" class="warn">blocked</text>
-<text x="180" y="436" class="fg h">M0.5-FU</text>
-<text x="262" y="436" class="fg">Follow-up burn-down for M0.5</text>
-<text x="262" y="450" class="muted s">waits on M0.5-01, M0.5-02, M0.5-03 +2</text>
-<polygon points="39,466 44,461 49,466 44,471" class="bad mk-owner"/>
-<text x="60" y="470" class="bad">owner to-do</text>
-<text x="180" y="470" class="fg h">M0.5-O1</text>
-<text x="262" y="470" class="fg">Approve stories, flow and design</text>
-<text x="262" y="484" class="muted s">waits on M0.5-01, M0.5-02, M0.5-03</text>
-<rect x="40" y="496" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="504" class="warn">blocked</text>
-<text x="180" y="504" class="fg h">M0.5-26</text>
-<text x="262" y="504" class="fg">REVIEW.md: R9 visual-rubric item (agent score below 3 is a minor finding) …</text>
-<text x="262" y="518" class="muted s">waits on M0.5-03</text>
-<polygon points="39,534 44,529 49,534 44,539" class="bad mk-owner"/>
-<text x="60" y="538" class="bad">owner to-do</text>
-<text x="180" y="538" class="fg h">M0.5-O4</text>
-<text x="262" y="538" class="fg">Invite the collaborator (Write) once COLLABORATING.md and the wake steps exi…</text>
-<rect x="24" y="562" width="832" height="404" rx="6" class="card"/>
-<text x="40" y="586" class="fg h">M1 Accounts and households</text>
-<text x="840" y="586" class="fg" text-anchor="end">0%  0/10</text>
-<text x="40" y="604" class="muted s">Google sign-in, households, invite links, members and ownership, with rules tests.</text>
-<rect x="40" y="616" width="640" height="8" rx="3" class="track"/>
-<rect x="40" y="640" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="648" class="warn">blocked</text>
-<text x="180" y="648" class="fg h">M1-01</text>
-<text x="262" y="648" class="fg">Plan M1: docs/milestones/M1.md and PR-sized tasks in this file</text>
-<text x="262" y="662" class="muted s">waits on all of M0.5</text>
-<rect x="40" y="674" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="682" class="warn">blocked</text>
-<text x="180" y="682" class="fg h">M1-02</text>
-<text x="262" y="682" class="fg">Start the Firestore emulator in the ui CI job (known gap R6-09), with the fi…</text>
-<text x="262" y="696" class="muted s">waits on M1-01</text>
-<rect x="40" y="708" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="716" class="warn">blocked</text>
-<text x="180" y="716" class="fg h">M1-03</text>
-<text x="262" y="716" class="fg">Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff art…</text>
-<text x="262" y="730" class="muted s">waits on M1-01</text>
-<rect x="40" y="742" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="750" class="warn">blocked</text>
-<text x="180" y="750" class="fg h">M1-04</text>
-<text x="262" y="750" class="fg">Design tokens: Theme.kt parity test against design/tokens.json and WCAG AA co…</text>
-<text x="262" y="764" class="muted s">waits on M0.5-03, M1-03</text>
-<rect x="40" y="776" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="784" class="warn">blocked</text>
-<text x="180" y="784" class="fg h">M1-05</text>
-<text x="262" y="784" class="fg">PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16)</text>
-<text x="262" y="798" class="muted s">waits on M1-01</text>
-<rect x="40" y="810" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="818" class="warn">blocked</text>
-<text x="180" y="818" class="fg h">M1-06</text>
-<text x="262" y="818" class="fg">Rules fuzzing: fast-check against a TS reference model of PLAN 3.1 (P17)</text>
-<text x="262" y="832" class="muted s">waits on M1-01</text>
-<rect x="40" y="844" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="852" class="warn">blocked</text>
-<text x="180" y="852" class="fg h">M1-07</text>
-<text x="262" y="852" class="fg">Test-impact summary: uncovered changed lines to the step summary and verif…</text>
-<text x="262" y="866" class="muted s">waits on M1-01</text>
-<rect x="40" y="878" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="886" class="warn">blocked</text>
-<text x="180" y="886" class="fg h">M1-FU</text>
-<text x="262" y="886" class="fg">Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)</text>
-<text x="262" y="900" class="muted s">waits on M1-01, M1-02, M1-03 +4</text>
-<polygon points="39,916 44,911 49,916 44,921" class="bad mk-owner"/>
-<text x="60" y="920" class="bad">owner to-do</text>
-<text x="180" y="920" class="fg h">M1-O1</text>
-<text x="262" y="920" class="fg">Create the Firebase project (Spark), enable Google sign-in and Firestore, add g…</text>
-<polygon points="39,936 44,931 49,936 44,941" class="bad mk-owner"/>
-<text x="60" y="940" class="bad">owner to-do</text>
-<text x="180" y="940" class="fg h">M1-O2</text>
-<text x="262" y="940" class="fg">Register the debug and release SHA-1 fingerprints in Firebase</text>
-<text x="262" y="954" class="bad s">waits on M1-O1 (owner)</text>
-<rect x="24" y="978" width="832" height="66" rx="6" class="card"/>
-<text x="40" y="1002" class="fg h">M2 Inventory lists</text>
-<text x="840" y="1002" class="muted" text-anchor="end">not planned yet</text>
-<text x="40" y="1020" class="muted s">Lists and items with real-time sync, offline use, search, sort and filter, in English and Danish.</text>
-<rect x="24" y="1056" width="832" height="66" rx="6" class="card"/>
-<text x="40" y="1080" class="fg h">M3 Packing rules (domain)</text>
-<text x="840" y="1080" class="muted" text-anchor="end">not planned yet</text>
-<text x="40" y="1098" class="muted s">Scaling, per-person templates and merging as property-tested pure Kotlin.</text>
-<rect x="24" y="1134" width="832" height="66" rx="6" class="card"/>
-<text x="40" y="1158" class="fg h">M4 Packing templates and trips</text>
-<text x="840" y="1158" class="muted" text-anchor="end">not planned yet</text>
-<text x="40" y="1176" class="muted s">Template and rule editor, create a trip, trip checklist and one-off items.</text>
-<rect x="24" y="1212" width="832" height="66" rx="6" class="card"/>
-<text x="40" y="1236" class="fg h">M5 Barcode scanning</text>
-<text x="840" y="1236" class="muted" text-anchor="end">not planned yet</text>
-<text x="40" y="1254" class="muted s">Camera scanning, product lookup with a fallback to manual entry, duplicate warning.</text>
-<rect x="24" y="1290" width="832" height="66" rx="6" class="card"/>
-<text x="40" y="1314" class="fg h">M6 Release</text>
-<text x="840" y="1314" class="muted" text-anchor="end">not planned yet</text>
-<text x="40" y="1332" class="muted s">Signed APK on tag as a GitHub Release, and a disabled Play internal-track workflow.</text>
-<text x="24" y="1390" class="fg h">Owner queue</text>
-<text x="856" y="1390" class="muted s" text-anchor="end">open PRs that are not drafts</text>
-<line x1="24" y1="1398" x2="856" y2="1398" class="rule"/>
-<text x="24" y="1422" class="fg h">#94</text>
-<text x="80" y="1422" class="fg">M0.5-01: v1 user stories with acceptance criteria (docs/p…</text>
-<text x="856" y="1422" class="warn" text-anchor="end">CI passing  merge state unknown</text>
-<text x="24" y="1444" class="fg h">#97</text>
-<text x="80" y="1444" class="fg">build(deps): Bump actions/setup-java from 4 to 5</text>
-<text x="856" y="1444" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1466" class="fg h">#98</text>
-<text x="80" y="1466" class="fg">build(deps-dev): Bump firebase-tools from 15.35.0 to 15.3…</text>
-<text x="856" y="1466" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1488" class="fg h">#99</text>
-<text x="80" y="1488" class="fg">build(deps-dev): Bump firebase from 12.6.0 to 13.3.0 in /…</text>
-<text x="856" y="1488" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1510" class="fg h">#100</text>
-<text x="80" y="1510" class="fg">build(deps-dev): Bump @types/node from 22.20.5 to 26.6.6…</text>
-<text x="856" y="1510" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1544" class="fg h">BLOCKERS</text>
-<text x="856" y="1544" class="muted s" text-anchor="end">5 open</text>
-<line x1="24" y1="1552" x2="856" y2="1552" class="rule"/>
-<text x="24" y="1576" class="warn">task</text>
-<text x="120" y="1576" class="fg h">M0.5-02</text>
-<text x="190" y="1576" class="fg">waits on M0.5-01</text>
-<text x="24" y="1598" class="warn">task</text>
-<text x="120" y="1598" class="fg h">M0.5-03</text>
-<text x="190" y="1598" class="fg">waits on M0.5-01</text>
-<text x="24" y="1620" class="warn">task</text>
-<text x="120" y="1620" class="fg h">M0.5-FU</text>
-<text x="190" y="1620" class="fg">waits on M0.5-01, M0.5-02, M0.5-03 +2</text>
-<text x="24" y="1642" class="warn">task</text>
-<text x="120" y="1642" class="fg h">M0.5-O1</text>
-<text x="190" y="1642" class="fg">waits on M0.5-01, M0.5-02, M0.5-03</text>
-<text x="24" y="1664" class="warn">task</text>
-<text x="120" y="1664" class="fg h">M0.5-26</text>
-<text x="190" y="1664" class="fg">waits on M0.5-03</text>
+<text x="60" y="308" class="ok">25 done</text>
+<circle cx="44" cy="324" r="4.5" class="ok mk-ready"/>
+<text x="60" y="328" class="ok">ready</text>
+<text x="180" y="328" class="fg h">M0.5-02</text>
+<text x="262" y="328" class="fg">App-flow diagram (docs/product/flow.md, Mermaid)</text>
+<circle cx="44" cy="344" r="4.5" class="ok mk-ready"/>
+<text x="60" y="348" class="ok">ready</text>
+<text x="180" y="348" class="fg h">M0.5-03</text>
+<text x="262" y="348" class="fg">Screen wireframes and design tokens (colors, type, spacing, dark mode) as an…</text>
+<polygon points="39,368 49,368 44,359" class="info mk-progress"/>
+<text x="60" y="368" class="info">in progress #102</text>
+<text x="180" y="368" class="fg h">M0.5-06</text>
+<text x="262" y="368" class="fg">CI: shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false…</text>
+<rect x="40" y="380" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="388" class="warn">blocked</text>
+<text x="180" y="388" class="fg h">M0.5-FU</text>
+<text x="262" y="388" class="fg">Follow-up burn-down for M0.5</text>
+<text x="262" y="402" class="muted s">waits on M0.5-02, M0.5-03, M0.5-06 +1</text>
+<polygon points="39,418 44,413 49,418 44,423" class="bad mk-owner"/>
+<text x="60" y="422" class="bad">owner to-do</text>
+<text x="180" y="422" class="fg h">M0.5-O1</text>
+<text x="262" y="422" class="fg">Approve stories, flow and design</text>
+<text x="262" y="436" class="muted s">waits on M0.5-02, M0.5-03</text>
+<rect x="40" y="448" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="456" class="warn">blocked</text>
+<text x="180" y="456" class="fg h">M0.5-26</text>
+<text x="262" y="456" class="fg">REVIEW.md: R9 visual-rubric item (agent score below 3 is a minor finding) …</text>
+<text x="262" y="470" class="muted s">waits on M0.5-03</text>
+<polygon points="39,486 44,481 49,486 44,491" class="bad mk-owner"/>
+<text x="60" y="490" class="bad">owner to-do</text>
+<text x="180" y="490" class="fg h">M0.5-O4</text>
+<text x="262" y="490" class="fg">Invite the collaborator (Write) once COLLABORATING.md and the wake steps exi…</text>
+<rect x="24" y="514" width="832" height="404" rx="6" class="card"/>
+<text x="40" y="538" class="fg h">M1 Accounts and households</text>
+<text x="840" y="538" class="fg" text-anchor="end">0%  0/10</text>
+<text x="40" y="556" class="muted s">Google sign-in, households, invite links, members and ownership, with rules tests.</text>
+<rect x="40" y="568" width="640" height="8" rx="3" class="track"/>
+<rect x="40" y="592" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="600" class="warn">blocked</text>
+<text x="180" y="600" class="fg h">M1-01</text>
+<text x="262" y="600" class="fg">Plan M1: docs/milestones/M1.md and PR-sized tasks in this file</text>
+<text x="262" y="614" class="muted s">waits on all of M0.5</text>
+<rect x="40" y="626" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="634" class="warn">blocked</text>
+<text x="180" y="634" class="fg h">M1-02</text>
+<text x="262" y="634" class="fg">Start the Firestore emulator in the ui CI job (known gap R6-09), with the fi…</text>
+<text x="262" y="648" class="muted s">waits on M1-01</text>
+<rect x="40" y="660" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="668" class="warn">blocked</text>
+<text x="180" y="668" class="fg h">M1-03</text>
+<text x="262" y="668" class="fg">Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff art…</text>
+<text x="262" y="682" class="muted s">waits on M1-01</text>
+<rect x="40" y="694" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="702" class="warn">blocked</text>
+<text x="180" y="702" class="fg h">M1-04</text>
+<text x="262" y="702" class="fg">Design tokens: Theme.kt parity test against design/tokens.json and WCAG AA co…</text>
+<text x="262" y="716" class="muted s">waits on M0.5-03, M1-03</text>
+<rect x="40" y="728" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="736" class="warn">blocked</text>
+<text x="180" y="736" class="fg h">M1-05</text>
+<text x="262" y="736" class="fg">PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16)</text>
+<text x="262" y="750" class="muted s">waits on M1-01</text>
+<rect x="40" y="762" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="770" class="warn">blocked</text>
+<text x="180" y="770" class="fg h">M1-06</text>
+<text x="262" y="770" class="fg">Rules fuzzing: fast-check against a TS reference model of PLAN 3.1 (P17)</text>
+<text x="262" y="784" class="muted s">waits on M1-01</text>
+<rect x="40" y="796" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="804" class="warn">blocked</text>
+<text x="180" y="804" class="fg h">M1-07</text>
+<text x="262" y="804" class="fg">Test-impact summary: uncovered changed lines to the step summary and verif…</text>
+<text x="262" y="818" class="muted s">waits on M1-01</text>
+<rect x="40" y="830" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="838" class="warn">blocked</text>
+<text x="180" y="838" class="fg h">M1-FU</text>
+<text x="262" y="838" class="fg">Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)</text>
+<text x="262" y="852" class="muted s">waits on M1-01, M1-02, M1-03 +4</text>
+<polygon points="39,868 44,863 49,868 44,873" class="bad mk-owner"/>
+<text x="60" y="872" class="bad">owner to-do</text>
+<text x="180" y="872" class="fg h">M1-O1</text>
+<text x="262" y="872" class="fg">Create the Firebase project (Spark), enable Google sign-in and Firestore, add g…</text>
+<polygon points="39,888 44,883 49,888 44,893" class="bad mk-owner"/>
+<text x="60" y="892" class="bad">owner to-do</text>
+<text x="180" y="892" class="fg h">M1-O2</text>
+<text x="262" y="892" class="fg">Register the debug and release SHA-1 fingerprints in Firebase</text>
+<text x="262" y="906" class="bad s">waits on M1-O1 (owner)</text>
+<rect x="24" y="930" width="832" height="66" rx="6" class="card"/>
+<text x="40" y="954" class="fg h">M2 Inventory lists</text>
+<text x="840" y="954" class="muted" text-anchor="end">not planned yet</text>
+<text x="40" y="972" class="muted s">Lists and items with real-time sync, offline use, search, sort and filter, in English and Danish.</text>
+<rect x="24" y="1008" width="832" height="66" rx="6" class="card"/>
+<text x="40" y="1032" class="fg h">M3 Packing rules (domain)</text>
+<text x="840" y="1032" class="muted" text-anchor="end">not planned yet</text>
+<text x="40" y="1050" class="muted s">Scaling, per-person templates and merging as property-tested pure Kotlin.</text>
+<rect x="24" y="1086" width="832" height="66" rx="6" class="card"/>
+<text x="40" y="1110" class="fg h">M4 Packing templates and trips</text>
+<text x="840" y="1110" class="muted" text-anchor="end">not planned yet</text>
+<text x="40" y="1128" class="muted s">Template and rule editor, create a trip, trip checklist and one-off items.</text>
+<rect x="24" y="1164" width="832" height="66" rx="6" class="card"/>
+<text x="40" y="1188" class="fg h">M5 Barcode scanning</text>
+<text x="840" y="1188" class="muted" text-anchor="end">not planned yet</text>
+<text x="40" y="1206" class="muted s">Camera scanning, product lookup with a fallback to manual entry, duplicate warning.</text>
+<rect x="24" y="1242" width="832" height="66" rx="6" class="card"/>
+<text x="40" y="1266" class="fg h">M6 Release</text>
+<text x="840" y="1266" class="muted" text-anchor="end">not planned yet</text>
+<text x="40" y="1284" class="muted s">Signed APK on tag as a GitHub Release, and a disabled Play internal-track workflow.</text>
+<text x="24" y="1342" class="fg h">Owner queue</text>
+<text x="856" y="1342" class="muted s" text-anchor="end">open PRs that are not drafts</text>
+<line x1="24" y1="1350" x2="856" y2="1350" class="rule"/>
+<text x="24" y="1374" class="fg h">#97</text>
+<text x="80" y="1374" class="fg">build(deps): Bump actions/setup-java from 4 to 5</text>
+<text x="856" y="1374" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="24" y="1396" class="fg h">#98</text>
+<text x="80" y="1396" class="fg">build(deps-dev): Bump firebase-tools from 15.35.0 to 15.3…</text>
+<text x="856" y="1396" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="24" y="1418" class="fg h">#99</text>
+<text x="80" y="1418" class="fg">build(deps-dev): Bump firebase from 12.6.0 to 13.3.0 in /…</text>
+<text x="856" y="1418" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="24" y="1440" class="fg h">#100</text>
+<text x="80" y="1440" class="fg">build(deps-dev): Bump @types/node from 22.20.5 to 26.6.6…</text>
+<text x="856" y="1440" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="24" y="1474" class="fg h">BLOCKERS</text>
+<text x="856" y="1474" class="muted s" text-anchor="end">3 open</text>
+<line x1="24" y1="1482" x2="856" y2="1482" class="rule"/>
+<text x="24" y="1506" class="warn">task</text>
+<text x="120" y="1506" class="fg h">M0.5-FU</text>
+<text x="190" y="1506" class="fg">waits on M0.5-02, M0.5-03, M0.5-06 +1</text>
+<text x="24" y="1528" class="warn">task</text>
+<text x="120" y="1528" class="fg h">M0.5-O1</text>
+<text x="190" y="1528" class="fg">waits on M0.5-02, M0.5-03</text>
+<text x="24" y="1550" class="warn">task</text>
+<text x="120" y="1550" class="fg h">M0.5-26</text>
+<text x="190" y="1550" class="fg">waits on M0.5-03</text>
 </svg>

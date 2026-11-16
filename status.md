@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 24/32 (75%) | 8 |
+| M0.5 | Product design and guardrails | 25/32 (78%) | 7 |
 | M1 | Accounts and households | 0/10 (0%) | 10 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,18 +62,18 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 24/32 done (75%), 8 open.
+**Progress:** 25/32 done (78%), 7 open.
 
 ### Tasks
 
 | Task | Title | Status | Depends on | Who | PR |
 |---|---|---|---|---|---|
-| M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | in progress | all of M0 | planner | [#94](https://github.com/bondo/listicles2/issues/94) |
-| M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | blocked | M0.5-01 | planner |  |
-| M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | blocked | M0.5-01, M0.5-16 | planner |  |
+| M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | done | all of M0 | planner | [#94](https://github.com/bondo/listicles2/issues/94) |
+| M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | ready | M0.5-01 | planner |  |
+| M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | ready | M0.5-01, M0.5-16 | planner |  |
 | M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | done | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
-| M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | ready | M0.5-05 | implementer |  |
+| M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | in progress | M0.5-05 | implementer | [#102](https://github.com/bondo/listicles2/issues/102) |
 | M0.5-07 | ruff check (E,F,W,B,UP,SIM) and mypy (default) for scripts/, in verify.sh and CI (P3) | done | M0.5-05, M0-10 | implementer | [#79](https://github.com/bondo/listicles2/issues/79) |
 | M0.5-08 | Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5) | done | M0.5-05 | implementer | [#96](https://github.com/bondo/listicles2/issues/96) |
 | M0.5-09 | Kotlin allWarningsAsErrors in all modules (P6) | done | M0-O11 | implementer | [#47](https://github.com/bondo/listicles2/issues/47) |
@@ -107,25 +107,20 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M0.5-01 User stories with acceptance criteria … (in progress)"]:::progress
-    n1["M0.5-02 App-flow diagram (docs/product/flow.… (blocked)"]:::blocked
-    n2["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::blocked
-    n3["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (ready)"]:::ready
-    n4["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
-    n5["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
-    n6["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
-    n7["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
-    n0 --> n1
-    n0 --> n2
+    n0["M0.5-02 App-flow diagram (docs/product/flow.… (ready)"]:::ready
+    n1["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ready
+    n2["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (in progress)"]:::progress
+    n3["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
+    n4["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
+    n5["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
+    n6["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
+    n0 --> n3
+    n1 --> n3
+    n2 --> n3
+    n5 --> n3
     n0 --> n4
     n1 --> n4
-    n2 --> n4
-    n3 --> n4
-    n6 --> n4
-    n0 --> n5
     n1 --> n5
-    n2 --> n5
-    n2 --> n6
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -171,7 +166,7 @@ flowchart LR
     n8["M1-O1 Create the Firebase project (Spark), en… (owner to-do)"]:::owner
     n9["M1-O2 Register the debug and release SHA-1 fi… (owner to-do)"]:::owner
     n10["all of M0.5"]:::ext
-    n11["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::ext
+    n11["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ext
     n10 --> n0
     n0 --> n1
     n0 --> n2
@@ -227,8 +222,6 @@ Not planned yet.
 
 ## Blockers
 
-- **task** M0.5-02: waits on M0.5-01
-- **task** M0.5-03: waits on M0.5-01
-- **task** M0.5-FU: waits on M0.5-01, M0.5-02, M0.5-03 +2
-- **task** M0.5-O1: waits on M0.5-01, M0.5-02, M0.5-03
+- **task** M0.5-FU: waits on M0.5-02, M0.5-03, M0.5-06 +1
+- **task** M0.5-O1: waits on M0.5-02, M0.5-03
 - **task** M0.5-26: waits on M0.5-03
