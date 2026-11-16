@@ -28,7 +28,7 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
 flowchart TD
     start(["App opens"]) --> signed{"Signed in?<br>AUTH-02"}
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
-    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>order, search, progress: OQ-8, OQ-9"]
+    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>most recently used first,<br>progress 12 of 30: OQ-8, OQ-9"]
     signin -- "Google account picked" --> lists
     link(["Invite link opened<br>HH-03"]) --> signed2{"Signed in?"}
     signed2 -- "no" --> signin2["Sign-in, then Join<br>AUTH-01, HH-03"]
@@ -97,19 +97,19 @@ flowchart TD
     deleted -. "creator's next app start" .-> notice["Notice: household deleted, my shared lists are private again<br>HH-06"]
 ```
 
-Leaving, removing a member, transferring ownership and deleting the household: whether they need a connection is
-[OQ-22](#10-new-open-questions).
+Creating, inviting, joining, leaving, removing a member, transferring ownership and deleting the household need a
+connection and show "This needs a connection" (OQ-22, decided 2026-11-16).
 
 ### Joining with an invite link
 
 ```mermaid
 flowchart TD
     tap(["Invite link opened"]) --> installed{"App installed?"}
-    installed -- "no" --> store["Not decided: OQ-21"]
+    installed -- "no" --> store["Web page: install the app, then tap the link again<br>OQ-21, host not decided"]
     installed -- "yes" --> auth{"Signed in?"}
     auth -- "no" --> si["Sign-in<br>AUTH-01"] --> net
     auth -- "yes" --> net{"Network?"}
-    net -- "no" --> onet["Message: joining needs a connection<br>proposed, OQ-22<br>HH-03, SYNC-03"]
+    net -- "no" --> onet["Message: this needs a connection<br>OQ-22<br>HH-03, SYNC-03"]
     net -- "yes" --> check{"Link valid?"}
     check -- "expired, used or revoked" --> bad["Message saying so; joins nothing<br>HH-03"]
     check -- "valid" --> other{"Already in<br>another household?"}
@@ -131,13 +131,11 @@ flowchart TD
     open["Open list"] -- "Rename (creator or shared with me)" --> rn{"New name empty?"}
     rn -- "yes" --> rnerr["Old name kept, field error<br>LIST-03"]
     rn -- "no" --> renamed["New name shown everywhere, also to members<br>LIST-03, OQ-3"]
-    open -- "Delete (creator or shared with me)" --> del["Confirm, undo or both: OQ-10<br>LIST-04"]
-    del -- "cancel or undo" --> open
-    del -- "final" --> dgone["List and items gone, also for members<br>LIST-04"] --> lists
+    open -- "Delete (creator or shared with me)" --> del["Confirm first, naming the list and its number of items<br>LIST-04, OQ-10"]
+    del -- "cancel" --> open
+    del -- "confirm" --> dgone["List and items gone, also for members<br>LIST-04"] --> lists
     open -- "Share with household (creator, private list)" --> inhh{"In a household?"}
-    inhh -- "no" --> hstep["Proposed, OQ-20: household step, create or join, then back here<br>(or a household made automatically)<br>VIS-02, OQ-1"]
-    hstep -- "in a household" --> sconfirm
-    hstep -- "gave up" --> open
+    inhh -- "no" --> hstep["Share is disabled with the message: you need a household to share<br>(household step after v1)<br>VIS-02, OQ-1, OQ-20"]
     inhh -- "yes" --> sconfirm["Confirm sharing this one list<br>VIS-02"]
     sconfirm -- "confirm" --> shared["Shared: every member sees it in Lists<br>VIS-02, VIS-03"]
     shared -- "Stop sharing (creator only)" --> stop["Confirm<br>VIS-04"]
@@ -169,19 +167,20 @@ flowchart TD
     edit -- "name cleared" --> keep["Old name kept, error<br>ITEM-02"]
     edit -- "year cleared" --> noyear["Item has no such year<br>ITEM-02"]
     edit -- "valid" --> saved["Saved, shown to members too<br>ITEM-02"]
-    open -- "Remove item" --> rem["Confirm, undo or both: OQ-10<br>ITEM-03"]
-    rem -- "cancel or undo" --> open
-    rem -- "final" --> rgone["Item gone<br>ITEM-03"]
+    open -- "Remove item" --> rem["Removed at once, Undo in a snackbar, no confirmation<br>ITEM-03, OQ-10"]
+    rem -- "undo" --> open
+    rem -- "not undone" --> rgone["Item gone<br>ITEM-03"]
     open -- "Tap checkbox" --> toggle["I have it: checked or unchecked, kept offline too<br>ITEM-04, OQ-7"]
 ```
 
-Duplicate item names (OQ-11), item order, a "show only missing" filter and search (OQ-8), and progress such as
-"12 of 30" (OQ-9) are not in this flow; the Open list screen shows all items (ITEM-05).
+Duplicate item names are still OQ-11. Decided 2026-11-16: items are sorted by release year, then name, and lists by
+most recently used; a "show only missing" filter is in v1; no search and no manual order in v1 (OQ-8). Progress
+("12 of 30") is small text under the list name in Lists and at the top of Open list (OQ-9).
 
 ## 6. Offline and sync
 
-The user does nothing to sync (SYNC-01). Whether the app shows the offline and waiting states is OQ-14; the states below
-exist either way.
+The user does nothing to sync (SYNC-01). While offline the app shows a small bar, "Offline: changes are sent when you are
+online again", with the number of waiting changes (OQ-14, decided 2026-11-16).
 
 ```mermaid
 stateDiagram-v2
@@ -199,8 +198,8 @@ stateDiagram-v2
     note right of Offline
         Needs a connection, SYNC-03:
         first sign-in, join, create invite.
-        Opening an invite link: proposed, OQ-22.
-        Others: OQ-22. Offline banner: OQ-14.
+        Also every household and invite
+        action (OQ-22). Offline bar: OQ-14.
     end note
 ```
 
@@ -277,10 +276,15 @@ Every v1 story appears in at least one diagram above. Each row lists every story
 | 7. Language | LANG-01, LANG-02 |
 | 8. Empty and error states | AUTH-01, HH-01, HH-03, HH-06, LIST-01, LIST-02, LIST-03, ITEM-01, ITEM-02, ITEM-05, SYNC-02, SYNC-03, LANG-01 |
 
-The open questions that block M0.5-03 stay open and are only marked where they plug in: OQ-8, OQ-9 (sections 1 and
-5), OQ-10 (sections 4 and 5), OQ-14 (section 6) and OQ-20 (section 4).
+OQ-8, OQ-9, OQ-10, OQ-14, OQ-20, OQ-21 and OQ-22 were decided by the owner on 2026-11-16 (issue #15) and are drawn
+as decided; the wireframes (M0.5-03, [wireframes/](wireframes/wireframes.html)) follow them.
 
 ## 10. New open questions
+
+All three were decided by the owner on 2026-11-16 (issue #15): OQ-20 differently from the recommendation (Share is
+disabled with a message for a user without a household; the household step comes after v1), OQ-21 and OQ-22 as
+recommended, with "This needs a connection" for household and invite actions and list and item changes still offline.
+The table keeps the original questions as history.
 
 Found while drawing the flow; for the owner to decide (the collaborator may advise). Ids continue the numbering of
 [stories section 11](stories.md#11-open-questions).
