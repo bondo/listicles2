@@ -177,6 +177,31 @@ class StatusWorkflow(unittest.TestCase):
     def test_publish_without_the_token_header_is_flagged(self):
         self.flagged(self.text.replace("http.https://github.com/.extraheader", "http.extraheader"), "token header")
 
+    PUBLISH_MARKER = "      - name: push to the status branch"
+    PUBLISH_ENV = "        env:\n          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n"
+
+    def split_publish(self):
+        head, sep, tail = self.text.partition(self.PUBLISH_MARKER)
+        self.assertTrue(sep, "publish step not found")
+        self.assertIn(self.PUBLISH_ENV, tail, "publish step env not found")
+        return head, sep + tail
+
+    def test_publish_step_without_its_env_is_flagged(self):
+        head, publish = self.split_publish()
+        self.flagged(head + publish.replace(self.PUBLISH_ENV, "", 1), "token header")
+
+    def test_token_moved_to_job_level_env_is_flagged(self):
+        head, publish = self.split_publish()
+        job_env = "    permissions:\n"
+        self.assertIn(job_env, head)
+        moved = head.replace(job_env, "    env:\n      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n" + job_env, 1)
+        self.flagged(moved + publish.replace(self.PUBLISH_ENV, "", 1), "token header")
+
+    def test_token_only_in_the_fetch_step_is_flagged(self):
+        head, publish = self.split_publish()
+        self.assertIn("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}", head)
+        self.flagged(head + publish.replace(self.PUBLISH_ENV, "        env:\n          REPO: ${{ github.repository }}\n", 1), "token header")
+
     def test_checkout_of_the_event_ref_is_flagged(self):
         self.flagged(self.text.replace("ref: main", "ref: ${{ github.ref }}", 1), "ref: main")
 
