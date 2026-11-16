@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 23/32 (71%) | 9 |
+| M0.5 | Product design and guardrails | 24/32 (75%) | 8 |
 | M1 | Accounts and households | 0/10 (0%) | 10 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,7 +62,7 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 23/32 done (71%), 9 open.
+**Progress:** 24/32 done (75%), 8 open.
 
 ### Tasks
 
@@ -75,7 +75,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
 | M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | ready | M0.5-05 | implementer |  |
 | M0.5-07 | ruff check (E,F,W,B,UP,SIM) and mypy (default) for scripts/, in verify.sh and CI (P3) | done | M0.5-05, M0-10 | implementer | [#79](https://github.com/bondo/listicles2/issues/79) |
-| M0.5-08 | Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5) | in progress | M0.5-05 | implementer | [#96](https://github.com/bondo/listicles2/issues/96) |
+| M0.5-08 | Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5) | done | M0.5-05 | implementer | [#96](https://github.com/bondo/listicles2/issues/96) |
 | M0.5-09 | Kotlin allWarningsAsErrors in all modules (P6) | done | M0-O11 | implementer | [#47](https://github.com/bondo/listicles2/issues/47) |
 | M0.5-10 | licensee with the owner's allowlist (P8, D3)&#58; Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause; Goog… | done | M0.5-09 | implementer | [#84](https://github.com/bondo/listicles2/issues/84) |
 | M0.5-11 | Konsist&#58; no floating point in core/domain, no raw colors/dp in UI; network-blocking JUnit extens… | done | M0-O11 | implementer | [#59](https://github.com/bondo/listicles2/issues/59) |
@@ -111,23 +111,21 @@ flowchart LR
     n1["M0.5-02 App-flow diagram (docs/product/flow.… (blocked)"]:::blocked
     n2["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::blocked
     n3["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (ready)"]:::ready
-    n4["M0.5-08 Firebase rules tests to strict TypeScri… (in progress)"]:::progress
-    n5["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
-    n6["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
-    n7["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
-    n8["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
+    n4["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
+    n5["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
+    n6["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
+    n7["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
     n0 --> n1
     n0 --> n2
+    n0 --> n4
+    n1 --> n4
+    n2 --> n4
+    n3 --> n4
+    n6 --> n4
     n0 --> n5
     n1 --> n5
     n2 --> n5
-    n3 --> n5
-    n4 --> n5
-    n7 --> n5
-    n0 --> n6
-    n1 --> n6
     n2 --> n6
-    n2 --> n7
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -174,7 +172,6 @@ flowchart LR
     n9["M1-O2 Register the debug and release SHA-1 fi… (owner to-do)"]:::owner
     n10["all of M0.5"]:::ext
     n11["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::ext
-    n12["M0.5-08 Firebase rules tests to strict TypeScri… (in progress)"]:::ext
     n10 --> n0
     n0 --> n1
     n0 --> n2
@@ -182,7 +179,6 @@ flowchart LR
     n2 --> n3
     n0 --> n4
     n0 --> n5
-    n12 --> n5
     n0 --> n6
     n0 --> n7
     n1 --> n7
@@ -233,6 +229,6 @@ Not planned yet.
 
 - **task** M0.5-02: waits on M0.5-01
 - **task** M0.5-03: waits on M0.5-01
-- **task** M0.5-FU: waits on M0.5-01, M0.5-02, M0.5-03 +3
+- **task** M0.5-FU: waits on M0.5-01, M0.5-02, M0.5-03 +2
 - **task** M0.5-O1: waits on M0.5-01, M0.5-02, M0.5-03
 - **task** M0.5-26: waits on M0.5-03
