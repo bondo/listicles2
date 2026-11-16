@@ -436,11 +436,11 @@ notes = "Tooling env. Effort S, implementer high (gate). Test-first: one negativ
 id = "M0.5-06"
 title = "CI: shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-05"]
-notes = "Tooling env. Effort S. Pinned binaries with checksums like gitleaks. Fix .githooks/pre-push:6 SC2046 with a justified disable."
+notes = "Tooling env. Effort S. Pinned binaries with checksums like gitleaks. Done without suppressions: pre-push:6 SC2046 and install_linters.sh SC1007 fixed in code, actions pinned to commit SHAs, zizmor runs with --no-ignores. Owner: add the workflow-lint job to the required checks of the main ruleset."
 
 [[task]]
 id = "M0.5-07"

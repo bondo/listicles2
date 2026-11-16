@@ -49,6 +49,8 @@ step docs-check python3 -I scripts/docs_check.py
 step gradle-repos python3 -I scripts/test_check_gradle_repos.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
 step python-lint ./scripts/lint_python.sh
+step workflow-lint-tests python3 -I scripts/test_lint_workflows.py
+step workflow-lint ./scripts/lint_workflows.sh
 step spotless gradle spotlessCheck
 step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest
 step lint gradle :app:lintDebug

@@ -16,7 +16,7 @@ SCRIPT = os.path.join(ROOT, "scripts", "lint_workflows.sh")
 LINT_CMD = "./scripts/lint_workflows.sh"
 TEST_CMD = "python3 -I scripts/test_lint_workflows.py"
 SHA = "34e114876b0b11c390a56381ad16ebd13914f8d5"
-USES = re.compile(r"^\s*-?\s*uses:\s*(\S+)@(\S+)(?:\s+#\s*(\S.*))?$")
+USES = re.compile(r"^\s*-?\s*uses:\s*(\S+)@(\S+?)(?:\s+#\s*(.*))?$")
 PINNED = re.compile(r"^[0-9a-f]{40}$")
 VERSION = re.compile(r"^v\d+(\.\d+){1,2}$")
 
@@ -132,10 +132,10 @@ class Behaviour(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("artipacked", out)
 
-    def test_persist_credentials_true_fails(self):
-        code, out = lint_wf(workflow().replace("persist-credentials: false", "persist-credentials: true"))
+    def test_ignore_comment_does_not_hide_a_finding(self):
+        code, out = lint_wf(workflow(step="uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]\n        with:\n          persist-credentials: false"))
         self.assertNotEqual(code, 0)
-        self.assertIn("artipacked", out)
+        self.assertIn("unpinned-uses", out)
 
     def test_actionlint_error_fails(self):
         code, out = lint_wf(workflow().replace("runs-on: ubuntu-latest", "runs-on: ubuntu-latest\n    needs: nowhere"))
@@ -197,8 +197,8 @@ class Wiring(unittest.TestCase):
             self.assertNotRegex(read(".github", "workflows", os.path.basename(path)), r"zizmor:\s*ignore|shellcheck\s+disable", path)
         script = read("scripts", "lint_workflows.sh")
         self.assertRegex(script, r"shellcheck\b.*-S warning")
-        self.assertRegex(script, r"zizmor\b.*--offline")
-        self.assertNotRegex(script, r"--min-severity|--min-confidence|--persona|--pedantic|-ignore|--fix|\|\|\s*true")
+        self.assertRegex(script, r"zizmor\b.*--offline.*--no-ignores")
+        self.assertNotRegex(script, r"--min-severity|--min-confidence|--persona|--pedantic|(?<![\w-])-ignore\b|--fix|\|\|\s*true")
 
     def test_codeowners_name_the_script_and_the_pins_explicitly(self):
         owners = active_lines(read(".github", "CODEOWNERS"))

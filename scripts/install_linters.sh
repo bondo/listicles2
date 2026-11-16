@@ -4,7 +4,7 @@
 # Any mismatch or malformed pin aborts with nothing installed. The binaries are never run here.
 set -euo pipefail
 
-here="$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+here="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(dirname "$here")"
 pins="$here/linters.pins"
 dest="$root/.tools/bin"
