@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # CI gate for #92: fail when an owner task in docs/tasks.toml is `todo` while its GitHub issue is closed or its PR is
 # merged (the owner confirmed it, the status row lagged). Reads GitHub through `gh` (GH_TOKEN, read-only) and runs
-# `tasks.py drift --check`. A gh failure fails the check (after retries): "could not look" is not "no drift".
+# `tasks.py drift --check`. A gh failure, incomplete_results or more than 1000 search results fail the check ("could not
+# look" is not "no drift").
 # Env: GITHUB_REPOSITORY (default bondo/listicles2), OWNER_DRIFT_RETRIES (3), OWNER_DRIFT_SLEEP (5 s, doubled each
 # retry), OWNER_DRIFT_TASKS (task file; tests only). Needs python3 and gh.
 set -uo pipefail
@@ -14,7 +15,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 fetch() { # fetch <query> <output file>: search/issues, every page, one JSON array of pages (see ORCHESTRATION 4.3)
-  local n=1 wait="$PAUSE"
+  local n=1 delay="$PAUSE"
   while :; do
     if gh api -X GET search/issues --paginate --slurp -f q="$1" -f per_page=100 > "$2" 2> "$TMP/err" && [ -s "$2" ]; then
       return 0
@@ -23,14 +24,31 @@ fetch() { # fetch <query> <output file>: search/issues, every page, one JSON arr
       echo "check_owner_drift: gh could not read GitHub after $n tries: $(head -c 300 "$TMP/err")" >&2
       return 1
     fi
-    sleep "$wait"
-    wait=$((wait * 2))
+    sleep "$delay"
+    delay=$((delay * 2))
     n=$((n + 1))
   done
 }
 
-fetch "repo:$REPO is:issue" "$TMP/issues.json" || exit 1
+complete() { # complete <file> <what>: search/issues caps at 1000 results and may say incomplete_results; never pass on a partial list
+  python3 -I - "$1" "$2" <<'PY' || return 1
+import json
+import sys
+
+path, what = sys.argv[1], sys.argv[2]
+for page in json.load(open(path)):
+    if page.get("incomplete_results"):
+        sys.exit(f"check_owner_drift: GitHub search returned incomplete_results for {what}; narrow the query or retry")
+    if page.get("total_count", 0) > 1000:
+        sys.exit(f"check_owner_drift: GitHub search has more than 1000 results for {what} (search cap); narrow the query")
+PY
+}
+
+# Only closed owner issues can drift (an open or unlabelled issue never fails the gate), which keeps the list far below the cap.
+fetch "repo:$REPO is:issue is:closed label:owner-todo" "$TMP/issues.json" || exit 1
+complete "$TMP/issues.json" "closed owner-todo issues" || exit 1
 fetch "repo:$REPO is:pr is:merged" "$TMP/prs.json" || exit 1
+complete "$TMP/prs.json" "merged PRs" || exit 1
 
 args=(--issues "$TMP/issues.json" --prs "$TMP/prs.json")
 [ -n "${OWNER_DRIFT_TASKS:-}" ] && args=(--file "$OWNER_DRIFT_TASKS" "${args[@]}")
