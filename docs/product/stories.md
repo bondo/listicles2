@@ -91,8 +91,10 @@ ownership or delete the household, so that the household stays under control.
 * Given I remove a member, then they lose access to the lists others shared, their open invites stop working, and the
   lists they created go with them as in HH-05, so the other members lose the lists they had shared (OQ-5).
 * Given I transfer ownership to another member, then that member is the household owner and I am a plain member.
-* Given I delete the household and confirm, then no one is a member any more and the household cannot be restored
-  (PLAN section 3.1, soft delete then cleanup); the confirmation says that shared lists go back to their creators.
+* Given I choose to delete the household, then I am asked to confirm, and the confirmation says that shared lists go
+  back to their creators and that the household cannot be restored.
+* Given I confirm, then no one is a member any more and the household cannot be restored (PLAN section 3.1, soft delete
+  then cleanup).
 * Given the household is deleted, then every list that was shared with it goes back to being private to its creator,
   with all its items, and every private list stays as it was: nothing is lost (OQ-17).
 * Given a list I created went back to private because the household was deleted, when I next open the app, then I see
@@ -219,6 +221,8 @@ so that we never work on an old copy.
   deleted and I see a short message that it was removed (PLAN section 3.2).
 * Given a list I have open is deleted, stops being shared, or leaves the household with its creator (HH-05, HH-06),
   then I leave it and see a short message.
+* Given I edited a list offline and lost access to it meanwhile (the cases above, or I was removed), when the network
+  returns, then my unsent edits to that list are dropped and I see the same short message.
 
 **SYNC-03 Actions that need the network.** As a user, I want a clear message when something needs a connection, so that
 I don't wait for nothing.
@@ -315,5 +319,7 @@ creator (OQ-5), but PLAN section 3 stores every list under a household. Lists ne
 security rules: the creator can do everything; members of the household a list is shared with can do everything except
 stop the share or change the list's creator or household (OQ-2, OQ-3, OQ-4); today members can read everything under the household (PLAN section 3.1). These need
 allow and deny tests and the `risk:high` tag, and change the M1 and M2 scope in PLAN section 7. PLAN section 3.1 deletes
-everything under a deleted household, but shared lists must go back to their creators (OQ-17). The PLAN section 3 item
+everything under a deleted household, but shared lists must go back to their creators (OQ-17). There are no Cloud
+Functions, so the planner must say who returns them: the security rules and each creator's own client (the creator makes
+their own lists private again, the same way as VIS-04), not the household owner's client. The PLAN section 3 item
 has no year fields; the v1 item needs a name, two optional years (1900 to the current year plus 50) and the check.
