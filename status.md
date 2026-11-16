@@ -218,6 +218,7 @@ Not planned yet.
 ## Blockers
 
 - **PR to merge** [#97](https://github.com/bondo/listicles2/issues/97): build(deps)&#58; Bump actions/setup-java from 4.9.1 to 6.2.0
+- **PR to merge** [#105](https://github.com/bondo/listicles2/issues/105): tooling&#58; ignore all firebase version updates in Dependabot (/firebase)
 - **task** M0.5-FU: waits on M0.5-03, M0.5-26
 - **task** M0.5-O1: waits on M0.5-03
 - **task** M0.5-26: waits on M0.5-03
