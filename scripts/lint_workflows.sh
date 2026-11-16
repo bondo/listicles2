@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck (-S warning) on shell files, actionlint and zizmor (--offline) on workflows, using the linters pinned in
+# Runs shellcheck (-S warning) on shell files, actionlint and zizmor (--offline) on workflows, using the linters pinned in
 # scripts/linters.pins. Anything missing or at another version is (re)installed by scripts/install_linters.sh, which
 # checks the sha256 of every archive first. No config files, no thresholds, no ignores: a finding fails the run.
 # Usage: scripts/lint_workflows.sh                    all tracked shell files (*.sh, .githooks/*) and .github/workflows
