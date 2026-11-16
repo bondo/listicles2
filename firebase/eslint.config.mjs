@@ -8,4 +8,7 @@ export default defineConfig({
     languageOptions: {
         parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
+    rules: {
+        "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "never" }],
+    },
 });

@@ -91,17 +91,6 @@ def ordered(text, commands):
     return True
 
 
-def casts(source):
-    """Type assertions (`x as T`, not `as const`) in TypeScript source, ignoring comments and `import * as ns` lines."""
-    found = []
-    for ln in source.splitlines():
-        code = ln.split("//")[0]
-        if code.lstrip().startswith("import ") or code.lstrip().startswith("} from"):
-            continue
-        found += re.findall(r"\bas\s+(?!const\b)[A-Za-z_(\[{]", code)
-    return found
-
-
 def dependabot_ignores_typescript_major(cfg):
     """True if the npm entry for /firebase ignores semver-major updates of typescript."""
     for entry in cfg.get("updates", []):
@@ -188,14 +177,6 @@ class HelperNegativeCases(unittest.TestCase):
         self.assertTrue(ordered("step a one\nstep b two\n", ["one", "two"]))
         self.assertFalse(ordered("step b two\nstep a one\n", ["one", "two"]))
         self.assertFalse(ordered("step a one\n", ["one", "two"]))
-
-    def test_cast_detector_finds_casts_and_ignores_comments_imports_and_as_const(self):
-        self.assertEqual(len(casts("const a = b as Foo;\n")), 1)
-        self.assertEqual(len(casts("const a = (b as unknown) as Foo;\n")), 2)
-        self.assertEqual(len(casts("const a = Object.keys(c) as (keyof T)[];\n")), 1)
-        self.assertEqual(casts("// the same as the modular call\n"), [])
-        self.assertEqual(casts("import * as fs from 'x';\nconst a = [1] as const;\n"), [])
-        self.assertEqual(casts('import {\n  a,\n  type B,\n} from "x";\n'), [])
 
     def test_dependabot_check_rejects_a_missing_wrong_or_misplaced_ignore(self):
         def cfg(eco="npm", directory="/firebase", name="typescript", types=("version-update:semver-major",)):
@@ -284,7 +265,6 @@ class Config(unittest.TestCase):
                      "%s: update and delete an existing doc", "list and add on a collection"):
             self.assertIn(case, text, case)
         self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
-        self.assertEqual(casts(text), [], "type assertions in rules.test.ts")
 
     def test_dependabot_ignores_typescript_majors_for_the_firebase_directory(self):
         self.assertTrue(dependabot_ignores_typescript_major(yaml.safe_load(read(".github", "dependabot.yml"))))
