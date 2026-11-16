@@ -20,6 +20,12 @@ n=$(wc -l < "$FAKE_GH_LOG")
 if [ "$n" -le "${FAKE_GH_FAILS:-0}" ]; then echo "gh: HTTP 502" >&2; exit 1; fi
 case "$*" in
   *is:pr*) cat "$FAKE_GH_PRS" ;;
+  *label:owner-todo*) # GitHub applies the label filter: keep only labelled items
+    python3 -I -c 'import json,sys
+pages = json.load(open(sys.argv[1]))
+for p in pages:
+    p["items"] = [i for i in p["items"] if any(l.get("name") == "owner-todo" for l in i.get("labels", []))]
+print(json.dumps(pages))' "$FAKE_GH_ISSUES" ;;
   *) cat "$FAKE_GH_ISSUES" ;;
 esac
 """
@@ -117,10 +123,26 @@ class OwnerDriftScriptTest(unittest.TestCase):
         code, out, _ = self.run_script("")
         self.assertEqual(code, 1, out)
         self.assertNotIn("no drift", out)
-    def test_issue_query_is_narrowed_to_closed_owner_todo_issues(self):
+
+    def test_issue_query_does_not_rely_on_the_owner_todo_label(self):
         _, _, calls = self.run_script(slurp())
         issue_calls = [c for c in calls if "is:pr" not in c]
-        self.assertTrue(issue_calls and all("is:closed" in c and "label:owner-todo" in c for c in issue_calls), calls)
+        self.assertTrue(issue_calls and all("is:issue" in c and "label:" not in c for c in issue_calls), calls)
+
+    def test_closed_unlabelled_issue_linked_by_number_fails(self):
+        # live #12-#14 are owner tasks without the owner-todo label; the row links them by `issue = N`
+        code, out, _ = self.run_script(slurp({"number": 12, "title": "Set up Firebase", "state": "closed", "labels": []}))
+        self.assertEqual(code, 1, out)
+        self.assertIn("M0-O1", out)
+        self.assertNotIn("no drift", out)
+
+    def test_refiled_issue_open_with_closed_duplicate_passes(self):
+        tasks = TASKS.replace("issue = 12\n", "")
+        old = {"number": 12, "title": "[owner] M0-O1: x", "state": "closed", "state_reason": "not_planned", "labels": []}
+        new = {"number": 30, "title": "[owner] M0-O1: x", "state": "open", "labels": []}
+        code, out, _ = self.run_script(slurp(old, new), tasks=tasks)
+        self.assertEqual(code, 0, out)
+        self.assertIn("no drift", out)
 
     def test_incomplete_issue_results_fail_the_check(self):
         code, out, _ = self.run_script(slurp(incomplete=True))
