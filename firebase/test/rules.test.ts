@@ -48,27 +48,25 @@ const CLIENTS = {
     "signed-in": (): Db => env.authenticatedContext("alice").firestore(),
 };
 
-describe.each(Object.keys(CLIENTS) as (keyof typeof CLIENTS)[])("default deny (%s)", (who) => {
+describe.each(Object.entries(CLIENTS))("default deny (%s)", (_who, client) => {
     test.each(PATHS)("%s: get", async (p) => {
-        await assertFails(CLIENTS[who]().doc(p).get());
+        await assertFails(client().doc(p).get());
     });
 
     test.each(PATHS)("%s: create/overwrite", async (p) => {
-        await assertFails(
-            CLIENTS[who]().doc(p).set({ name: "y", ownerUid: "alice", deleted: false }),
-        );
+        await assertFails(client().doc(p).set({ name: "y", ownerUid: "alice", deleted: false }));
     });
 
     test.each(PATHS)("%s: update and delete an existing doc", async (p) => {
         await env.withSecurityRulesDisabled(async (ctx) => {
             await ctx.firestore().doc(p).set({ name: "seed" });
         });
-        await assertFails(CLIENTS[who]().doc(p).update({ name: "z" }));
-        await assertFails(CLIENTS[who]().doc(p).delete());
+        await assertFails(client().doc(p).update({ name: "z" }));
+        await assertFails(client().doc(p).delete());
     });
 
     test("list and add on a collection", async () => {
-        const db = CLIENTS[who]();
+        const db = client();
         await assertFails(db.collection("households").get());
         await assertFails(db.collection("households/h1/lists").add({ name: "n" }));
     });
