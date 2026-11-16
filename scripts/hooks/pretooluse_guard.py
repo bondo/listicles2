@@ -36,6 +36,9 @@ PROTECTED = (
     "scripts/guards.sh",
     "scripts/install-hooks.sh",
     "scripts/hooks/",
+    ".tools/",  # linter binaries that the allow rules in .claude/settings.json run
+    "scripts/install_linters.sh",
+    "scripts/linters.pins",
 )
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
@@ -54,6 +57,7 @@ WRAPPERS = {
     "ionice": ({"-c", "-n", "-p", "-t"}, 0),
     "timeout": ({"-s", "-k", "--signal", "--kill-after"}, 1),
     "nohup": (set(), 0),
+    "coproc": (set(), 0),
     "command": (set(), 0),
     "exec": ({"-a"}, 0),
     "builtin": (set(), 0),
@@ -312,10 +316,14 @@ def ansi_c(s):
     return re.sub(r"\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|.)", rep, s)
 
 
+class Word(str):
+    glob = False  # the word has an unquoted { } * ? [ ~ @ + ! that the shell expands after the guard has read it
+
+
 def lex(src):
     """Split a shell command string into simple commands. Raises ValueError when it cannot be parsed."""
     cmds, cur = [], Cmd()
-    word, in_word, quoted, pending = [], False, False, None
+    word, in_word, quoted, pending, ug = [], False, False, None, False
     heredocs = []
     i, n = 0, len(src)
 
@@ -327,11 +335,11 @@ def lex(src):
         cur = Cmd()
 
     def flush():
-        nonlocal word, in_word, quoted, pending
+        nonlocal word, in_word, quoted, pending, ug
         if not in_word:
             return
-        text, q = "".join(word), quoted
-        word, in_word, quoted = [], False, False
+        text, q, g = "".join(word), quoted, ug
+        word, in_word, quoted, ug = [], False, False, False
         if pending:
             kind, pending = pending, None
             if kind == "write":
@@ -342,7 +350,8 @@ def lex(src):
             elif kind[0] == "heredoc":
                 heredocs.append((text, q, kind[1], cur))
             return
-        cur.words.append(text)
+        cur.words.append(Word(text))
+        cur.words[-1].glob = g
 
     while i < n:
         c = src[i]
@@ -482,6 +491,7 @@ def lex(src):
         else:
             word.append(c)
             in_word = True
+            ug = ug or c in "{}*?[~@+!"
             i += 1
     flush()
     end_cmd()
@@ -733,6 +743,21 @@ def unwrap(words):
     return assigns, words[i:], nested, seen
 
 
+LINTER_FLAGS = {  # flags that run a program (actionlint), rewrite files (zizmor --fix) or create directories
+    "actionlint": re.compile(r"^--?(shellcheck|pyflakes|init-config)(=|$)"),
+    "zizmor": re.compile(r"^--?(fix|cache-dir|lsp)(=|$)"),
+}
+
+
+def check_linter(prog, args):
+    """The allow rules would approve these flags, and shell syntax that expands into them after the guard has looked."""
+    for a in args:
+        if LINTER_FLAGS[prog].match(a):
+            deny(f"{prog} {a.split('=')[0]} runs programs, rewrites files or creates directories the allow rule does not cover")
+        if "$" in a or "`" in a or (getattr(a, "glob", False) and not re.match(r"[A-Za-z0-9._/]", a)):
+            deny(f"{prog} arguments built from $, backticks, ~, braces, globs or extglob cannot be checked; write them out")
+
+
 def check_assign(a):
     name, val = a.split("=", 1)
     if name in CONFIG_FILE_VARS:
@@ -785,7 +810,9 @@ def expand(w, state):
     for q in BRANCH_SUBS:
         if q in w:
             w = w.replace(q, branch(state["cwd"]) or q)
-    return re.sub(r"\$\{(\w+)\}|\$(\w+)", rep, w)
+    out = Word(re.sub(r"\$\{(\w+)\}|\$(\w+)", rep, w))
+    out.glob = getattr(w, "glob", False)
+    return out
 
 
 def check_command_string(command, state, depth=0):
@@ -864,6 +891,10 @@ def check_simple(cmd, state, depth):
         if any(a in SENSITIVE_SUBS for a in args[:3]):
             deny("the command name is built from a variable or substitution; write it out")
         return
+    if prog in LINTER_FLAGS:
+        check_linter(prog, args)
+    if prog == "shopt" and "extglob" in args:
+        deny("shopt extglob makes patterns such as @(...) expand into flags the guard cannot see")
     if prog in ("cd", "pushd"):
         tgt = [a for a in args if not a.startswith("-")]
         t = tgt[-1] if tgt else "~"

@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(.tools/bin/shellcheck *)",
+      "Bash(.tools/bin/actionlint *)",
+      "Bash(.tools/bin/zizmor --offline *)"
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/statusline.sh\""
