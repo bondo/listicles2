@@ -3,7 +3,8 @@
     "allow": [
       "Bash(.tools/bin/shellcheck *)",
       "Bash(.tools/bin/actionlint *)",
-      "Bash(.tools/bin/zizmor --offline *)"
+      "Bash(.tools/bin/zizmor --offline *)",
+      "Bash(scripts/mark-ready.sh *)"
     ]
   },
   "statusLine": {
