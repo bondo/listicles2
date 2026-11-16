@@ -18,10 +18,11 @@ and
   has the same rights as the creator, except that only the creator can stop sharing it (OQ-2, OQ-3, OQ-4).
   *Leaving and household deletion:* when a member leaves, is removed or deletes their account, the lists they created go
   with them (OQ-5); when the household is deleted, each shared list goes back to its creator as a private list (OQ-17).
-  *Item* = one line in a list: a name, an optional release year, an optional re-release year and an "I have it"
-  checkbox (Q2, OQ-6).
+  *List type* = chosen when a list is created and never changed (OQ-32): a *plain list* (the default) or a
+  *collection list*. *Item* = one line in a list: in a plain list a name and an "I have it" checkbox; in a collection
+  list also an optional release year and an optional re-release year (Q2, OQ-6, list types decided 2026-11-16).
 * The first use case (Q1): a user keeps a collection checklist, for example which Georg Jensen Christmas mobiles they
-  own. They type in the items themselves (name, years) and tick the ones they have. A shopping list is just a shared
+  own. They make a collection list, type in the items themselves (name, years) and tick the ones they have. A shopping list is just a shared
   list (Q4).
 
 ## 1. Sign-in and account
@@ -180,8 +181,11 @@ ownership or delete the household, so that the household stays under control.
 * Given I have no lists, then I see an empty state that explains lists and offers "Create list".
 * Whether each list also shows progress (for example "12 of 30"), the order of lists and search: OQ-8, OQ-9.
 
-**LIST-02 Create a list.** As a user, I want to create a list with a name, so that I can start collecting items.
-* Given I enter a name and confirm, then the list exists, is **private** (Q3) and opens empty.
+**LIST-02 Create a list.** As a user, I want to create a list with a name and a type, so that I can start collecting
+items.
+* Given I enter a name and confirm, then the list exists, is **private** (Q3), is a plain list unless I chose
+  "Collection", and opens empty.
+* Given I created a list, then its type cannot be changed afterwards (assumed, OQ-32).
 * Given the name is empty or only spaces, when I confirm, then no list is created and the field shows an error.
 * Given a name with spaces at the start or end, when I confirm, then they are removed.
 
@@ -199,10 +203,12 @@ lists stay tidy.
 
 ## 4. Items
 
-**ITEM-01 Add an item.** As a user, I want to add an item with a name and its years, so that my list holds what I
-collect.
+**ITEM-01 Add an item.** As a user, I want to add an item with a name (and its years in a collection list), so that
+my list holds what I collect.
 * Given an open list I can see (mine, or shared with me: OQ-3), when I enter a name and confirm, then the item is in
-  the list and not checked; the release year and the re-release year are optional (OQ-6).
+  the list and not checked.
+* Given a plain list, then the input asks only for a name; there are no year fields.
+* Given a collection list, then the release year and the re-release year are optional (OQ-6), with the rules below.
 * Given the name is empty, when I confirm, then no item is added.
 * Given a release year or a re-release year, then it is a whole number from 1900 to the current year plus 50; any other
   value is refused with an error (OQ-6).
@@ -212,10 +218,11 @@ collect.
 * Given I add several items in a row, then the input stays open for the next item.
 * Whether two items may have the same name: OQ-11.
 
-**ITEM-02 Edit an item.** As a user, I want to fix an item's name or years, so that a typo doesn't stay.
-* Given an item, when I change its name, release year or re-release year (same rules as ITEM-01) and confirm, then the change is saved and shown (also to members).
+**ITEM-02 Edit an item.** As a user, I want to fix an item's name (or years), so that a typo doesn't stay.
+* Given an item, when I change its name, or in a collection list its release year or re-release year (same rules as
+  ITEM-01), and confirm, then the change is saved and shown (also to members).
 * Given I clear the name, when I confirm, then the old name is kept and an error is shown.
-* Given I clear a year, when I confirm, then the item has no such year.
+* Given an item in a collection list, when I clear a year and confirm, then the item has no such year.
 
 **ITEM-03 Remove an item.** As a user, I want to remove an item, so that the list only holds what I want.
 * Given an item, when I remove it and the removal is final (confirmed or not undone, OQ-10), then it is gone from the
@@ -227,14 +234,15 @@ and what I still miss.
 * Given I check an item, when I reopen the app (also offline), then it is still checked.
 * Whether the checkbox is always called "I have it", or the word depends on the list (a shopping list): OQ-7.
 
-**ITEM-05 See what a list contains.** As a user, I want to see every item of a list with its years and check state, so
-that I know at a glance what I have.
-* Given an open list, then each item shows its name, its release year and re-release year (each only if set) and
-  whether it is checked.
+**ITEM-05 See what a list contains.** As a user, I want to see every item of a list with its check state (and years),
+so that I know at a glance what I have.
+* Given an open plain list, then each item shows its name and whether it is checked, sorted by name.
+* Given an open collection list, then each item also shows its release year and re-release year (each only if set),
+  sorted by release year and then by name (where items without a release year go: OQ-33).
 * Given a list with 30 or more items, then all can be reached by scrolling, and no name or year is cut off at the
   default font size in English or Danish.
 * Given an empty list, then I see an empty state that offers "Add item".
-* Item order, a "show only missing" filter and search: OQ-8.
+* A "show only missing" filter and search: OQ-8 (item order is now set per list type).
 
 ## 5. Private and shared lists
 
@@ -329,8 +337,8 @@ Decided as not in v1 (Q1, Q2, Q4); the ones marked *later* are planned for a lat
 ## 9. Leave room for
 
 These are constraints for the data model and screens; v1 builds none of them (M2 planning decides how):
-* **Item status, quantity and photo** (Q2): the v1 item is name, optional release year, optional re-release year and
-  "I have it" (OQ-6); it gets more fields later without breaking items saved by v1, and the v1 "I have it" check can
+* **Item status, quantity and photo** (Q2): the v1 item is a name and "I have it", plus in a collection list an
+  optional release year and re-release year (OQ-6); it gets more fields later without breaking items saved by v1, and the v1 "I have it" check can
   become "own" in a later status without losing data.
 * **Per-list permissions** (OQ-3): later the creator may choose per list who can edit and who can only view; v1 gives
   everyone the list is shared with the creator's rights (except stopping the share).
@@ -339,7 +347,7 @@ These are constraints for the data model and screens; v1 builds none of them (M2
 * **Who added an item** (OQ-18): each item records who added it, so OQ-18 can be decided in M2 planning.
 * **Catalogue** (Q1): a list can later be filled from a catalogue, and an item can point at a catalogue entry while
   keeping the user's own check state and edits.
-* **List types** (Q4): a list carries a type (PLAN section 3 has a `kind` field), so a shopping list or a recipe-linked
+* **List types** (Q4): a list carries a type (PLAN section 3 has a `kind` field; v1 has plain and collection), so a shopping list or a recipe-linked
   list can get its own features later without moving data.
 * **Recipes and meal planning** (Q4): other features must be able to add items to a shared list (a recipe's ingredients
   to the shopping list; a week's meal plan to the shopping list).
@@ -367,6 +375,7 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-25 | **Decided (2026-11-16):** accept the Identity Platform upgrade for TOTP if it needs no billing; the owner verifies this first, so AUTH-09 depends on it. | AUTH-09 |
 | OQ-26 | **Decided (2026-11-16):** passwords have at least 12 characters and no other rules; the Firebase password policy in Require mode plus a check in the app. | AUTH-05, AUTH-08 |
 | OQ-27 | **Decided (2026-11-16):** no email-link ("magic link") sign-in in v1; reconsider only on the Blaze plan. | section 8 |
+| Types | **Decided (2026-11-16, issue #15 comment 6927705004):** two list types, chosen at creation: plain (default; name and "I have it", sorted by name) and collection (also the two optional years under OQ-6 and OQ-19; sorted by release year, then name). | LIST-02, ITEM-01, ITEM-02, ITEM-05 |
 | OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
@@ -391,6 +400,8 @@ diagram (M0.5-02) any more.
 | OQ-29 | The verification and reset emails and the pages their links open: Firebase's default pages and email texts, or own pages on Firebase Hosting (next to the invite page, OQ-21)? In which language are they sent (English and Danish, LANG-01)? | AUTH-06, AUTH-08 | M1 planning |
 | OQ-30 | The privacy text must say that Google (Firebase Authentication, Identity Platform) stores email addresses and passwords as a processor. Who writes it, and before which release? | AUTH-05 | before release |
 | OQ-31 | For password accounts: are changing the email, changing the password and adding a second sign-in method to an existing account in v1 (each needs a recent sign-in), or later? | AUTH-10 | M1 planning |
+| OQ-32 | Assumed: a list's type (plain or collection) cannot be changed after it is created. Confirm. | LIST-02 | M1 planning |
+| OQ-33 | In a collection list, where do items without a release year go: first or last? And does the plain-list sort by name ignore upper and lower case, with Danish letters (æ, ø, å) after z? | ITEM-05 | M0.5-03 |
 | OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
@@ -401,6 +412,7 @@ allow and deny tests and the `risk:high` tag, and change the M1 and M2 scope in 
 everything under a deleted household, but shared lists must go back to their creators (OQ-17). There are no Cloud
 Functions, so the planner must say who returns them: the security rules and each creator's own client (the creator makes
 their own lists private again, the same way as VIS-04), not the household owner's client. The PLAN section 3 item
-has no year fields; the v1 item needs a name, two optional years (1900 to the current year plus 50) and the check.
+has no year fields; the v1 item needs a name, the check, and in a collection list two optional years (1900 to the
+current year plus 50); the list's `kind` holds its type.
 Sign-in (OQ-23 to OQ-27) adds to M1: the rules need an `email_verified` check (also for reading an invite) with allow
 and deny tests, and the password, verification, reset and same-email flows are `risk:high`, in PRs split by concern.

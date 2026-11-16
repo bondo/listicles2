@@ -1,8 +1,8 @@
 # Tally app flow (v1)
 
 Task M0.5-02. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
-Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19, OQ-23 to OQ-27;
-state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
+Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19,
+OQ-23 to OQ-27, the two list types; state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
 open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions). New questions this flow raised are in
 [section 10](#10-new-open-questions).
 
@@ -156,10 +156,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    lists["Lists<br>LIST-01"] -- "Create list" --> name["Enter name"]
+    lists["Lists<br>LIST-01"] -- "Create list" --> name["Enter name; type Plain (default) or Collection,<br>not changeable later (OQ-32)<br>LIST-02"]
     name -- "confirm" --> nvalid{"Empty or<br>only spaces?"}
     nvalid -- "yes" --> nerr["Field error, no list<br>LIST-02"] --> name
-    nvalid -- "no" --> newlist["Name trimmed; list is private and opens empty<br>LIST-02, VIS-01"]
+    nvalid -- "no" --> newlist["Name trimmed; list is private, has its type and opens empty<br>LIST-02, VIS-01"]
     open["Open list"] -- "Rename (creator or shared with me)" --> rn{"New name empty?"}
     rn -- "yes" --> rnerr["Old name kept, field error<br>LIST-03"]
     rn -- "no" --> renamed["New name shown everywhere, also to members<br>LIST-03, OQ-3"]
@@ -190,14 +190,15 @@ tests):
 
 ```mermaid
 flowchart TD
-    open["Open list<br>ITEM-05"] -- "Add item" --> input["Name, optional release year,<br>optional re-release year"]
+    open["Open list<br>ITEM-05<br>plain: by name; collection: by release year, then name"] -- "Add item" --> input["Name; in a collection list also optional<br>release year and re-release year<br>ITEM-01"]
     input -- "confirm" --> iname{"Name empty?"}
     iname -- "yes" --> noadd["No item added<br>ITEM-01"] --> input
-    iname -- "no" --> years{"Each year set is a whole number<br>1900 to current year + 50?"}
+    iname -- "no, plain list" --> added
+    iname -- "no, collection list" --> years{"Each year set is a whole number<br>1900 to current year + 50?"}
     years -- "no" --> yerr["Year field error<br>ITEM-01, OQ-6"] --> input
     years -- "yes" --> added["Item added, not checked; input stays open<br>ITEM-01, OQ-19"]
     added --> input
-    open -- "Edit item" --> edit["Change name or years, same rules<br>ITEM-02"]
+    open -- "Edit item" --> edit["Change name, or years in a collection list,<br>same rules<br>ITEM-02"]
     edit -- "name cleared" --> keep["Old name kept, error<br>ITEM-02"]
     edit -- "year cleared" --> noyear["Item has no such year<br>ITEM-02"]
     edit -- "valid" --> saved["Saved, shown to members too<br>ITEM-02"]
@@ -207,7 +208,8 @@ flowchart TD
     open -- "Tap checkbox" --> toggle["I have it: checked or unchecked, kept offline too<br>ITEM-04, OQ-7"]
 ```
 
-Duplicate item names (OQ-11), item order, a "show only missing" filter and search (OQ-8), and progress such as
+Item order is set by the list type (ITEM-05; items without a release year: OQ-33). Duplicate item names (OQ-11), a
+"show only missing" filter and search (OQ-8), and progress such as
 "12 of 30" (OQ-9) are not in this flow; the Open list screen shows all items (ITEM-05).
 
 ## 6. Offline and sync
