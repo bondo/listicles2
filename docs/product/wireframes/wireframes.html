@@ -25,42 +25,31 @@
   :root[data-theme="dark"] { --page: #121514; --pageText: #E2E6E4; --frame: #4A524F; --muted: #9AA39F; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page); color: var(--pageText); font-family: Roboto, system-ui, sans-serif; }
-  .ms { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1;
-        letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; display: inline-block;
-        -webkit-font-smoothing: antialiased; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .ms { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; display: inline-block; -webkit-font-smoothing: antialiased; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
   .ms.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
   /* Gallery and shot layout (outside the phone; not part of the design) */
   .shot { padding: 20px 24px 16px; width: 816px; }
-  .cap { display: flex; gap: 12px; align-items: baseline; margin: 0 0 4px; }
-  .cap .num { font-size: 22px; font-weight: 500; }
-  .cap .ttl { font-size: 20px; font-weight: 500; }
-  .cap .th { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .cap { display: flex; gap: 12px; align-items: baseline; margin: 0 0 4px; } .cap .num { font-size: 22px; font-weight: 500; }
+  .cap .ttl { font-size: 20px; font-weight: 500; } .cap .th { margin-left: auto; font-size: 13px; color: var(--muted); }
   .refs { font-size: 13px; color: var(--muted); margin: 0 0 14px; min-height: 36px; line-height: 18px; }
-  .pair { display: flex; gap: 48px; }
-  .pair figure { margin: 0; }
+  .pair { display: flex; gap: 48px; } .pair figure { margin: 0; }
   .pair figcaption { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; }
-  .gallery { padding: 16px; }
-  .gallery h1 { font-size: 24px; font-weight: 500; margin: 8px 8px 4px; }
+  .gallery { padding: 16px; } .gallery h1 { font-size: 24px; font-weight: 500; margin: 8px 8px 4px; }
   .gallery .intro { margin: 0 8px 16px; color: var(--muted); max-width: 70ch; font-size: 14px; line-height: 20px; }
   .toolbar { position: sticky; top: 0; z-index: 9; display: flex; gap: 8px; padding: 8px; background: var(--page); flex-wrap: wrap; }
-  .toolbar button { font: 500 14px Roboto, sans-serif; padding: 8px 16px; border-radius: 20px; border: 1px solid var(--frame);
-                    background: transparent; color: var(--pageText); cursor: pointer; min-height: 40px; }
+  .toolbar button { font: 500 14px Roboto, sans-serif; padding: 8px 16px; border-radius: 20px; border: 1px solid var(--frame); background: transparent; color: var(--pageText); cursor: pointer; min-height: 40px; }
   .toolbar button[aria-pressed="true"] { background: var(--pageText); color: var(--page); }
   .gallery .shot { width: auto; max-width: 100%; overflow-x: auto; }
   @media (max-width: 860px) { .pair { gap: 16px; } }
 
   /* Phone: every value below comes from token custom properties set on .phone */
-  .phone { width: 360px; height: 760px; border-radius: 36px; border: 8px solid var(--frameBezel, #202423); position: relative;
-           overflow: hidden; background: var(--surface); color: var(--onSurface); flex: none;
-           font-family: Roboto, sans-serif; }
+  .phone { width: 360px; height: 760px; border-radius: 36px; border: 8px solid var(--frameBezel, #202423); position: relative; overflow: hidden; background: var(--surface); color: var(--onSurface); flex: none; font-family: Roboto, sans-serif; }
   .phone.dark { --frameBezel: #000; }
-  .status { height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-l);
-            font-size: 12px; color: var(--onSurface); }
+  .status { height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-l); font-size: 12px; color: var(--onSurface); }
   .status .ms { font-size: 16px; }
   .body { position: absolute; top: 24px; left: 0; right: 0; bottom: 20px; display: flex; flex-direction: column; }
-  .gesture { position: absolute; bottom: 6px; left: 50%; width: 108px; height: 4px; margin-left: -54px; border-radius: 2px;
-             background: var(--onSurface); opacity: .4; }
+  .gesture { position: absolute; bottom: 6px; left: 50%; width: 108px; height: 4px; margin-left: -54px; border-radius: 2px; background: var(--onSurface); opacity: .4; }
   .scroll { flex: 1; overflow: hidden; position: relative; }
   .t-headlineSmall { font-size: var(--headlineSmall-size); line-height: var(--headlineSmall-lh); font-weight: var(--headlineSmall-w); }
   .t-titleLarge { font-size: var(--titleLarge-size); line-height: var(--titleLarge-lh); font-weight: var(--titleLarge-w); }
@@ -73,12 +62,9 @@
   .var { color: var(--onSurfaceVariant); }
 
   .topbar { height: var(--sz-topAppBar); display: flex; align-items: center; padding: 0 var(--sp-xs); gap: var(--sp-xs); flex: none; }
-  .topbar .title { flex: 1; padding: 0 var(--sp-m); min-width: 0; }
-  .topbar .icon + .title { padding-left: var(--sp-xs); }
-  .icon { width: var(--sz-minTouchTarget); height: var(--sz-minTouchTarget); display: inline-flex; align-items: center;
-          justify-content: center; border-radius: 50%; color: var(--onSurfaceVariant); flex: none; }
-  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primaryContainer); color: var(--onPrimaryContainer);
-            display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; flex: none; }
+  .topbar .title { flex: 1; padding: 0 var(--sp-m); min-width: 0; } .topbar .icon + .title { padding-left: var(--sp-xs); }
+  .icon { width: var(--sz-minTouchTarget); height: var(--sz-minTouchTarget); display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--onSurfaceVariant); flex: none; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primaryContainer); color: var(--onPrimaryContainer); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; flex: none; }
   .avatar.lg { width: 40px; height: 40px; font-size: 16px; }
   .avatar.sec { background: var(--secondaryContainer); color: var(--onSecondaryContainer); }
   .avatar.ter { background: var(--tertiaryContainer); color: var(--onTertiaryContainer); }
@@ -90,111 +76,77 @@
   .divider { height: 1px; background: var(--outlineVariant); margin: var(--sp-s) 0; }
   .section { padding: var(--sp-l) var(--sp-l) var(--sp-xs); color: var(--primary); }
 
-  .cbw { width: var(--sz-minTouchTarget); height: var(--sz-minTouchTarget); display: inline-flex; align-items: center; justify-content: center;
-         margin: calc(-1 * var(--sp-s)) calc(-1 * var(--sp-m)) calc(-1 * var(--sp-s)) calc(-1 * var(--sp-m)); flex: none; }
-  .cb { width: 18px; height: 18px; border-radius: 2px; border: 2px solid var(--onSurfaceVariant); display: inline-flex;
-        align-items: center; justify-content: center; }
+  .cbw { width: var(--sz-minTouchTarget); height: var(--sz-minTouchTarget); display: inline-flex; align-items: center; justify-content: center; margin: calc(-1 * var(--sp-s)) calc(-1 * var(--sp-m)) calc(-1 * var(--sp-s)) calc(-1 * var(--sp-m)); flex: none; }
+  .cb { width: 18px; height: 18px; border-radius: 2px; border: 2px solid var(--onSurfaceVariant); display: inline-flex; align-items: center; justify-content: center; }
   .cb.on { background: var(--primary); border-color: var(--primary); color: var(--onPrimary); }
   .cb.on .ms { font-size: 16px; font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 20; }
   .item.row { gap: var(--sp-l); padding-left: var(--sp-l); }
 
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-s); height: 40px; padding: 0 var(--sp-xl);
-         border-radius: 20px; white-space: nowrap; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-s); height: 40px; padding: 0 var(--sp-xl); border-radius: 20px; white-space: nowrap; }
   .btn.filled { background: var(--primary); color: var(--onPrimary); }
   .btn.tonal { background: var(--secondaryContainer); color: var(--onSecondaryContainer); }
-  .btn.text { color: var(--primary); padding: 0 var(--sp-m); }
-  .btn.outlined { border: 1px solid var(--outline); color: var(--primary); }
-  .btn.danger { color: var(--error); }
-  .btn.dangerFilled { background: var(--error); color: var(--onError); }
-  .btn .ms { font-size: 18px; }
+  .btn.text { color: var(--primary); padding: 0 var(--sp-m); } .btn.outlined { border: 1px solid var(--outline); color: var(--primary); }
+  .btn.danger { color: var(--error); } .btn.dangerFilled { background: var(--error); color: var(--onError); } .btn .ms { font-size: 18px; }
   .btn.wide { width: 100%; }
 
-  .fab { position: absolute; right: var(--sp-l); bottom: var(--sp-l); height: var(--sz-fab); border-radius: var(--sh-large);
-         background: var(--primaryContainer); color: var(--onPrimaryContainer); display: flex; align-items: center; gap: var(--sp-m);
-         padding: 0 var(--sp-l) 0 var(--sp-l); box-shadow: 0 3px 6px rgba(0,0,0,.18); }
-  .chip { display: inline-flex; align-items: center; gap: var(--sp-s); height: 32px; padding: 0 var(--sp-l); border-radius: var(--sh-small);
-          border: 1px solid var(--outline); color: var(--onSurfaceVariant); white-space: nowrap; }
+  .fab { position: absolute; right: var(--sp-l); bottom: var(--sp-l); height: var(--sz-fab); border-radius: var(--sh-large); background: var(--primaryContainer); color: var(--onPrimaryContainer); display: flex; align-items: center; gap: var(--sp-m); padding: 0 var(--sp-l) 0 var(--sp-l); box-shadow: 0 3px 6px rgba(0,0,0,.18); }
+  .chip { display: inline-flex; align-items: center; gap: var(--sp-s); height: 32px; padding: 0 var(--sp-l); border-radius: var(--sh-small); border: 1px solid var(--outline); color: var(--onSurfaceVariant); white-space: nowrap; }
   .chip.on { background: var(--secondaryContainer); color: var(--onSecondaryContainer); border-color: var(--secondaryContainer); padding-left: var(--sp-s); }
   .chip .ms { font-size: 18px; }
   .chipwrap { height: var(--sz-minTouchTarget); display: inline-flex; align-items: center; }
 
-  .offline { display: flex; align-items: center; gap: var(--sp-s); min-height: var(--sz-offlineBar); padding: var(--sp-xs) var(--sp-l);
-             background: var(--tertiaryContainer); color: var(--onTertiaryContainer); flex: none; }
-  .offline .ms { font-size: 18px; }
-  .offline .txt { flex: 1; }
+  .offline { display: flex; align-items: center; gap: var(--sp-s); min-height: var(--sz-offlineBar); padding: var(--sp-xs) var(--sp-l); background: var(--tertiaryContainer); color: var(--onTertiaryContainer); flex: none; }
+  .offline .ms { font-size: 18px; } .offline .txt { flex: 1; }
   .pending { white-space: nowrap; }
 
-  .snack { position: absolute; left: var(--sp-s); right: var(--sp-s); bottom: var(--sp-s); min-height: 48px; border-radius: 4px;
-           background: var(--inverseSurface); color: var(--inverseOnSurface); display: flex; align-items: center;
-           padding: var(--sp-s) var(--sp-s) var(--sp-s) var(--sp-l); gap: var(--sp-s); box-shadow: 0 3px 8px rgba(0,0,0,.25); z-index: 5; }
+  .snack { position: absolute; left: var(--sp-s); right: var(--sp-s); bottom: var(--sp-s); min-height: 48px; border-radius: 4px; background: var(--inverseSurface); color: var(--inverseOnSurface); display: flex; align-items: center; padding: var(--sp-s) var(--sp-s) var(--sp-s) var(--sp-l); gap: var(--sp-s); box-shadow: 0 3px 8px rgba(0,0,0,.25); z-index: 5; }
   .snack .txt { flex: 1; }
   .snack .act { color: var(--inversePrimary); padding: 0 var(--sp-m); height: 40px; display: inline-flex; align-items: center; }
 
   .scrim { position: absolute; inset: -24px 0 -20px 0; background: var(--scrim); opacity: .32; z-index: 6; }
-  .dialog { position: absolute; left: var(--sp-xl); right: var(--sp-xl); top: 50%; transform: translateY(-50%); z-index: 7;
-            background: var(--surfaceContainerHigh); border-radius: var(--sh-extraLarge); padding: var(--sp-xl); }
+  .dialog { position: absolute; left: var(--sp-xl); right: var(--sp-xl); top: 50%; transform: translateY(-50%); z-index: 7; background: var(--surfaceContainerHigh); border-radius: var(--sh-extraLarge); padding: var(--sp-xl); }
   .dialog .hd { margin-bottom: var(--sp-l); }
   .dialog .hi { display: flex; justify-content: center; color: var(--secondary); margin-bottom: var(--sp-l); }
   .dialog .hi + .hd { text-align: center; }
   .dialog .acts { display: flex; justify-content: flex-end; gap: var(--sp-s); margin-top: var(--sp-xl); flex-wrap: wrap; }
   .dialog .acts .btn { padding: 0 var(--sp-m); }
 
-  .field { position: relative; border: 1px solid var(--outline); border-radius: 4px; min-height: 56px; padding: var(--sp-l);
-           display: flex; align-items: center; color: var(--onSurface); margin-top: var(--sp-s); }
+  .field { position: relative; border: 1px solid var(--outline); border-radius: 4px; min-height: 56px; padding: var(--sp-l); display: flex; align-items: center; color: var(--onSurface); margin-top: var(--sp-s); }
   .field.focus { border: 2px solid var(--primary); padding: calc(var(--sp-l) - 1px); }
   .field.err { border: 2px solid var(--error); padding: calc(var(--sp-l) - 1px); }
-  .field .lbl { position: absolute; top: -9px; left: var(--sp-m); padding: 0 var(--sp-xs); background: var(--fieldBg, var(--surface));
-                color: var(--onSurfaceVariant); }
-  .field.focus .lbl { color: var(--primary); }
-  .field.err .lbl { color: var(--error); }
-  .field .ph { color: var(--onSurfaceVariant); }
+  .field .lbl { position: absolute; top: -9px; left: var(--sp-m); padding: 0 var(--sp-xs); background: var(--fieldBg, var(--surface)); color: var(--onSurfaceVariant); }
+  .field.focus .lbl { color: var(--primary); } .field.err .lbl { color: var(--error); } .field .ph { color: var(--onSurfaceVariant); }
   .field .caret { display: inline-block; width: 2px; height: 20px; background: var(--primary); margin-left: 1px; vertical-align: middle; }
   .field .trail { margin-left: auto; color: var(--error); }
-  .support { padding: var(--sp-xs) var(--sp-l) 0; color: var(--onSurfaceVariant); }
-  .support.err { color: var(--error); }
+  .support { padding: var(--sp-xs) var(--sp-l) 0; color: var(--onSurfaceVariant); } .support.err { color: var(--error); }
   .dialog .field { --fieldBg: var(--surfaceContainerHigh); }
 
-  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--surfaceContainerLow);
-           border-radius: var(--sh-extraLarge) var(--sh-extraLarge) 0 0; padding: var(--sp-s) var(--sp-l) var(--sp-l); --fieldBg: var(--surfaceContainerLow); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--surfaceContainerLow); border-radius: var(--sh-extraLarge) var(--sh-extraLarge) 0 0; padding: var(--sp-s) var(--sp-l) var(--sp-l); --fieldBg: var(--surfaceContainerLow); }
   .sheet .handle { width: 32px; height: 4px; border-radius: 2px; background: var(--onSurfaceVariant); opacity: .4; margin: var(--sp-s) auto var(--sp-l); }
-  .sheet .two { display: flex; gap: var(--sp-l); }
-  .sheet .two > div { flex: 1; min-width: 0; }
+  .sheet .two { display: flex; gap: var(--sp-l); } .sheet .two > div { flex: 1; min-width: 0; }
   .sheet .acts { display: flex; gap: var(--sp-s); justify-content: flex-end; margin-top: var(--sp-l); align-items: center; }
-  .kbd { background: var(--surfaceContainerHighest); padding: var(--sp-s) var(--sp-s) var(--sp-l); display: grid;
-         grid-template-columns: repeat(3, 1fr); gap: var(--sp-s); margin: var(--sp-l) calc(-1 * var(--sp-l)) calc(-1 * var(--sp-l)); }
-  .kbd span { height: 44px; border-radius: var(--sh-small); background: var(--surfaceContainerLowest); display: flex; align-items: center;
-              justify-content: center; font-size: 20px; color: var(--onSurface); }
+  .kbd { background: var(--surfaceContainerHighest); padding: var(--sp-s) var(--sp-s) var(--sp-l); display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-s); margin: var(--sp-l) calc(-1 * var(--sp-l)) calc(-1 * var(--sp-l)); }
+  .kbd span { height: 44px; border-radius: var(--sh-small); background: var(--surfaceContainerLowest); display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--onSurface); }
 
-  .menu { position: absolute; z-index: 7; background: var(--surfaceContainer); border-radius: 4px; padding: var(--sp-s) 0;
-          box-shadow: 0 4px 12px rgba(0,0,0,.22); min-width: 200px; max-width: 290px; }
+  .menu { position: absolute; z-index: 7; background: var(--surfaceContainer); border-radius: 4px; padding: var(--sp-s) 0; box-shadow: 0 4px 12px rgba(0,0,0,.22); min-width: 200px; max-width: 290px; }
   .menu .mi { display: flex; gap: var(--sp-m); align-items: flex-start; padding: var(--sp-m) var(--sp-m); min-height: var(--sz-minTouchTarget); }
-  .menu .mi .ms { color: var(--onSurfaceVariant); }
-  .menu .mi.dis { opacity: .38; }
-  .menu .mi.dis .note { opacity: 1; }
-  .menu .mi.danger, .menu .mi.danger .ms { color: var(--error); }
-  .menu .note { color: var(--onSurfaceVariant); display: block; margin-top: 2px; }
-  .menu .disnote { display: block; margin-top: 2px; color: var(--onSurface); }
+  .menu .mi .ms { color: var(--onSurfaceVariant); } .menu .dis { opacity: .38; }
+  .menu .mi.danger, .menu .mi.danger .ms { color: var(--error); } .menu .disnote { display: block; margin-top: 2px; color: var(--onSurface); }
 
-  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-            padding: var(--sp-xl) var(--sp-xxl); gap: var(--sp-m); }
-  .bubble { width: 96px; height: 96px; border-radius: 50%; background: var(--secondaryContainer); color: var(--onSecondaryContainer);
-            display: flex; align-items: center; justify-content: center; margin-bottom: var(--sp-s); }
+  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--sp-xl) var(--sp-xxl); gap: var(--sp-m); }
+  .bubble { width: 96px; height: 96px; border-radius: 50%; background: var(--secondaryContainer); color: var(--onSecondaryContainer); display: flex; align-items: center; justify-content: center; margin-bottom: var(--sp-s); }
   .bubble .ms { font-size: 44px; }
   .stack { display: flex; flex-direction: column; gap: var(--sp-s); width: 100%; margin-top: var(--sp-l); }
   .logo { width: 72px; height: 72px; border-radius: 20px; background: var(--primary); display: flex; align-items: center; justify-content: center; }
   .head { padding: var(--sp-s) var(--sp-l) var(--sp-s); }
   .meta { display: flex; align-items: center; gap: var(--sp-s); flex-wrap: wrap; }
-  .browser { background: var(--surfaceContainerHigh); display: flex; align-items: center; gap: var(--sp-s); padding: var(--sp-s) var(--sp-m);
-             flex: none; }
-  .browser .url { flex: 1; background: var(--surfaceContainerHighest); border-radius: 20px; height: 36px; display: flex; align-items: center;
-                  padding: 0 var(--sp-m); gap: var(--sp-xs); color: var(--onSurfaceVariant); min-width: 0; overflow: hidden; white-space: nowrap; }
+  .browser { background: var(--surfaceContainerHigh); display: flex; align-items: center; gap: var(--sp-s); padding: var(--sp-s) var(--sp-m); flex: none; }
+  .browser .url { flex: 1; background: var(--surfaceContainerHighest); border-radius: 20px; height: 36px; display: flex; align-items: center; padding: 0 var(--sp-m); gap: var(--sp-xs); color: var(--onSurfaceVariant); min-width: 0; overflow: hidden; white-space: nowrap; }
   .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; background: linear-gradient(transparent, var(--surface)); }
 
   /* Tokens sheet */
-  .tsheet { padding: 24px; width: 1180px; }
-  .tsheet h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; }
-  .tsheet h2 { font-size: 18px; font-weight: 500; margin: 24px 0 8px; }
-  .tsheet .sub { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+  .tsheet { padding: 24px; width: 1180px; } .tsheet h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; }
+  .tsheet h2 { font-size: 18px; font-weight: 500; margin: 24px 0 8px; } .tsheet .sub { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
   .tcols { display: flex; gap: 16px; }
   .tpanel { flex: 1; border-radius: 16px; padding: 16px; }
   .swgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -217,8 +169,8 @@ const TOKENS_URL = params.get('tokens') || '../../../design/tokens.json';
 /* ---------- Strings (English, Danish). List, item and household names are user data: never translated. ---------- */
 const S = {
   en: {
-    lang: 'English', appTag: 'Collections and lists, shared with your household',
-    signIn: 'Sign in with Google', signInNote: 'Your lists are kept with your Google account, so they follow you to a new phone.',
+    appTag: 'Collections and lists, shared with your household',
+    signIn: 'Sign in with Google', signInNote: 'Your lists are kept with your account, so they follow you to a new phone.',
     needsConnection: 'This needs a connection',
     lists: 'Lists', createList: 'Create list', noListsTitle: 'No lists yet',
     noListsBody: 'Make a list of what you collect or need, and tick off what you have. A new list is private until you share it.',
@@ -240,17 +192,17 @@ const S = {
     verify: 'Verify', changePw: 'Change password', currentPw: 'Current password', newPw: 'New password',
     changePwNote: 'To keep your account safe, sign in again with your current password first.', iHaveIt: 'I have it',
     newList: 'New list', listName: 'List name', enterName: 'Enter a name', cancel: 'Cancel', create: 'Create',
-    showMissing: 'Show only missing', addItem: 'Add item', reRelease: 'Re-release', reReleased: 'Re-release',
+    showMissing: 'Show only missing', addItem: 'Add item', reReleased: 'Re-released',
     offline: 'Offline: changes are sent when you are online again', pending: n => n === 1 ? '1 waiting' : `${n} waiting`,
     name: 'Name', releaseYear: 'Release year', reReleaseYear: 'Re-release year', optional: 'Optional',
     yearRange: 'Use a year from 1900 to 2076', done: 'Done', add: 'Add', editItem: 'Edit item', remove: 'Remove', save: 'Save',
     removed: n => `“${n}” removed`, undo: 'Undo',
-    rename: 'Rename list', share: 'Share with household', needHousehold: 'You need a household to share', stopShare: 'Stop sharing',
+    rename: 'Rename list', share: 'Share with household', needHousehold: 'You need a household to share',
     deleteList: 'Delete list', deleteListQ: 'Delete list?',
     deleteListBody: (n, c) => `“${n}” and its ${c} items will be deleted for everyone who can see it. This cannot be undone.`,
     delete: 'Delete', shareQ: h => `Share with ${h}?`,
     shareBody: 'Everyone in the household can see and change this list. Only you can stop sharing it.', shareBtn: 'Share',
-    emptyListTitle: 'This list is empty', emptyListBody: 'Add the first item. You can add years now or later.',
+    emptyListTitle: 'This list is empty', emptyPlainBody: 'Add the first item.', emptyCollBody: 'Add the first item. You can add years now or later.',
     household: 'Household', hhNoneTitle: 'Share lists with your household',
     hhNoneBody: 'A household is the people you live with. You need one only to share a list; your lists work without it.',
     hhName: 'Household name', createHh: 'Create household', haveLink: 'Have an invite link?',
@@ -265,7 +217,7 @@ const S = {
     linkDead: 'This invite link no longer works',
     linkDeadBody: 'It has expired, was already used or was revoked. Ask someone in the household for a new link.',
     toLists: 'Go to my lists',
-    account: 'Account', language: 'Language', phoneSetting: 'Phone setting (English)', signOut: 'Sign out',
+    account: 'Account', signOut: 'Sign out',
     signOutNote: 'Removes your lists from this phone', deleteAccount: 'Delete account',
     deleteAccountQ: 'Delete your account?',
     deleteAccountBody: 'Your account and every list you created, private and shared, are deleted. Household members lose the lists you shared. This cannot be undone.',
@@ -276,8 +228,8 @@ const S = {
     webPlay: 'Open Google Play', webSmall: 'Already installed? Tap the link in your message again.',
   },
   da: {
-    lang: 'Dansk', appTag: 'Samlinger og lister, delt med din husstand',
-    signIn: 'Log ind med Google', signInNote: 'Dine lister gemmes med din Google-konto, så de følger med til en ny telefon.',
+    appTag: 'Samlinger og lister, delt med din husstand',
+    signIn: 'Log ind med Google', signInNote: 'Dine lister gemmes med din konto, så de følger med til en ny telefon.',
     needsConnection: 'Det kræver internetforbindelse',
     lists: 'Lister', createList: 'Opret liste', noListsTitle: 'Ingen lister endnu',
     noListsBody: 'Lav en liste over det, du samler på eller mangler, og sæt flueben ved det, du har. En ny liste er privat, indtil du deler den.',
@@ -299,17 +251,17 @@ const S = {
     verify: 'Bekræft', changePw: 'Skift adgangskode', currentPw: 'Nuværende adgangskode', newPw: 'Ny adgangskode',
     changePwNote: 'For at beskytte din konto skal du først logge ind igen med din nuværende adgangskode.', iHaveIt: 'Jeg har den',
     newList: 'Ny liste', listName: 'Listens navn', enterName: 'Skriv et navn', cancel: 'Annuller', create: 'Opret',
-    showMissing: 'Vis kun manglende', addItem: 'Tilføj ting', reRelease: 'Genudgivet', reReleased: 'Genudgivet',
+    showMissing: 'Vis kun manglende', addItem: 'Tilføj ting', reReleased: 'Genudgivet',
     offline: 'Offline: ændringer sendes, når du er online igen', pending: n => `${n} venter`,
     name: 'Navn', releaseYear: 'Udgivelsesår', reReleaseYear: 'Genudgivelsesår', optional: 'Valgfrit',
     yearRange: 'Brug et år fra 1900 til 2076', done: 'Færdig', add: 'Tilføj', editItem: 'Rediger ting', remove: 'Fjern', save: 'Gem',
     removed: n => `»${n}« er fjernet`, undo: 'Fortryd',
-    rename: 'Omdøb liste', share: 'Del med husstanden', needHousehold: 'Du skal være i en husstand for at dele', stopShare: 'Stop deling',
+    rename: 'Omdøb liste', share: 'Del med husstanden', needHousehold: 'Du skal være i en husstand for at dele',
     deleteList: 'Slet liste', deleteListQ: 'Slet liste?',
     deleteListBody: (n, c) => `»${n}« og dens ${c} ting slettes for alle, der kan se den. Det kan ikke fortrydes.`,
     delete: 'Slet', shareQ: h => `Del med ${h}?`,
     shareBody: 'Alle i husstanden kan se og ændre listen. Kun du kan stoppe delingen.', shareBtn: 'Del',
-    emptyListTitle: 'Listen er tom', emptyListBody: 'Tilføj den første ting. Årstal kan du tilføje nu eller senere.',
+    emptyListTitle: 'Listen er tom', emptyPlainBody: 'Tilføj den første ting.', emptyCollBody: 'Tilføj den første ting. Årstal kan du tilføje nu eller senere.',
     household: 'Husstand', hhNoneTitle: 'Del lister med din husstand',
     hhNoneBody: 'En husstand er dem, du bor med. Du skal kun bruge en for at dele en liste; dine lister virker uden.',
     hhName: 'Husstandens navn', createHh: 'Opret husstand', haveLink: 'Har du et invitationslink?',
@@ -324,7 +276,7 @@ const S = {
     linkDead: 'Dette invitationslink virker ikke længere',
     linkDeadBody: 'Det er udløbet, allerede brugt eller tilbagekaldt. Bed en i husstanden om et nyt link.',
     toLists: 'Gå til mine lister',
-    account: 'Konto', language: 'Sprog', phoneSetting: 'Telefonens indstilling (dansk)', signOut: 'Log ud',
+    account: 'Konto', signOut: 'Log ud',
     signOutNote: 'Fjerner dine lister fra denne telefon', deleteAccount: 'Slet konto',
     deleteAccountQ: 'Slet din konto?',
     deleteAccountBody: 'Din konto og alle lister, du har oprettet, private og delte, slettes. Husstandens medlemmer mister de lister, du har delt. Det kan ikke fortrydes.',
@@ -342,9 +294,9 @@ const LISTS = [
   { name: 'Christmas mobiles', have: 12, total: 30, by: 'Anna' },
   { name: 'Indkøb', have: 2, total: 11, shared: true },
   { name: 'Christmas plates 1970–1999', have: 7, total: 30 },
-  { name: 'Board games', have: 0, total: 0 },
+  { name: 'Board games', have: 0, total: 0, type: 'collection' },
 ];
-// Sorted by release year, then name (OQ-8); items without a release year come last (open question in the PR).
+// Sorted by release year, then name (OQ-8); items without a release year come last (OQ-33).
 const ITEMS = [
   { n: 'Bell', y: 1984, c: true }, { n: 'Star', y: 1985, r: 2015, c: true }, { n: 'Heart', y: 1986 },
   { n: 'Snowflake', y: 1987, c: true }, { n: 'Christmas tree', y: 1988 },
@@ -454,7 +406,7 @@ const SCREENS = [
     f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}<div class="center"><div class="bubble">${ic('playlist_add')}</div>
       <div class="t-titleLarge">${s.emptyListTitle}</div></div><div class="menu t-bodyLarge" style="top:56px;right:8px">
       <div class="mi">${ic('edit')}<span>${s.rename}</span></div>
-      <div class="mi">${ic('group_add', 'dis')}<span><span style="opacity:.38">${s.share}</span><span class="disnote t-bodySmall">${s.needHousehold}</span></span></div>
+      <div class="mi">${ic('group_add', 'dis')}<span><span class="dis">${s.share}</span><span class="disnote t-bodySmall">${s.needHousehold}</span></span></div>
       <div class="mi danger">${ic('delete')}<span>${s.deleteList}</span></div></div>` },
   { id: '11', t: 'Delete list', refs: 'LIST-04, OQ-10: confirmation first, naming the list and its number of items.',
     f: s => openList(s, { overlay: dialog({ icon: 'delete', title: s.deleteListQ, body: s.deleteListBody('Christmas mobiles', 30),
@@ -462,11 +414,11 @@ const SCREENS = [
   { id: '12', t: 'Share with household', refs: 'VIS-02, VIS-04. Creator of a private list who is in a household. Sharing and stopping sharing need a connection (33).',
     f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}<div class="center"></div>${dialog({ icon: 'group_add', title: s.shareQ(HH), body: s.shareBody,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.shareBtn}</span>` })}` },
-  { id: '13', t: 'Open list, empty', refs: 'ITEM-05, VIS-01. Progress line shows "No items yet" until the first item.',
+  { id: '13', t: 'Open list, empty (collection)', refs: 'ITEM-05, VIS-01. A collection: progress line shows "No items yet" until the first item. A plain list shows only "Add the first item." (no years).',
     f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}<div class="head t-bodyMedium var meta"><span>${s.noItems}</span><span>·</span><span class="meta" style="gap:4px">${
-      ic('lock').replace('class="ms ', 'style="font-size:16px" class="ms ')}${s.private}</span></div>
+      ic('lock').replace('class="ms ', 'style="font-size:16px" class="ms ')}${s.private}</span><span>·</span><span>${s.collection}</span></div>
       <div class="center"><div class="bubble">${ic('playlist_add')}</div><div class="t-titleLarge">${s.emptyListTitle}</div>
-      <div class="t-bodyMedium var">${s.emptyListBody}</div></div>${fab(s.addItem)}` },
+      <div class="t-bodyMedium var">${LISTS[3].type === 'plain' ? s.emptyPlainBody : s.emptyCollBody}</div></div>${fab(s.addItem)}` },
   { id: '14', t: 'Household, none yet', refs: 'HH-01, HH-03, OQ-1, OQ-22 (creating needs a connection). Empty name: field error.',
     f: s => `${topbar(s.household, { back: true })}<div class="center" style="justify-content:flex-start;padding-top:var(--sp-xl)">
       <div class="bubble">${ic('home')}</div><div class="t-titleLarge">${s.hhNoneTitle}</div><div class="t-bodyMedium var">${s.hhNoneBody}</div>
