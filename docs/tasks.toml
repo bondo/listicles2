@@ -371,16 +371,18 @@ notes = "The GitHub tools available to agents cannot create labels. Repo, Issues
 id = "M0.5-01"
 title = "User stories with acceptance criteria (docs/product/stories.md)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M0"]
+pr = 94
 
 [[task]]
 id = "M0.5-02"
 title = "App-flow diagram (docs/product/flow.md, Mermaid)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
+pr = 103
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0.5-01"]

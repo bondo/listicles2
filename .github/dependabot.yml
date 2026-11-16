@@ -14,8 +14,15 @@ updates:
         update-types: [minor, patch]
     # TypeScript 7 is not supported by ts-jest (typescript <7) or typescript-eslint (typescript <6.1), so a major bump
     # fails the firebase job. Revisit when both support it, then remove this ignore and bump TypeScript by hand.
+    # firebase 13 cannot resolve against @firebase/rules-unit-testing 5.0.0 (peer firebase ^12.0.0), so npm ci fails.
+    # Revisit when rules-unit-testing supports firebase 13.
+    # @types/node 26 declares APIs that the Node 22 used in CI lacks. Revisit when CI moves to a newer Node LTS.
     ignore:
       - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: firebase
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
   - package-ecosystem: pip
     directory: /scripts
