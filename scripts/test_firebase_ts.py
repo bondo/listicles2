@@ -32,10 +32,14 @@ NPM = "bash -c 'cd firebase && npm {} --silent'"
 VERIFY = [NPM.format(c) for c in ("ci", "run typecheck", "run lint", "run format:check")] + ["python3 -I scripts/test_firebase_ts.py", NPM.format("test")]
 CI = ["npm ci --silent", "npm run typecheck --silent", "npm run lint --silent", "npm run format:check --silent", "npm test --silent"]
 CI_ROOT_CMD = "python3 -I scripts/test_firebase_ts.py"
-# Dependabot ignores semver-major updates of these npm packages in /firebase, and nothing else. Reasons: TypeScript 7 is not
-# supported by ts-jest or typescript-eslint; firebase 13 cannot resolve against @firebase/rules-unit-testing 5.0.0 (peer
-# firebase ^12.0.0); @types/node 26 declares APIs that the Node 22 used in CI lacks.
-MAJOR_IGNORED = ("typescript", "firebase", "@types/node")
+# Dependabot ignores these npm packages in /firebase, and nothing else. typescript and @types/node: semver-major only (TypeScript 7
+# is not supported by ts-jest or typescript-eslint; @types/node 26 declares APIs that the Node 22 used in CI lacks). firebase: every
+# version update (major, minor, patch), because firebase 12.19 declarations need the Temporal namespace that TypeScript 6 lacks, so
+# `npm run typecheck` fails, and firebase 13 cannot resolve against @firebase/rules-unit-testing 5.0.0 (peer firebase ^12.0.0).
+# Revisit when TypeScript and @firebase/rules-unit-testing are bumped together by hand.
+MAJOR = ["version-update:semver-major"]
+ALL_TYPES = ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+IGNORE_POLICY = {"typescript": MAJOR, "firebase": ALL_TYPES, "@types/node": MAJOR}
 # tsconfig compilerOptions allowlist: anything else (skipLibCheck, strict: false, a lone strict flag turned off) is a problem.
 TS_OPTIONS = {"target", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns"}
 CLEAN_TS = 'export function add(a: number, b: number): number {\n    return a + b;\n}\n'
@@ -95,9 +99,9 @@ def ordered(text, commands):
     return True
 
 
-def dependabot_ignore_problems(cfg, names=MAJOR_IGNORED):
-    """Problems with the ignore rules of the npm entry for /firebase: each of `names` must be ignored for semver-major updates
-    only (so minor and patch bumps still arrive), and no other package may be ignored."""
+def dependabot_ignore_problems(cfg, policy=IGNORE_POLICY):
+    """Problems with the ignore rules of the npm entry for /firebase: each package in `policy` must have exactly one rule that
+    ignores exactly the listed update types (a version-specific rule is no substitute), and no other package may be ignored."""
     entries = [e for e in cfg.get("updates", []) if e.get("package-ecosystem") == "npm" and e.get("directory") == "/firebase"]
     if len(entries) != 1:
         return [f"expected one npm entry for /firebase, found {len(entries)}"]
@@ -106,11 +110,12 @@ def dependabot_ignore_problems(cfg, names=MAJOR_IGNORED):
     for rule in entries[0].get("ignore", []):
         name = rule.get("dependency-name")
         seen.append(name)
-        if name not in names:
+        if name not in policy:
             problems.append(f"{name} must not be ignored")
-        elif rule != {"dependency-name": name, "update-types": ["version-update:semver-major"]}:
-            problems.append(f"{name} must be ignored for semver-major updates only, got {rule}")
-    problems += [f"{name} has no ignore rule" for name in names if name not in seen]
+        elif rule != {"dependency-name": name, "update-types": policy[name]}:
+            problems.append(f"{name} must be ignored for {policy[name]} only, got {rule}")
+    problems += [f"{name} has no ignore rule" for name in policy if seen.count(name) == 0]
+    problems += [f"{name} has {seen.count(name)} ignore rules" for name in policy if seen.count(name) > 1]
     return problems
 
 
@@ -192,27 +197,40 @@ class HelperNegativeCases(unittest.TestCase):
         self.assertFalse(ordered("step a one\n", ["one", "two"]))
 
     def test_dependabot_check_rejects_a_missing_wrong_or_misplaced_ignore(self):
-        major = "version-update:semver-major"
+        major, minor, patch = ALL_TYPES[0], ALL_TYPES[1], ALL_TYPES[2]
 
-        def rule(name, types=(major,)):
-            return {"dependency-name": name, "update-types": list(types)}
+        def rule(name, types=None):
+            return {"dependency-name": name, "update-types": list(types or IGNORE_POLICY.get(name, MAJOR))}
 
         def cfg(rules, eco="npm", directory="/firebase"):
             return {"updates": [{"package-ecosystem": eco, "directory": directory, "ignore": rules}]}
 
-        full = [rule(n) for n in MAJOR_IGNORED]
+        ts, fb, node = rule("typescript"), rule("firebase"), rule("@types/node")
+        full = [ts, fb, node]
         self.assertEqual(dependabot_ignore_problems(cfg(full)), [])
         bad = {
             "no ignore": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]},
-            "typescript missing": cfg(full[1:]),
-            "firebase missing": cfg([full[0], full[2]]),
-            "@types/node missing": cfg(full[:2]),
+            "typescript missing": cfg([fb, node]),
+            "firebase missing": cfg([ts, node]),
+            "@types/node missing": cfg([ts, fb]),
             "extra package": cfg([*full, rule("eslint")]),
-            "minor only": cfg([rule("typescript"), rule("firebase", ("version-update:semver-minor",)), rule("@types/node")]),
-            "major and minor": cfg([rule("typescript"), rule("firebase", (major, "version-update:semver-minor")), rule("@types/node")]),
-            "patch only": cfg([rule("typescript"), rule("firebase"), rule("@types/node", ("version-update:semver-patch",))]),
-            "all updates ignored": cfg([rule("typescript"), rule("firebase"), {"dependency-name": "@types/node"}]),
-            "version ignore": cfg([*full[:2], {"dependency-name": "@types/node", "versions": [">=26"]}]),
+            "firebase-tools ignored for major": cfg([*full, rule("firebase-tools", (major,))]),
+            "firebase-tools ignored for all": cfg([*full, rule("firebase-tools", ALL_TYPES)]),
+            "firebase major only": cfg([ts, rule("firebase", (major,)), node]),
+            "firebase major and minor": cfg([ts, rule("firebase", (major, minor)), node]),
+            "firebase minor and patch": cfg([ts, rule("firebase", (minor, patch)), node]),
+            "firebase minor only": cfg([ts, rule("firebase", (minor,)), node]),
+            "firebase patch only": cfg([ts, rule("firebase", (patch,)), node]),
+            "firebase version ignore": cfg([ts, {"dependency-name": "firebase", "versions": [">=12.19.0"]}, node]),
+            "firebase version ignore beside major": cfg([ts, rule("firebase", (major,)), {"dependency-name": "firebase", "versions": [">=12.19.0"]}, node]),
+            "firebase version ignore added to all": cfg([ts, {**fb, "versions": [">=12.19.0"]}, node]),
+            "@types/node minor and patch": cfg([ts, fb, rule("@types/node", (minor, patch))]),
+            "@types/node ignored for all": cfg([ts, fb, rule("@types/node", ALL_TYPES)]),
+            "@types/node no update types": cfg([ts, fb, {"dependency-name": "@types/node"}]),
+            "typescript ignored for all": cfg([rule("typescript", ALL_TYPES), fb, node]),
+            "typescript minor only": cfg([rule("typescript", (minor,)), fb, node]),
+            "typescript version ignore": cfg([{"dependency-name": "typescript", "versions": [">=7"]}, fb, node]),
+            "firebase twice": cfg([*full, fb]),
             "other directory": cfg(full, directory="/"),
             "other ecosystem": cfg(full, eco="pip"),
         }
@@ -296,7 +314,7 @@ class Config(unittest.TestCase):
             self.assertIn(case, text, case)
         self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
 
-    def test_dependabot_ignores_only_the_major_updates_of_typescript_firebase_and_types_node_in_firebase(self):
+    def test_dependabot_ignores_every_firebase_update_and_only_the_major_updates_of_typescript_and_types_node(self):
         self.assertEqual(dependabot_ignore_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
 
     def test_fixture_directories_are_gitignored(self):
