@@ -2,7 +2,7 @@
 
 Task M0.5-01. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
 Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17, OQ-19 and
-OQ-23 to OQ-27 of 2026-11-16 (state issue #15; OQ-23 to OQ-27 follow the sign-in security review, comment 6927207374),
+OQ-23 to OQ-27 and the other answers of 2026-11-16 in section 10 (state issue #15; OQ-23 to OQ-27 follow the sign-in security review, comment 6927207374),
 and
 [the plan](../PLAN.md). Decided questions are in [section 10](#10-decided-questions); anything still unsettled is marked
 **OQ-n** and listed in [section 11](#11-open-questions), and nothing here decides it. Later milestones trace their acceptance tests to the story ids below (PLAN section 7).
@@ -31,7 +31,8 @@ Two sign-in methods in v1: Google (the main one) and email with password (OQ-23)
 (OQ-27). **Server access:** every Firestore read and write needs a signed-in user whose email is verified
 (`email_verified`; Google accounts are verified by Google, password accounts after AUTH-06), invites included. No
 security rule may rely on a two-step (MFA) claim: two-step verification (AUTH-09) protects the sign-in, not the rules.
-Rules allow and deny tests cover both.
+Rules allow and deny tests cover both. Before anyone but the owner installs the app, a privacy text in English and
+Danish names Google as processor of email addresses and passwords (OQ-30).
 
 **AUTH-01 Sign in.** As a new user, I want to sign in with my Google account, or with an email and password if I
 prefer, so that my lists follow me to a new phone.
@@ -81,6 +82,8 @@ owner of the address can use the account.
 * Given I created an account (AUTH-05), then I see a screen saying a link was sent to my email, with "Continue",
   "Send again" and "Sign out".
 * Given I opened the link in the email, when I tap "Continue", then I see my lists (or the join screen, HH-03).
+* Given the email and the page its link opens, then they are Firebase's defaults, with the email text in English and
+  Danish (OQ-29; the same for AUTH-08).
 * Given I have not opened the link yet, when I tap "Continue", then I see a message that the email is not verified yet
   and stay on the screen.
 * Given I tap "Send again" many times, then I see "Try again later" instead of a new email.
@@ -107,19 +110,27 @@ password, so that I reach my lists on any phone.
 **AUTH-09 Two-step verification (optional).** Depends on the owner's check that the Identity Platform upgrade needs no
 billing (OQ-25 verification). As a password user, I want to add a code from an authenticator app, so that a stolen
 password alone is not enough.
+* Given I start turning it on, then a warning first says that if I lose the authenticator app I may lose access to
+  my account; it does not mention an administrator. There are no backup codes in v1 (OQ-28).
 * Given a verified password account, when I turn on two-step verification in Account, then (after a recent sign-in) I
   see a QR code and a key for an authenticator app, and it is on only after I enter a correct code.
 * Given it is on, when I sign in with my password (AUTH-07) or sign in again (AUTH-04), then I must also enter a
   6-digit code; a wrong code shows an error, many wrong codes show "try again later".
 * Given it is on, when I turn it off (after a recent sign-in with a code), then sign-in needs only my password again.
 * Given a Google account, then this is not offered (OQ-24: optional, for password accounts).
-* Losing the authenticator app: OQ-28.
+* Given I lost the authenticator app, then the second step can only be removed by hand in the Firebase console (OQ-28).
 
 **AUTH-10 Same email, another method.** As a user who signed up one way, I want a clear way back when I use the other
 way, so that I never get two accounts or lose my lists.
 * Given my email has an account with one method, when I try the other method (Google or email and password), then the
   app never merges or links the accounts by itself; it tells me to sign in with the method I used first.
-* Given I signed in with the method I used first, then I see my lists as before; adding a second method: OQ-31.
+* Given I signed in with the method I used first, then I see my lists as before; adding a second method or changing the email comes after v1 (OQ-31).
+
+**AUTH-11 Change my password.** As a password user, I want to change my password, so that I can replace a weak or
+leaked one (OQ-31).
+* Given a password account, when I choose "Change password" in Account, then I first sign in again (with a code if
+  AUTH-09 is on), then enter a new password of at least 12 characters (OQ-26); after that the old one no longer works.
+* Given there is no network, then I see "This needs a connection".
 
 ## 2. Household
 
@@ -129,8 +140,8 @@ people I live with.
   owner and only member.
 * Given the name is empty or only spaces, when I confirm, then nothing is created and the name field shows an error.
 * Given I am already in a household, then creating another one is not offered (one household per user, PLAN section 3).
-* A household is not needed to make lists; I need one only to share a list (OQ-1). Whether the app creates it for me
-  when I first share is left to M1/M2 planning.
+* A household is not needed to make lists; I need one only to share a list (OQ-1). The app never creates one for me
+  (OQ-20).
 
 **HH-02 Invite someone.** As a household member, I want to send an invite link, so that a person can join my household.
 * Given I am a member, when I tap "Invite", then the app makes a single-use link and opens the Android share sheet.
@@ -167,7 +178,7 @@ ownership or delete the household, so that the household stays under control.
 * Given the household is deleted, then every list that was shared with it goes back to being private to its creator,
   with all its items, and every private list stays as it was: nothing is lost (OQ-17).
 * Given a list I created went back to private because the household was deleted, when I next open the app, then I see
-  a notice that the household was deleted and my shared lists are private again; I can share them again once I am in a
+  a dialog I must acknowledge saying that the household was deleted and my shared lists are private again; I can share them again once I am in a
   household (VIS-02).
 * Given the household is deleted, then a former member cannot read or change a list that someone else created and had
   shared with it, and the creator still can (rules allow and deny tests).
@@ -179,7 +190,8 @@ ownership or delete the household, so that the household stays under control.
 * Given a list in that screen, then it shows its name and whether it is private or shared; a shared list created by
   someone else also shows the creator's display name.
 * Given I have no lists, then I see an empty state that explains lists and offers "Create list".
-* Whether each list also shows progress (for example "12 of 30"), the order of lists and search: OQ-8, OQ-9.
+* Given my lists, then the most recently used is first, and each shows its progress as small text under its name,
+  for example "12 of 30" (OQ-8, OQ-9). There is no search in v1.
 
 **LIST-02 Create a list.** As a user, I want to create a list with a name and a type, so that I can start collecting
 items.
@@ -196,10 +208,10 @@ items.
 
 **LIST-04 Delete a list.** As a user who can see a list, I want to delete it when it is no longer needed, so that my
 lists stay tidy.
-* Given I created the list or it is shared with me (OQ-2, OQ-3), when I delete it and the delete is final (confirmed or not undone, OQ-10), then
-  the list and all its items are gone, also for members if it was shared.
-* Given I cancel or undo the delete, then nothing changes.
-* Pending OQ-10: whether a confirmation (naming the list and its number of items), an undo, or both are shown.
+* Given I created the list or it is shared with me (OQ-2, OQ-3), when I delete it, then I am first asked to confirm, with
+  the list's name and its number of items (OQ-10); when I confirm, the list and all its items are gone, also for
+  members if it was shared.
+* Given I cancel, then nothing changes.
 
 ## 4. Items
 
@@ -225,24 +237,27 @@ my list holds what I collect.
 * Given an item in a collection list, when I clear a year and confirm, then the item has no such year.
 
 **ITEM-03 Remove an item.** As a user, I want to remove an item, so that the list only holds what I want.
-* Given an item, when I remove it and the removal is final (confirmed or not undone, OQ-10), then it is gone from the
-  list.
+* Given an item, when I remove it, then it is gone at once with no confirmation, and "Undo" shows for 10 seconds
+  (OQ-10); when I tap "Undo", the item is back as it was.
 
 **ITEM-04 Check off what I have.** As a collector, I want to tick "I have it" on an item, so that I can see what I own
 and what I still miss.
 * Given an unchecked item, when I tap its checkbox, then it is checked; tapping again unchecks it.
 * Given I check an item, when I reopen the app (also offline), then it is still checked.
-* Whether the checkbox is always called "I have it", or the word depends on the list (a shopping list): OQ-7.
+* Given an item is checked, then it stays in its place in the order.
+* Given any list, then the checkbox is called "I have it" (Danish "Jeg har den") in v1 (OQ-7).
 
 **ITEM-05 See what a list contains.** As a user, I want to see every item of a list with its check state (and years),
 so that I know at a glance what I have.
-* Given an open plain list, then each item shows its name and whether it is checked, sorted by name.
+* Given an open plain list, then each item shows its name and whether it is checked, sorted by name, ignoring case,
+  with æ, ø and å after z (OQ-33).
 * Given an open collection list, then each item also shows its release year and re-release year (each only if set),
-  sorted by release year and then by name (where items without a release year go: OQ-33).
+  sorted by release year and then by name (items without a release year last, OQ-33).
+* Given an open list, then its progress shows at the top, for example "12 of 30" (OQ-9).
 * Given a list with 30 or more items, then all can be reached by scrolling, and no name or year is cut off at the
   default font size in English or Danish.
 * Given an empty list, then I see an empty state that offers "Add item".
-* A "show only missing" filter and search: OQ-8 (item order is now set per list type).
+* Given I turn on "Show only missing", then only unchecked items are shown (OQ-8). No search or manual order in v1.
 
 ## 5. Private and shared lists
 
@@ -257,9 +272,8 @@ use it together (for example a shopping list).
 * Given I created a private list and I am in a household, when I choose "Share with household" and confirm, then every current
   member sees the list in LIST-01.
 * Given a list is shared, when a new member joins, then they see it too (assumed; OQ-16).
-* Given I am not in a household, when I choose to share, then the app takes me to the household step (create or join
-  one, or one is created for me: decided in M0.5-02 and M1/M2 planning, OQ-1), and the list is shared only once I am in
-  a household.
+* Given I am not in a household, then "Share with household" is disabled, with a message that I need a household to
+  share (OQ-20); a household step that leads there comes after v1.
 * Sharing is per list: sharing one list never shares another.
 
 **VIS-03 Use a shared list.** As a household member, I want to open a list someone shared, so that I see what it
@@ -285,7 +299,7 @@ bad connection never stops me.
 * Given there is no network, when I create a list, add, edit, remove or check items, then the change shows at once.
 * Given I made changes offline, when the network returns, then the changes are saved and other members get them, with
   nothing for me to do.
-* Whether the app shows that it is offline: OQ-14.
+* Given there is no network, then a small banner says "Offline: changes are sent when you are online again" (OQ-14).
 
 **SYNC-02 See changes from others.** As a member of a shared list, I want changes from others to appear by themselves,
 so that we never work on an old copy.
@@ -302,9 +316,9 @@ so that we never work on an old copy.
 
 **SYNC-03 Actions that need the network.** As a user, I want a clear message when something needs a connection, so that
 I don't wait for nothing.
-* Given there is no network, when I sign in the first time, create an account, verify my email, reset my password,
-  join a household or create an invite, then I see a message
-  that this needs a connection, and nothing half-done is left behind.
+* Given there is no network, when I sign in the first time, create an account, verify my email, reset or change my
+  password, open an invite link, join, create, leave or manage a household, create an invite, share a list or stop
+  sharing it, then I see "This needs a connection" and nothing half-done is left behind (OQ-22).
 
 ## 7. Language
 
@@ -316,9 +330,9 @@ I don't wait for nothing.
 
 **LANG-02 Switch language.** As a user, I want to pick English or Danish for this app only, so that it does not have to
 follow my phone.
-* Given I pick the other language, when I return to the app, then every screen uses it without a reinstall and my lists
+* Given I pick the other language in Android's per-app language setting (no switch inside the app in v1, OQ-12), when I
+  return to the app, then every screen uses it without a reinstall and my lists
   are unchanged.
-* Whether the switch is inside the app or only in Android's per-app language setting: OQ-12.
 
 ## 8. Not in v1
 
@@ -331,8 +345,8 @@ Decided as not in v1 (Q1, Q2, Q4); the ones marked *later* are planned for a lat
 * More than one household per user (PLAN section 3: a user record holds one household id).
 * Sign-in with an email link ("magic link", OQ-27); reconsidered only if the project moves to the paid Blaze plan.
 * Notes and tags on items, barcode scanning and title lookup, packing templates and trips: in [the plan](../PLAN.md)
-  (sections 1 and 7, M2-M5), but not in the v1 item of Q2 (OQ-15). Search, sort and filter are also planned for M2
-  (PLAN sections 1 and 7); whether any of them is in v1 is OQ-8.
+  (sections 1 and 7, M2-M5), but not in the v1 item of Q2 (OQ-15). Search and manual order are
+  not in v1; sorting and the "show only missing" filter are (OQ-8).
 
 ## 9. Leave room for
 
@@ -360,7 +374,7 @@ These are constraints for the data model and screens; v1 builds none of them (M2
 Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the stories above follow them.
 
 **Labels for the M1 strings** (decided): the re-release year is "re-release year" in English and "Genudgivelsesår" in Danish
-(OQ-19).
+(OQ-19); an item is "ting" in Danish; the checkbox is "I have it", Danish "Jeg har den" (OQ-7).
 
 | Id | Decision (owner, 2026-11-15 unless marked) | Stories |
 |---|---|---|
@@ -378,6 +392,18 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-27 | **Decided (2026-11-16):** no email-link ("magic link") sign-in in v1; reconsider only on the Blaze plan. | section 8 |
 | Types | **Decided (2026-11-16, issue #15 comment 6927705004):** two list types, chosen at creation: plain (default; name and "I have it", sorted by name) and collection (also the two optional years under OQ-6 and OQ-19; sorted by release year, then name). | LIST-02, ITEM-01, ITEM-02, ITEM-05 |
 | OQ-32 | **Decided (2026-11-16):** a list's type cannot be changed in v1. Turning a plain list into a collection list may come later (section 9). | LIST-02 |
+| OQ-7 | **Decided (2026-11-16):** the checkbox is always "I have it" ("Jeg har den") in v1; it may depend on the list type later. | ITEM-04 |
+| OQ-8 | **Decided (2026-11-16):** items sorted per list type (ITEM-05); lists by most recently used; a "show only missing" filter in v1; no search and no manual order. Checked items stay in place. | LIST-01, ITEM-05 |
+| OQ-9 | **Decided (2026-11-16):** progress ("12 of 30") as small text under the list name and at the top of the list. | LIST-01, ITEM-05 |
+| OQ-10 | **Decided (2026-11-16):** deleting an item has no confirmation and an undo for 10 seconds; deleting a list asks to confirm first. | LIST-04, ITEM-03 |
+| OQ-12 | **Decided (2026-11-16):** only Android's per-app language setting in v1, no switch inside the app. | LANG-02 |
+| OQ-14 | **Decided (2026-11-16):** a small banner shows the offline state and that changes wait to be sent. | SYNC-01 |
+| OQ-20..22 | **Decided (2026-11-16):** see [flow section 10](flow.md#10-new-open-questions): sharing without a household is disabled; an invite page "install, then tap the link again"; household, invite and sharing actions need a connection. | VIS-02, HH-03, SYNC-03 |
+| OQ-28 | **Decided (2026-11-16):** a lost authenticator app is reset by hand in the Firebase console; no backup codes in v1; the warning never mentions an administrator. | AUTH-09 |
+| OQ-29 | **Decided (2026-11-16):** Firebase's default pages and email templates, translated to English and Danish in the console (template languages to check in M1); own pages may come later. | AUTH-06, AUTH-08 |
+| OQ-30 | **Decided (2026-11-16):** a planner drafts the privacy text in Danish and English during M1, naming Google as processor; the owner approves it; ready before anyone but the owner installs the app. | AUTH-05 |
+| OQ-31 | **Decided (2026-11-16):** changing the password is in v1 (AUTH-11); changing the email and linking a second method come after v1. | AUTH-10, AUTH-11 |
+| OQ-33 | **Decided (2026-11-16):** collection lists put items without a release year last; plain lists sort by name ignoring case, with æ, ø, å after z. | ITEM-05 |
 | OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
@@ -388,21 +414,10 @@ diagram (M0.5-02) any more.
 
 | Id | Question | Stories | Blocks |
 |---|---|---|---|
-| OQ-7 | Is the checkbox always "I have it", or does the word depend on the list (for example "bought")? | ITEM-04 | later |
-| OQ-8 | Order of items (by year, by name, as added, or by hand) and of lists; are a "show only missing" filter and search in v1? | LIST-01, ITEM-05 | M0.5-03 |
-| OQ-9 | Should lists and the list screen show progress, such as "12 of 30"? | LIST-01, ITEM-05 | M0.5-03 |
-| OQ-10 | Deleting a list or an item: confirm first, offer undo afterwards, or both? | LIST-04, ITEM-03 | M0.5-03 |
 | OQ-11 | May two items in one list have the same name (for example two mobiles from different years)? | ITEM-01 | later |
-| OQ-12 | Language switch inside the app, or only Android's per-app language setting? | LANG-02 | later |
 | OQ-13 | Assumed: signing out removes the local copy of the user's data from the phone. Confirm. | AUTH-03 | later |
-| OQ-14 | Should the app show when it is offline and when changes are waiting to be sent? | SYNC-01 | M0.5-03 |
 | OQ-15 | The plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | PLAN update, M1/M2 scope |
 | OQ-16 | Assumed: a member who joins later sees the lists already shared with the household. Confirm. | VIS-02 | later |
-| OQ-28 | A user with two-step verification loses the authenticator app: how do they get back in? Without Cloud Functions there is no in-app recovery; only the project owner can remove the second step in the Firebase console. | AUTH-09 | M1 planning |
-| OQ-29 | The verification and reset emails and the pages their links open: Firebase's default pages and email texts, or own pages on Firebase Hosting (next to the invite page, OQ-21)? In which language are they sent (English and Danish, LANG-01)? | AUTH-06, AUTH-08 | M1 planning |
-| OQ-30 | The privacy text must say that Google (Firebase Authentication, Identity Platform) stores email addresses and passwords as a processor. Who writes it, and before which release? | AUTH-05 | before release |
-| OQ-31 | For password accounts: are changing the email, changing the password and adding a second sign-in method to an existing account in v1 (each needs a recent sign-in), or later? | AUTH-10 | M1 planning |
-| OQ-33 | In a collection list, where do items without a release year go: first or last? And does the plain-list sort by name ignore upper and lower case, with Danish letters (æ, ø, å) after z? | ITEM-05 | M0.5-03 |
 | OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their

@@ -2,7 +2,7 @@
 
 Task M0.5-02. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
 Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19,
-OQ-23 to OQ-27, the two list types; state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
+OQ-23 to OQ-33, the two list types; state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
 open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions). New questions this flow raised are in
 [section 10](#10-new-open-questions).
 
@@ -16,7 +16,7 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
   **Email sign-in** (sign in, create account, reset password: AUTH-05, AUTH-07, AUTH-08), **Verify email** (AUTH-06),
   **Lists** (all lists I can see, LIST-01), **Open list**
   (one list and its items, ITEM-05), **Household** (HH-04), **Join** (HH-03), **Account** (sign out, delete account,
-  language if in the app: OQ-12).
+  two-step verification, change password; no language switch, OQ-12).
 * A dotted arrow is something that happens later, not a tap. A step marked OQ-n is not decided: the diagram shows
   where the answer plugs in, not the answer. A step marked **proposed** is the planner's recommended answer to an open
   question, drawn so the flow is complete; it changes if the owner decides otherwise.
@@ -30,7 +30,7 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
 flowchart TD
     start(["App opens"]) --> signed{"Signed in?<br>AUTH-02"}
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
-    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>order, search, progress: OQ-8, OQ-9"]
+    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9"]
     signin -- "Google account picked" --> lists
     signin -- "Use email and password" --> email["Email sign-in<br>AUTH-05, AUTH-07, AUTH-08, AUTH-10"]
     email -- "signed in, email verified" --> lists
@@ -44,7 +44,7 @@ flowchart TD
     lists -- "tap a list" --> open["Open list<br>ITEM-05, VIS-03"]
     lists -- "Create list" --> open
     lists --> household["Household<br>HH-01..06"]
-    lists --> account["Account<br>AUTH-03, AUTH-04, LANG-02"]
+    lists --> account["Account<br>AUTH-03, AUTH-04, AUTH-09, AUTH-11"]
     open -- "back" --> lists
     account -- "sign out or account deleted" --> signin
 ```
@@ -67,6 +67,8 @@ flowchart TD
     known -- "yes, for example a new phone" --> mine["Lists with my lists<br>AUTH-01, LIST-01"]
     home -. "later starts, also offline" .-> home2["Lists without signing in again<br>AUTH-02"]
     acc["Account"] -- "Sign out" --> wipe["Local copy removed (assumed, OQ-13)<br>AUTH-03"] --> si
+    acc -- "Change password" --> chpw["Sign in again, new password of at least 12<br>AUTH-11, OQ-31"]
+    acc -- "Turn on two-step" --> warn["Warning: losing the app may lose access to the account;<br>QR code, then a code<br>AUTH-09, OQ-28"]
     acc -- "Delete account" --> owner{"Household owner<br>with other members?"}
     owner -- "yes" --> transfer["Guide: transfer ownership first, nothing deleted<br>AUTH-04, HH-06"]
     owner -- "no" --> confirm["Confirm: my lists, private and shared, are deleted<br>AUTH-04, OQ-5"]
@@ -126,22 +128,22 @@ flowchart TD
     members -- "Delete household (household owner)" --> delc["Confirm: shared lists go back to their creators;<br>cannot be restored<br>HH-06"]
     delc -- "cancel" --> members
     delc -- "confirm" --> deleted["No members; every shared list private to its creator again<br>HH-06, OQ-17"]
-    deleted -. "creator's next app start" .-> notice["Notice: household deleted, my shared lists are private again<br>HH-06"]
+    deleted -. "creator's next app start" .-> notice["Dialog to acknowledge: household deleted,<br>my shared lists are private again<br>HH-06"]
 ```
 
-Leaving, removing a member, transferring ownership and deleting the household: whether they need a connection is
-[OQ-22](#10-new-open-questions).
+Leaving, removing a member, transferring ownership and deleting the household need a connection
+([OQ-22](#10-new-open-questions)).
 
 ### Joining with an invite link
 
 ```mermaid
 flowchart TD
     tap(["Invite link opened"]) --> installed{"App installed?"}
-    installed -- "no" --> store["Not decided: OQ-21"]
+    installed -- "no" --> store["Web page: install Tally, then tap the link again<br>OQ-21"]
     installed -- "yes" --> auth{"Signed in?"}
     auth -- "no" --> si["Sign-in, or create account and verify email<br>AUTH-01, AUTH-05, AUTH-06"] --> net
     auth -- "yes" --> net{"Network?"}
-    net -- "no" --> onet["Message: joining needs a connection<br>proposed, OQ-22<br>HH-03, SYNC-03"]
+    net -- "no" --> onet["This needs a connection<br>OQ-22<br>HH-03, SYNC-03"]
     net -- "yes" --> check{"Link valid?"}
     check -- "expired, used or revoked" --> bad["Message saying so; joins nothing<br>HH-03"]
     check -- "valid" --> other{"Already in<br>another household?"}
@@ -163,16 +165,14 @@ flowchart TD
     open["Open list"] -- "Rename (creator or shared with me)" --> rn{"New name empty?"}
     rn -- "yes" --> rnerr["Old name kept, field error<br>LIST-03"]
     rn -- "no" --> renamed["New name shown everywhere, also to members<br>LIST-03, OQ-3"]
-    open -- "Delete (creator or shared with me)" --> del["Confirm, undo or both: OQ-10<br>LIST-04"]
-    del -- "cancel or undo" --> open
+    open -- "Delete (creator or shared with me)" --> del["Confirm, naming the list and its items<br>LIST-04, OQ-10"]
+    del -- "cancel" --> open
     del -- "final" --> dgone["List and items gone, also for members<br>LIST-04"] --> lists
     open -- "Share with household (creator, private list)" --> inhh{"In a household?"}
-    inhh -- "no" --> hstep["Proposed, OQ-20: household step, create or join, then back here<br>(or a household made automatically)<br>VIS-02, OQ-1"]
-    hstep -- "in a household" --> sconfirm
-    hstep -- "gave up" --> open
-    inhh -- "yes" --> sconfirm["Confirm sharing this one list<br>VIS-02"]
+    inhh -- "no" --> hstep["Share disabled: you need a household to share<br>VIS-02, OQ-20"]
+    inhh -- "yes" --> sconfirm["Confirm sharing this one list; needs a connection<br>VIS-02, OQ-22"]
     sconfirm -- "confirm" --> shared["Shared: every member sees it in Lists<br>VIS-02, VIS-03"]
-    shared -- "Stop sharing (creator only)" --> stop["Confirm<br>VIS-04"]
+    shared -- "Stop sharing (creator only)" --> stop["Confirm; needs a connection<br>VIS-04, OQ-22"]
     stop -- "cancel" --> shared
     stop -- "confirm" --> private["Private to the creator with all items; members lose it<br>VIS-04, OQ-2, OQ-4"]
 ```
@@ -190,7 +190,7 @@ tests):
 
 ```mermaid
 flowchart TD
-    open["Open list<br>ITEM-05<br>plain: by name; collection: by release year, then name"] -- "Add item" --> input["Name; in a collection list also optional<br>release year and re-release year<br>ITEM-01"]
+    open["Open list, progress at the top<br>ITEM-05, OQ-9<br>plain: by name; collection: by release year, then name"] -- "Add item" --> input["Name; in a collection list also optional<br>release year and re-release year<br>ITEM-01"]
     input -- "confirm" --> iname{"Name empty?"}
     iname -- "yes" --> noadd["No item added<br>ITEM-01"] --> input
     iname -- "no, plain list" --> added
@@ -202,20 +202,18 @@ flowchart TD
     edit -- "name cleared" --> keep["Old name kept, error<br>ITEM-02"]
     edit -- "year cleared" --> noyear["Item has no such year<br>ITEM-02"]
     edit -- "valid" --> saved["Saved, shown to members too<br>ITEM-02"]
-    open -- "Remove item" --> rem["Confirm, undo or both: OQ-10<br>ITEM-03"]
-    rem -- "cancel or undo" --> open
-    rem -- "final" --> rgone["Item gone<br>ITEM-03"]
-    open -- "Tap checkbox" --> toggle["I have it: checked or unchecked, kept offline too<br>ITEM-04, OQ-7"]
+    open -- "Remove item" --> rgone["Item gone at once; Undo for 10 seconds<br>ITEM-03, OQ-10"]
+    rgone -- "Undo" --> open
+    open -- "Tap checkbox" --> toggle["I have it: checked or unchecked, stays in place, kept offline too<br>ITEM-04, OQ-7"]
+    open -- "Show only missing" --> missing["Only unchecked items<br>ITEM-05, OQ-8"]
 ```
 
-Item order is set by the list type (ITEM-05; items without a release year: OQ-33). Duplicate item names (OQ-11), a
-"show only missing" filter and search (OQ-8), and progress such as
-"12 of 30" (OQ-9) are not in this flow; the Open list screen shows all items (ITEM-05).
+Item order is set by the list type (ITEM-05; items without a release year last, OQ-33). Duplicate item names (OQ-11)
+are not in this flow; there is no search or manual order in v1 (OQ-8).
 
 ## 6. Offline and sync
 
-The user does nothing to sync (SYNC-01). Whether the app shows the offline and waiting states is OQ-14; the states below
-exist either way.
+The user does nothing to sync (SYNC-01). A small banner shows the offline and waiting states (OQ-14).
 
 ```mermaid
 stateDiagram-v2
@@ -233,9 +231,9 @@ stateDiagram-v2
     note right of Offline
         Needs a connection, SYNC-03:
         first sign-in, create account, verify,
-        reset password, join, create invite.
-        Opening an invite link: proposed, OQ-22.
-        Others: OQ-22. Offline banner: OQ-14.
+        reset or change password, invite link, join,
+        household actions, create invite, share
+        and stop sharing (OQ-22). Banner: OQ-14.
     end note
 ```
 
@@ -263,7 +261,7 @@ flowchart TD
     picked -- "no" --> phone{"Phone set to Danish?<br>LANG-01"}
     phone -- "yes" --> da["Danish, also plurals"]
     phone -- "no" --> en["English"]
-    switch["Switch language: in the app or Android per-app setting, OQ-12"] --> back["Back in the app: every screen in the new language,<br>lists unchanged, no reinstall<br>LANG-02"]
+    switch["Switch language: Android per-app language setting only, OQ-12"] --> back["Back in the app: every screen in the new language,<br>lists unchanged, no reinstall<br>LANG-02"]
     use --> names["List and item names shown as typed, never translated<br>LANG-01"]
     da --> names
     en --> names
@@ -291,7 +289,7 @@ flowchart LR
         m3["Leave your household first<br>HH-03"]
         m4["Item was removed by someone else<br>SYNC-02"]
         m5["List no longer available<br>SYNC-02"]
-        m6["Household deleted, your lists are private again<br>HH-06"]
+        m6["Dialog: household deleted, your lists are private again<br>HH-06"]
         m7["Wrong email or password; too many tries, try again later<br>AUTH-07, AUTH-09"]
         m8["If an account exists, we sent an email<br>AUTH-08"]
         m9["Email not verified yet<br>AUTH-06"]
@@ -308,8 +306,8 @@ Every v1 story appears in at least one diagram above. Each row lists every story
 
 | Section | Stories |
 |---|---|
-| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-10, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03, LANG-02 |
-| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, HH-03, HH-06, LIST-01, VIS-01, SYNC-03 |
+| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03 |
+| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, HH-03, HH-06, LIST-01, VIS-01, SYNC-03 |
 | 3. Household | AUTH-01, AUTH-05, AUTH-06, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, VIS-02, SYNC-03 |
 | 4. Lists and sharing | LIST-01, LIST-02, LIST-03, LIST-04, VIS-01, VIS-02, VIS-03, VIS-04 |
 | 5. Items | ITEM-01, ITEM-02, ITEM-03, ITEM-04, ITEM-05 |
@@ -317,16 +315,15 @@ Every v1 story appears in at least one diagram above. Each row lists every story
 | 7. Language | LANG-01, LANG-02 |
 | 8. Empty and error states | AUTH-01, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, HH-01, HH-03, HH-06, LIST-01, LIST-02, LIST-03, ITEM-01, ITEM-02, ITEM-05, SYNC-02, SYNC-03, LANG-01 |
 
-The open questions that block M0.5-03 stay open and are only marked where they plug in: OQ-8, OQ-9 (sections 1 and
-5), OQ-10 (sections 4 and 5), OQ-14 (section 6) and OQ-20 (section 4).
+The questions that blocked M0.5-03 (OQ-8, OQ-9, OQ-10, OQ-14, OQ-20) are decided and drawn in sections 1 and 4 to 6.
 
 ## 10. New open questions
 
-Found while drawing the flow; for the owner to decide (the collaborator may advise). Ids continue the numbering of
+Found while drawing the flow; all three decided by the owner on 2026-11-16 (issue #15). Ids continue the numbering of
 [stories section 11](stories.md#11-open-questions).
 
-| Id | Question | Recommendation (planner; the owner decides) | Stories | Blocks |
+| Id | Question | Decision (owner, 2026-11-16) | Stories | Blocks |
 |---|---|---|---|---|
-| OQ-20 | A user who is not in a household taps "Share with household": does the app show a household step (create one with a name, or join with a link) and then share, or create a household for them behind the scenes (OQ-1 leaves this to M1/M2)? | The household step, drawn in section 4 as *proposed*: HH-01 needs a name, a household made behind the scenes would need a made-up one, and the step tells the user who will see the list. | VIS-02, HH-01 | M0.5-03 (whether the household step is a screen), M1/M2 planning |
-| OQ-21 | An invite link opened on a phone without the app: open the Play Store page and ask the person to open the link again after installing? (Firebase Dynamic Links is shut down and there are no Cloud Functions, so the link may not survive the install.) | Yes: the link's web page says "install Tally, then tap this link again" and links to the Play Store; no deferred link in v1. | HH-02, HH-03 | M1/M2 planning |
-| OQ-22 | Besides first sign-in, joining and creating an invite (SYNC-03): do opening an invite link, leaving, removing a member, transferring ownership, deleting the household, sharing, stopping sharing and deleting the account also need a connection, or may some wait offline and be sent later? | All need a connection in v1, with the SYNC-03 message: they change who can see what, the invite and the household name are only on the server, and deleting the account may need a recent sign-in. Drawn as *proposed* for opening an invite link (section 3). | SYNC-03, HH-03, HH-05, HH-06, VIS-02, VIS-04, AUTH-04 | M1/M2 planning |
+| OQ-20 | A user who is not in a household taps "Share with household": does the app show a household step (create one with a name, or join with a link) and then share, or create a household for them behind the scenes (OQ-1 leaves this to M1/M2)? | **Decided, differs from the recommendation:** in v1 "Share with household" is disabled with a message; the household step comes after v1. | VIS-02, HH-01 | M0.5-03 (whether the household step is a screen), M1/M2 planning |
+| OQ-21 | An invite link opened on a phone without the app: open the Play Store page and ask the person to open the link again after installing? (Firebase Dynamic Links is shut down and there are no Cloud Functions, so the link may not survive the install.) | **Decided:** yes, a simple web page; its hosting and subdomain are an open owner item. | HH-02, HH-03 | M1/M2 planning |
+| OQ-22 | Besides first sign-in, joining and creating an invite (SYNC-03): do opening an invite link, leaving, removing a member, transferring ownership, deleting the household, sharing, stopping sharing and deleting the account also need a connection, or may some wait offline and be sent later? | **Decided:** household, invite and sharing actions need a connection ("This needs a connection"); list and item changes work offline. | SYNC-03, HH-03, HH-05, HH-06, VIS-02, VIS-04, AUTH-04 | M1/M2 planning |
