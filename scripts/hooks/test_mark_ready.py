@@ -1,8 +1,11 @@
 """scripts/mark-ready.sh is the only thing the project permission rule lets agents run to mark a PR ready.
-It must accept exactly one PR number and make exactly one fixed call. A fake `gh` on PATH records what the wrapper would run.
+It must accept exactly one PR number and make exactly one fixed call. A fake `gh` records what the wrapper would run: the wrapper finds `gh` only in
+the fixed directories on its `gh_dirs=` line (never through PATH, R5-03), so the tests run a copy of the real file whose `gh_dirs=` line points to a
+temporary directory holding the fake. A decoy `gh` earlier in PATH must never be used.
 Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -20,20 +23,42 @@ FAKE_GH = (
 )
 
 
+GH_DIRS_LINE = re.compile(r'(?m)^gh_dirs="[^"\n]*"$')
+
+
+def read_wrapper():
+    with open(WRAPPER, encoding="utf-8") as f:
+        return f.read()
+
+
 class MarkReady(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.out = os.path.join(self.tmp.name, "gh.out")
-        gh = os.path.join(self.tmp.name, "gh")
-        with open(gh, "w", encoding="utf-8") as f:
-            f.write(FAKE_GH)
-        os.chmod(gh, 0o755)
+        self.fixed = os.path.join(self.tmp.name, "fixed")  # the only directory the copy looks in for gh
+        self.decoy = os.path.join(self.tmp.name, "decoy")  # first in PATH, must never be used
+        self.decoy_out = os.path.join(self.tmp.name, "decoy.out")
+        for d, body in [(self.fixed, FAKE_GH), (self.decoy, FAKE_GH.replace("$FAKE_GH_OUT", self.decoy_out))]:
+            os.makedirs(d)
+            with open(os.path.join(d, "gh"), "w", encoding="utf-8") as f:
+                f.write(body)
+            os.chmod(os.path.join(d, "gh"), 0o755)
 
-    def run_wrapper(self, *args, env=None):
-        e = {"PATH": self.tmp.name + os.pathsep + "/usr/bin:/bin", "FAKE_GH_OUT": self.out}
+    def copy_with_gh_dirs(self, dirs):
+        """A copy of the real wrapper whose gh_dirs line is replaced; fails if the real file has no such single line."""
+        src = read_wrapper()
+        self.assertEqual(len(GH_DIRS_LINE.findall(src)), 1, 'scripts/mark-ready.sh needs exactly one line: gh_dirs="<absolute dirs>"')
+        path = os.path.join(self.tmp.name, "mark-ready-copy.sh")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{dirs}"', src))
+        return path
+
+    def run_wrapper(self, *args, env=None, dirs=None):
+        e = {"PATH": self.decoy + os.pathsep + "/usr/bin:/bin", "FAKE_GH_OUT": self.out}
         e.update(env or {})
-        p = subprocess.run(["bash", WRAPPER, *args], capture_output=True, text=True, env=e, cwd=ROOT, timeout=30)
+        script = self.copy_with_gh_dirs(self.fixed if dirs is None else dirs)
+        p = subprocess.run(["bash", script, *args], capture_output=True, text=True, env=e, cwd=ROOT, timeout=30)
         called = os.path.exists(self.out)
         return p, called
 
@@ -84,8 +109,46 @@ class MarkReady(unittest.TestCase):
             src = f.read()
         for bad in ['"$@"', "$*", "merge", "PUT", "DELETE", "--input", "--hostname", "eval ", "-H "]:
             self.assertNotIn(bad, src, bad)
-        self.assertEqual(src.count("gh api"), 1)
+        self.assertEqual(src.count("api -X POST"), 1)
+        self.assertEqual(len(re.findall(r'exec "\$d/gh" api -X POST "repos/bondo/listicles2/pulls/\$\{n\}/ccr/ready_for_review"', src)), 1)
         self.assertIn("repos/bondo/listicles2/pulls/", src)
+
+    def test_a_decoy_gh_earlier_in_path_is_not_used(self):
+        """R5-03: `gh` is resolved in fixed directories, not through PATH, so a shim planted in a PATH directory cannot run."""
+        p, called = self.run_wrapper("7")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertTrue(called, "the gh in the fixed directory must run")
+        self.assertFalse(os.path.exists(self.decoy_out), "the decoy gh earlier in PATH must not run")
+
+    def test_without_gh_in_the_fixed_directories_it_fails_and_never_falls_back_to_path(self):
+        empty = os.path.join(self.tmp.name, "empty")
+        os.makedirs(empty)
+        p, called = self.run_wrapper("7", dirs=empty)
+        self.assertNotEqual(p.returncode, 0)
+        self.assertFalse(called)
+        self.assertFalse(os.path.exists(self.decoy_out), "no fallback to a gh found through PATH")
+        self.assertIn("gh", p.stderr)
+
+    def test_gh_itself_runs_with_a_fixed_path(self):
+        probe = os.path.join(self.fixed, "gh")
+        with open(probe, "w", encoding="utf-8") as f:
+            f.write('#!/bin/sh\nprintf "%s" "$PATH" > "$FAKE_GH_OUT"\n')
+        p, called = self.run_wrapper("7")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        with open(self.out, encoding="utf-8") as f:
+            path = f.read()
+        self.assertNotIn(self.decoy, path)
+        self.assertTrue(path and all(os.path.isabs(d) for d in path.split(":")), path)
+
+    def test_source_fixes_the_interpreter_and_the_gh_directories(self):
+        src = read_wrapper()
+        self.assertEqual(src.splitlines()[0], "#!/bin/bash", "no `env` lookup of bash through PATH")
+        dirs = GH_DIRS_LINE.findall(src)
+        self.assertEqual(len(dirs), 1)
+        listed = dirs[0].split('"')[1].split()
+        self.assertTrue(listed and all(os.path.isabs(d) and not d.startswith(("/home", "/root", "/tmp")) for d in listed), listed)
+        for bad in ["command -v", "which ", "type -p", "env bash", "exec gh", "\ngh "]:
+            self.assertNotIn(bad, src, bad)
 
 
 if __name__ == "__main__":
