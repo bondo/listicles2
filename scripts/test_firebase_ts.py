@@ -32,6 +32,10 @@ NPM = "bash -c 'cd firebase && npm {} --silent'"
 VERIFY = [NPM.format(c) for c in ("ci", "run typecheck", "run lint", "run format:check")] + ["python3 -I scripts/test_firebase_ts.py", NPM.format("test")]
 CI = ["npm ci --silent", "npm run typecheck --silent", "npm run lint --silent", "npm run format:check --silent", "npm test --silent"]
 CI_ROOT_CMD = "python3 -I scripts/test_firebase_ts.py"
+# Dependabot ignores semver-major updates of these npm packages in /firebase, and nothing else. Reasons: TypeScript 7 is not
+# supported by ts-jest or typescript-eslint; firebase 13 cannot resolve against @firebase/rules-unit-testing 5.0.0 (peer
+# firebase ^12.0.0); @types/node 26 declares APIs that the Node 22 used in CI lacks.
+MAJOR_IGNORED = ("typescript", "firebase", "@types/node")
 # tsconfig compilerOptions allowlist: anything else (skipLibCheck, strict: false, a lone strict flag turned off) is a problem.
 TS_OPTIONS = {"target", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns"}
 CLEAN_TS = 'export function add(a: number, b: number): number {\n    return a + b;\n}\n'
@@ -91,14 +95,23 @@ def ordered(text, commands):
     return True
 
 
-def dependabot_ignores_typescript_major(cfg):
-    """True if the npm entry for /firebase ignores semver-major updates of typescript."""
-    for entry in cfg.get("updates", []):
-        if entry.get("package-ecosystem") == "npm" and entry.get("directory") == "/firebase":
-            for rule in entry.get("ignore", []):
-                if rule.get("dependency-name") == "typescript" and "version-update:semver-major" in rule.get("update-types", []):
-                    return True
-    return False
+def dependabot_ignore_problems(cfg, names=MAJOR_IGNORED):
+    """Problems with the ignore rules of the npm entry for /firebase: each of `names` must be ignored for semver-major updates
+    only (so minor and patch bumps still arrive), and no other package may be ignored."""
+    entries = [e for e in cfg.get("updates", []) if e.get("package-ecosystem") == "npm" and e.get("directory") == "/firebase"]
+    if len(entries) != 1:
+        return [f"expected one npm entry for /firebase, found {len(entries)}"]
+    problems = []
+    seen = []
+    for rule in entries[0].get("ignore", []):
+        name = rule.get("dependency-name")
+        seen.append(name)
+        if name not in names:
+            problems.append(f"{name} must not be ignored")
+        elif rule != {"dependency-name": name, "update-types": ["version-update:semver-major"]}:
+            problems.append(f"{name} must be ignored for semver-major updates only, got {rule}")
+    problems += [f"{name} has no ignore rule" for name in names if name not in seen]
+    return problems
 
 
 def tsconfig_problems(cfg):
@@ -179,16 +192,33 @@ class HelperNegativeCases(unittest.TestCase):
         self.assertFalse(ordered("step a one\n", ["one", "two"]))
 
     def test_dependabot_check_rejects_a_missing_wrong_or_misplaced_ignore(self):
-        def cfg(eco="npm", directory="/firebase", name="typescript", types=("version-update:semver-major",)):
-            ignore = [{"dependency-name": name, "update-types": list(types)}]
-            return {"updates": [{"package-ecosystem": eco, "directory": directory, "ignore": ignore}]}
+        major = "version-update:semver-major"
 
-        self.assertTrue(dependabot_ignores_typescript_major(cfg()))
-        bad = {"no ignore": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]}, "other package": cfg(name="eslint"),
-               "minor only": cfg(types=("version-update:semver-minor",)), "other directory": cfg(directory="/"), "other ecosystem": cfg(eco="pip")}
+        def rule(name, types=(major,)):
+            return {"dependency-name": name, "update-types": list(types)}
+
+        def cfg(rules, eco="npm", directory="/firebase"):
+            return {"updates": [{"package-ecosystem": eco, "directory": directory, "ignore": rules}]}
+
+        full = [rule(n) for n in MAJOR_IGNORED]
+        self.assertEqual(dependabot_ignore_problems(cfg(full)), [])
+        bad = {
+            "no ignore": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]},
+            "typescript missing": cfg(full[1:]),
+            "firebase missing": cfg([full[0], full[2]]),
+            "@types/node missing": cfg(full[:2]),
+            "extra package": cfg([*full, rule("eslint")]),
+            "minor only": cfg([rule("typescript"), rule("firebase", ("version-update:semver-minor",)), rule("@types/node")]),
+            "major and minor": cfg([rule("typescript"), rule("firebase", (major, "version-update:semver-minor")), rule("@types/node")]),
+            "patch only": cfg([rule("typescript"), rule("firebase"), rule("@types/node", ("version-update:semver-patch",))]),
+            "all updates ignored": cfg([rule("typescript"), rule("firebase"), {"dependency-name": "@types/node"}]),
+            "version ignore": cfg([*full[:2], {"dependency-name": "@types/node", "versions": [">=26"]}]),
+            "other directory": cfg(full, directory="/"),
+            "other ecosystem": cfg(full, eco="pip"),
+        }
         for name, c in bad.items():
             with self.subTest(name):
-                self.assertFalse(dependabot_ignores_typescript_major(c))
+                self.assertNotEqual(dependabot_ignore_problems(c), [])
 
     def test_tsconfig_allowlist_rejects_every_weakening(self):
         good = {
@@ -266,8 +296,8 @@ class Config(unittest.TestCase):
             self.assertIn(case, text, case)
         self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
 
-    def test_dependabot_ignores_typescript_majors_for_the_firebase_directory(self):
-        self.assertTrue(dependabot_ignores_typescript_major(yaml.safe_load(read(".github", "dependabot.yml"))))
+    def test_dependabot_ignores_only_the_major_updates_of_typescript_firebase_and_types_node_in_firebase(self):
+        self.assertEqual(dependabot_ignore_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
 
     def test_fixture_directories_are_gitignored(self):
         self.assertIn("firebase/fixture-tmp-*/", active_lines(read(".gitignore")))

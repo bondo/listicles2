@@ -3,7 +3,7 @@
 # Docs/scripts/hooks/CI/firebase-only pushes skip Gradle (scripts/hooks/prepush_scope.py decides; unknown means build).
 cd "$(git rev-parse --show-toplevel)" || exit 1
 # Pushing from a linked worktree exports GIT_DIR and friends; the guards and tests below must not inherit them (R11-51).
-unset $(git rev-parse --local-env-vars)
+while read -r v; do unset "$v"; done < <(git rev-parse --local-env-vars)
 scope=$(python3 -I scripts/hooks/prepush_scope.py)  # reads the pre-push stdin
 echo "pre-push: scope=$scope"
 ./scripts/guards.sh || exit 1
