@@ -595,6 +595,25 @@ seen the batch report.
   (3) **Closing keywords:** never write close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly
   before an issue number in a commit or PR body unless closing that issue is intended; write "gated on #N", "see #N" or
   "mark #N done" instead. Scan the PR body for them before asking the owner to merge.
+* **Marking a PR ready:** the orchestrator (or the implementer session when the orchestrator says so) marks a draft PR ready after
+  clean review rounds with `scripts/mark-ready.sh <N>`. Reviewers never mark PRs ready. The script accepts exactly one argument,
+  the PR number as digits only, and makes one fixed POST to the `ready_for_review` route of this repo; it refuses anything else
+  before `gh` runs. The project `.claude/settings.json` pre-allows exactly one rule for it, `Bash(scripts/mark-ready.sh *)`, and
+  no rule for raw `gh` commands, because `*` in a rule also matches spaces and slashes, so a raw rule could be steered to another
+  route (a merge, say). The auto-mode classifier may still evaluate the call on its own, so the rule is not a guarantee.
+  The allow rule approves any command that starts with the script's path, so the PreToolUse guard also treats every file named
+  `mark-ready.sh` as a process file and checks the command's first word (also after unquoting, and writes to such names): if it names `mark-ready.sh`, the command is allowed only as
+  the **whole command**, exactly `scripts/mark-ready.sh <N>` and nothing before, after or beside it (no `;`, `&&`, `||`, `|`, `&`,
+  newline, group, subshell, `cd`, env prefix, wrapper, redirect or substitution), from the project root, and only while
+  the script is a regular file, not a symlink, whose SHA-256 equals the pin in the guard, because edits that never name the file
+  (`sed -i scripts/*.sh`, `cp -t scripts`) cannot all be caught. The hash is taken before the command runs, so a compound could
+  rewrite the script after it (R4-01). Residual risks the owner accepts: a background process started by an earlier tool call can still
+  swap the file between the hash and the `exec`; the guard is loaded from the working tree, so a branch switch replaces guard and pin
+  (owner review of the branch is the control); the auto-mode classifier and Claude Code's matcher semantics cannot be tested here. Interpreter forms such as `bash scripts/mark-ready.sh N` do not match
+  the allow rule and go to the normal permission check. The script finds neither `bash` nor `gh` through `PATH` (R5-03: `#!/bin/bash`, fixed `gh` directories). A legitimate edit of the script updates the pin in the same tooling PR.
+  Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
+  tooling-session change (CODEOWNERS covers `/.claude/` and `/scripts/`); `scripts/hooks/test_settings_permissions.py` and
+  `scripts/hooks/test_mark_ready.py` fail if the list holds anything else or the script accepts anything but a PR number.
 * **Strict up-to-date merge procedure:** `main` requires branches to be up to date, so merge one PR at a time. After each
   owner merge, the **orchestrator** updates the next ready PR with `update_pull_request_branch`, passing `expectedHeadSha`
   set to its current head, waits about 4 minutes for CI, and only then tells the owner it is ready. This is the single

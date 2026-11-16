@@ -18,11 +18,13 @@ Best effort by nature (shell is expressive). CODEOWNERS and branch protection ar
 Fails closed: an unparseable command that mentions git or a protected path is denied.
 """
 
+import hashlib
 import json
 import os
 import fnmatch
 import re
 import shlex
+import stat
 import subprocess
 import sys
 
@@ -35,11 +37,25 @@ PROTECTED = (
     ".githooks/",
     "scripts/guards.sh",
     "scripts/install-hooks.sh",
+    "scripts/mark-ready.sh",  # the project allow rule approves this path; see MARK_READY below
     "scripts/hooks/",
     ".tools/",  # linter binaries that the allow rules in .claude/settings.json run
     "scripts/install_linters.sh",
     "scripts/linters.pins",
 )
+# The allow rule `Bash(scripts/mark-ready.sh *)` approves any command that starts with that text. So: a file with this name is a process
+# file in every directory, and a command that runs one is allowed only as exactly `scripts/mark-ready.sh <PR number>` from the project root.
+# Writes to the file cannot all be caught by name (sed -i scripts/*.sh, cp -t scripts, tar, git apply), so its content is checked when it runs:
+# the wrapper must be a regular file, not a symlink, with exactly this SHA-256. A legitimate edit of the wrapper updates this pin in the same
+# reviewed tooling PR (test_guard_mark_ready.py fails until it does).
+MARK_READY_SHA256 = "31dadb519381aa1754aad85588e06bd23bd4086f11889ceda3b5549d3958879a"
+MARK_READY = "mark-ready.sh"
+MARK_READY_CALL = "scripts/mark-ready.sh"
+PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")
+# R5-02: a word that names the wrapper, also after unquoting (`scripts/mark-ready.sh\\ 1` is one word): a path component that is exactly
+# mark-ready.sh, then whitespace, a slash or the end. Names such as mark-ready.sh.md or xmark-ready.sh do not match.
+WRAPPER_WORD = re.compile(r"(^|/)" + re.escape(MARK_READY) + r"(\s|/|$)")
+WHOLE_CALL = re.compile(re.escape(MARK_READY_CALL) + r" [1-9][0-9]{0,5}")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -47,7 +63,7 @@ ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash"}
 INTERPRETERS = re.compile(r"^(python[0-9.]*|node|nodejs|ruby|perl|php|deno|bun)$")
 RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for", "in", "case", "esac", "!", "{", "}", "function",
-            "select"}
+            "select", "coproc"}
 # name -> (options that take a value, number of leading positional arguments to skip)
 WRAPPERS = {
     "env": ({"-u", "-C", "--unset", "--chdir", "-S", "--split-string"}, 0),
@@ -154,6 +170,8 @@ def protection(path, cwd):
     """'always' (git internals), 'process' (process files) or None."""
     if not path:
         return None
+    if WRAPPER_WORD.search(path):
+        return "process"
     proj = os.environ.get("CLAUDE_PROJECT_DIR")
     if proj:
         path = path.replace("${CLAUDE_PROJECT_DIR}", proj).replace("$CLAUDE_PROJECT_DIR", proj)
@@ -711,6 +729,8 @@ def unwrap(words):
             continue
         if w in RESERVED:
             i += 1
+            if w in ("function", "coproc") and i + 1 < len(words) and (w == "function" or words[i + 1] in ("{", "(")):
+                i += 1  # `function NAME {` and `coproc NAME {`: the name is not the command (R5-01)
             continue
         base = os.path.basename(w)
         if base == "script":  # script -qc 'cmd' /dev/null runs cmd
@@ -867,6 +887,39 @@ def check_literals(code, state, depth):
         check_command_string(c, child(state), depth + 1)
 
 
+def wrapper_is_pinned(root):
+    """R3-01: scripts/ is not a symlink, the wrapper is a regular file (not a symlink), and its SHA-256 is the pinned one."""
+    scripts = os.path.join(root, "scripts")
+    path = os.path.join(scripts, MARK_READY)
+    try:
+        if os.path.islink(scripts) or not stat.S_ISREG(os.lstat(path).st_mode):
+            return False
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest() == MARK_READY_SHA256
+    except OSError:
+        return False
+
+
+def check_mark_ready(cmd, assigns, words, wrappers, state):
+    """R2-01/R2-02/R3-01/R4-01: the exact call only, as the whole command, of the pinned wrapper. Raw words are judged, so $(...), backticks,
+    $VAR, globs and braces never pass the digit check. Runs when the command's first word is a mark-ready.sh; `bash scripts/mark-ready.sh N`
+    is not matched by the allow rule."""
+    here = os.path.realpath(state["cwd"])
+    # R4-01: the hash below is taken before anything else in the line runs
+    if WHOLE_CALL.fullmatch(state.get("whole", "").strip(" \t\n")) is None:
+        deny("run the PR marker only as the whole command, exactly `scripts/mark-ready.sh <PR number>`: nothing before, after or beside it "
+             "(no ; && || | & newline, group, subshell, wrapper or nesting), because the guard checks the script before the rest of the line runs")
+    exact = (words[0] == MARK_READY_CALL and len(words) == 2 and PR_NUMBER.fullmatch(words[1]) is not None
+             and not assigns and not wrappers and not (cmd.writes or cmd.heredocs or cmd.subs)
+             and state["known"] and here in project_roots(state["cwd"]))
+    if not exact:
+        deny("run the PR marker only as exactly `scripts/mark-ready.sh <PR number>` from the project root: no other path, no cd or env prefix, "
+             "no wrapper, redirect or substitution (the project allow rule approves that text, so the guard narrows it)")
+    if not wrapper_is_pinned(here):
+        deny("scripts/mark-ready.sh is missing, a symlink, or not the pinned version (SHA-256 in pretooluse_guard.py MARK_READY_SHA256); "
+             "only a tooling session may change the wrapper, together with the pin")
+
+
 def check_simple(cmd, state, depth):
     for t in cmd.writes:
         guard_target(expand(t, state), state, "redirect to")
@@ -875,6 +928,9 @@ def check_simple(cmd, state, depth):
         check_assign(a)
     for s in nested:
         check_command_string(s, child(state), depth + 1)
+    if words and WRAPPER_WORD.search(words[0]):
+        check_mark_ready(cmd, assigns, words, wrappers, state)
+        return
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values
             name, val = a.split("=", 1)
@@ -927,6 +983,10 @@ def check_simple(cmd, state, depth):
     if prog == "eval":
         check_command_string(" ".join(args), child(state), depth + 1)
         return
+    if prog == "trap":  # the first non-option argument is a command string the shell runs later (R5-01)
+        for body in [a for a in args if not a.startswith("-")][:1]:
+            check_command_string(body, child(state), depth + 1)
+        return
     if prog == "find":
         j = 0
         while j < len(args):
@@ -967,7 +1027,9 @@ def guard_target(path, state, what="write to"):
 
 
 def check_bash(command, cwd):
-    check_command_string(command, {"cwd": cwd, "known": True, "vars": {}})
+    if re.search(re.escape(MARK_READY) + r"\\\r?\n", command):  # R5-02: `mark-ready.sh\<newline>1` joins to a different word; never judge it
+        deny("a line continuation right after mark-ready.sh is not allowed; write exactly `scripts/mark-ready.sh <PR number>`")
+    check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command})
 
 
 def main():
