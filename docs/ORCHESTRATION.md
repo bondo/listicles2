@@ -298,7 +298,7 @@ The orchestrator logs drift in the state issue and hands it to the next implemen
 
 **CI gate (#92).** CI job `tasks` runs `scripts/check_owner_drift.sh`, which feeds the repo's issues and merged PRs to
 `tasks.py drift --check`. It fails when an owner task is `todo` while a linked issue is closed (any reason) or its `pr` is
-merged. Agent tasks and the follow-up rules are not part of it (they stay in plain `drift`). The issue query is narrowed to closed `owner-todo` issues. A GitHub read error, `incomplete_results=true` or more than 1000 search results fail the
+merged. Agent tasks and the follow-up rules are not part of it (they stay in plain `drift`). The issue query takes all issues (open ones too, and no label filter: tasks link by number or title). A GitHub read error, `incomplete_results=true` or more than 1000 search results fail the
 check, as "could not look" is not "no drift". The fix is a PR that sets the row to `done` (or `dropped` with a note). A
 confirmation given only in chat or as a #15 comment has no issue to close, so the check cannot see it: that is the
 orchestrator's wake step in §4.5.

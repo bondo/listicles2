@@ -44,9 +44,10 @@ for page in json.load(open(path)):
 PY
 }
 
-# Only closed owner issues can drift (an open or unlabelled issue never fails the gate), which keeps the list far below the cap.
-fetch "repo:$REPO is:issue is:closed label:owner-todo" "$TMP/issues.json" || exit 1
-complete "$TMP/issues.json" "closed owner-todo issues" || exit 1
+# All issues, not only labelled ones: owner issues are linked by `issue = N` or by title and the label is not relied on
+# (#12-#14 never had it), and tasks.py needs the open issues too (an open one wins over a closed duplicate).
+fetch "repo:$REPO is:issue" "$TMP/issues.json" || exit 1
+complete "$TMP/issues.json" "issues" || exit 1
 fetch "repo:$REPO is:pr is:merged" "$TMP/prs.json" || exit 1
 complete "$TMP/prs.json" "merged PRs" || exit 1
 
