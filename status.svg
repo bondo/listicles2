@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1494" viewBox="0 0 880 1494" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 27/32; M1 Accounts and households 0/10; M2 Inventory lists 0/0; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/0), 2 PRs waiting, 3 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1494" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1516" viewBox="0 0 880 1516" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 27/32; M1 Accounts and households 0/10; M2 Inventory lists 0/0; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/0), 2 PRs waiting, 4 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1516" class="bg"/>
 <text x="24" y="36" class="fg t">Listicles status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-16 17:23 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-16 17:58 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 16. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -122,21 +122,24 @@
 <text x="856" y="1302" class="muted s" text-anchor="end">open PRs that are not drafts</text>
 <line x1="24" y1="1310" x2="856" y2="1310" class="rule"/>
 <text x="24" y="1334" class="fg h">#97</text>
-<text x="80" y="1334" class="fg">build(deps): Bump actions/setup-java from 4 to 5</text>
-<text x="856" y="1334" class="bad" text-anchor="end">CI failing</text>
+<text x="80" y="1334" class="fg">build(deps): Bump actions/setup-java from 4.9.1 to 6.2.0</text>
+<text x="856" y="1334" class="ok" text-anchor="end">CI passing</text>
 <text x="24" y="1356" class="fg h">#104</text>
 <text x="80" y="1356" class="fg">build(deps-dev): Bump the npm-minor-patch group across 1…</text>
 <text x="856" y="1356" class="bad" text-anchor="end">CI failing  behind main</text>
 <text x="24" y="1390" class="fg h">BLOCKERS</text>
-<text x="856" y="1390" class="muted s" text-anchor="end">3 open</text>
+<text x="856" y="1390" class="muted s" text-anchor="end">4 open</text>
 <line x1="24" y1="1398" x2="856" y2="1398" class="rule"/>
-<text x="24" y="1422" class="warn">task</text>
-<text x="120" y="1422" class="fg h">M0.5-FU</text>
-<text x="190" y="1422" class="fg">waits on M0.5-03, M0.5-26</text>
+<text x="24" y="1422" class="info">PR to merge</text>
+<text x="120" y="1422" class="fg h">#97</text>
+<text x="190" y="1422" class="fg">build(deps): Bump actions/setup-java from 4.9.1 to 6.2.0</text>
 <text x="24" y="1444" class="warn">task</text>
-<text x="120" y="1444" class="fg h">M0.5-O1</text>
-<text x="190" y="1444" class="fg">waits on M0.5-03</text>
+<text x="120" y="1444" class="fg h">M0.5-FU</text>
+<text x="190" y="1444" class="fg">waits on M0.5-03, M0.5-26</text>
 <text x="24" y="1466" class="warn">task</text>
-<text x="120" y="1466" class="fg h">M0.5-26</text>
+<text x="120" y="1466" class="fg h">M0.5-O1</text>
 <text x="190" y="1466" class="fg">waits on M0.5-03</text>
+<text x="24" y="1488" class="warn">task</text>
+<text x="120" y="1488" class="fg h">M0.5-26</text>
+<text x="190" y="1488" class="fg">waits on M0.5-03</text>
 </svg>
