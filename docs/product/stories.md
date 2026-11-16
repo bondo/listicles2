@@ -276,7 +276,7 @@ These are constraints for the data model and screens; v1 builds none of them (M2
 
 Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the stories above follow them.
 
-**Labels for the M1 strings** (decided): the re-release year is "re-release year" in English and "Genudgivelse" in Danish
+**Labels for the M1 strings** (decided): the re-release year is "re-release year" in English and "Genudgivelsesår" in Danish
 (OQ-19).
 
 | Id | Decision (owner, 2026-11-15 unless marked) | Stories |
@@ -288,7 +288,7 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-5 | **Decided:** in v1 everything a person created goes with them when they leave the household, are removed, or delete their account, including the shared lists they created (the other members lose those lists). Later the leaver chooses per shared list whether it stays (section 9). | AUTH-04, HH-05, HH-06 |
 | OQ-6 | **Decided:** the year is optional, valid from 1900 to the current year plus 50. An item can have two years: the original release year and, optionally, a re-release year (rules between them: OQ-19). | ITEM-01, ITEM-02, ITEM-05 |
 | OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes what they created with them. | AUTH-04, HH-05, HH-06 |
-| OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelse". | ITEM-01, ITEM-02, ITEM-05 |
+| OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
 
