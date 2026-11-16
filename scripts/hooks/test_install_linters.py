@@ -47,8 +47,10 @@ class Tree:
     def __init__(self, test):
         self.root = tempfile.mkdtemp()
         test.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
-        os.makedirs(os.path.join(self.root, "scripts"))
-        os.makedirs(os.path.join(self.root, "arch"))
+        self.decoy = os.path.join(self.root, "decoy")  # CDPATH points here: neither the installer nor the wrapper may follow it (R4-01)
+        for sub in ("scripts", "arch", "decoy/scripts", "decoy/.tools/bin", "decoy/.tools/libexec"):
+            os.makedirs(os.path.join(self.root, sub))
+        os.symlink("/bin/false", os.path.join(self.decoy, ".tools", "libexec", "actionlint"))
         shutil.copy(INSTALLER, os.path.join(self.root, "scripts", "install_linters.sh"))
         self.lines = []
         for name, fname, comp, member in FIXTURE:
@@ -63,11 +65,10 @@ class Tree:
             f.write(text)
 
     def run(self, file_urls=True):
-        env = {"PATH": os.environ["PATH"], "HOME": self.root}
+        env = {"PATH": os.environ["PATH"], "HOME": self.root, "CDPATH": self.decoy}
         if file_urls:
             env["LINTERS_ALLOW_FILE_URLS"] = "1"
-        return subprocess.run(["bash", os.path.join(self.root, "scripts", "install_linters.sh")], cwd=self.root, env=env,
-                              capture_output=True, text=True)
+        return subprocess.run(["bash", "scripts/install_linters.sh"], cwd=self.root, env=env, capture_output=True, text=True)
 
     def installed(self):
         d = os.path.join(self.root, ".tools", "bin")
@@ -94,9 +95,11 @@ class Installer(unittest.TestCase):
         t = Tree(self)
         self.assertEqual(t.run().returncode, 0)
         d = os.path.realpath(os.path.join(t.root, ".tools", "bin"))
-        for cwd, exe in ((t.root, os.path.join(d, "actionlint")), (d, "./actionlint"), ("/", os.path.join(d, "..", "bin", "actionlint"))):
-            r = subprocess.run([exe, "a.yml"], cwd=cwd, env={"PATH": "/nonexistent"}, capture_output=True, text=True)
-            self.assertEqual(r.stdout.strip(), f"fake actionlint -shellcheck={d}/shellcheck -pyflakes= a.yml", (cwd, exe, r.stderr))
+        for cwd, exe in ((t.root, os.path.join(d, "actionlint")), (d, "./actionlint"), ("/", os.path.join(d, "..", "bin", "actionlint")),
+                         (t.root, ".tools/bin/actionlint")):
+            for cdpath in (t.decoy, ".", ""):
+                r = subprocess.run([exe, "a.yml"], cwd=cwd, env={"PATH": "/nonexistent", "CDPATH": cdpath}, capture_output=True, text=True)
+                self.assertEqual(r.stdout.strip(), f"fake actionlint -shellcheck={d}/shellcheck -pyflakes= a.yml", (cwd, exe, cdpath, r.stderr))
         with open(os.path.join(d, "actionlint")) as f:
             self.assertNotIn("fake actionlint", f.read(), "bin/actionlint is the wrapper, the real binary is in libexec")
 
@@ -121,14 +124,12 @@ class Installer(unittest.TestCase):
         for raw in bad:
             t = Tree(self)
             t.write_pins(raw)
-            r = t.run()
-            self.assertNotEqual(r.returncode, 0, repr(raw))
+            self.assertNotEqual(t.run().returncode, 0, repr(raw))
             self.assertEqual(t.installed(), [], repr(raw))
 
     def test_file_urls_need_the_explicit_test_switch(self):
         t = Tree(self)
-        r = t.run(file_urls=False)
-        self.assertNotEqual(r.returncode, 0)
+        self.assertNotEqual(t.run(file_urls=False).returncode, 0)
         self.assertEqual(t.installed(), [])
 
     def test_missing_member_refused_and_extra_members_not_installed(self):
@@ -204,8 +205,7 @@ class RepoPins(unittest.TestCase):
         with open(INSTALLER, encoding="utf-8") as f:
             text = f.read()
         self.assertIn("proto='=https'", text)
-        self.assertRegex(text, r'--proto "\$proto"')
-        self.assertRegex(text, r'--proto-redir "\$proto"', "redirects must obey the same protocol limit (R1-03)")
+        self.assertRegex(text, r'--proto "\$proto" --proto-redir "\$proto"', "redirects obey the same protocol limit (R1-03)")
 
 
 if __name__ == "__main__":
