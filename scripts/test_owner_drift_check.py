@@ -61,12 +61,14 @@ depends_on = ["M0-01"]
 """
 
 
-def slurp(*items):
-    return json.dumps([{"total_count": len(items), "items": list(items)}])
+def slurp(*items, total=None, incomplete=False):
+    """One search/issues page as `gh api --paginate --slurp` prints it."""
+    return json.dumps([{"total_count": len(items) if total is None else total,
+                        "incomplete_results": incomplete, "items": list(items)}])
 
 
 class OwnerDriftScriptTest(unittest.TestCase):
-    def run_script(self, issues, prs="[]", fails=0, retries="3"):
+    def run_script(self, issues, prs="[]", fails=0, retries="3", tasks=TASKS):
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
             (d / "bin").mkdir()
@@ -75,7 +77,7 @@ class OwnerDriftScriptTest(unittest.TestCase):
             gh.chmod(gh.stat().st_mode | stat.S_IXUSR)
             (d / "issues.json").write_text(issues)
             (d / "prs.json").write_text(prs)
-            (d / "tasks.toml").write_text(TASKS)
+            (d / "tasks.toml").write_text(tasks)
             env = {
                 "PATH": f"{d / 'bin'}:{os.environ['PATH']}", "HOME": str(d),
                 "FAKE_GH_LOG": str(d / "gh.log"), "FAKE_GH_ISSUES": str(d / "issues.json"),
@@ -115,6 +117,49 @@ class OwnerDriftScriptTest(unittest.TestCase):
         code, out, _ = self.run_script("")
         self.assertEqual(code, 1, out)
         self.assertNotIn("no drift", out)
+    def test_issue_query_is_narrowed_to_closed_owner_todo_issues(self):
+        _, _, calls = self.run_script(slurp())
+        issue_calls = [c for c in calls if "is:pr" not in c]
+        self.assertTrue(issue_calls and all("is:closed" in c and "label:owner-todo" in c for c in issue_calls), calls)
+
+    def test_incomplete_issue_results_fail_the_check(self):
+        code, out, _ = self.run_script(slurp(incomplete=True))
+        self.assertEqual(code, 1, out)
+        self.assertIn("incomplete", out)
+        self.assertNotIn("no drift", out)
+
+    def test_issue_results_over_the_search_cap_fail_the_check(self):
+        code, out, _ = self.run_script(slurp(total=1001))
+        self.assertEqual(code, 1, out)
+        self.assertIn("1000", out)
+        self.assertNotIn("no drift", out)
+
+    def test_issue_results_at_the_search_cap_are_accepted(self):
+        code, out, _ = self.run_script(slurp(total=1000))
+        self.assertEqual(code, 0, out)
+
+    def test_incomplete_pr_results_fail_the_check(self):
+        code, out, _ = self.run_script(slurp(), prs=slurp(incomplete=True))
+        self.assertEqual(code, 1, out)
+        self.assertIn("incomplete", out)
+
+    def test_pr_results_over_the_search_cap_fail_the_check(self):
+        code, out, _ = self.run_script(slurp(), prs=slurp(total=1001))
+        self.assertEqual(code, 1, out)
+        self.assertIn("1000", out)
+
+    def test_merged_pr_with_todo_row_fails_and_names_the_task(self):
+        tasks = TASKS.replace("issue = 12", "pr = 77")
+        merged = {"number": 77, "title": "x", "state": "closed", "pull_request": {"merged_at": "2026-11-01T00:00:00Z"}}
+        code, out, _ = self.run_script(slurp(), prs=slurp(merged), tasks=tasks)
+        self.assertEqual(code, 1, out)
+        self.assertIn("M0-O1", out)
+
+    def test_unmerged_pr_number_with_todo_row_passes(self):
+        tasks = TASKS.replace("issue = 12", "pr = 77")
+        other = {"number": 78, "title": "x", "state": "closed", "pull_request": {"merged_at": "2026-11-01T00:00:00Z"}}
+        code, out, _ = self.run_script(slurp(), prs=slurp(other), tasks=tasks)
+        self.assertEqual(code, 0, out)
 
 
 class ScriptFileTest(unittest.TestCase):
