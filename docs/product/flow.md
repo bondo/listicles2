@@ -88,7 +88,7 @@ flowchart TD
     si["Sign-in screen<br>AUTH-01"] -- "Use email and password" --> es["Email sign-in<br>AUTH-07"]
     es -- "Create account" --> ca["Email and password<br>AUTH-05"]
     ca -- "invalid email or password under 12" --> caerr["Field error, nothing created<br>AUTH-05, OQ-26"] --> ca
-    ca -- "email already has an account" --> same["Message: sign in with the method you used first;<br>never merged by the app<br>AUTH-10"]
+    ca -- "email may already have an account" --> same["Neutral message: if you already have an account,<br>sign in the way you created it;<br>does not reveal the account<br>AUTH-10"]
     ca -- "valid" --> ve["Verify email: Continue, Send again, Sign out<br>AUTH-06"]
     ve -- "Continue, link not opened yet" --> vnot["Message: not verified yet<br>AUTH-06"] --> ve
     ve -- "Continue, link opened" --> home["Lists, or Join if I came from an invite<br>AUTH-06, HH-03"]
@@ -97,10 +97,11 @@ flowchart TD
     ok -- "yes, email not verified" --> ve
     ok -- "yes, two-step on" --> code["Enter 6-digit code<br>AUTH-09, OQ-25"]
     code -- "right code" --> home
+    code -- "wrong code" --> codeerr["Wrong code: error;<br>after many tries: try again later<br>AUTH-09"] --> code
     ok -- "yes" --> home
     es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email<br>AUTH-08"]
     rp -. "link opened" .-> newpw["New password, at least 12;<br>expired or used link: message<br>AUTH-08"] --> es
-    si -- "Google, but the email has a password account" --> same
+    si -- "Google, the email may have a password account" --> gsame["Firebase handling (trusted provider)<br>checked in M1; no lists lost<br>AUTH-10, OQ-34"]
 ```
 
 ## 3. Household
@@ -233,7 +234,8 @@ stateDiagram-v2
         first sign-in, create account, verify,
         reset or change password, invite link, join,
         household actions, create invite, share
-        and stop sharing (OQ-22). Banner: OQ-14.
+        and stop sharing (OQ-22), delete account,
+        two-step on or off. Banner: OQ-14.
     end note
 ```
 
@@ -293,7 +295,7 @@ flowchart LR
         m7["Wrong email or password; too many tries, try again later<br>AUTH-07, AUTH-09"]
         m8["If an account exists, we sent an email<br>AUTH-08"]
         m9["Email not verified yet<br>AUTH-06"]
-        m10["Sign in with the method you used first<br>AUTH-10"]
+        m10["If you already have an account, sign in the way you created it<br>AUTH-10"]
     end
 ```
 
@@ -322,8 +324,11 @@ The questions that blocked M0.5-03 (OQ-8, OQ-9, OQ-10, OQ-14, OQ-20) are decided
 Found while drawing the flow; all three decided by the owner on 2026-11-16 (issue #15). Ids continue the numbering of
 [stories section 11](stories.md#11-open-questions).
 
-| Id | Question | Decision (owner, 2026-11-16) | Stories | Blocks |
-|---|---|---|---|---|
-| OQ-20 | A user who is not in a household taps "Share with household": does the app show a household step (create one with a name, or join with a link) and then share, or create a household for them behind the scenes (OQ-1 leaves this to M1/M2)? | **Decided, differs from the recommendation:** in v1 "Share with household" is disabled with a message; the household step comes after v1. | VIS-02, HH-01 | M0.5-03 (whether the household step is a screen), M1/M2 planning |
-| OQ-21 | An invite link opened on a phone without the app: open the Play Store page and ask the person to open the link again after installing? (Firebase Dynamic Links is shut down and there are no Cloud Functions, so the link may not survive the install.) | **Decided:** yes, a simple web page; its hosting and subdomain are an open owner item. | HH-02, HH-03 | M1/M2 planning |
-| OQ-22 | Besides first sign-in, joining and creating an invite (SYNC-03): do opening an invite link, leaving, removing a member, transferring ownership, deleting the household, sharing, stopping sharing and deleting the account also need a connection, or may some wait offline and be sent later? | **Decided:** household, invite and sharing actions need a connection ("This needs a connection"); list and item changes work offline. | SYNC-03, HH-03, HH-05, HH-06, VIS-02, VIS-04, AUTH-04 | M1/M2 planning |
+| Id | Question | Decision (owner, 2026-11-16) | Stories |
+|---|---|---|---|
+| OQ-20 | A user who is not in a household taps "Share with household": does the app show a household step (create one with a name, or join with a link) and then share, or create a household for them behind the scenes (OQ-1 leaves this to M1/M2)? | **Decided, differs from the recommendation:** in v1 "Share with household" is disabled with a message; the household step comes after v1. | VIS-02, HH-01 |
+| OQ-21 | An invite link opened on a phone without the app: open the Play Store page and ask the person to open the link again after installing? (Firebase Dynamic Links is shut down and there are no Cloud Functions, so the link may not survive the install.) | **Decided:** yes, a simple web page; its hosting and subdomain are an open owner item. | HH-02, HH-03 |
+| OQ-22 | Besides first sign-in, joining and creating an invite (SYNC-03): do opening an invite link, leaving, removing a member, transferring ownership, deleting the household, sharing, stopping sharing and deleting the account also need a connection, or may some wait offline and be sent later? | **Decided:** household, invite and sharing actions need a connection ("This needs a connection"); list and item changes work offline. | SYNC-03, HH-03, HH-05, HH-06, VIS-02, VIS-04, AUTH-04 |
+
+Deleting the account and turning two-step verification on or off are not named in the OQ-22 answer; they need a
+connection anyway, because the server demands a recent sign-in first (AUTH-04, AUTH-09, SYNC-03).

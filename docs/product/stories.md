@@ -2,9 +2,8 @@
 
 Task M0.5-01. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
 Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17, OQ-19 and
-OQ-23 to OQ-27 and the other answers of 2026-11-16 in section 10 (state issue #15; OQ-23 to OQ-27 follow the sign-in security review, comment 6927207374),
-and
-[the plan](../PLAN.md). Decided questions are in [section 10](#10-decided-questions); anything still unsettled is marked
+OQ-23 to OQ-27 and the other answers of 2026-11-16 in section 10 (state issue #15; OQ-23 to OQ-27 follow the sign-in
+security review, comment 6927207374), and [the plan](../PLAN.md). Decided questions are in [section 10](#10-decided-questions); anything still unsettled is marked
 **OQ-n** and listed in [section 11](#11-open-questions), and nothing here decides it. Later milestones trace their acceptance tests to the story ids below (PLAN section 7).
 
 ## How to read this
@@ -74,7 +73,8 @@ I want to create an account with my email and a password, so that I can use Tall
 * Given a password shorter than 12 characters, when I confirm, then nothing is created and the field shows an error;
   there are no other password rules (no required digits, symbols or capitals, OQ-26).
 * Given the email is not a valid address, when I confirm, then nothing is created and the field shows an error.
-* Given the email already has an account, when I confirm, then no second account is created (AUTH-10).
+* Given the email already has an account, when I confirm, then no second account is created and I see the same
+  neutral message as in AUTH-10, which does not say whether an account exists.
 * Given there is no network, when I confirm, then I see a message that this needs a connection.
 
 **AUTH-06 Verify my email.** As a user who created a password account, I want to confirm my email, so that only the
@@ -122,9 +122,16 @@ password alone is not enough.
 
 **AUTH-10 Same email, another method.** As a user who signed up one way, I want a clear way back when I use the other
 way, so that I never get two accounts or lose my lists.
-* Given my email has an account with one method, when I try the other method (Google or email and password), then the
-  app never merges or links the accounts by itself; it tells me to sign in with the method I used first.
-* Given I signed in with the method I used first, then I see my lists as before; adding a second method or changing the email comes after v1 (OQ-31).
+* Email-enumeration protection is on, so the app cannot tell which method an email used and must never reveal
+  whether an account exists for an email.
+* Given I try to create a password account with an email that may already have an account (with either method), when
+  I confirm, then no second account is created and I see "If you already have an account, sign in the way you created
+  it", the same text whether or not an account exists.
+* Given I sign in with Google and the email may already have a password account, then what Firebase does (Google is a
+  trusted provider under one account per email) is checked in M1 (OQ-34); in every case no lists are lost and no
+  second account is created.
+* Given I signed in the way I created the account, then I see my lists as before; adding a second method or changing
+  the email comes after v1 (OQ-31).
 
 **AUTH-11 Change my password.** As a password user, I want to change my password, so that I can replace a weak or
 leaked one (OQ-31).
@@ -150,6 +157,8 @@ people I live with.
 
 **HH-03 Join a household.** As an invited person, I want to open the link and join, so that I see the household's shared
 lists.
+* Given the app is not installed, when I open the link, then a web page tells me to install Tally and then tap the
+  link again (OQ-21).
 * Given I open a valid link and I am not signed in, when the app opens, then I sign in first (AUTH-01), or create an
   account and verify my email (AUTH-05, AUTH-06), and then see the join screen.
 * Given my email is not verified, then the server refuses to read the invite (rules allow and deny tests).
@@ -190,8 +199,8 @@ ownership or delete the household, so that the household stays under control.
 * Given a list in that screen, then it shows its name and whether it is private or shared; a shared list created by
   someone else also shows the creator's display name.
 * Given I have no lists, then I see an empty state that explains lists and offers "Create list".
-* Given my lists, then the most recently used is first, and each shows its progress as small text under its name,
-  for example "12 of 30" (OQ-8, OQ-9). There is no search in v1.
+* Given my lists, then the most recently used is first (what "used" means: OQ-35), and each shows its progress as
+  small text under its name, for example "12 of 30" (OQ-8, OQ-9). There is no search in v1.
 
 **LIST-02 Create a list.** As a user, I want to create a list with a name and a type, so that I can start collecting
 items.
@@ -250,9 +259,12 @@ and what I still miss.
 **ITEM-05 See what a list contains.** As a user, I want to see every item of a list with its check state (and years),
 so that I know at a glance what I have.
 * Given an open plain list, then each item shows its name and whether it is checked, sorted by name, ignoring case,
-  with æ, ø and å after z (OQ-33).
+  with æ, ø and å after z, in that order (OQ-33). Items whose names are equal under this rule keep the order they
+  were added in, oldest first.
 * Given an open collection list, then each item also shows its release year and re-release year (each only if set),
-  sorted by release year and then by name (items without a release year last, OQ-33).
+  sorted by release year, oldest year first, with items without a release year last (OQ-33); items with the same
+  release year (or both without one) are sorted by name with the same rule as plain lists, and then oldest added
+  first. The re-release year does not change the order.
 * Given an open list, then its progress shows at the top, for example "12 of 30" (OQ-9).
 * Given a list with 30 or more items, then all can be reached by scrolling, and no name or year is cut off at the
   default font size in English or Danish.
@@ -318,7 +330,9 @@ so that we never work on an old copy.
 I don't wait for nothing.
 * Given there is no network, when I sign in the first time, create an account, verify my email, reset or change my
   password, open an invite link, join, create, leave or manage a household, create an invite, share a list or stop
-  sharing it, then I see "This needs a connection" and nothing half-done is left behind (OQ-22).
+  sharing it, delete my account, or turn two-step verification on or off, then I see "This needs a connection" and
+  nothing half-done is left behind (OQ-22). Deleting the account and turning two-step verification on or off need a
+  recent sign-in with the server (AUTH-04, AUTH-09), so they cannot wait offline.
 
 ## 7. Language
 
@@ -384,27 +398,27 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-4 | **Decided:** stopping sharing is in v1; the list becomes private to its creator again and the other members lose access. | VIS-04 |
 | OQ-5 | **Decided:** in v1 everything a person created goes with them when they leave the household, are removed, or delete their account, including the shared lists they created (the other members lose those lists). Later the leaver chooses per shared list whether it stays (section 9). | AUTH-04, HH-05, HH-06 |
 | OQ-6 | **Decided:** the year is optional, valid from 1900 to the current year plus 50. An item can have two years: the original release year and, optionally, a re-release year (rules between them: OQ-19). | ITEM-01, ITEM-02, ITEM-05 |
-| OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes what they created with them. | AUTH-04, HH-05, HH-06 |
-| OQ-23 | **Decided (2026-11-16):** email and password sign-in is built together with Google in v1 (M1), not later. Google stays the main button. | AUTH-01, AUTH-05..08, AUTH-10 |
-| OQ-24 | **Decided (2026-11-16):** two-step verification with an authenticator app (TOTP) is optional, for password accounts. | AUTH-09 |
-| OQ-25 | **Decided (2026-11-16):** accept the Identity Platform upgrade for TOTP if it needs no billing; the owner verifies this first, so AUTH-09 depends on it. | AUTH-09 |
-| OQ-26 | **Decided (2026-11-16):** passwords have at least 12 characters and no other rules; the Firebase password policy in Require mode plus a check in the app. | AUTH-05, AUTH-08 |
-| OQ-27 | **Decided (2026-11-16):** no email-link ("magic link") sign-in in v1; reconsider only on the Blaze plan. | section 8 |
-| Types | **Decided (2026-11-16, issue #15 comment 6927705004):** two list types, chosen at creation: plain (default; name and "I have it", sorted by name) and collection (also the two optional years under OQ-6 and OQ-19; sorted by release year, then name). | LIST-02, ITEM-01, ITEM-02, ITEM-05 |
-| OQ-32 | **Decided (2026-11-16):** a list's type cannot be changed in v1. Turning a plain list into a collection list may come later (section 9). | LIST-02 |
 | OQ-7 | **Decided (2026-11-16):** the checkbox is always "I have it" ("Jeg har den") in v1; it may depend on the list type later. | ITEM-04 |
 | OQ-8 | **Decided (2026-11-16):** items sorted per list type (ITEM-05); lists by most recently used; a "show only missing" filter in v1; no search and no manual order. Checked items stay in place. | LIST-01, ITEM-05 |
 | OQ-9 | **Decided (2026-11-16):** progress ("12 of 30") as small text under the list name and at the top of the list. | LIST-01, ITEM-05 |
 | OQ-10 | **Decided (2026-11-16):** deleting an item has no confirmation and an undo for 10 seconds; deleting a list asks to confirm first. | LIST-04, ITEM-03 |
 | OQ-12 | **Decided (2026-11-16):** only Android's per-app language setting in v1, no switch inside the app. | LANG-02 |
 | OQ-14 | **Decided (2026-11-16):** a small banner shows the offline state and that changes wait to be sent. | SYNC-01 |
+| OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes what they created with them. | AUTH-04, HH-05, HH-06 |
+| OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 | OQ-20..22 | **Decided (2026-11-16):** see [flow section 10](flow.md#10-new-open-questions): sharing without a household is disabled; an invite page "install, then tap the link again"; household, invite and sharing actions need a connection. | VIS-02, HH-03, SYNC-03 |
+| OQ-23 | **Decided (2026-11-16):** email and password sign-in is built together with Google in v1 (M1), not later. Google stays the main button. | AUTH-01, AUTH-05..08, AUTH-10 |
+| OQ-24 | **Decided (2026-11-16):** two-step verification with an authenticator app (TOTP) is optional, for password accounts. | AUTH-09 |
+| OQ-25 | **Decided (2026-11-16):** accept the Identity Platform upgrade for TOTP if it needs no billing; the owner verifies this first, so AUTH-09 depends on it. | AUTH-09 |
+| OQ-26 | **Decided (2026-11-16):** passwords have at least 12 characters and no other rules; the Firebase password policy in Require mode plus a check in the app. | AUTH-05, AUTH-08 |
+| OQ-27 | **Decided (2026-11-16):** no email-link ("magic link") sign-in in v1; reconsider only on the Blaze plan. | section 8 |
 | OQ-28 | **Decided (2026-11-16):** a lost authenticator app is reset by hand in the Firebase console; no backup codes in v1; the warning never mentions an administrator. | AUTH-09 |
 | OQ-29 | **Decided (2026-11-16):** Firebase's default pages and email templates, translated to English and Danish in the console (template languages to check in M1); own pages may come later. | AUTH-06, AUTH-08 |
 | OQ-30 | **Decided (2026-11-16):** a planner drafts the privacy text in Danish and English during M1, naming Google as processor; the owner approves it; ready before anyone but the owner installs the app. | AUTH-05 |
 | OQ-31 | **Decided (2026-11-16):** changing the password is in v1 (AUTH-11); changing the email and linking a second method come after v1. | AUTH-10, AUTH-11 |
+| OQ-32 | **Decided (2026-11-16):** a list's type cannot be changed in v1. Turning a plain list into a collection list may come later (section 9). | LIST-02 |
 | OQ-33 | **Decided (2026-11-16):** collection lists put items without a release year last; plain lists sort by name ignoring case, with æ, ø, å after z. | ITEM-05 |
-| OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
+| Types | **Decided (2026-11-16, issue #15 comment 6927705004):** two list types, chosen at creation: plain (default; name and "I have it", sorted by name) and collection (also the two optional years under OQ-6 and OQ-19; sorted by release year, then name). | LIST-02, ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
 
@@ -419,6 +433,8 @@ diagram (M0.5-02) any more.
 | OQ-15 | The plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | PLAN update, M1/M2 scope |
 | OQ-16 | Assumed: a member who joins later sees the lists already shared with the household. Confirm. | VIS-02 | later |
 | OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
+| OQ-34 | Google is a trusted provider, and the project uses one account per email. When someone signs in with Google and the email already has a password account (verified or not), does Firebase link Google to it, replace the password sign-in, or refuse? Check in M1 with a test project; the app must not lose lists or create a second account, and must not reveal whether an account exists (AUTH-10). | AUTH-01, AUTH-10 | M1 planning |
+| OQ-35 | LIST-01 sorts lists "most recently used" first (OQ-8): does "used" mean opened or changed, and is it per user (my own use) or per list (anyone's use)? | LIST-01 | M1 planning |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
 creator (OQ-5), but PLAN section 3 stores every list under a household. Lists need a creator and a sharing state, and new
