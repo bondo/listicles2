@@ -224,6 +224,9 @@ const S = {
     noListsBody: 'Make a list of what you collect or need, and tick off what you have. A new list is private until you share it.',
     of: (a, b) => `${a} of ${b}`, private: 'Private', shared: 'Shared', sharedBy: n => `Shared by ${n}`,
     noItems: 'No items yet',
+    listType: 'List type', plainList: 'Plain list', plainNote: 'Items with a name, sorted by name', collection: 'Collection',
+    collectionNote: 'Items with release and re-release year, sorted by year', typeFixed: 'The type cannot be changed later.',
+    signInEmail: 'Sign in with email', createAccount: 'Create account',
     newList: 'New list', listName: 'List name', enterName: 'Enter a name', cancel: 'Cancel', create: 'Create',
     showMissing: 'Show only missing', addItem: 'Add item', reRelease: 'Re-release', reReleased: 'Re-release',
     offline: 'Offline: changes are sent when you are online again', pending: n => n === 1 ? '1 waiting' : `${n} waiting`,
@@ -268,6 +271,9 @@ const S = {
     noListsBody: 'Lav en liste over det, du samler på eller mangler, og sæt flueben ved det, du har. En ny liste er privat, indtil du deler den.',
     of: (a, b) => `${a} af ${b}`, private: 'Privat', shared: 'Delt', sharedBy: n => `Delt af ${n}`,
     noItems: 'Ingen ting endnu',
+    listType: 'Listetype', plainList: 'Almindelig liste', plainNote: 'Ting med et navn, sorteret efter navn', collection: 'Samling',
+    collectionNote: 'Ting med udgivelses- og genudgivelsesår, sorteret efter år', typeFixed: 'Typen kan ikke ændres senere.',
+    signInEmail: 'Log ind med e-mail', createAccount: 'Opret konto',
     newList: 'Ny liste', listName: 'Listens navn', enterName: 'Skriv et navn', cancel: 'Annuller', create: 'Opret',
     showMissing: 'Vis kun manglende', addItem: 'Tilføj ting', reRelease: 'Genudgivet', reReleased: 'Genudgivet',
     offline: 'Offline: ændringer sendes, når du er online igen', pending: n => `${n} venter`,
@@ -322,6 +328,12 @@ const ITEMS = [
   { n: 'Dove', y: 1991, c: true }, { n: 'Candle', y: 1992 }, { n: 'Sleigh', r: 2018 },
 ];
 
+// A plain list (owner decision 2026-11-16): name and the check only, sorted by name.
+const PLAIN = [
+  { n: 'Bananer' }, { n: 'Brød', c: true }, { n: 'Havregryn' }, { n: 'Kaffe' }, { n: 'Mælk', c: true }, { n: 'Ost' },
+  { n: 'Rugbrød' }, { n: 'Smør' }, { n: 'Æg' },
+];
+
 /* ---------- Building blocks ---------- */
 const ic = (n, cls = '') => `<span class="ms ${cls}">${n}</span>`;
 const iconBtn = (n, cls = '') => `<span class="icon">${ic(n, cls)}</span>`;
@@ -353,46 +365,48 @@ const logo = () => `<div class="logo"><svg width="44" height="40" viewBox="0 0 4
   <g stroke="var(--onPrimary)" stroke-width="4" stroke-linecap="round"><path d="M8 6v28M16 6v28M24 6v28M32 6v28"/><path d="M3 30L39 10"/></g></svg></div>`;
 
 const listHead = (s, l, filterOn) => `<div class="head"><div class="meta t-bodyMedium var"><span>${s.of(l.have, l.total)}</span><span>·</span><span class="meta" style="gap:4px">${
-  ic('group').replace('class="ms ', 'style="font-size:16px" class="ms ')}${s.sharedBy(l.by)}</span></div>
+  ic('group').replace('class="ms ', 'style="font-size:16px" class="ms ')}${l.by ? s.sharedBy(l.by) : s.shared}</span></div>
   <div class="chipwrap"><span class="chip t-labelLarge ${filterOn ? 'on' : ''}">${filterOn ? ic('check') : ''}${s.showMissing}</span></div></div>`;
-const openList = (s, { items = ITEMS, filterOn = false, extraTop = '', overlay = '', fabOn = true } = {}) => {
-  const l = LISTS[0];
+const openList = (s, { items = ITEMS, filterOn = false, extraTop = '', overlay = '', fabOn = true, l = LISTS[0] } = {}) => {
   return `${topbar(l.name, { back: true, actions: iconBtn('more_vert') })}${extraTop}${listHead(s, l, filterOn)}
   <div class="scroll">${items.map(it => itemRow(s, it)).join('')}<div class="fade"></div>${fabOn ? fab(s.addItem) : ''}</div>${overlay}`;
 };
-const sheetItem = (s, { title, name, y, r, yErr = false, rErr = false, focus = '', kbd = false, edit = false }) => `<div class="scrim"></div><div class="sheet">
+const sheetItem = (s, { title, name, y, r, yErr = false, rErr = false, focus = '', kbd = false, edit = false, plain = false }) => `<div class="scrim"></div><div class="sheet">
   <div class="handle"></div><div class="t-titleLarge" style="margin-bottom:var(--sp-m)">${title}</div>
   ${field({ label: s.name, value: name, state: focus === 'n' ? 'focus' : '', caret: focus === 'n' })}
-  <div class="two" style="margin-top:var(--sp-s)">
+  ${plain ? '' : `<div class="two" style="margin-top:var(--sp-s)">
     <div>${field({ label: s.releaseYear, value: y, state: yErr ? 'err' : focus === 'y' ? 'focus' : '', caret: focus === 'y', trail: yErr ? 'error' : '' })}${support(yErr ? s.yearRange : s.optional, yErr)}</div>
     <div>${field({ label: s.reReleaseYear, value: r, state: rErr ? 'err' : focus === 'r' ? 'focus' : '', caret: focus === 'r', trail: rErr ? 'error' : '' })}${support(rErr ? s.yearRange : s.optional, rErr)}</div>
-  </div>
+  </div>`}
   <div class="acts t-labelLarge">${edit ? `<span class="btn text danger" style="margin-right:auto">${ic('delete')}${s.remove}</span><span class="btn text">${s.cancel}</span><span class="btn filled">${s.save}</span>`
     : `<span class="btn text">${s.done}</span><span class="btn filled">${s.add}</span>`}</div>
   ${kbd ? `<div class="kbd">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', ic('backspace')].map(k => `<span>${k}</span>`).join('')}</div>` : ''}
 </div>`;
 
+const radio = (on, label, note) => `<div class="row" style="padding:var(--sp-xs) 0;gap:var(--sp-xs);align-items:flex-start"><span class="icon" style="color:var(--${on ? 'primary' : 'onSurfaceVariant'})">${ic(on ? 'radio_button_checked' : 'radio_button_unchecked', on ? 'fill' : '')}</span><div class="txt" style="padding-top:var(--sp-m)"><div class="t-bodyLarge">${label}</div><div class="t-bodySmall var">${note}</div></div></div>`;
+const typeChoice = s => `<div class="t-labelLarge var" style="margin-top:var(--sp-l)">${s.listType}</div>${radio(true, s.plainList, s.plainNote)}${radio(false, s.collection, s.collectionNote)}<div class="t-bodySmall var">${s.typeFixed}</div>`;
+
 /* ---------- Screens: id, title, story and decision refs, content(strings) ---------- */
 const SCREENS = [
-  { id: '01', t: 'Sign-in', refs: 'AUTH-01, AUTH-02, SYNC-03, OQ-22. Shown only when signed out. No connection: snackbar, nothing else happens. Cancelling the account picker shows nothing.',
+  { id: '01', t: 'Sign-in', refs: 'AUTH-01, AUTH-02, SYNC-03, OQ-22, OQ-23. Google stays the main button; email and password (decided 2026-11-16) get their own screens once the stories PR lands. Shown only when signed out. No connection: snackbar, nothing else happens. Cancelling the account picker shows nothing.',
     f: s => `<div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-l)">Tally</div>
       <div class="t-bodyLarge var">${s.appTag}</div>
-      <div class="stack"><span class="btn filled wide t-labelLarge">${ic('login')}${s.signIn}</span></div>
+      <div class="stack"><span class="btn filled wide t-labelLarge">${ic('login')}${s.signIn}</span><span class="btn outlined wide t-labelLarge">${ic('mail')}${s.signInEmail}</span><span class="btn text wide t-labelLarge">${s.createAccount}</span></div>
       <div class="t-bodySmall var" style="margin-top:var(--sp-s)">${s.signInNote}</div></div>${snack(s.needsConnection)}` },
   { id: '02', t: 'Lists, empty', refs: 'LIST-01, VIS-01, OQ-1. First start of a new account.',
     f: s => `${listsBar(s)}<div class="center"><div class="bubble">${ic('checklist')}</div><div class="t-titleLarge">${s.noListsTitle}</div>
       <div class="t-bodyMedium var">${s.noListsBody}</div></div>${fab(s.createList)}` },
   { id: '03', t: 'Lists', refs: 'LIST-01, VIS-03, OQ-8 (most recently used first), OQ-9 (progress under the name). Private or shared, and who shared it, on every row.',
     f: s => `${listsBar(s)}<div class="scroll" style="padding-top:var(--sp-s)">${LISTS.map(l => listRow(s, l)).join('')}${fab(s.createList)}</div>` },
-  { id: '04', t: 'Create list, name missing', refs: 'LIST-02. Empty or only spaces: field error, nothing created. Same dialog for Rename (LIST-03).',
+  { id: '04', t: 'Create list, name missing', refs: 'LIST-02, list types (owner, 2026-11-16): plain (default) or collection, chosen here and fixed. Empty name: field error, nothing created. Rename (LIST-03) has only the name.',
     f: s => `${listsBar(s)}<div class="scroll" style="padding-top:var(--sp-s)">${LISTS.map(l => listRow(s, l)).join('')}</div>${dialog({
-      title: s.newList, extra: `<div style="margin-top:var(--sp-s)">${field({ label: s.listName, state: 'err', trail: 'error' })}${support(s.enterName, true)}</div>`,
+      title: s.newList, extra: `<div style="margin-top:var(--sp-s)">${field({ label: s.listName, state: 'err', trail: 'error' })}${support(s.enterName, true)}</div>${typeChoice(s)}`,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.create}</span>` })}` },
-  { id: '05', t: 'Open list', refs: 'ITEM-04, ITEM-05, VIS-03, OQ-8 (release year, then name), OQ-9 ("12 of 30" at the top). Tap the box: I have it. Tap the row: edit.',
+  { id: '05', t: 'Open list, collection', refs: 'Collection list. ITEM-04, ITEM-05, VIS-03, OQ-8 (release year, then name), OQ-9 ("12 of 30" at the top). Tap the box: I have it. Tap the row: edit.',
     f: s => openList(s) },
   { id: '06', t: 'Show only missing, offline', refs: 'OQ-8 filter, OQ-14 offline bar with waiting changes, SYNC-01. Ticking works offline; the bar goes away when everything is sent.',
     f: s => openList(s, { items: ITEMS.filter(i => !i.c), filterOn: true, extraTop: offline(s, 3) }) },
-  { id: '07', t: 'Add item, year out of range', refs: 'ITEM-01, OQ-6, OQ-19. Both years optional, any order, 1900 to this year + 50. The sheet stays open for the next item.',
+  { id: '07', t: 'Add item, collection, year out of range', refs: 'ITEM-01, OQ-6, OQ-19. Both years optional, any order, 1900 to this year + 50. The sheet stays open for the next item.',
     f: s => openList(s, { fabOn: false, overlay: sheetItem(s, { title: s.addItem, name: 'Candle', y: '1992', r: '1890', rErr: true, focus: 'r', kbd: true }) }) },
   { id: '08', t: 'Edit item', refs: 'ITEM-02, ITEM-03. Clearing a year removes it; clearing the name keeps the old one with an error. Remove is here.',
     f: s => openList(s, { fabOn: false, overlay: sheetItem(s, { title: s.editItem, name: 'Star', y: '1985', r: '2015', edit: true }) }) },
@@ -458,6 +472,10 @@ const SCREENS = [
     f: s => `<div class="browser t-bodyMedium"><span class="url">${ic('lock').replace('class="ms ', 'style="font-size:16px" class="ms ')}&lt;host not decided&gt;/join/…</span>${iconBtn('more_vert')}</div>
       <div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-s)">${s.webTitle}</div><div class="t-bodyLarge var">${s.webBody}</div>
       <div class="stack"><span class="btn filled wide t-labelLarge">${ic('shop')}${s.webPlay}</span></div><div class="t-bodySmall var">${s.webSmall}</div></div>` },
+  { id: '22', t: 'Plain list', refs: 'List types (owner, 2026-11-16): a plain list has name and the check only, sorted by name; same progress, filter and offline bar as a collection.',
+    f: s => openList(s, { l: LISTS[1], items: PLAIN }) },
+  { id: '23', t: 'Add item, plain list', refs: 'ITEM-01 for a plain list: the name only; the sheet stays open for the next item. Edit (08) is the same without years.',
+    f: s => openList(s, { l: LISTS[1], items: PLAIN, fabOn: false, overlay: sheetItem(s, { title: s.addItem, name: 'Kaffeb', focus: 'n', plain: true }) }) },
 ];
 
 /* ---------- Token plumbing ---------- */
