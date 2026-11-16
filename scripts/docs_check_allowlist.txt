@@ -3,7 +3,6 @@
 # or no doc mentions it any more: delete it then. Paths are relative to the repository root.
 
 # Planned: owned by a task in docs/tasks.toml.
-docs/product/flow.md  # planned: M0.5-02
 docs/product/rubric.md  # planned: drafted in M0.5-03
 design/tokens.json  # planned: emitted by M0.5-03, consumed by M1-04
 scripts/screenshots.sh  # planned: Roborazzi screenshots, M1
