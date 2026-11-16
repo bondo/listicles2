@@ -75,7 +75,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
 | M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | ready | M0.5-05 | implementer |  |
 | M0.5-07 | ruff check (E,F,W,B,UP,SIM) and mypy (default) for scripts/, in verify.sh and CI (P3) | done | M0.5-05, M0-10 | implementer | [#79](https://github.com/bondo/listicles2/issues/79) |
-| M0.5-08 | Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5) | ready | M0.5-05 | implementer |  |
+| M0.5-08 | Firebase rules tests to strict TypeScript, ESLint strictTypeChecked and Prettier (P4, P5) | in progress | M0.5-05 | implementer | [#96](https://github.com/bondo/listicles2/issues/96) |
 | M0.5-09 | Kotlin allWarningsAsErrors in all modules (P6) | done | M0-O11 | implementer | [#47](https://github.com/bondo/listicles2/issues/47) |
 | M0.5-10 | licensee with the owner's allowlist (P8, D3)&#58; Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause; Goog… | done | M0.5-09 | implementer | [#84](https://github.com/bondo/listicles2/issues/84) |
 | M0.5-11 | Konsist&#58; no floating point in core/domain, no raw colors/dp in UI; network-blocking JUnit extens… | done | M0-O11 | implementer | [#59](https://github.com/bondo/listicles2/issues/59) |
@@ -111,7 +111,7 @@ flowchart LR
     n1["M0.5-02 App-flow diagram (docs/product/flow.… (blocked)"]:::blocked
     n2["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::blocked
     n3["M0.5-06 CI: shellcheck, actionlint, zizmor#59; SH… (ready)"]:::ready
-    n4["M0.5-08 Firebase rules tests to strict TypeScri… (ready)"]:::ready
+    n4["M0.5-08 Firebase rules tests to strict TypeScri… (in progress)"]:::progress
     n5["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
     n6["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
     n7["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
@@ -174,7 +174,7 @@ flowchart LR
     n9["M1-O2 Register the debug and release SHA-1 fi… (owner to-do)"]:::owner
     n10["all of M0.5"]:::ext
     n11["M0.5-03 Screen wireframes and design tokens (… (blocked)"]:::ext
-    n12["M0.5-08 Firebase rules tests to strict TypeScri… (ready)"]:::ext
+    n12["M0.5-08 Firebase rules tests to strict TypeScri… (in progress)"]:::ext
     n10 --> n0
     n0 --> n1
     n0 --> n2
