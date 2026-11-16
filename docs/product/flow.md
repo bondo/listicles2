@@ -30,7 +30,7 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
 flowchart TD
     start(["App opens"]) --> signed{"Signed in?<br>AUTH-02"}
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
-    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9"]
+    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
     signin -- "Google account picked" --> lists
     signin -- "Use email and password" --> email["Email sign-in<br>AUTH-05, AUTH-07, AUTH-08, AUTH-10"]
     email -- "signed in, email verified" --> lists
@@ -88,8 +88,7 @@ flowchart TD
     si["Sign-in screen<br>AUTH-01"] -- "Use email and password" --> es["Email sign-in<br>AUTH-07"]
     es -- "Create account" --> ca["Email and password<br>AUTH-05"]
     ca -- "invalid email or password under 12" --> caerr["Field error, nothing created<br>AUTH-05, OQ-26"] --> ca
-    ca -- "email may already have an account" --> same["Neutral message: if you already have an account,<br>sign in the way you created it;<br>does not reveal the account<br>AUTH-10"]
-    ca -- "valid" --> ve["Verify email: Continue, Send again, Sign out<br>AUTH-06"]
+    ca -- "valid, with or without an existing account" --> ve["Verify email: Continue, Send again, Sign out;<br>same screen whether or not the email has an account<br>AUTH-06, AUTH-10, OQ-34"]
     ve -- "Continue, link not opened yet" --> vnot["Message: not verified yet<br>AUTH-06"] --> ve
     ve -- "Continue, link opened" --> home["Lists, or Join if I came from an invite<br>AUTH-06, HH-03"]
     es -- "email and password" --> ok{"Right?"}
@@ -99,7 +98,7 @@ flowchart TD
     code -- "right code" --> home
     code -- "wrong code" --> codeerr["Wrong code: error;<br>after many tries: try again later<br>AUTH-09"] --> code
     ok -- "yes" --> home
-    es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email<br>AUTH-08"]
+    es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email;<br>Google-only email: OQ-34<br>AUTH-08"]
     rp -. "link opened" .-> newpw["New password, at least 12;<br>expired or used link: message<br>AUTH-08"] --> es
     si -- "Google, the email may have a password account" --> gsame["Firebase handling (trusted provider)<br>checked in M1; no lists lost<br>AUTH-10, OQ-34"]
 ```
@@ -295,7 +294,7 @@ flowchart LR
         m7["Wrong email or password; too many tries, try again later<br>AUTH-07, AUTH-09"]
         m8["If an account exists, we sent an email<br>AUTH-08"]
         m9["Email not verified yet<br>AUTH-06"]
-        m10["If you already have an account, sign in the way you created it<br>AUTH-10"]
+        m10["On check your email: if you already have an account,<br>no new email is sent, sign in the way you created it<br>AUTH-06, AUTH-10"]
     end
 ```
 

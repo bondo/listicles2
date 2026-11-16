@@ -68,19 +68,20 @@ once.
 
 **AUTH-05 Create an account with email and password.** As a new user without (or not wanting to use) a Google account,
 I want to create an account with my email and a password, so that I can use Tally too.
-* Given I enter a valid email and a password of at least 12 characters, when I confirm, then the account is created, a
-  verification email is sent, and I see the "check your email" screen (AUTH-06).
+* Given I enter a valid email that has no account and a password of at least 12 characters, when I confirm, then the
+  account is created, a verification email is sent, and I see the "check your email" screen (AUTH-06).
 * Given a password shorter than 12 characters, when I confirm, then nothing is created and the field shows an error;
   there are no other password rules (no required digits, symbols or capitals, OQ-26).
 * Given the email is not a valid address, when I confirm, then nothing is created and the field shows an error.
-* Given the email already has an account, when I confirm, then no second account is created and I see the same
-  neutral message as in AUTH-10, which does not say whether an account exists.
+* Given the email already has an account (either method), when I confirm, then no second account is created, no email
+  is sent, and I see the same "check your email" screen as for a new account (AUTH-10).
 * Given there is no network, when I confirm, then I see a message that this needs a connection.
 
 **AUTH-06 Verify my email.** As a user who created a password account, I want to confirm my email, so that only the
 owner of the address can use the account.
-* Given I created an account (AUTH-05), then I see a screen saying a link was sent to my email, with "Continue",
-  "Send again" and "Sign out".
+* Given I created an account (AUTH-05), then I see a screen saying a link was sent to my email, with the line "If you
+  already have an account with this email, no new email is sent: sign in the way you created it", and the buttons
+  "Continue", "Send again" and "Sign out".
 * Given I opened the link in the email, when I tap "Continue", then I see my lists (or the join screen, HH-03).
 * Given the email and the page its link opens, then they are Firebase's defaults, with the email text in English and
   Danish (OQ-29; the same for AUTH-08).
@@ -122,11 +123,16 @@ password alone is not enough.
 
 **AUTH-10 Same email, another method.** As a user who signed up one way, I want a clear way back when I use the other
 way, so that I never get two accounts or lose my lists.
-* Email-enumeration protection is on, so the app cannot tell which method an email used and must never reveal
-  whether an account exists for an email.
-* Given I try to create a password account with an email that may already have an account (with either method), when
-  I confirm, then no second account is created and I see "If you already have an account, sign in the way you created
-  it", the same text whether or not an account exists.
+* Email-enumeration protection is on, so the app cannot tell which method an email used, and no screen or message of
+  the app reveals whether an account exists for an email. Whether Firebase's own sign-up service still reports an
+  existing email to someone who calls it directly, outside the app, is checked in M1 (OQ-34); if it does, sign-up
+  reveals that an account exists to such a caller, and the owner decides whether to accept that (OQ-34).
+* Given one email with an account (either method) and one without, when I create a password account with each, then
+  both end on the same "check your email" screen (AUTH-05, AUTH-06) with the same text and buttons, and tapping
+  "Continue" (link not opened: "not verified yet") or "Send again" shows the same messages for both; only the email
+  without an account gets an account and an email.
+* Given I sign in with a password (AUTH-07) or ask for a reset (AUTH-08) for an email, then the messages are the same
+  whether or not an account exists and whichever method it uses (what a Google-only email gets: OQ-34).
 * Given I sign in with Google and the email may already have a password account, then what Firebase does (Google is a
   trusted provider under one account per email) is checked in M1 (OQ-34); in every case no lists are lost and no
   second account is created.
@@ -433,7 +439,7 @@ diagram (M0.5-02) any more.
 | OQ-15 | The plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | PLAN update, M1/M2 scope |
 | OQ-16 | Assumed: a member who joins later sees the lists already shared with the household. Confirm. | VIS-02 | later |
 | OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
-| OQ-34 | Google is a trusted provider, and the project uses one account per email. When someone signs in with Google and the email already has a password account (verified or not), does Firebase link Google to it, replace the password sign-in, or refuse? Check in M1 with a test project; the app must not lose lists or create a second account, and must not reveal whether an account exists (AUTH-10). | AUTH-01, AUTH-10 | M1 planning |
+| OQ-34 | Google is a trusted provider, and the project uses one account per email. Check in M1 with a test project: (a) When someone signs in with Google and the email already has a password account (verified or not), does Firebase link Google to it, replace the password sign-in, or refuse? (b) Reverse: a Google-only email asks for a password reset (AUTH-08). Is a reset email sent, and does opening it add a password to the account (a second method, which OQ-31 puts after v1)? (c) Password sign-in (AUTH-07) for a Google-only email shows "Wrong email or password" with no hint to use Google: should that message, shown to everyone, add "If you created your account with Google, use Google"? (d) Does Firebase's sign-up report an existing email ("email already in use") even with email-enumeration protection on, so that anyone calling it directly can probe emails? If so, the app still shows the same screen (AUTH-10), and the owner decides whether to accept that limit. In every case the app must not lose lists or create a second account, and its screens must not reveal whether an account exists (AUTH-10). | AUTH-01, AUTH-05, AUTH-07, AUTH-08, AUTH-10 | M1 planning |
 | OQ-35 | LIST-01 sorts lists "most recently used" first (OQ-8): does "used" mean opened or changed, and is it per user (my own use) or per list (anyone's use)? | LIST-01 | M1 planning |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
