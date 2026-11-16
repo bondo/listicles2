@@ -1,0 +1,212 @@
+"""Tests for scripts/install_linters.sh and scripts/linters.pins. No network: the installer is copied into a temp tree with a pins
+file pointing at local fixture archives (file:// only with LINTERS_ALLOW_FILE_URLS=1; the repo's pins file is https only)."""
+
+import hashlib
+import io
+import os
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import unittest
+
+import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
+
+ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+INSTALLER = os.path.join(ROOT, "scripts", "install_linters.sh")
+PINS = os.path.join(ROOT, "scripts", "linters.pins")
+APPROVED = {  # owner approval 2026-11-15, recorded on issue #15
+    "shellcheck": ("8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198", "v0.11.0", "x86_64"),
+    "actionlint": ("8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8", "1.7.12", "amd64"),
+    "zizmor": ("bb110cc765eca9cd7efb2e284a956be5974c60027b0970f16397d86208a9957b", "v1.32.0", "x86_64-unknown-linux-gnu"),
+}
+# (name, archive file name, compression, member path)
+FIXTURE = [
+    ("shellcheck", "shellcheck.tar.xz", "xz", "shellcheck-v0.11.0/shellcheck"), ("actionlint", "actionlint.tar.gz", "gz", "actionlint"),
+    ("zizmor", "zizmor.tar.gz", "gz", "zizmor"),
+]
+
+
+def make_archive(path, comp, member, payload, extra=None):
+    with tarfile.open(path, f"w:{comp}") as t:
+        for name, data in [(member, payload)] + list((extra or {}).items()):
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            info.mode = 0o755
+            t.addfile(info, io.BytesIO(data))
+
+
+def sha(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+class Tree:
+    """A temp project tree: scripts/install_linters.sh + a fixture pins file + local archives."""
+
+    def __init__(self, test):
+        self.root = tempfile.mkdtemp()
+        test.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.decoy = os.path.join(self.root, "decoy")  # CDPATH points here: neither the installer nor the wrapper may follow it (R4-01)
+        for sub in ("scripts", "arch", "decoy/scripts", "decoy/.tools/bin", "decoy/.tools/libexec"):
+            os.makedirs(os.path.join(self.root, sub))
+        os.symlink("/bin/false", os.path.join(self.decoy, ".tools", "libexec", "actionlint"))
+        shutil.copy(INSTALLER, os.path.join(self.root, "scripts", "install_linters.sh"))
+        self.lines = []
+        for name, fname, comp, member in FIXTURE:
+            p = os.path.join(self.root, "arch", fname)
+            make_archive(p, comp, member, f"#!/bin/sh\necho fake {name} \"$@\"\n".encode(), extra={"evil": b"#!/bin/sh\necho evil\n"})
+            self.lines.append([name, sha(p), member, "file://" + p])
+        self.write_pins()
+
+    def write_pins(self, raw=None):
+        text = raw if raw is not None else "# fixture\n" + "".join(" ".join(line) + "\n" for line in self.lines)
+        with open(os.path.join(self.root, "scripts", "linters.pins"), "w") as f:
+            f.write(text)
+
+    def run(self, file_urls=True):
+        env = {"PATH": os.environ["PATH"], "HOME": self.root, "CDPATH": self.decoy}
+        if file_urls:
+            env["LINTERS_ALLOW_FILE_URLS"] = "1"
+        return subprocess.run(["bash", "scripts/install_linters.sh"], cwd=self.root, env=env, capture_output=True, text=True)
+
+    def installed(self):
+        d = os.path.join(self.root, ".tools", "bin")
+        return sorted(os.listdir(d)) if os.path.isdir(d) else []
+
+
+class Installer(unittest.TestCase):
+    def test_installs_verified_binaries_and_only_those(self):
+        t = Tree(self)
+        r = t.run()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(t.installed(), ["actionlint", "shellcheck", "zizmor"])
+        self.assertEqual(sorted(os.listdir(os.path.join(t.root, ".tools"))), ["bin", "libexec"], "no staging leftovers")
+        for n, sub in (("shellcheck", "bin"), ("zizmor", "bin"), ("actionlint", "libexec")):
+            p = os.path.join(t.root, ".tools", sub, n)
+            self.assertTrue(os.access(p, os.X_OK))
+            self.assertEqual(os.stat(p).st_mode & 0o022, 0, "not group/other writable")
+            with open(p) as f:
+                self.assertIn(f"fake {n}", f.read())
+        self.assertEqual(t.run().returncode, 0, "idempotent")
+
+    def test_actionlint_wrapper_pins_shellcheck_and_ignores_path(self):
+        """R3-03: .tools/bin/actionlint is a wrapper that passes the pinned shellcheck and disables pyflakes, so PATH is irrelevant."""
+        t = Tree(self)
+        self.assertEqual(t.run().returncode, 0)
+        d = os.path.realpath(os.path.join(t.root, ".tools", "bin"))
+        for cwd, exe in ((t.root, os.path.join(d, "actionlint")), (d, "./actionlint"), ("/", os.path.join(d, "..", "bin", "actionlint")),
+                         (t.root, ".tools/bin/actionlint")):
+            for cdpath in (t.decoy, ".", ""):
+                r = subprocess.run([exe, "a.yml"], cwd=cwd, env={"PATH": "/nonexistent", "CDPATH": cdpath}, capture_output=True, text=True)
+                self.assertEqual(r.stdout.strip(), f"fake actionlint -shellcheck={d}/shellcheck -pyflakes= a.yml", (cwd, exe, cdpath, r.stderr))
+        with open(os.path.join(d, "actionlint")) as f:
+            self.assertNotIn("fake actionlint", f.read(), "bin/actionlint is the wrapper, the real binary is in libexec")
+
+    def test_checksum_mismatch_refuses_and_installs_nothing(self):
+        for which in range(3):
+            t = Tree(self)
+            t.lines[which][1] = "0" * 64
+            t.write_pins()
+            r = t.run()
+            self.assertNotEqual(r.returncode, 0, which)
+            self.assertIn("mismatch", r.stderr.lower())
+            self.assertEqual(t.installed(), [], "all-or-nothing: a bad archive blocks the good ones too")
+
+    def test_bad_pins_refused(self):
+        good = Tree(self).lines[0]
+        sha_, member, url = good[1], good[2], good[3]
+        line = f"shellcheck {sha_} {member} {url}\n"
+        bad = ["", f"shellcheck {sha_} {member}\n", f"shellcheck {sha_[:-1]} {member} {url}\n", f"shellcheck {sha_.upper()} {member} {url}\n",
+               f"shellcheck {'g' * 64} {member} {url}\n", f"shellcheck {sha_} {member} {url} extra\n", f"shell/check {sha_} {member} {url}\n",
+               f"../shellcheck {sha_} {member} {url}\n", f"shellcheck {sha_} ../{member} {url}\n", f"shellcheck {sha_} /{member} {url}\n",
+               f"shellcheck {sha_} {member} http://example.com/x.tar.gz\n", f"shellcheck {sha_} {member} ftp://example.com/x.tar.gz\n", line + line]
+        for raw in bad:
+            t = Tree(self)
+            t.write_pins(raw)
+            self.assertNotEqual(t.run().returncode, 0, repr(raw))
+            self.assertEqual(t.installed(), [], repr(raw))
+
+    def test_file_urls_need_the_explicit_test_switch(self):
+        t = Tree(self)
+        self.assertNotEqual(t.run(file_urls=False).returncode, 0)
+        self.assertEqual(t.installed(), [])
+
+    def test_missing_member_refused_and_extra_members_not_installed(self):
+        t = Tree(self)
+        t.lines[0][2] = "shellcheck-v0.11.0/not-there"
+        t.write_pins()
+        self.assertNotEqual(t.run().returncode, 0)
+        self.assertEqual(t.installed(), [])
+        t = Tree(self)
+        self.assertEqual(t.run().returncode, 0)
+        self.assertNotIn("evil", t.installed())
+
+    def test_failure_while_staging_leaves_existing_binaries_untouched(self):
+        """R1-02: stage every binary first, then rename into place; an error on the second install must not leave a mixed set."""
+        t = Tree(self)
+        d = os.path.join(t.root, ".tools", "bin")
+        os.makedirs(d)
+        for n in ("shellcheck", "actionlint", "zizmor"):
+            with open(os.path.join(d, n), "w") as f:
+                f.write("old " + n)
+        fake = os.path.join(t.root, "fakebin")
+        os.makedirs(fake)
+        real = shutil.which("install")
+        with open(os.path.join(fake, "install"), "w") as f:
+            f.write(f'#!/bin/sh\nc="{t.root}/count"\nn=$(cat "$c" 2>/dev/null || echo 0)\nn=$((n+1))\necho $n > "$c"\n'
+                    f'[ "$n" -eq 2 ] && exit 1\nexec {real} "$@"\n')
+        os.chmod(os.path.join(fake, "install"), 0o755)
+        env = {"PATH": fake + os.pathsep + os.environ["PATH"], "HOME": t.root, "LINTERS_ALLOW_FILE_URLS": "1"}
+        r = subprocess.run(["bash", os.path.join(t.root, "scripts", "install_linters.sh")], cwd=t.root, env=env, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        for n in ("shellcheck", "actionlint", "zizmor"):
+            with open(os.path.join(d, n)) as f:
+                self.assertEqual(f.read(), "old " + n, n)
+        self.assertEqual(sorted(os.listdir(os.path.join(t.root, ".tools"))), ["bin"], "no staging leftovers")
+
+    def test_script_syntax_and_strict_mode(self):
+        self.assertEqual(subprocess.run(["bash", "-n", INSTALLER]).returncode, 0)
+        with open(INSTALLER, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("set -euo pipefail", text)
+        self.assertNotRegex(text, r"(?m)^\s*(eval|sudo)\b")
+        self.assertNotRegex(text, r"\|\s*(ba)?sh\b", "never pipe a download into a shell")
+
+
+class RepoPins(unittest.TestCase):
+    def entries(self):
+        out = {}
+        with open(PINS, encoding="utf-8") as f:
+            for line in f:
+                if line.strip() and not line.startswith("#"):
+                    name, digest, member, url = line.split()
+                    self.assertNotIn(name, out)
+                    out[name] = (digest, member, url)
+        return out
+
+    def test_exactly_the_three_approved_archives(self):
+        e = self.entries()
+        self.assertEqual(set(e), set(APPROVED))
+        for name, (digest, version, arch) in APPROVED.items():
+            got_digest, member, url = e[name]
+            self.assertEqual(got_digest, digest, name)
+            self.assertTrue(url.startswith("https://github.com/"), url)
+            self.assertIn(f"/releases/download/{version if name != 'actionlint' else 'v' + version}/", url)
+            self.assertIn(arch, url)
+            self.assertIn("linux", url.lower())
+            self.assertTrue(member.endswith(name), member)
+
+    def test_dest_is_git_ignored(self):
+        with open(os.path.join(ROOT, ".gitignore"), encoding="utf-8") as f:
+            self.assertIn(".tools/", [line.strip() for line in f])
+
+    def test_installer_uses_https_only_by_default(self):
+        with open(INSTALLER, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("proto='=https'", text)
+        self.assertRegex(text, r'--proto "\$proto" --proto-redir "\$proto"', "redirects obey the same protocol limit (R1-03)")
+
+
+if __name__ == "__main__":
+    unittest.main()
