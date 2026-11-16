@@ -166,6 +166,13 @@ class Behaviour(unittest.TestCase):
         self.assertNotEqual(lint(["bogus"], {})[0], 0)
 
 
+class Repository(unittest.TestCase):
+    def test_every_tracked_shell_file_and_workflow_passes(self):
+        """Includes the lint script itself: a comment that starts with `# shellcheck (` is parsed as a directive (SC1073)."""
+        done = subprocess.run([SCRIPT], cwd=ROOT, capture_output=True, text=True, check=False)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+
 class Wiring(unittest.TestCase):
     def test_verify_runs_the_lint_and_its_tests_even_in_fast_mode(self):
         verify = read("scripts", "verify.sh")
