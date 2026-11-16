@@ -129,6 +129,10 @@ jobs:
   tasks:
     name: tasks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -155,6 +159,12 @@ jobs:
         run: python3 -I scripts/prompt_rules.py
       - name: docs/tasks.toml validates
         run: python3 -I scripts/tasks.py validate
+      - name: owner drift check tests
+        run: python3 -I scripts/test_owner_drift_check.py
+      - name: owner tasks match GitHub (no closed issue or merged PR on a todo row)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/check_owner_drift.sh
       - name: docs check tests
         run: python3 -I scripts/test_docs_check.py
       - name: docs links and paths exist
