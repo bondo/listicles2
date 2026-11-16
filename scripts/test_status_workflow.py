@@ -13,7 +13,7 @@ TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_st
          "python3 -I scripts/test_status_publish.py", "python3 -I scripts/test_status_workflow.py")
 PAGE_URL = "https://github.com/bondo/listicles2/blob/status/status.md"
 JOB_PERMISSIONS = ["checks: read", "contents: write", "issues: read", "pull-requests: read"]
-USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)\s*$")
+USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)(?:\s+#\s*(\S.*))?$")
 
 
 def read(*parts):
@@ -105,12 +105,17 @@ def problems(text):
     conc = block(text, "concurrency", 0) or []
     if not any(re.fullmatch(r"  group: \S+", ln) for ln in conc) or "  cancel-in-progress: false" not in conc:
         found.append("concurrency group with cancel-in-progress: false is required")
-    if "ref: main" not in step_after(text, "uses: actions/checkout@v4"):
+    checkout = step_after(text, "uses: actions/checkout@")
+    if "ref: main" not in checkout:
         found.append("checkout must use ref: main")
+    if "persist-credentials: false" not in checkout:
+        found.append("checkout must set persist-credentials: false")
+    if "http.https://github.com/.extraheader" not in text or "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in text:
+        found.append("the publish step must authenticate with a step-scoped token header, not a persisted credential")
     for ln in text.splitlines():
         m = USES.match(ln)
-        if m and not re.fullmatch(r"v\d+", m.group(2)):
-            found.append(f"{m.group(1)}@{m.group(2)}: pin like ci.yml (major tag)")
+        if m and not (re.fullmatch(r"[0-9a-f]{40}", m.group(2)) and re.fullmatch(r"v\d+(\.\d+){1,2}", m.group(3) or "")):
+            found.append(f"{m.group(1)}@{m.group(2)}: pin to a commit SHA with a trailing '# vX.Y.Z' comment")
     if re.search(r"--force|force-with-lease|\s-f\s|push\s+\S+\s+\+", text):
         found.append("never force-push")
     for needle in ("scripts/status_fetch.py", "scripts/status_visual.py render", "scripts/status_publish.py"):
@@ -158,7 +163,19 @@ class StatusWorkflow(unittest.TestCase):
         self.flagged(self.text + "\n      - run: git push --force origin status\n", "force-push")
 
     def test_unpinned_action_is_flagged(self):
-        self.flagged(self.text.replace("actions/checkout@v4", "actions/checkout@main", 1), "pin like ci.yml")
+        for ref in ("v4", "main"):
+            with self.subTest(ref):
+                self.flagged(re.sub(r"(actions/checkout)@\w+ # \S+", rf"\1@{ref}", self.text, count=1), "pin to a commit SHA")
+
+    def test_pin_without_a_version_comment_is_flagged(self):
+        self.flagged(re.sub(r"(actions/checkout@[0-9a-f]{40}) # \S+", r"\1", self.text, count=1), "pin to a commit SHA")
+
+    def test_persisted_checkout_credentials_are_flagged(self):
+        self.flagged(self.text.replace("          persist-credentials: false\n", "", 1), "persist-credentials")
+        self.flagged(self.text.replace("persist-credentials: false", "persist-credentials: true", 1), "persist-credentials")
+
+    def test_publish_without_the_token_header_is_flagged(self):
+        self.flagged(self.text.replace("http.https://github.com/.extraheader", "http.extraheader"), "token header")
 
     def test_checkout_of_the_event_ref_is_flagged(self):
         self.flagged(self.text.replace("ref: main", "ref: ${{ github.ref }}", 1), "ref: main")
