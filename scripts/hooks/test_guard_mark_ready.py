@@ -69,6 +69,23 @@ class MarkReadyGuard(unittest.TestCase):
             self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 2, c + " (tooling)")
         self.assertEqual(run("Bash", {"command": call}, d), 0)
 
+    def test_reserved_words_and_definitions_cannot_hide_the_call(self):
+        """R5-01: `coproc` (and a function body or a trap string) runs the call without the guard seeing it as the first word."""
+        d = repo()
+        install_wrapper(d)
+        call = "scripts/mark-ready.sh 1"
+        forms = ["coproc " + call, "coproc X { " + call + "; }", "coproc { " + call + "; }", "coproc X ( " + call + " )",
+                 "cp -t scripts /tmp/x/mark-ready.sh && coproc " + call, "cp /tmp/x/mark-ready.sh scripts/; coproc X { " + call + "; }",
+                 "function f { " + call + "; }; f", "function f() { " + call + "; }; f", "f() { " + call + "; }; f",
+                 "trap '" + call + "' EXIT", "trap -- '" + call + "' EXIT",
+                 "time -p " + call, "select x in a; do " + call + "; done", "until false; do " + call + "; done", "[[ -n x ]] && " + call,
+                 "case x in x) " + call + ";; esac", "while true; do " + call + "; done", "for i in 1; do " + call + "; done"]
+        for c in forms:
+            self.assertEqual(run("Bash", {"command": c}, d), 2, c)
+            self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 2, c + " (tooling)")
+        for c in ["coproc echo hi", "function f { echo hi; }", "trap 'echo bye' EXIT", "trap - EXIT", "trap -p"]:
+            self.assertEqual(run("Bash", {"command": c}, d), 0, c + " (other uses stay allowed)")
+
     def test_any_other_form_is_denied(self):
         for c in ["scripts/mark-ready.sh", "scripts/mark-ready.sh 0", "scripts/mark-ready.sh 012", "scripts/mark-ready.sh 1234567",
                   "scripts/mark-ready.sh -1", "scripts/mark-ready.sh 1 2", "scripts/mark-ready.sh 1 --input x", "scripts/mark-ready.sh ''",
