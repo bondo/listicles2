@@ -57,7 +57,7 @@ ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash"}
 INTERPRETERS = re.compile(r"^(python[0-9.]*|node|nodejs|ruby|perl|php|deno|bun)$")
 RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for", "in", "case", "esac", "!", "{", "}", "function",
-            "select"}
+            "select", "coproc"}
 # name -> (options that take a value, number of leading positional arguments to skip)
 WRAPPERS = {
     "env": ({"-u", "-C", "--unset", "--chdir", "-S", "--split-string"}, 0),
@@ -716,6 +716,8 @@ def unwrap(words):
             continue
         if w in RESERVED:
             i += 1
+            if w in ("function", "coproc") and i + 1 < len(words) and (w == "function" or words[i + 1] in ("{", "(")):
+                i += 1  # `function NAME {` and `coproc NAME {`: the name is not the command (R5-01)
             continue
         base = os.path.basename(w)
         if base == "script":  # script -qc 'cmd' /dev/null runs cmd
@@ -946,6 +948,11 @@ def check_simple(cmd, state, depth):
         return
     if prog == "eval":
         check_command_string(" ".join(args), child(state), depth + 1)
+        return
+    if prog == "trap":  # the first non-option argument is a command string the shell runs later (R5-01)
+        handler = [a for a in args if not a.startswith("-")][:1]
+        for body in handler:
+            check_command_string(body, child(state), depth + 1)
         return
     if prog == "find":
         j = 0
