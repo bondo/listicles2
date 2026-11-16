@@ -4,7 +4,7 @@
 # Any mismatch or malformed pin aborts with nothing installed. The binaries are never run here.
 set -euo pipefail
 
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+here="$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(dirname "$here")"
 pins="$here/linters.pins"
 dest="$root/.tools/bin"
@@ -61,7 +61,7 @@ done
 # bin/actionlint is a wrapper that pins the installed shellcheck and disables pyflakes (real binary in libexec): PATH is irrelevant.
 if [ -f "$tmp/stage/actionlint" ]; then
   mv "$tmp/stage/actionlint" "$tmp/stage/actionlint.real"
-  printf '#!/bin/sh\nd=$(cd "${0%%/*}" && pwd)\nexec "$d/../libexec/actionlint" "-shellcheck=$d/shellcheck" -pyflakes= "$@"\n' > "$tmp/stage/actionlint"
+  printf '#!/bin/sh\nd=$(CDPATH= cd -- "${0%%/*}" && pwd)\nexec "$d/../libexec/actionlint" "-shellcheck=$d/shellcheck" -pyflakes= "$@"\n' > "$tmp/stage/actionlint"
   chmod 0755 "$tmp/stage/actionlint"
   mkdir -p "$root/.tools/libexec"
   mv -f "$tmp/stage/actionlint.real" "$root/.tools/libexec/actionlint"

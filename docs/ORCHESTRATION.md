@@ -615,7 +615,7 @@ seen the batch report.
   `test_settings_permissions.py` pins the allow list and checks no rule can match merge, push, curl or rm. **Residual risks, accepted by the owner when merging (a rule is not a guarantee):** (1) the `*` spans spaces, slashes and
   shell metacharacters, so `$(...)` in an argument is not modelled (only compound commands are); (2) the paths are relative to the cwd, so a `cd` into a
   directory holding another `.tools/bin/` is not excluded; (3) a binary planted or swapped in
-  the install directory runs under the rule without a prompt (the guard checks writes best-effort and never re-hashes binaries);
+  the install directories (bin, libexec) run under the rule without a prompt (the guard checks writes best-effort and never re-hashes binaries);
   (4) the auto-mode classifier decides independently of allow rules and cannot be tested from the repo; (5) the flag checks
   see only the command text (not arguments read from a file, or a program that starts a linter itself); (6) the linters can read
   any file (`--rcfile`, `-config-file`, `--config`, file arguments) and `LD_PRELOAD=x` before a command is not blocked.
