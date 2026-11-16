@@ -45,7 +45,7 @@ PROTECTED = (
 # Writes to the file cannot all be caught by name (sed -i scripts/*.sh, cp -t scripts, tar, git apply), so its content is checked when it runs:
 # the wrapper must be a regular file, not a symlink, with exactly this SHA-256. A legitimate edit of the wrapper updates this pin in the same
 # reviewed tooling PR (test_guard_mark_ready.py fails until it does).
-MARK_READY_SHA256 = "5f63c355e1513a2d4d1af6fe6dfdb3a89b57de76671126eccec424b8c7dc92d9"
+MARK_READY_SHA256 = "b16d02a17ae53f612feff6f5930103ee932b921c22811a484f14232ba67bcf2f"
 MARK_READY = "mark-ready.sh"
 MARK_READY_CALL = "scripts/mark-ready.sh"
 PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")

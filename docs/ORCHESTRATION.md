@@ -602,7 +602,7 @@ seen the batch report.
   no rule for raw `gh` commands, because `*` in a rule also matches spaces and slashes, so a raw rule could be steered to another
   route (a merge, say). The auto-mode classifier may still evaluate the call on its own, so the rule is not a guarantee.
   The allow rule approves any command that starts with the script's path, so the PreToolUse guard also treats every file named
-  `mark-ready.sh` as a process file and checks the command's first word: if it is a `mark-ready.sh`, the command is allowed only as
+  `mark-ready.sh` as a process file and checks the command's first word (also after unquoting, so `scripts/mark-ready.sh\ 1` counts, and file writes to such names are denied): if it names `mark-ready.sh`, the command is allowed only as
   the **whole command**, exactly `scripts/mark-ready.sh <N>` and nothing before, after or beside it (no `;`, `&&`, `||`, `|`, `&`,
   newline, group, subshell, `cd`, env prefix, wrapper, redirect or substitution), from the project root, and only while
   the script is a regular file, not a symlink, whose SHA-256 equals the pin in the guard, because edits that never name the file
@@ -610,7 +610,7 @@ seen the batch report.
   rewrite the script after it (R4-01). Residual risks the owner accepts: a background process started by an earlier tool call can still
   swap the file between the hash and the `exec`; the guard is loaded from the working tree, so a branch switch replaces guard and pin
   (owner review of the branch is the control); the auto-mode classifier and Claude Code's matcher semantics cannot be tested here. Interpreter forms such as `bash scripts/mark-ready.sh N` do not match
-  the allow rule and go to the normal permission check. A legitimate edit of the script updates the pin in the same tooling PR.
+  the allow rule and go to the normal permission check. The script itself resolves neither `bash` (`#!/bin/bash`) nor `gh` (fixed directories only, fixed `PATH`) through `PATH`, so a shim in a `PATH` directory does not run (R5-03). A legitimate edit of the script updates the pin in the same tooling PR.
   Merging stays with the merge agent/owner (§1, §7.5), never with this rule. Changing the allow list or the script is an owner-only,
   tooling-session change (CODEOWNERS covers `/.claude/` and `/scripts/`); `scripts/hooks/test_settings_permissions.py` and
   `scripts/hooks/test_mark_ready.py` fail if the list holds anything else or the script accepts anything but a PR number.

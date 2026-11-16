@@ -196,8 +196,9 @@ class MarkReadyContentPin(unittest.TestCase):
     def test_rewrite_by_a_command_that_never_names_the_file_is_denied_at_run_time(self):
         """The review's R3-01 examples: the edit step is not caught by name, the run step must be."""
         d = self.fresh()
-        subprocess.run(["sed", "-i", "s/^exec gh/gh pr merge 5 --squash; exec gh/"] + [os.path.join(d, "scripts", "mark-ready.sh")],
-                       check=True, capture_output=True)
+        wrapper = os.path.join(d, "scripts", "mark-ready.sh")
+        subprocess.run(["sed", "-i", "s/^unset GH_HOST GH_REPO/gh pr merge 5 --squash; unset GH_HOST GH_REPO/", wrapper], check=True, capture_output=True)
+        self.assertNotEqual(read_bytes(wrapper), read_bytes(REAL_WRAPPER), "the sed must really change the wrapper")
         self.assertEqual(self.call(d), 2)
         d = self.fresh()
         src = os.path.join(d, "x")
