@@ -1,7 +1,8 @@
 # Tally user stories (v1)
 
 Task M0.5-01. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
-Sources: the owner's design-chain decisions Q1-Q5 and the answers to OQ-1 to OQ-6 of 2026-11-15 (state issue #15), and
+Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17 and OQ-19 of
+2026-11-16 (state issue #15), and
 [the plan](../PLAN.md). Decided questions are in [section 10](#10-decided-questions); anything still unsettled is marked
 **OQ-n** and listed in [section 11](#11-open-questions), and nothing here decides it. Later milestones trace their acceptance tests to the story ids below (PLAN section 7).
 
@@ -14,6 +15,8 @@ Sources: the owner's design-chain decisions Q1-Q5 and the answers to OQ-1 to OQ-
   one member who manages the household. *List creator* = the user who created a list (not the same as household owner).
   *Private list* = only its creator can see it. *Shared list* = every member of the creator's household can see it and
   has the same rights as the creator, except that only the creator can stop sharing it (OQ-2, OQ-3, OQ-4).
+  *Leaving and household deletion:* when a member leaves, is removed or deletes their account, the lists they created go
+  with them (OQ-5); when the household is deleted, each shared list goes back to its creator as a private list (OQ-17).
   *Item* = one line in a list: a name, an optional release year, an optional re-release year and an "I have it"
   checkbox (Q2, OQ-6).
 * The first use case (Q1): a user keeps a collection checklist, for example which Georg Jensen Christmas mobiles they
@@ -45,7 +48,8 @@ once.
   account are deleted, and I see the sign-in screen (OQ-5); members lose the shared lists I created.
 * Given I am the household owner and other members remain, when I ask to delete my account, then the app first guides me
   to transfer ownership (HH-06) and deletes nothing until that is done.
-* Given I am the last member, when I delete my account, then the household is deleted too.
+* Given I am the last member, when I delete my account, then the household is deleted too (my lists are deleted with
+  my account, so nothing returns to anyone, OQ-17).
 * Given Google demands a recent sign-in, when I confirm, then the app asks me to sign in again and then continues.
 * What happens to items I added to lists other people created: OQ-18.
 
@@ -80,7 +84,7 @@ lists.
 **HH-05 Leave a household.** As a member who is not the household owner, I want to leave, so that I stop sharing.
 * Given I confirm leaving, then I no longer see lists other members shared, and my open invites are deleted.
 * Given I confirm leaving, then every list I created goes with me: it stays mine and is private to me, and the other
-  members lose the lists I had shared (OQ-5). The confirmation says so.
+  members lose the lists I had shared (OQ-5). The confirmation says so. (Household deletion works differently: HH-06.)
 
 **HH-06 Manage the household (household owner).** As the household owner, I want to remove a member, hand over
 ownership or delete the household, so that the household stays under control.
@@ -88,8 +92,14 @@ ownership or delete the household, so that the household stays under control.
   lists they created go with them as in HH-05, so the other members lose the lists they had shared (OQ-5).
 * Given I transfer ownership to another member, then that member is the household owner and I am a plain member.
 * Given I delete the household and confirm, then no one is a member any more and the household cannot be restored
-  (PLAN section 3.1, soft delete then cleanup); every member's private lists stay theirs (OQ-1).
-* What happens to the lists that were shared when the household is deleted: OQ-17.
+  (PLAN section 3.1, soft delete then cleanup); the confirmation says that shared lists go back to their creators.
+* Given the household is deleted, then every list that was shared with it goes back to being private to its creator,
+  with all its items, and every private list stays as it was: nothing is lost (OQ-17).
+* Given a list I created went back to private because the household was deleted, when I next open the app, then I see
+  a notice that the household was deleted and my shared lists are private again; I can share them again once I am in a
+  household (VIS-02).
+* Given the household is deleted, then a former member cannot read or change a list that someone else created and had
+  shared with it, and the creator still can (rules allow and deny tests).
 
 ## 3. Lists
 
@@ -126,7 +136,9 @@ collect.
 * Given the name is empty, when I confirm, then no item is added.
 * Given a release year or a re-release year, then it is a whole number from 1900 to the current year plus 50; any other
   value is refused with an error (OQ-6).
-* How the two years relate (a re-release year without a release year, or earlier than it) and the final wording: OQ-19.
+* Given only a re-release year, or only a release year, when I confirm, then the item is saved with just that year.
+* Given a re-release year earlier than the release year, when I confirm, then the item is saved: the two years have no
+  rule between them, each only has to be in the valid range (OQ-19).
 * Given I add several items in a row, then the input stays open for the next item.
 * Whether two items may have the same name: OQ-11.
 
@@ -262,21 +274,27 @@ These are constraints for the data model and screens; v1 builds none of them (M2
 
 ## 10. Decided questions
 
-Answered by the owner on 2026-11-15 (state issue #15); the stories above follow them.
+Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the stories above follow them.
 
-| Id | Decision (owner, 2026-11-15) | Stories |
+**Labels for the M1 strings** (decided): the re-release year is "re-release year" in English and "Genudgivelse" in Danish
+(OQ-19).
+
+| Id | Decision (owner, 2026-11-15 unless marked) | Stories |
 |---|---|---|
 | OQ-1 | **Decided:** no household is needed to create lists. After sign-in a user can create private lists at once; creating or joining a household is needed only to share a list. Whether the household is created behind the scenes is left to M1/M2 planning. | HH-01, LIST-02, VIS-01, VIS-02 |
 | OQ-2 | **Decided:** only the creator of a list can stop sharing it; everything else is equal for everyone the list is shared with (OQ-3). | LIST-03, LIST-04, VIS-04 |
 | OQ-3 | **Decided:** in v1 everyone a list is shared with has the same rights as its creator: add, edit, check and remove items, rename the list, delete the list. Per-list permissions come later (section 9). | VIS-03, LIST-03, LIST-04, ITEM-01..04 |
 | OQ-4 | **Decided:** stopping sharing is in v1; the list becomes private to its creator again and the other members lose access. | VIS-04 |
 | OQ-5 | **Decided:** in v1 everything a person created goes with them when they leave the household, are removed, or delete their account, including the shared lists they created (the other members lose those lists). Later the leaver chooses per shared list whether it stays (section 9). | AUTH-04, HH-05, HH-06 |
-| OQ-6 | **Decided:** the year is optional, valid from 1900 to the current year plus 50. An item can have two years: the original release year and, optionally, a re-release year (wording to confirm, OQ-19). | ITEM-01, ITEM-02, ITEM-05 |
+| OQ-6 | **Decided:** the year is optional, valid from 1900 to the current year plus 50. An item can have two years: the original release year and, optionally, a re-release year (rules between them: OQ-19). | ITEM-01, ITEM-02, ITEM-05 |
+| OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes what they created with them. | AUTH-04, HH-05, HH-06 |
+| OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelse". | ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
 
 For the owner to decide (the collaborator may advise). Nothing above depends on a guess about these. **Blocks** says
-which next step needs the answer first; *later* means it blocks no design step.
+which next step needs the answer first; *later* means it blocks no design step. No open question blocks the app-flow
+diagram (M0.5-02) any more.
 
 | Id | Question | Stories | Blocks |
 |---|---|---|---|
@@ -290,13 +308,12 @@ which next step needs the answer first; *later* means it blocks no design step.
 | OQ-14 | Should the app show when it is offline and when changes are waiting to be sent? | SYNC-01 | M0.5-03 |
 | OQ-15 | The plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | PLAN update, M1/M2 scope |
 | OQ-16 | Assumed: a member who joins later sees the lists already shared with the household. Confirm. | VIS-02 | later |
-| OQ-17 | When the household owner deletes the household, do the shared lists go back to being private to their creators (as when a person leaves, OQ-5), or are they deleted? | HH-06 | M0.5-02 |
 | OQ-18 | When a person leaves, is removed or deletes their account, do the items they added to lists other people created stay in those lists, or go with them (OQ-5 says "everything a person created")? And the reverse: do the items other members added to that person's shared lists go with those lists? | AUTH-04, HH-05, HH-06 | M2 planning |
-| OQ-19 | Two years per item: may an item have a re-release year without a release year, and may it be earlier than the release year? Is "re-release year" the right English word (the owner wrote the Danish "genoblaeg", read as re-release or reissue), and what is the Danish label? | ITEM-01, ITEM-02, ITEM-05 | M0.5-03 |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
 creator (OQ-5), but PLAN section 3 stores every list under a household. Lists need a creator and a sharing state, and new
 security rules: the creator can do everything; members of the household a list is shared with can do everything except
 stop the share or change the list's creator or household (OQ-2, OQ-3, OQ-4); today members can read everything under the household (PLAN section 3.1). These need
-allow and deny tests and the `risk:high` tag, and change the M1 and M2 scope in PLAN section 7. The PLAN section 3 item
+allow and deny tests and the `risk:high` tag, and change the M1 and M2 scope in PLAN section 7. PLAN section 3.1 deletes
+everything under a deleted household, but shared lists must go back to their creators (OQ-17). The PLAN section 3 item
 has no year fields; the v1 item needs a name, two optional years (1900 to the current year plus 50) and the check.
