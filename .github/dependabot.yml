@@ -12,6 +12,11 @@ updates:
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
+    # TypeScript 7 is not supported by ts-jest (typescript <7) or typescript-eslint (typescript <6.1), so a major bump
+    # fails the firebase job. Revisit when both support it, then remove this ignore and bump TypeScript by hand.
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: pip
     directory: /scripts
     schedule: { interval: weekly }

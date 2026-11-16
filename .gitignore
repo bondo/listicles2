@@ -7,6 +7,7 @@ local.properties
 captures/
 node_modules/
 firebase/*.log
+firebase/fixture-tmp-*/
 firebase-debug.log
 firestore-debug.log
 app/google-services.json

@@ -59,10 +59,15 @@ else
   echo "skip  unit-tests, coverage (--fast)"; SKIPPED=1
 fi
 step build gradle :app:assembleDebug :app:assembleDebugAndroidTest
+step firebase-install bash -c 'cd firebase && npm ci --silent'
+step firebase-typecheck bash -c 'cd firebase && npm run typecheck --silent'
+step firebase-lint bash -c 'cd firebase && npm run lint --silent'
+step firebase-format bash -c 'cd firebase && npm run format:check --silent'
+step firebase-ts-tests python3 -I scripts/test_firebase_ts.py
 if [ "${SKIP_FIREBASE:-0}" = 1 ]; then
   echo "skip  firebase-rules (SKIP_FIREBASE=1)"; SKIPPED=1
 else
-  step firebase-rules bash -c 'cd firebase && npm ci --silent && npm test --silent'
+  step firebase-rules bash -c 'cd firebase && npm test --silent'
 fi
 
 [ "$fail" = 0 ] && echo "verify: all steps passed$([ "$SKIPPED" = 1 ] && echo " (some skipped)")" || echo "verify: FAILED"
