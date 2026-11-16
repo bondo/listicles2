@@ -4,8 +4,7 @@
 # Exactly one argument, digits only (1 to 6 digits, no leading zero). Everything else is refused before gh runs.
 set -eu
 
-# Neither bash nor gh is found through PATH (a shim planted in a PATH directory would run under the allow rule): the interpreter is /bin/bash,
-# gh is looked up only in these fixed system directories, and gh itself runs with this fixed PATH.
+# Neither bash nor gh is found through PATH (a planted shim would run under the allow rule): /bin/bash, gh only from these directories, fixed PATH.
 gh_dirs="/usr/local/bin /opt/homebrew/bin /usr/bin /bin"
 PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
 export PATH

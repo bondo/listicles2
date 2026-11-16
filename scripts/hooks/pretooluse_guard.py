@@ -45,12 +45,12 @@ PROTECTED = (
 # Writes to the file cannot all be caught by name (sed -i scripts/*.sh, cp -t scripts, tar, git apply), so its content is checked when it runs:
 # the wrapper must be a regular file, not a symlink, with exactly this SHA-256. A legitimate edit of the wrapper updates this pin in the same
 # reviewed tooling PR (test_guard_mark_ready.py fails until it does).
-MARK_READY_SHA256 = "b16d02a17ae53f612feff6f5930103ee932b921c22811a484f14232ba67bcf2f"
+MARK_READY_SHA256 = "31dadb519381aa1754aad85588e06bd23bd4086f11889ceda3b5549d3958879a"
 MARK_READY = "mark-ready.sh"
 MARK_READY_CALL = "scripts/mark-ready.sh"
 PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")
-# R5-02: a word that names the wrapper, also after unquoting (`scripts/mark-ready.sh\\ 1` is the single word "scripts/mark-ready.sh 1"): a path
-# component that is exactly mark-ready.sh, followed by whitespace, a slash or the end. Names such as mark-ready.sh.md or xmark-ready.sh do not match.
+# R5-02: a word that names the wrapper, also after unquoting (`scripts/mark-ready.sh\\ 1` is one word): a path component that is exactly
+# mark-ready.sh, then whitespace, a slash or the end. Names such as mark-ready.sh.md or xmark-ready.sh do not match.
 WRAPPER_WORD = re.compile(r"(^|/)" + re.escape(MARK_READY) + r"(\s|/|$)")
 WHOLE_CALL = re.compile(re.escape(MARK_READY_CALL) + r" [1-9][0-9]{0,5}")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
@@ -953,8 +953,7 @@ def check_simple(cmd, state, depth):
         check_command_string(" ".join(args), child(state), depth + 1)
         return
     if prog == "trap":  # the first non-option argument is a command string the shell runs later (R5-01)
-        handler = [a for a in args if not a.startswith("-")][:1]
-        for body in handler:
+        for body in [a for a in args if not a.startswith("-")][:1]:
             check_command_string(body, child(state), depth + 1)
         return
     if prog == "find":
@@ -998,7 +997,7 @@ def guard_target(path, state, what="write to"):
 
 def check_bash(command, cwd):
     if re.search(re.escape(MARK_READY) + r"\\\r?\n", command):  # R5-02: `mark-ready.sh\<newline>1` joins to a different word; never judge it
-        deny("a line continuation right after mark-ready.sh is not allowed; write the call as exactly `scripts/mark-ready.sh <PR number>`")
+        deny("a line continuation right after mark-ready.sh is not allowed; write exactly `scripts/mark-ready.sh <PR number>`")
     check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command})
 
 

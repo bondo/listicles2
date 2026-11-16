@@ -41,75 +41,50 @@ class MarkReadyGuard(unittest.TestCase):
         return run("Bash", {"command": c}, cwd or self.d, env)
 
     def test_exact_call_from_the_project_root_is_allowed(self):
-        for c in ["scripts/mark-ready.sh 1", "scripts/mark-ready.sh 86", "scripts/mark-ready.sh 123456",
-                  "scripts/mark-ready.sh 1\n", "  scripts/mark-ready.sh 1  "]:
+        for c in ["scripts/mark-ready.sh 1", "scripts/mark-ready.sh 123456", "scripts/mark-ready.sh 1\n", " scripts/mark-ready.sh 1 "]:
             self.assertEqual(self.bash(c), 0, c)
+
+    def denied_everywhere(self, forms):
+        """Every form is denied with the pinned wrapper present (so only the shape can cause it), also in tooling sessions."""
+        for c in forms:
+            self.assertEqual(self.bash(c), 2, c)
+            self.assertEqual(self.bash(c, env=TOOLING), 2, c + " (tooling)")
 
     def test_only_the_whole_command_is_allowed_never_a_compound(self):
         """R4-01: the guard hashes the wrapper before any part of the command runs, so anything that could run before (or beside) the call
         could rewrite the wrapper after the hash. The call is allowed only as the entire command."""
-        d = repo()
-        install_wrapper(d)  # the pinned wrapper is present, so only the compound shape can cause the denial
         call = "scripts/mark-ready.sh 1"
-        forms = [  # the review's four forms, then every other way to put something before, after or beside the call
-            "cp /tmp/x/mark-ready.sh scripts/ && " + call, "cp /tmp/x/mark-ready.sh scripts/ ; " + call,
-            "cp -t scripts /tmp/x/mark-ready.sh && " + call,
+        cp = "cp /tmp/x/mark-ready.sh scripts/"
+        self.denied_everywhere([  # the review's four forms, then every other way to put something before, after or beside the call
+            cp + " && " + call, cp + " ; " + call, "cp -t scripts /tmp/x/mark-ready.sh && " + call,
             "sed -i 's/^exec gh/echo evil; exec gh/' scripts/*.sh && " + call,
-            "git checkout other && " + call, "git switch other; " + call,
-            "(sleep 1; cp /tmp/x/mark-ready.sh scripts/) & " + call,
-            "tar xf e.tar && " + call, "git apply p.diff && " + call,
-            "cd . && " + call, "true || " + call, "true | " + call, "echo x\n" + call, "echo x &\n" + call, "{ " + call + "; }", "( " + call + " )",
-            "! " + call, "if true; then " + call + "; fi", "sleep 1 & " + call,
-            call + " && cp /tmp/x/mark-ready.sh scripts/", call + " ; true", call + " || true", call + " | cat", call + " &", call + " & sleep 1",
-            call + "\nrm -rf x", call + " # comment", call + " $(true)", call + " `true`", call + " > /dev/null",
-            "bash -c '" + call + "'", "sh -c \"" + call + "\"", "eval '" + call + "'", "echo '" + call + "' | sh", "time " + call,
-        ]
-        for c in forms:
-            self.assertEqual(run("Bash", {"command": c}, d), 2, c)
-            self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 2, c + " (tooling)")
-        self.assertEqual(run("Bash", {"command": call}, d), 0)
+            "git checkout other && " + call, "git switch other; " + call, "(sleep 1; " + cp + ") & " + call, "tar xf e.tar && " + call,
+            "git apply p.diff && " + call, "cd . && " + call, "true || " + call, "true | " + call, "echo x\n" + call, "echo x &\n" + call,
+            "{ " + call + "; }", "( " + call + " )", "! " + call, "if true; then " + call + "; fi", "sleep 1 & " + call, "time " + call,
+            call + " && " + cp, call + " ; true", call + " || true", call + " | cat", call + " &", call + " & sleep 1", call + "\nrm -rf x",
+            call + " # comment", call + " $(true)", call + " `true`", call + " > /dev/null", "echo '" + call + "' | sh",
+            "bash -c '" + call + "'", "sh -c \"" + call + "\"", "eval '" + call + "'"])
+        self.assertEqual(self.bash(call), 0)
 
     def test_reserved_words_and_definitions_cannot_hide_the_call(self):
-        """R5-01: `coproc` (and a function body or a trap string) runs the call without the guard seeing it as the first word."""
-        d = repo()
-        install_wrapper(d)
+        """R5-01: `coproc`, a function body or a trap string runs the call without the guard seeing it as the first word."""
         call = "scripts/mark-ready.sh 1"
-        forms = ["coproc " + call, "coproc X { " + call + "; }", "coproc { " + call + "; }", "coproc X ( " + call + " )",
-                 "cp -t scripts /tmp/x/mark-ready.sh && coproc " + call, "cp /tmp/x/mark-ready.sh scripts/; coproc X { " + call + "; }",
-                 "function f { " + call + "; }; f", "function f() { " + call + "; }; f", "f() { " + call + "; }; f",
-                 "trap '" + call + "' EXIT", "trap -- '" + call + "' EXIT",
-                 "time -p " + call, "select x in a; do " + call + "; done", "until false; do " + call + "; done", "[[ -n x ]] && " + call,
-                 "case x in x) " + call + ";; esac", "while true; do " + call + "; done", "for i in 1; do " + call + "; done"]
-        for c in forms:
-            self.assertEqual(run("Bash", {"command": c}, d), 2, c)
-            self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 2, c + " (tooling)")
+        self.denied_everywhere([
+            "coproc " + call, "coproc X { " + call + "; }", "coproc { " + call + "; }", "coproc X ( " + call + " )",
+            "cp -t scripts /tmp/x/mark-ready.sh && coproc " + call, "cp /tmp/x/mark-ready.sh scripts/; coproc X { " + call + "; }",
+            "function f { " + call + "; }; f", "function f() { " + call + "; }; f", "f() { " + call + "; }; f",
+            "trap '" + call + "' EXIT", "trap -- '" + call + "' EXIT", "time -p " + call, "select x in a; do " + call + "; done",
+            "until false; do " + call + "; done", "[[ -n x ]] && " + call, "case x in x) " + call + ";; esac", "while true; do " + call + "; done",
+            "for i in 1; do " + call + "; done"])
         for c in ["coproc echo hi", "function f { echo hi; }", "trap 'echo bye' EXIT", "trap - EXIT", "trap -p"]:
-            self.assertEqual(run("Bash", {"command": c}, d), 0, c + " (other uses stay allowed)")
+            self.assertEqual(self.bash(c), 0, c + " (other uses stay allowed)")
 
     def test_quoted_or_escaped_first_words_are_checked(self):
-        """R5-02: after unquoting, `scripts/mark-ready.sh\\ 1` and `"scripts/mark-ready.sh 1"` are one word that only STARTS with the wrapper path;
-        the shell runs a file with that odd name. Nothing but the exact unquoted call is allowed."""
-        d = repo()
-        install_wrapper(d)
-        for c in ["scripts/mark-ready.sh\\ 1", '"scripts/mark-ready.sh 1"', 'scripts/"mark-ready.sh 1"', "'scripts/mark-ready.sh 1'",
-                  "scripts/mark-ready.sh\\\t1", "scripts/mark-ready.sh\\\n1", "./scripts/mark-ready.sh\\ 1", "app/scripts/mark-ready.sh\\ 1",
-                  "cp -t scripts /tmp/x/mark-ready.sh && scripts/mark-ready.sh\\ 1", "nohup scripts/mark-ready.sh\\ 1"]:
-            self.assertEqual(run("Bash", {"command": c}, d), 2, c)
-            self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 2, c + " (tooling)")
-
-    def test_writes_to_files_named_like_the_wrapper_plus_text_are_denied(self):
-        """R5-02: the same odd name as a write target: planting `scripts/mark-ready.sh 1`, then running it as `scripts/mark-ready.sh\\ 1`."""
-        for c in ["printf x > 'scripts/mark-ready.sh 1'", "cp /tmp/e 'scripts/mark-ready.sh 1'", "chmod +x 'scripts/mark-ready.sh 1'",
-                  "touch 'scripts/mark-ready.sh 1'", "mv /tmp/e scripts/mark-ready.sh\\ 1", "tee 'scripts/mark-ready.sh 1' < /tmp/x",
-                  "ln -s /tmp/e 'scripts/mark-ready.sh 1'", "install /tmp/e 'scripts/mark-ready.sh 1'", "echo x > scripts/mark-ready.sh\\ 1",
-                  "cp /tmp/e 'app/scripts/mark-ready.sh 1'", "rm 'scripts/mark-ready.sh 1'", "printf x > 'scripts/mark-ready.sh\t1'"]:
-            self.assertEqual(self.bash(c), 2, c)
-            self.assertEqual(self.bash(c, env=TOOLING), 0, (c, "tooling"))
-        for tool in ["Edit", "Write", "MultiEdit"]:
-            self.assertEqual(run(tool, {"file_path": "scripts/mark-ready.sh 1"}, self.d), 2, tool)
-            self.assertEqual(run(tool, {"file_path": "scripts/mark-ready.sh 1"}, self.d, TOOLING), 0, tool)
-        for c in ["printf x > scripts/mark-ready.sh.md", "cp /tmp/e scripts/mark-ready.shx", "touch scripts/mark-ready.sh.bak", "touch scripts/xmark-ready.sh"]:
-            self.assertEqual(self.bash(c), 0, c + " (names that cannot be the wrapper stay allowed)")
+        """R5-02: unquoted, `scripts/mark-ready.sh\\ 1` is one word that only STARTS with the wrapper path; the shell runs a file with that name."""
+        self.denied_everywhere([
+            "scripts/mark-ready.sh\\ 1", '"scripts/mark-ready.sh 1"', 'scripts/"mark-ready.sh 1"', "'scripts/mark-ready.sh 1'", "scripts/mark-ready.sh\\\t1",
+            "scripts/mark-ready.sh\\\n1", "./scripts/mark-ready.sh\\ 1", "app/scripts/mark-ready.sh\\ 1", "nohup scripts/mark-ready.sh\\ 1",
+            "cp -t scripts /tmp/x/mark-ready.sh && scripts/mark-ready.sh\\ 1"])
 
     def test_any_other_form_is_denied(self):
         for c in ["scripts/mark-ready.sh", "scripts/mark-ready.sh 0", "scripts/mark-ready.sh 012", "scripts/mark-ready.sh 1234567",
@@ -140,7 +115,7 @@ class MarkReadyGuard(unittest.TestCase):
     def test_planted_copy_in_a_subdirectory_cannot_be_run_or_written(self):
         self.assertEqual(self.bash("cd app && scripts/mark-ready.sh 1"), 2)
         for p in ["app/scripts/mark-ready.sh", "scripts/nested/scripts/mark-ready.sh", "scripts/mark-ready.sh",
-                  os.path.join("x", "..", "app", "scripts", "mark-ready.sh")]:
+                  os.path.join("x", "..", "app", "scripts", "mark-ready.sh"), "scripts/mark-ready.sh 1"]:
             for tool in ["Edit", "Write", "MultiEdit"]:
                 self.assertEqual(run(tool, {"file_path": p}, self.d), 2, (tool, p))
                 self.assertEqual(run(tool, {"file_path": p}, self.d, TOOLING), 0, (tool, p, "tooling sessions may edit it"))
@@ -149,7 +124,12 @@ class MarkReadyGuard(unittest.TestCase):
         for c in ["echo x > scripts/mark-ready.sh", "printf x > app/scripts/mark-ready.sh", "cp /tmp/x scripts/mark-ready.sh",
                   "tee scripts/mark-ready.sh < /tmp/x", "sed -i s/a/b/ scripts/mark-ready.sh", "rm scripts/mark-ready.sh",
                   "mv /tmp/x app/scripts/mark-ready.sh", "echo x >> scripts/mark-ready.sh", "install -m 755 /tmp/x scripts/mark-ready.sh",
-                  "python3 -c \"open('scripts/mark-ready.sh','w').write('x')\"", "truncate -s 0 scripts/mark-ready.sh"]:
+                  "python3 -c \"open('scripts/mark-ready.sh','w').write('x')\"", "truncate -s 0 scripts/mark-ready.sh",
+                  # R5-02: planting a file whose name only STARTS with the wrapper path, to run it later as `scripts/mark-ready.sh\\ 1`
+                  "printf x > 'scripts/mark-ready.sh 1'", "cp /tmp/e 'scripts/mark-ready.sh 1'", "chmod +x 'scripts/mark-ready.sh 1'",
+                  "touch 'scripts/mark-ready.sh 1'", "mv /tmp/e scripts/mark-ready.sh\\ 1", "tee 'scripts/mark-ready.sh 1' < /tmp/x",
+                  "ln -s /tmp/e 'scripts/mark-ready.sh 1'", "install /tmp/e 'scripts/mark-ready.sh 1'", "echo x > scripts/mark-ready.sh\\ 1",
+                  "cp /tmp/e 'app/scripts/mark-ready.sh 1'", "rm 'scripts/mark-ready.sh 1'", "printf x > 'scripts/mark-ready.sh\t1'"]:
             self.assertEqual(self.bash(c), 2, c)
             self.assertEqual(self.bash(c, env=TOOLING), 0, (c, "tooling"))
 
@@ -158,7 +138,8 @@ class MarkReadyGuard(unittest.TestCase):
                   "grep -n gh scripts/mark-ready.sh", "wc -l scripts/mark-ready.sh", "echo x > scripts/other.sh", "cp scripts/mark-ready.sh /tmp/x",
                   "git commit -m 'edit scripts/mark-ready.sh'", "bash -n scripts/mark-ready.sh"]:
             self.assertEqual(self.bash(c), 0, c)
-        for p in ["scripts/verify.sh", "scripts/mark-ready.sh.md", "docs/mark-ready.md", "scripts/hooks-other.sh"]:
+        for p in ["scripts/verify.sh", "scripts/mark-ready.sh.md", "docs/mark-ready.md", "scripts/hooks-other.sh", "scripts/mark-ready.shx",
+                  "scripts/mark-ready.sh.bak", "scripts/xmark-ready.sh"]:
             self.assertEqual(run("Write", {"file_path": p}, self.d), 0, p)
 
 
