@@ -1,8 +1,8 @@
 {
-  "blockers": 6,
+  "blockers": 5,
   "current_milestone": "M0.5",
   "followups": 16,
-  "generated_at": "2026-11-16T07:40:55Z",
+  "generated_at": "2026-11-16T09:24:29Z",
   "milestones": [
     {
       "done": 28,
