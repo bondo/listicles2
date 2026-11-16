@@ -76,6 +76,17 @@ def step_after(text, marker):
     return out
 
 
+def publish_step(text):
+    """The lines of the step that runs scripts/status_publish.py (from its `- ` line up to the next step), or []."""
+    lines = text.splitlines()
+    starts = [i for i, ln in enumerate(lines) if re.match(r"^      - ", ln)]
+    for n, start in enumerate(starts):
+        end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+        if any("scripts/status_publish.py" in ln for ln in lines[start:end]):
+            return lines[start:end]
+    return []
+
+
 def problems(text):
     found = []
     top = block(text, "permissions", 0)
@@ -110,7 +121,9 @@ def problems(text):
         found.append("checkout must use ref: main")
     if "persist-credentials: false" not in checkout:
         found.append("checkout must set persist-credentials: false")
-    if "http.https://github.com/.extraheader" not in text or "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in text:
+    publish = publish_step(text)
+    step_env = block("\n".join(publish), "env", 8) or []
+    if "http.https://github.com/.extraheader" not in "\n".join(publish) or "          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in step_env:
         found.append("the publish step must authenticate with a step-scoped token header, not a persisted credential")
     for ln in text.splitlines():
         m = USES.match(ln)
