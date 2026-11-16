@@ -16,7 +16,9 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
   (one list and its items, ITEM-05), **Household** (HH-04), **Join** (HH-03), **Account** (sign out, delete account,
   language if in the app: OQ-12).
 * A dotted arrow is something that happens later, not a tap. A step marked OQ-n is not decided: the diagram shows
-  where the answer plugs in, not the answer.
+  where the answer plugs in, not the answer. A step marked **proposed** is the planner's recommended answer to an open
+  question, drawn so the flow is complete; it changes if the owner decides otherwise.
+* Every confirmation can be cancelled, and then nothing changes.
 * "Needs a connection" means the step stops with a message when there is no network and leaves nothing half done
   (SYNC-03).
 
@@ -26,7 +28,7 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
 flowchart TD
     start(["App opens"]) --> signed{"Signed in?<br>AUTH-02"}
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
-    signed -- "yes, also offline" --> lists["Lists<br>LIST-01"]
+    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>order, search, progress: OQ-8, OQ-9"]
     signin -- "Google account picked" --> lists
     link(["Invite link opened<br>HH-03"]) --> signed2{"Signed in?"}
     signed2 -- "no" --> signin2["Sign-in, then Join<br>AUTH-01, HH-03"]
@@ -48,12 +50,14 @@ at once and needs no household (OQ-1, VIS-01).
 
 ```mermaid
 flowchart TD
-    open(["First start"]) --> si["Sign-in screen only<br>AUTH-01"]
+    open(["First start on this phone"]) --> si["Sign-in screen only<br>AUTH-01"]
     si -- "Sign in with Google" --> net{"Network?"}
     net -- "no" --> nonet["Message: first sign-in needs a connection<br>AUTH-01, SYNC-03"] --> si
     net -- "yes" --> picker["System account picker<br>AUTH-01"]
     picker -- "cancel" --> si
-    picker -- "account picked" --> home["Lists, empty state with Create list<br>LIST-01"]
+    picker -- "account picked" --> known{"Account already<br>has lists?"}
+    known -- "no, new account" --> home["Lists, empty state with Create list<br>LIST-01"]
+    known -- "yes, for example a new phone" --> mine["Lists with my lists<br>AUTH-01, LIST-01"]
     home -. "later starts, also offline" .-> home2["Lists without signing in again<br>AUTH-02"]
     acc["Account"] -- "Sign out" --> wipe["Local copy removed (assumed, OQ-13)<br>AUTH-03"] --> si
     acc -- "Delete account" --> owner{"Household owner<br>with other members?"}
@@ -83,10 +87,12 @@ flowchart TD
     inv -- "yes" --> share["Single-use link, valid 7 days; Android share sheet<br>HH-02"]
     members -- "Revoke invite (its creator or household owner)" --> revoked["Link no longer works<br>HH-02"]
     members -- "Leave (not household owner)" --> leave["Confirm: lists I created go with me, private;<br>members lose those I shared<br>HH-05, OQ-5"]
-    leave -- "confirm" --> left["Not in a household; my invites deleted<br>HH-05"]
-    members -- "Remove member (household owner)" --> removed["Member loses others' shared lists; their lists go with them<br>HH-06, OQ-5"]
+    leave -- "cancel" --> members
+    leave -- "confirm" --> left["Not in a household; I no longer see others' shared lists;<br>my invites deleted<br>HH-05"]
+    members -- "Remove member (household owner)" --> removed["Member loses others' shared lists, their open invites stop working;<br>their lists go with them<br>HH-06, OQ-5"]
     members -- "Transfer ownership (household owner)" --> moved["Other member is household owner; I am a plain member<br>HH-06"]
     members -- "Delete household (household owner)" --> delc["Confirm: shared lists go back to their creators;<br>cannot be restored<br>HH-06"]
+    delc -- "cancel" --> members
     delc -- "confirm" --> deleted["No members; every shared list private to its creator again<br>HH-06, OQ-17"]
     deleted -. "creator's next app start" .-> notice["Notice: household deleted, my shared lists are private again<br>HH-06"]
 ```
@@ -101,13 +107,16 @@ flowchart TD
     tap(["Invite link opened"]) --> installed{"App installed?"}
     installed -- "no" --> store["Not decided: OQ-21"]
     installed -- "yes" --> auth{"Signed in?"}
-    auth -- "no" --> si["Sign-in<br>AUTH-01"] --> check
-    auth -- "yes" --> check{"Link valid?"}
+    auth -- "no" --> si["Sign-in<br>AUTH-01"] --> net
+    auth -- "yes" --> net{"Network?"}
+    net -- "no" --> onet["Message: joining needs a connection<br>proposed, OQ-22<br>HH-03, SYNC-03"]
+    net -- "yes" --> check{"Link valid?"}
     check -- "expired, used or revoked" --> bad["Message saying so; joins nothing<br>HH-03"]
     check -- "valid" --> other{"Already in<br>another household?"}
     other -- "yes" --> leavefirst["Message: leave that household first<br>HH-03"]
     other -- "no" --> joinscr["Join screen shows the household name<br>HH-03"]
     joinscr -- "confirm, no network" --> jnet["Message: joining needs a connection<br>HH-03, SYNC-03"]
+    joinscr -- "cancel" --> nojoin["Joins nothing"]
     joinscr -- "confirm" --> member["Member; Lists shows the household's shared lists<br>HH-03, VIS-02, OQ-16"]
 ```
 
@@ -126,12 +135,13 @@ flowchart TD
     del -- "cancel or undo" --> open
     del -- "final" --> dgone["List and items gone, also for members<br>LIST-04"] --> lists
     open -- "Share with household (creator, private list)" --> inhh{"In a household?"}
-    inhh -- "no" --> hstep["Household step: create or join, then back here<br>VIS-02, OQ-1, OQ-20"]
+    inhh -- "no" --> hstep["Proposed, OQ-20: household step, create or join, then back here<br>(or a household made automatically)<br>VIS-02, OQ-1"]
     hstep -- "in a household" --> sconfirm
     hstep -- "gave up" --> open
     inhh -- "yes" --> sconfirm["Confirm sharing this one list<br>VIS-02"]
     sconfirm -- "confirm" --> shared["Shared: every member sees it in Lists<br>VIS-02, VIS-03"]
     shared -- "Stop sharing (creator only)" --> stop["Confirm<br>VIS-04"]
+    stop -- "cancel" --> shared
     stop -- "confirm" --> private["Private to the creator with all items; members lose it<br>VIS-04, OQ-2, OQ-4"]
 ```
 
@@ -141,7 +151,7 @@ tests):
 | Who | Private list | Shared list |
 |---|---|---|
 | List creator | everything | everything, including Stop sharing |
-| Member of the household it is shared with | not shown, server refuses | everything except Stop sharing and changing creator or household (OQ-3) |
+| Other member of the creator's household | not shown, server refuses | everything except Stop sharing and changing creator or household (OQ-2, OQ-3, VIS-04) |
 | Anyone else | not shown, server refuses | not shown, server refuses |
 
 ## 5. Items
@@ -160,6 +170,7 @@ flowchart TD
     edit -- "year cleared" --> noyear["Item has no such year<br>ITEM-02"]
     edit -- "valid" --> saved["Saved, shown to members too<br>ITEM-02"]
     open -- "Remove item" --> rem["Confirm, undo or both: OQ-10<br>ITEM-03"]
+    rem -- "cancel or undo" --> open
     rem -- "final" --> rgone["Item gone<br>ITEM-03"]
     open -- "Tap checkbox" --> toggle["I have it: checked or unchecked, kept offline too<br>ITEM-04, OQ-7"]
 ```
@@ -182,12 +193,13 @@ stateDiagram-v2
     Online --> Online: change from a member appears by itself (SYNC-02)
     Sending --> ItemGone: edited item was deleted meanwhile
     ItemGone --> Online: item stays deleted, short message (SYNC-02)
-    Sending --> AccessLost: list deleted, unshared, or left with its creator
+    Sending --> AccessLost: list deleted, unshared, left with its creator, household deleted, or I was removed
     Online --> AccessLost: same while the list is open
     AccessLost --> Online: leave the list, unsent edits dropped, short message (SYNC-02)
     note right of Offline
         Needs a connection, SYNC-03:
         first sign-in, join, create invite.
+        Opening an invite link: proposed, OQ-22.
         Others: OQ-22. Offline banner: OQ-14.
     end note
 ```
@@ -252,29 +264,29 @@ No error is shown when the account picker is cancelled (AUTH-01). Danish text mu
 
 ## 9. Story coverage
 
-Every v1 story appears in at least one diagram above.
+Every v1 story appears in at least one diagram above. Each row lists every story id its section cites.
 
 | Section | Stories |
 |---|---|
-| 1. Screen map | AUTH-01, AUTH-02, HH-03, LIST-01, ITEM-05, VIS-03 |
-| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04 |
-| 3. Household | HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, VIS-02 |
-| 4. Lists and sharing | LIST-02, LIST-03, LIST-04, VIS-01, VIS-02, VIS-03, VIS-04 |
+| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03, LANG-02 |
+| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, HH-06, LIST-01, VIS-01, SYNC-03 |
+| 3. Household | AUTH-01, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, VIS-02, SYNC-03 |
+| 4. Lists and sharing | LIST-01, LIST-02, LIST-03, LIST-04, VIS-01, VIS-02, VIS-03, VIS-04 |
 | 5. Items | ITEM-01, ITEM-02, ITEM-03, ITEM-04, ITEM-05 |
 | 6. Offline and sync | SYNC-01, SYNC-02, SYNC-03 |
 | 7. Language | LANG-01, LANG-02 |
-| 8. Empty and error states | LIST-01, ITEM-05, HH-01, HH-03, SYNC-02, SYNC-03, HH-06 |
+| 8. Empty and error states | AUTH-01, HH-01, HH-03, HH-06, LIST-01, LIST-02, LIST-03, ITEM-01, ITEM-02, ITEM-05, SYNC-02, SYNC-03, LANG-01 |
 
-The open questions that block M0.5-03 stay open and are only marked where they plug in: OQ-8, OQ-9 (section 5),
-OQ-10 (sections 4 and 5) and OQ-14 (section 6).
+The open questions that block M0.5-03 stay open and are only marked where they plug in: OQ-8, OQ-9 (sections 1 and
+5), OQ-10 (sections 4 and 5), OQ-14 (section 6) and OQ-20 (section 4).
 
 ## 10. New open questions
 
 Found while drawing the flow; for the owner to decide (the collaborator may advise). Ids continue the numbering of
 [stories section 11](stories.md#11-open-questions).
 
-| Id | Question | Stories | Blocks |
-|---|---|---|---|
-| OQ-20 | A user who is not in a household taps "Share with household": does the app show a household step (create one with a name, or join with a link) and then share, as drawn in section 4, or create a household for them behind the scenes (OQ-1 leaves this to M1/M2)? | VIS-02, HH-01 | M1/M2 planning |
-| OQ-21 | An invite link opened on a phone without the app: open the Play Store page and ask the person to open the link again after installing? (Firebase Dynamic Links is shut down and there are no Cloud Functions, so the link may not survive the install.) | HH-02, HH-03 | M1/M2 planning |
-| OQ-22 | Besides first sign-in, joining and creating an invite (SYNC-03): do leaving, removing a member, transferring ownership, deleting the household, sharing, stopping sharing and deleting the account also need a connection, or may some wait offline and be sent later? | SYNC-03, HH-05, HH-06, VIS-02, VIS-04, AUTH-04 | M1/M2 planning |
+| Id | Question | Recommendation (planner; the owner decides) | Stories | Blocks |
+|---|---|---|---|---|
+| OQ-20 | A user who is not in a household taps "Share with household": does the app show a household step (create one with a name, or join with a link) and then share, or create a household for them behind the scenes (OQ-1 leaves this to M1/M2)? | The household step, drawn in section 4 as *proposed*: HH-01 needs a name, a household made behind the scenes would need a made-up one, and the step tells the user who will see the list. | VIS-02, HH-01 | M0.5-03 (whether the household step is a screen), M1/M2 planning |
+| OQ-21 | An invite link opened on a phone without the app: open the Play Store page and ask the person to open the link again after installing? (Firebase Dynamic Links is shut down and there are no Cloud Functions, so the link may not survive the install.) | Yes: the link's web page says "install Tally, then tap this link again" and links to the Play Store; no deferred link in v1. | HH-02, HH-03 | M1/M2 planning |
+| OQ-22 | Besides first sign-in, joining and creating an invite (SYNC-03): do opening an invite link, leaving, removing a member, transferring ownership, deleting the household, sharing, stopping sharing and deleting the account also need a connection, or may some wait offline and be sent later? | All need a connection in v1, with the SYNC-03 message: they change who can see what, the invite and the household name are only on the server, and deleting the account may need a recent sign-in. Drawn as *proposed* for opening an invite link (section 3). | SYNC-03, HH-03, HH-05, HH-06, VIS-02, VIS-04, AUTH-04 | M1/M2 planning |
