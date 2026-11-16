@@ -28,14 +28,8 @@ SCRIPTS = {
     "format:check": "prettier --check .",
 }
 # Every verify.sh step and CI step this task adds. verify.sh runs them in this order: install first, the rules emulator test last.
-VERIFY = [
-    "bash -c 'cd firebase && npm ci --silent'",
-    "bash -c 'cd firebase && npm run typecheck --silent'",
-    "bash -c 'cd firebase && npm run lint --silent'",
-    "bash -c 'cd firebase && npm run format:check --silent'",
-    "python3 -I scripts/test_firebase_ts.py",
-    "bash -c 'cd firebase && npm test --silent'",
-]
+NPM = "bash -c 'cd firebase && npm {} --silent'"
+VERIFY = [NPM.format(c) for c in ("ci", "run typecheck", "run lint", "run format:check")] + ["python3 -I scripts/test_firebase_ts.py", NPM.format("test")]
 CI = ["npm ci --silent", "npm run typecheck --silent", "npm run lint --silent", "npm run format:check --silent", "npm test --silent"]
 CI_ROOT_CMD = "python3 -I scripts/test_firebase_ts.py"
 # tsconfig compilerOptions allowlist: anything else (skipLibCheck, strict: false, a lone strict flag turned off) is a problem.
@@ -204,22 +198,16 @@ class HelperNegativeCases(unittest.TestCase):
         self.assertEqual(casts('import {\n  a,\n  type B,\n} from "x";\n'), [])
 
     def test_dependabot_check_rejects_a_missing_wrong_or_misplaced_ignore(self):
-        rule = {"dependency-name": "typescript", "update-types": ["version-update:semver-major"]}
-        good = {"updates": [{"package-ecosystem": "npm", "directory": "/firebase", "ignore": [rule]}]}
-        self.assertTrue(dependabot_ignores_typescript_major(good))
-        for name, cfg in {
-            "no ignore": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]},
-            "other package": {
-                "updates": [{"package-ecosystem": "npm", "directory": "/firebase", "ignore": [{**rule, "dependency-name": "eslint"}]}]
-            },
-            "minor only": {
-                "updates": [{"package-ecosystem": "npm", "directory": "/firebase", "ignore": [{**rule, "update-types": ["version-update:semver-minor"]}]}]
-            },
-            "other directory": {"updates": [{"package-ecosystem": "npm", "directory": "/", "ignore": [rule]}]},
-            "other ecosystem": {"updates": [{"package-ecosystem": "pip", "directory": "/firebase", "ignore": [rule]}]},
-        }.items():
+        def cfg(eco="npm", directory="/firebase", name="typescript", types=("version-update:semver-major",)):
+            ignore = [{"dependency-name": name, "update-types": list(types)}]
+            return {"updates": [{"package-ecosystem": eco, "directory": directory, "ignore": ignore}]}
+
+        self.assertTrue(dependabot_ignores_typescript_major(cfg()))
+        bad = {"no ignore": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]}, "other package": cfg(name="eslint"),
+               "minor only": cfg(types=("version-update:semver-minor",)), "other directory": cfg(directory="/"), "other ecosystem": cfg(eco="pip")}
+        for name, c in bad.items():
             with self.subTest(name):
-                self.assertFalse(dependabot_ignores_typescript_major(cfg))
+                self.assertFalse(dependabot_ignores_typescript_major(c))
 
     def test_tsconfig_allowlist_rejects_every_weakening(self):
         good = {
@@ -294,9 +282,7 @@ class Config(unittest.TestCase):
                      "%s: update and delete an existing doc", "list and add on a collection"):
             self.assertIn(case, text, case)
         self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
-
-    def test_rules_test_has_no_type_assertions(self):
-        self.assertEqual(casts(read("firebase", "test", "rules.test.ts")), [])
+        self.assertEqual(casts(text), [], "type assertions in rules.test.ts")
 
     def test_dependabot_ignores_typescript_majors_for_the_firebase_directory(self):
         self.assertTrue(dependabot_ignores_typescript_major(yaml.safe_load(read(".github", "dependabot.yml"))))
@@ -368,11 +354,9 @@ class Behaviour(unittest.TestCase):
 
 
 class NoLeftovers(unittest.TestCase):
-    """unittest loads classes alphabetically, so this one runs after Behaviour, which creates the fixture directories."""
-
+    """Alphabetical class order puts this after Behaviour, which creates the fixture directories."""
     def test_no_fixture_directory_is_left_behind(self):
-        left = [d for d in os.listdir(FB) if d.startswith("fixture-tmp-")]
-        self.assertEqual(left, [])
+        self.assertEqual([d for d in os.listdir(FB) if d.startswith("fixture-tmp-")], [])
 
 
 if __name__ == "__main__":
