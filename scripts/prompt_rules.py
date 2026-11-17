@@ -339,7 +339,8 @@ RULES = (
             r"if everything above nit was deferred and no commit followed the reviewed range, "
             r"post `accepted: all findings above nit deferred \(#a, #b\)` \(verdict `ready_deferred`\)",
         ),
-        "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: small minors are fixed (30 lines), never blockers, majors or protected areas without owner OK, limit 8 per milestone",
+        "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: small minors (30 lines) are fixed, never blockers, "
+        "majors or protected areas without owner OK, limit 8 per milestone",
         forbidden=(r"more than about 15 changed lines", r"ask the owner to do m0-o10"),
     ),
     Rule(
@@ -661,7 +662,8 @@ RULES = (
         (
             r"archive \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it",
             r"keep an implementer until its pr is merged or handed elsewhere",
-            r"after every handover the new orchestrator sweeps: it archives every finished worker, reviewer, planner and previous-orchestrator session of this project",
+            r"after every handover the new orchestrator sweeps: it archives every finished worker, reviewer, planner "
+            r"and previous-orchestrator session of this project",
             r"keeps itself, the merge agent and any session still running or with unpushed work",
             r"never archive a session that does not clearly belong to this project \(list it for the owner\)",
         ),
@@ -670,7 +672,7 @@ RULES = (
 )
 
 
-O = "docs/ORCHESTRATION.md"
+ORCH = "docs/ORCHESTRATION.md"
 DOC_RULES = (
     DocRule(
         "claude-reading", "CLAUDE.md",
@@ -807,7 +809,7 @@ DOC_RULES = (
         forbidden=(r"max 2 rounds",),
     ),
     DocRule(
-        "orch-roles", O,
+        "orch-roles", ORCH,
         (
             r"\| \*\*orchestrator\*\* \| opus / medium \|", r"\| \*\*implementer\*\* \| opus / high \(max for `risk:high`\) \|",
             r"reads whole transcripts, merges \|",
@@ -816,7 +818,7 @@ DOC_RULES = (
         forbidden=(r"sonnet / (low|medium)", r"reads full transcripts", r"applies `big-pr` without the owner's say-so"),
     ),
     DocRule(
-        "orch-autonomy", O,
+        "orch-autonomy", ORCH,
         (
             r"run review rounds \(max 4 per batch, §6\.2\) and the one escalation reviewer after round 4",
             r"mark a pr ready and send it to the merge agent \(a `risk:high` pr only after the independent second-reviewer pass\)",
@@ -830,7 +832,7 @@ DOC_RULES = (
         forbidden=(r"applies `big-pr` only with the owner's explicit say-so", r"\* merges \(of any pr\)", r"the 4-round cap being hit"),
     ),
     DocRule(
-        "orch-handover", O,
+        "orch-handover", ORCH,
         (
             r"trigger: about 80% context", r"at a \*\*batch boundary\*\*", r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
@@ -839,7 +841,7 @@ DOC_RULES = (
         forbidden=(r"about 50% context", r"the owner archives you"),
     ),
     DocRule(
-        "orch-parallel", O,
+        "orch-parallel", ORCH,
         (
             r"\*\*parallelism cap\*\* \(§7\.7\.5\): at most \*\*5\*\* worker sessions run at once, writers, reviewers, second and escalation "
             r"reviewers together; subagents do not count",
@@ -849,7 +851,7 @@ DOC_RULES = (
         forbidden=(r"at most \*{0,2}3\*{0,2} worker sessions",),
     ),
     DocRule(
-        "orch-review-rounds", O,
+        "orch-review-rounds", ORCH,
         (
             r"finding ids `r<round>-<nn>` \(`s<round>-<nn>` for the second reviewer, `d<round>-<nn>` for design-review rounds, §8\.5\)",
             r"`base_sha` \(the merge base\), `head_sha`, `reviewed_through`",
@@ -865,7 +867,7 @@ DOC_RULES = (
         ),
     ),
     DocRule(
-        "orch-cap-and-minors", O,
+        "orch-cap-and-minors", ORCH,
         (
             r"round 4 with findings above `nit`: the escalation of §7\.2\.2 decides `fix`, `split` or `owner`; it does not stop at the owner",
             r"\*\*default:\*\* fix a minor in the pr when its fix is small \(about 30 changed lines or fewer\)",
@@ -878,7 +880,7 @@ DOC_RULES = (
         ),
     ),
     DocRule(
-        "orch-spawn-checks", O,
+        "orch-spawn-checks", ORCH,
         (
             r"### 7\.2\.2 plan review, second reviewer, escalation reviewer, escaped defects",
             r"\*\*plan review:\*\* after the planner writes `docs/milestones/<mx>\.md` and before any implementer starts, the orchestrator spawns "
@@ -893,7 +895,7 @@ DOC_RULES = (
         "ORCHESTRATION 7.2.2: spawn steps for the plan review, the second reviewer and the one escalation reviewer, and the Caused-by step",
     ),
     DocRule(
-        "orch-results-and-failures", O,
+        "orch-results-and-failures", ORCH,
         (
             r"4\. targeted `list_events` \(a `kinds` filter, a small `limit`\) when steps 1-3 do not explain the state, and before an escalation "
             r"decision; never whole transcripts",
@@ -904,7 +906,7 @@ DOC_RULES = (
         "ORCHESTRATION 7.3 and 7.4: targeted list_events as step 4; two failures get one retry with a changed brief before the owner",
     ),
     DocRule(
-        "orch-archive", O,
+        "orch-archive", ORCH,
         (
             r"\*\*archive\*\* \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it",
             r"keep an implementer until its pr is merged or handed elsewhere",
@@ -917,7 +919,7 @@ DOC_RULES = (
         forbidden=(r"once their metrics row is logged and the owner has seen the batch report",),
     ),
     DocRule(
-        "orch-merge-agent", O,
+        "orch-merge-agent", ORCH,
         (
             r"\* \*\*merge agent:\*\* the merge agent merges every ready pr except the owner-only ones, one at a time",
             r"owner-only: permissions and `\.claude` settings, guard thresholds, branch protection, design and product sign-off, naming "
@@ -930,7 +932,7 @@ DOC_RULES = (
         "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
     ),
     DocRule(
-        "orch-throttle", O,
+        "orch-throttle", ORCH,
         (
             r"§7\.7\.6 throttle order \(owner decision a, 2026-11-17\)", r"\(1\) no optional extras", r"\(2\) the worker cap 3, then 2",
             r"\(3\) pause new work and finish the open prs",
@@ -940,7 +942,7 @@ DOC_RULES = (
         "ORCHESTRATION 7.7.6: the throttle order (extras, worker cap, new work); reviews are never throttled (owner decision A)",
     ),
     DocRule(
-        "orch-spawn-templates", O,
+        "orch-spawn-templates", ORCH,
         (
             r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, whole diff \{base_sha\}\.\.\{head_sha\}, focus since \{reviewed_through\}",
             r"### 8\.6 plan review, second reviewer, escalation reviewer",
@@ -951,7 +953,7 @@ DOC_RULES = (
         forbidden=(r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, range",),
     ),
     DocRule(
-        "orch-design-rounds", O,
+        "orch-design-rounds", ORCH,
         (
             r"max 3 rounds per design pr", r"round \{round\} of max 3", r"\(round 3, or an earlier round when nothing above nit is open\)",
         ),

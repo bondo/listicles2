@@ -1242,7 +1242,7 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the next round covers it, or until the owner explicitly accepts it."),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Owner acceptance (the bullet above) is the only alternative."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Round 4 with findings above `nit`: stop and ask the owner."),
-        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "the orchestrator defers the remaining minors and nits (follow-up issues) instead of running another round"),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "the orchestrator defers the remaining minors and nits (follow-up issues) instead of running"),
         ("docs/ORCHESTRATION.md", "orch-archive", "Archive finished worker sessions once their metrics row is logged and the owner has seen the batch report."),
         ("docs/ORCHESTRATION.md", "orch-design-rounds", "Round {round} of max 2."),
         ("docs/FOLLOW-UPS.md", "followups-labels", "Labels (the owner creates them once, task M0-O10;"),
