@@ -185,7 +185,7 @@ Span = tuple[int, int]
 
 def _script_only(text: str) -> str:
     """The text with everything outside <script> elements blanked (line numbers kept); text without a script tag is returned as is."""
-    scripts = list(re.finditer(r"<script\b[^>]*>(.*?)</script\s*>", text, re.S | re.I))
+    scripts = list(re.finditer(r"<script\b[^>]*>(.*?)</script\b[^>]*>", text, re.S | re.I))
     if not scripts:
         return text
     chars = list(re.sub(r"[^\n]", " ", text))
