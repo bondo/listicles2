@@ -53,7 +53,7 @@ class Rule:
 
 @dataclass(frozen=True)
 class DocRule:
-    """Like Rule, for one repository file (CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md) instead of a role prompt."""
+    """Like Rule, for one of the repository files in DOC_RULES instead of a role prompt."""
     id: str
     path: str
     patterns: tuple
@@ -689,7 +689,13 @@ DOC_RULES = (
             r"`caused by: #n`", r"a retro session \(opus / high\)", r"model and effort come from `agents/roles\.yaml`",
         ),
         "PLAN 9.1 and 9.4 follow roles.yaml and the Caused-by tracking instead of repeating the old models and budgets (#129 R1-03)",
-        forbidden=(r"sonnet / low", r"haiku", r"token budget", r"label `escaped`", r"retro session \(sonnet"),
+        forbidden=(r"sonnet / low", r"haiku", r"token budget", r"starting budgets", r"tokens/pr", r"label `escaped`", r"retro session \(sonnet"),
+    ),
+    DocRule(
+        "reviews-retro", "docs/reviews/README.md",
+        (r"\| r6 \| opus high worker \| plan 9\.4", r"opus high worker \| the csv, `docs/agent-tuning\.md` and a sample of transcripts and pr threads"),
+        "the reviews README names the R6 retro as Opus/high with transcripts, as PLAN 9.4 and roles.yaml do (#129 R2-02)",
+        forbidden=(r"sonnet medium worker",),
     ),
     DocRule(
         "template-handoff", "handoff/TEMPLATE.md",

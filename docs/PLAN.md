@@ -481,7 +481,7 @@ drop) is decided when post-v1 work is planned.
 
 Escalation rules (written down so agents don't decide on their own):
 * Model and effort come from `agents/roles.yaml`. An agent that needs more asks in its `WORKER-RESULT`, and the orchestrator decides within that file.
-  An implementer that fails `verify.sh` 3 times on the same error runs a CI-triage pass first, then stops and reports.
+  An implementer that fails `verify.sh` 3 times on the same error runs a CI-triage pass first, then, if it does not explain the failure, stops and reports.
 * Security rules, sync and merge logic, and the release workflow are tagged `risk:high`
   in `Mx.md`. Their implementers and reviewers run at max effort, and a second reviewer covers the same round.
 * De-escalation (lower effort or a cheaper model for a role) happens only through the
@@ -490,7 +490,7 @@ Escalation rules (written down so agents don't decide on their own):
 Role definitions are checked in, so they get reviewed and versioned like code:
 * `.claude/agents/explorer.md` and `.claude/agents/ci-triage.md`: subagent definitions,
   with model and effort in their frontmatter.
-* `agents/prompts/{orchestrator,planner,implementer,reviewer,design-reviewer}.md`: opening prompts for the sessions.
+* `agents/prompts/{orchestrator,planner,implementer,reviewer,design-reviewer}.md`, plus `second-reviewer.md`, `escalation-reviewer.md` and `verifier.md`: opening prompts for the sessions.
 * `agents/roles.yaml`: the single source of truth for each role's model and effort.
 
 ### 9.2 Working rules (in CLAUDE.md)
@@ -549,6 +549,4 @@ The next retro checks whether that effect happened, and reverts the change if no
 Guardrail: quality metrics take precedence over cost. A change that cuts tokens but
 raises escaped defects or blockers per PR gets reverted.
 
-Starting budgets (calibrated after M0): implementer about 300k tokens/PR, reviewer
-about 100k tokens per round, planner about 150k per milestone. Going over a budget
-doesn't stop work. It flags the PR for the retro.
+Spend is reported per PR class and milestone; there are no per-session limits on tokens (`agents/roles.yaml`).

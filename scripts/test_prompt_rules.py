@@ -1210,7 +1210,7 @@ class Pr3RuleTests(unittest.TestCase):
     def test_plan_prompt_list_and_triage_bullet_match_the_prompts(self):  # R2-03 of #129
         plan = prompt_rules.normalize(self.doc("docs/PLAN.md")).lower()
         self.assertIn("agents/prompts/{orchestrator,planner,implementer,reviewer,design-reviewer}.md", plan)  # M0.5-15 pin
-        self.assertRegex(plan, r"second-reviewer[^.]*escalation-reviewer[^.]*verifier|escalation-reviewer[^.]*second-reviewer")
+        self.assertRegex(plan, r"second-reviewer\.md.{0,40}escalation-reviewer\.md.{0,40}verifier\.md")
         self.assertIn("runs a ci-triage pass first, then, if it does not explain the failure, stops and reports", plan)
         self.assertIn("repository files", prompt_rules.DocRule.__doc__)
 
