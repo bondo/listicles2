@@ -10,6 +10,7 @@ import sys
 
 ZERO = "0" * 40
 # Top-level locations that cannot affect the Android build. Anything else (including new directories) builds.
+# Kotlin and Kotlin script files build wherever they are: spotless and detekt target **/*.kt and **/*.gradle.kts (R1-01).
 SKIP_PREFIXES = ("docs/", "handoff/", "scripts/", ".githooks/", ".claude/", ".github/", "agents/", "firebase/", "metrics/")
 SKIP_FILES = {"README.md", "CLAUDE.md", "REVIEW.md"}
 
@@ -17,6 +18,8 @@ SKIP_FILES = {"README.md", "CLAUDE.md", "REVIEW.md"}
 def classify(paths):
     for p in paths:
         if ".." in p.split("/"):
+            return "android"
+        if p.endswith((".kt", ".kts")):
             return "android"
         if p in SKIP_FILES or p.startswith(SKIP_PREFIXES):
             continue
