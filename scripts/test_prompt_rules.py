@@ -653,7 +653,8 @@ class M015Tests(unittest.TestCase):
             ("max 2 opus rounds per design pr", "max 3 opus rounds per design pr"),
             ("a third round never happens", "a third round is fine"),
             ("goes into the hand-off as a question for the owner", "is dropped"),
-            ("round 2: only the commits since round 1 and your open findings", "round 2: the whole pr again"),
+            ("every round: the whole pr diff and the findings json of earlier rounds", "round 2: the whole pr again"),
+            ("focus on the commits since the last round", "look at nothing"),  # #129 R1-01: row 3 for design rounds too
         ):
             self.assert_fails("design-reviewer", "dr-rounds", old, new)
 
@@ -1048,6 +1049,11 @@ class Pr3RuleTests(unittest.TestCase):
         "review-minors-and-cap": "REVIEW.md",
         "review-escalation": "REVIEW.md",
         "followups-small-fix": "docs/FOLLOW-UPS.md",
+        "plan-review-loop": "docs/PLAN.md",  # #129 R1-02, R1-03: PLAN section 6 and 9 follow CLAUDE.md and roles.yaml
+        "plan-working-rules": "docs/PLAN.md",
+        "plan-handoff": "docs/PLAN.md",
+        "plan-roles": "docs/PLAN.md",
+        "template-handoff": "handoff/TEMPLATE.md",
     }
     # (file, rule id, the old wording that must now be rejected)
     STALE = (
@@ -1061,6 +1067,15 @@ class Pr3RuleTests(unittest.TestCase):
         ("REVIEW.md", "review-escalation", "Fixes made after round 4 are not re-reviewed unless the owner asks."),
         ("REVIEW.md", "review-escalation", "Disputes: the reviewer either withdraws or restates; the owner breaks ties."),
         ("docs/FOLLOW-UPS.md", "followups-small-fix", "The fix is not small: more than about 15 changed lines."),
+        ("docs/PLAN.md", "plan-review-loop", "Each later round sees only the commits since the last round. The loop stops and you decide."),
+        ("docs/PLAN.md", "plan-working-rules", "Read files in parts and search narrowly. They only run targeted tests."),
+        ("docs/PLAN.md", "plan-handoff", "At **about 50%** context, the session finishes its current step."),
+        ("docs/PLAN.md", "plan-handoff", "**One PR per implementer session. One review round per reviewer session.**"),
+        ("docs/PLAN.md", "plan-roles", "| **Orchestrator** | Sonnet / low | One long-lived session |"),
+        ("docs/PLAN.md", "plan-roles", "The single source of truth for each role's model, effort and token budget."),
+        ("docs/PLAN.md", "plan-roles", "A retro session (Sonnet / medium) reads only the CSV. Escaped defects get the label `escaped`."),
+        ("handoff/TEMPLATE.md", "template-handoff", "Write it at about 50% context, commit it, and end the session."),
+        ("REVIEW.md", "review-escalation", "A dropped finding stays open."),
     )
 
     def doc(self, path):
@@ -1153,6 +1168,39 @@ class Pr3RuleTests(unittest.TestCase):
         for prefix in ("`R<round>-<nn>`", "`S<round>-<nn>`", "`D<round>-<nn>`"):
             self.assertIn(prefix, text)
         self.assertIn("review-ids", self.doc_problems("REVIEW.md", text.replace("`S<round>-<nn>`", "")))
+
+    def test_design_reviewer_gets_the_whole_diff_every_round(self):  # R1-01 of #129 (row 3)
+        norm = prompt_rules.normalize(real("design-reviewer")).lower()
+        self.assertIn("every round: the whole pr diff and the findings json of earlier rounds", norm)
+        self.assertNotIn("only the commits since round 1", norm)
+        old = " Round 2: only the commits since round 1 and your open findings."
+        self.assertIn("dr-rounds", ids(prompt_rules.check_text("design-reviewer", real("design-reviewer") + old)))
+        self.assertIn("max 2 opus rounds per design pr", norm, "the round count stays for PR 4")
+
+    def test_an_escalation_drop_becomes_withdrawn_and_an_owner_finding_stays_open(self):  # R1-04 of #129
+        prompt = prompt_rules.normalize(real("escalation-reviewer")).lower()
+        self.assertIn("a `drop` sets the finding to `withdrawn`", prompt)
+        self.assertIn("an `owner` finding stays open for the owner", prompt)
+        self.assertIn("a dropped finding becomes `withdrawn`", prompt_rules.normalize(self.doc("REVIEW.md")).lower())
+        for old, new in (("a `drop` sets the finding to `withdrawn`", "a `drop` closes the finding"),
+                         ("an `owner` finding stays open for the owner", "")):
+            text = re.sub(re.escape(old), new, prompt_rules.normalize(real("escalation-reviewer")), flags=re.I)
+            self.assertIn("escalation-role", ids(prompt_rules.check_text("escalation-reviewer", text)), old)
+
+    def test_the_escalation_reviewer_resumes_after_a_usage_limit_without_a_second_decision(self):  # R1-05 of #129
+        norm = prompt_rules.normalize(real("escalation-reviewer")).lower()
+        self.assertIn("usage limit reset: re-read the pr head, the thread and your notes", norm)
+        self.assertIn("post the one decision comment if it is not posted yet", norm)
+
+    def test_plan_and_template_follow_the_new_rules(self):  # R1-02, R1-03 of #129
+        plan = prompt_rules.normalize(self.doc("docs/PLAN.md")).lower()
+        for needle in ("agents/roles.yaml", "**second reviewer**", "**escalation reviewer**", "`caused by: #n`",
+                       "one implementer session per pr, kept across its review rounds"):
+            self.assertIn(needle, plan)
+        for stale in ("sonnet / low", "haiku", "token budget", "search narrowly", "label `escaped`", "once 50% is crossed"):
+            self.assertNotIn(stale, plan)
+        self.assertIn("60% of a 1m window, 40% of a 200k one", prompt_rules.normalize(self.doc("handoff/TEMPLATE.md")).lower())
+        self.assertIn("deferred minors do not count", plan)  # the M0-11 pin in test_wiring.py
 
 
 if __name__ == "__main__":
