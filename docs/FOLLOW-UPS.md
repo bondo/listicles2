@@ -37,7 +37,7 @@ Open means status `open` (not `fixed`, `withdrawn`, `disputed` with the reviewer
 A minor may be deferred only if all of these hold:
 * The PR's own acceptance criteria and its tests do not depend on the fix (a test that cannot catch the bug
   it claims to catch is a `major`, not a deferrable minor).
-* The fix is not small: more than about 15 changed lines, or it touches files outside the PR's scope.
+* The fix is not small: more than about 30 changed lines, or it touches files outside the PR's scope.
   Small fixes are made now; follow-ups are for work that costs more than it is worth in this PR.
 * The finding is not a regression introduced by this PR in code that already worked.
 

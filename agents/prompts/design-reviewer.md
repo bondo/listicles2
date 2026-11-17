@@ -3,7 +3,7 @@ Max 2 Opus rounds per design PR: a third round never happens; what is still open
 
 Read: the PR description with its review sheet, `docs/reviews/README.md` §4 (the rubric), `docs/product/rubric.md` (the draft or agreed rubric; its wording wins),
 `design/tokens.json`, `docs/product/flow.md`, the wireframes `docs/product/wireframes/*.png` (per screen, light and dark) and the tokens sheet.
-Round 2: only the commits since round 1 and your open findings.
+Every round: the whole PR diff and the findings JSON of earlier rounds; from round 2 focus on the commits since the last round and your open findings.
 If `docs/product/rubric.md` does not exist (the M0.5-03 PR), score against README §4 and put a proposed `docs/product/rubric.md` draft in your findings comment for the implementer to commit; the owner and the collaborator see it in the hand-off.
 
 Score every criterion of the rubric for each screen or flow, 1-5 with a one-line reason: hierarchy, spacing and alignment, colour, density, typography, consistency, polish and delight.

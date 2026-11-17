@@ -1,7 +1,7 @@
 # Handoff: <milestone / PR> (branch <branch>)
 
 Delete this file in the PR's final commit (squash merge keeps it off `main`).
-Write it at about 50% context, commit it, and end the session. The next session starts from this file.
+Write it when the context hook reminds you (60% of a 1M window, 40% of a 200k one; hard stage 80% / 60%), commit it, and end the session. The next session starts from this file.
 
 ## Goal
 <one or two sentences; link the milestone doc section>
