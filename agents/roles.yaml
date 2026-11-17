@@ -1,25 +1,90 @@
 # Single source of truth for agent roles (PLAN section 9.1). Changed only through a reviewed PR,
-# and only by the metrics retro (9.4) or the owner. Budgets are starting values, calibrated after M0.
-# `high_effort_when` lists the PLAN 9.1 escalation rules; agents must not escalate on their own judgment.
+# and only by the metrics retro (9.4) or the owner. Agent Usage Redesign (rev 46): roles that judge or write code run on
+# a strong model at high effort; there are no per-session token budgets (spend is reported per PR class and milestone).
+# `max_effort_when` lists the cases that raise effort to max; an agent may ask for more in its WORKER-RESULT and the
+# orchestrator decides within this file. Agents must not escalate on their own judgment.
+# Roles without a `prompt` have none yet: the role prompts follow in the later redesign PRs.
 roles:
   orchestrator:
-    model: sonnet
-    effort: low
-    session: one long-lived session; handoff at ~50% context
-    token_budget: null
+    model: opus
+    effort: medium
+    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 80% context
     prompt: agents/prompts/orchestrator.md
   planner:
     model: opus
     effort: high
     session: fresh, once per milestone
-    token_budget: 150000
     prompt: agents/prompts/planner.md
+  implementer:
+    model: opus
+    effort: high
+    session: fresh, one per PR, kept across review rounds
+    prompt: agents/prompts/implementer.md
+    max_effort_when:
+      - the PR is tagged risk:high in the milestone doc
+  reviewer:
+    model: opus
+    effort: high
+    session: fresh, one per review round
+    prompt: agents/prompts/reviewer.md
+    max_effort_when:
+      - the PR is tagged risk:high in the milestone doc
+  second-reviewer:
+    model: opus
+    effort: high
+    session: fresh, same round as the reviewer, for risk:high PRs and protected areas
+  escalation-reviewer:
+    model: opus
+    effort: max
+    session: fresh, once per PR after round 4 or on a dispute
+  verifier:
+    model: opus
+    effort: high
+    session: subagent in a reviewer or implementer session (finding verification, self-review)
+  design-reviewer:
+    model: opus
+    effort: high
+    session: fresh, one per design PR round (max 3 rounds per design PR)
+    prompt: agents/prompts/design-reviewer.md
+  explorer:
+    model: sonnet
+    effort: medium
+    session: subagent
+    definition: .claude/agents/explorer.md
+  ci-triage:
+    model: sonnet
+    effort: medium
+    session: subagent
+    definition: .claude/agents/ci-triage.md
+  retro:
+    model: opus
+    effort: high
+    session: fresh, one per retro run
+context:
+  handoff_at_percent_1m: 80
+  step_boundary_after_percent_1m: 60
+  handoff_at_percent_200k: 60
+  step_boundary_after_percent_200k: 40
+  small_window_up_to_tokens: 200000
+  handoff_template: handoff/TEMPLATE.md
+review:
+  max_rounds: 4
+  severities: [blocker, major, minor, nit]
+# Kill-switch fallback set: the pre-pilot values. After PILOT-STOP in #15 the orchestrator spawns with these instead of
+# the roles above (the explorer and ci-triage subagents keep the .claude/agents frontmatter). Not read as active roles.
+fallback:
+  orchestrator:
+    model: sonnet
+    effort: low
+    token_budget: null
+  planner:
+    model: opus
+    effort: high
+    token_budget: 150000
   implementer:
     model: sonnet
     effort: medium
-    session: fresh, one per PR
     token_budget: 300000
-    prompt: agents/prompts/implementer.md
     high_effort_when:
       - verify.sh failed 3 times on the same error
       - 2 review rounds ended with blockers
@@ -27,30 +92,16 @@ roles:
   reviewer:
     model: opus
     effort: high
-    session: fresh, one per review round
     token_budget: 100000
-    prompt: agents/prompts/reviewer.md
     max_effort_when:
       - the PR is tagged risk:high in the milestone doc
   design-reviewer:
     model: opus
     effort: high
-    session: fresh, one per design PR round (max 2 rounds per design PR)
     token_budget: 100000
-    prompt: agents/prompts/design-reviewer.md
   explorer:
     model: haiku
     effort: low
-    session: subagent
-    definition: .claude/agents/explorer.md
   ci-triage:
     model: haiku
     effort: low
-    session: subagent
-    definition: .claude/agents/ci-triage.md
-context:
-  handoff_at_percent: 50
-  handoff_template: handoff/TEMPLATE.md
-review:
-  max_rounds: 4
-  severities: [blocker, major, minor, nit]

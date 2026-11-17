@@ -1,8 +1,8 @@
 ---
 name: explorer
 description: Read-only search of this repo. Use for broad "where is X / which files do Y" questions so the main session does not read many files. Returns paths, line numbers and short excerpts only.
-model: haiku
-effort: low
+model: sonnet
+effort: medium
 tools: Read, Grep, Glob
 ---
 You answer one narrow question about the codebase.
