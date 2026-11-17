@@ -253,6 +253,57 @@ class Headless(unittest.TestCase):
         self.assertIn("HANDOFF SOON", self.status(60, env_window="garbage"))
         self.assertIn("HANDOFF SOON", self.status(60, window="abc"))  # a garbage window size in the input counts as unknown
 
+    # R1-01 (#126 review): the statusline knows the real window; it records it next to the % and the hook uses it.
+    def record(self, pct, window, sid="r1"):
+        """Run the statusline for session `sid` (window=None: the status JSON has no context_window_size) in self.tmp."""
+        cw = {"used_percentage": pct}
+        if window is not None:
+            cw["context_window_size"] = window
+        env = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
+        env.update(TMPDIR=self.tmp)
+        return subprocess.run(["bash", STATUS], input=json.dumps({"session_id": sid, "context_window": cw}), env=env,
+                              capture_output=True, text=True).stdout
+
+    def test_a_200k_session_at_65_percent_gets_the_hard_reminder_like_its_status_line_says(self):
+        self.assertIn("HANDOFF NOW", self.record(65, 200000))
+        out = self.hook(sid="r1")  # no LISTICLES_CONTEXT_WINDOW: the recorded window is used
+        self.assertIn("Do not start new work", out)
+        self.assertIn("65%", out)
+
+    def test_the_recorded_window_beats_the_env_window(self):
+        self.record(45, 200000)  # 45% of a 200k window is past the 40% soft stage
+        self.assertIn("next step boundary", self.hook(sid="r1", env={"LISTICLES_CONTEXT_WINDOW": "1000000"}))
+
+    def test_the_recorded_window_sizes_the_transcript_percentage_too(self):
+        self.record(10, 200000)  # the statusline % is low; the transcript says 130k tokens = 65% of 200k (13% of 1M)
+        self.write([assistant(130000)])
+        self.assertIn("Do not start new work", self.hook(sid="r1"))
+
+    def test_without_a_recorded_window_the_env_then_1m_still_apply(self):
+        self.assertNotIn("HANDOFF", self.record(50, None))  # 50% of the 1M default: quiet
+        self.assertEqual(self.hook(sid="r1"), "")
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "listicles-ctx", "r1.window")))
+        self.record(45, None, sid="r2")
+        self.assertIn("next step boundary", self.hook(sid="r2", env={"LISTICLES_CONTEXT_WINDOW": "200000"}))
+
+    def test_a_garbage_window_is_neither_recorded_nor_used(self):
+        for bad in ("abc", 0, -5, 1.5):
+            self.record(45, bad, sid="r3")
+            self.assertFalse(os.path.exists(os.path.join(self.tmp, "listicles-ctx", "r3.window")), bad)
+        base = os.path.join(self.tmp, "listicles-ctx")
+        for i, junk in enumerate(("abc", "0", "-5", "\u00b2", "")):
+            with open(os.path.join(base, f"r4{i}.window"), "w") as f:
+                f.write(junk)
+            with open(os.path.join(base, f"r4{i}"), "w") as f:
+                f.write("45")
+            self.assertEqual(self.hook(sid=f"r4{i}"), "", repr(junk))  # 45% of the 1M default: quiet, no crash
+
+    def test_the_recorded_window_stays_per_session(self):
+        self.record(65, 200000, sid="ra")
+        self.record(65, 1000000, sid="rb")
+        self.assertIn("Do not start new work", self.hook(sid="ra"))
+        self.assertIn("next step boundary", self.hook(sid="rb"))
+
     def test_statusline_threshold_env_is_a_single_stage(self):
         self.assertNotIn("HANDOFF", self.status(79, thr="80"))
         self.assertIn("HANDOFF NOW", self.status(80, thr="80"))
