@@ -653,14 +653,11 @@ class RetroTaskTests(unittest.TestCase):
 
     def invariants(self, graph):
         retro = [t for t in graph.tasks if t.milestone == "M0.5" and t.assignee == "retro"]
-        self.assertEqual(len(retro), 1)
-        self.assertEqual(retro[0].status, "todo")
+        self.assertEqual(len(retro), 1)  # whatever its status
         self.assertIn("R6", retro[0].title)
-        open_ids = {t.id for t in graph.tasks
-                    if t.milestone == "M0.5" and t.status == "todo" and t.id not in (retro[0].id, "M0.5-FU")
-                    and t.assignee != "owner"}
-        self.assertTrue(open_ids, "the test needs open M0.5 tasks to be meaningful")
-        self.assertLessEqual(open_ids, set(retro[0].depends_on))
+        before = {t.id for t in graph.tasks
+                  if t.milestone == "M0.5" and t.id not in (retro[0].id, "M0.5-FU") and t.assignee != "owner"}
+        self.assertLessEqual(before, set(retro[0].depends_on))  # every one of them, open or done: no status filter
         for t in graph.tasks:
             if t.milestone == "M0.5":
                 self.assertEqual(retro[0].id in t.depends_on, t.id == "M0.5-FU", t.id)
@@ -679,7 +676,8 @@ class RetroTaskTests(unittest.TestCase):
                 self.invariants(tasks.parse(self.mark_done(self.TEXT, done)))
 
     def test_the_invariants_still_catch_a_missing_dependency_and_a_missing_retro(self):
-        text = self.TEXT.replace('depends_on = ["M0.5-03", "M0.5-26"]\nnotes = "Fresh Opus', 'depends_on = ["M0.5-03"]\nnotes = "Fresh Opus', 1)
+        at = self.TEXT.index('id = "M0.5-28"')
+        text = self.TEXT[:at] + self.TEXT[at:].replace('"M0.5-27", ', '', 1)  # a done task must stay listed too
         self.assertNotEqual(text, self.TEXT)
         with self.assertRaises(AssertionError):
             self.invariants(tasks.parse(text))

@@ -51,7 +51,7 @@ INCIDENT_REQ = ["date", "batch", "session_id", "kind", "impact", "recovery", "pr
 REVIEW_REQ = ["date", "review_id", "run_ref", "findings", "acted_on", "ignored", "disputed", "deferred",
               "cost_usd", "window_end"]
 ESCAPED_REQ = ["date", "bug", "caused_by", "area"]
-ESCAPED_AREAS = ("security-rules", "sync-merge", "release", "risk-high", "general")
+ESCAPED_AREAS = ("security-rules", "sync-merge", "release", "risk-high", "process", "general")
 CAUSED_BY = re.compile(r"^Caused by: #([1-9][0-9]*)$")
 REVIEW_COUNTS = ["findings", "acted_on", "ignored", "disputed", "deferred"]
 SCHEMA = {

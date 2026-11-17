@@ -504,6 +504,12 @@ RULES = (
             r"never edit or push the pr branch: report only", r"marked ready only after your pass",
         ),
         "the second reviewer works independently on risk:high and protected areas and never edits the PR branch",
+        forbidden=(r"effort \(max",),  # roles.yaml gives it no max_effort_when (R1-06 of #128)
+    ),
+    Rule(
+        "verifier-handoff", ("implementer", "reviewer", "second-reviewer"),
+        (r"give it the text of agents/prompts/verifier\.md first", r"the subagent has no definition of its own"),
+        "the verifier subagent has no .claude/agents definition, so the prompt text is handed to it (R1-02 of #128)",
     ),
     Rule(
         "verifier-role", ("verifier",),
