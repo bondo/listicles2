@@ -173,8 +173,16 @@ if [ "$STAGED" = 0 ]; then
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
       /^diff --git/ { file = $3; next }
       /^(---|\+\+\+)/ { next }
-      /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
-        l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key)
+      {
+        # A test function NAME is not a check setting (owner decision, #15): drop only the declared name of
+        # `def test...(` and `fun test...(` / fun `name`(, so the rest of the line and all other lines still count.
+        body = $0
+        if (match(body, /^[-+][ \t]*(async[ \t]+)?def[ \t]+test[A-Za-z0-9_]*[ \t]*\(/) ||
+            match(body, /^[-+][ \t]*(@[A-Za-z]+[ \t]+)*fun[ \t]+(test[A-Za-z0-9_]*|`[^`]*`)[ \t]*\(/))
+          body = substr(body, 1, 1) "test(" substr(body, RLENGTH + 1)
+      }
+      body ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
+        l = norm(body); key = file "|" l; gsub(/[0-9]+/, "N", key)
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = num(l) } else { add[key] = l; addn[key] = num(l) }
       }
       END {
