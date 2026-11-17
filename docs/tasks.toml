@@ -748,12 +748,13 @@ depends_on = ["milestone:M0.5"]
 
 [[task]]
 id = "M1-02"
-title = "Start the Firestore emulator in the ui CI job (known gap R6-09), with the first Firebase-backed UI test"
+title = "Auth and Firestore emulators for the app's integration tests in CI: firebase.json auth entry, ui job, verify.sh"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
+notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-listicles); tests live in core/data/src/androidTest"
 
 [[task]]
 id = "M1-03"
@@ -853,7 +854,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-12"]
-notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here; the marker-driven list unsharing is M2"
+notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2"
 
 [[task]]
 id = "M1-12"
@@ -890,8 +891,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-30", "M1-13"]
-notes = "Sign out per OQ-13 (decided 2026-11-17): wait for pending writes, offline warning, terminate + clearPersistence"
+depends_on = ["M1-30", "M1-13", "M1-02"]
+notes = "Sign out per OQ-13 (decided 2026-11-17): pending writes (wait online, warn offline), terminate, clearPersistence, Auth signOut last"
 
 [[task]]
 id = "M1-15"
@@ -909,7 +910,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-14", "M1-02", "M1-03"]
+depends_on = ["M1-14", "M1-03"]
 
 [[task]]
 id = "M1-17"
@@ -936,7 +937,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-12", "M1-30"]
+depends_on = ["M1-12", "M1-30", "M1-02"]
 
 [[task]]
 id = "M1-31"
@@ -958,13 +959,13 @@ depends_on = ["M1-18"]
 
 [[task]]
 id = "M1-20"
-title = "Invite link and join screen (HH-03)"
+title = "Invite link and join screen (HH-03), incl. signed-out routing through sign-in"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-19"]
-notes = "The web page and App Links domain wait for the owner's hosting choice (OQ-21); see docs/milestones/M1.md"
+depends_on = ["M1-19", "M1-17"]
+notes = "The web page and App Links domain wait for the owner's hosting choice (OQ-21); unverified links open the browser on Android 12+ (OQ-40); see docs/milestones/M1.md"
 
 [[task]]
 id = "M1-21"
@@ -982,7 +983,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-17"]
+depends_on = ["M1-17", "M1-25"]
 
 [[task]]
 id = "M1-32"
@@ -1005,7 +1006,7 @@ notes = "Dropped if the Identity Platform upgrade needs billing (OQ-25, M1-O3)"
 
 [[task]]
 id = "M1-25"
-title = "Crashlytics off by default with an opt-in setting, no Analytics"
+title = "Settings screen and navigation (owner of the screen), Crashlytics off by default with an opt-in switch, no Analytics"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
@@ -1099,7 +1100,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-O1", "M1-26"]
-notes = "docs/milestones/M1.md R5. Enforcement only after about two weeks of metrics (M6)"
+notes = "docs/milestones/M1.md R5. No fingerprint in M1: Play Integrity runs only in release builds, so the GitHub release key's SHA-256 is registered by M6-O1. Enforcement only after about two weeks of metrics (M6)"
 
 [[task]]
 id = "M1-O5"
