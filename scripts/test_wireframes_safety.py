@@ -3,8 +3,12 @@
 Run: python3 -I scripts/test_wireframes_safety.py
 """
 
+import html
+import json
 import re
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -99,17 +103,159 @@ class SafePatternsPass(unittest.TestCase):
         self.assertEqual(ws.check(t), [])
 
 
+class SanitizerMustWrapTheWholeValue(unittest.TestCase):
+    """R2-02: a lookup or literal ternary somewhere in the expression must not clear the whole value."""
+
+    def test_includes_in_the_condition_does_not_clean_the_value(self):
+        t = js("const one = params.get('s');\nconst v = one.includes('a') ? one : '';\napp.innerHTML = `<p>${v}</p>`;")
+        self.assertEqual(lines(t), [6])
+
+    def test_literal_ternary_with_a_tainted_branch(self):
+        t = js("const one = params.get('s');\nconst v = one === 'x' ? 'ok' : one;\napp.innerHTML = `<p>${v}</p>`;")
+        self.assertEqual(lines(t), [6])
+
+    def test_find_on_a_tainted_list(self):
+        t = js("const list = params.get('s');\nconst v = list.find(x => x);\napp.innerHTML = `<p>${v}</p>`;")
+        self.assertEqual(lines(t), [6])
+
+    def test_a_name_that_is_not_a_whitelisted_sanitizer(self):
+        t = js("const one = params.get('s');\napp.innerHTML = `<p>${sanitize(one)}</p>`;")
+        self.assertEqual(lines(t), [5])
+
+    def test_a_sanitizer_around_only_part_of_the_value(self):
+        t = js("const one = params.get('s');\napp.innerHTML = `<p>${esc(one) + one}</p>`;")
+        self.assertEqual(lines(t), [5])
+
+    def test_whitelisted_sanitizers_around_the_whole_value_pass(self):
+        t = js("const one = params.get('s');\napp.innerHTML = `<p>${esc(one)}</p>`;\napp.innerHTML = '<p>' + esc(location.hash) + '</p>';")
+        self.assertEqual(ws.check(t), [])
+
+    def test_whole_value_forms_that_pass(self):
+        t = js(
+            "const one = params.get('s');\nconst a = one === 'x' ? 'yes' : 'no';\nconst b = one.includes('x');\nconst c = LIST.find(x => x.id === one);\n"
+            "app.innerHTML = `<p class=\"${a}\">${b}${c.name}</p>`;"
+        )
+        self.assertEqual(ws.check(t), [])
+
+
+class MoreSources(unittest.TestCase):
+    def test_document_url_referrer_and_window_name(self):
+        for src in ("document.URL", "document.documentURI", "document.referrer", "window.name", "location.href"):
+            self.assertEqual(lines(js(f"app.innerHTML = `<p>${{{src}}}</p>`;")), [4], src)
+
+    def test_fetched_data_in_a_then_callback(self):
+        t = js("fetch(U).then(r => r.json()).then(d => { app.innerHTML = `<b>${d.name}</b>`; });")
+        self.assertEqual(lines(t), [4])
+
+    def test_fetched_data_passed_by_function_name(self):
+        t = js("function render(T) { app.innerHTML = `<b>${T.name}</b>`; }\nfetch(U).then(r => r.json()).then(render);")
+        self.assertEqual(lines(t), [4])
+
+    def test_fetched_data_through_an_awaited_declaration(self):
+        t = js("async function go() { const d = await (await fetch(U)).json(); app.innerHTML = `<b>${d.x}</b>`; }")
+        self.assertEqual(lines(t), [4])
+
+    def test_fetched_data_cleaned_at_the_source_passes(self):
+        t = js("function render(T) { app.innerHTML = `<b>${T.name}</b>`; }\nfetch(U).then(r => r.json()).then(d => render(escDeep(d)));")
+        self.assertEqual(ws.check(t), [])
+
+    def test_function_parameter_that_receives_a_url_value(self):
+        t = js("function show(m) { app.innerHTML = `<p>${m}</p>`; }\nshow(params.get('a'));")
+        self.assertEqual(lines(t), [4])
+
+    def test_function_parameter_that_only_gets_clean_values(self):
+        t = js("function show(m) { app.innerHTML = `<p>${m}</p>`; }\nshow('fixed');")
+        self.assertEqual(ws.check(t), [])
+
+    def test_callback_parameters_of_a_tainted_receiver(self):
+        t = js("const d = params.get('s');\nconst rows = Object.entries(d).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');")
+        self.assertEqual(lines(t), [5])
+
+    def test_markup_template_that_is_returned_not_assigned(self):
+        t = js("const sheet = (d) => `<section>${d.title}</section>`;\nfetch(U).then(r => r.json()).then(d => { app.innerHTML = sheet(d); });")
+        self.assertEqual(lines(t), [4])
+
+    def test_a_plain_text_template_is_not_markup(self):
+        t = js("const one = params.get('s');\nshowText(`No screen ${one}`);")
+        self.assertEqual(ws.check(t), [])
+
+    def test_the_docstring_states_the_limits(self):
+        doc = ws.__doc__ or ""
+        self.assertIn("Limits", doc)
+        for word in ("DOM", "aliasing", "same name"):
+            self.assertIn(word, doc)
+
+
+class PageHelpers(unittest.TestCase):
+    """R2-01: the tokens URL must be same-origin and token values must be escaped; the helpers run under node."""
+
+    BASE = "http://localhost:8000/docs/product/wireframes/wireframes.html"
+    DEFAULT = "../../../design/tokens.json"
+
+    @classmethod
+    def helpers(cls) -> str:
+        text = PAGE.read_text(encoding="utf-8")
+        m = re.search(r"/\* safe-helpers:begin.*?\*/(.*?)/\* safe-helpers:end \*/", text, re.S)
+        if not m:
+            raise AssertionError("wireframes.html needs a /* safe-helpers:begin ... */ ... /* safe-helpers:end */ block (esc, escDeep, sameOriginUrl)")
+        return m.group(1)
+
+    def run_js(self, expr: str):
+        prog = self.helpers() + "\nprocess.stdout.write(JSON.stringify(" + expr + "));"
+        out = subprocess.run(["node", "-e", prog], capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return json.loads(out.stdout)
+
+    def same_origin(self, value: str):
+        return self.run_js(f"sameOriginUrl({json.dumps(value)}, {json.dumps(self.BASE)}, {json.dumps(self.DEFAULT)})")
+
+    def test_other_origin_urls_are_replaced_by_the_default(self):
+        for bad in ("https://evil.example/t.json", "http://localhost:9999/t.json", "//evil.example/t.json", "http://localhost.evil.example/t.json",
+                    "javascript:alert(1)", "data:application/json,{}", "file:///etc/passwd", "http://user@evil.example/t.json"):
+            self.assertEqual(self.same_origin(bad), self.DEFAULT, bad)
+
+    def test_same_origin_urls_are_kept(self):
+        self.assertEqual(self.same_origin("/design/tokens.json"), "http://localhost:8000/design/tokens.json")
+        self.assertEqual(self.same_origin("../../../design/tokens.json"), "http://localhost:8000/design/tokens.json")
+        self.assertEqual(self.same_origin("http://localhost:8000/copy.json"), "http://localhost:8000/copy.json")
+
+    def test_markup_in_a_token_value_or_key_is_escaped(self):
+        got = self.run_js("escDeep({meta: {font: '<img src=x onerror=alert(1)>', 'k\"<b>': 'a&b'}, list: ['<i>', 3, true, null]})")
+        self.assertEqual(got["meta"]["font"], "&lt;img src=x onerror=alert(1)&gt;")
+        self.assertEqual(got["meta"]["k&quot;&lt;b&gt;"], "a&amp;b")
+        self.assertEqual(got["list"], ["&lt;i&gt;", 3, True, None])
+
+    def test_esc_escapes_all_five_characters(self):
+        self.assertEqual(self.run_js("esc(`&<>\"'`)"), "&amp;&lt;&gt;&quot;&#39;")
+
+    def test_the_real_tokens_are_unchanged_by_escaping_apart_from_entities(self):
+        real = json.loads((ROOT / "design" / "tokens.json").read_text(encoding="utf-8"))
+        got = self.run_js("escDeep(" + json.dumps(real) + ")")
+
+        def same(a, b):
+            if isinstance(a, dict):
+                return isinstance(b, dict) and {html.unescape(k) for k in a} == set(b) and all(same(a[k], b[html.unescape(k)]) for k in a)
+            if isinstance(a, list):
+                return isinstance(b, list) and len(a) == len(b) and all(same(x, y) for x, y in zip(a, b, strict=True))
+            return html.unescape(a) == b if isinstance(a, str) else a == b
+
+        self.assertTrue(same(got, real))
+
+    def test_the_page_uses_the_helpers_for_the_tokens_url_and_the_fetched_data(self):
+        text = PAGE.read_text(encoding="utf-8")
+        self.assertRegex(text, r"TOKENS_URL = sameOriginUrl\(")
+        self.assertRegex(text, r"render\(escDeep\(")
+
+
 class TheRealPage(unittest.TestCase):
     def test_the_wireframes_page_has_no_url_or_error_text_in_innerhtml(self):
         self.assertEqual(ws.check(PAGE.read_text(encoding="utf-8")), [])
 
     def test_the_cli_exits_non_zero_on_a_bad_file_and_zero_on_the_page(self):
-        bad = ROOT / ".wireframes-safety-fixture.tmp"
-        try:
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "bad.html"
             bad.write_text(js("app.innerHTML = location.hash;"), encoding="utf-8")
             self.assertEqual(ws.main([str(bad)]), 1)
-        finally:
-            bad.unlink(missing_ok=True)
         self.assertEqual(ws.main([]), 0)
 
 
