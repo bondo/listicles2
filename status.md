@@ -70,7 +70,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 |---|---|---|---|---|---|
 | M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | done | all of M0 | planner | [#94](https://github.com/bondo/listicles2/issues/94) |
 | M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | done | M0.5-01 | planner | [#103](https://github.com/bondo/listicles2/issues/103) |
-| M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | in progress | M0.5-01, M0.5-16 | planner | [#113](https://github.com/bondo/listicles2/issues/113) |
+| M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | ready | M0.5-01, M0.5-16 | planner | [#113](https://github.com/bondo/listicles2/issues/113) |
 | M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | done | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
 | M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | done | M0.5-05 | implementer | [#102](https://github.com/bondo/listicles2/issues/102) |
@@ -108,7 +108,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M0.5-03 Screen wireframes and design tokens (… (in progress)"]:::progress
+    n0["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ready
     n1["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
     n2["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
     n3["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
@@ -162,7 +162,7 @@ flowchart LR
     n8["M1-O1 Create the Firebase project (Spark), en… (owner to-do)"]:::owner
     n9["M1-O2 Register the debug and release SHA-1 fi… (owner to-do)"]:::owner
     n10["all of M0.5"]:::ext
-    n11["M0.5-03 Screen wireframes and design tokens (… (in progress)"]:::ext
+    n11["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ext
     n10 --> n0
     n0 --> n1
     n0 --> n2
