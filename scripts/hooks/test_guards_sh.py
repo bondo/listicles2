@@ -771,6 +771,38 @@ class ThresholdTestNames(GuardsCase):
         self.change(self.KT, "fun `t`() { val x = 80 }\n")
         self.assertFails("guard: removed check setting:")
 
+    def test_a_value_on_the_same_line_as_a_keyword_test_name_still_fails(self):
+        # R1-01: the name is only ignored for a bare declaration; a value on the line keeps it a check setting.
+        self.base(self.PY, "def test_threshold(): return 50\n")
+        self.change(self.PY, "def test_threshold(): return 40\n")
+        self.assertFails("guard: lowered threshold:")
+        self.base(self.PY, "def test_threshold(): return 50\n")
+        self.change(self.PY, "\n")
+        self.assertFails("guard: removed check setting:")
+        self.base(self.PY, "def test_threshold(): return 50\n")
+        self.change(self.PY, "def test_threshold(): return\n")
+        self.assertFails("guard: removed check setting:")
+        self.base(self.KT, "fun test_threshold() = 80\n")
+        self.change(self.KT, "fun test_threshold() = 60\n")
+        self.assertFails("guard: lowered threshold:")
+
+    def test_names_are_only_ignored_in_test_files(self):
+        self.base("app/src/main/kotlin/Cfg.kt", "fun `threshold`() = 80\n")
+        self.change("app/src/main/kotlin/Cfg.kt", "fun `threshold`() = 60\n")
+        self.assertFails("guard: lowered threshold:")
+        self.base("app/build.gradle.kts", "fun test_minBound() = 80\n")
+        self.change("app/build.gradle.kts", "fun test_minBound() = 60\n")
+        self.assertFails("guard: lowered threshold:")
+        self.base("scripts/tool.py", "def test_threshold(self):\n    pass\n")
+        self.change("scripts/tool.py", "def test_other(self):\n    pass\n")
+        self.assertFails("guard: removed check setting:")
+
+    def test_a_digit_in_the_test_name_does_not_hide_a_lowered_value(self):
+        # R1-03: the first number on the line must not come from the name.
+        self.base(self.PY, "def test_2(self): threshold = 50\n")
+        self.change(self.PY, "def test_2(self): threshold = 10\n")
+        self.assertFails("guard: lowered threshold:")
+
     def test_lowering_a_number_in_a_test_name_is_ignored_but_not_in_the_body(self):
         self.base(self.PY, "def test_threshold_50(self):\n    threshold = 50\n")
         self.change(self.PY, "def test_threshold_40(self):\n    threshold = 40\n")
