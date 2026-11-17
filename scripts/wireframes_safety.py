@@ -30,9 +30,11 @@ regex literals that contain quote or backtick characters confuse the scanner (wr
 \x22, \x27, \x60), and only `//` line comments at the start or after code are stripped. Test pages by hand in a browser for anything beyond these rules.
 """
 
+import functools
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 PAGE = Path("docs/product/wireframes/wireframes.html")
 SANITIZERS = ("esc", "escDeep")
@@ -75,161 +77,21 @@ def _skip_string(s: str, i: int) -> int:
     return i + 1
 
 
-def _skip_template(s: str, i: int) -> int:
-    """Index after the template literal that starts at s[i] (a backtick)."""
-    i += 1
-    while i < len(s) and s[i] != "`":
-        if s[i] == "\\":
-            i += 2
-        elif s.startswith("${", i):
-            i = _skip_balanced(s, i + 2) + 1
-        else:
-            i += 1
-    return i + 1
+class _Scan(NamedTuple):
+    mask: bytearray  # 1 for every character that is code (not in a string literal or the static text of a template)
+    blocks: dict[int, int]  # start of each `{` (or `$` of `${`) -> end
+    templates: list[tuple[str, list[tuple[int, int]]]]  # static text and the (start, end) of each `${...}` code
 
 
-def _skip_balanced(s: str, i: int) -> int:
-    """Index of the `}` that closes a `${` whose content starts at s[i]."""
-    depth = 0
-    while i < len(s):
-        c = s[i]
-        if c in "'\"":
-            i = _skip_string(s, i)
-            continue
-        if c == "`":
-            i = _skip_template(s, i)
-            continue
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            if depth == 0:
-                return i
-            depth -= 1
-        i += 1
-    return len(s)
-
-
-def _expr_end(s: str, i: int) -> int:
-    """End of the expression that starts at s[i]: the `;` or unmatched closer at depth 0."""
-    depth = 0
-    while i < len(s):
-        c = s[i]
-        if c in "'\"":
-            i = _skip_string(s, i)
-            continue
-        if c == "`":
-            i = _skip_template(s, i)
-            continue
-        if c in "([{":
-            depth += 1
-        elif c in ")]}":
-            if depth == 0:
-                return i
-            depth -= 1
-        elif c == ";" and depth == 0:
-            return i
-        i += 1
-    return len(s)
-
-
-def _split_args(s: str) -> list[str]:
-    """Split on commas at depth 0 (strings and templates skipped)."""
-    out: list[str] = []
-    depth = 0
-    start = 0
-    i = 0
-    while i < len(s):
-        c = s[i]
-        if c in "'\"":
-            i = _skip_string(s, i)
-            continue
-        if c == "`":
-            i = _skip_template(s, i)
-            continue
-        if c in "([{":
-            depth += 1
-        elif c in ")]}":
-            depth -= 1
-        elif c == "," and depth == 0:
-            out.append(s[start:i])
-            start = i + 1
-        i += 1
-    out.append(s[start:])
-    return out
-
-
-def _code_only(s: str) -> str:
-    """The expression without string literals and without the static text of templates; `${...}` code is kept."""
-    out: list[str] = []
-    i = 0
-    while i < len(s):
-        c = s[i]
-        if c in "'\"":
-            i = _skip_string(s, i)
-            out.append(" ")
-        elif c == "`":
-            i += 1
-            while i < len(s) and s[i] != "`":
-                if s[i] == "\\":
-                    i += 2
-                elif s.startswith("${", i):
-                    end = _skip_balanced(s, i + 2)
-                    out.append(" " + _code_only(s[i + 2 : end]) + " ")
-                    i = end + 1
-                else:
-                    i += 1
-            i += 1
-            out.append(" ")
-        else:
-            out.append(c)
-            i += 1
-    return "".join(out)
-
-
-def _templates(s: str, base: int = 0) -> list[tuple[str, list[tuple[int, str]]]]:
-    """Every template literal in s (nested ones too) as (static text, [(offset, interpolation code)])."""
-    found: list[tuple[str, list[tuple[int, str]]]] = []
-    i = 0
-    while i < len(s):
-        c = s[i]
-        if c in "'\"":
-            i = _skip_string(s, i)
-        elif c == "`":
-            static: list[str] = []
-            interps: list[tuple[int, str]] = []
-            i += 1
-            while i < len(s) and s[i] != "`":
-                if s[i] == "\\":
-                    static.append(s[i : i + 2])
-                    i += 2
-                elif s.startswith("${", i):
-                    end = _skip_balanced(s, i + 2)
-                    interps.append((base + i, s[i + 2 : end]))
-                    found.extend(_templates(s[i + 2 : end], base + i + 2))
-                    i = end + 1
-                else:
-                    static.append(s[i])
-                    i += 1
-            i += 1
-            found.append(("".join(static), interps))
-        else:
-            i += 1
-    return found
-
-
-def _words(code: str) -> set[str]:
-    return set(re.findall(r"(?<![\w$.])" + _ID, code))
-
-
-Span = tuple[int, int]
-
-
-def _code_mask(js: str) -> bytearray:
-    """1 for every character that is code: not inside a string literal or the static text of a template (`${...}` is code)."""
+@functools.lru_cache(maxsize=16)
+def _scan(js: str) -> _Scan:
+    """One pass over js: which characters are code, where blocks end, and every template literal (nested ones too)."""
     mask = bytearray(len(js))
+    blocks: dict[int, int] = {}
+    templates: list[tuple[str, list[tuple[int, int]]]] = []
 
-    def code(i: int, in_interp: bool) -> int:
-        depth = 0
+    def code(i: int, interp_start: int) -> int:
+        stack: list[int] = []
         while i < len(js):
             c = js[i]
             if c in "'\"":
@@ -239,28 +101,86 @@ def _code_mask(js: str) -> bytearray:
                 i = template(i)
                 continue
             if c == "{":
-                depth += 1
+                stack.append(i)
             elif c == "}":
-                if depth == 0 and in_interp:
+                if stack:
+                    blocks[stack.pop()] = i + 1
+                elif interp_start >= 0:
+                    blocks[interp_start] = i + 1
                     return i
-                depth = max(depth - 1, 0)
             mask[i] = 1
             i += 1
         return i
 
     def template(i: int) -> int:
+        static: list[str] = []
+        interps: list[tuple[int, int]] = []
         i += 1
         while i < len(js) and js[i] != "`":
             if js[i] == "\\":
+                static.append(js[i : i + 2])
                 i += 2
             elif js.startswith("${", i):
-                i = code(i + 2, True) + 1
+                end = code(i + 2, i)
+                interps.append((i + 2, end))
+                i = end + 1
             else:
+                static.append(js[i])
                 i += 1
+        templates.append(("".join(static), interps))
         return i + 1
 
-    code(0, False)
-    return mask
+    code(0, -1)
+    return _Scan(mask, blocks, templates)
+
+
+def _expr_end(s: str, i: int) -> int:
+    """End of the expression that starts at s[i]: the `;` or unmatched closer at depth 0."""
+    mask = _scan(s).mask
+    depth = 0
+    for j in range(i, len(s)):
+        if not mask[j]:
+            continue
+        if s[j] in "([{":
+            depth += 1
+        elif s[j] in ")]}":
+            if depth == 0:
+                return j
+            depth -= 1
+        elif s[j] == ";" and depth == 0:
+            return j
+    return len(s)
+
+
+def _split_args(s: str) -> list[str]:
+    """Split on commas at depth 0 (strings and templates skipped)."""
+    mask = _scan(s).mask
+    out: list[str] = []
+    depth = 0
+    start = 0
+    for j, c in enumerate(s):
+        if not mask[j]:
+            continue
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            out.append(s[start:j])
+            start = j + 1
+    return [*out, s[start:]]
+
+
+def _code_only(s: str) -> str:
+    """The expression without string literals and without the static text of templates; `${...}` code is kept."""
+    return "".join(c if k else " " for c, k in zip(s, _scan(s).mask, strict=True))
+
+
+def _words(code: str) -> set[str]:
+    return set(re.findall(r"(?<![\w$.])" + _ID, code))
+
+
+Span = tuple[int, int]
 
 
 def _script_only(text: str) -> str:
@@ -274,74 +194,12 @@ def _script_only(text: str) -> str:
     return "".join(chars)
 
 
-def _blocks(js: str) -> list[Span]:
-    """Spans of every `{...}` in code, including `${...}` inside templates."""
-    spans: list[Span] = []
-    stack: list[int] = []
-
-    def scan(i: int, end_on_close: bool) -> int:
-        """Scan code from i; return the index after the `}` that closes the context (or len)."""
-        while i < len(js):
-            c = js[i]
-            if c in "'\"":
-                i = _skip_string(js, i)
-                continue
-            if c == "`":
-                i = scan_template(i)
-                continue
-            if c == "{":
-                stack.append(i)
-            elif c == "}":
-                if stack:
-                    spans.append((stack.pop(), i + 1))
-                elif end_on_close:
-                    return i + 1
-            i += 1
-        return i
-
-    def scan_template(i: int) -> int:
-        i += 1
-        while i < len(js) and js[i] != "`":
-            if js[i] == "\\":
-                i += 2
-            elif js.startswith("${", i):
-                start = i
-                stack.append(start)
-                i = scan_interp(i + 2)
-            else:
-                i += 1
-        return i + 1
-
-    def scan_interp(i: int) -> int:
-        depth = len(stack)
-        while i < len(js):
-            c = js[i]
-            if c in "'\"":
-                i = _skip_string(js, i)
-                continue
-            if c == "`":
-                i = scan_template(i)
-                continue
-            if c == "{":
-                stack.append(i)
-            elif c == "}":
-                start = stack.pop()
-                spans.append((start, i + 1))
-                if len(stack) < depth:
-                    return i + 1
-            i += 1
-        return i
-
-    scan(0, False)
-    return spans
-
-
 def _body_span(js: str, i: int) -> Span:
     """Span of a function body that starts at js[i] (after `=>` or after the parameter list)."""
     while i < len(js) and js[i].isspace():
         i += 1
     if i < len(js) and js[i] == "{":
-        return (i, _skip_balanced(js, i + 1) + 1)
+        return (i, _scan(js).blocks.get(i, len(js)))
     return (i, _expr_end(js, i))
 
 
@@ -450,7 +308,8 @@ def _taint(js: str) -> _Taint:
     """Names that hold URL, error or fetched data, directly or through other values (see the module docstring)."""
     t = _Taint(_sources(js))
     whole = (0, len(js))
-    blocks = _blocks(js)
+    scan = _scan(js)
+    blocks = list(scan.blocks.items())
 
     def scope(pos: int) -> Span:
         inside = [b for b in blocks if b[0] <= pos < b[1]]
@@ -509,9 +368,8 @@ def _taint(js: str) -> _Taint:
         inside = [sp for sp in declared.get(name, []) if sp[0] <= pos < sp[1]]
         return min(inside, key=lambda sp: sp[1] - sp[0]) if inside else whole
 
-    mask = _code_mask(js)
     for m in _ASSIGN.finditer(js):
-        if not mask[m.start(1)]:
+        if not scan.mask[m.start(1)]:
             continue
         decls.append(({m.group(1)}, js[m.end() : _expr_end(js, m.end())], m.end(), assign_scope(m.group(1), m.start())))
     calls: list[tuple[str, list[tuple[str, int]]]] = []
@@ -570,11 +428,11 @@ def check(text: str) -> list[tuple[int, str]]:
         raw = js[m.end() : _expr_end(js, m.end())]
         if t.tainted(raw, m.end()):
             report(m.end(), "HTML insertion call", raw)
-    for static, interps in _templates(js):
+    for static, interps in _scan(js).templates:
         if _MARKUP.search(static):
-            for offset, code in interps:
-                if t.tainted(code, offset + 2):
-                    report(offset + 2, "markup template", code)
+            for a, b in interps:
+                if t.tainted(js[a:b], a):
+                    report(a, "markup template", js[a:b])
     return sorted(found.items())
 
 
