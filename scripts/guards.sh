@@ -171,23 +171,29 @@ if [ "$STAGED" = 0 ]; then
     git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
+      function testpath(p) {
+        return (p ~ /(^|\/)test_[^\/]*\.py$|_test\.py$/ || p ~ /(^|\/)src\/(test|androidTest|testFixtures|[a-z]+Test)\/.*\.(kt|java)$/)
+      }
       /^diff --git/ {
         file = $3
-        istest = (file ~ /(^|\/)test_[^\/]*\.py$|_test\.py$|(Test|Tests)\.(kt|java)$|\/src\/[A-Za-z]*[Tt]est[A-Za-z]*\//)
+        istest = (NF == 4 && testpath($3) && testpath($4))   # old AND new path must be test files
         next
       }
       /^(---|\+\+\+)/ { next }
       {
         # A test function NAME is not a check setting (owner decision, #15). Only in test files, the declared name
         # of `def test...(` / `fun test...(` / fun `name`( is dropped from the line. The keyword scan ignores the
-        # name only for a bare declaration (no digit after it); a value on the line keeps the whole line in scope.
-        body = $0; kw = $0
-        if (istest && (match(body, /^[-+][ \t]*(async[ \t]+)?def[ \t]+test[A-Za-z0-9_]*[ \t]*\(/) ||
-            match(body, /^[-+][ \t]*(@[A-Za-z]+[ \t]+)*fun[ \t]+(test[A-Za-z0-9_]*|`[^`]*`)[ \t]*\(/))) {
-          rest = substr(body, RLENGTH + 1)
-          body = substr(body, 1, 1) "test(" rest
-          if (rest !~ /[0-9]/) kw = body
+        # name only for a bare declaration: the rest of the line is just the end of the signature. Anything else on
+        # the line (a value, an expression, a body) keeps the whole line in scope.
+        body = $0; kw = $0; decl = 0
+        if (istest) {
+          if (match(body, /^[-+][ \t]*(async[ \t]+)?def[ \t]+test[A-Za-z0-9_]*[ \t]*\(/)) {
+            decl = 1; rest = substr(body, RLENGTH + 1); bare = (rest ~ /^[^)]*\)[ \t]*(->[^:]*)?:[ \t]*\r?$/)
+          } else if (match(body, /^[-+][ \t]*(@[A-Za-z]+[ \t]+)*fun[ \t]+(test[A-Za-z0-9_]*|`[^`]*`)[ \t]*\(/)) {
+            decl = 1; rest = substr(body, RLENGTH + 1); bare = (rest ~ /^[^)]*\)[ \t]*(:[^={]*)?\{?[ \t]*\}?[ \t]*\r?$/)
+          }
         }
+        if (decl) { body = substr(body, 1, 1) "test(" rest; if (bare) kw = body }
       }
       kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
         l = norm(body); key = file "|" l; gsub(/[0-9]+/, "N", key)
