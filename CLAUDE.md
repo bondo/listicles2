@@ -29,17 +29,22 @@ lists app: Kotlin, Compose, Firebase (Firestore + Auth), no Cloud Functions, Eng
 - Firestore rules changes need allow and deny tests in `firebase/test`.
 - Match existing style; spotless and detekt run in the pre-commit hook.
 
-## Saving tokens
-- Search narrowly and read files in parts. Delegate broad searches to the `explorer` subagent.
-- Do not re-read files you just edited. Do not narrate; report results.
+## Reading and reporting
+- Read what you need to understand the change, and read whole files you edit before editing them.
+- Broad "where is X" searches may go to the `explorer` subagent; for your own task, read directly. Report results; do not narrate.
 
 ## Context and handoff
-- The status line shows context %. At about 50% a hook reminds you: finish the current step, write
+- The status line shows context %. A hook reminds you once at the step boundary (60% of a 1M window, 40% of a 200k one:
+  hand off at the next step boundary) and once at the hard stage (80% / 60%: finish the current step only). To hand off, write
   `handoff/<branch>.md` from `handoff/TEMPLATE.md`, commit, and end the session.
-- One PR per implementer session; one review round per reviewer session.
+- One implementer session per PR, kept across its review rounds; a fresh reviewer session per round. An idle container can be
+  reclaimed, so end every turn with all work committed and pushed and the handoff file current. On the next message check your
+  branch head against `git ls-remote`, rerun `scripts/install-hooks.sh`, and treat anything not on the remote as lost.
 
 ## Reviews
-- Process and finding format: `REVIEW.md`. Max 4 rounds per batch (a one-batch PR: per PR); then stop and report to the owner.
-- Reviewers never edit or push the PR branch: report only (a throwaway worktree is allowed, never pushed anywhere and deleted afterwards). Minor/nit findings may be
-  deferred to follow-up issues once no blocker or major is open.
+- Process and finding format: `REVIEW.md`. Every round is a fresh reviewer with the whole PR diff. Max 4 rounds per batch (a one-batch PR: per PR).
+  If round 4 still has findings above nit, one escalation reviewer per PR decides fix, split or owner; a fix gets one more fresh round,
+  and anything above nit still open then goes to the owner. There is no second escalation.
+- Reviewers never edit or push the PR branch: report only (a throwaway worktree is allowed, never pushed anywhere and deleted afterwards).
+- Fix minors in the PR when the fix is small (about 30 changed lines or fewer). Defer only a larger or out-of-scope minor, by `docs/FOLLOW-UPS.md`.
 - Role models and effort: `agents/roles.yaml`. Do not change your own effort or model.
