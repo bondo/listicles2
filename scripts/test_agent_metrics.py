@@ -442,5 +442,99 @@ class ReviewTests(unittest.TestCase):
         self.assertNotIn("Traceback", err.getvalue())
 
 
+ESCAPED_HDR = "date,bug,caused_by,area"
+E1 = "2026-11-17,130,121,security-rules"
+
+
+def escaped_row(**over):
+    cols = ESCAPED_HDR.split(",")
+    row = dict(zip(cols, E1.split(","), strict=True))
+    row.update(over)
+    return ",".join(row[c] for c in cols)
+
+
+class EscapedDefectTests(unittest.TestCase):
+    """Redesign PR 2: one `escaped` row per bug found after merge, linked to the PR that caused it (no per-PR labels)."""
+
+    def errors(self, *rows):
+        return run(block("escaped", ESCAPED_HDR, *rows))
+
+    def assertRejected(self, row, needle):
+        rows, errors = self.errors(row)
+        self.assertEqual(rows, [], errors)
+        self.assertTrue(any(needle in e for e in errors), f"{needle!r} not in {errors}")
+
+    def test_valid_row_keeps_bug_caused_by_and_area_and_sorts_after_reviews(self):
+        rows, errors = run(block("escaped", ESCAPED_HDR, E1), block("review", REVIEW_HDR, V1))
+        self.assertEqual(errors, [])
+        self.assertEqual([r["row_type"] for r in rows], ["review", "escaped"])
+        out = list(csv.DictReader(io.StringIO(am.render(rows))))
+        self.assertEqual((out[1]["bug"], out[1]["caused_by"], out[1]["area"]), ("130", "121", "security-rules"))
+        self.assertEqual(out[0]["caused_by"], "")  # the new columns stay empty on other row kinds
+
+    def test_every_documented_area_is_accepted_and_others_are_not(self):
+        for area in ("security-rules", "sync-merge", "release", "risk-high", "process", "general"):
+            self.assertEqual(self.errors(escaped_row(area=area))[1], [], area)
+        for bad in ("", "Security", "docs", "=cmd", "release "):
+            _, errors = self.errors(escaped_row(area=bad))
+            self.assertTrue(any("area" in e for e in errors), (bad, errors))
+
+    def test_bug_and_caused_by_are_positive_whole_numbers(self):
+        for field in ("bug", "caused_by"):
+            for bad in ("", "0", "#12", "012", "1.5", "-3", "abc"):
+                _, errors = self.errors(escaped_row(**{field: bad}))
+                self.assertTrue(any(field in e for e in errors), (field, bad, errors))
+
+    def test_a_bug_cannot_be_caused_by_itself(self):
+        self.assertRejected(escaped_row(bug="121", caused_by="121"), "itself")
+
+    def test_one_row_per_bug_even_across_inputs(self):
+        _, errors = run(block("escaped", ESCAPED_HDR, E1), block("escaped", ESCAPED_HDR, escaped_row(caused_by="99")))
+        self.assertTrue(any("duplicate escaped bug 130" in e for e in errors), errors)
+        rows, errors = self.errors(E1, escaped_row(bug="131"))
+        self.assertEqual((len(rows), errors), (2, []))
+
+    def test_bad_date_missing_column_and_unknown_column_are_rejected(self):
+        self.assertRejected(escaped_row(date="17.11.2026"), "date")
+        _, errors = run(block("escaped", "date,bug,area", "2026-11-17,130,release"))
+        self.assertTrue(any("missing column 'caused_by'" in e for e in errors), errors)
+        _, errors = run(block("escaped", ESCAPED_HDR + ",cost_usd", E1 + ",1.0"))
+        self.assertTrue(any("unknown column 'cost_usd'" in e for e in errors), errors)
+
+
+class CausedByLineTests(unittest.TestCase):
+    """The bug issue carries one line `Caused by: #N`; agent_metrics.caused_by reads it."""
+
+    def test_the_line_is_found_anywhere_in_the_body(self):
+        self.assertEqual(am.caused_by("Steps\n\nCaused by: #121\nmore text"), 121)
+        self.assertEqual(am.caused_by("Caused by: #7"), 7)
+
+    def test_no_line_or_a_malformed_one_gives_none(self):
+        for body in ("", "no such line", "caused by: #1", "Caused by: 121", "Caused by: #0", "Caused by: #012",
+                     "Caused by: #12 and #13", "Caused by: #12x", "- Caused by: #12", "Caused by:#12"):
+            self.assertIsNone(am.caused_by(body), body)
+
+    def test_two_different_lines_are_ambiguous_but_a_repeat_is_fine(self):
+        self.assertIsNone(am.caused_by("Caused by: #1\nCaused by: #2"))
+        self.assertEqual(am.caused_by("Caused by: #3\nCaused by: #3"), 3)
+
+    def test_a_line_inside_a_code_fence_does_not_count(self):
+        self.assertIsNone(am.caused_by("```\nCaused by: #5\n```"))
+
+    def test_cli_prints_the_number_or_fails_without_a_traceback(self):
+        with tempfile.TemporaryDirectory() as d:
+            good, bad = Path(d, "good.md"), Path(d, "bad.md")
+            good.write_text("Caused by: #121\n")
+            bad.write_text("nothing here\n")
+            out, err = io.StringIO(), io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                self.assertEqual(am.main(["--caused-by", str(good)]), 0)
+                self.assertEqual(am.main(["--caused-by", str(bad)]), 1)
+                self.assertEqual(am.main(["--caused-by", str(Path(d, "missing.md"))]), 1)
+            self.assertEqual(out.getvalue(), "121\n")
+            self.assertIn("bad.md: no single 'Caused by: #N' line", err.getvalue())
+            self.assertNotIn("Traceback", err.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

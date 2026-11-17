@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 
@@ -297,6 +298,26 @@ class Headless(unittest.TestCase):
             with open(os.path.join(base, f"r4{i}"), "w") as f:
                 f.write("45")
             self.assertEqual(self.hook(sid=f"r4{i}"), "", repr(junk))  # 45% of the 1M default: quiet, no crash
+
+    # R2-01 (#126 review): a window recorded earlier must not outlive a status JSON that no longer carries one.
+    def test_a_stale_window_file_is_removed_when_the_status_json_has_no_valid_window(self):
+        path = os.path.join(self.tmp, "listicles-ctx", "r5.window")
+        for later in (None, "abc", 0):
+            self.record(65, 200000, sid="r5")
+            self.assertTrue(os.path.exists(path))
+            self.record(45, later, sid="r5")
+            self.assertFalse(os.path.exists(path), later)
+            self.assertEqual(self.hook(sid="r5"), "", later)  # 45% of the 1M default is quiet, not 45% of a stale 200k
+
+    def test_a_valid_window_stays_recorded_and_is_replaced_by_a_newer_one(self):
+        path = os.path.join(self.tmp, "listicles-ctx", "r6.window")
+        self.record(65, 200000, sid="r6")
+        self.record(66, 200000, sid="r6")
+        self.assertEqual(Path(path).read_text(), "200000")
+        self.record(66, 1000000, sid="r6")
+        self.assertEqual(Path(path).read_text(), "1000000")
+        self.record(10, None, sid="r7")  # removing a window file that was never there is not an error
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "listicles-ctx", "r7.window")))
 
     def test_the_recorded_window_stays_per_session(self):
         self.record(65, 200000, sid="ra")
