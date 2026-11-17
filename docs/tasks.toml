@@ -975,7 +975,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-19", "M1-17"]
-notes = "The web page and App Links domain wait for the owner's hosting choice (OQ-21); unverified links open the browser on Android 12+ (OQ-40); see docs/milestones/M1.md"
+notes = "Invite page and assetlinks.json on tally.bjarkebjarke.dk (OQ-21, decided 2026-11-17); this PR proposes the hosting. Unverified links open the browser on Android 12+, so the domain is a prerequisite for the first external tester, no paste-link field (OQ-40, decided). See docs/milestones/M1.md"
 
 [[task]]
 id = "M1-21"
