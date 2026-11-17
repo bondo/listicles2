@@ -834,6 +834,7 @@ class ThresholdTestNames(GuardsCase):
         # R2-02: classify on both the old and the new path.
         filler = "".join(f"val line{i} = {i}\n" for i in range(30))
         self.base(self.KT, filler + "fun `warningsAsErrors`() = true\n")
+        os.makedirs(os.path.join(self.repo.dir, "app/src/main/kotlin"))
         self.repo.git("mv", self.KT, "app/src/main/kotlin/X.kt")
         self.repo.write("app/src/main/kotlin/X.kt", filler + "fun `warningsAsErrors`() = false\n")
         self.repo.commit()
