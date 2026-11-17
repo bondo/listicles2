@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""PostToolUse hook: once context use reaches the threshold, remind the agent ONCE per session to finish the step,
-write handoff/<branch>.md from handoff/TEMPLATE.md, commit and end (PLAN 9.3).
+"""PostToolUse hook: remind the agent to hand off before the context window fills (PLAN 9.3; Agent Usage Redesign rev 46).
+Two stages, each given ONCE per session: a step-boundary reminder (60% of a 1M window, 40% of a 200k one) to write
+handoff/<branch>.md from handoff/TEMPLATE.md, commit and end at the next step boundary, and a hard reminder (80% / 60%)
+to finish the current step only and do it now. The numbers are mirrored in agents/roles.yaml (a test ties the two).
 
 Usage source (works headless/in the cloud, where the statusline never runs): the last main-thread assistant record in
 transcript_path, context = input + cache_creation + cache_read + output tokens of that call. If scripts/statusline.sh did
 record a value for the session (interactive CLI), the larger of the two is used.
-Window: LISTICLES_CONTEXT_WINDOW (tokens), else 1,000,000 (the models used here have a 1M window; a 200k default fired
-the reminder at ~100k tokens). Set LISTICLES_CONTEXT_WINDOW at spawn for a smaller window. Garbage values fall back.
+Window: LISTICLES_CONTEXT_WINDOW (tokens), else 1,000,000 (the models used here have a 1M window). A window of up to
+200,000 tokens uses the small-window stages. Set LISTICLES_CONTEXT_WINDOW at spawn for a smaller window. Garbage values fall back.
 Calls made inside subagents (hook input has agent_id) are ignored.
-Env: LISTICLES_CONTEXT_THRESHOLD (percent, default 50). Output: hookSpecificOutput.additionalContext. Never fails."""
+Env: LISTICLES_CONTEXT_THRESHOLD (percent) replaces the hard stage and switches the step-boundary stage off; garbage falls back to
+the window defaults. Output: hookSpecificOutput.additionalContext. Never fails."""
 
 import contextlib
 import json
@@ -18,7 +21,9 @@ import sys
 
 TAIL_BYTES = 512 * 1024
 DEFAULT_WINDOW = 1_000_000
-DEFAULT_THRESHOLD = 50
+SMALL_WINDOW_MAX = 200_000
+THRESHOLDS_LARGE = (60, 80)  # (step boundary, hard) in percent of a window above SMALL_WINDOW_MAX
+THRESHOLDS_SMALL = (40, 60)  # the same for a window of up to SMALL_WINDOW_MAX
 FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
 
 
@@ -60,6 +65,13 @@ def window_of():
     return positive_int(os.environ.get("LISTICLES_CONTEXT_WINDOW")) or DEFAULT_WINDOW
 
 
+def stages(window):
+    """(step-boundary %, hard %) for this window; LISTICLES_CONTEXT_THRESHOLD replaces the hard stage and drops the soft one."""
+    soft, hard = THRESHOLDS_SMALL if window <= SMALL_WINDOW_MAX else THRESHOLDS_LARGE
+    override = positive_int(os.environ.get("LISTICLES_CONTEXT_THRESHOLD"))
+    return (None, override) if override else (soft, hard)
+
+
 def main():
     data = json.load(sys.stdin)
     if data.get("agent_id"):  # PostToolUse also fires inside subagents: neither warn them nor use up the main reminder
@@ -78,14 +90,26 @@ def main():
     if not pcts:
         return
     pct = max(pcts)
-    limit = positive_int(os.environ.get("LISTICLES_CONTEXT_THRESHOLD")) or DEFAULT_THRESHOLD
+    soft, hard = stages(window_of())
     flag = os.path.join(base, sid + ".warned")
-    if pct < limit or os.path.exists(flag):
+    soft_flag = os.path.join(base, sid + ".soft")
+    if pct >= hard:
+        if os.path.exists(flag):
+            return
+        msg = (f"CONTEXT {pct}% (limit {hard}%). Finish the current step only, then: write handoff/<branch>.md from "
+               "handoff/TEMPLATE.md, commit it, and end the session. Do not start new work.")
+        marks = (flag, soft_flag)
+    elif soft is not None and pct >= soft:
+        if os.path.exists(soft_flag):
+            return
+        msg = (f"CONTEXT {pct}% (step-boundary limit {soft}%, hard limit {hard}%). At the next step boundary: write handoff/<branch>.md "
+               "from handoff/TEMPLATE.md, commit it, and end the session. Do not start a new step after that.")
+        marks = (soft_flag,)
+    else:
         return
     os.makedirs(base, exist_ok=True)
-    open(flag, "w").close()
-    msg = (f"CONTEXT {pct}% (limit {limit}%). Finish the current step only, then: write handoff/<branch>.md from "
-           "handoff/TEMPLATE.md, commit it, and end the session. Do not start new work.")
+    for mark in marks:
+        open(mark, "w").close()
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": msg}}))
 
 

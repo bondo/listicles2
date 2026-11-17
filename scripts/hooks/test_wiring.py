@@ -243,7 +243,7 @@ class PreCommitSkipsGradleForDocsOnly(unittest.TestCase):
 
     def test_pre_commit_still_runs_the_guards_unconditionally(self):
         hook = read(".githooks", "pre-commit")
-        self.assertLess(hook.index("guards.sh --staged"), hook.index("prepush_scope.py"))
+        self.assertLess(hook.index("./scripts/guards.sh --staged"), hook.index("python3 -I scripts/hooks/prepush_scope.py"))
 
 
 class GitEnvImports(unittest.TestCase):
