@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 28/34 (82%) | 6 |
+| M0.5 | Product design and guardrails | 29/34 (85%) | 5 |
 | M1 | Accounts and households | 0/39 (0%) | 39 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,7 +62,7 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 28/34 done (82%), 6 open.
+**Progress:** 29/34 done (85%), 5 open.
 
 ### Tasks
 
@@ -70,7 +70,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 |---|---|---|---|---|---|
 | M0.5-01 | User stories with acceptance criteria (docs/product/stories.md) | done | all of M0 | planner | [#94](https://github.com/bondo/listicles2/issues/94) |
 | M0.5-02 | App-flow diagram (docs/product/flow.md, Mermaid) | done | M0.5-01 | planner | [#103](https://github.com/bondo/listicles2/issues/103) |
-| M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | ready | M0.5-01, M0.5-16 | planner | [#113](https://github.com/bondo/listicles2/issues/113) |
+| M0.5-03 | Screen wireframes and design tokens (colors, type, spacing, dark mode) as an artifact | done | M0.5-01, M0.5-16 | planner | [#113](https://github.com/bondo/listicles2/issues/113) |
 | M0.5-04 | App and repo name shortlist (#17)&#58; 5-8 candidates with Play Store, GitHub and domain availabilit… | done | all of M0 | planner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-05 | guards.sh&#58; suppressions of new linters (noqa, type&#58; ignore, eslint-disable, &#64;ts-*, coverage, for… | done | M0-O11 | implementer | [#43](https://github.com/bondo/listicles2/issues/43) |
 | M0.5-06 | CI&#58; shellcheck, actionlint, zizmor; SHA-pin actions; persist-credentials false (P2) | done | M0.5-05 | implementer | [#102](https://github.com/bondo/listicles2/issues/102) |
@@ -98,7 +98,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-23 | docs/reviews/README.md&#58; review catalogue R1-R12, procedures, visual-quality rubric, meta-revie… | done | M0.5-21 | implementer |  |
 | M0.5-24 | scripts/agent_metrics.py&#58; &#96;review&#96; row type (ledger of docs/reviews/README.md section 5), fai… | done | M0.5-23 | implementer |  |
 | M0.5-25 | Orchestrator prompt&#58; R3 weekly digest step, ledger row after each review, R10 owner-todo per … | done | M0.5-19, M0.5-21, M0.5-23 | implementer |  |
-| M0.5-26 | REVIEW.md&#58; R9 visual-rubric item (agent score below 3 is a minor finding) and R7 rules allow/… | blocked | M0.5-03, M0.5-15, M0.5-23 | implementer |  |
+| M0.5-26 | REVIEW.md&#58; R9 visual-rubric item (agent score below 3 is a minor finding) and R7 rules allow/… | ready | M0.5-03, M0.5-15, M0.5-23 | implementer |  |
 | M0.5-O4 | Collaborator invite sent and accepted | done | M0.5-19, M0.5-O3 | owner |  |
 | M0.5-O5 | Confirm the collaborator's 2FA and run the live test | owner to-do | M0.5-O4 | owner |  |
 | M0.5-28 | R6 retro of M0.5&#58; compare the Agent Usage Redesign pilot with its baseline and propose at most … | blocked | M0.5-01, M0.5-02, M0.5-03, M0.5-04, M0.5-05, M0.5-06, M0.5-07, M0.5-08, M0.5-09, M0.5-10, M0.5-11, M0.5-12, M0.5-13, M0.5-14, M0.5-15, M0.5-27, M0.5-16, M0.5-17, M0.5-18, M0.5-19, M0.5-20, M0.5-21, M0.5-22, M0.5-23, M0.5-24, M0.5-25, M0.5-26 | retro |  |
@@ -109,19 +109,14 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ready
-    n1["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
-    n2["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
-    n3["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
-    n4["M0.5-O5 Confirm the collaborator's 2FA and run… (owner to-do)"]:::owner
-    n5["M0.5-28 R6 retro of M0.5: compare the Agent U… (blocked)"]:::blocked
-    n0 --> n1
-    n3 --> n1
-    n5 --> n1
-    n0 --> n2
-    n0 --> n3
-    n0 --> n5
-    n3 --> n5
+    n0["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
+    n1["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
+    n2["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (ready)"]:::ready
+    n3["M0.5-O5 Confirm the collaborator's 2FA and run… (owner to-do)"]:::owner
+    n4["M0.5-28 R6 retro of M0.5: compare the Agent U… (blocked)"]:::blocked
+    n2 --> n0
+    n4 --> n0
+    n2 --> n4
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -225,11 +220,9 @@ flowchart LR
     n37["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
     n38["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
     n39["all of M0.5"]:::ext
-    n40["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ext
     n39 --> n0
     n7 --> n1
     n0 --> n2
-    n40 --> n3
     n2 --> n3
     n0 --> n4
     n0 --> n5
@@ -384,7 +377,5 @@ flowchart LR
 
 - **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **task** M0.5-FU: waits on M0.5-03, M0.5-26, M0.5-28
-- **task** M0.5-O1: waits on M0.5-03
-- **task** M0.5-26: waits on M0.5-03
-- **task** M0.5-28: waits on M0.5-03, M0.5-26
+- **task** M0.5-FU: waits on M0.5-26, M0.5-28
+- **task** M0.5-28: waits on M0.5-26
