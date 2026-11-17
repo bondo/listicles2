@@ -11,7 +11,8 @@ callback that follows a callback that reads them). Show such text with textConte
 sanitizer call: esc(...) for one string, escDeep(...) for a fetched object (both are tested against the real page in
 scripts/test_wireframes_safety.py).
 
-A value is derived (tainted) when it is declared or assigned from a source or from another tainted value, when it is a parameter of a
+A value is derived (tainted) when it is declared or assigned (`=` or a compound `+=`, `||=`, `??=`, ... after `;`, `{`, `}`, `)`,
+`=>`, `else` or at the start of a line) from a source or from another tainted value, when it is a parameter of a
 function that is called with a tainted argument, or when it is a parameter of an array callback (`.map`, `.forEach`, ...) whose
 receiver is tainted. A value stops being tainted only when the WHOLE right-hand side is one of: a whitelisted sanitizer call; a
 ternary whose two results are string literals; a boolean/number method (`.includes`, `.test`, `.has`, `.some`, `.every`, `.indexOf`,
@@ -38,7 +39,10 @@ SANITIZERS = ("esc", "escDeep")
 _ID = r"[A-Za-z_$][\w$]*"
 _SINK = re.compile(r"\.(?:innerHTML|outerHTML)\s*\+?=(?!=)\s*")
 _CALL_SINK = re.compile(r"\.insertAdjacentHTML\s*\(|\bdocument\s*\.\s*write(?:ln)?\s*\(")
-_DECL = re.compile(r"(?:\b(?:const|let|var)\s+|(?m:^)\s*)(" + _ID + r")\s*=(?![=>])\s*")
+_DECL = re.compile(r"\b(?:const|let|var)\s+(" + _ID + r")\s*=(?![=>])\s*")
+_ASSIGN = re.compile(
+    r"(?:(?m:^)|[;{})]|=>|\belse\b)\s*(" + _ID + r")\s*(?:\*\*|<<|>>>?|\|\||&&|\?\?|[-+*/%&|^])?=(?![=>])\s*"
+)
 _DECL_PATTERN = re.compile(r"\b(?:const|let|var)\s+([\[{][^=;]*?[\]}])\s*=(?!=)\s*")
 _FOR_OF = re.compile(r"\bfor\s*\(\s*(?:const|let|var)\s+([^;()]*?)\s+(?:of|in)\s+")
 _PARAMS_OBJECT = re.compile(r"\b(" + _ID + r")\s*=\s*new\s+URLSearchParams\b")
@@ -439,9 +443,25 @@ def _taint(js: str) -> _Taint:
                 t.add(params[0], body)
 
     decls: list[tuple[set[str], str, int, Span]] = []
+    declared: dict[str, list[Span]] = {}  # name -> scopes of its const/let/var declarations and function parameters
     for rx in (_DECL, _DECL_PATTERN, _FOR_OF):
         for m in rx.finditer(js):
-            decls.append((_words(m.group(1)), js[m.end() : _expr_end(js, m.end())], m.end(), scope(m.start())))
+            sc = scope(m.start())
+            decls.append((_words(m.group(1)), js[m.end() : _expr_end(js, m.end())], m.end(), sc))
+            for n in _words(m.group(1)):
+                declared.setdefault(n, []).append(sc)
+    for params, body in functions.values():
+        for group in params:
+            for n in group:
+                declared.setdefault(n, []).append(body)
+
+    def assign_scope(name: str, pos: int) -> Span:
+        """The scope of the variable an assignment at pos writes to: the innermost declaration around it, else the whole file."""
+        inside = [sp for sp in declared.get(name, []) if sp[0] <= pos < sp[1]]
+        return min(inside, key=lambda sp: sp[1] - sp[0]) if inside else whole
+
+    for m in _ASSIGN.finditer(js):
+        decls.append(({m.group(1)}, js[m.end() : _expr_end(js, m.end())], m.end(), assign_scope(m.group(1), m.start())))
     calls: list[tuple[str, list[tuple[str, int]]]] = []
     for m in _CALL.finditer(js):
         if m.group(1) in functions and not re.search(r"\bfunction\s+$", js[: m.start()]):

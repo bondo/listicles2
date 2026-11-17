@@ -172,6 +172,7 @@ function escDeep(v) {
   if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [esc(k), escDeep(x)]));
   return v;
 }
+function storedTheme(v) { return ['light', 'dark', 'tokens'].includes(v) ? v : 'light'; }
 function sameOriginUrl(value, base, fallback) {
   try {
     const u = new URL(value, base);
@@ -588,7 +589,7 @@ function render(T) {
     return;
   }
   let theme = 'light';
-  try { theme = localStorage.getItem('tally-wf-theme') || 'light'; } catch (e) { /* storage may be blocked */ }
+  try { theme = storedTheme(localStorage.getItem('tally-wf-theme')); } catch (e) { /* storage may be blocked */ }
   const draw = () => {
     app.innerHTML = `<div class="gallery"><h1>Tally v1 wireframes</h1><p class="intro">Status: working draft, not owner-approved (open: T1, T2, R1, screen 32a; see issue #15)</p><p class="intro">Draft for the owner's sign-off (task M0.5-03). Each screen is shown in English and Danish.
       Numbers match the review sheet in the pull request. Story ids refer to docs/product/stories.md, OQ ids to its open and decided questions.</p>
