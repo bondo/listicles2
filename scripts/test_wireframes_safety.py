@@ -138,6 +138,54 @@ class SanitizerMustWrapTheWholeValue(unittest.TestCase):
         self.assertEqual(ws.check(t), [])
 
 
+class Reassignment(unittest.TestCase):
+    """R3-01: an existing name that is assigned from a source taints it, wherever the assignment sits."""
+
+    SINK = "app.innerHTML = `<p>${a}</p>`;"
+
+    def flagged(self, body: str, line: int):
+        self.assertEqual(lines(js(body)), [line], body)
+
+    def test_assignment_in_an_if_without_braces(self):
+        self.flagged("let a = 'x';\nif (params.has('s')) a = params.get('s');\n" + self.SINK, 6)
+
+    def test_assignment_on_the_same_line_after_a_semicolon(self):
+        self.flagged("let a = 'x'; a = params.get('s');\n" + self.SINK, 5)
+
+    def test_compound_assignments(self):
+        for op in ("+=", "||=", "??=", "&&="):
+            self.flagged(f"let a = 'x';\na {op} params.get('s');\n" + self.SINK, 6)
+
+    def test_assignment_in_an_arrow_body(self):
+        self.flagged("let a = 'x';\nbtn.onclick = () => a = location.hash;\n" + self.SINK, 6)
+
+    def test_assignment_after_an_opening_brace(self):
+        self.flagged("let a = 'x';\nif (c) { a = location.hash; }\n" + self.SINK, 6)
+
+    def test_assignment_inside_a_block_but_use_after_it(self):
+        self.flagged("let a = 'x';\nif (c) {\n  a = params.get('s');\n}\n" + self.SINK, 8)
+
+    def test_assignment_to_a_parameter(self):
+        self.flagged("function f(a) {\n  a = params.get('s');\n  app.innerHTML = `<p>${a}</p>`;\n}", 6)
+
+    def test_else_branch_assignment(self):
+        self.flagged("let a = 'x';\nif (c) { go(); } else a = location.hash;\n" + self.SINK, 6)
+
+    def test_assignments_that_do_not_taint(self):
+        for body in (
+            "let a = 'x'; a = 'y';\n" + self.SINK,
+            "let a = 'x';\nif (params.has('s')) a = 'y';\n" + self.SINK,
+            "let a = 'x';\nconst t = params.get('s');\n" + self.SINK,
+            "let a = 'x';\nif (a === params.get('s')) { go(); }\n" + self.SINK,
+            "let a = 'x'; o.a = params.get('s');\n" + self.SINK,
+            "let a = 'x'; a = esc(params.get('s'));\n" + self.SINK,
+        ):
+            self.assertEqual(ws.check(js(body)), [], body)
+
+    def test_the_docstring_names_the_assignment_forms(self):
+        self.assertIn("compound", ws.__doc__ or "")
+
+
 class MoreSources(unittest.TestCase):
     def test_document_url_referrer_and_window_name(self):
         for src in ("document.URL", "document.documentURI", "document.referrer", "window.name", "location.href"):
@@ -172,8 +220,12 @@ class MoreSources(unittest.TestCase):
         self.assertEqual(lines(t), [5])
 
     def test_markup_template_that_is_returned_not_assigned(self):
+        t = js("const sheet = (d) => `<section>${d.title}</section>`;\nfetch(U).then(r => r.json()).then(d => { keep = sheet(d); });")
+        self.assertEqual(lines(t), [4])
+
+    def test_markup_template_and_the_sink_that_receives_it(self):
         t = js("const sheet = (d) => `<section>${d.title}</section>`;\nfetch(U).then(r => r.json()).then(d => { app.innerHTML = sheet(d); });")
-        self.assertIn(4, lines(t))  # the template that is returned, and the sink that receives it (line 5)
+        self.assertEqual(lines(t), [4, 5])
 
     def test_a_plain_text_template_is_not_markup(self):
         t = js("const one = params.get('s');\nshowText(`No screen ${one}`);")
@@ -240,6 +292,18 @@ class PageHelpers(unittest.TestCase):
             return html.unescape(a) == b if isinstance(a, str) else a == b
 
         self.assertTrue(same(got, real))
+
+    def test_stored_theme_is_whitelisted(self):
+        cases = (("light", "light"), ("dark", "dark"), ("tokens", "tokens"), ("sepia", "light"), ("", "light"), ("__proto__", "light"), ("DARK", "light"))
+        for stored, want in cases:
+            self.assertEqual(self.run_js(f"storedTheme({json.dumps(stored)})"), want, stored)
+        self.assertEqual(self.run_js("storedTheme(null)"), "light")
+        self.assertEqual(self.run_js("storedTheme(undefined)"), "light")
+
+    def test_the_page_reads_the_stored_theme_through_the_whitelist(self):
+        text = PAGE.read_text(encoding="utf-8")
+        self.assertRegex(text, r"theme = storedTheme\(localStorage\.getItem\(")
+        self.assertNotRegex(text, r"theme = localStorage\.getItem")
 
     def test_the_page_uses_the_helpers_for_the_tokens_url_and_the_fetched_data(self):
         text = PAGE.read_text(encoding="utf-8")
