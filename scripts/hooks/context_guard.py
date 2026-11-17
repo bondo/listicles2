@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""PostToolUse hook: remind the agent to hand off before the context window fills (PLAN 9.3; Agent Usage Redesign rev 46).
-Two stages, each given ONCE per session: a step-boundary reminder (60% of a 1M window, 40% of a 200k one) to write
-handoff/<branch>.md from handoff/TEMPLATE.md, commit and end at the next step boundary, and a hard reminder (80% / 60%)
-to finish the current step only and do it now. The numbers are mirrored in agents/roles.yaml (a test ties the two).
+"""PostToolUse hook: once context use reaches the threshold, remind the agent ONCE per session to finish the step,
+write handoff/<branch>.md from handoff/TEMPLATE.md, commit and end (PLAN 9.3). Since the Agent Usage Redesign (rev 46) there are
+two thresholds, each reminded ONCE per session: a step-boundary stage (60% of a 1M window, 40% of a 200k one: hand off at the next
+step boundary) and a hard stage (80% / 60%: finish the current step only, then hand off). The numbers are mirrored in
+agents/roles.yaml (a test ties the two).
 
 Usage source (works headless/in the cloud, where the statusline never runs): the last main-thread assistant record in
 transcript_path, context = input + cache_creation + cache_read + output tokens of that call. If scripts/statusline.sh did
