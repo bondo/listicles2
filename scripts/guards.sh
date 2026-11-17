@@ -171,17 +171,25 @@ if [ "$STAGED" = 0 ]; then
     git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
-      /^diff --git/ { file = $3; next }
+      /^diff --git/ {
+        file = $3
+        istest = (file ~ /(^|\/)test_[^\/]*\.py$|_test\.py$|(Test|Tests)\.(kt|java)$|\/src\/[A-Za-z]*[Tt]est[A-Za-z]*\//)
+        next
+      }
       /^(---|\+\+\+)/ { next }
       {
-        # A test function NAME is not a check setting (owner decision, #15): drop only the declared name of
-        # `def test...(` and `fun test...(` / fun `name`(, so the rest of the line and all other lines still count.
-        body = $0
-        if (match(body, /^[-+][ \t]*(async[ \t]+)?def[ \t]+test[A-Za-z0-9_]*[ \t]*\(/) ||
-            match(body, /^[-+][ \t]*(@[A-Za-z]+[ \t]+)*fun[ \t]+(test[A-Za-z0-9_]*|`[^`]*`)[ \t]*\(/))
-          body = substr(body, 1, 1) "test(" substr(body, RLENGTH + 1)
+        # A test function NAME is not a check setting (owner decision, #15). Only in test files, the declared name
+        # of `def test...(` / `fun test...(` / fun `name`( is dropped from the line. The keyword scan ignores the
+        # name only for a bare declaration (no digit after it); a value on the line keeps the whole line in scope.
+        body = $0; kw = $0
+        if (istest && (match(body, /^[-+][ \t]*(async[ \t]+)?def[ \t]+test[A-Za-z0-9_]*[ \t]*\(/) ||
+            match(body, /^[-+][ \t]*(@[A-Za-z]+[ \t]+)*fun[ \t]+(test[A-Za-z0-9_]*|`[^`]*`)[ \t]*\(/))) {
+          rest = substr(body, RLENGTH + 1)
+          body = substr(body, 1, 1) "test(" rest
+          if (rest !~ /[0-9]/) kw = body
+        }
       }
-      body ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
+      kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
         l = norm(body); key = file "|" l; gsub(/[0-9]+/, "N", key)
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = num(l) } else { add[key] = l; addn[key] = num(l) }
       }
