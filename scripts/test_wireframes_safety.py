@@ -187,6 +187,15 @@ class Reassignment(unittest.TestCase):
         page = "<style>p { content: \"don't\"; }</style>\n<p>don't</p>\n" + js("const one = params.get('s');\napp.innerHTML = `<p>${one}</p>`;")
         self.assertEqual(lines(page), [7])
 
+    def test_script_end_tags_with_attributes_or_whitespace_close_the_script(self):
+        for end in ("</script>", "</script >", "</SCRIPT>", "</script foo>", "</script\t\n bar>"):
+            page = "<p>before</p><script>a=1;" + end + "\n<p>after</p>"
+            got = ws._script_only(page)
+            self.assertIn("a=1;", got, end)
+            self.assertNotIn("<p>after</p>", got, end)
+            self.assertNotIn("<p>before</p>", got, end)
+            self.assertEqual(got.count("\n"), page.count("\n"), end)
+
     def test_assignments_that_do_not_taint(self):
         for body in (
             "let a = 'x'; a = 'y';\n" + self.SINK,
