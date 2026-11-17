@@ -2,7 +2,7 @@
   "blockers": 5,
   "current_milestone": "M0.5",
   "followups": 16,
-  "generated_at": "2026-11-17T09:31:06Z",
+  "generated_at": "2026-11-17T09:41:06Z",
   "milestones": [
     {
       "done": 28,
@@ -11,10 +11,10 @@
       "total": 28
     },
     {
-      "done": 27,
+      "done": 28,
       "id": "M0.5",
       "title": "Product design and guardrails",
-      "total": 32
+      "total": 33
     },
     {
       "done": 0,
@@ -54,5 +54,5 @@
     }
   ],
   "outside_questions": 0,
-  "owner_queue": 7
+  "owner_queue": 6
 }

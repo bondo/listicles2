@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 27/32 (84%) | 5 |
+| M0.5 | Product design and guardrails | 28/33 (84%) | 5 |
 | M1 | Accounts and households | 0/10 (0%) | 10 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,7 +62,7 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 27/32 done (84%), 5 open.
+**Progress:** 28/33 done (84%), 5 open.
 
 ### Tasks
 
@@ -99,7 +99,8 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-24 | scripts/agent_metrics.py&#58; &#96;review&#96; row type (ledger of docs/reviews/README.md section 5), fai… | done | M0.5-23 | implementer |  |
 | M0.5-25 | Orchestrator prompt&#58; R3 weekly digest step, ledger row after each review, R10 owner-todo per … | done | M0.5-19, M0.5-21, M0.5-23 | implementer |  |
 | M0.5-26 | REVIEW.md&#58; R9 visual-rubric item (agent score below 3 is a minor finding) and R7 rules allow/… | blocked | M0.5-03, M0.5-15, M0.5-23 | implementer |  |
-| M0.5-O4 | Invite the collaborator (Write) once COLLABORATING.md and the wake steps exist, confirm 2FA, ru… | owner to-do | M0.5-19, M0.5-O3 | owner |  |
+| M0.5-O4 | Collaborator invite sent and accepted | done | M0.5-19, M0.5-O3 | owner |  |
+| M0.5-O5 | Confirm the collaborator's 2FA and run the live test | owner to-do | M0.5-O4 | owner |  |
 
 ### Open tasks and what blocks them
 
@@ -111,7 +112,7 @@ flowchart LR
     n1["M0.5-FU Follow-up burn-down for M0.5 (blocked)"]:::blocked
     n2["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
     n3["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
-    n4["M0.5-O4 Invite the collaborator (Write) once C… (owner to-do)"]:::owner
+    n4["M0.5-O5 Confirm the collaborator's 2FA and run… (owner to-do)"]:::owner
     n0 --> n1
     n3 --> n1
     n0 --> n2
