@@ -61,7 +61,7 @@ lists/{lid}                      { kind: PLAIN|COLLECTION, name, createdBy, shar
                                    schemaVersion, createdAt, updatedAt, updatedBy }
 lists/{lid}/items/{iid}          { name, have: bool, releaseYear?, reReleaseYear?,   // years: COLLECTION only
                                    createdBy, createdAt, updatedAt, updatedBy }
-config/app                       { minVersionCode }                    // any signed-in user reads; owner edits in the console
+config/app                       { minVersionCode }                    // anyone reads, even signed out; owner edits in the console
 ```
 
 Lists are **top level**, not under a household: a list exists without a household (OQ-1), and it stays with its
@@ -84,9 +84,9 @@ tombstone read (below). Rules that involve no household need no `LIVE`: `users/{
 list, and the creator's own access to their lists and items.
 
 **Signed in** means `request.auth != null && request.auth.token.email_verified == true`[^ev]. Every rule below,
-including the invite `get`, requires it, with two exceptions for any `request.auth != null`: reading
-the `config` app document (so an old app can say "Update the app" before verification) and the own `users/{uid}` doc
-(AUTH-06, HH-03). The `config` app document has no client writes. No rule relies on a two-step (MFA) claim.
+including the invite `get`, requires it, with two exceptions: the own `users/{uid}` doc needs only
+`request.auth != null` (AUTH-06, HH-03), and the `config` app document is readable by anyone, even signed out (so an
+old app can say "Update the app" before sign-in or verification). The `config` app document has no client writes. No rule relies on a two-step (MFA) claim.
 
 **Reads**: members (`M(uid)`, `LIVE`) can read the household doc and everything under it.
 `users/{uid}` can be read and written only by that user, and holds nothing but
