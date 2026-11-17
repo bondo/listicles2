@@ -12,7 +12,8 @@ import gitenv  # noqa: F401  # justified: imported for its side effect, drops GI
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
-SUITES = ("test_prepush_hook.py", "test_prepush_scope.py", "test_guards_sh.py", "test_pretooluse_guard.py", "test_session_end_metrics.py")
+SUITES = ("test_prepush_hook.py", "test_precommit_hook.py", "test_prepush_scope.py", "test_guards_sh.py", "test_pretooluse_guard.py",
+          "test_session_end_metrics.py")
 
 
 def git(cwd, *args, env=None):
@@ -47,7 +48,7 @@ class GitEnvIsolation(unittest.TestCase):
         with open(cfg, "w") as f:
             f.write("[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n[core]\n\thooksPath = /nonexistent\n")
         env = dict(os.environ, GIT_CONFIG_GLOBAL=cfg)
-        for suite in ("test_prepush_hook.py", "test_guards_sh.py"):
+        for suite in ("test_prepush_hook.py", "test_precommit_hook.py", "test_guards_sh.py"):
             r = subprocess.run([sys.executable, "-I", "-m", "unittest", "discover", "-s", HERE, "-p", suite], cwd=ROOT, env=env,
                                capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, suite + r.stderr[-600:])
