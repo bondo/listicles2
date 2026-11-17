@@ -116,6 +116,15 @@ class AgentEffort(unittest.TestCase):
         self.assertEqual(set(roles()), {"orchestrator", "planner", "implementer", "reviewer", "design-reviewer", "explorer", "ci-triage"})
 
 
+class PreCommitSkipsGradleForDocsOnly(unittest.TestCase):
+    def test_pre_commit_uses_the_scope_script(self):
+        self.assertIn("prepush_scope.py", read(".githooks", "pre-commit"))
+
+    def test_pre_commit_still_runs_the_guards_unconditionally(self):
+        hook = read(".githooks", "pre-commit")
+        self.assertLess(hook.index("./scripts/guards.sh --staged"), hook.index("python3 -I scripts/hooks/prepush_scope.py"))
+
+
 class GitEnvImports(unittest.TestCase):
     def test_every_hook_test_that_runs_git_imports_gitenv_directly(self):
         """R12-51: protection through another module's import is accidental; discover order must not matter."""
