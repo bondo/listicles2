@@ -1054,6 +1054,7 @@ class Pr3RuleTests(unittest.TestCase):
         "plan-handoff": "docs/PLAN.md",
         "plan-roles": "docs/PLAN.md",
         "template-handoff": "handoff/TEMPLATE.md",
+        "reviews-retro": "docs/reviews/README.md",  # #129 R2-02: the R6 retro is Opus/high as in PLAN 9.4 and roles.yaml
     }
     # (file, rule id, the old wording that must now be rejected)
     STALE = (
@@ -1074,6 +1075,9 @@ class Pr3RuleTests(unittest.TestCase):
         ("docs/PLAN.md", "plan-roles", "| **Orchestrator** | Sonnet / low | One long-lived session |"),
         ("docs/PLAN.md", "plan-roles", "The single source of truth for each role's model, effort and token budget."),
         ("docs/PLAN.md", "plan-roles", "A retro session (Sonnet / medium) reads only the CSV. Escaped defects get the label `escaped`."),
+        ("docs/PLAN.md", "plan-roles", "Starting budgets (calibrated after M0): implementer about 300k tokens/PR."),  # R2-01
+        ("docs/reviews/README.md", "reviews-retro", "| R6 | Sonnet medium worker | PLAN 9.4 + section 5 | exists |"),
+        ("docs/reviews/README.md", "reviews-retro", "| Sonnet medium worker | the CSV, `docs/agent-tuning.md` |"),
         ("handoff/TEMPLATE.md", "template-handoff", "Write it at about 50% context, commit it, and end the session."),
         ("REVIEW.md", "review-escalation", "A dropped finding stays open."),
     )
@@ -1197,10 +1201,24 @@ class Pr3RuleTests(unittest.TestCase):
         for needle in ("agents/roles.yaml", "**second reviewer**", "**escalation reviewer**", "`caused by: #n`",
                        "one implementer session per pr, kept across its review rounds"):
             self.assertIn(needle, plan)
-        for stale in ("sonnet / low", "haiku", "token budget", "search narrowly", "label `escaped`", "once 50% is crossed"):
+        for stale in ("sonnet / low", "haiku", "token budget", "search narrowly", "label `escaped`", "once 50% is crossed",
+                      "starting budgets", "tokens/pr", "tokens per round"):  # R2-01 of #129: the budgets in section 9.4
             self.assertNotIn(stale, plan)
         self.assertIn("60% of a 1m window, 40% of a 200k one", prompt_rules.normalize(self.doc("handoff/TEMPLATE.md")).lower())
         self.assertIn("deferred minors do not count", plan)  # the M0-11 pin in test_wiring.py
+
+    def test_plan_prompt_list_and_triage_bullet_match_the_prompts(self):  # R2-03 of #129
+        plan = prompt_rules.normalize(self.doc("docs/PLAN.md")).lower()
+        self.assertIn("agents/prompts/{orchestrator,planner,implementer,reviewer,design-reviewer}.md", plan)  # M0.5-15 pin
+        self.assertRegex(plan, r"second-reviewer[^.]*escalation-reviewer[^.]*verifier|escalation-reviewer[^.]*second-reviewer")
+        self.assertIn("runs a ci-triage pass first, then, if it does not explain the failure, stops and reports", plan)
+        self.assertIn("repository files", prompt_rules.DocRule.__doc__)
+
+    def test_the_r6_retro_is_opus_high_with_transcripts_in_the_reviews_readme(self):  # R2-02 of #129
+        readme = prompt_rules.normalize(self.doc("docs/reviews/README.md")).lower()
+        self.assertNotIn("sonnet medium worker", readme)
+        self.assertIn("| r6 | opus high worker | plan 9.4", readme)
+        self.assertIn("a sample of transcripts and pr threads", readme)
 
 
 if __name__ == "__main__":
