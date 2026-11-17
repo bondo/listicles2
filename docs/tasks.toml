@@ -819,7 +819,7 @@ notes = "Normal env. Must merge before M1-O1 registers the Android app in Fireba
 
 [[task]]
 id = "M1-08"
-title = "Rules base: default deny, signedIn() requiring email_verified, users/{uid}, config/app, allow and deny tests"
+title = "Rules base: signedIn() with email_verified, users/{uid} householdId set/clear, tombstone read, config/app"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
@@ -846,12 +846,13 @@ depends_on = ["M1-09"]
 
 [[task]]
 id = "M1-11"
-title = "Rules: leave, remove member, household soft delete and cleanup, allow and deny tests"
+title = "Rules: leave, remove member (removed marker), household soft delete and cleanup, allow and deny tests"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-10"]
+depends_on = ["M1-12"]
+notes = "After M1-12: Leave, Remove and cleanup delete invites"
 
 [[task]]
 id = "M1-12"
@@ -905,7 +906,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-14", "M1-02"]
+depends_on = ["M1-14", "M1-02", "M1-03"]
 
 [[task]]
 id = "M1-17"
@@ -927,12 +928,21 @@ depends_on = ["M1-29"]
 
 [[task]]
 id = "M1-18"
-title = "Household data: create, invite, join, leave, remove, transfer, delete with cleanup resume (emulator)"
+title = "Household data 1: create, invite, revoke, join, start-up self-heal (emulator)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-11", "M1-12", "M1-30"]
+depends_on = ["M1-12", "M1-30"]
+
+[[task]]
+id = "M1-31"
+title = "Household data 2: leave, remove (marker, resumable), transfer, delete with cleanup resume (emulator)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-11", "M1-18"]
 
 [[task]]
 id = "M1-19"
@@ -960,16 +970,25 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-19"]
+depends_on = ["M1-19", "M1-31"]
 
 [[task]]
 id = "M1-22"
-title = "Account: change password (AUTH-11) and delete account (AUTH-04) with recent sign-in"
+title = "Account: change password with recent sign-in (AUTH-11)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-17", "M1-21"]
+depends_on = ["M1-17"]
+
+[[task]]
+id = "M1-32"
+title = "Account: delete account (AUTH-04) with recent sign-in, resumable"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-22", "M1-21"]
 
 [[task]]
 id = "M1-23"
@@ -978,7 +997,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-22", "M1-O3"]
+depends_on = ["M1-32", "M1-O3"]
 notes = "Dropped if the Identity Platform upgrade needs billing (OQ-25, M1-O3)"
 
 [[task]]
@@ -992,7 +1011,7 @@ depends_on = ["M1-30"]
 
 [[task]]
 id = "M1-26"
-title = "App Check: Play Integrity in release, debug provider in debug and CI (not enforced)"
+title = "App Check: Play Integrity in release, debug provider in debug builds (not enforced)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
@@ -1018,6 +1037,16 @@ risk = "normal"
 depends_on = ["M1-01"]
 
 [[task]]
+id = "M1-33"
+title = "Release smoke build with R8 in CI (best-practices checklist follow-up 7)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30"]
+notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4)"
+
+[[task]]
 id = "M1-FU"
 title = "Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)"
 milestone = "M1"
@@ -1027,7 +1056,7 @@ risk = "normal"
 depends_on = [
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
-  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30",
+  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33",
 ]
 
 [[task]]
@@ -1042,7 +1071,7 @@ notes = "Steps: docs/milestones/M1.md R1 (database location eur3 cannot be chang
 
 [[task]]
 id = "M1-O2"
-title = "Register the SHA-1 and SHA-256 fingerprints of the debug and GitHub release keys in Firebase and App Check"
+title = "Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in)"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
@@ -1061,7 +1090,7 @@ notes = "Runbook: docs/milestones/M1.md R2 (and R3, the MFA reset). If billing i
 
 [[task]]
 id = "M1-O4"
-title = "Register App Check (Play Integrity, device integrity only), add the CI debug token secret, watch metrics"
+title = "Enable the Play Integrity API (Cloud console), register App Check (device integrity only), watch metrics"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
@@ -1077,3 +1106,25 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-28"]
+
+# ---------------------------------------------------------------- M6 owner tasks (from the M1 plan)
+
+[[task]]
+id = "M6-O1"
+title = "Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json"
+milestone = "M6"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O2"]
+notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 so M1 can close before the release key exists"
+
+[[task]]
+id = "M6-O2"
+title = "Register a free limited-distribution Android developer account when available in Denmark"
+milestone = "M6"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 120
