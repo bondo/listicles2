@@ -8,7 +8,7 @@ agents/roles.yaml (a test ties the two).
 Usage source (works headless/in the cloud, where the statusline never runs): the last main-thread assistant record in
 transcript_path, context = input + cache_creation + cache_read + output tokens of that call. If scripts/statusline.sh did
 record a value for the session (interactive CLI), the larger of the two is used.
-Window: LISTICLES_CONTEXT_WINDOW (tokens), else 1,000,000 (the models used here have a 1M window). A window of up to
+Window: the one the status line recorded for the session, else LISTICLES_CONTEXT_WINDOW (tokens), else 1,000,000 (the models used here have a 1M window). A window of up to
 200,000 tokens uses the small-window stages. Set LISTICLES_CONTEXT_WINDOW at spawn for a smaller window. Garbage values fall back.
 Calls made inside subagents (hook input has agent_id) are ignored.
 Env: LISTICLES_CONTEXT_THRESHOLD (percent) replaces the hard stage and switches the step-boundary stage off; garbage falls back to
@@ -61,9 +61,14 @@ def positive_int(value):
     return int(s) if re.fullmatch(r"[0-9]+", s) and int(s) > 0 else None  # ASCII digits only: int("\u00b2") raises
 
 
-def window_of():
-    """LISTICLES_CONTEXT_WINDOW, else 1,000,000. (PostToolUse input has no window field; only the statusline JSON does.)"""
-    return positive_int(os.environ.get("LISTICLES_CONTEXT_WINDOW")) or DEFAULT_WINDOW
+def window_of(base="", sid=""):
+    """The window the status line recorded for this session (<base>/<sid>.window), else LISTICLES_CONTEXT_WINDOW, else 1,000,000.
+    (PostToolUse input has no window field; only the statusline JSON does, so the statusline records it. Garbage is ignored.)"""
+    recorded = None
+    with contextlib.suppress(OSError):
+        with open(os.path.join(base, sid + ".window")) as f:
+            recorded = positive_int(f.read())
+    return recorded or positive_int(os.environ.get("LISTICLES_CONTEXT_WINDOW")) or DEFAULT_WINDOW
 
 
 def stages(window):
@@ -87,11 +92,11 @@ def main():
     tp = data.get("transcript_path")
     found = last_usage(tp) if isinstance(tp, str) and tp else None
     if found:
-        pcts.append(found * 100 // window_of())
+        pcts.append(found * 100 // window_of(base, sid))
     if not pcts:
         return
     pct = max(pcts)
-    soft, hard = stages(window_of())
+    soft, hard = stages(window_of(base, sid))
     flag = os.path.join(base, sid + ".warned")
     soft_flag = os.path.join(base, sid + ".soft")
     if pct >= hard:
