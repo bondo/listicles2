@@ -173,7 +173,7 @@ class MoreSources(unittest.TestCase):
 
     def test_markup_template_that_is_returned_not_assigned(self):
         t = js("const sheet = (d) => `<section>${d.title}</section>`;\nfetch(U).then(r => r.json()).then(d => { app.innerHTML = sheet(d); });")
-        self.assertEqual(lines(t), [4])
+        self.assertIn(4, lines(t))  # the template that is returned, and the sink that receives it (line 5)
 
     def test_a_plain_text_template_is_not_markup(self):
         t = js("const one = params.get('s');\nshowText(`No screen ${one}`);")

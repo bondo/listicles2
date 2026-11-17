@@ -163,8 +163,25 @@
 <div id="app"><p style="padding:24px">Loading design/tokens.json (serve the repository root over HTTP; see the comment at the top of this file).</p></div>
 <script>
 'use strict';
+/* safe-helpers:begin (run under node by scripts/test_wireframes_safety.py: keep this block self-contained) */
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function esc(s) { return String(s).replace(/[&<>\x22\x27]/g, c => ESC[c]); }
+function escDeep(v) {
+  if (typeof v === 'string') return esc(v);
+  if (Array.isArray(v)) return v.map(escDeep);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [esc(k), escDeep(x)]));
+  return v;
+}
+function sameOriginUrl(value, base, fallback) {
+  try {
+    const u = new URL(value, base);
+    return /^https?:$/.test(u.protocol) && u.origin === new URL(base).origin ? u.href : fallback;
+  } catch (e) { return fallback; }
+}
+/* safe-helpers:end */
 const params = new URLSearchParams(location.search);
-const TOKENS_URL = params.get('tokens') || '../../../design/tokens.json';
+const DEFAULT_TOKENS = '../../../design/tokens.json';
+const TOKENS_URL = sameOriginUrl(params.get('tokens') || DEFAULT_TOKENS, location.href, DEFAULT_TOKENS);
 
 /* ---------- Strings (English, Danish). List, item and household names are user data: never translated. ---------- */
 const S = {
@@ -589,7 +606,7 @@ function render(T) {
 }
 
 fetch(TOKENS_URL).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(render)
+  .then(data => render(escDeep(data)))
   .catch(e => showText(`Could not read ${TOKENS_URL} (${e}). Serve the repository root over HTTP.`));
 </script>
 </body>
