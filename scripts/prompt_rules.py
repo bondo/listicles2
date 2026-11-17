@@ -578,6 +578,16 @@ RULES = (
         forbidden=(r"flag plan gaps for the owner instead of deciding",),
     ),
     Rule(
+        "reviewer-visual-matrix", ("reviewer",),
+        (
+            r"visual check and rules matrix \(review\.md items 12 and 13\)", r"an agent score below 3 is a `minor` finding, never a blocker or major",
+            r"taste stays with the owner", r"`area:security-rules`, `area:sync-merge` or `risk:high`",
+            r"covers each changed rule with an allow case and a deny case", r"a gap is a `major` finding \(area `security-rules`\)",
+        ),
+        "the reviewer does the R9 visual check (agent score below 3 is a minor) and the R7 allow/deny matrix check (REVIEW.md items 12, 13; M0.5-26)",
+        forbidden=(r"score below 3 is a `?(?:blocker|major)", r"below 3 (?:blocks|must block) the merge"),
+    ),
+    Rule(
         "escalation-role", ("escalation-reviewer",),
         (
             r"you are the escalation reviewer", r"opus, max effort", r"once per pr", r"no second escalation",
@@ -659,6 +669,26 @@ DOC_RULES = (
         "REVIEW.md: after round 4 one escalation reviewer decides; a dispute uses the same single escalation (rev 46 row 4)",
         forbidden=(r"fixes made after round 4 are not re-reviewed", r"the owner breaks ties", r"stop and report to the owner, who decides",
                    r"a dropped finding stays open"),
+    ),
+    DocRule(
+        "review-visual", "REVIEW.md",
+        (
+            r"12\. \*\*visual check \(r9\)\*\*", r"goldens per state \(light and dark, en and da\)", r"`golden-update` diff", r"docs/product/rubric\.md",
+            r"an agent score below 3 is a `minor` finding, never a `blocker` or `major`", r"agent scores are advisory and taste stays with the owner",
+            r"a calibration note for the rubric, not a finding", r"inside this review \(no extra session\)",
+        ),
+        "REVIEW.md item 12 (R9): goldens per state and rubric scores for changed screens; an agent score below 3 is a minor finding, never a blocker (D-3.4, M0.5-26)",
+        forbidden=(r"score below 3 (?:is|are) (?:a |an )?`?(?:blocker|major)", r"below 3 (?:blocks|must block) the merge"),
+    ),
+    DocRule(
+        "review-rules-matrix", "REVIEW.md",
+        (
+            r"13\. \*\*rules allow/deny matrix \(r7\)\*\*", r"`area:security-rules`, `area:sync-merge` or `risk:high`",
+            r"rules allow/deny matrix \(d-2\.6, `firebase/test`\)", r"covers each changed rule with an allow case and a deny case",
+            r"without both is a `major` finding \(area `security-rules`\)",
+        ),
+        "REVIEW.md item 13 (R7): on rules, sync-merge and risk:high PRs the allow/deny matrix must cover each changed rule (D-2.6, M0.5-26)",
+        forbidden=(r"without both is a `?(?:minor|nit)", r"without both is a nit"),
     ),
     DocRule(
         "plan-review-loop", "docs/PLAN.md",
