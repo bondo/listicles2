@@ -218,6 +218,8 @@ Not planned yet.
 ## Blockers
 
 - **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
+- **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
+- **PR to merge** [#111](https://github.com/bondo/listicles2/issues/111): build(deps-dev)&#58; Bump firebase-tools from 15.35.0 to 15.36.0 in /firebase in the npm-minor-patc…
 - **PR to merge** [#114](https://github.com/bondo/listicles2/issues/114): Product&#58; email and password sign-in stories (AUTH-05..11), list types and owner answers
 - **PR to merge** [#115](https://github.com/bondo/listicles2/issues/115): tasks&#58; split M0.5-O4 (invite done) from M0.5-O5; link PR 113 to M0.5-03
 - **PR to merge** [#116](https://github.com/bondo/listicles2/issues/116): ci&#58; bump actions/setup-java to v6.2.0, pinned by commit SHA
