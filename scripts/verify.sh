@@ -46,6 +46,8 @@ step metrics-tests python3 -I scripts/test_agent_metrics.py
 step metrics-check python3 -I scripts/agent_metrics.py --check
 step docs-check-tests python3 -I scripts/test_docs_check.py
 step docs-check python3 -I scripts/docs_check.py
+step wireframes-safety-tests python3 -I scripts/test_wireframes_safety.py
+step wireframes-safety python3 -I scripts/wireframes_safety.py
 step gradle-repos python3 -I scripts/test_check_gradle_repos.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
 step python-lint ./scripts/lint_python.sh
