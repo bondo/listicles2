@@ -171,6 +171,22 @@ class Reassignment(unittest.TestCase):
     def test_else_branch_assignment(self):
         self.flagged("let a = 'x';\nif (c) { go(); } else a = location.hash;\n" + self.SINK, 6)
 
+    def test_chained_comma_for_ternary_and_logical_assignments(self):
+        self.flagged("let x, y;\nx = y = params.get('s');\napp.innerHTML = `<p>${y}</p>`;", 6)
+        self.flagged("let a, b;\na = 1, b = params.get('s');\napp.innerHTML = `<p>${b}</p>`;", 6)
+        self.flagged("let a;\nfor (a = params.get('s'); ; ) { break; }\napp.innerHTML = `<p>${a}</p>`;", 6)
+        self.flagged("let a = 'x';\nc ? a = location.hash : 0;\napp.innerHTML = `<p>${a}</p>`;", 6)
+        self.flagged("let a = 'x';\nc && (a = location.hash);\napp.innerHTML = `<p>${a}</p>`;", 6)
+        self.flagged("let y;\nconst x = y = params.get('s');\napp.innerHTML = `<p>${y}</p>`;", 6)
+
+    def test_assignment_text_inside_strings_and_templates_is_not_code(self):
+        t = js("let a = 'x';\nconst h = `<i data-a=\"${a} b = ${params.get('s')}\">`;\nlog('a = ' + location.hash);\n" + self.SINK)
+        self.assertEqual(ws.check(t), [])
+
+    def test_html_outside_script_tags_is_not_analysed(self):
+        page = "<style>p { content: \"don't\"; }</style>\n<p>don't</p>\n" + js("const one = params.get('s');\napp.innerHTML = `<p>${one}</p>`;")
+        self.assertEqual(lines(page), [8])
+
     def test_assignments_that_do_not_taint(self):
         for body in (
             "let a = 'x'; a = 'y';\n" + self.SINK,
