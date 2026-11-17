@@ -2,7 +2,7 @@
   "blockers": 6,
   "current_milestone": "M0.5",
   "followups": 17,
-  "generated_at": "2026-11-17T17:58:31Z",
+  "generated_at": "2026-11-17T18:06:29Z",
   "milestones": [
     {
       "done": 28,
@@ -20,7 +20,7 @@
       "done": 0,
       "id": "M1",
       "title": "Accounts and households",
-      "total": 10
+      "total": 39
     },
     {
       "done": 0,
@@ -50,9 +50,9 @@
       "done": 0,
       "id": "M6",
       "title": "Release",
-      "total": 0
+      "total": 3
     }
   ],
   "outside_questions": 0,
-  "owner_queue": 6
+  "owner_queue": 5
 }

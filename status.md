@@ -8,12 +8,12 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 28/34 (82%) | 6 |
-| M1 | Accounts and households | 0/10 (0%) | 10 |
+| M1 | Accounts and households | 0/39 (0%) | 39 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
 | M5 | Barcode scanning | not planned yet | 0 |
-| M6 | Release | not planned yet | 0 |
+| M6 | Release | 0/3 (0%) | 3 |
 
 ## M0 Foundation and process
 
@@ -131,24 +131,53 @@ flowchart LR
 
 ## M1 Accounts and households
 
-Google sign-in, households, invite links, members and ownership, with rules tests.
+Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 0/10 done (0%), 10 open.
+**Progress:** 0/39 done (0%), 39 open.
 
 ### Tasks
 
 | Task | Title | Status | Depends on | Who | PR |
 |---|---|---|---|---|---|
 | M1-01 | Plan M1&#58; docs/milestones/M1.md and PR-sized tasks in this file | blocked | all of M0.5 | planner |  |
-| M1-02 | Start the Firestore emulator in the ui CI job (known gap R6-09), with the first Firebase-backed … | blocked | M1-01 | implementer |  |
+| M1-02 | Create &#58;core&#58;data with an emulator smoke test; Auth and Firestore emulators in CI (firebase.jso… | blocked | M1-29 | implementer |  |
 | M1-03 | Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff artifact, ATF and enabl… | blocked | M1-01 | implementer |  |
 | M1-04 | Design tokens&#58; Theme.kt parity test against design/tokens.json and WCAG AA contrast test (P22) | blocked | M0.5-03, M1-03 | implementer |  |
 | M1-05 | PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16) | blocked | M1-01 | implementer |  |
-| M1-06 | Rules fuzzing&#58; fast-check against a TS reference model of PLAN 3.1 (P17) | blocked | M1-01, M0.5-08 | implementer |  |
+| M1-06 | Rules fuzzing&#58; fast-check against a TS reference model of PLAN 3.1 (P17) | blocked | M1-01, M0.5-08, M1-10 | implementer |  |
 | M1-07 | Test-impact summary&#58; uncovered changed lines to the step summary and verify.sh (P19) | blocked | M1-01 | implementer |  |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07 | implementer |  |
-| M1-O1 | Create the Firebase project (Spark), enable Google sign-in and Firestore, add google-services.json … | owner to-do | all of M0, M0.5-O2 | owner |  |
-| M1-O2 | Register the debug and release SHA-1 fingerprints in Firebase | owner to-do | M1-O1 | owner |  |
+| M1-29 | Rename to Tally&#58; applicationId and namespace dk.bjarkebjarke.tally, packages, app label en/da | blocked | M1-01 | implementer |  |
+| M1-08 | Rules base&#58; signedIn() with email_verified, users/{uid} householdId set/clear, tombstone read, c… | blocked | M1-01 | implementer |  |
+| M1-09 | Rules spike&#58; PLAN 3.1 items a-e in the emulator, ADR 0002 with the results | blocked | M1-08 | implementer |  |
+| M1-10 | Rules&#58; create household, member display name, transfer ownership, allow and deny tests | blocked | M1-09 | implementer |  |
+| M1-11 | Rules&#58; leave, remove member (removed marker), household soft delete and cleanup, allow and de… | blocked | M1-12 | implementer |  |
+| M1-12 | Rules&#58; invites (create, get, list, revoke, cleanup) and the join batch, incl. unverified get denied | blocked | M1-10 | implementer |  |
+| M1-30 | App skeleton&#58; Hilt, Navigation 3, signed-in/signed-out root, connectivity helper, Google Services p… | blocked | M1-29, M1-02 | implementer |  |
+| M1-13 | Domain&#58; email and password validation (12+ code points), property tests | blocked | M1-01 | implementer |  |
+| M1-14 | Auth data&#58; Google sign-in via Credential Manager, session state, sign out (Auth emulator) | blocked | M1-30, M1-13, M1-02 | implementer |  |
+| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-14 | implementer |  |
+| M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01..03) | blocked | M1-14, M1-03 | implementer |  |
+| M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16 | implementer |  |
+| M1-24 | LocaleConfig&#58; generateLocaleConfig and resources.properties (LANG-02) | blocked | M1-29 | implementer |  |
+| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | blocked | M1-12, M1-30, M1-02 | implementer |  |
+| M1-31 | Household data 2&#58; leave, remove (marker, resumable), transfer, delete with cleanup resume (em… | blocked | M1-11, M1-18 | implementer |  |
+| M1-19 | Household UI&#58; create, members, invite share sheet, revoke (HH-01, HH-02, HH-04) | blocked | M1-18 | implementer |  |
+| M1-20 | Invite link and join screen (HH-03), incl. signed-out routing through sign-in | blocked | M1-19, M1-17 | implementer |  |
+| M1-21 | Leave, remove, transfer and delete household UI, household-deleted dialog (HH-05, HH-06) | blocked | M1-19, M1-31 | implementer |  |
+| M1-22 | Account&#58; change password with recent sign-in (AUTH-11) | blocked | M1-17, M1-25 | implementer |  |
+| M1-32 | Account&#58; delete account (AUTH-04) with recent sign-in, resumable | blocked | M1-22, M1-21 | implementer |  |
+| M1-23 | Optional TOTP two-step verification (AUTH-09) | blocked | M1-32, M1-O3 | implementer |  |
+| M1-25 | Settings screen and navigation (owner of the screen), Crashlytics off by default with an opt-in s… | blocked | M1-30 | implementer |  |
+| M1-26 | App Check&#58; Play Integrity in release, debug provider in debug builds (not enforced) | blocked | M1-30 | implementer |  |
+| M1-27 | Minimum app version&#58; config/app.minVersionCode, schemaVersion, update screen | blocked | M1-08, M1-30 | implementer |  |
+| M1-28 | Privacy text draft in English and Danish (OQ-30) | blocked | M1-01 | planner |  |
+| M1-33 | Release smoke build with R8 in CI (best-practices checklist follow-up 7) | blocked | M1-30 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33 | implementer |  |
+| M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29 | owner |  |
+| M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
+| M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
+| M1-O4 | Enable the Play Integrity API for the Firebase project in the Google Cloud console | owner to-do | M1-O1, M1-26 | owner |  |
+| M1-O5 | Approve the privacy text (OQ-30) before anyone but the owner installs the app | owner to-do | M1-28 | owner |  |
 
 ### Open tasks and what blocks them
 
@@ -157,33 +186,134 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 ```mermaid
 flowchart LR
     n0["M1-01 Plan M1: docs/milestones/M1.md and … (blocked)"]:::blocked
-    n1["M1-02 Start the Firestore emulator in the ui… (blocked)"]:::blocked
+    n1["M1-02 Create :core:data with an emulator s… (blocked)"]:::blocked
     n2["M1-03 Roborazzi screenshots (light/dark x en/… (blocked)"]:::blocked
     n3["M1-04 Design tokens: Theme.kt parity test ag… (blocked)"]:::blocked
     n4["M1-05 PIT plus kotest-pitest on core/domain,… (blocked)"]:::blocked
     n5["M1-06 Rules fuzzing: fast-check against a TS … (blocked)"]:::blocked
     n6["M1-07 Test-impact summary: uncovered chang… (blocked)"]:::blocked
-    n7["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n8["M1-O1 Create the Firebase project (Spark), en… (owner to-do)"]:::owner
-    n9["M1-O2 Register the debug and release SHA-1 fi… (owner to-do)"]:::owner
-    n10["all of M0.5"]:::ext
-    n11["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ext
-    n10 --> n0
-    n0 --> n1
+    n7["M1-29 Rename to Tally: applicationId and na… (blocked)"]:::blocked
+    n8["M1-08 Rules base: signedIn() with email_ver… (blocked)"]:::blocked
+    n9["M1-09 Rules spike: PLAN 3.1 items a-e in the… (blocked)"]:::blocked
+    n10["M1-10 Rules: create household, member displ… (blocked)"]:::blocked
+    n11["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
+    n12["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
+    n13["M1-30 App skeleton: Hilt, Navigation 3, signe… (blocked)"]:::blocked
+    n14["M1-13 Domain: email and password validatio… (blocked)"]:::blocked
+    n15["M1-14 Auth data: Google sign-in via Credentia… (blocked)"]:::blocked
+    n16["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
+    n17["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
+    n18["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
+    n19["M1-24 LocaleConfig: generateLocaleConfig and … (blocked)"]:::blocked
+    n20["M1-18 Household data 1: create, invite, revok… (blocked)"]:::blocked
+    n21["M1-31 Household data 2: leave, remove (mark… (blocked)"]:::blocked
+    n22["M1-19 Household UI: create, members, invite… (blocked)"]:::blocked
+    n23["M1-20 Invite link and join screen (HH-03), in… (blocked)"]:::blocked
+    n24["M1-21 Leave, remove, transfer and delete hou… (blocked)"]:::blocked
+    n25["M1-22 Account: change password with recent … (blocked)"]:::blocked
+    n26["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
+    n27["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
+    n28["M1-25 Settings screen and navigation (owner … (blocked)"]:::blocked
+    n29["M1-26 App Check: Play Integrity in release, d… (blocked)"]:::blocked
+    n30["M1-27 Minimum app version: config/app.min… (blocked)"]:::blocked
+    n31["M1-28 Privacy text draft in English and Danis… (blocked)"]:::blocked
+    n32["M1-33 Release smoke build with R8 in CI (be… (blocked)"]:::blocked
+    n33["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n34["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n35["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n36["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n37["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n38["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n39["all of M0.5"]:::ext
+    n40["M0.5-03 Screen wireframes and design tokens (… (ready)"]:::ext
+    n39 --> n0
+    n7 --> n1
     n0 --> n2
-    n11 --> n3
+    n40 --> n3
     n2 --> n3
     n0 --> n4
     n0 --> n5
+    n10 --> n5
     n0 --> n6
     n0 --> n7
-    n1 --> n7
-    n2 --> n7
-    n3 --> n7
-    n4 --> n7
-    n5 --> n7
-    n6 --> n7
+    n0 --> n8
     n8 --> n9
+    n9 --> n10
+    n12 --> n11
+    n10 --> n12
+    n7 --> n13
+    n1 --> n13
+    n0 --> n14
+    n13 --> n15
+    n14 --> n15
+    n1 --> n15
+    n15 --> n16
+    n15 --> n17
+    n2 --> n17
+    n16 --> n18
+    n17 --> n18
+    n7 --> n19
+    n12 --> n20
+    n13 --> n20
+    n1 --> n20
+    n11 --> n21
+    n20 --> n21
+    n20 --> n22
+    n22 --> n23
+    n18 --> n23
+    n22 --> n24
+    n21 --> n24
+    n18 --> n25
+    n28 --> n25
+    n25 --> n26
+    n24 --> n26
+    n26 --> n27
+    n36 --> n27
+    n13 --> n28
+    n13 --> n29
+    n8 --> n30
+    n13 --> n30
+    n0 --> n31
+    n13 --> n32
+    n0 --> n33
+    n1 --> n33
+    n2 --> n33
+    n3 --> n33
+    n4 --> n33
+    n5 --> n33
+    n6 --> n33
+    n8 --> n33
+    n9 --> n33
+    n10 --> n33
+    n11 --> n33
+    n12 --> n33
+    n14 --> n33
+    n15 --> n33
+    n16 --> n33
+    n17 --> n33
+    n18 --> n33
+    n20 --> n33
+    n22 --> n33
+    n23 --> n33
+    n24 --> n33
+    n25 --> n33
+    n27 --> n33
+    n19 --> n33
+    n28 --> n33
+    n29 --> n33
+    n30 --> n33
+    n31 --> n33
+    n7 --> n33
+    n13 --> n33
+    n21 --> n33
+    n26 --> n33
+    n32 --> n33
+    n7 --> n34
+    n34 --> n35
+    n34 --> n36
+    n34 --> n37
+    n29 --> n37
+    n31 --> n38
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -193,7 +323,7 @@ flowchart LR
 
 ## M2 Inventory lists
 
-Lists and items with real-time sync, offline use, search, sort and filter, in English and Danish.
+Private and shared lists, plain and collection items, real-time sync and offline use, in English and Danish.
 
 Not planned yet.
 
@@ -219,7 +349,36 @@ Not planned yet.
 
 Signed APK on tag as a GitHub Release, and a disabled Play internal-track workflow.
 
-Not planned yet.
+**Progress:** 0/3 done (0%), 3 open.
+
+### Tasks
+
+| Task | Title | Status | Depends on | Who | PR |
+|---|---|---|---|---|---|
+| M6-O1 | Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json | owner to-do | M1-O2 | owner |  |
+| M6-O2 | Register a free limited-distribution Android developer account when available in Denmark | owner to-do | none | owner |  |
+| M6-O3 | Register App Check (Play Integrity, device integrity only) with the release key; watch metrics t… | owner to-do | M6-O1, M1-O4 | owner |  |
+
+### Open tasks and what blocks them
+
+An arrow points from what a task waits on to the task. Dashed grey boxes are outside this milestone.
+
+```mermaid
+flowchart LR
+    n0["M6-O1 Create the GitHub release key#59; register… (owner to-do)"]:::owner
+    n1["M6-O2 Register a free limited-distribution A… (owner to-do)"]:::owner
+    n2["M6-O3 Register App Check (Play Integrity, dev… (owner to-do)"]:::owner
+    n3["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::ext
+    n4["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::ext
+    n3 --> n0
+    n0 --> n2
+    n4 --> n2
+    classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
+    classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
+    classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
+    classDef owner fill:#ffebe9,stroke:#cf222e,color:#1f2328,stroke-dasharray:4 3
+    classDef ext fill:#eaeef2,stroke:#59636e,color:#1f2328,stroke-dasharray:2 2
+```
 
 ## Blockers
 
