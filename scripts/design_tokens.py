@@ -22,7 +22,7 @@ NON_TEXT_PAIRS = {("outline", "surface")}
 
 
 def _lum(color: str) -> float:
-    ch = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    ch = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
     ch = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in ch]
     return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
 

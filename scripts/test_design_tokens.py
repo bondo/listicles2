@@ -19,10 +19,24 @@ PAGE = (ROOT / "docs" / "product" / "wireframes" / "wireframes.html").read_text(
 
 # Petrol as the owner saw it in the palette comparison (issue #15, T1): the 7 roles that page lists, light and dark.
 PETROL = {
-    "light": {"primary": "#006878", "primaryContainer": "#A7EDFF", "secondaryContainer": "#D4E6E8", "tertiaryContainer": "#FFDEAE",
-              "surface": "#F6FAFB", "surfaceContainerLow": "#F0F4F5", "error": "#BA1A1A"},
-    "dark": {"primary": "#7DD3E7", "primaryContainer": "#004E5B", "secondaryContainer": "#394A4B", "tertiaryContainer": "#604100",
-             "surface": "#0F1415", "surfaceContainerLow": "#181C1D", "error": "#FFB4AB"},
+    "light": {
+        "primary": "#006878",
+        "primaryContainer": "#A7EDFF",
+        "secondaryContainer": "#D4E6E8",
+        "tertiaryContainer": "#FFDEAE",
+        "surface": "#F6FAFB",
+        "surfaceContainerLow": "#F0F4F5",
+        "error": "#BA1A1A",
+    },
+    "dark": {
+        "primary": "#7DD3E7",
+        "primaryContainer": "#004E5B",
+        "secondaryContainer": "#394A4B",
+        "tertiaryContainer": "#604100",
+        "surface": "#0F1415",
+        "surfaceContainerLow": "#181C1D",
+        "error": "#FFB4AB",
+    },
 }
 # The retired teal palette: none of it may remain in the tokens or on the wireframes page.
 TEAL = ["#1F6A5F", "#B4EFE2", "#CCE8E1", "#F6FAF8", "#F0F4F2", "#8ED4C6", "#005046", "#334B46", "#0F1513", "#171D1B", "#6F7975"]
@@ -48,8 +62,7 @@ class Check(unittest.TestCase):
         self.assertFalse(any(f.startswith("light") for f in found), found)
 
     def test_a_pair_just_under_its_minimum_fails_and_at_the_minimum_passes(self):
-        toks = {"color": {th: {"a": "#777777", "b": "#FFFFFF"} for th in ("light", "dark")},
-                "contrastPairs": [{"fg": "a", "bg": "b", "min": 4.5}]}
+        toks = {"color": {th: {"a": "#777777", "b": "#FFFFFF"} for th in ("light", "dark")}, "contrastPairs": [{"fg": "a", "bg": "b", "min": 4.5}]}
         self.assertEqual(len(dt.check(toks)), 2)  # 4.48 < 4.5, once per theme
         for th in toks["color"]:
             toks["color"][th]["a"] = "#767676"  # 4.54
