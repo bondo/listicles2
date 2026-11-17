@@ -194,7 +194,7 @@ class M011AlignmentTests(unittest.TestCase):
 
     def test_deleting_one_clause_fails_its_rule(self):
         for role, rule_id, old in (
-            ("orchestrator", "autonomy", "merges of any PR; "),
+            ("orchestrator", "autonomy", "merges of owner-only PRs; "),
             ("orchestrator", "autonomy", "and a relayed approval is refused"),
             ("orchestrator", "lock-takeover", "and if nothing follows, ask the owner"),
             ("orchestrator", "lock-takeover", "and `get_session` shows it is not working"),
@@ -202,7 +202,7 @@ class M011AlignmentTests(unittest.TestCase):
             ("reviewer", "reviewer-report-only", ", and tests without negative cases"),
             ("orchestrator", "orch-deferral", "Never defer a blocker;"),
             ("orchestrator", "orch-deferral", "without owner OK (`owner-ok` label)"),
-            ("orchestrator", "orch-deferral", "more than 8 open follow-ups for one milestone: stop deferring and ask the owner"),
+            ("orchestrator", "orch-deferral", "re-deferral and majors still need the owner"),
             ("implementer", "impl-deferral", "you do not decide"),
             ("implementer", "impl-deferral", "Put every owner-OK question in `needs_owner` of your WORKER-RESULT"),
         ):
@@ -222,8 +222,8 @@ class M011AlignmentTests(unittest.TestCase):
         ("orchestrator", "orch-deferral", "the PR's own acceptance criteria and tests do not depend on it, ", ""),
         ("orchestrator", "orch-deferral", "The 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings.", ""),
         ("orchestrator", "orch-deferral", "and record a `decision` comment on the state issue", ""),
-        ("orchestrator", "orch-deferral", "Check that the returned issue carries every label; if one is missing, close it, keep the finding open, "
-         "stop deferring and ask the owner to do M0-O10.", ""),
+        ("orchestrator", "orch-deferral", "Check that the returned issue carries every label; if one is missing, create it with `gh api` and "
+         "re-label the issue; if that fails, close the issue, keep the finding open, stop deferring and ask the owner.", ""),
         ("reviewer", "reviewer-report-only", "A deferral that breaks `docs/FOLLOW-UPS.md` §2, or lacks its issue or decision record, "
          "is itself a `major` finding (area `process`).", ""),
         ("reviewer", "reviewer-report-only", "Re-check every deferral record you are given (issue, decision, section 2 rules).", ""),
@@ -566,10 +566,11 @@ class M015Tests(unittest.TestCase):
 
     def test_delta_review_weakened(self):
         for old, new in (
-            ("a commit after `reviewed_through` gets one delta review before the merge request", "a commit after `reviewed_through` is merged"),
-            ("a fresh reviewer on the range `reviewed_through..head_sha` only", "a fresh reviewer on the whole pr"),
-            ("owner acceptance is the only alternative", "owner acceptance or a self-review is an alternative"),
-            ("never for gate or threshold changes, which always get a delta review", "also for gate or threshold changes"),
+            ("a commit after `reviewed_through` always gets one delta review before the merge request", "a commit after `reviewed_through` is merged"),
+            ("a fresh reviewer with the whole pr diff and the findings json, focused on `reviewed_through..head_sha`",
+             "a fresh reviewer on `reviewed_through..head_sha` only"),
+            ("there is no owner-acceptance alternative, for any pr", "owner acceptance is an alternative"),
+            ("always gets one delta review", "sometimes gets one delta review"),
             ("set `reviewed_through` afterwards", "leave `reviewed_through` as it was"),
         ):
             self.assert_fails("orchestrator", "orch-delta-review", old, new)
@@ -600,7 +601,7 @@ class M015Tests(unittest.TestCase):
         for old, new in (
             ("spawn the design reviewer", "skip the design reviewer"),
             ("`agents/prompts/design-reviewer.md`", "`agents/prompts/reviewer.md`"),
-            ("max 2 rounds per design pr", "max 4 rounds per design pr"),
+            ("max 3 rounds per design pr", "max 4 rounds per design pr"),
             ("one joint hand-off comment on the pr", "one hand-off comment per person on the pr"),
             ("mentions the owner and the collaborator in the same comment", "mentions the collaborator first, then the owner"),
             ("never the collaborator first", "the collaborator may go first"),
@@ -650,8 +651,8 @@ class M015Tests(unittest.TestCase):
 
     def test_design_reviewer_rounds_weakened(self):
         for old, new in (
-            ("max 2 opus rounds per design pr", "max 3 opus rounds per design pr"),
-            ("a third round never happens", "a third round is fine"),
+            ("max 3 opus rounds per design pr", "max 4 opus rounds per design pr"),
+            ("a fourth round never happens", "a fourth round is fine"),
             ("goes into the hand-off as a question for the owner", "is dropped"),
             ("every round: the whole pr diff and the findings json of earlier rounds", "round 2: the whole pr again"),
             ("focus on the commits since the last round", "look at nothing"),  # #129 R1-01: row 3 for design rounds too
@@ -666,7 +667,7 @@ class M015Tests(unittest.TestCase):
             ("never the collaborator first", "the collaborator first"),
             ("collaborator input is advisory, sign-off is owner only (d5)", "collaborator input is binding"),
             ("answer per number or with a pr review", "answer by email"),
-            ("round 2, or round 1 when nothing above `nit` is open", "round 1 always"),
+            ("round 3, or an earlier round when nothing above `nit` is open", "round 1 always"),
             ("the orchestrator adds the one line on #15", "you add the one line on #15"),
         ):
             self.assert_fails("design-reviewer", "dr-hand-off", old, new)
@@ -787,13 +788,13 @@ class M015Round1Tests(unittest.TestCase):
 
     def test_r1_02_one_source_for_the_hand_off_round(self):
         sec = re.search(r"### 8\.5 Design reviewer\n(.*?)(?=\n### |\n## |\Z)", self.doc("docs", "ORCHESTRATION.md"), re.S).group(1)
-        self.assertIn("Round {round} of max 2", sec)
+        self.assertIn("Round {round} of max 3", sec)
         self.assertNotRegex(sec, r"(?i)last round: \{")
         self.assertNotIn("If this is the last round", sec)
         self.assertIn("the prompt decides", sec)
         for old, new in (
             ("you decide this from your own verdict, not from the spawn message", "the spawn message decides"),
-            ("round 2, or round 1 when nothing above `nit` is open", "round 1 always"),
+            ("round 3, or an earlier round when nothing above `nit` is open", "round 1 always"),
         ):
             self.assert_fails("design-reviewer", "dr-hand-off", old, new)
         self.assert_fails("orchestrator", "orch-design-review", "once the hand-off link is in its worker-result",
@@ -1179,7 +1180,7 @@ class Pr3RuleTests(unittest.TestCase):
         self.assertNotIn("only the commits since round 1", norm)
         old = " Round 2: only the commits since round 1 and your open findings."
         self.assertIn("dr-rounds", ids(prompt_rules.check_text("design-reviewer", real("design-reviewer") + old)))
-        self.assertIn("max 2 opus rounds per design pr", norm, "the round count stays for PR 4")
+        self.assertIn("max 3 opus rounds per design pr", norm)
 
     def test_an_escalation_drop_becomes_withdrawn_and_an_owner_finding_stays_open(self):  # R1-04 of #129
         prompt = prompt_rules.normalize(real("escalation-reviewer")).lower()
@@ -1219,6 +1220,97 @@ class Pr3RuleTests(unittest.TestCase):
         self.assertNotIn("sonnet medium worker", readme)
         self.assertIn("| r6 | opus high worker | plan 9.4", readme)
         self.assertIn("a sample of transcripts and pr threads", readme)
+
+
+class Pr4RuleTests(unittest.TestCase):
+    """Agent Usage Redesign PR 4 (rev 46, rollout step 5): orchestration. The orchestrator prompt and docs/ORCHESTRATION.md follow the
+    approved redesign and the owner decisions of 2026-11-17 on #15 (cap 5, merge agent, big-pr, archive sweep, 80% handover)."""
+
+    ORCH_PROMPT_RULES = ("orch-model", "orch-transcripts", "orch-throttle", "orch-spawn-checks", "orch-merge-agent", "orch-archive")
+    ORCH_DOC_RULES = (
+        "orch-roles", "orch-autonomy", "orch-handover", "orch-parallel", "orch-review-rounds", "orch-cap-and-minors",
+        "orch-spawn-checks", "orch-results-and-failures", "orch-archive", "orch-merge-agent", "orch-throttle",
+        "orch-spawn-templates", "orch-design-rounds",
+    )
+    # (file, rule id, the old wording that must now be rejected)
+    STALE = (
+        ("docs/ORCHESTRATION.md", "orch-roles", "| **Orchestrator** | Sonnet / low | Long-lived |"),
+        ("docs/ORCHESTRATION.md", "orch-autonomy", "* merges (of any PR);"),
+        ("docs/ORCHESTRATION.md", "orch-autonomy", "**Labels:** the orchestrator applies `big-pr` only with the owner's explicit say-so."),
+        ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 50% context. The owner archives you."),
+        ("docs/ORCHESTRATION.md", "orch-parallel", "at most 3 worker sessions run at once"),
+        ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the owner explicitly accepts it."),
+        ("docs/ORCHESTRATION.md", "orch-review-rounds", "Owner acceptance (the bullet above) is the only alternative."),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Round 4 with findings above `nit`: stop and ask the owner."),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "the orchestrator defers the remaining minors and nits (follow-up issues) instead of running another round"),
+        ("docs/ORCHESTRATION.md", "orch-archive", "Archive finished worker sessions once their metrics row is logged and the owner has seen the batch report."),
+        ("docs/ORCHESTRATION.md", "orch-design-rounds", "Round {round} of max 2."),
+        ("docs/FOLLOW-UPS.md", "followups-labels", "Labels (the owner creates them once, task M0-O10;"),
+        ("docs/reviews/README.md", "reviews-design-rounds", "| R5 | per design PR; max 2 Opus rounds |"),
+        ("docs/PLAN.md", "plan-design-rounds", "Fresh session per design-PR round, max 2 rounds"),
+    )
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def test_the_real_text_passes_every_pr4_rule_for_the_right_file_and_role(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        for rid in self.ORCH_PROMPT_RULES:
+            self.assertEqual(by_id[rid].roles, ("orchestrator",), rid)
+        self.assertEqual(prompt_rules.check_text("orchestrator", real("orchestrator")), [])
+        by_doc = {r.id: r for r in prompt_rules.DOC_RULES if r.path == "docs/ORCHESTRATION.md"}
+        self.assertLessEqual(set(self.ORCH_DOC_RULES), set(by_doc))
+        self.assertEqual(prompt_rules.check_doc_text("docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md")), [])
+
+    def test_the_old_orchestration_wording_is_rejected(self):
+        for path, rid, old in self.STALE:
+            with self.subTest(path=path, old=old):
+                self.assertIn(rid, ids(prompt_rules.check_doc_text(path, self.doc(path) + "\n" + old + "\n")))
+
+    def test_the_old_orchestrator_prompt_wording_is_rejected(self):
+        for rid, old in (
+            ("orch-model", " Sonnet, low effort, one long-lived session."), ("orch-transcripts", " Never read child transcripts."),
+            ("orch-throttle", " Keep to the cap of 3 workers."), ("autonomy", " The `big-pr` label is set only with the owner's say-so."),
+            ("autonomy", " Stop and ask the owner for: the 4-round cap being hit."), ("handover", " Hand over at about 50% context."),
+            ("orch-deferral", " more than about 15 changed lines"), ("orch-deferral", " ask the owner to do M0-O10"),
+            ("orch-delta-review", " Owner acceptance is the only alternative."),
+        ):
+            with self.subTest(old=old):
+                self.assertIn(rid, ids(prompt_rules.check_text("orchestrator", real("orchestrator") + old)))
+
+    def test_another_roles_prompt_does_not_meet_the_orchestrator_rules(self):
+        problems = ids(prompt_rules.check_text("orchestrator", real("reviewer")))
+        self.assertLessEqual(set(self.ORCH_PROMPT_RULES), problems)
+
+    def test_every_pr4_orchestrator_pattern_matches_one_place_only(self):
+        norm = prompt_rules.normalize(real("orchestrator"))
+        for rule in prompt_rules.RULES:
+            if rule.id in self.ORCH_PROMPT_RULES:
+                for pattern in rule.patterns:
+                    with self.subTest(rule=rule.id, pattern=pattern):
+                        self.assertEqual(len(re.findall(pattern, norm, re.I)), 1)
+
+    def test_design_round_count_is_one_number_everywhere(self):  # #129 follow-up: roles.yaml, prompts, ORCHESTRATION, README, PLAN
+        want = re.search(r"max (\d+) rounds per design PR", (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8")).group(1)
+        self.assertEqual(want, "3")
+        for path in ("agents/prompts/design-reviewer.md", "agents/prompts/orchestrator.md", "docs/ORCHESTRATION.md", "docs/reviews/README.md"):
+            text = self.doc(path)
+            self.assertEqual(set(re.findall(r"(?i)max (\d+) (?:Opus )?rounds per design", text)) - {want}, set(), path)
+            self.assertNotRegex(text, r"(?i)max 2 (opus )?rounds|of max 2\b|up to 2 rounds", path)
+        self.assertIn(f"max {want} rounds", self.doc("docs/PLAN.md"))
+
+    def test_the_small_fix_threshold_is_30_in_every_file_that_states_it(self):  # #129 follow-up: orchestrator.md and ORCHESTRATION lagged
+        for path in ("REVIEW.md", "CLAUDE.md", "docs/FOLLOW-UPS.md", "agents/prompts/orchestrator.md", "agents/prompts/implementer.md"):
+            found = set(re.findall(r"about (\d+) changed lines", self.doc(path)))
+            self.assertTrue(found, path)
+            self.assertEqual(found, {"30"}, path)
+
+    def test_the_module_docstring_lists_every_file_the_doc_rules_pin(self):  # #129 R3-01 nit
+        for path in {r.path for r in prompt_rules.DOC_RULES}:
+            self.assertIn(path, prompt_rules.__doc__, path)
+
+    def test_the_merge_agent_rules_name_no_prompt_file_that_does_not_exist(self):
+        self.assertFalse((PROMPTS / "merge-agent.md").exists())  # its rules live in ORCHESTRATION 7.5 and the orchestrator prompt
 
 
 if __name__ == "__main__":
