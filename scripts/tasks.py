@@ -408,6 +408,26 @@ def drift(graph: Graph, issues=None, prs=None) -> list[str]:
     return msgs
 
 
+def owner_drift(graph: Graph, issues=None, prs=None) -> list[str]:
+    """Owner tasks that are `todo` while GitHub says they are finished (#92): a linked issue is closed, whatever the
+    reason, or the task's PR is merged. Only owner tasks: nobody else carries their status edit. Empty without input."""
+    if issues is None and prs is None:
+        return []
+    by_number, by_title, merged, _ = load_github(issues, prs)
+    msgs: list[str] = []
+    for t in graph.tasks:
+        if t.assignee != "owner" or t.status != "todo":
+            continue
+        st = owner_issue_state(t, by_number, by_title)
+        if st in ("completed", "not_planned"):
+            ref = f"issue #{t.issue}" if t.issue is not None and t.issue in by_number else "its [owner] issue"
+            how = "" if st == "completed" else " without completion"
+            msgs.append(f"{t.id}: {ref} is closed{how} but status is todo (set done, or drop it, in the next PR)")
+        if t.pr is not None and t.pr in merged:
+            msgs.append(f"{t.id}: PR #{t.pr} is merged but status is todo (set done in the next PR)")
+    return msgs
+
+
 @dataclass
 class FollowUp:
     number: int
@@ -550,6 +570,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--in-review", default="", help="comma-separated task ids awaiting review or merge")
     ap.add_argument("--assignee", help="filter: owner, agent, or one role")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--check", action="store_true",
+                    help="drift only: exit 1 if an owner task is todo while its issue is closed or its PR merged")
     ap.add_argument("command", choices=("validate", "ready", "review", "status", "drift", "followups"))
     a = ap.parse_args(argv)
 
@@ -579,6 +601,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: --assignee must be agent or one of {ASSIGNEES}", file=sys.stderr)
         return 1
 
+    if a.check and a.command != "drift":
+        print("error: --check only applies to the drift command", file=sys.stderr)
+        return 1
     if a.command == "validate":
         print(f"ok: {len(graph.tasks)} tasks in {len(graph.milestones)} milestones")
         return 0
@@ -587,6 +612,13 @@ def main(argv: list[str] | None = None) -> int:
             print("error: drift needs --issues, --prs and/or --followups (no GitHub input, so nothing to compare)",
                   file=sys.stderr)
             return 2
+        if a.check:
+            if issues is None and prs is None:
+                print("error: drift --check needs --issues and/or --prs", file=sys.stderr)
+                return 2
+            found = owner_drift(graph, issues, prs)
+            print(json.dumps(found, indent=2) if a.json else "\n".join(found) or "no drift")
+            return 1 if found else 0
         msgs = drift(graph, issues, prs) + followup_drift(graph, fus)
         print(json.dumps(msgs, indent=2) if a.json else "\n".join(msgs) or "no drift")
         return 0
