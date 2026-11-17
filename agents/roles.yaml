@@ -3,7 +3,7 @@
 # a strong model at high effort; there are no per-session token budgets (spend is reported per PR class and milestone).
 # `max_effort_when` lists the cases that raise effort to max; an agent may ask for more in its WORKER-RESULT and the
 # orchestrator decides within this file. Agents must not escalate on their own judgment.
-# Roles without a `prompt` have none yet: the role prompts follow in the later redesign PRs.
+# Roles without a `prompt` have none yet (escalation-reviewer, retro): their prompts follow in the later redesign PRs.
 roles:
   orchestrator:
     model: opus
@@ -33,6 +33,7 @@ roles:
     model: opus
     effort: high
     session: fresh, same round as the reviewer, for risk:high PRs and protected areas
+    prompt: agents/prompts/second-reviewer.md
   escalation-reviewer:
     model: opus
     effort: max
@@ -41,6 +42,7 @@ roles:
     model: opus
     effort: high
     session: subagent in a reviewer or implementer session (finding verification, self-review)
+    prompt: agents/prompts/verifier.md
   design-reviewer:
     model: opus
     effort: high

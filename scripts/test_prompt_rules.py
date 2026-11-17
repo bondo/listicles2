@@ -18,7 +18,7 @@ import tasks
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPTS = ROOT / "agents" / "prompts"
-ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer")
+ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer", "second-reviewer", "verifier")
 
 TIER0 = {"feedback", "idea", "decision", "needs-collaborator", "needs-owner"}
 NEVER = {"golden-update", "big-pr", "owner-todo", "orchestrator-state", "follow-up", "severity:*", "target:*", "owner-ok", "area:*"}
@@ -925,6 +925,100 @@ class CliTests(unittest.TestCase):
         r = self.run_cli("--prompts", "/nonexistent-dir-for-test")
         self.assertEqual(r.returncode, 2)
         self.assertIn("error:", r.stderr)
+
+
+class Pr2CheckTests(unittest.TestCase):
+    """Agent Usage Redesign PR 2 (rev 46, "New quality checks"): plan review, self-review, finding verification and the
+    second reviewer live in the role prompts. Each clause is pinned by a rule that fails when it is deleted or weakened."""
+
+    RULES = {
+        "plan-review": ("reviewer",),
+        "plan-reviewed-before-implementers": ("planner",),
+        "self-review": ("implementer",),
+        "finding-verification": ("reviewer", "second-reviewer"),
+        "second-reviewer-role": ("second-reviewer",),
+        "verifier-role": ("verifier",),
+        "verifier-handoff": ("implementer", "reviewer", "second-reviewer"),  # R1-02 of #128
+    }
+
+    def mutate(self, role, old, new=""):
+        text = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), text.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), new, text, count=1, flags=re.I)))
+
+    def test_rules_exist_for_the_right_roles_and_the_real_prompts_pass_them(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        for rid, roles in self.RULES.items():
+            self.assertEqual(by_id[rid].roles, roles, rid)
+            for role in roles:
+                self.assertNotIn(rid, ids(prompt_rules.check_text(role, real(role))), (rid, role))
+
+    def test_each_new_prompt_exists_and_roles_yaml_names_it(self):
+        roles_yaml = (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8")
+        for role in ("second-reviewer", "verifier"):
+            self.assertTrue((PROMPTS / f"{role}.md").is_file(), role)
+            self.assertIn(f"prompt: agents/prompts/{role}.md", roles_yaml)
+
+    def test_other_roles_wording_does_not_count(self):
+        self.assertIn("plan-review", ids(prompt_rules.check_text("reviewer", real("implementer"))))
+        self.assertIn("self-review", ids(prompt_rules.check_text("implementer", real("reviewer"))))
+        self.assertIn("verifier-role", ids(prompt_rules.check_text("verifier", real("reviewer"))))
+        self.assertIn("second-reviewer-role", ids(prompt_rules.check_text("second-reviewer", real("reviewer"))))
+
+    def test_deleting_a_clause_fails_its_rule(self):
+        for role, rid, clause in (
+            ("reviewer", "plan-review", "docs/milestones/<Mx>.md"),
+            ("reviewer", "plan-review", "wrong task order"),
+            ("reviewer", "plan-review", "missing tasks"),
+            ("planner", "plan-reviewed-before-implementers", "before any implementer starts"),
+            ("implementer", "self-review", "only the diff and the task"),
+            ("implementer", "self-review", "it is not a new session"),
+            ("reviewer", "finding-verification", "never your reasoning"),
+            ("reviewer", "finding-verification", "not reproduced"),
+            ("second-reviewer", "finding-verification", "never your reasoning"),
+            ("second-reviewer", "second-reviewer-role", "you are not given the first reviewer's findings"),
+            ("second-reviewer", "second-reviewer-role", "security-rules, sync-merge and release"),
+            ("second-reviewer", "second-reviewer-role", "report only"),
+            ("implementer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("reviewer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("second-reviewer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("verifier", "verifier-role", "never edit"),
+            ("verifier", "verifier-role", "confirmed"),
+        ):
+            with self.subTest(role=role, clause=clause):
+                self.assertIn(rid, self.mutate(role, clause))
+
+    def test_the_second_reviewer_has_no_effort_escalation_that_roles_yaml_does_not_back(self):  # R1-06 of #128
+        self.assertNotIn("max_effort_when", (ROOT / "agents" / "roles.yaml").read_text().split("  escalation-reviewer:")[0]
+                         .split("  second-reviewer:")[1])
+        text = real("second-reviewer") + " Opus, high effort (max for risk:high PRs when `agents/roles.yaml` says so)."
+        self.assertIn("second-reviewer-role", ids(prompt_rules.check_text("second-reviewer", text)))
+        self.assertNotIn("max for", real("second-reviewer"))
+
+    def test_second_reviewer_ids_never_collide_with_the_reviewers(self):  # R2-01 of #128 (was R1-03)
+        norm = prompt_rules.normalize(real("second-reviewer"))
+        self.assertIn("ids `s<round>-<nn>`", norm.lower())
+        self.assertIn("never `r<round>-<nn>`", norm.lower())
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", "ids `S<round>-<nn>`"))
+        old_wording = "with ids `R<round>-<nn>` continuing after the highest id you were given"
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", "with ids `S<round>-<nn>`", old_wording))
+
+    def test_a_second_reviewer_that_sees_the_first_reviewers_findings_is_rejected(self):
+        self.assertIn("second-reviewer-role", self.mutate(
+            "second-reviewer", "you are not given the first reviewer's findings", "you are given the first reviewer's findings"))
+
+    def test_the_new_prompts_must_carry_the_common_rules(self):
+        for role in ("second-reviewer", "verifier"):
+            got = ids(prompt_rules.check_text(role, "report only"))
+            self.assertIn("data-fenced", got)
+            self.assertIn("no-resolve-thread", got)
+
+    def test_check_dir_reports_a_missing_new_prompt(self):
+        with tempfile.TemporaryDirectory() as d:
+            for role in ROLES:
+                if role != "verifier":
+                    shutil.copy(PROMPTS / f"{role}.md", d)
+            self.assertIn("verifier.md: cannot read (No such file or directory)", prompt_rules.check_dir(d))
 
 
 if __name__ == "__main__":
