@@ -3,6 +3,7 @@ Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os
 import re
+import sys
 import unittest
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -23,17 +24,39 @@ def ci_job(name):
     return m.group(1)
 
 
+def roles_file():
+    """agents/roles.yaml as nested dicts and lists (small purpose-built parser: `key: value`, `key:` and `- item` lines)."""
+    root = {}
+    stack = [(-1, root, None, None)]  # (indent, container, parent container, key in parent)
+    for raw in read("agents", "roles.yaml").splitlines():
+        line = raw.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        while stack[-1][0] >= indent:
+            stack.pop()
+        _, node, parent, key = stack[-1]
+        text = line.strip()
+        if text.startswith("- "):
+            if isinstance(node, dict) and not node:  # the `key:` above turned out to head a list
+                node = []
+                parent[key] = node
+                stack[-1] = (stack[-1][0], node, parent, key)
+            node.append(text[2:].strip())
+            continue
+        name, _, value = text.partition(":")
+        value = value.strip()
+        if value:
+            node[name] = int(value) if value.isdigit() else (None if value == "null" else value)
+        else:
+            node[name] = {}
+            stack.append((indent, node[name], node, name))
+    return root
+
+
 def roles():
-    """agents/roles.yaml role -> effort (small purpose-built parser: the file is two levels of plain key: value)."""
-    out, role = {}, None
-    for line in read("agents", "roles.yaml").splitlines():
-        m = re.match(r"^  ([\w-]+):\s*$", line)
-        if m:
-            role = m.group(1)
-        m = re.match(r"^    effort:\s*(\w+)\s*$", line)
-        if m and role:
-            out[role] = m.group(1)
-    return out
+    """agents/roles.yaml role -> effort (the active `roles:` section only)."""
+    return {name: r["effort"] for name, r in roles_file()["roles"].items()}
 
 
 class DiffCap(unittest.TestCase):
@@ -103,17 +126,124 @@ class HookTestsRunThroughTheSkipGate(unittest.TestCase):
             self.assertNotIn("-m unittest discover -s scripts/hooks", text, name)
 
 
+# Agent Usage Redesign, tooling PR 1 (rev 46, "Roles and models"): role -> (model, effort).
+NEW_ROLES = {
+    "orchestrator": ("opus", "medium"),
+    "planner": ("opus", "high"),
+    "implementer": ("opus", "high"),
+    "reviewer": ("opus", "high"),
+    "second-reviewer": ("opus", "high"),
+    "escalation-reviewer": ("opus", "max"),
+    "verifier": ("opus", "high"),
+    "design-reviewer": ("opus", "high"),
+    "explorer": ("sonnet", "medium"),
+    "ci-triage": ("sonnet", "medium"),
+    "retro": ("opus", "high"),
+}
+# The pre-pilot values, kept as the kill-switch fallback set (the orchestrator spawns with them after PILOT-STOP).
+FALLBACK = {
+    "orchestrator": ("sonnet", "low"),
+    "planner": ("opus", "high"),
+    "implementer": ("sonnet", "medium"),
+    "reviewer": ("opus", "high"),
+    "design-reviewer": ("opus", "high"),
+    "explorer": ("haiku", "low"),
+    "ci-triage": ("haiku", "low"),
+}
+
+
+def frontmatter(name):
+    return read(".claude", "agents", f"{name}.md").split("---")[1]
+
+
 class AgentEffort(unittest.TestCase):
     def test_subagent_frontmatter_effort_matches_roles_yaml(self):
         efforts = roles()
         for name in ("explorer", "ci-triage"):
-            front = read(".claude", "agents", f"{name}.md").split("---")[1]
-            m = re.search(r"^effort:\s*(\w+)\s*$", front, re.M)
+            m = re.search(r"^effort:\s*(\w+)\s*$", frontmatter(name), re.M)
             self.assertIsNotNone(m, f"{name}.md frontmatter lacks effort")
             self.assertEqual(m.group(1), efforts[name], name)
 
+    def test_subagent_frontmatter_model_matches_roles_yaml(self):
+        for name in ("explorer", "ci-triage"):
+            m = re.search(r"^model:\s*(\w+)\s*$", frontmatter(name), re.M)
+            self.assertIsNotNone(m, f"{name}.md frontmatter lacks model")
+            self.assertEqual(m.group(1), roles_file()["roles"][name]["model"], name)
+
     def test_roles_parser_sees_all_roles(self):
-        self.assertEqual(set(roles()), {"orchestrator", "planner", "implementer", "reviewer", "design-reviewer", "explorer", "ci-triage"})
+        self.assertEqual(set(roles()), set(NEW_ROLES))
+
+
+class RolesYaml(unittest.TestCase):
+    """Agent Usage Redesign PR 1: strong models at high effort for roles that judge or write code; no token budgets."""
+
+    def test_models_and_effort_follow_the_approved_table(self):
+        for name, (model, effort) in NEW_ROLES.items():
+            role = roles_file()["roles"][name]
+            self.assertEqual((role["model"], role["effort"]), (model, effort), name)
+
+    def test_no_active_role_has_a_token_budget(self):
+        for name, role in roles_file()["roles"].items():
+            self.assertNotIn("token_budget", role, name)
+
+    def test_risk_high_raises_implementer_effort_to_max(self):
+        impl = roles_file()["roles"]["implementer"]
+        self.assertEqual(impl["max_effort_when"], ["the PR is tagged risk:high in the milestone doc"])
+        self.assertNotIn("high_effort_when", impl)  # high is the default now; an agent may ask for more in its WORKER-RESULT
+
+    def test_fallback_set_keeps_the_pre_pilot_values(self):
+        fallback = roles_file()["fallback"]
+        self.assertEqual(set(fallback), set(FALLBACK))
+        for name, (model, effort) in FALLBACK.items():
+            self.assertEqual((fallback[name]["model"], fallback[name]["effort"]), (model, effort), name)
+
+    def test_fallback_keeps_the_old_budgets_and_escalation_rules(self):
+        fallback = roles_file()["fallback"]
+        self.assertEqual(fallback["implementer"]["token_budget"], 300000)
+        self.assertEqual(len(fallback["implementer"]["high_effort_when"]), 3)
+        self.assertEqual(fallback["planner"]["token_budget"], 150000)
+
+    def test_fallback_is_not_read_as_active_roles(self):
+        self.assertEqual(roles()["implementer"], "high")  # the fallback implementer is medium
+
+    def test_design_reviewer_gets_three_rounds(self):
+        self.assertIn("max 3 rounds", roles_file()["roles"]["design-reviewer"]["session"])
+
+    def test_parser_reads_lists_and_nulls(self):
+        self.assertIsInstance(roles_file()["fallback"]["implementer"]["high_effort_when"], list)
+        self.assertIsNone(roles_file()["fallback"]["orchestrator"]["token_budget"])
+
+
+class CiTriageReport(unittest.TestCase):
+    def test_ci_triage_reports_up_to_60_lines_not_10(self):
+        body = read(".claude", "agents", "ci-triage.md")
+        self.assertIn("60 lines", body)
+        self.assertNotIn("at most 10 lines", body)
+
+
+class ContextThresholdsMatchTheHook(unittest.TestCase):
+    """roles.yaml documents the handoff thresholds; the hook cannot parse YAML (stdlib, python -I), so a test ties the two."""
+
+    def test_roles_yaml_context_section_equals_the_hook_constants(self):
+        sys.path.insert(0, os.path.join(ROOT, "scripts", "hooks"))
+        try:
+            import context_guard
+        finally:
+            sys.path.pop(0)
+        ctx = roles_file()["context"]
+        self.assertEqual((ctx["handoff_at_percent_1m"], ctx["step_boundary_after_percent_1m"]), context_guard.THRESHOLDS_LARGE[::-1])
+        self.assertEqual((ctx["handoff_at_percent_200k"], ctx["step_boundary_after_percent_200k"]), context_guard.THRESHOLDS_SMALL[::-1])
+        self.assertEqual(ctx["small_window_up_to_tokens"], context_guard.SMALL_WINDOW_MAX)
+        self.assertEqual(ctx["handoff_template"], "handoff/TEMPLATE.md")
+
+
+class PreCommitSkipsGradleForDocsOnly(unittest.TestCase):
+    def test_pre_commit_uses_the_scope_script(self):
+        self.assertIn("prepush_scope.py", read(".githooks", "pre-commit"))
+
+    def test_pre_commit_still_runs_the_guards_unconditionally(self):
+        hook = read(".githooks", "pre-commit")
+        self.assertLess(hook.index("guards.sh --staged"), hook.index("prepush_scope.py"))
 
 
 class GitEnvImports(unittest.TestCase):

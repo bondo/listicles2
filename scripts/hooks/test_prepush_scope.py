@@ -122,5 +122,36 @@ class Cli(unittest.TestCase):
         self.assertEqual((r.returncode, r.stdout.strip()), (0, "android"))
 
 
+
+class PathsMode(unittest.TestCase):
+    """`--paths`: newline-separated paths on stdin (the staged files, for the pre-commit hook); same fail-closed classification."""
+
+    def scope(self, text):
+        r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "prepush_scope.py"), "--paths"], input=text,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.strip()
+
+    def test_prose_and_scripts_skip(self):
+        self.assertEqual(self.scope("docs/a.md\nscripts/hooks/x.py\nagents/roles.yaml\n"), "skip")
+
+    def test_one_android_path_among_docs_builds(self):
+        self.assertEqual(self.scope("docs/a.md\napp/src/main/A.kt\n"), "android")
+
+    def test_gradle_and_config_paths_build(self):
+        for p in ("build.gradle.kts", "gradle/libs.versions.toml", "config/detekt/detekt.yml", ".editorconfig"):
+            self.assertEqual(self.scope(p + "\n"), "android", p)
+
+    def test_no_paths_builds_because_unknown_means_build(self):
+        self.assertEqual(self.scope(""), "android")
+        self.assertEqual(self.scope("\n\n"), "android")
+
+    def test_parent_directory_escape_builds(self):
+        self.assertEqual(self.scope("docs/../app/A.kt\n"), "android")
+
+    def test_without_the_flag_the_stdin_is_still_pre_push_lines(self):
+        self.assertEqual(self.scope("refs/heads/b 1 refs/heads/b 2\n"), "android")  # a pre-push line is not a docs path
+
+
 if __name__ == "__main__":
     unittest.main()
