@@ -172,7 +172,7 @@ if [ "$STAGED" = 0 ]; then
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
       function testpath(p) {
-        return (p ~ /(^|\/)test_[^\/]*\.py$|_test\.py$/ || p ~ /(^|\/)src\/(test|androidTest|testFixtures|[a-z]+Test)\/.*\.(kt|java)$/)
+        return (p ~ /(^|\/)test_[^\/]*\.py$|_test\.py$/ || p ~ /^[ab]\/([^\/]+|core\/[^\/]+)\/src\/(test|androidTest|testFixtures|[a-z]+Test)\/.*\.(kt|java)$/)
       }
       /^diff --git/ {
         file = $3
@@ -183,21 +183,22 @@ if [ "$STAGED" = 0 ]; then
       {
         # A test function NAME is not a check setting (owner decision, #15). Only in test files, the declared name
         # of `def test...(` / `fun test...(` / fun `name`( is dropped from the line. The keyword scan ignores the
-        # name only for a bare declaration: the rest of the line is just the end of the signature. Anything else on
-        # the line (a value, an expression, a body) keeps the whole line in scope.
+        # name only for a bare declaration: an empty parameter list (Python: only self or cls), at most a plain
+        # identifier return type, and nothing else. Anything else on the line keeps the whole line in scope; its key
+        # always uses the full line, and the name-free line is used only for the number comparison.
         body = $0; kw = $0; decl = 0
         if (istest) {
           if (match(body, /^[-+][ \t]*(async[ \t]+)?def[ \t]+test[A-Za-z0-9_]*[ \t]*\(/)) {
-            decl = 1; rest = substr(body, RLENGTH + 1); bare = (rest ~ /^[^)]*\)[ \t]*(->[^:]*)?:[ \t]*\r?$/)
+            decl = 1; rest = substr(body, RLENGTH + 1); bare = (rest ~ /^[ \t]*((self|cls)[ \t]*)?\)[ \t]*(->[ \t]*[A-Za-z_][A-Za-z0-9_.]*[ \t]*)?:[ \t]*\r?$/)
           } else if (match(body, /^[-+][ \t]*(@[A-Za-z]+[ \t]+)*fun[ \t]+(test[A-Za-z0-9_]*|`[^`]*`)[ \t]*\(/)) {
-            decl = 1; rest = substr(body, RLENGTH + 1); bare = (rest ~ /^[^)]*\)[ \t]*(:[^={]*)?\{?[ \t]*\}?[ \t]*\r?$/)
+            decl = 1; rest = substr(body, RLENGTH + 1); bare = (rest ~ /^[ \t]*\)[ \t]*(:[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*)?\{?[ \t]*\}?[ \t]*\r?$/)
           }
         }
         if (decl) { body = substr(body, 1, 1) "test(" rest; if (bare) kw = body }
       }
       kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
-        l = norm(body); key = file "|" l; gsub(/[0-9]+/, "N", key)
-        if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = num(l) } else { add[key] = l; addn[key] = num(l) }
+        l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
+        if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n } else { add[key] = l; addn[key] = n }
       }
       END {
         for (k in rem) {
