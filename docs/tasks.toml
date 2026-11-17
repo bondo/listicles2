@@ -843,6 +843,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-09"]
+notes = "Includes the one-household check on the owner's member create (PLAN 3.1)"
 
 [[task]]
 id = "M1-11"
@@ -852,7 +853,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-12"]
-notes = "After M1-12: Leave, Remove and cleanup delete invites"
+notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here; the marker-driven list unsharing is M2"
 
 [[task]]
 id = "M1-12"
@@ -862,6 +863,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-10"]
+notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write"
 
 [[task]]
 id = "M1-30"
@@ -889,6 +891,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-30", "M1-13"]
+notes = "Sign out per OQ-13 (decided 2026-11-17): wait for pending writes, offline warning, terminate + clearPersistence"
 
 [[task]]
 id = "M1-15"
