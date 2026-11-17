@@ -636,5 +636,40 @@ class OwnerDriftCliTest(unittest.TestCase):
 
 
 
+class RetroTaskTests(unittest.TestCase):
+    """Agent Usage Redesign PR 2: the R6 retro of M0.5 is a task, so M1 (which depends on milestone:M0.5) waits for it."""
+
+    @classmethod
+    def setUpClass(cls):
+        text = (Path(__file__).resolve().parent.parent / tasks.DEFAULT_FILE).read_text(encoding="utf-8")
+        cls.graph = tasks.parse(text)
+        cls.retro = [t for t in cls.graph.tasks if t.milestone == "M0.5" and t.assignee == "retro"]
+
+    def test_there_is_exactly_one_open_r6_retro_task_for_m0_5(self):
+        self.assertEqual(len(self.retro), 1)
+        self.assertEqual(self.retro[0].status, "todo")
+        self.assertIn("R6", self.retro[0].title)
+
+    def test_it_waits_for_every_other_open_m0_5_task_that_is_not_the_owners(self):
+        retro = self.retro[0]
+        open_ids = {t.id for t in self.graph.tasks
+                    if t.milestone == "M0.5" and t.status == "todo" and t.id != retro.id and t.assignee != "owner"}
+        self.assertTrue(open_ids, "the test needs open M0.5 tasks to be meaningful")
+        self.assertLessEqual(open_ids, set(retro.depends_on))
+
+    def test_it_is_not_a_dependency_of_any_m0_5_task_so_there_is_no_cycle(self):
+        for t in self.graph.tasks:
+            if t.milestone == "M0.5":
+                self.assertNotIn(self.retro[0].id, t.depends_on, t.id)
+
+    def test_its_notes_name_the_baseline_the_tuning_doc_and_the_pilot_checks(self):
+        notes = self.retro[0].notes.lower()
+        for word in ("baseline", "docs/agent-tuning.md", "docs/agent-metrics.csv", "pilot", "at most 3", "kill switch"):
+            self.assertIn(word, notes)
+
+    def test_m1_tasks_still_wait_for_the_whole_milestone(self):
+        self.assertIn("milestone:M0.5", self.graph.by_id["M1-01"].depends_on)
+
+
 if __name__ == "__main__":
     unittest.main()
