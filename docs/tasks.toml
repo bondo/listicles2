@@ -902,7 +902,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-30", "M1-13", "M1-02"]
-notes = "Sign out per OQ-13 (decided 2026-11-17): pending writes (wait online, warn offline), terminate, clearPersistence, Auth signOut last"
+notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
 
 [[task]]
 id = "M1-15"
