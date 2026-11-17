@@ -28,12 +28,12 @@ purpose = "User stories, app flow, design tokens and the test, lint and review g
 [[milestone]]
 id = "M1"
 title = "Accounts and households"
-purpose = "Google sign-in, households, invite links, members and ownership, with rules tests."
+purpose = "Google and email sign-in, households, invite links, members and ownership, with rules tests."
 
 [[milestone]]
 id = "M2"
 title = "Inventory lists"
-purpose = "Lists and items with real-time sync, offline use, search, sort and filter, in English and Danish."
+purpose = "Private and shared lists, plain and collection items, real-time sync and offline use, in English and Danish."
 
 [[milestone]]
 id = "M3"
@@ -758,12 +758,13 @@ depends_on = ["milestone:M0.5"]
 
 [[task]]
 id = "M1-02"
-title = "Start the Firestore emulator in the ui CI job (known gap R6-09), with the first Firebase-backed UI test"
+title = "Create :core:data with an emulator smoke test; Auth and Firestore emulators in CI (firebase.json, ui job, verify.sh)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-01"]
+depends_on = ["M1-29"]
+notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-listicles); tests live in core/data/src/androidTest. Test-first: the first commit adds a smoke test there that signs in against the Auth emulator and writes and reads a document on the Firestore emulator (10.0.2.2), failing when the emulators are not running. Adds the Firebase BoM, Auth and Firestore to the catalog and :core:data (no Google Services plugin; that is M1-30). After the rename M1-29"
 
 [[task]]
 id = "M1-03"
@@ -802,8 +803,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-01", "M0.5-08"]
-notes = "Normal env. Effort M. Depends on the first real rules task from the M1 plan; the planner wires that dependency."
+depends_on = ["M1-01", "M0.5-08", "M1-10"]
+notes = "Normal env. Effort M. Depends on the first real rules task from the M1 plan (M1-10, docs/milestones/M1.md)."
 
 [[task]]
 id = "M1-07"
@@ -815,6 +816,250 @@ risk = "normal"
 depends_on = ["M1-01"]
 notes = "Tooling env (CI). Effort M."
 
+# Added by the M1 plan (M1-01, docs/milestones/M1.md section 4). risk:high = PLAN 9.1 (rules, auth, deletion, batches).
+
+[[task]]
+id = "M1-29"
+title = "Rename to Tally: applicationId and namespace dk.bjarkebjarke.tally, packages, app label en/da"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Normal env. Must merge before M1-O1 registers the Android app in Firebase (docs/product/naming.md). The repo rename is the owner's"
+
+[[task]]
+id = "M1-08"
+title = "Rules base: signedIn() with email_verified, users/{uid} householdId set/clear, tombstone read, config/app"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-01"]
+
+[[task]]
+id = "M1-09"
+title = "Rules spike: PLAN 3.1 items a-e in the emulator, ADR 0002 with the results"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-08"]
+
+[[task]]
+id = "M1-10"
+title = "Rules: create household, member display name, transfer ownership, allow and deny tests"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-09"]
+notes = "Includes the one-household check on the owner's member create (PLAN 3.1)"
+
+[[task]]
+id = "M1-11"
+title = "Rules: leave, remove member (removed marker), household soft delete and cleanup, allow and deny tests"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-12"]
+notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2"
+
+[[task]]
+id = "M1-12"
+title = "Rules: invites (create, get, list, revoke, cleanup) and the join batch, incl. unverified get denied"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-10"]
+notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write"
+
+[[task]]
+id = "M1-30"
+title = "App skeleton: Hilt, Navigation 3, signed-in/signed-out root, connectivity helper, Google Services plugin + stand-in config"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-29", "M1-02"]
+
+[[task]]
+id = "M1-13"
+title = "Domain: email and password validation (12+ code points), property tests"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+
+[[task]]
+id = "M1-14"
+title = "Auth data: Google sign-in via Credential Manager, session state, sign out (Auth emulator)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-30", "M1-13", "M1-02"]
+notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
+
+[[task]]
+id = "M1-15"
+title = "Auth data: email and password sign-up, sign-in, verification, reset, error mapping, collision message"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-14"]
+
+[[task]]
+id = "M1-16"
+title = "Sign-in UI: sign-in screen and Google button (AUTH-01..03)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-14", "M1-03"]
+
+[[task]]
+id = "M1-17"
+title = "Email UI: create account, check your email, sign in, reset (AUTH-05..08, AUTH-10)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-15", "M1-16"]
+
+[[task]]
+id = "M1-24"
+title = "LocaleConfig: generateLocaleConfig and resources.properties (LANG-02)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-29"]
+
+[[task]]
+id = "M1-18"
+title = "Household data 1: create, invite, revoke, join, start-up self-heal (emulator)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-12", "M1-30", "M1-02"]
+
+[[task]]
+id = "M1-31"
+title = "Household data 2: leave, remove (marker, resumable), transfer, delete with cleanup resume (emulator)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-11", "M1-18"]
+
+[[task]]
+id = "M1-19"
+title = "Household UI: create, members, invite share sheet, revoke (HH-01, HH-02, HH-04)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-18"]
+
+[[task]]
+id = "M1-20"
+title = "Invite link and join screen (HH-03), incl. signed-out routing through sign-in"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-19", "M1-17"]
+notes = "Invite page and assetlinks.json on tally.bjarkebjarke.dk (OQ-21, decided 2026-11-17); this PR proposes the hosting. Unverified links open the browser on Android 12+, so the domain is a prerequisite for the first external tester, no paste-link field (OQ-40, decided). See docs/milestones/M1.md"
+
+[[task]]
+id = "M1-21"
+title = "Leave, remove, transfer and delete household UI, household-deleted dialog (HH-05, HH-06)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-19", "M1-31"]
+
+[[task]]
+id = "M1-22"
+title = "Account: change password with recent sign-in (AUTH-11)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-17", "M1-25"]
+
+[[task]]
+id = "M1-32"
+title = "Account: delete account (AUTH-04) with recent sign-in, resumable"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-22", "M1-21"]
+
+[[task]]
+id = "M1-23"
+title = "Optional TOTP two-step verification (AUTH-09)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-32", "M1-O3"]
+notes = "Dropped if the Identity Platform upgrade needs billing (OQ-25, M1-O3)"
+
+[[task]]
+id = "M1-25"
+title = "Settings screen and navigation (owner of the screen), Crashlytics off by default with an opt-in switch, no Analytics"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30"]
+
+[[task]]
+id = "M1-26"
+title = "App Check: Play Integrity in release, debug provider in debug builds (not enforced)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30"]
+
+[[task]]
+id = "M1-27"
+title = "Minimum app version: config/app.minVersionCode, schemaVersion, update screen"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-08", "M1-30"]
+
+[[task]]
+id = "M1-28"
+title = "Privacy text draft in English and Danish (OQ-30)"
+milestone = "M1"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M1-01"]
+
+[[task]]
+id = "M1-33"
+title = "Release smoke build with R8 in CI (best-practices checklist follow-up 7)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30"]
+notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4)"
+
 [[task]]
 id = "M1-FU"
 title = "Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)"
@@ -822,23 +1067,88 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07"]
+depends_on = [
+  "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
+  "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
+  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33",
+]
 
 [[task]]
 id = "M1-O1"
-title = "Create the Firebase project (Spark), enable Google sign-in and Firestore, add google-services.json as a GitHub secret"
+title = "Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.json secret"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["milestone:M0", "M0.5-O2"]
-notes = "Waits for the name decision (M0.5-O2): the Firebase project name and applicationId derive from it"
+depends_on = ["milestone:M0", "M0.5-O2", "M1-29"]
+notes = "Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
 
 [[task]]
 id = "M1-O2"
-title = "Register the debug and release SHA-1 fingerprints in Firebase"
+title = "Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in)"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-O1"]
+
+[[task]]
+id = "M1-O3"
+title = "Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via REST"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Runbook: docs/milestones/M1.md R2 (and R3, the MFA reset). If billing is needed, M1-23 is dropped"
+
+[[task]]
+id = "M1-O4"
+title = "Enable the Play Integrity API for the Firebase project in the Google Cloud console"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M1-26"]
+notes = "docs/milestones/M1.md R5 step 1. Registration, device-integrity settings and metrics are M6-O3 (they need the release key from M6-O1)"
+
+[[task]]
+id = "M1-O5"
+title = "Approve the privacy text (OQ-30) before anyone but the owner installs the app"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-28"]
+
+# ---------------------------------------------------------------- M6 owner tasks (from the M1 plan)
+
+[[task]]
+id = "M6-O1"
+title = "Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json"
+milestone = "M6"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O2"]
+notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 so M1 can close before the release key exists"
+
+[[task]]
+id = "M6-O2"
+title = "Register a free limited-distribution Android developer account when available in Denmark"
+milestone = "M6"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+issue = 120
+
+[[task]]
+id = "M6-O3"
+title = "Register App Check (Play Integrity, device integrity only) with the release key; watch metrics two weeks"
+milestone = "M6"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M6-O1", "M1-O4"]
+notes = "docs/milestones/M1.md R5 steps 2-4. Before the first external tester and at least two weeks before App Check enforcement"
