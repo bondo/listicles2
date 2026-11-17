@@ -636,5 +636,54 @@ class OwnerDriftCliTest(unittest.TestCase):
 
 
 
+class RetroTaskTests(unittest.TestCase):
+    """Agent Usage Redesign PR 2: the R6 retro of M0.5 is a task, so M1 (which depends on milestone:M0.5) waits for it.
+    The invariants must hold in every valid state of docs/tasks.toml, whatever is done (R1-01 of #128)."""
+
+    TEXT = (Path(__file__).resolve().parent.parent / tasks.DEFAULT_FILE).read_text(encoding="utf-8")
+
+    @staticmethod
+    def mark_done(text, ids):
+        """The tasks file with the given task ids set to status done."""
+        blocks = text.split("[[task]]")
+        for i, block in enumerate(blocks):
+            if any(f'id = "{task_id}"\n' in block for task_id in ids):
+                blocks[i] = block.replace('status = "todo"', 'status = "done"', 1)
+        return "[[task]]".join(blocks)
+
+    def invariants(self, graph):
+        retro = [t for t in graph.tasks if t.milestone == "M0.5" and t.assignee == "retro"]
+        self.assertEqual(len(retro), 1)  # whatever its status
+        self.assertIn("R6", retro[0].title)
+        before = {t.id for t in graph.tasks
+                  if t.milestone == "M0.5" and t.id not in (retro[0].id, "M0.5-FU") and t.assignee != "owner"}
+        self.assertLessEqual(before, set(retro[0].depends_on))  # every one of them, open or done: no status filter
+        for t in graph.tasks:
+            if t.milestone == "M0.5":
+                self.assertEqual(retro[0].id in t.depends_on, t.id == "M0.5-FU", t.id)
+        notes = retro[0].notes.lower()
+        for word in ("baseline", "docs/agent-tuning.md", "docs/agent-metrics.csv", "pilot", "at most 3", "kill switch"):
+            self.assertIn(word, notes)
+        self.assertIn("milestone:M0.5", graph.by_id["M1-01"].depends_on)
+
+    def test_the_invariants_hold_for_the_repository_file(self):
+        self.invariants(tasks.parse(self.TEXT))
+
+    def test_the_invariants_hold_when_tasks_are_marked_done_as_work_progresses(self):
+        every = [t.id for t in tasks.parse(self.TEXT).tasks if t.milestone == "M0.5"]
+        for done in (["M0.5-03", "M0.5-26"], ["M0.5-03", "M0.5-26", "M0.5-28"], every):
+            with self.subTest(done=done[:3], n=len(done)):
+                self.invariants(tasks.parse(self.mark_done(self.TEXT, done)))
+
+    def test_the_invariants_still_catch_a_missing_dependency_and_a_missing_retro(self):
+        at = self.TEXT.index('id = "M0.5-28"')
+        text = self.TEXT[:at] + self.TEXT[at:].replace('"M0.5-27", ', '', 1)  # a done task must stay listed too
+        self.assertNotEqual(text, self.TEXT)
+        with self.assertRaises(AssertionError):
+            self.invariants(tasks.parse(text))
+        with self.assertRaises(AssertionError):
+            self.invariants(tasks.parse(self.TEXT.replace('assignee = "retro"', 'assignee = "implementer"', 1)))
+
+
 if __name__ == "__main__":
     unittest.main()
