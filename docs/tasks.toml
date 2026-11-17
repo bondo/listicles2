@@ -748,13 +748,13 @@ depends_on = ["milestone:M0.5"]
 
 [[task]]
 id = "M1-02"
-title = "Auth and Firestore emulators for the app's integration tests in CI: firebase.json auth entry, ui job, verify.sh"
+title = "Create :core:data with an emulator smoke test; Auth and Firestore emulators in CI (firebase.json, ui job, verify.sh)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-01"]
-notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-listicles); tests live in core/data/src/androidTest"
+depends_on = ["M1-29"]
+notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-listicles); tests live in core/data/src/androidTest. Test-first: the first commit adds a smoke test there that signs in against the Auth emulator and writes and reads a document on the Firestore emulator (10.0.2.2), failing when the emulators are not running. Adds the Firebase BoM, Auth and Firestore to the catalog and :core:data (no Google Services plugin; that is M1-30). After the rename M1-29"
 
 [[task]]
 id = "M1-03"
@@ -868,12 +868,12 @@ notes = "Join includes the one-household check (PLAN 3.1): deny a join without t
 
 [[task]]
 id = "M1-30"
-title = "App skeleton: Hilt, Navigation 3, signed-in/signed-out root, connectivity helper"
+title = "App skeleton: Hilt, Navigation 3, signed-in/signed-out root, connectivity helper, Google Services plugin + stand-in config"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-29"]
+depends_on = ["M1-29", "M1-02"]
 
 [[task]]
 id = "M1-13"
@@ -1094,13 +1094,13 @@ notes = "Runbook: docs/milestones/M1.md R2 (and R3, the MFA reset). If billing i
 
 [[task]]
 id = "M1-O4"
-title = "Enable the Play Integrity API (Cloud console), register App Check (device integrity only), watch metrics"
+title = "Enable the Play Integrity API for the Firebase project in the Google Cloud console"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-O1", "M1-26"]
-notes = "docs/milestones/M1.md R5. No fingerprint in M1: Play Integrity runs only in release builds, so the GitHub release key's SHA-256 is registered by M6-O1. Enforcement only after about two weeks of metrics (M6)"
+notes = "docs/milestones/M1.md R5 step 1. Registration, device-integrity settings and metrics are M6-O3 (they need the release key from M6-O1)"
 
 [[task]]
 id = "M1-O5"
@@ -1132,3 +1132,13 @@ assignee = "owner"
 risk = "normal"
 depends_on = []
 issue = 120
+
+[[task]]
+id = "M6-O3"
+title = "Register App Check (Play Integrity, device integrity only) with the release key; watch metrics two weeks"
+milestone = "M6"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M6-O1", "M1-O4"]
+notes = "docs/milestones/M1.md R5 steps 2-4. Before the first external tester and at least two weeks before App Check enforcement"
