@@ -395,6 +395,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-16"]
+pr = 113
 notes = "Output includes design/tokens.json (colors, type, spacing, light and dark) consumed by M1-04 (P22); tests for it come in M1. It also drafts docs/product/rubric.md, the visual-quality rubric of docs/reviews/README.md section 4 (D-3.3); the owner edits and agrees it at D5. Review packet for the owner and the collaborator (same time), docs/reviews/collaborator-workflow.md section 7; collaborator input is advisory, sign-off is owner only: docs/product/wireframes/*.png (per screen, light and dark, outside screenshots/ and golden/), docs/product/flow.md (Mermaid), a tokens sheet image; the PR body starts with a plain-language review sheet (numbered screens, 2-3 questions each)."
 
 [[task]]
@@ -595,7 +596,7 @@ status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Decisions are logged and the labels feedback, idea, decision, needs-collaborator, needs-owner were created by the orchestrator. Still open for the owner: check the Actions settings by eye (C5: read-only workflow permissions, no create/approve PRs, auto-merge OFF, no secrets or variables); do it before M0.5-O4"
+notes = "Decisions are logged and the labels feedback, idea, decision, needs-collaborator, needs-owner were created by the orchestrator. Still open for the owner: check the Actions settings by eye (C5: read-only workflow permissions, no create/approve PRs, auto-merge OFF, no secrets or variables); do it before M0.5-O5"
 
 [[task]]
 id = "M0.5-16"
@@ -714,13 +715,24 @@ notes = "Tooling env (REVIEW.md). Effort S. After the rubric is drafted in M0.5-
 
 [[task]]
 id = "M0.5-O4"
-title = "Invite the collaborator (Write) once COLLABORATING.md and the wake steps exist, confirm 2FA, run the live test"
+title = "Collaborator invite sent and accepted"
+milestone = "M0.5"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M0.5-19", "M0.5-O3"]
+notes = "Owner confirmed on 2026-11-16 (#15) that the invite was sent and accepted. Split from the original combined task: 2FA confirmation and the live test are M0.5-O5."
+
+[[task]]
+id = "M0.5-O5"
+title = "Confirm the collaborator's 2FA and run the live test"
 milestone = "M0.5"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M0.5-19", "M0.5-O3"]
-notes = "Invite only after COLLABORATING.md and the wake steps exist; send COLLABORATING.md. Live test: report section 6 (comment, PR review, form issue, and what Merge does on a green PR), results noted on #15"
+depends_on = ["M0.5-O4"]
+issue = 119
+notes = "Owner only. Send COLLABORATING.md; confirm 2FA is on. Live test: docs/reviews/collaborator-workflow.md section 6 (comment, PR review, form issue, and what Merge does on a green PR), results noted on #15"
 
 # ---------------------------------------------------------------- M1 auth + households
 # The planner (M1-01) breaks M1 into PR-sized tasks and adds them here in its PR.

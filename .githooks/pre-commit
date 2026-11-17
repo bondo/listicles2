@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Guards on the staged content, then spotless + detekt. Do not bypass with --no-verify.
+# Gradle runs only when a staged path can affect Kotlin or Gradle (scripts/hooks/prepush_scope.py --paths decides; unknown
+# means build). The guards run on every commit.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 ./scripts/guards.sh --staged || exit 1
+scope=$(git -c core.quotepath=off diff --cached --name-only --no-renames | python3 -I scripts/hooks/prepush_scope.py --paths 2>/dev/null)
+if [ "$scope" = skip ]; then
+  echo "pre-commit: no staged file can affect Kotlin or Gradle, skipping spotless and detekt"
+  exit 0
+fi
 ./gradlew -q --console=plain spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest 2>&1 | grep -v '^Picked up' | tail -25
 exit "${PIPESTATUS[0]}"

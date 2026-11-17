@@ -534,6 +534,107 @@ class CliTest(unittest.TestCase):
                 f.write_text(body)
                 self.assertTrue(self.run_cli(text, "--issues", str(f), "ready")[1].startswith("M0-01"))
 
+class OwnerDriftCheckTest(unittest.TestCase):
+    """#92: an owner task that is todo while GitHub says it is finished must fail the check."""
+
+    def check(self, g, issues=(), prs=()):
+        return tasks.owner_drift(g, list(issues), list(prs))
+
+    def test_closed_issue_with_todo_row_fails(self):
+        g = graph(task("M0-O1", assignee="owner", issue=12))
+        msgs = "\n".join(self.check(g, [{"number": 12, "title": "", "state": "closed"}]))
+        self.assertIn("M0-O1: issue #12 is closed but status is todo", msgs)
+
+    def test_open_issue_with_todo_row_passes(self):
+        g = graph(task("M0-O1", assignee="owner", issue=12))
+        self.assertEqual(self.check(g, [{"number": 12, "title": "", "state": "open"}]), [])
+
+    def test_closed_issue_with_done_row_passes(self):
+        g = graph(task("M0-O1", assignee="owner", status="done", issue=12))
+        self.assertEqual(self.check(g, [{"number": 12, "title": "", "state": "closed"}]), [])
+
+    def test_closed_not_planned_with_todo_row_fails_too(self):
+        g = graph(task("M0-O1", assignee="owner", issue=12))
+        issues = [{"number": 12, "title": "", "state": "closed", "state_reason": "not_planned"}]
+        self.assertIn("M0-O1", "\n".join(self.check(g, issues)))
+
+    def test_issue_linked_by_title_counts(self):
+        g = graph(task("M0-O4", assignee="owner"))
+        issues = [{"number": 60, "title": "[owner] M0-O4: confirm the handle", "state": "closed"}]
+        self.assertIn("M0-O4", "\n".join(self.check(g, issues)))
+
+    def test_merged_pr_with_todo_owner_row_fails(self):
+        g = graph(task("M0-O7", assignee="owner", pr=1))
+        self.assertIn("M0-O7: PR #1 is merged but status is todo", "\n".join(self.check(g, prs=[{"number": 1, "merged": True}])))
+        self.assertEqual(self.check(g, prs=[{"number": 1, "merged": False}]), [])
+
+    def test_agent_tasks_are_not_part_of_the_check(self):
+        g = graph(task("M0-01", pr=3, issue=12))
+        issues = [{"number": 12, "title": "", "state": "closed"}]
+        self.assertEqual(self.check(g, issues, [{"number": 3, "merged": True}]), [])
+
+    def test_dropped_owner_task_passes(self):
+        g = graph(task("M0-O1", assignee="owner", status="dropped", issue=12))
+        self.assertEqual(self.check(g, [{"number": 12, "title": "", "state": "closed"}]), [])
+
+    def test_missing_github_data_is_no_drift(self):
+        g = graph(task("M0-O1", assignee="owner", issue=12))
+        self.assertEqual(tasks.owner_drift(g, None, None), [])
+
+    def test_output_is_sorted_by_task_id_order_in_file(self):
+        g = graph(task("M0-O2", assignee="owner", issue=2), task("M0-O1", assignee="owner", issue=1))
+        issues = [{"number": n, "title": "", "state": "closed"} for n in (1, 2)]
+        self.assertEqual([m.split(":")[0] for m in self.check(g, issues)], ["M0-O2", "M0-O1"])
+
+
+class OwnerDriftCliTest(unittest.TestCase):
+    run_cli = CliTest.run_cli
+
+    def issues_file(self, d, items):
+        f = Path(d, "issues.json")
+        f.write_text(json.dumps(items))
+        return str(f)
+
+    def test_check_exits_1_and_names_the_task_on_drift(self):
+        text = task("M0-O1", assignee="owner", issue=12)
+        with tempfile.TemporaryDirectory() as d:
+            f = self.issues_file(d, [{"number": 12, "title": "", "state": "closed"}])
+            code, out, err = self.run_cli(text, "--issues", f, "drift", "--check")
+        self.assertEqual(code, 1)
+        self.assertIn("M0-O1", out + err)
+
+    def test_check_exits_0_without_owner_drift(self):
+        text = task("M0-O1", assignee="owner", issue=12)
+        with tempfile.TemporaryDirectory() as d:
+            f = self.issues_file(d, [{"number": 12, "title": "", "state": "open"}])
+            code, out, _ = self.run_cli(text, "--issues", f, "drift", "--check")
+        self.assertEqual((code, out.strip()), (0, "no drift"))
+
+    def test_plain_drift_still_exits_0_on_drift(self):
+        text = task("M0-O1", assignee="owner", issue=12)
+        with tempfile.TemporaryDirectory() as d:
+            f = self.issues_file(d, [{"number": 12, "title": "", "state": "closed"}])
+            self.assertEqual(self.run_cli(text, "--issues", f, "drift")[0], 0)
+
+    def test_check_ignores_follow_up_and_agent_drift(self):
+        text = task("M0-01", pr=3) + task("M0-O1", assignee="owner", issue=12)
+        with tempfile.TemporaryDirectory() as d:
+            f = self.issues_file(d, [{"number": 12, "title": "", "state": "open"}])
+            p = Path(d, "prs.json")
+            p.write_text(json.dumps([{"number": 3, "merged": True}]))
+            self.assertEqual(self.run_cli(text, "--issues", f, "--prs", str(p), "drift", "--check")[0], 0)
+
+    def test_check_without_github_input_exits_2(self):
+        code, _, err = self.run_cli(task("M0-O1", assignee="owner"), "drift", "--check")
+        self.assertEqual(code, 2)
+        self.assertIn("--issues", err)
+
+    def test_check_with_another_command_exits_1(self):
+        code, _, err = self.run_cli(task("M0-01"), "--check", "ready")
+        self.assertEqual(code, 1)
+        self.assertIn("--check", err)
+
+
 
 if __name__ == "__main__":
     unittest.main()
