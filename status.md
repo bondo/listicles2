@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 28/33 (84%) | 5 |
+| M0.5 | Product design and guardrails | 28/34 (82%) | 6 |
 | M1 | Accounts and households | 0/10 (0%) | 10 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,7 +62,7 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 28/33 done (84%), 5 open.
+**Progress:** 28/34 done (82%), 6 open.
 
 ### Tasks
 
@@ -83,7 +83,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-13 | Metrics&#58; orchestrator CSV comments per ORCHESTRATION 6 and scripts/agent_metrics.py to docs/age… | done | M0-O11 | implementer | [#58](https://github.com/bondo/listicles2/issues/58) |
 | M0.5-14 | ORCHESTRATION.md retro changes&#58; delta review, one batch per PR, env pick, default deferral, early… | done | M0-O11 | process |  |
 | M0.5-15 | Prompts&#58; design-reviewer role and checklist, PR-body refresh, delta review, environment pick (P… | done | M0-11, M0.5-14, M0.5-23 | implementer |  |
-| M0.5-FU | Follow-up burn-down for M0.5 | blocked | M0.5-01, M0.5-02, M0.5-03, M0.5-04, M0.5-05, M0.5-06, M0.5-07, M0.5-08, M0.5-09, M0.5-10, M0.5-11, M0.5-12, M0.5-13, M0.5-14, M0.5-15, M0.5-16, M0.5-17, M0.5-18, M0.5-19, M0.5-20, M0.5-21, M0.5-22, M0.5-23, M0.5-24, M0.5-25, M0.5-26, M0.5-27 | implementer |  |
+| M0.5-FU | Follow-up burn-down for M0.5 | blocked | M0.5-01, M0.5-02, M0.5-03, M0.5-04, M0.5-05, M0.5-06, M0.5-07, M0.5-08, M0.5-09, M0.5-10, M0.5-11, M0.5-12, M0.5-13, M0.5-14, M0.5-15, M0.5-16, M0.5-17, M0.5-18, M0.5-19, M0.5-20, M0.5-21, M0.5-22, M0.5-23, M0.5-24, M0.5-25, M0.5-26, M0.5-27, M0.5-28 | implementer |  |
 | M0.5-27 | Status picture on the README&#58; scripts render docs/tasks.toml plus PR and issue state to an SVG, a… | done | none | implementer | [#71](https://github.com/bondo/listicles2/issues/71) |
 | M0.5-O1 | Approve stories, flow and design | owner to-do | M0.5-01, M0.5-02, M0.5-03 | owner |  |
 | M0.5-O2 | Pick the app and repo name from the shortlist | done | M0.5-04 | owner | [#77](https://github.com/bondo/listicles2/issues/77) |
@@ -101,6 +101,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-26 | REVIEW.md&#58; R9 visual-rubric item (agent score below 3 is a minor finding) and R7 rules allow/… | blocked | M0.5-03, M0.5-15, M0.5-23 | implementer |  |
 | M0.5-O4 | Collaborator invite sent and accepted | done | M0.5-19, M0.5-O3 | owner |  |
 | M0.5-O5 | Confirm the collaborator's 2FA and run the live test | owner to-do | M0.5-O4 | owner |  |
+| M0.5-28 | R6 retro of M0.5&#58; compare the Agent Usage Redesign pilot with its baseline and propose at most … | blocked | M0.5-01, M0.5-02, M0.5-03, M0.5-04, M0.5-05, M0.5-06, M0.5-07, M0.5-08, M0.5-09, M0.5-10, M0.5-11, M0.5-12, M0.5-13, M0.5-14, M0.5-15, M0.5-27, M0.5-16, M0.5-17, M0.5-18, M0.5-19, M0.5-20, M0.5-21, M0.5-22, M0.5-23, M0.5-24, M0.5-25, M0.5-26 | retro |  |
 
 ### Open tasks and what blocks them
 
@@ -113,10 +114,14 @@ flowchart LR
     n2["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
     n3["M0.5-26 REVIEW.md: R9 visual-rubric item (ag… (blocked)"]:::blocked
     n4["M0.5-O5 Confirm the collaborator's 2FA and run… (owner to-do)"]:::owner
+    n5["M0.5-28 R6 retro of M0.5: compare the Agent U… (blocked)"]:::blocked
     n0 --> n1
     n3 --> n1
+    n5 --> n1
     n0 --> n2
     n0 --> n3
+    n0 --> n5
+    n3 --> n5
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -220,6 +225,7 @@ Not planned yet.
 
 - **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **task** M0.5-FU: waits on M0.5-03, M0.5-26
+- **task** M0.5-FU: waits on M0.5-03, M0.5-26, M0.5-28
 - **task** M0.5-O1: waits on M0.5-03
 - **task** M0.5-26: waits on M0.5-03
+- **task** M0.5-28: waits on M0.5-03, M0.5-26
