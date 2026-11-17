@@ -473,7 +473,7 @@ class EscapedDefectTests(unittest.TestCase):
         self.assertEqual(out[0]["caused_by"], "")  # the new columns stay empty on other row kinds
 
     def test_every_documented_area_is_accepted_and_others_are_not(self):
-        for area in ("security-rules", "sync-merge", "release", "risk-high", "general"):
+        for area in ("security-rules", "sync-merge", "release", "risk-high", "process", "general"):
             self.assertEqual(self.errors(escaped_row(area=area))[1], [], area)
         for bad in ("", "Security", "docs", "=cmd", "release "):
             _, errors = self.errors(escaped_row(area=bad))

@@ -637,39 +637,54 @@ class OwnerDriftCliTest(unittest.TestCase):
 
 
 class RetroTaskTests(unittest.TestCase):
-    """Agent Usage Redesign PR 2: the R6 retro of M0.5 is a task, so M1 (which depends on milestone:M0.5) waits for it."""
+    """Agent Usage Redesign PR 2: the R6 retro of M0.5 is a task, so M1 (which depends on milestone:M0.5) waits for it.
+    The invariants must hold in every valid state of docs/tasks.toml, whatever is done (R1-01 of #128)."""
 
-    @classmethod
-    def setUpClass(cls):
-        text = (Path(__file__).resolve().parent.parent / tasks.DEFAULT_FILE).read_text(encoding="utf-8")
-        cls.graph = tasks.parse(text)
-        cls.retro = [t for t in cls.graph.tasks if t.milestone == "M0.5" and t.assignee == "retro"]
+    TEXT = (Path(__file__).resolve().parent.parent / tasks.DEFAULT_FILE).read_text(encoding="utf-8")
 
-    def test_there_is_exactly_one_open_r6_retro_task_for_m0_5(self):
-        self.assertEqual(len(self.retro), 1)
-        self.assertEqual(self.retro[0].status, "todo")
-        self.assertIn("R6", self.retro[0].title)
+    @staticmethod
+    def mark_done(text, ids):
+        """The tasks file with the given task ids set to status done."""
+        blocks = text.split("[[task]]")
+        for i, block in enumerate(blocks):
+            if any(f'id = "{task_id}"\n' in block for task_id in ids):
+                blocks[i] = block.replace('status = "todo"', 'status = "done"', 1)
+        return "[[task]]".join(blocks)
 
-    def test_it_waits_for_every_other_open_m0_5_task_that_is_not_the_owners(self):
-        retro = self.retro[0]
-        open_ids = {t.id for t in self.graph.tasks
-                    if t.milestone == "M0.5" and t.status == "todo" and t.id not in (retro.id, "M0.5-FU")
+    def invariants(self, graph):
+        retro = [t for t in graph.tasks if t.milestone == "M0.5" and t.assignee == "retro"]
+        self.assertEqual(len(retro), 1)
+        self.assertEqual(retro[0].status, "todo")
+        self.assertIn("R6", retro[0].title)
+        open_ids = {t.id for t in graph.tasks
+                    if t.milestone == "M0.5" and t.status == "todo" and t.id not in (retro[0].id, "M0.5-FU")
                     and t.assignee != "owner"}
         self.assertTrue(open_ids, "the test needs open M0.5 tasks to be meaningful")
-        self.assertLessEqual(open_ids, set(retro.depends_on))
-
-    def test_only_the_follow_up_burn_down_waits_for_it(self):
-        for t in self.graph.tasks:
+        self.assertLessEqual(open_ids, set(retro[0].depends_on))
+        for t in graph.tasks:
             if t.milestone == "M0.5":
-                self.assertEqual(self.retro[0].id in t.depends_on, t.id == "M0.5-FU", t.id)
-
-    def test_its_notes_name_the_baseline_the_tuning_doc_and_the_pilot_checks(self):
-        notes = self.retro[0].notes.lower()
+                self.assertEqual(retro[0].id in t.depends_on, t.id == "M0.5-FU", t.id)
+        notes = retro[0].notes.lower()
         for word in ("baseline", "docs/agent-tuning.md", "docs/agent-metrics.csv", "pilot", "at most 3", "kill switch"):
             self.assertIn(word, notes)
+        self.assertIn("milestone:M0.5", graph.by_id["M1-01"].depends_on)
 
-    def test_m1_tasks_still_wait_for_the_whole_milestone(self):
-        self.assertIn("milestone:M0.5", self.graph.by_id["M1-01"].depends_on)
+    def test_the_invariants_hold_for_the_repository_file(self):
+        self.invariants(tasks.parse(self.TEXT))
+
+    def test_the_invariants_hold_when_tasks_are_marked_done_as_work_progresses(self):
+        every = [t.id for t in tasks.parse(self.TEXT).tasks if t.milestone == "M0.5"]
+        for done in (["M0.5-03", "M0.5-26"], ["M0.5-03", "M0.5-26", "M0.5-28"], every):
+            with self.subTest(done=done[:3], n=len(done)):
+                self.invariants(tasks.parse(self.mark_done(self.TEXT, done)))
+
+    def test_the_invariants_still_catch_a_missing_dependency_and_a_missing_retro(self):
+        text = self.TEXT.replace('depends_on = ["M0.5-03", "M0.5-26"]\nnotes = "Fresh Opus', 'depends_on = ["M0.5-03"]\nnotes = "Fresh Opus', 1)
+        self.assertNotEqual(text, self.TEXT)
+        with self.assertRaises(AssertionError):
+            self.invariants(tasks.parse(text))
+        with self.assertRaises(AssertionError):
+            self.invariants(tasks.parse(self.TEXT.replace('assignee = "retro"', 'assignee = "implementer"', 1)))
 
 
 if __name__ == "__main__":

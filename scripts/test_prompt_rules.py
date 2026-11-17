@@ -938,6 +938,7 @@ class Pr2CheckTests(unittest.TestCase):
         "finding-verification": ("reviewer", "second-reviewer"),
         "second-reviewer-role": ("second-reviewer",),
         "verifier-role": ("verifier",),
+        "verifier-handoff": ("implementer", "reviewer", "second-reviewer"),  # R1-02 of #128
     }
 
     def mutate(self, role, old, new=""):
@@ -978,11 +979,21 @@ class Pr2CheckTests(unittest.TestCase):
             ("second-reviewer", "second-reviewer-role", "you are not given the first reviewer's findings"),
             ("second-reviewer", "second-reviewer-role", "security-rules, sync-merge and release"),
             ("second-reviewer", "second-reviewer-role", "report only"),
+            ("implementer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("reviewer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("second-reviewer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
             ("verifier", "verifier-role", "never edit"),
             ("verifier", "verifier-role", "confirmed"),
         ):
             with self.subTest(role=role, clause=clause):
                 self.assertIn(rid, self.mutate(role, clause))
+
+    def test_the_second_reviewer_has_no_effort_escalation_that_roles_yaml_does_not_back(self):  # R1-06 of #128
+        self.assertNotIn("max_effort_when", (ROOT / "agents" / "roles.yaml").read_text().split("  escalation-reviewer:")[0]
+                         .split("  second-reviewer:")[1])
+        text = real("second-reviewer") + " Opus, high effort (max for risk:high PRs when `agents/roles.yaml` says so)."
+        self.assertIn("second-reviewer-role", ids(prompt_rules.check_text("second-reviewer", text)))
+        self.assertNotIn("max for", real("second-reviewer"))
 
     def test_a_second_reviewer_that_sees_the_first_reviewers_findings_is_rejected(self):
         self.assertIn("second-reviewer-role", self.mutate(
