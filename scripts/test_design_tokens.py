@@ -93,6 +93,23 @@ class Check(unittest.TestCase):
         pairs = {(p["fg"], p["bg"]): p["min"] for p in REAL["contrastPairs"]}
         self.assertEqual(pairs[("outline", "surface")], 3.0)
 
+    def test_an_empty_pair_list_fails_the_gate(self):
+        bad = copy.deepcopy(REAL)
+        bad["contrastPairs"] = []
+        self.assertTrue(dt.check(bad))
+
+    def test_deleting_any_one_pair_fails_the_gate(self):
+        for i, pair in enumerate(REAL["contrastPairs"]):
+            bad = copy.deepcopy(REAL)
+            del bad["contrastPairs"][i]
+            found = dt.check(bad)
+            self.assertTrue(any(pair["fg"] in f and pair["bg"] in f and "missing" in f for f in found), (pair, found))
+
+    def test_a_pair_for_a_role_the_tokens_never_had_does_not_replace_a_required_one(self):
+        bad = copy.deepcopy(REAL)
+        bad["contrastPairs"][0] = {"fg": "onSurface", "bg": "surface", "min": 4.5}  # duplicate of another pair
+        self.assertTrue(any("onPrimary on primary" in f and "missing" in f for f in dt.check(bad)))
+
     def test_main_returns_zero_for_the_real_tokens_and_one_for_a_bad_file(self):
         self.assertEqual(dt.main([]), 0)
         bad = copy.deepcopy(REAL)
