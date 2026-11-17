@@ -349,9 +349,9 @@ class M011Alignment(unittest.TestCase):
             for ln in lines:
                 self.assertIn("per batch", ln, f"{name}: {ln}")
 
-    def test_claude_md_keeps_one_review_round_per_reviewer_session(self):
-        """M0.5-22 owns this rule: M0-11 must not touch it."""
-        self.assertIn("One PR per implementer session; one review round per reviewer session.", read("CLAUDE.md"))
+    def test_claude_md_keeps_one_implementer_per_pr_and_a_fresh_reviewer_per_round(self):
+        """M0.5-22 owns this rule; redesign PR 3 keeps the implementer across rounds, reviewers stay fresh."""
+        self.has(read("CLAUDE.md"), "One implementer session per PR, kept across its review rounds", "fresh reviewer session per round")
 
     def test_findings_format_carries_area_recommend_and_deferred(self):
         review = read("REVIEW.md")
