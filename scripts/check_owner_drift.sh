@@ -46,7 +46,7 @@ PY
 
 # All issues, not only labelled ones: owner issues are linked by `issue = N` or by title and the label is not relied on
 # (#12-#14 never had it), and tasks.py needs the open issues too (an open one wins over a closed duplicate).
-fetch "repo:$REPO is:issue is:closed" "$TMP/issues.json" || exit 1
+fetch "repo:$REPO is:issue" "$TMP/issues.json" || exit 1
 complete "$TMP/issues.json" "issues" || exit 1
 fetch "repo:$REPO is:pr is:merged" "$TMP/prs.json" || exit 1
 complete "$TMP/prs.json" "merged PRs" || exit 1
