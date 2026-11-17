@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Pre-push scope: reads git's pre-push stdin ("<local ref> <local sha> <remote ref> <remote sha>" per line) and prints
 `skip` when everything being pushed is prose, scripts, hooks, CI or firebase files that cannot affect the Android build,
-otherwise `android`. Fails closed: unknown paths, unknown remote commits or unparseable input print `android`."""
+otherwise `android`. Fails closed: unknown paths, unknown remote commits or unparseable input print `android`.
+With `--paths`, stdin is a list of newline-separated paths instead (the staged files, for .githooks/pre-commit); no paths at
+all print `android` too, because unknown means build."""
 
 import subprocess
 import sys
 
 ZERO = "0" * 40
 # Top-level locations that cannot affect the Android build. Anything else (including new directories) builds.
+# Kotlin and Kotlin script files build wherever they are: spotless and detekt target **/*.kt and **/*.gradle.kts (R1-01).
 SKIP_PREFIXES = ("docs/", "handoff/", "scripts/", ".githooks/", ".claude/", ".github/", "agents/", "firebase/", "metrics/")
 SKIP_FILES = {"README.md", "CLAUDE.md", "REVIEW.md"}
 
@@ -15,6 +18,8 @@ SKIP_FILES = {"README.md", "CLAUDE.md", "REVIEW.md"}
 def classify(paths):
     for p in paths:
         if ".." in p.split("/"):
+            return "android"
+        if p.endswith((".kt", ".kts")):
             return "android"
         if p in SKIP_FILES or p.startswith(SKIP_PREFIXES):
             continue
@@ -41,7 +46,14 @@ def changed_paths(local, remote):
     return None if out is None else [p for p in out.splitlines() if p]
 
 
+def paths_mode():
+    paths = [p for p in sys.stdin.read().splitlines() if p.strip()]
+    print(classify(paths) if paths else "android")
+
+
 def main():
+    if sys.argv[1:] == ["--paths"]:
+        return paths_mode()
     paths, seen = [], False
     for line in sys.stdin.read().splitlines():
         parts = line.split()
