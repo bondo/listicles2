@@ -218,6 +218,11 @@ Not planned yet.
 ## Blockers
 
 - **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
+- **PR to merge** [#114](https://github.com/bondo/listicles2/issues/114): Product&#58; email and password sign-in stories (AUTH-05..11), list types and owner answers
+- **PR to merge** [#115](https://github.com/bondo/listicles2/issues/115): tasks&#58; split M0.5-O4 (invite done) from M0.5-O5; link PR 113 to M0.5-03
+- **PR to merge** [#116](https://github.com/bondo/listicles2/issues/116): ci&#58; bump actions/setup-java to v6.2.0, pinned by commit SHA
+- **PR to merge** [#117](https://github.com/bondo/listicles2/issues/117): M0.5-03&#58; design tokens and draft visual-quality rubric (split from #113)
+- **PR to merge** [#118](https://github.com/bondo/listicles2/issues/118): tasks&#58; fail CI when an owner task is todo but its issue is closed or PR merged (#92)
 - **task** M0.5-FU: waits on M0.5-03, M0.5-26
 - **task** M0.5-O1: waits on M0.5-03
 - **task** M0.5-26: waits on M0.5-03
