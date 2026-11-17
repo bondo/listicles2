@@ -1,7 +1,9 @@
 """Checks that agents/prompts/*.md carry the collaborator-workflow and review-process rules (M0.5-19, M0.5-25, M0.5-15,
-Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer).
+Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
+full-diff review, kept implementer, minors fixed by default, the single escalation; the PR 3 rules also pin CLAUDE.md,
+REVIEW.md and docs/FOLLOW-UPS.md, see DOC_RULES).
 
-Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts]
+Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
 
 Rules come from docs/ORCHESTRATION.md sections 7.6 and 7.7, docs/reviews/README.md sections 1-5 (M0.5-25;
@@ -18,7 +20,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer", "second-reviewer", "verifier")
+ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer", "second-reviewer", "verifier",
+         "escalation-reviewer")
 
 # Owner decision D4 (docs/reviews/collaborator-workflow.md section 4).
 TIER0_LABELS = ("feedback", "idea", "decision", "needs-collaborator", "needs-owner")
@@ -46,6 +49,16 @@ class Rule:
     patterns: tuple  # regexes, all must match (case-insensitive) in the normalized text
     message: str
     forbidden: tuple = ()  # regexes, none may match (case-insensitive): stale instructions the prompt must not carry
+
+
+@dataclass(frozen=True)
+class DocRule:
+    """Like Rule, for one repository file (CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md) instead of a role prompt."""
+    id: str
+    path: str
+    patterns: tuple
+    message: str
+    forbidden: tuple = ()
 
 
 ALL = ROLES
@@ -397,9 +410,10 @@ RULES = (
         "reviewer-delta", ("reviewer",),
         (
             r"delta review \(orchestration §7\.2\)", r"a commit after the last round", r"`reviewed_through\.\.head_sha`",
-            r"review that range only", r"do not re-review unchanged code",
+            r"the whole pr diff and the findings json", r"focus on that range", r"how the new commits interact with the old code",
         ),
-        "a delta review covers only reviewed_through..head_sha and re-checks open findings (§7.2)",
+        "every round and every delta review gets the whole PR diff and the findings JSON and focuses on the new commits (rev 46 row 3)",
+        forbidden=(r"review that range only", r"do not re-review unchanged code", r"only the commits since the last round"),
     ),
     Rule(
         "impl-pr-body", ("implementer",),
@@ -520,6 +534,132 @@ RULES = (
         ),
         "the verifier is read-only, decides confirmed or not reproduced, and never sees the reviewer's reasoning",
     ),
+    Rule(
+        "reviewer-proof", ("reviewer", "second-reviewer"),
+        (r"run any test, the app's jvm screenshots or a script when it helps",),
+        "reviewers run whatever proves a finding, not only targeted tests (rev 46 row 6)",
+        forbidden=(r"targeted tests only", r"rely on ci for the full suite"),
+    ),
+    Rule(
+        "reviewer-ids", ("reviewer",),
+        (r"ids `r<round>-<nn>`, never `s<round>-<nn>`",),
+        "the reviewer's ids are R<round>-<nn>; S<round>-<nn> belongs to the second reviewer (#128 round 3)",
+    ),
+    Rule(
+        "impl-kept-across-rounds", ("implementer",),
+        (
+            r"you stay on your pr through every review round", r"end every turn with all work committed and pushed",
+            r"handoff file current", r"git ls-remote", r"scripts/install-hooks\.sh` again",
+            r"anything not on the remote as lost", r"starts a fresh implementer from your handoff file",
+        ),
+        "the implementer stays on its PR across rounds, pushes every turn and re-checks its branch head on resume (rev 46 row 2)",
+    ),
+    Rule(
+        "impl-model-and-handoff", ("implementer",),
+        (
+            r"opus, high effort \(max for risk:high prs per `agents/roles\.yaml`", r"60% of a 1m window, 40% of a 200k one",
+            r"80% / 60%",
+        ),
+        "the implementer prompt names the roles.yaml model and the hook's handoff thresholds (rev 46 rows 1, 12)",
+        forbidden=(r"sonnet, medium", r"at about 50% context"),
+    ),
+    Rule(
+        "impl-minors-and-triage", ("implementer",),
+        (
+            r"fix every minor whose fix is about 30 changed lines or fewer", r"run a `ci-triage` subagent on the failure first",
+        ),
+        "minors are fixed by default (about 30 lines) and a ci-triage pass comes before the 3-failure stop (rev 46 row 17, gates)",
+    ),
+    Rule(
+        "planner-gaps", ("planner",),
+        (r"decide plan gaps that are cheap to reverse", r"taste or one-way doors", r"the plan review checks each decision"),
+        "the planner decides cheap-to-reverse plan gaps and asks the owner only about taste or one-way doors (rev 46 gates)",
+        forbidden=(r"flag plan gaps for the owner instead of deciding",),
+    ),
+    Rule(
+        "escalation-role", ("escalation-reviewer",),
+        (
+            r"you are the escalation reviewer", r"opus, max effort", r"once per pr", r"no second escalation",
+            r"decide `fix`, `split` or `owner`", r"one more fresh round", r"taste or scope goes to the owner",
+            r"never edit or push the pr branch: report only", r"use up the pr's one escalation",
+        ),
+        "the escalation reviewer decides fix, split or owner once per PR and never edits the branch (rev 46 row 4)",
+    ),
+)
+
+
+DOC_RULES = (
+    DocRule(
+        "claude-reading", "CLAUDE.md",
+        (r"read what you need to understand the change", r"read whole files you edit", r"`explorer` subagent"),
+        "CLAUDE.md: read what you need and whole files you edit; no narrow-search rule (rev 46 rows 7, 8)",
+        forbidden=(r"search narrowly", r"do not re-read files you just edited"),
+    ),
+    DocRule(
+        "claude-handoff-and-implementer", "CLAUDE.md",
+        (
+            r"60% of a 1m window, 40% of a 200k one", r"80% / 60%", r"one implementer session per pr, kept across its review rounds",
+            r"fresh reviewer session per round", r"committed and pushed", r"git ls-remote",
+        ),
+        "CLAUDE.md: hook thresholds, one implementer per PR kept across rounds, push every turn (rev 46 rows 1, 2)",
+        forbidden=(r"at about 50% a hook", r"one pr per implementer session;"),
+    ),
+    DocRule(
+        "claude-reviews", "CLAUDE.md",
+        (
+            r"max 4 rounds per batch", r"whole pr diff", r"one escalation reviewer per pr", r"fix, split or owner",
+            r"one more fresh round", r"no second escalation", r"about 30 changed lines or fewer",
+        ),
+        "CLAUDE.md: full-diff rounds, the single escalation and minors fixed by default (rev 46 rows 3, 4, 17)",
+        forbidden=(r"then stop and report to the owner",),
+    ),
+    DocRule(
+        "review-full-diff", "REVIEW.md",
+        (
+            r"every round, delta reviews included: the whole pr diff", r"the findings json of all earlier rounds",
+            r"focus on the commits since the last round", r"how the fixes interact with the old code",
+            r"run whatever proves a finding: any test, the app's jvm screenshots, or a script",
+        ),
+        "REVIEW.md: every round gets the whole PR diff and the findings JSON; reviewers run whatever proves a finding (rows 3, 6)",
+        forbidden=(r"round n>1: only the commits since", r"targeted tests only", r"do not re-review unchanged code"),
+    ),
+    DocRule(
+        "review-verified", "REVIEW.md",
+        (
+            r'"verified": "confirmed"', r"`verified`: required for every `blocker` and `major`", r"`confirmed` or `not reproduced`",
+            r"verifier subagent", r"never the reviewer's reasoning", r"does not block",
+        ),
+        "REVIEW.md: the verified field, set from a verifier subagent that never sees the reviewer's reasoning (check 3)",
+    ),
+    DocRule(
+        "review-ids", "REVIEW.md",
+        (r"`r<round>-<nn>`", r"`s<round>-<nn>`", r"`d<round>-<nn>`", r"second reviewer", r"never `r`"),
+        "REVIEW.md names the id prefixes R (reviewer), S (second reviewer) and D (design review), so they cannot collide (#128)",
+    ),
+    DocRule(
+        "review-minors-and-cap", "REVIEW.md",
+        (
+            r"the same implementer session in every round", r"pushes every turn", r"about 30 changed lines or fewer",
+            r"maximum 4 rounds per batch",
+        ),
+        "REVIEW.md: the implementer is kept across rounds, minors with a small fix are fixed, the 4-round cap stays per batch",
+    ),
+    DocRule(
+        "review-escalation", "REVIEW.md",
+        (
+            r"one escalation reviewer per pr", r"agents/prompts/escalation-reviewer\.md", r"decides `fix`, `split` or `owner`",
+            r"one more fresh round \(round 5\)", r"goes to the owner", r"no second escalation", r"no commit lands unreviewed",
+            r"the escalation reviewer rules with both arguments in front of it",
+        ),
+        "REVIEW.md: after round 4 one escalation reviewer decides; a dispute uses the same single escalation (rev 46 row 4)",
+        forbidden=(r"fixes made after round 4 are not re-reviewed", r"the owner breaks ties", r"stop and report to the owner, who decides"),
+    ),
+    DocRule(
+        "followups-small-fix", "docs/FOLLOW-UPS.md",
+        (r"the fix is not small: more than about 30 changed lines",),
+        "FOLLOW-UPS section 2: a minor is deferred only when its fix is larger than about 30 lines (rev 46 row 17)",
+        forbidden=(r"more than about 15 changed lines",),
+    ),
 )
 
 
@@ -590,6 +730,35 @@ def check_text(role, text):
     return problems
 
 
+def check_doc_text(path, text):
+    """Problems for one repository file against DOC_RULES, as `<rule id>: <what is missing>` strings."""
+    norm = normalize(text)
+    problems = []
+    for rule in DOC_RULES:
+        if rule.path != path:
+            continue
+        for pattern in rule.patterns:
+            if not re.search(pattern, norm, re.I):
+                problems.append(f"{rule.id}: {rule.message} (no match for /{pattern}/)")
+                break
+        else:
+            problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden if re.search(p, norm, re.I))
+    return problems
+
+
+def check_docs(root):
+    """All DOC_RULES problems for the files under a repository root, each prefixed with its path."""
+    out = []
+    for path in dict.fromkeys(r.path for r in DOC_RULES):
+        try:
+            text = (Path(root) / path).read_text(encoding="utf-8")
+        except OSError as e:
+            out.append(f"{path}: cannot read ({e.strerror})")
+            continue
+        out.extend(f"{path}: {p}" for p in check_doc_text(path, text))
+    return out
+
+
 def check_dir(prompts_dir):
     """All problems for the four role prompts in a directory, each prefixed with its file name."""
     out = []
@@ -607,12 +776,14 @@ def check_dir(prompts_dir):
 def main(argv=None):
     default = Path(__file__).resolve().parent.parent / "agents" / "prompts"
     ap = argparse.ArgumentParser(description="Check agents/prompts for the collaborator-workflow rules.")
-    ap.add_argument("--prompts", default=str(default), help="directory with the four role prompts")
+    ap.add_argument("--prompts", default=str(default), help="directory with the role prompts")
+    ap.add_argument("--root", default=str(default.parent.parent), help="repository root for CLAUDE.md, REVIEW.md, docs/")
     args = ap.parse_args(argv)
-    if not Path(args.prompts).is_dir():
-        print(f"error: {args.prompts} is not a directory", file=sys.stderr)
-        return 2
-    problems = check_dir(args.prompts)
+    for d in (args.prompts, args.root):
+        if not Path(d).is_dir():
+            print(f"error: {d} is not a directory", file=sys.stderr)
+            return 2
+    problems = check_dir(args.prompts) + check_docs(args.root)
     if problems:
         print("\n".join(problems))
         return 1

@@ -694,7 +694,7 @@ class M015Tests(unittest.TestCase):
             ("delta review (orchestration §7.2)", "full review"),
             ("a commit after the last round", "any commit"),
             ("`reviewed_through..head_sha`", "`main..head_sha`"),
-            ("the whole PR diff and the findings JSON", "the new commits only"),  # redesign PR 3, row 3
+            ("the whole pr diff and the findings json", "the new commits only"),  # redesign PR 3, row 3
             ("focus on that range", "review that range only"),
             ("how the new commits interact with the old code", "nothing else"),
         ):
