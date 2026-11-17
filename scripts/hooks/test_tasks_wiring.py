@@ -9,12 +9,15 @@ import unittest
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 TASKS_TESTS = "python3 -I scripts/test_tasks.py"
 TASKS_VALIDATE = "python3 -I scripts/tasks.py validate"
+DRIFT_TESTS = "python3 -I scripts/test_owner_drift_check.py"
+DRIFT_CHECK = "scripts/check_owner_drift.sh"
 PROCESS_DOCS = (
     "docs/ORCHESTRATION.md",
     "docs/orchestrator-state.md",
     "docs/tasks.toml",
     "docs/FOLLOW-UPS.md",
     "scripts/tasks.py",
+    "scripts/check_owner_drift.sh",
 )
 OWNER = "@bondo"
 
@@ -111,6 +114,39 @@ class VerifyRunsTasks(unittest.TestCase):
         self.assertIsNotNone(fast, "verify.sh FAST block not found")
         self.assertNotIn("tasks.py", fast.group(1))
         self.assertNotIn("test_tasks.py", fast.group(1))
+
+
+class VerifyRunsOwnerDriftTests(unittest.TestCase):
+    def test_verify_runs_the_owner_drift_script_tests_even_in_fast_mode(self):
+        verify = read("scripts", "verify.sh")
+        self.assertTrue(top_level_step(verify, DRIFT_TESTS))
+        fast = re.search(r'if \[ "\$FAST" = 0 \]; then(.*?)\nelse', verify, re.S)
+        self.assertIsNotNone(fast)
+        self.assertNotIn("check_owner_drift", fast.group(1))
+
+
+class CiRunsOwnerDriftCheck(unittest.TestCase):
+    """#92: CI fails an owner task that is todo while its issue is closed. The live check needs the GitHub API, so it
+    is a CI step only; verify.sh runs the script's tests."""
+
+    def setUp(self):
+        self.tasks_job = job(read(".github", "workflows", "ci.yml"), "tasks")
+
+    def test_tasks_job_runs_the_script_tests_and_the_check(self):
+        self.assertTrue(runs(self.tasks_job, DRIFT_TESTS))
+        self.assertTrue(runs(self.tasks_job, DRIFT_CHECK))
+
+    def test_check_gets_a_read_only_token_and_the_permissions_it_needs(self):
+        self.assertIn("GH_TOKEN: ${{ github.token }}", self.tasks_job)
+        perms = re.search(r"(?m)^    permissions:\n((?:      .*\n)+)", self.tasks_job)
+        self.assertIsNotNone(perms, "the tasks job needs its own permissions block")
+        self.assertRegex(perms.group(1), r"contents: read")
+        self.assertRegex(perms.group(1), r"issues: read")
+        self.assertRegex(perms.group(1), r"pull-requests: read")
+        self.assertNotRegex(perms.group(1), r"write")
+
+    def test_script_is_executable(self):
+        self.assertTrue(os.access(os.path.join(ROOT, DRIFT_CHECK), os.X_OK))
 
 
 class CiRunsTasks(unittest.TestCase):
