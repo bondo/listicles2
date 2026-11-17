@@ -797,6 +797,48 @@ class ThresholdTestNames(GuardsCase):
         self.change("scripts/tool.py", "def test_other(self):\n    pass\n")
         self.assertFails("guard: removed check setting:")
 
+    def test_a_non_numeric_same_line_value_after_a_keyword_name_still_fails(self):
+        # R2-01: bare means the rest of the line is only the end of the signature.
+        self.base(self.KT, "fun `maxIssues`() = ZERO\n")
+        self.change(self.KT, "\n")
+        self.assertFails("guard: removed check setting:")
+        self.base(self.KT, "fun test_warningsAsErrors() = true\n")
+        self.change(self.KT, "fun test_warningsAsErrors() = false\n")
+        self.assertFails("guard: removed check setting:")
+        self.base(self.PY, "def test_threshold(): return MIN_COV\n")
+        self.change(self.PY, "def test_threshold(): return LOW\n")
+        self.assertFails("guard: removed check setting:")
+
+    def test_signature_ends_with_annotations_and_empty_bodies_are_still_bare(self):
+        self.base(self.PY, "def test_threshold(self) -> None:\n    pass\n")
+        self.change(self.PY, "def test_stage(self) -> None:\n    pass\n")
+        self.assertPasses()
+        self.base(self.KT, "fun `threshold`(): Unit {\n}\nfun testMaxIssues() {}\n")
+        self.change(self.KT, "fun `stage`(): Unit {\n}\n")
+        self.assertPasses()
+
+    def test_only_real_test_directories_count_as_test_files(self):
+        # R2-02: src/latest, src/contest and a CfgTest.kt under src/main are not test files.
+        for rel in ("app/src/latest/kotlin/Cfg.kt", "app/src/contest/kotlin/Cfg.kt", "app/src/main/kotlin/CfgTest.kt"):
+            with self.subTest(rel=rel):
+                self.base(rel, "fun `threshold`() {}\n")
+                self.change(rel, "fun `stage`() {}\n")
+                self.assertFails("guard: removed check setting:")
+        for rel in ("app/src/androidTest/kotlin/Cfg.kt", "app/src/testFixtures/kotlin/Cfg.kt", "app/src/integrationTest/kotlin/Cfg.kt"):
+            with self.subTest(rel=rel):
+                self.base(rel, "fun `threshold`() {}\n")
+                self.change(rel, "fun `stage`() {}\n")
+                self.assertPasses()
+
+    def test_moving_a_file_out_of_a_test_directory_loses_the_exemption(self):
+        # R2-02: classify on both the old and the new path.
+        filler = "".join(f"val line{i} = {i}\n" for i in range(30))
+        self.base(self.KT, filler + "fun `warningsAsErrors`() = true\n")
+        self.repo.git("mv", self.KT, "app/src/main/kotlin/X.kt")
+        self.repo.write("app/src/main/kotlin/X.kt", filler + "fun `warningsAsErrors`() = false\n")
+        self.repo.commit()
+        self.assertFails("guard: removed check setting:")
+
     def test_a_digit_in_the_test_name_does_not_hide_a_lowered_value(self):
         # R1-03: the first number on the line must not come from the name.
         self.base(self.PY, "def test_2(self): threshold = 50\n")
