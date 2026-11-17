@@ -102,6 +102,7 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
    - `fix`: the author fixes, and one more fresh round (round 5) reviews. Anything above `nit` still open after it goes to the owner.
    - `split`: the work moves to a new PR from `main` that takes `main` in with merge commits, never a rebase or force-push.
    - `owner`: taste or scope questions, which stay with the owner.
+   A dropped finding becomes `withdrawn` (ruling `drop`, citing the escalation comment) in the next round's JSON; an `owner` finding stays open for the owner.
    There is no second escalation, and no commit lands unreviewed: a commit after a round gets a delta review.
 5. Disputes: the reviewer either withdraws or restates with new evidence. If it is still disputed, the escalation reviewer rules with both arguments in front of it
    (this uses the PR's one escalation); taste or scope goes to the owner.

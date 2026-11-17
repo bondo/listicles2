@@ -451,9 +451,10 @@ RULES = (
         "dr-rounds", ("design-reviewer",),
         (
             r"max 2 opus rounds per design pr", r"a third round never happens", r"goes into the hand-off as a question for the owner",
-            r"round 2: only the commits since round 1 and your open findings",
+            r"every round: the whole pr diff and the findings json of earlier rounds", r"focus on the commits since the last round",
         ),
-        "at most 2 Opus rounds per design PR; what is open after round 2 goes to the owner (D-3.2)",
+        "at most 2 Opus rounds per design PR (count: PR 4); every round gets the whole PR diff (rev 46 row 3; D-3.2)",
+        forbidden=(r"only the commits since round 1",),
     ),
     Rule(
         "dr-hand-off", ("design-reviewer",),
@@ -582,6 +583,9 @@ RULES = (
             r"you are the escalation reviewer", r"opus, max effort", r"once per pr", r"no second escalation",
             r"decide `fix`, `split` or `owner`", r"one more fresh round", r"taste or scope goes to the owner",
             r"never edit or push the pr branch: report only", r"use up the pr's one escalation",
+            r"a `drop` sets the finding to `withdrawn`", r"an `owner` finding stays open for the owner",  # R1-04 of #129
+            r"usage limit reset: re-read the pr head, the thread and your notes",  # R1-05 of #129
+            r"post the one decision comment if it is not posted yet",
         ),
         "the escalation reviewer decides fix, split or owner once per PR and never edits the branch (rev 46 row 4)",
     ),
@@ -649,10 +653,49 @@ DOC_RULES = (
         (
             r"one escalation reviewer per pr", r"agents/prompts/escalation-reviewer\.md", r"decides `fix`, `split` or `owner`",
             r"one more fresh round \(round 5\)", r"goes to the owner", r"no second escalation", r"no commit lands unreviewed",
-            r"the escalation reviewer rules with both arguments in front of it",
+            r"the escalation reviewer rules with both arguments in front of it", r"a dropped finding becomes `withdrawn`",
+            r"an `owner` finding stays open for the owner",
         ),
         "REVIEW.md: after round 4 one escalation reviewer decides; a dispute uses the same single escalation (rev 46 row 4)",
-        forbidden=(r"fixes made after round 4 are not re-reviewed", r"the owner breaks ties", r"stop and report to the owner, who decides"),
+        forbidden=(r"fixes made after round 4 are not re-reviewed", r"the owner breaks ties", r"stop and report to the owner, who decides",
+                   r"a dropped finding stays open"),
+    ),
+    DocRule(
+        "plan-review-loop", "docs/PLAN.md",
+        (
+            r"the same implementer session in every round", r"about 30 changed lines or fewer", r"the whole pr diff",
+            r"how the fixes interact with the old code", r"one escalation reviewer per pr decides fix, split or owner",
+            r"only nits or deferred minors remain", r"deferred minors do not count",
+        ),
+        "PLAN section 6 follows REVIEW.md: whole-diff rounds, minors fixed by default, the single escalation (#129 R1-02)",
+        forbidden=(r"sees only the commits since the last", r"doesn't re-review unchanged code", r"the loop stops and you decide"),
+    ),
+    DocRule(
+        "plan-working-rules", "docs/PLAN.md",
+        (r"read what you need to understand the change", r"run whatever proves a finding: any test"),
+        "PLAN 9.2 follows CLAUDE.md: read what you need, reviewers run whatever proves a finding (#129 R1-02)",
+        forbidden=(r"search narrowly", r"only run targeted tests"),
+    ),
+    DocRule(
+        "plan-handoff", "docs/PLAN.md",
+        (r"one implementer session per pr, kept across its review rounds", r"60% of a 1m window, 40% of a 200k one", r"context_guard\.py"),
+        "PLAN 9.3 follows CLAUDE.md and the context hook (#129 R1-02)",
+        forbidden=(r"at \*\*about 50%\*\*", r"one pr per implementer session\. one review round", r"once 50% is crossed"),
+    ),
+    DocRule(
+        "plan-roles", "docs/PLAN.md",
+        (
+            r"\*\*second reviewer\*\*", r"\*\*escalation reviewer\*\*", r"each role's model and effort\.",
+            r"`caused by: #n`", r"a retro session \(opus / high\)", r"model and effort come from `agents/roles\.yaml`",
+        ),
+        "PLAN 9.1 and 9.4 follow roles.yaml and the Caused-by tracking instead of repeating the old models and budgets (#129 R1-03)",
+        forbidden=(r"sonnet / low", r"haiku", r"token budget", r"label `escaped`", r"retro session \(sonnet"),
+    ),
+    DocRule(
+        "template-handoff", "handoff/TEMPLATE.md",
+        (r"60% of a 1m window, 40% of a 200k one", r"hard stage 80% / 60%"),
+        "the handoff template names the hook's thresholds (#129 R1-02)",
+        forbidden=(r"at about 50% context",),
     ),
     DocRule(
         "followups-small-fix", "docs/FOLLOW-UPS.md",
