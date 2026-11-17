@@ -4,8 +4,9 @@ Usage: python3 -I scripts/design_tokens.py [tokens.json]   (default: design/toke
 Exit status: 0 clean, 1 findings (one line per finding).
 
 Rules: every color is #RRGGBB in upper case; the light and dark themes have exactly the same roles (so a theme can be swapped
-whole, post-v1); every contrastPairs entry names roles that exist, keeps the WCAG AA minimum (4.5 for text, 3.0 for the outline
-pair) and meets that minimum in both themes. Thresholds are never read from anywhere that could weaken them: a pair may ask for
+whole, post-v1); every pair in REQUIRED_PAIRS is listed in contrastPairs (an empty or shortened list fails); every
+contrastPairs entry names roles that exist, keeps the WCAG AA minimum (4.5 for text, 3.0 for the outline pair) and meets
+that minimum in both themes. Thresholds are never read from anywhere that could weaken them: a pair may ask for
 more than AA, never less.
 """
 
@@ -19,6 +20,35 @@ HEX = re.compile(r"#[0-9A-F]{6}")
 AA_TEXT = 4.5
 AA_NON_TEXT = 3.0
 NON_TEXT_PAIRS = {("outline", "surface")}
+# The pairs the gate always checks: deleting one from tokens.json (or emptying the list) fails, so the gate cannot be weakened there.
+REQUIRED_PAIRS = (
+    ("onPrimary", "primary"),
+    ("onPrimaryContainer", "primaryContainer"),
+    ("onSecondaryContainer", "secondaryContainer"),
+    ("onTertiaryContainer", "tertiaryContainer"),
+    ("onErrorContainer", "errorContainer"),
+    ("onError", "error"),
+    ("onSurface", "surface"),
+    ("onSurfaceVariant", "surface"),
+    ("onSurfaceVariant", "surfaceContainerHigh"),
+    ("onSurfaceVariant", "surfaceContainerLow"),
+    ("onSurfaceVariant", "surfaceContainer"),
+    ("onSurface", "surfaceContainerLow"),
+    ("onSurface", "surfaceContainer"),
+    ("onSurface", "surfaceContainerHigh"),
+    ("onSurface", "surfaceContainerHighest"),
+    ("onSurfaceVariant", "surfaceContainerHighest"),
+    ("primary", "surface"),
+    ("primary", "surfaceContainerLow"),
+    ("primary", "surfaceContainerHigh"),
+    ("error", "surface"),
+    ("error", "surfaceContainerLow"),
+    ("error", "surfaceContainer"),
+    ("error", "surfaceContainerHigh"),
+    ("inverseOnSurface", "inverseSurface"),
+    ("inversePrimary", "inverseSurface"),
+    ("outline", "surface"),
+)
 
 
 def _lum(color: str) -> float:
@@ -32,8 +62,12 @@ def contrast(a: str, b: str) -> float:
     return (hi + 0.05) / (lo + 0.05)
 
 
-def check(tokens: dict) -> list[str]:
+def check(tokens: dict, required: tuple[tuple[str, str], ...] = REQUIRED_PAIRS) -> list[str]:
     found: list[str] = []
+    listed = {(p["fg"], p["bg"]) for p in tokens["contrastPairs"]}
+    for fg, bg in required:
+        if (fg, bg) not in listed:
+            found.append(f"pair {fg} on {bg} is missing from contrastPairs (required)")
     colors = tokens["color"]
     themes = sorted(colors)
     roles = {t: set(colors[t]) for t in themes}

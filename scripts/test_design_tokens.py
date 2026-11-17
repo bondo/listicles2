@@ -63,10 +63,10 @@ class Check(unittest.TestCase):
 
     def test_a_pair_just_under_its_minimum_fails_and_at_the_minimum_passes(self):
         toks = {"color": {th: {"a": "#777777", "b": "#FFFFFF"} for th in ("light", "dark")}, "contrastPairs": [{"fg": "a", "bg": "b", "min": 4.5}]}
-        self.assertEqual(len(dt.check(toks)), 2)  # 4.48 < 4.5, once per theme
+        self.assertEqual(len(dt.check(toks, required=())), 2)  # 4.48 < 4.5, once per theme
         for th in toks["color"]:
             toks["color"][th]["a"] = "#767676"  # 4.54
-        self.assertEqual(dt.check(toks), [])
+        self.assertEqual(dt.check(toks, required=()), [])
 
     def test_a_role_in_one_theme_only_is_reported(self):
         bad = copy.deepcopy(REAL)
@@ -105,7 +105,7 @@ class Check(unittest.TestCase):
             found = dt.check(bad)
             self.assertTrue(any(pair["fg"] in f and pair["bg"] in f and "missing" in f for f in found), (pair, found))
 
-    def test_a_pair_for_a_role_the_tokens_never_had_does_not_replace_a_required_one(self):
+    def test_a_duplicate_of_another_pair_does_not_stand_in_for_a_required_one(self):
         bad = copy.deepcopy(REAL)
         bad["contrastPairs"][0] = {"fg": "onSurface", "bg": "surface", "min": 4.5}  # duplicate of another pair
         self.assertTrue(any("onPrimary on primary" in f and "missing" in f for f in dt.check(bad)))

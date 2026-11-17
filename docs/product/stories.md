@@ -382,8 +382,10 @@ and not shown in v1). As a user, I want to pick the app's colour theme, so that 
 * Which themes are offered, whether the choice follows me to another phone, and whether "follow the phone's colours" is one of them
   are open and decided when this story is planned.
 **Constraint for v1:** design tokens stay theme-swappable. Colors are Material roles only (`design/tokens.json`), `Theme.kt`
-builds the `ColorScheme` from one color set per theme, and no screen, page or test hard-codes a palette value, so a theme is a
-new light and dark set with nothing else to change (checked by `scripts/design_tokens.py`).
+builds the `ColorScheme` from one color set per theme, and no screen or page hard-codes a palette value, so a theme is a
+new light and dark set with nothing else to change. Enforced today by `scripts/design_tokens.py` (both themes have the same
+roles, every required contrast pair passes) and by the tests against the retired teal values; that `Theme.kt` is built from
+the tokens, and that no screen hard-codes a color, is checked with M1-04 and the M1 screens, not yet.
 
 ## 9. Leave room for
 
