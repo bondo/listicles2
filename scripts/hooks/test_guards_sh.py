@@ -840,6 +840,50 @@ class ThresholdTestNames(GuardsCase):
         self.repo.commit()
         self.assertFails("guard: removed check setting:")
 
+    def test_non_bare_declarations_are_keyed_on_the_full_line(self):
+        # R3-01: with the name dropped from the key every `fun X() = N` collapsed to one key and hid a removal.
+        self.base(self.KT, "fun `maxIssues`() = 0\nfun `threshold`() = 80\n")
+        self.change(self.KT, "fun `threshold`() = 90\n")
+        self.assertFails("guard: removed check setting: fun `maxIssues`() = 0")
+        self.base(self.PY, "def test_minBound(): return 70\ndef test_threshold(): return 80\n")
+        self.change(self.PY, "def test_threshold(): return 90\n")
+        self.assertFails("guard: removed check setting: def test_minBound(): return 70")
+
+    def test_parameters_and_return_types_make_a_declaration_non_bare(self):
+        # R3-02: bare = empty parameter list (Python: only self/cls) and no or a plain identifier return type.
+        for rel, old, new, needle in (
+            (self.PY, "def test_threshold(x=50):\n", "def test_threshold(x=10):\n", "guard: lowered threshold:"),
+            (self.PY, "def test_threshold(self, x=50):\n", "def test_threshold(self, x=10):\n", "guard: lowered threshold:"),
+            (self.PY, "def test_threshold(minimum=MIN_COV):\n", "def test_threshold(minimum=LOW):\n", "guard: removed check setting:"),
+            (self.PY, "def test_threshold() -> Annotated[int, 50]:\n", "def test_threshold() -> Annotated[int, 40]:\n", "guard: lowered threshold:"),
+            (self.KT, "fun test_threshold(x: Int = 50) {\n", "fun test_threshold(x: Int = 10) {\n", "guard: lowered threshold:"),
+            (self.KT, "fun `maxIssues`(x: Int = ZERO) {}\n", "\n", "guard: removed check setting:"),
+            (self.KT, "fun `threshold`(): Limit<50> {\n", "fun `threshold`(): Limit<40> {\n", "guard: lowered threshold:"),
+        ):
+            with self.subTest(old=old):
+                self.base(rel, old)
+                self.change(rel, new)
+                self.assertFails(needle)
+
+    def test_self_cls_and_identifier_return_types_stay_bare(self):
+        self.base(self.PY, "def test_threshold(cls) -> None:\n    pass\n")
+        self.change(self.PY, "def test_stage(cls) -> None:\n    pass\n")
+        self.assertPasses()
+        self.base(self.KT, "fun `threshold`(): Unit { }\n")
+        self.change(self.KT, "fun `stage`(): Unit { }\n")
+        self.assertPasses()
+
+    def test_a_test_directory_nested_below_a_source_set_is_not_a_test_file(self):
+        # R3-03: the test directory must sit directly under a top-level module (app, core/<name>).
+        for rel in ("app/src/main/kotlin/a/src/test/Cfg.kt", "app/src/main/kotlin/src/test/Cfg.kt"):
+            with self.subTest(rel=rel):
+                self.base(rel, "fun `threshold`() {}\n")
+                self.change(rel, "fun `stage`() {}\n")
+                self.assertFails("guard: removed check setting:")
+        self.base("core/domain/src/test/kotlin/Cfg.kt", "fun `threshold`() {}\n")
+        self.change("core/domain/src/test/kotlin/Cfg.kt", "fun `stage`() {}\n")
+        self.assertPasses()
+
     def test_a_digit_in_the_test_name_does_not_hide_a_lowered_value(self):
         # R1-03: the first number on the line must not come from the name.
         self.base(self.PY, "def test_2(self): threshold = 50\n")
