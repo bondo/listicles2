@@ -23,6 +23,17 @@ class Classify(unittest.TestCase):
                   "firebase/firestore.rules", "metrics/sessions/a.json", "CLAUDE.md"):
             self.assertEqual(prepush_scope.classify([p]), "skip", p)
 
+    def test_kotlin_and_gradle_script_files_build_under_any_skip_prefix(self):
+        """R1-01: spotless and detekt check **/*.kt and **/*.gradle.kts wherever they are, so a skip prefix must not hide them."""
+        for p in ("firebase/x/src/A.kt", "scripts/x/build.gradle.kts", "docs/sample/src/A.kt", "agents/Tool.kt", "metrics/a.kts",
+                  ".github/settings.gradle.kts"):
+            self.assertEqual(prepush_scope.classify([p]), "android", p)
+        self.assertEqual(prepush_scope.classify(["docs/a.md", "firebase/x/A.kt"]), "android")
+
+    def test_names_that_only_look_like_kotlin_still_skip(self):
+        for p in ("docs/kt.md", "docs/a.kt.md", "scripts/notes-kts.txt", "docs/kt/readme.md"):
+            self.assertEqual(prepush_scope.classify([p]), "skip", p)
+
     def test_android_paths_build(self):
         for p in ("app/src/main/java/A.kt", "core/domain/src/main/kotlin/B.kt", "build.gradle.kts", "settings.gradle.kts",
                   "gradle/libs.versions.toml", "gradle.properties", "gradlew", "config/detekt/detekt.yml", "app/src/main/res/values/strings.xml"):
@@ -120,6 +131,37 @@ class Cli(unittest.TestCase):
         r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "prepush_scope.py")], input="", cwd=self.repo,
                            capture_output=True, text=True)
         self.assertEqual((r.returncode, r.stdout.strip()), (0, "android"))
+
+
+
+class PathsMode(unittest.TestCase):
+    """`--paths`: newline-separated paths on stdin (the staged files, for the pre-commit hook); same fail-closed classification."""
+
+    def scope(self, text):
+        r = subprocess.run([sys.executable, "-I", os.path.join(HERE, "prepush_scope.py"), "--paths"], input=text,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.strip()
+
+    def test_prose_and_scripts_skip(self):
+        self.assertEqual(self.scope("docs/a.md\nscripts/hooks/x.py\nagents/roles.yaml\n"), "skip")
+
+    def test_one_android_path_among_docs_builds(self):
+        self.assertEqual(self.scope("docs/a.md\napp/src/main/A.kt\n"), "android")
+
+    def test_gradle_and_config_paths_build(self):
+        for p in ("build.gradle.kts", "gradle/libs.versions.toml", "config/detekt/detekt.yml", ".editorconfig"):
+            self.assertEqual(self.scope(p + "\n"), "android", p)
+
+    def test_no_paths_builds_because_unknown_means_build(self):
+        self.assertEqual(self.scope(""), "android")
+        self.assertEqual(self.scope("\n\n"), "android")
+
+    def test_parent_directory_escape_builds(self):
+        self.assertEqual(self.scope("docs/../app/A.kt\n"), "android")
+
+    def test_without_the_flag_the_stdin_is_still_pre_push_lines(self):
+        self.assertEqual(self.scope("refs/heads/b 1 refs/heads/b 2\n"), "android")  # a pre-push line is not a docs path
 
 
 if __name__ == "__main__":
