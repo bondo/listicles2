@@ -1,5 +1,7 @@
 # Tally user stories (v1)
 
+Status: working draft, merged as the baseline for M1 planning; not owner-approved (see issue #15).
+
 Task M0.5-01. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
 Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17, OQ-19 and
 OQ-23 to OQ-27 and the other answers of 2026-11-16 in section 10 (state issue #15; OQ-23 to OQ-27 follow the sign-in

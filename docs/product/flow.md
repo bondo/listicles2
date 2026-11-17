@@ -1,5 +1,7 @@
 # Tally app flow (v1)
 
+Status: working draft, merged as the baseline for M1 planning; not owner-approved (see issue #15).
+
 Task M0.5-02. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
 Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19,
 OQ-23 to OQ-33, the two list types; state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
