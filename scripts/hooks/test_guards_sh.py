@@ -696,6 +696,87 @@ class DiffChecks(GuardsCase):
         self.assertFails("no base/merge-base", CI="true")
 
 
+class ThresholdTestNames(GuardsCase):
+    """Owner decision (#15): a test FUNCTION NAME containing a check keyword is not a check setting.
+
+    Only the declared name is ignored; the rest of the line and every other line still count.
+    """
+
+    PY = "scripts/hooks/test_x.py"
+    KT = "app/src/test/kotlin/XTest.kt"
+
+    def base(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+
+    def change(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def test_removing_or_renaming_a_python_test_named_threshold_passes(self):
+        self.base(self.PY, "def test_boundaries_threshold(self):\n    pass\n\n\ndef test_other(self):\n    pass\n")
+        self.change(self.PY, "def test_other(self):\n    pass\n")
+        self.assertPasses()
+        self.base(self.PY, "class T:\n    def test_threshold_env_default(self):\n        pass\n")
+        self.change(self.PY, "class T:\n    def test_stage_env_default(self):\n        pass\n")
+        self.assertPasses()
+
+    def test_removing_or_renaming_a_kotlin_test_named_threshold_passes(self):
+        self.base(self.KT, "class XTest {\n    fun `lowered threshold fails`() {}\n    fun testThresholdEdge() {}\n}\n")
+        self.change(self.KT, "class XTest {\n    fun `new stage fails`() {}\n}\n")
+        self.assertPasses()
+
+    def test_removing_a_real_setting_in_config_files_still_fails(self):
+        for rel, line in (
+            ("app/build.gradle.kts", "kover { minBound(80) }"),
+            ("pyproject.toml", "fail_threshold = 50"),
+            ("config/detekt.yml", "  maxIssues: 0"),
+            ("settings.json", '{"threshold": 50}'),
+        ):
+            with self.subTest(rel=rel):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_removing_or_lowering_a_threshold_in_code_still_fails(self):
+        self.base("scripts/tool.py", "threshold = 50\n")
+        self.change("scripts/tool.py", "\n")
+        self.assertFails("guard: removed check setting:")
+        self.base("scripts/tool.py", "limit = env.get('X', threshold=50)\n")
+        self.change("scripts/tool.py", "limit = env.get('X', threshold=40)\n")
+        self.assertFails("guard: lowered threshold:")
+
+    def test_a_non_test_function_named_threshold_still_fails(self):
+        self.base("scripts/tool.py", "def threshold_default():\n    return 50\n")
+        self.change("scripts/tool.py", "def other():\n    return 50\n")
+        self.assertFails("guard: removed check setting: def threshold_default")
+        self.base(self.KT, "fun threshold() = 80\n")
+        self.change(self.KT, "fun other() = 80\n")
+        self.assertFails("guard: removed check setting: fun threshold")
+
+    def test_threshold_lines_inside_a_test_body_still_fail(self):
+        self.base(self.PY, "def test_a(self):\n    threshold = 50\n    self.assertEqual(run(), threshold)\n")
+        self.change(self.PY, "def test_a(self):\n    self.assertEqual(run(), 50)\n")
+        self.assertFails("guard: removed check setting: threshold = 50")
+        self.base(self.PY, "def test_a(self):\n    self.assertEqual(threshold(), 50)\n")
+        self.change(self.PY, "def test_a(self):\n    self.assertEqual(threshold(), 40)\n")
+        self.assertFails("guard: lowered threshold:")
+
+    def test_a_setting_on_the_same_line_as_a_test_declaration_still_fails(self):
+        self.base(self.PY, "def test_a(self): threshold = 50\n")
+        self.change(self.PY, "def test_b(self): pass\n")
+        self.assertFails("guard: removed check setting:")
+        self.base(self.KT, "fun `t`() { val threshold = 80 }\n")
+        self.change(self.KT, "fun `t`() { val x = 80 }\n")
+        self.assertFails("guard: removed check setting:")
+
+    def test_lowering_a_number_in_a_test_name_is_ignored_but_not_in_the_body(self):
+        self.base(self.PY, "def test_threshold_50(self):\n    threshold = 50\n")
+        self.change(self.PY, "def test_threshold_40(self):\n    threshold = 40\n")
+        self.assertFails("guard: lowered threshold: threshold = 40")
+
+
 class StagedMode(GuardsCase):
     def test_staged_flags_only_the_index(self):
         self.repo.write("app/src/main/kotlin/S.kt", "@Suppress(\"X\") fun f() {}\n")
