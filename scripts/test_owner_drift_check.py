@@ -20,13 +20,20 @@ n=$(wc -l < "$FAKE_GH_LOG")
 if [ "$n" -le "${FAKE_GH_FAILS:-0}" ]; then echo "gh: HTTP 502" >&2; exit 1; fi
 case "$*" in
   *is:pr*) cat "$FAKE_GH_PRS" ;;
-  *label:owner-todo*) # GitHub applies the label filter: keep only labelled items
+  *) # GitHub applies the qualifiers of the issue query: label:owner-todo, is:closed and is:open filter the items
     python3 -I -c 'import json,sys
+q = sys.argv[2]
 pages = json.load(open(sys.argv[1]))
 for p in pages:
-    p["items"] = [i for i in p["items"] if any(l.get("name") == "owner-todo" for l in i.get("labels", []))]
-print(json.dumps(pages))' "$FAKE_GH_ISSUES" ;;
-  *) cat "$FAKE_GH_ISSUES" ;;
+    keep = p["items"]
+    if "label:owner-todo" in q:
+        keep = [i for i in keep if any(l.get("name") == "owner-todo" for l in i.get("labels", []))]
+    if "is:closed" in q:
+        keep = [i for i in keep if i.get("state") == "closed"]
+    if "is:open" in q:
+        keep = [i for i in keep if i.get("state") == "open"]
+    p["items"] = keep
+print(json.dumps(pages))' "$FAKE_GH_ISSUES" "$*" ;;
 esac
 """
 
@@ -127,7 +134,7 @@ class OwnerDriftScriptTest(unittest.TestCase):
     def test_issue_query_does_not_rely_on_the_owner_todo_label(self):
         _, _, calls = self.run_script(slurp())
         issue_calls = [c for c in calls if "is:pr" not in c]
-        self.assertTrue(issue_calls and all("is:issue" in c and "label:" not in c for c in issue_calls), calls)
+        self.assertTrue(issue_calls and all("is:issue" in c and not any(q in c for q in ("label:", "is:closed", "is:open")) for c in issue_calls), calls)
 
     def test_closed_unlabelled_issue_linked_by_number_fails(self):
         # live #12-#14 are owner tasks without the owner-todo label; the row links them by `issue = N`
