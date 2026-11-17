@@ -11,8 +11,8 @@ callback that follows a callback that reads them). Show such text with textConte
 sanitizer call: esc(...) for one string, escDeep(...) for a fetched object (both are tested against the real page in
 scripts/test_wireframes_safety.py).
 
-A value is derived (tainted) when it is declared or assigned (`=` or a compound `+=`, `||=`, `??=`, ... after `;`, `{`, `}`, `)`,
-`=>`, `else` or at the start of a line) from a source or from another tainted value, when it is a parameter of a
+A value is derived (tainted) when it is declared or assigned (`=` or a compound `+=`, `||=`, `??=`, ... anywhere in code: chained, in
+conditions, after `=>`, `else` or a comma) from a source or from another tainted value, when it is a parameter of a
 function that is called with a tainted argument, or when it is a parameter of an array callback (`.map`, `.forEach`, ...) whose
 receiver is tainted. A value stops being tainted only when the WHOLE right-hand side is one of: a whitelisted sanitizer call; a
 ternary whose two results are string literals; a boolean/number method (`.includes`, `.test`, `.has`, `.some`, `.every`, `.indexOf`,
@@ -21,7 +21,8 @@ somewhere inside a larger expression cleans nothing; a sanitizer call is removed
 (`'<p>' + esc(x)` is fine, `esc(x) + x` is not).
 
 Limits (this is a lint, not a proof): taint is tracked per name inside the function or block where the name is declared, so two
-variables with the same name in the same scope share it (conservative) and a shadowed name in a nested scope is not told apart; there
+variables with the same name in the same scope share it (conservative) and a shadowed name in a nested scope is not told apart; only
+the contents of <script> elements are analysed (markup and inline event-handler attributes outside them are not); there
 is no aliasing or property tracking (`o.x = tainted; use(o.x)`), no flow through closures that are not named functions, no `+`
 string concatenation outside a sink expression, no tracking through DOM reads (`el.value`, `el.dataset`, `localStorage`),
 `postMessage`, `eval`, `new Function`, `javascript:` URLs, event-handler attributes or other sinks (`.src`, `.href`, `setAttribute`),
@@ -40,9 +41,7 @@ _ID = r"[A-Za-z_$][\w$]*"
 _SINK = re.compile(r"\.(?:innerHTML|outerHTML)\s*\+?=(?!=)\s*")
 _CALL_SINK = re.compile(r"\.insertAdjacentHTML\s*\(|\bdocument\s*\.\s*write(?:ln)?\s*\(")
 _DECL = re.compile(r"\b(?:const|let|var)\s+(" + _ID + r")\s*=(?![=>])\s*")
-_ASSIGN = re.compile(
-    r"(?:(?m:^)|[;{})]|=>|\belse\b)\s*(" + _ID + r")\s*(?:\*\*|<<|>>>?|\|\||&&|\?\?|[-+*/%&|^])?=(?![=>])\s*"
-)
+_ASSIGN = re.compile(r"(?<![\w$.])(" + _ID + r")\s*(?:\*\*|<<|>>>?|\|\||&&|\?\?|[-+*/%&|^])?=(?![=>])\s*")
 _DECL_PATTERN = re.compile(r"\b(?:const|let|var)\s+([\[{][^=;]*?[\]}])\s*=(?!=)\s*")
 _FOR_OF = re.compile(r"\bfor\s*\(\s*(?:const|let|var)\s+([^;()]*?)\s+(?:of|in)\s+")
 _PARAMS_OBJECT = re.compile(r"\b(" + _ID + r")\s*=\s*new\s+URLSearchParams\b")
@@ -223,6 +222,56 @@ def _words(code: str) -> set[str]:
 
 
 Span = tuple[int, int]
+
+
+def _code_mask(js: str) -> bytearray:
+    """1 for every character that is code: not inside a string literal or the static text of a template (`${...}` is code)."""
+    mask = bytearray(len(js))
+
+    def code(i: int, in_interp: bool) -> int:
+        depth = 0
+        while i < len(js):
+            c = js[i]
+            if c in "'\"":
+                i = _skip_string(js, i)
+                continue
+            if c == "`":
+                i = template(i)
+                continue
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                if depth == 0 and in_interp:
+                    return i
+                depth = max(depth - 1, 0)
+            mask[i] = 1
+            i += 1
+        return i
+
+    def template(i: int) -> int:
+        i += 1
+        while i < len(js) and js[i] != "`":
+            if js[i] == "\\":
+                i += 2
+            elif js.startswith("${", i):
+                i = code(i + 2, True) + 1
+            else:
+                i += 1
+        return i + 1
+
+    code(0, False)
+    return mask
+
+
+def _script_only(text: str) -> str:
+    """The text with everything outside <script> elements blanked (line numbers kept); text without a script tag is returned as is."""
+    scripts = list(re.finditer(r"<script\b[^>]*>(.*?)</script\s*>", text, re.S | re.I))
+    if not scripts:
+        return text
+    chars = list(re.sub(r"[^\n]", " ", text))
+    for m in scripts:
+        chars[m.start(1) : m.end(1)] = list(text[m.start(1) : m.end(1)])
+    return "".join(chars)
 
 
 def _blocks(js: str) -> list[Span]:
@@ -460,7 +509,10 @@ def _taint(js: str) -> _Taint:
         inside = [sp for sp in declared.get(name, []) if sp[0] <= pos < sp[1]]
         return min(inside, key=lambda sp: sp[1] - sp[0]) if inside else whole
 
+    mask = _code_mask(js)
     for m in _ASSIGN.finditer(js):
+        if not mask[m.start(1)]:
+            continue
         decls.append(({m.group(1)}, js[m.end() : _expr_end(js, m.end())], m.end(), assign_scope(m.group(1), m.start())))
     calls: list[tuple[str, list[tuple[str, int]]]] = []
     for m in _CALL.finditer(js):
@@ -501,7 +553,7 @@ def tainted_names(js: str) -> set[str]:
 
 def check(text: str) -> list[tuple[int, str]]:
     """Findings (line, message) for one HTML or JS text, one per line."""
-    js = _BLOCK_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+    js = _BLOCK_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), _script_only(text))
     js = _LINE_COMMENT.sub("", js)
     t = _taint(js)
     found: dict[int, str] = {}

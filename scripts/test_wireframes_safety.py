@@ -180,12 +180,12 @@ class Reassignment(unittest.TestCase):
         self.flagged("let y;\nconst x = y = params.get('s');\napp.innerHTML = `<p>${y}</p>`;", 6)
 
     def test_assignment_text_inside_strings_and_templates_is_not_code(self):
-        t = js("let a = 'x';\nconst h = `<i data-a=\"${a} b = ${params.get('s')}\">`;\nlog('a = ' + location.hash);\n" + self.SINK)
+        t = js("let a = 'x';\nconst h = `<i title=\"a = location.hash; a = params.get('s')\">${a}</i>`;\nlog('a = ' + location.hash);\n" + self.SINK)
         self.assertEqual(ws.check(t), [])
 
     def test_html_outside_script_tags_is_not_analysed(self):
         page = "<style>p { content: \"don't\"; }</style>\n<p>don't</p>\n" + js("const one = params.get('s');\napp.innerHTML = `<p>${one}</p>`;")
-        self.assertEqual(lines(page), [8])
+        self.assertEqual(lines(page), [7])
 
     def test_assignments_that_do_not_taint(self):
         for body in (
