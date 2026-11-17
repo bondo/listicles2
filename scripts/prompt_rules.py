@@ -677,7 +677,8 @@ DOC_RULES = (
             r"an agent score below 3 is a `minor` finding, never a `blocker` or `major`", r"agent scores are advisory and taste stays with the owner",
             r"a calibration note for the rubric, not a finding", r"inside this review \(no extra session\)",
         ),
-        "REVIEW.md item 12 (R9): goldens per state and rubric scores for changed screens; an agent score below 3 is a minor finding, never a blocker (D-3.4, M0.5-26)",
+        "REVIEW.md item 12 (R9): goldens per state and rubric scores for changed screens; "
+        "an agent score below 3 is a minor finding, never a blocker (D-3.4, M0.5-26)",
         forbidden=(r"score below 3 (?:is|are) (?:a |an )?`?(?:blocker|major)", r"below 3 (?:blocks|must block) the merge"),
     ),
     DocRule(
