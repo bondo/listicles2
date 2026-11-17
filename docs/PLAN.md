@@ -475,7 +475,7 @@ drop) is decided when post-v1 work is planned.
 | **Reviewer** | Opus / high | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
 | **Second reviewer** | Opus / high | Fresh session in the same round, for `risk:high` and the protected areas | Diff, PR description, `REVIEW.md`; not the first reviewer's findings | Findings (`S<round>-<nn>`), merged with the reviewer's |
 | **Escalation reviewer** | Opus / max | Fresh session, once per PR after round 4 or on a dispute | The whole review thread | `fix`, `split` or `owner` (`REVIEW.md`, Loop and cap) |
-| **Design reviewer** | Opus / high | Fresh session per design-PR round, max 2 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |
+| **Design reviewer** | Opus / high | Fresh session per design-PR round, max 3 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |
 | **Explorer** (subagent) | Sonnet / medium | Subagent inside an implementer or reviewer | A narrow question | File paths and short excerpts, no dumps |
 | **CI triage** (subagent) | Sonnet / medium | Subagent inside an implementer | Failing job log | The failing test or rule and the minimal error |
 

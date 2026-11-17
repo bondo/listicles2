@@ -1239,7 +1239,7 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-autonomy", "**Labels:** the orchestrator applies `big-pr` only with the owner's explicit say-so."),
         ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 50% context. The owner archives you."),
         ("docs/ORCHESTRATION.md", "orch-parallel", "at most 3 worker sessions run at once"),
-        ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the owner explicitly accepts it."),
+        ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the next round covers it, or until the owner explicitly accepts it."),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Owner acceptance (the bullet above) is the only alternative."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Round 4 with findings above `nit`: stop and ask the owner."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "the orchestrator defers the remaining minors and nits (follow-up issues) instead of running another round"),
@@ -1300,8 +1300,9 @@ class Pr4RuleTests(unittest.TestCase):
         self.assertIn(f"max {want} rounds", self.doc("docs/PLAN.md"))
 
     def test_the_small_fix_threshold_is_30_in_every_file_that_states_it(self):  # #129 follow-up: orchestrator.md and ORCHESTRATION lagged
-        for path in ("REVIEW.md", "CLAUDE.md", "docs/FOLLOW-UPS.md", "agents/prompts/orchestrator.md", "agents/prompts/implementer.md"):
-            found = set(re.findall(r"about (\d+) changed lines", self.doc(path)))
+        for path in ("REVIEW.md", "CLAUDE.md", "docs/FOLLOW-UPS.md", "docs/ORCHESTRATION.md", "agents/prompts/orchestrator.md",
+                     "agents/prompts/implementer.md"):
+            found = set(re.findall(r"fix[^.]{0,40}about (\d+) changed lines", self.doc(path)))
             self.assertTrue(found, path)
             self.assertEqual(found, {"30"}, path)
 

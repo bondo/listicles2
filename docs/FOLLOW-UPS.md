@@ -126,10 +126,10 @@ When in doubt: `fix-now`.
 
 ## 7. The issue
 
-Issue title: `[follow-up] <finding title>`. Labels (the owner creates them once, task M0-O10; the orchestrator
-checks they exist before the first filing. It files with all labels in the same call and on **every** filing checks that the returned issue carries every
-label (the API can drop labels silently, e.g. without push access). If any is missing it closes that issue, keeps the finding
-`open` (fix-now, or ask the owner), stops deferring and asks the owner to do M0-O10):
+Issue title: `[follow-up] <finding title>`. Labels (created once by task M0-O10; the orchestrator
+checks they exist before the first filing and creates a missing label with `gh api`. It files with all labels in the same call and on **every** filing checks that the returned issue carries every
+label (the API can drop labels silently, e.g. without push access). If any is still missing it closes that issue, keeps the finding
+`open` (fix-now, or ask the owner), stops deferring and asks the owner):
 
 | Label | Meaning |
 |---|---|
