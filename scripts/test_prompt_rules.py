@@ -942,8 +942,8 @@ class Pr2CheckTests(unittest.TestCase):
 
     def mutate(self, role, old, new=""):
         text = prompt_rules.normalize(real(role))
-        self.assertIn(old, text, f"{role}.md lacks {old!r}")
-        return ids(prompt_rules.check_text(role, text.replace(old, new, 1)))
+        self.assertIn(old.lower(), text.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), new, text, count=1, flags=re.I)))
 
     def test_rules_exist_for_the_right_roles_and_the_real_prompts_pass_them(self):
         by_id = {r.id: r for r in prompt_rules.RULES}

@@ -1,4 +1,5 @@
-"""Checks that agents/prompts/*.md carry the collaborator-workflow and review-process rules (M0.5-19, M0.5-25, M0.5-15).
+"""Checks that agents/prompts/*.md carry the collaborator-workflow and review-process rules (M0.5-19, M0.5-25, M0.5-15,
+Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -17,7 +18,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer")
+ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer", "second-reviewer", "verifier")
 
 # Owner decision D4 (docs/reviews/collaborator-workflow.md section 4).
 TIER0_LABELS = ("feedback", "idea", "decision", "needs-collaborator", "needs-owner")
@@ -475,6 +476,42 @@ RULES = (
         "dr-findings-format", ("design-reviewer",),
         (r"ids `d<round>-<nn>`", r"a `scores` list of screen, criterion, score and reason"),
         "design-review findings use D<round>-<nn> ids and carry a scores list (REVIEW.md, ORCHESTRATION 7.2, 8.5)",
+    ),
+    Rule(
+        "plan-review", ("reviewer",),
+        (r"plan review", r"docs/milestones/<mx>\.md", r"wrong task order", r"missing tasks", r"size guideline"),
+        "plan review: a fresh reviewer checks the milestone plan for task order, missing tasks and PR size before any implementer starts",
+    ),
+    Rule(
+        "plan-reviewed-before-implementers", ("planner",),
+        (r"a fresh reviewer reviews your plan before any implementer starts",),
+        "the plan is reviewed by a fresh reviewer before any implementer starts",
+    ),
+    Rule(
+        "self-review", ("implementer",),
+        (r"self-review", r"verifier subagent", r"only the diff and the task", r"it is not a new session"),
+        "self-review: a verifier subagent gets only the diff and the task before the implementer asks for review",
+    ),
+    Rule(
+        "finding-verification", ("reviewer", "second-reviewer"),
+        (r"verifier subagent", r"never your reasoning", r"verified: confirmed", r"verified: not reproduced"),
+        "each blocker or major is checked by a verifier subagent that never sees the reviewer's reasoning",
+    ),
+    Rule(
+        "second-reviewer-role", ("second-reviewer",),
+        (
+            r"you are not given the first reviewer's findings", r"risk:high", r"security-rules, sync-merge and release",
+            r"never edit or push the pr branch: report only", r"marked ready only after your pass",
+        ),
+        "the second reviewer works independently on risk:high and protected areas and never edits the PR branch",
+    ),
+    Rule(
+        "verifier-role", ("verifier",),
+        (
+            r"read-only", r"never edit or push anything", r"decide `confirmed` or `not reproduced`",
+            r"never the reviewer's reasoning", r"only the diff and the task",
+        ),
+        "the verifier is read-only, decides confirmed or not reproduced, and never sees the reviewer's reasoning",
     ),
 )
 

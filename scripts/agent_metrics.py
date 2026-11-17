@@ -4,17 +4,21 @@ Input: text files holding state-issue comment bodies, saved as they were posted.
 numbers from get_session (external_metadata.usage etc.) into the CSV blocks; this script never calls a
 network or reads transcripts. A block starts with a marker line, then a header line, then one CSV row per line:
 
-    # metrics:session | metrics:round | metrics:incident | metrics:review
+    # metrics:session | metrics:round | metrics:incident | metrics:review | metrics:escaped
     <header>
     <row>...
 
 A block ends at a blank line, a code fence or another marker line; prose around blocks is ignored. Rows are
 single-line CSV (quote fields containing commas). Empty fields mean "unknown"; numbers are never estimated.
-Output: one CSV, first column row_type (session, round, incident, review), other columns empty where they do not apply,
-rows sorted deterministically. Input is validated; every problem is reported as `file:line: message`, exit 1,
-and nothing is written.
+Output: one CSV, first column row_type (session, round, incident, review, escaped), other columns empty where they do
+not apply, rows sorted deterministically. Input is validated; every problem is reported as `file:line: message`,
+exit 1, and nothing is written.
+
+Escaped defects (Agent Usage Redesign): a bug found after merge gets the line `Caused by: #N` (N = the PR that caused
+it) in its issue and one `escaped` row (date, bug, caused_by, area). No per-PR labels. `--caused-by FILE` reads the line.
 
 Usage: python3 -I scripts/agent_metrics.py [--check] [-o docs/agent-metrics.csv] [input ...]
+       python3 -I scripts/agent_metrics.py --caused-by ISSUE_BODY_FILE   (prints N, exit 1 without exactly one such line)
   input defaults to docs/metrics/*.txt. --check exits 1 when the output file differs from what the inputs give.
 """
 
@@ -46,26 +50,30 @@ ROUND_REQ = ["date", "batch", "pr", "round", "reviewer_session", "base_sha", "he
 INCIDENT_REQ = ["date", "batch", "session_id", "kind", "impact", "recovery", "prevention"]
 REVIEW_REQ = ["date", "review_id", "run_ref", "findings", "acted_on", "ignored", "disputed", "deferred",
               "cost_usd", "window_end"]
+ESCAPED_REQ = ["date", "bug", "caused_by", "area"]
+ESCAPED_AREAS = ("security-rules", "sync-merge", "release", "risk-high", "general")
+CAUSED_BY = re.compile(r"^Caused by: #([1-9][0-9]*)$")
 REVIEW_COUNTS = ["findings", "acted_on", "ignored", "disputed", "deferred"]
 SCHEMA = {
     "session": (SESSION_REQ, SESSION_OPT),
     "round": (ROUND_REQ, []),
     "incident": (INCIDENT_REQ, []),
     "review": (REVIEW_REQ, []),
+    "escaped": (ESCAPED_REQ, []),
 }
 RENAME = {"incident": {"kind": "incident_kind"}}  # `kind` would clash with the marker word in the output
 INT_FIELDS = {"pr", "round", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
               "handoffs", "verify_fails_before_push", "ci_red_runs", "post_cap_commits", "owner_interventions",
               "blocker", "major", "minor", "nit", "disputed", "withdrawn", "deferred", "findings", "acted_on",
-              "ignored"}
+              "ignored", "bug", "caused_by"}
 
 COLUMNS = (["row_type", "date", "batch", "pr", "tasks", "role", "session_id", "model", "effort", "env", "result",
             "cost_usd", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "handoffs",
             "verify_fails_before_push", "ci_red_runs", "post_cap_commits", "owner_interventions", "round",
             "reviewer_session", "base_sha", "head_sha", "blocker", "major", "minor", "nit", "disputed",
             "withdrawn", "deferred", "verdict", "incident_kind", "impact", "recovery", "prevention",
-            "review_id", "run_ref", "findings", "acted_on", "ignored", "window_end"])
-TYPE_ORDER = {"session": 0, "round": 1, "incident": 2, "review": 3}
+            "review_id", "run_ref", "findings", "acted_on", "ignored", "window_end", "bug", "caused_by", "area"])
+TYPE_ORDER = {"session": 0, "round": 1, "incident": 2, "review": 3, "escaped": 4}
 
 
 def _parse_date(value):
@@ -100,6 +108,32 @@ def _check_review(row):
     return problems
 
 
+def _check_escaped(row):
+    problems = []
+    for field in ("bug", "caused_by"):
+        value = row.get(field, "")
+        if not value:
+            problems.append(f"{field} is required for an escaped row")
+        elif INT.match(value) and int(value) < 1:
+            problems.append(f"{field} {value!r} is not a whole number of 1 or more")
+    if row.get("bug") and row.get("bug") == row.get("caused_by"):
+        problems.append(f"bug {row['bug']} cannot be caused by itself")
+    if row.get("area") not in ESCAPED_AREAS:
+        problems.append(f"area {row.get('area')!r} is not one of {', '.join(ESCAPED_AREAS)}")
+    return problems
+
+
+def caused_by(body):
+    """N from the one `Caused by: #N` line of an issue body (outside code fences), or None (none, malformed or two different)."""
+    found, fenced = set(), False
+    for line in body.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        elif not fenced and (m := CAUSED_BY.match(line)):
+            found.add(int(m.group(1)))
+    return found.pop() if len(found) == 1 else None
+
+
 def _check_values(kind, row):
     problems = []
     date = row.get("date", "")
@@ -128,6 +162,8 @@ def _check_values(kind, row):
                 problems.append(f"{field} is required for a round row")
     if kind == "review":
         problems += _check_review(row)
+    if kind == "escaped":
+        problems += _check_escaped(row)
     return problems
 
 
@@ -189,7 +225,7 @@ def build(texts, names=None):
     """Parse comment bodies. Returns (sorted rows as dicts keyed by COLUMNS, error strings)."""
     names = names or [f"input{n + 1}" for n in range(len(texts))]
     errors, out = [], []
-    sessions, rounds, reviews = {}, {}, {}
+    sessions, rounds, reviews, bugs = {}, {}, {}, {}
     for text, name in zip(texts, names, strict=True):
         lines = text.splitlines()
         i = 0
@@ -225,6 +261,11 @@ def build(texts, names=None):
                         errors.append(f"{name}:{lineno}: duplicate review {row['review_id']} for run "
                                       f"{row['run_ref']} (first at {prev})")
                         continue
+                if kind == "escaped":
+                    prev = bugs.setdefault(row["bug"], f"{name}:{lineno}")
+                    if prev != f"{name}:{lineno}":
+                        errors.append(f"{name}:{lineno}: duplicate escaped bug {row['bug']} (first at {prev})")
+                        continue
                 renamed = {RENAME.get(kind, {}).get(k, k): v for k, v in row.items()}
                 out.append({**{c: "" for c in COLUMNS}, "row_type": kind, **renamed})
     out.sort(key=lambda r: (TYPE_ORDER[r["row_type"]], r["date"] == "", r["date"],
@@ -245,7 +286,20 @@ def main(argv=None):
     ap.add_argument("inputs", nargs="*", help="saved comment files (default docs/metrics/*.txt)")
     ap.add_argument("-o", "--output", default=str(ROOT / "docs/agent-metrics.csv"))
     ap.add_argument("--check", action="store_true", help="fail if the output file is not up to date")
+    ap.add_argument("--caused-by", metavar="FILE", help="print N from the `Caused by: #N` line of an issue body file")
     args = ap.parse_args(argv)
+    if args.caused_by:
+        try:
+            body = Path(args.caused_by).read_text(encoding="utf-8")
+        except OSError as e:
+            print(f"{args.caused_by}: cannot read ({e.strerror})", file=sys.stderr)
+            return 1
+        n = caused_by(body)
+        if n is None:
+            print(f"{args.caused_by}: no single 'Caused by: #N' line", file=sys.stderr)
+            return 1
+        print(n)
+        return 0
     paths = args.inputs or sorted(str(p) for p in (ROOT / "docs/metrics").glob("*.txt"))
     texts, names, errors = [], [], []
     for p in paths:

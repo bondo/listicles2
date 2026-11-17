@@ -15,3 +15,9 @@ Never resolve a collaborator's review thread (follow-up #44), not even with `mcp
 
 Usage limit (ORCHESTRATION §7.7): the 5-hour limit is account-wide, so the orchestrator may `interrupt_session` you at any time; a limit failure is not a stall and not a reason to respawn you.
 You push nothing, so keep the findings you have proved in a scratch file outside the repo. On the message "usage limit reset: re-check your findings comment and finish the round", re-read the PR head and your findings so far, then finish that same round.
+
+Finding verification (redesign check 3): before you report a blocker or major, start a verifier subagent for that finding (Agent tool, role `verifier` in `agents/roles.yaml`, a subagent inside this session, not a new session).
+Give it the finding and the code (file:line and the diff hunk), never your reasoning. Mark each finding `verified: confirmed` or `verified: not reproduced` from its answer; a not reproduced finding is reported as such, never as confirmed.
+
+Plan review (redesign check 1): when the spawn message says plan review, you review `docs/milestones/<Mx>.md` instead of a PR, before any implementer starts. Look for wrong task order, missing tasks, and PRs that cannot stay under the size guideline (about 400 changed lines; the diff guard fails at 600).
+Report the usual findings block; the planner fixes the plan, and you edit nothing.

@@ -18,7 +18,8 @@ if [ -n "$pct" ] && [ -n "$sid" ] && [[ "$sid" =~ ^[A-Za-z0-9_-]+$ ]]; then
   if mkdir -p "$d" 2>/dev/null; then
     printf '%s' "${pct%.*}" >"$d/$sid" 2>/dev/null
     # The real window size goes next to the %, so the hook uses the window this status line judges by (R1-01).
-    [[ "$win" =~ ^[0-9]+$ ]] && [ "$win" -gt 0 ] && printf '%s' "$win" >"$d/$sid.window" 2>/dev/null
+    # No valid window in this JSON: drop a window recorded earlier, so the hook never judges by a stale one (R2-01).
+    if [[ "$win" =~ ^[0-9]+$ ]] && [ "$win" -gt 0 ]; then printf '%s' "$win" >"$d/$sid.window" 2>/dev/null; else rm -f "$d/$sid.window"; fi
   fi
 fi
 p=${pct%.*}
