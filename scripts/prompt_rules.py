@@ -502,6 +502,7 @@ RULES = (
         (
             r"you are not given the first reviewer's findings", r"risk:high", r"security-rules, sync-merge and release",
             r"never edit or push the pr branch: report only", r"marked ready only after your pass",
+            r"ids `s<round>-<nn>`", r"never `r<round>-<nn>`",  # own id prefix: no same-round collision (R2-01 of #128)
         ),
         "the second reviewer works independently on risk:high and protected areas and never edits the PR branch",
         forbidden=(r"effort \(max",),  # roles.yaml gives it no max_effort_when (R1-06 of #128)
