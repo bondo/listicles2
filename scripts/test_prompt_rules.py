@@ -995,6 +995,14 @@ class Pr2CheckTests(unittest.TestCase):
         self.assertIn("second-reviewer-role", ids(prompt_rules.check_text("second-reviewer", text)))
         self.assertNotIn("max for", real("second-reviewer"))
 
+    def test_second_reviewer_ids_never_collide_with_the_reviewers(self):  # R2-01 of #128 (was R1-03)
+        norm = prompt_rules.normalize(real("second-reviewer"))
+        self.assertIn("ids `s<round>-<nn>`", norm.lower())
+        self.assertIn("never `r<round>-<nn>`", norm.lower())
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", "ids `S<round>-<nn>`"))
+        old_wording = "with ids `R<round>-<nn>` continuing after the highest id you were given"
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", "with ids `S<round>-<nn>`", old_wording))
+
     def test_a_second_reviewer_that_sees_the_first_reviewers_findings_is_rejected(self):
         self.assertIn("second-reviewer-role", self.mutate(
             "second-reviewer", "you are not given the first reviewer's findings", "you are given the first reviewer's findings"))
