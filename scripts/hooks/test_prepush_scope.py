@@ -23,6 +23,17 @@ class Classify(unittest.TestCase):
                   "firebase/firestore.rules", "metrics/sessions/a.json", "CLAUDE.md"):
             self.assertEqual(prepush_scope.classify([p]), "skip", p)
 
+    def test_kotlin_and_gradle_script_files_build_under_any_skip_prefix(self):
+        """R1-01: spotless and detekt check **/*.kt and **/*.gradle.kts wherever they are, so a skip prefix must not hide them."""
+        for p in ("firebase/x/src/A.kt", "scripts/x/build.gradle.kts", "docs/sample/src/A.kt", "agents/Tool.kt", "metrics/a.kts",
+                  ".github/settings.gradle.kts"):
+            self.assertEqual(prepush_scope.classify([p]), "android", p)
+        self.assertEqual(prepush_scope.classify(["docs/a.md", "firebase/x/A.kt"]), "android")
+
+    def test_names_that_only_look_like_kotlin_still_skip(self):
+        for p in ("docs/kt.md", "docs/a.kt.md", "scripts/notes-kts.txt", "docs/kt/readme.md"):
+            self.assertEqual(prepush_scope.classify([p]), "skip", p)
+
     def test_android_paths_build(self):
         for p in ("app/src/main/java/A.kt", "core/domain/src/main/kotlin/B.kt", "build.gradle.kts", "settings.gradle.kts",
                   "gradle/libs.versions.toml", "gradle.properties", "gradlew", "config/detekt/detekt.yml", "app/src/main/res/values/strings.xml"):
