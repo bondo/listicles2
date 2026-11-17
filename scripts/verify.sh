@@ -42,6 +42,7 @@ step status-workflow-tests python3 -I scripts/test_status_workflow.py
 step prompt-rules-tests python3 -I scripts/test_prompt_rules.py
 step prompt-rules python3 -I scripts/prompt_rules.py
 step tasks-validate python3 -I scripts/tasks.py validate
+step owner-drift-tests python3 -I scripts/test_owner_drift_check.py
 step metrics-tests python3 -I scripts/test_agent_metrics.py
 step metrics-check python3 -I scripts/agent_metrics.py --check
 step docs-check-tests python3 -I scripts/test_docs_check.py

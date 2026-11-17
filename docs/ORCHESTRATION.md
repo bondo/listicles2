@@ -296,6 +296,13 @@ One-off renumbering (old ids appear only in earlier commits, review comments and
 `drift` needs `--issues` and/or `--prs`; without GitHub input it exits 2 instead of printing "no drift".
 The orchestrator logs drift in the state issue and hands it to the next implementer or process session.
 
+**CI gate (#92).** CI job `tasks` runs `scripts/check_owner_drift.sh`, which feeds the repo's issues and merged PRs to
+`tasks.py drift --check`. It fails when an owner task is `todo` while a linked issue is closed (any reason) or its `pr` is
+merged. Agent tasks and the follow-up rules are not part of it (they stay in plain `drift`). The issue query takes all issues (open ones too, and no label filter: tasks link by number or title). A GitHub read error, `incomplete_results=true` or more than 1000 search results fail the
+check, as "could not look" is not "no drift". The fix is a PR that sets the row to `done` (or `dropped` with a note). A
+confirmation given only in chat or as a #15 comment has no issue to close, so the check cannot see it: that is the
+orchestrator's wake step in §4.5.
+
 ### 4.5 Owner to-dos
 
 Owner work is tasks with `assignee = "owner"`, and each one gets an issue once it is **ready**
@@ -318,6 +325,11 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
 * The owner closes the issue when done. They don't need to tell the orchestrator: on each wake the
   orchestrator runs the ready query (closed issues count at once), checks *Done when* itself, and logs
   `todo-done <id>` in the state issue. If the check fails, it reopens the issue with a one-line comment.
+* **Wake step (#92): owner confirmations.** After reading the owner's decisions on a wake, list every
+  `assignee = "owner"` task that is still `todo` (`--assignee owner status`) and compare it with the #15 comments and the
+  closed `owner-todo` issues. For each confirmed one, batch the status fix into one small PR in the same wake, naming the
+  confirmation (date and comment) in the PR body. Give each owner task an `issue = N` as soon as its issue exists, so the
+  CI gate above can see it close.
 * Reminders are scheduled tasks bound to the **current** orchestrator, recorded in the state body.
 * When you report to the owner, give the ready owner tasks (`--assignee owner ready`) as one short list in priority order.
 
