@@ -119,6 +119,42 @@ class PreCommitHook(unittest.TestCase):
         self.assertEqual(self.hook()[0], 0)
         self.assertTrue(self.gradle_called())
 
+    def test_kotlin_and_gradle_script_files_under_a_skip_prefix_build(self):
+        """R1-01: spotless and detekt target **/*.kt and **/*.gradle.kts, so these must not be skipped by their directory."""
+        for path in ("firebase/tool/src/main/A.kt", "scripts/x/build.gradle.kts", "docs/sample/src/A.kt"):
+            if os.path.exists(self.log):
+                os.remove(self.log)
+            self.stage(path)
+            self.assertEqual(self.hook()[0], 0)
+            self.assertTrue(self.gradle_called(), path)
+            self.run_git("reset", "-q")
+
+    def test_a_space_in_a_docs_path_still_skips(self):
+        """R1-02: pins today's behaviour so dropping core.quotepath=off or changing the parser cannot regress silently."""
+        self.stage("docs/a b.md")
+        self.assertEqual(self.hook()[0], 0)
+        self.assertFalse(self.gradle_called())
+
+    def test_a_quoted_kotlin_file_name_builds(self):
+        """R1-02: git C-quotes a name with a double quote; the quoted form matches no skip prefix, so it builds."""
+        self.stage('app/src/a"b.kt')
+        self.assertEqual(self.hook()[0], 0)
+        self.assertTrue(self.gradle_called())
+
+    def test_a_non_ascii_kotlin_file_name_builds(self):
+        self.stage("app/src/æøå.kt")
+        self.assertEqual(self.hook()[0], 0)
+        self.assertTrue(self.gradle_called())
+
+    def test_staged_docs_with_unstaged_kotlin_skips_because_only_the_commit_counts(self):
+        """R1-02: Gradle checks the working tree, so the staged set decides; unstaged edits are not part of the commit."""
+        self.stage("app/src/main/A.kt", "class A")
+        self.run_git("commit", "-q", "-m", "kt")
+        self.write("app/src/main/A.kt", "class A  // edited, not staged")
+        self.stage("docs/a.md")
+        self.assertEqual(self.hook()[0], 0)
+        self.assertFalse(self.gradle_called())
+
     def test_failing_guards_block_before_gradle(self):
         self.stage("app/src/main/A.kt")
         rc, _ = self.hook(STUB_GUARDS="1")
