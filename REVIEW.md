@@ -33,13 +33,20 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
     The commit order must show the failing test first, then the fix. Flag any untested change or untested tooling
     (`major` when it is a gate or guard, otherwise `minor`; see Severity).
 11. **Android guidance**: code under `app/` follows `docs/ANDROID-BEST-PRACTICES.md` (implementers too); a deviation needs a recorded decision, otherwise `minor`.
+12. **Visual check (R9)**: on a PR that changes a screen, inside this review (no extra session), look at the goldens per state (light and dark, en and da),
+    read each `golden-update` diff, and score every changed screen against `docs/product/rubric.md` (1 to 5 per criterion, a one-line reason each, listed in `scores`).
+    An agent score below 3 is a `minor` finding, never a `blocker` or `major`. Agent scores are advisory and taste stays with the owner; a disagreement with the
+    owner's scores is a calibration note for the rubric, not a finding. Do not judge motion, touch feel, real-device size or density, felt speed or taste.
+13. **Rules allow/deny matrix (R7)**: on a PR labelled `area:security-rules`, `area:sync-merge` or `risk:high`, check that the rules allow/deny matrix (D-2.6, `firebase/test`)
+    covers each changed rule with an allow case and a deny case. A changed rule without both is a `major` finding (area `security-rules`), and a `blocker` when the missing case hides a real security hole
+    (a non-member, or a member without the right, could read or write); name the rule and the missing case.
 
 ## Severity
 | Severity | Meaning | Author must |
 |---|---|---|
 | `blocker` | Data loss or corruption, security hole, crash on a main path, or a broken build/gate. Must not merge. | Fix |
 | `major` | Wrong behavior in a realistic case, a test that cannot catch the bug it claims to, a weakened gate, an untested gate, guard or other tooling check (item 10). | Fix, or `deferred` only with owner OK (`docs/FOLLOW-UPS.md`) |
-| `minor` | Real but low-impact: edge case, unclear code that invites bugs, other untested change or missing non-critical test (item 10). | Fix (small fixes, about 30 changed lines or fewer, are always made now), mark `disputed` with a reason, or `deferred` per `docs/FOLLOW-UPS.md` with an issue link (see Loop and cap) |
+| `minor` | Real but low-impact: edge case, unclear code that invites bugs, other untested change or missing non-critical test (item 10), an agent rubric score below 3 (item 12). | Fix (small fixes, about 30 changed lines or fewer, are always made now), mark `disputed` with a reason, or `deferred` per `docs/FOLLOW-UPS.md` with an issue link (see Loop and cap) |
 | `nit` | Style, naming, wording, taste. | Optional, or `deferred` per `docs/FOLLOW-UPS.md` |
 
 When unsure between two levels, choose the lower and say why. Do not pad: no findings is a valid result.
@@ -78,6 +85,7 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 - `verified`: required for every `blocker` and `major`, left out for minor and nit. `confirmed` or `not reproduced`, taken from the answer of a verifier
   subagent (`agents/prompts/verifier.md`) that gets the finding and the code, never the reviewer's reasoning. A `not reproduced` finding is reported as such,
   never as `confirmed`, and does not block: the verdict, the cap and the loop count only findings that are confirmed (minor and nit need no verification).
+- `scores` (UI PRs, item 12; design reviews too): a list of `{screen, criterion, score, reason}`, left out when no screen changed.
 - `area`: `security-rules | sync-merge | release | process | general`. Use the first three whenever the finding concerns Firestore
   rules and their tests, offline/last-write-wins merge, or the release workflow (never deferred without owner OK, `docs/FOLLOW-UPS.md`).
 - `recommend` (the reviewer's advice, never a decision): `fix-now`, or `defer` (only for `minor`/`nit`, see below; blockers and majors are always `fix-now`).
