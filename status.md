@@ -374,5 +374,4 @@ flowchart LR
 
 - **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **PR to merge** [#144](https://github.com/bondo/listicles2/issues/144): Tooling&#58; UI rule gaps (.em, Color named args, hue constants), detekt on &#58;core&#58;testing, channel gr…
 - **task** M0.5-FU: waits on M0.5-28
