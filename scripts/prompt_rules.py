@@ -77,12 +77,17 @@ SCORE_BLOCKS_MERGE = r"below 3 (?:blocks|must block) the merge"
 MATRIX_WRONG_SEVERITY = (
     r"(?:(?:a |the |such a )?(?:matrix )?gaps? (?:in the matrix )?|without both )(?:is|are) (?:always |only |just )?(?:a |an )?`?(?:minor|nit|blocker)"
 )
-# Wording that would allow resolving a thread (follow-up #44). The ban itself is pinned by the patterns; this keeps a later edit from
-# adding permission next to it. "never resolve ..." must not match, hence the lookbehind and the may/can/should forms.
+# Wording that would allow an agent to resolve a thread (follow-up #44; R1-01 and R1-02 of #150). The ban itself is pinned by the patterns
+# of the rules; this keeps a later edit from adding permission next to it. Each pattern needs an agent subject or a sentence-start
+# imperative, so "never/do not/must not resolve ..." and "only the owner may resolve ..." do not match. Wording pins are not exhaustive.
+_AGENT = r"(?:you|agents?|the (?:orchestrator|implementer|reviewer|planner|worker)s?)"
+_NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
+_THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
 RESOLVE_PERMISSION = (
-    r"\b(?:may|can|should|must)\s+resolve\s+(?:the|a|any|their)\b[^.]{0,40}\b(?:thread|conversation)",
-    r"(?<!never )\bresolves?\s+(?:the|a)\s+collaborator's\s+(?:review\s+)?(?:thread|conversation)",
-    r"\bagents?\s+resolves?\s+(?:the|a)\s+(?:review\s+)?(?:thread|conversation)",
+    rf"\b{_AGENT}\s+(?:may|can|could|should|must|will)\s+(?:also\s+|then\s+)?resolve\s+{_THREAD}",
+    rf"\b(?:feel free|(?:is|are) (?:allowed|permitted|free)) to resolve\s+{_THREAD}",
+    rf"\b{_AGENT}\s+(?:also\s+)?resolves?\s+{_THREAD}",
+    rf"(?:^|[.:;]\s+|[-*]\s+|\b(?:then|and)\s+)resolve\s+(?:the|a|an|any|their|all)\s+{_NOUN}",
 )
 RULES = (
     Rule(

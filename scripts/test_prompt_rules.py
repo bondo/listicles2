@@ -1537,14 +1537,14 @@ class NoResolveThreadTests(unittest.TestCase):
             for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
                 base = real(where) if where in ROLES else self.doc(where)
                 with self.subTest(where=where, stale=stale):
-                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base + "\n" + stale + "\n"))
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base.rstrip() + ".\n" + stale + "\n"))
 
     def test_correct_ban_and_owner_only_wording_is_not_rejected(self):
         for good in self.BAN_WORDING:
             for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
                 base = real(where) if where in ROLES else self.doc(where)
                 with self.subTest(where=where, good=good):
-                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, base + "\n" + good + "\n"))
+                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, base.rstrip() + ".\n" + good + "\n"))
 
     def test_every_prompt_still_needs_the_ban_itself(self):
         for role in ROLES:
