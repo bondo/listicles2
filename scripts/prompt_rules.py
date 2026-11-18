@@ -651,13 +651,16 @@ RULES = (
             r"the limit is for pipeline flow, not cost: up to 10 worker and reviewer sessions at once, more when independent work exists",
             r"the limits are file overlap, owner-merge queue depth and account rate limits",
             r"a review starts as soon as its pr is ready, without waiting for a slot",
-            r"throttle only when a rate limit is near or in overage \(a 7-day warning or `isusingoverage`\)",
-            r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"\(2\) halve the concurrency limit, then halve it again",
+            r"throttle only near a rate limit: a 7-day warning holds at stage 1 and required work goes on \(§7\.7\.1\); stage 2 applies in "
+            r"overage or when the §7\.7\.5 forecast says the limit is reached before `resetsat`; stage 3 only on an owner decision in #15",
+            r"\(1\) no optional extras \(recurring reviews r3 and r4,",
+            r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice",
             r"\(3\) pause new work and finish the open prs",
             r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews and the r2 usage read",
         ),
         "concurrency is for pipeline flow (default 10, reviews without a slot); throttle only near a rate limit or in overage (2026-11-18)",
-        forbidden=(r"cap of [35] workers", r"at most 5 worker sessions", r"the worker cap 3, then 2", r"recurring reviews r2"),
+        forbidden=(r"cap of [35] workers", r"at most 5 worker sessions", r"the worker cap 3, then 2", r"recurring reviews r2",
+                   r"one stage per check-in"),
     ),
     Rule(
         "orch-spawn-checks", ("orchestrator",),
@@ -667,6 +670,8 @@ RULES = (
             r"session in the same round, never showing it the reviewer's findings, and merge both reports",
             r"escalation reviewer \(§7\.2\.2\): when round 4 still has a confirmed finding above nit \(deferred minors do not count\) "
             r"or a dispute is still open, spawn one escalation reviewer per pr",
+            r"every spawn in §7\.2\.2 uses the §8\.3 message \(last-action `send_message`, worker-result, incremental findings comment\) "
+            r"with its own role line",
             r"a `fix` ruling gets one fresh round 5, a `split` opens a new pr from `main` with merge commits, `owner` goes to the owner; "
             r"there is no second escalation",
             r"escaped defect: when a bug is found after merge, put a `caused by: #n` line in the bug issue and add one `escaped` row to the metrics csv",
@@ -926,6 +931,8 @@ DOC_RULES = (
             r"and a `risk:high` pr is marked ready only after that pass",
             r"\*\*escalation:\*\* when round 4 still has a confirmed finding above nit \(deferred minors do not count\) or a dispute is still "
             r"open, the orchestrator spawns one escalation reviewer per pr",
+            r"every spawn in §7\.2\.2 uses the §8\.3 message \(last-action `send_message`, worker-result, incremental findings comment\) "
+            r"with its own role line",
             r"`fix` gets one fresh round 5, `split` opens a new pr from `main` with merge commits, `owner` goes to the owner; there is no second escalation",
             r"\*\*escaped defects:\*\* a bug found after merge gets a `caused by: #n` line in its issue and one `escaped` row in the metrics csv",
         ),
@@ -970,14 +977,17 @@ DOC_RULES = (
     DocRule(
         "orch-throttle", ORCH,
         (
-            r"§7\.7\.6 throttle order\.", r"throttle only when a rate limit is near or in overage: a 7-day `allowed_warning` or `isusingoverage`",
-            r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"\(2\) halve the concurrency limit, then halve it again",
+            r"§7\.7\.6 throttle order\.",
+            r"throttle only near a rate limit\. a 7-day `allowed_warning` holds at stage 1 and required work goes on \(§7\.7\.1\); stage 2 applies in "
+            r"overage or when the §7\.7\.5 forecast says the limit is reached before `resetsat`; stage 3 only on an owner decision in #15",
+            r"\(1\) no optional extras \(recurring reviews r3 and r4,",
+            r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice",
             r"\(3\) pause new work and finish the open prs",
             r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, "
             r"and the r2 usage read of §7\.7\.1",
         ),
         "ORCHESTRATION 7.7.6: throttle only near a rate limit or in overage: extras, halve the concurrency, pause new work; reviews are never throttled",
-        forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2"),
+        forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2", r"one stage per check-in"),
     ),
     DocRule(
         "orch-spawn-templates", ORCH,
