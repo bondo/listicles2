@@ -1462,7 +1462,10 @@ class NoResolveThreadTests(unittest.TestCase):
 
     REPLY_ROLES = ("implementer", "orchestrator")  # the roles that answer on threads; read-only roles only carry the ban
     DOCS = {
-        "docs/ORCHESTRATION.md": ("orch-no-resolve-thread", "never resolve a collaborator's review thread (follow-up #44): reply and leave it for the collaborator or the owner"),
+        "docs/ORCHESTRATION.md": (
+            "orch-no-resolve-thread",
+            "never resolve a collaborator's review thread (follow-up #44): reply and leave it for the collaborator or the owner",
+        ),
         "docs/COLLABORATING.md": ("collab-no-resolve", "**Resolve conversation**"),
     }
 
