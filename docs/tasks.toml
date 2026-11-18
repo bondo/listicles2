@@ -752,6 +752,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 141
 notes = "Tooling env (scripts/guards.sh, scripts/hooks/). Test-first, with negative cases; the guard runs in verify.sh, the pre-commit hook (--staged) and the CI guards job. Owner decision on #15, comment 6974778901 (Git LFS not adopted, guard now, LFS deferred to M6-O4). Owner merge: scripts/ and a guard limit"
 
 # ---------------------------------------------------------------- M1 auth + households
