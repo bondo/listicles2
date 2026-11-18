@@ -1302,7 +1302,8 @@ class M026Tests(unittest.TestCase):
         for bad in (" An agent score below 3 is a `blocker`.", " An agent score below 3 is a major finding."):
             with self.subTest(bad=bad):
                 self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("reviewer") + bad)))
-        for bad in (" A gap is a `blocker`.", " A gap in the matrix is always a `blocker`."):
+        for bad in (" A gap is a `blocker`.", " A gap in the matrix is always a `blocker`.", " A matrix gap is always a `blocker`.",
+                    " A gap is a `minor` finding.", " A gap is a nit."):  # R2-02 of #133: as wide as the REVIEW.md pin
             with self.subTest(bad=bad):
                 self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("reviewer") + bad)))
         self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("design-reviewer"))))
