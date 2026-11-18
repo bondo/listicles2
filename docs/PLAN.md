@@ -199,6 +199,9 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]).
   create, so every item create accepts any `createdAt` not later than `request.time` (a forged older value
   only changes a tie-break order). `createdBy` is the caller, so an Undo by another member records them as the
   adder (acceptable while OQ-18 is open; revisit then).
+* **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
+  an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 builds none of it; the
+  sync-merge design must not rule it out (per-list change history across members; the losing side of a conflict is kept).
 * Timestamps use `serverTimestamp()`. They are read with
   `ServerTimestampBehavior.ESTIMATE` so pending local writes still sort correctly.
 * Losing access while offline (stop sharing, removal, household deleted): the queued writes are rejected
