@@ -508,7 +508,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
   or force-push). A worker prompt that asks for a force-push is denied by the auto-mode classifier; do not write one.
 * **Branch lock**: before spawning a writer, set the branch's holder in the state body.
   Only one writer per branch at a time. Reviewers hold no lock and never push.
-* **Concurrency** (§7.7.5): for pipeline flow, not cost (owner decision of 2026-11-18, #15): up to 10 worker and reviewer sessions at once, more when independent work exists.
+* **Concurrency** (§7.7.6): for pipeline flow, not cost (owner decision of 2026-11-18, #15): up to 10 worker and reviewer sessions at once, more when independent work exists.
   The limits are file overlap (no two implementers on the same files unless merge commits resolve it cheaply), owner-merge queue depth and account rate limits (§7.7.6).
   A review starts as soon as its PR is ready, without waiting for a slot; subagents do not count.
 * The orchestrator's own **45-minute check-in** (`send_later`, §1.1) is re-scheduled on every wake (except while paused, §7.7.2), and it is

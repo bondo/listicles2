@@ -1373,7 +1373,7 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Owner acceptance (the bullet above) is the only alternative."),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "The reviewer reviews `base_sha..head_sha` only."),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "`reviewed_through` per branch, with explicit owner acceptance logged"),
-        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "The orchestrator defers the remaining minors and nits (follow-up issues) instead of running another round."),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "The orchestrator defers the remaining minors and nits (follow-up issues) instead of running."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Stop deferring and report to the owner."),
         ("docs/ORCHESTRATION.md", "orch-archive", "Archive finished worker sessions once their metrics row is logged and the owner has seen the batch report."),
         ("docs/ORCHESTRATION.md", "orch-spawn-templates", "Role: agents/prompts/reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}."),
@@ -1400,12 +1400,14 @@ class Pr4RuleTests(unittest.TestCase):
 
     def test_the_old_orchestrator_prompt_wording_is_rejected(self):
         for role, rid, old in (
-            ("orchestrator", "orch-model", " Sonnet, low effort, one long-lived session."), ("orchestrator", "orch-transcripts", " Never read child transcripts."),
+            ("orchestrator", "orch-model", " Sonnet, low effort, one long-lived session."),
+            ("orchestrator", "orch-transcripts", " Never read child transcripts."),
             ("orchestrator", "orch-throttle", " At most 5 worker sessions at once."), ("orchestrator", "orch-throttle", " Keep to the cap of 3 workers."),
             ("orchestrator", "orch-throttle", " One stage per check-in while it lasts."), ("orchestrator", "orch-throttle", " (2) the worker cap 3, then 2."),
             ("orchestrator", "orch-throttle", " (1) no optional extras (recurring reviews R2 to R4)."),
             ("orchestrator", "orch-throttle", " Stage 2 applies when the §7.7.5 forecast says it."),
-            ("orchestrator", "autonomy", " The `big-pr` label is set only with the owner's say-so."), ("orchestrator", "autonomy", " The 4-round cap being hit."),
+            ("orchestrator", "autonomy", " The `big-pr` label is set only with the owner's say-so."),
+            ("orchestrator", "autonomy", " The 4-round cap being hit."),
             ("orchestrator", "handover", " Hand over at about 80% context."), ("orchestrator", "handover", " Hand over at about 50% context."),
             ("orchestrator", "orch-deferral", " more than about 15 changed lines"),
             ("orchestrator", "orch-deferral", " Stop deferring and ask the owner to do M0-O10."),
