@@ -896,6 +896,73 @@ class ThresholdTestNames(GuardsCase):
         self.assertFails("guard: lowered threshold: threshold = 40")
 
 
+class ThresholdProse(GuardsCase):
+    """Owner decision (#15, comment 6969709604): the word `threshold` inside prose is not a check setting.
+
+    Only an occurrence with a word on each side (`gate or threshold changes`) is prose. Identifiers, keys,
+    assignments and calls still count, and so does every other keyword on the same line.
+    """
+
+    def base(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+
+    def change(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def test_prose_lines_that_merely_mention_a_threshold_pass(self):
+        # The three real false positives from redesign PR 4: role-prompt prose, a test pair and a rule regex.
+        for rel, old in (
+            (
+                "agents/prompts/orchestrator.md",
+                "Owner acceptance is the only alternative, and never for gate or threshold changes, which always get a delta review.\n",
+            ),
+            (
+                "scripts/test_prompt_rules.py",
+                '    ("never for gate or threshold changes, which always get a delta review", "also for gate or threshold changes"),\n',
+            ),
+            (
+                "scripts/prompt_rules.py",
+                '    r"owner acceptance is the only alternative, and never for gate or threshold changes, which always get a delta review",\n',
+            ),
+        ):
+            with self.subTest(rel=rel):
+                self.base(rel, old)
+                self.change(rel, "\n")
+                self.assertPasses()
+
+    def test_real_settings_still_fail(self):
+        for rel, line in (
+            ("scripts/tool.py", "threshold = 50"),
+            ("scripts/tool.py", "limit = env.get('X', threshold=50)"),
+            ("scripts/tool.py", 'CONFIG = {"threshold": 50}'),
+            ("config/detekt.yml", "  threshold: 11"),
+            ("pyproject.toml", "fail_threshold = 50"),
+            ("app/build.gradle.kts", "val mutationThreshold = 80"),
+            ("app/build.gradle.kts", "kover { minBound(80) }"),
+            ("app/src/main/kotlin/Cfg.kt", "val threshold = 80"),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_a_setting_with_a_prose_comment_on_the_same_line_still_fails(self):
+        self.base("scripts/tool.py", "threshold = 50  # only raise the threshold with a review\n")
+        self.change("scripts/tool.py", "\n")
+        self.assertFails("guard: removed check setting:")
+        self.base("scripts/tool.py", "limit = 50  # the maxIssues of this threshold are fixed\n")
+        self.change("scripts/tool.py", "\n")
+        self.assertFails("guard: removed check setting:")
+
+    def test_lowering_a_setting_next_to_prose_still_fails(self):
+        self.base("scripts/tool.py", "threshold = 50  # a threshold with a comment\n")
+        self.change("scripts/tool.py", "threshold = 40  # a threshold with a comment\n")
+        self.assertFails("guard: lowered threshold:")
+
+
 class StagedMode(GuardsCase):
     def test_staged_flags_only_the_index(self):
         self.repo.write("app/src/main/kotlin/S.kt", "@Suppress(\"X\") fun f() {}\n")
