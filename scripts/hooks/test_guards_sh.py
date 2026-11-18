@@ -748,11 +748,28 @@ class FileSizeChecks(GuardsCase):
     def test_wireframes_exemption_is_only_for_that_directory(self):
         self.repo.write_bytes("docs/product/wireframes-old/a.png", self.PNG + 1)
         self.repo.write_bytes("docs/product/other/wireframes/b.png", self.PNG + 1)
+        # Git paths are case-sensitive: other casings of the directory are other directories (R1-02).
+        self.repo.write_bytes("DOCS/PRODUCT/WIREFRAMES/c.png", self.PNG + 1)
+        self.repo.write_bytes("Docs/Product/Wireframes/d.png", self.PNG + 1)
         self.repo.commit()
         rc, out = self.repo.guards()
         self.assertNotEqual(rc, 0, out)
-        self.assertIn("docs/product/wireframes-old/a.png", out)
-        self.assertIn("docs/product/other/wireframes/b.png", out)
+        for path in ("docs/product/wireframes-old/a.png", "docs/product/other/wireframes/b.png",
+                     "DOCS/PRODUCT/WIREFRAMES/c.png", "Docs/Product/Wireframes/d.png"):
+            self.assertIn(f"guard: file too large: {path}", out)
+
+    def test_renaming_a_large_png_out_of_wireframes_fails_and_within_wireframes_passes(self):
+        """R1-01: renames must be seen as an added file (git diff --no-renames), or the new path is never checked."""
+        self.repo.write_bytes("docs/product/wireframes/w.png", 400 * 1024)
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.repo.git("mv", "docs/product/wireframes/w.png", "docs/product/wireframes/w2.png")
+        self.repo.commit()
+        self.assertPasses()
+        os.makedirs(os.path.join(self.repo.dir, "app"))
+        self.repo.git("mv", "docs/product/wireframes/w2.png", "app/w.png")
+        self.repo.commit()
+        self.assertFails("guard: file too large: app/w.png")
 
     def test_non_png_between_300kb_and_1mb_passes(self):
         self.repo.write_bytes("data/photo.jpg", 600 * 1024)
