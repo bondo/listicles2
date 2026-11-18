@@ -148,12 +148,19 @@ def check_verification(meta, props_text, verify_text=""):
     problems = []
     # Gradle reads gradle.properties with java.util.Properties (key ends at =, : or whitespace) and the mode case-insensitively.
     prop = re.compile(r"\s*" + re.escape(VERIFICATION_PROP) + r"(?:\s*[=:]\s*|\s+)(\S+)")
-    for line in props_text.splitlines():
+    lines, joined = [], ""
+    for raw in props_text.splitlines():  # a non-comment line ending in an odd number of backslashes continues on the next line
+        line = joined + (raw.lstrip() if joined else raw)
+        cont = not line.lstrip().startswith(("#", "!")) and (len(line) - len(line.rstrip("\\"))) % 2 == 1
+        joined = line[:-1] if cont else ""
+        if not cont:
+            lines.append(line)
+    for line in lines:
         m = None if line.lstrip().startswith(("#", "!")) else prop.fullmatch(line.rstrip()) or prop.match(line)
         if m and m.group(1).lower() in ("off", "lenient"):
             problems.append(f"gradle.properties: {VERIFICATION_PROP}={m.group(1).lower()} disables verification")
     flags = re.compile(
-        r"(?:--dependency-verification|\s-F|-D" + re.escape(VERIFICATION_PROP) + r")(?:\s*=\s*|\s+)(?:off|lenient)\b", re.I
+        r"(?:--dependency-verification|\s-F|-D" + re.escape(VERIFICATION_PROP) + r")(?:\s*=\s*|\s+|(?<=-F))[\"']?(?:off|lenient)\b", re.I
     )
     if any(flags.search(ln) for ln in verify_text.splitlines() if not ln.lstrip().startswith("#")):
         problems.append("scripts/verify.sh: switches Gradle dependency verification off")
