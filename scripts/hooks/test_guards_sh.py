@@ -1321,6 +1321,16 @@ class JustifiedReasonWords(GuardsCase):
                 self.repo.git("rm", "-q", "-f", path)
                 self.repo.commit()
 
+    def test_the_reason_ends_at_an_html_comment_closer(self):
+        """R2-04: words after `-->` are markup, not reason."""
+        xml = "app/src/main/res/layout/a.xml"
+        self.repo.write(xml, '<View tools:ignore="X" /> <!-- justified: ok --> <Other android:text="some more words" />\n', raw=True)
+        self.repo.commit()
+        self.assertFails("guard: unjustified suppression:")
+        self.repo.write(xml, '<View tools:ignore="X" /> <!-- justified: a three word reason --> <Other android:text="more" />\n', raw=True)
+        self.repo.commit()
+        self.assertPasses()
+
     def test_a_url_or_an_issue_number_inside_the_reason_does_not_cut_it(self):
         for reason in ["see http://example.invalid/a for details", "tracked in issue #46 upstream", "upstream bug, see https://x.invalid/y"]:
             with self.subTest(reason=reason):
@@ -1474,8 +1484,9 @@ class EmbeddedPackageJsonConfig(GuardsCase):
 
 
 class GlobalDirective(GuardsCase):
-    """#46: `/* global foo */` (ESLint) switches off no-undef for the names. Only a comma list of identifiers closed on the same line
-    in a JS or TS file counts, so ordinary block comments that start with the word pass."""
+    """#46: `/* global foo */` (ESLint) switches off no-undef for the names. Any block comment that starts with `global` or `globals` and a
+    name, closed on the same line, in a JS or TS file counts (ESLint reads `/* global state is kept */` as a directive too). A comment
+    that merely contains the word, a multi-line comment and other languages pass."""
 
     def test_global_directives_need_a_justification(self):
         for text in ["/* global foo */", "/*global foo*/", "/* globals foo, bar */", "/* global foo:readonly, bar:writable */", "/* global $, _ */",
@@ -1559,6 +1570,37 @@ class LineLengthDiffs(DiffCase):
                 self.base(rel, old)
                 self.change(rel, new)
                 self.assertPasses()
+
+    def test_a_raise_through_an_added_setting_or_another_file_fails(self):
+        """R2-02: compared per file by the largest value of the setting family, and across a deleted file and the style files at HEAD."""
+        ec = "[*]\nmax_line_length = 100\n"
+        pp = "[tool.ruff]\nline-length = 100\n"
+        for rel, old, new in [
+            (".editorconfig", ec, ec + "[*.kt]\nmax_line_length = 200\n"),
+            ("pyproject.toml", pp, pp + "[tool.ruff.lint.pycodestyle]\nmax-line-length = 200\n"),
+            ("pyproject.toml", pp, "[tool.ruff.lint.pycodestyle]\nmax-line-length = 200\n"),
+            ("config/detekt/detekt.yml", "style:\n  MaxLineLength:\n    maxLineLength: '100'\n", "style:\n  MaxLineLength:\n    maxLineLength: '160'\n"),
+        ]:
+            with self.subTest(file=rel, new=new):
+                self.base(rel, old)
+                self.change(rel, new)
+                self.assertFails("guard: raised line length:")
+        self.base("ruff.toml", "line-length = 100\n")
+        self.repo.git("rm", "-q", "-f", "ruff.toml")
+        self.change("pyproject.toml", "[tool.ruff]\nline-length = 200\n")
+        self.assertFails("guard: raised line length:")
+
+    def test_added_settings_that_do_not_raise_pass(self):
+        ec = "[*]\nmax_line_length = 100\n"
+        self.base(".editorconfig", ec)
+        self.change(".editorconfig", ec + "[*.kt]\nmax_line_length = 80\n")
+        self.assertPasses()
+        self.change(".editorconfig", ec + "# max_line_length = 300 was tried\n")
+        self.assertPasses()
+        self.base("ruff.toml", "line-length = 100\n")
+        self.repo.git("rm", "-q", "-f", "ruff.toml")
+        self.change("pyproject.toml", "[tool.ruff]\nline-length = 100\n")
+        self.assertPasses()
 
     def test_the_words_outside_the_style_config_files_are_not_a_setting(self):
         self.base("app/src/main/kotlin/L.kt", "val maxLineLength = 100\n")
@@ -1645,6 +1687,35 @@ class NarrowedLists(DiffCase):
         self.change("ruff.toml", '[lint]\nselect = ["ALL"]\n')
         self.assertPasses()
         self.change("ruff.toml", '[lint]\nselect = [\n    "E",\n    "F",\n    "W",\n]\n')
+        self.assertPasses()
+
+    def test_widening_a_ruff_select_to_a_parent_prefix_passes(self):
+        """R2-01: `E` covers E4, E7 and E9, `PL` covers PLR."""
+        for old, new in [('["E4", "E7", "E9", "F"]', '["E", "F"]'), ('["E", "PLR"]', '["E", "PL"]')]:
+            with self.subTest(old=old):
+                self.base("ruff.toml", f"[lint]\nselect = {old}\n")
+                self.change("ruff.toml", f"[lint]\nselect = {new}\n")
+                self.assertPasses()
+
+    def test_narrowing_a_ruff_select_to_a_longer_prefix_fails(self):
+        self.base("ruff.toml", '[lint]\nselect = ["E", "F"]\n')
+        self.change("ruff.toml", '[lint]\nselect = ["E4", "F"]\n')
+        self.assertFails("guard: narrowed ruff select:")
+        self.base("ruff.toml", '[lint]\nselect = ["PL", "F"]\n')
+        self.change("ruff.toml", '[lint]\nselect = ["PLR", "F"]\n')
+        self.assertFails("guard: narrowed ruff select:")
+
+    def test_a_renamed_tsconfig_cannot_add_an_exclude_entry_unchecked(self):
+        """R2-03: a rename is a delete plus an add."""
+        self.base("firebase/tsconfig.json", '{ "exclude": ["node_modules"] }\n')
+        self.repo.git("mv", "firebase/tsconfig.json", "firebase/tsconfig.app.json")
+        self.change("firebase/tsconfig.app.json", '{ "exclude": ["node_modules", "test"] }\n')
+        self.assertFails("guard: widened tsconfig exclude:")
+        self.change("firebase/tsconfig.app.json", '{ "exclude": ["node_modules", "test"] } // justified: tests have their own project\n')
+        self.assertPasses()
+        self.base("firebase/tsconfig.app.json", '{ "exclude": ["node_modules", "test"] }\n')
+        self.repo.git("mv", "firebase/tsconfig.app.json", "firebase/tsconfig.json")
+        self.change("firebase/tsconfig.json", '{ "exclude": ["test", "node_modules"] }\n')
         self.assertPasses()
 
     def test_a_new_ruff_config_and_other_arrays_pass(self):
