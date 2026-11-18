@@ -345,13 +345,14 @@ class RoundThreeTests(CliFlagCase):
         "mypy --ignore-missing c.py", "mypy --disable-error no-untyped-def b.py", "mypy @args.txt b.py", 'mypy --config-file "" b.py',
         "mypy --config-f ci.ini b.py", "mypy --config ci.ini b.py", "mypy --follow-imp=skip b.py",
         "tsc -b --verbose ci.json", "tsc --build --force ci.json", "tsc -b tsconfig.json ci.json",
-        "shellcheck -S warning --rcfile ci.rc a.sh", "shellcheck --rc ci.rc a.sh", "shellcheck --exc=SC2086 a.sh", "shellcheck --incl=SC2086 a.sh",
+        "shellcheck -S warning --rcfile ci.rc a.sh", "shellcheck --rcfile=.shellcheckrc a.sh", "shellcheck --rc ci.rc a.sh",
+        "shellcheck --exc=SC2086 a.sh", "shellcheck --incl=SC2086 a.sh",
         "shellcheck --sev=error a.sh",
     ]
     GOOD = [
         "eslint --prune-suppressions .", "ruff check --extend-select E .", "mypy --config-file mypy.ini b.py", "mypy --config mypy.ini b.py",
         "mypy --follow-imports=normal b.py", "mypy --strict --warn-unused-ignores b.py", "tsc -b --verbose", "tsc -b tsconfig.json --force",
-        "shellcheck --norc a.sh", "shellcheck --sev=style a.sh", "shellcheck --rcfile=.shellcheckrc a.sh",
+        "shellcheck --norc a.sh", "shellcheck --sev=style a.sh",
     ]
 
     def test_relaxing_forms_fail(self):
@@ -367,7 +368,7 @@ class RoundThreeTests(CliFlagCase):
                 self.assertPasses()
 
     def test_ruff_add_inline_ignore_flag_fails(self):
-        self.put("scripts/lint.sh", "ruff check --add-noqa .")  # justified: fixture text for the CLI flag check, written to a throwaway repo, never run
+        self.put("scripts/lint.sh", "ruff check --add-noqa .")  # justified: fixture text for the CLI flag check, never run
         self.assertFails(MARK + ": scripts/lint.sh:1:")
 
     def test_eslint_suppressions_are_a_baseline_and_no_justification_waives_them(self):

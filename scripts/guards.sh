@@ -200,8 +200,30 @@ function cfg(p, flags, okre,   re, t, v, q, i) {
     q = substr(t, 1, 1)
     if (q == "\"" || q == "\047") { t = substr(t, 2); i = index(t, q); v = (i ? substr(t, 1, i - 1) : t) }
     else { v = t; sub(/[ \t].*$/, "", v); sub(/["\047,]+$/, "", v) }
+    if (v == "" && (q == "\"" || q == "\047")) return 1
     if (v == "" || v ~ /^-/) continue
-    if (v ~ /^[\/~]/ || v ~ /[$`]/ || v ~ /(^|\/)\.\.(\/|$)/ || v !~ okre) return 1
+    if (badpath(v, okre)) return 1
+  }
+  return 0
+}
+function badpath(v, okre) { return (v ~ /^[\/~]/ || v ~ /[$`]/ || v ~ /(^|\/)\.\.(\/|$)/ || v !~ okre) }
+# pre: the prefixes of a long option name from m characters up, as a regex alternation (argparse and getopt accept unique prefixes).
+function pre(n, m,   i, r) { for (i = m; i <= length(n); i++) r = r (r == "" ? "" : "|") substr(n, 1, i); return r }
+# abbr: a long option that is a proper prefix of one of the space-separated names (mypy and shellcheck accept `--ignore-missing`).
+function abbr(p, names,   t, n, k, i) {
+  n = split(names, k, " ")
+  while (match(p, SP "--[A-Za-z][A-Za-z-]*")) {
+    t = substr(p, RSTART, RLENGTH); sub(/^[ \t"\047]*--/, "", t); p = substr(p, RSTART + RLENGTH)
+    for (i = 1; i <= n; i++) if (length(t) >= 2 && length(t) < length(k[i]) && index(k[i], t) == 1) return 1
+  }
+  return 0
+}
+# tscbuild: every project argument of tsc -b / --build (any number, in any position among flags) must be a scanned tsconfig.
+function tscbuild(p,   t, n, w, i) {
+  while (match(p, SP "(-b|--build)([ \t=]|$)")) {
+    t = substr(p, RSTART + RLENGTH); p = t
+    n = split(t, w, /[ \t]+/)
+    for (i = 1; i <= n; i++) { gsub(/["\047,]/, "", w[i]); if (w[i] != "" && w[i] !~ /^-/ && badpath(w[i], TSOK)) return 1 }
   }
   return 0
 }
@@ -237,17 +259,19 @@ function numflag(p, flag, valre,   t) {
   }
   return 0
 }
-function ruff(s) { return hit(s, "(extend-)?ignore|per-file-ignores|extend-per-file-ignores|exclude|extend-exclude|exit-zero|isolated", "on") || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$") }
+function ruff(s) { return hit(s, "(extend-)?ignore|per-file-ignores|extend-per-file-ignores|exclude|extend-exclude|exit-zero|isolated|select|fix-only|add-noqa", "on") || (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|$)")) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$") }
 function mypy(s) {
   return hit(s, "ignore-missing-imports|allow-[a-z-]+|no-strict-[a-z-]+|no-check-untyped-defs|no-warn-[a-z-]+|no-extra-checks|disable-error-code|implicit-optional|implicit-reexport|exclude|untyped-calls-exclude", "on") || \
-    (s ~ (SP "--follow-imports[ \t=]+[\"\047]?(skip|silent)([ \t\"\047]|$)")) || cfg(s, "--config-file", "^[^= \t]*(mypy\\.ini|setup\\.cfg|tox\\.ini|pyproject\\.toml)$")
+    abbr(s, MYPYN) || (s ~ SP "@[^ \t\"\047]") || (s ~ (SP "--(" pre("follow-imports", 3) ")[ \t=]+[\"\047]?(skip|silent)([ \t\"\047]|$)")) || \
+    cfg(s, "--(" pre("config-file", 3) ")", "^[^= \t]*(mypy\\.ini|setup\\.cfg|tox\\.ini|pyproject\\.toml)$")
 }
 function tsc(s, direct) {
   if (direct && s !~ SP "(-p|--project|-b|--build)([ \t=\"\047]|$)" && s ~ (SP "[^ \t\"\047=-][^ \t\"\047=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)([ \t\"\047]|$)")) return 1
   return hit(s, "noCheck|skipLibCheck|skipDefaultLibCheck|allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors", "on") || \
     hit(s, "strict[A-Za-z]*|noImplicit[A-Za-z]*|noUnused[A-Za-z]*|alwaysStrict|useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noFallthroughCasesInSwitch|noPropertyAccessFromIndexSignature|checkJs", "off") || \
-    cfg(s, "-p|--project|-b|--build", "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)")
+    cfg(s, "-p|--project", TSOK) || tscbuild(s)
 }
+function eslintbase(s) { return hit(s, "suppress-all|suppress-rule|suppressions-location|pass-on-unpruned-suppressions", "on") }
 function eslint(s, ok) {
   return hit(s, "quiet|ignore-pattern|ignore-path|no-eslintrc|no-config-lookup|no-error-on-unmatched-pattern|pass-on-no-patterns", "on") || eslintrule(s) || \
     numflag(s, "--max-warnings", "^[ \t=]*[\"\047]?(-1|[1-9][0-9]*)([^0-9]|$)") || numflag(s, "--report-unused-disable-directives-severity", "^[ \t=]*[\"\047]?(off|0)([^A-Za-z0-9_-]|$)") || cfg(s, "-c|--config", ok)
@@ -256,9 +280,13 @@ function prettier(s, ok) {
   return hit(s, "ignore-path|require-pragma|no-error-on-unmatched-pattern|ignore-unknown", "on") || (s ~ (SP "-u([ \t\"\047]|$)")) || cfg(s, "--config", ok)
 }
 function shellcheck(s) {
-  return (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|SC[0-9]|$)")) || (s ~ (SP "-[A-Za-z]*i([ \t\"\047]|SC[0-9]|$)")) || hit(s, "exclude|include", "on") || \
-    (s ~ (SP "(-[A-Za-z]*S[ \t]*|--severity[ \t=]+)[\"\047]?error([ \t\"\047]|$)"))
+  return (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|SC[0-9]|$)")) || (s ~ (SP "-[A-Za-z]*i([ \t\"\047]|SC[0-9]|$)")) || hit(s, "exclude|include|rcfile", "on") || abbr(s, "exclude include rcfile") || \
+    (s ~ (SP "(-[A-Za-z]*S[ \t]*|--(" pre("severity", 3) ")[ \t=]+)[\"\047]?error([ \t\"\047]|$)"))
 }
+function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
+function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
+# baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
+function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
 function relaxed(p,   js, dd, s, ok) {
   js = (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bunx)([^A-Za-z0-9_.-]|$)/)
   dd = ""
@@ -275,16 +303,16 @@ function relaxed(p,   js, dd, s, ok) {
   if ((has(p, "prettier") || dd != "") && prettier((has(p, "prettier") ? after(p, "prettier") : "") " " dd, ok)) return 1
   return 0
 }
-function flush(   n, i, parts, c) {
+function flush(   n, i, parts, j) {
   if (cur == "") return
-  if (cur !~ JUSTRE) {
-    c = stripc(cur)
-    n = split(c, parts, /[;&|]+/)
-    for (i = 1; i <= n; i++) if (relaxed(parts[i])) { printf "%s:%d:%s\n", F, start, cur; break }
-  }
+  j = (cur ~ JUSTRE)
+  n = split(stripc(cur), parts, /[;&|]+/)
+  for (i = 1; i <= n; i++) if (baseline(parts[i]) || (!j && relaxed(parts[i]))) { printf "%s:%d:%s\n", F, start, cur; break }
   cur = ""
 }
-BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0 }
+BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)"
+  MYPYN = "ignore-missing-imports allow-untyped-defs allow-untyped-globals allow-redefinition allow-redefinition-new no-strict-optional no-strict-equality no-strict-bytes no-check-untyped-defs no-warn-no-return no-warn-unused-ignores no-warn-redundant-casts no-warn-unused-configs no-extra-checks disable-error-code implicit-optional implicit-reexport exclude untyped-calls-exclude"
+  SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0 }
 {
   line = $0; sub(/\r$/, "", line)
   if (!cont && line ~ /^[ \t]*#/) next
