@@ -632,15 +632,12 @@ seen the batch report.
   documented exception to "the orchestrator never commits or pushes" (§1 role table): it is a server-side merge of `main`,
   not authored code. Do it only when no worker holds that branch (F6, two writers); otherwise the branch-holding worker
   merges `main` itself, or the orchestrator waits.
-* **Merge agent (issue 136):** for the owner-authorized kinds only (`working-draft-docs`, `tasks-sync` = a status sync that changes only
-  `docs/tasks.toml`, `dependabot`), the merge agent runs only `scripts/merge_ready.py <N> <sha> <kind>`, where `<sha>` is the head the
-  owner or orchestrator named. It makes no other merge call and does not repeat the checks by hand. The script refuses (exit 1, reasons on stderr, nothing
-  merged) unless the head equals `<sha>`, `mergeable_state` is `clean`, every ruleset-required check has a successful latest run, no closing
-  keyword precedes an issue number in the title, body or commit messages, and every changed file is inside the kind's paths
-  (docs: `docs/product/`, `docs/milestones/`, `docs/reviews/`, `design/`, `docs/PLAN.md`; tasks-sync: `docs/tasks.toml`; dependabot: manifests,
-  lockfiles and `uses:` version pins in workflows). Otherwise it squash-merges through the REST API with `<sha>` pinned. On a refusal the agent
-  stops and reports the reasons; it never retries with other flags or merges another way. Changing the script or the paths is an owner-only
-  tooling change (`scripts/merge_ready.py`, tested by `scripts/test_merge_ready.py` in `verify.sh` and CI).
+* **Merge agent (issue 136):** for the owner-authorized kinds only (`working-draft-docs`, `tasks-sync` = only `docs/tasks.toml`, `dependabot`) the
+  merge agent runs only `scripts/merge_ready.py <N> <sha> <kind>` (`<sha>` = the head the owner or orchestrator named), from a clean checkout of `origin/main` (`git status --porcelain` empty),
+  never from a branch or a modified tree. No other merge call, no hand-repeated checks. The script refuses (exit 1, reasons on stderr, nothing merged) unless head == `<sha>`, `mergeable_state` is `clean`, the ruleset-required checks succeeded,
+  no closing keyword precedes an issue number, and every changed file is in the kind's paths (see its header); else it squash-merges via REST with
+  `<sha>` pinned. On a refusal the agent stops and reports. The script and its test are protected process files (PreToolUse guard); changing them is
+  an owner-only tooling change (`scripts/test_merge_ready.py` runs in `verify.sh` and CI).
 * **Dependabot weekly routine:** once a week one batch triage worker reads the open Dependabot PRs and groups the bumps
   into one new branch cut from `main` (never a feature branch, F6), opens a draft PR and posts a "ready" comment on it.
   The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since its bumps then supersede them.

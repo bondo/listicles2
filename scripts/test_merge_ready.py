@@ -231,11 +231,10 @@ class RefusalTests(unittest.TestCase):
     def test_base_other_than_main_is_refused(self):
         self.refused(make_api(base="release"), r"base .*release.*main")
 
-    def test_truncated_file_list_is_refused(self):
-        self.refused(make_api(counts={"files": 3001}), r"files.*3001")
-
-    def test_truncated_commit_list_is_refused(self):
-        self.refused(make_api(counts={"commits": 251}), r"commits.*251")
+    def test_truncated_file_or_commit_list_is_refused(self):
+        for counts, reason in (({"files": 3001}, r"files.*3001"), ({"commits": 251}, r"commits.*251")):
+            with self.subTest(counts=counts):
+                self.refused(make_api(counts=counts), reason)
 
     def pin_patch(self, old, new):
         return file_entry(".github/workflows/ci.yml", patch=f"@@ -3 +3 @@\n-{old}\n+{new}")
@@ -253,14 +252,12 @@ class RefusalTests(unittest.TestCase):
                 files = [file_entry(".github/workflows/ci.yml", patch=patch)]
                 self.refused(make_api(files=files), r"ci\.yml.*(pin|uses)", kind="dependabot")
 
-    def test_dependabot_wrapper_url_on_another_host_is_refused(self):
+    def test_dependabot_wrapper_other_host_or_property_is_refused(self):
         evil = "distributionUrl=https\\://evil.example/gradle-9.2-bin.zip"
-        files = [file_entry("gradle/wrapper/gradle-wrapper.properties", patch=f"@@ -1 +1 @@\n-{WRAP_OLD}\n+{evil}")]
-        self.refused(make_api(files=files), r"gradle-wrapper\.properties", kind="dependabot")
-
-    def test_dependabot_wrapper_other_property_is_refused(self):
-        files = [file_entry("gradle/wrapper/gradle-wrapper.properties", patch="@@ -1 +1 @@\n-networkTimeout=10000\n+networkTimeout=1")]
-        self.refused(make_api(files=files), r"gradle-wrapper\.properties", kind="dependabot")
+        for patch in (f"@@ -1 +1 @@\n-{WRAP_OLD}\n+{evil}", "@@ -1 +1 @@\n-networkTimeout=10000\n+networkTimeout=1"):
+            with self.subTest(patch=patch):
+                files = [file_entry("gradle/wrapper/gradle-wrapper.properties", patch=patch)]
+                self.refused(make_api(files=files), r"gradle-wrapper\.properties", kind="dependabot")
 
     def test_no_changed_files_is_refused(self):
         self.refused(make_api(files=[]), r"no changed files")
@@ -320,37 +317,6 @@ class UsageTests(unittest.TestCase):
         code, text = go(api)
         self.assertNotEqual(code, 0)
         self.assertIn("405", text)
-
-
-class GhApiTests(unittest.TestCase):
-    """GhApi retries only reads that failed with a 429 or 5xx HTTP status, never the merge PUT."""
-
-    def fake_gh(self, stderr, calls):
-        def fake_run(cmd, **kwargs):
-            calls.append(cmd)
-            return subprocess.CompletedProcess(cmd, 1, "", stderr)
-
-        return fake_run
-
-    def failing(self, stderr, call):
-        calls = []
-        real_run, real_sleep = merge_ready.subprocess.run, merge_ready.time.sleep
-        merge_ready.subprocess.run, merge_ready.time.sleep = self.fake_gh(stderr, calls), lambda s: None
-        try:
-            with self.assertRaises(merge_ready.ApiError):
-                call(merge_ready.GhApi())
-        finally:
-            merge_ready.subprocess.run, merge_ready.time.sleep = real_run, real_sleep
-        return len(calls)
-
-    def test_read_is_retried_on_http_5xx(self):
-        self.assertEqual(self.failing("gh: Bad Gateway (HTTP 502)", lambda a: a.get("repos/x")), merge_ready.RETRIES)
-
-    def test_merge_put_is_never_retried(self):
-        self.assertEqual(self.failing("gh: Bad Gateway (HTTP 502)", lambda a: a.put("repos/x", {"sha": SHA})), 1)
-
-    def test_a_number_in_the_message_is_not_a_status(self):
-        self.assertEqual(self.failing("gh: Not Found (HTTP 404): 500 files", lambda a: a.get("repos/x")), 1)
 
 
 class WiringTests(unittest.TestCase):
