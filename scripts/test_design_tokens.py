@@ -161,6 +161,8 @@ MALFORMED = {
     "a pair bg is a list": lambda t: t["contrastPairs"][0].update(bg=["surface"]) or t,
     "a pair min is a string": lambda t: t["contrastPairs"][0].update(min="4.5") or t,
     "a pair min is null": lambda t: t["contrastPairs"][0].update(min=None) or t,
+    "a pair min is NaN": lambda t: t["contrastPairs"][0].update(min=float("nan")) or t,
+    "a pair min is infinite": lambda t: t["contrastPairs"][0].update(min=float("inf")) or t,
     "a pair min is a boolean": lambda t: t["contrastPairs"][0].update(min=True) or t,
 }
 
@@ -200,7 +202,7 @@ class Malformed(unittest.TestCase):
     def test_a_valid_extra_key_or_a_valid_float_minimum_is_not_a_structure_finding(self):
         tokens = copy.deepcopy(REAL)
         tokens["extra"] = {"anything": [1, 2]}
-        tokens["contrastPairs"][0]["min"] = 7  # an int above AA is fine
+        tokens["contrastPairs"][0]["min"] = 5  # an int above AA (and below the real ratio) is fine
         self.assertEqual(dt.check(tokens), [])
 
 
