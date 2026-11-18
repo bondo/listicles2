@@ -195,17 +195,16 @@ if [ "$STAGED" = 0 ]; then
           }
         }
         if (decl) { body = substr(body, 1, 1) "test(" rest; if (bare) kw = body }
-        # The word `threshold` in prose is not a check setting (owner decision, #15; PR 135 R1). Prose = a letter-word
-        # and spaces on each side (`gate or threshold changes`), on a line with no digit, in a markdown/text file or
-        # inside a double-quoted string (odd number of `"` before it). Code (`val threshold by x`), comments, numbers,
-        # keys, assignments, calls and every other keyword on the line still count; single quotes are not trusted.
-        txt = (file ~ /\.(md|txt|rst)$/); nodigit = ($0 !~ /[0-9]/); out = ""; rest = kw
-        while (match(rest, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) {
-          pre = out substr(rest, 1, RSTART - 1); mid = substr(rest, RSTART, RLENGTH - 1); q = gsub(/"/, "&", pre)
-          if (nodigit && (txt || q % 2 == 1)) sub(/threshold/, "prose", mid)
-          out = pre mid; rest = substr(rest, RSTART + RLENGTH - 1)
+        # The word `threshold` in prose is not a check setting (owner decision, #15; PR 135 R1, R2). Prose = a letter-word
+        # and spaces on each side (`gate or threshold changes`) on a line with no digit, and the line is either in a
+        # markdown/text file or made of nothing but double-quoted string literals (optional r/b/u/f prefix, no backslash
+        # inside) and punctuation `( ) [ ] { } , ;`. Code, comments, keys, assignments, calls, config values and every
+        # other keyword on the line still count; a stray `"`, a char literal or an escape leaves letters or symbols
+        # outside the literals, so the line is not a bare string line.
+        lit = $0; gsub(/[rRbBuUfF]?"[^"\\]*"/, "", lit)
+        if ($0 !~ /[0-9]/ && (file ~ /\.(md|txt|rst)$/ || lit ~ /^[-+][][ \t(){},;]*$/)) {
+          while (match(kw, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
         }
-        kw = out rest
       }
       kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
