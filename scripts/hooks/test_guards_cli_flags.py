@@ -185,6 +185,20 @@ class ConfigIndirectionTests(CliFlagCase):
                 self.put("scripts/lint.sh", line)
                 self.assertPasses()
 
+    def test_config_paths_inside_package_json_strings(self):
+        """The value ends at the closing quote and comma of the JSON string, not at whitespace."""
+        good = ['    "typecheck": "tsc --noEmit -p tsconfig.json",', '    "lint": "eslint -c eslint.config.mjs",',
+                '    "lint": "ruff check --config ruff.toml"', '    "fmt": "prettier --check --config .prettierrc.json ."']
+        bad = ['    "typecheck": "tsc --noEmit -p ci.json",', '    "lint": "eslint -c relaxed.mjs",', '    "lint": "ruff check --config ci.toml"']
+        for line in good:
+            with self.subTest(line=line):
+                self.put("firebase/package.json", line)
+                self.assertPasses()
+        for line in bad:
+            with self.subTest(line=line):
+                self.put("firebase/package.json", line)
+                self.assertFails(MARK + ": firebase/package.json:1:")
+
     def test_justification_waives_a_config_path(self):
         self.put("scripts/lint.sh", "ruff check --config ci.toml scripts # justified: ci.toml is the generated-code profile, owner approved")
         self.assertPasses()
