@@ -1233,7 +1233,10 @@ class M026Tests(unittest.TestCase):
         ("review-visual", "agent scores are advisory and taste stays with the owner", "agent scores decide"),
         ("review-visual", "goldens per state (light and dark, en and da)", "goldens per state (light)"),
         ("review-visual", "a calibration note for the rubric, not a finding", "a finding"),
-        ("review-rules-matrix", "without both is a `major` finding (area `security-rules`)", "without both is a `minor` finding"),
+        ("review-rules-matrix", "without both is a `major` finding (area `security-rules`), and a `blocker` when the missing case hides a real security hole",
+         "without both is a `minor` finding"),
+        ("review-rules-matrix", ", and a `blocker` when the missing case hides a real security hole", ""),  # owner decision, #15 comment 6969890077
+        ("review-rules-matrix", "hides a real security hole", "hides a gap"),
         ("review-rules-matrix", "`area:security-rules`, `area:sync-merge` or `risk:high`", "`area:security-rules`"),
         ("review-rules-matrix", "with an allow case and a deny case", "with an allow case"),
     )
@@ -1244,6 +1247,8 @@ class M026Tests(unittest.TestCase):
         ("REVIEW.md", "review-visual", "A score below 3 blocks the merge."),
         ("REVIEW.md", "review-rules-matrix", "A changed rule without both is a `minor` finding."),
         ("REVIEW.md", "review-rules-matrix", "A changed rule without both is a nit."),
+        ("REVIEW.md", "review-rules-matrix", "A changed rule without both is a `blocker`."),
+        ("REVIEW.md", "review-rules-matrix", "A changed rule without both is always a blocker."),
     )
 
     def doc(self, path):
@@ -1295,6 +1300,9 @@ class M026Tests(unittest.TestCase):
 
     def test_the_reviewer_prompt_rejects_the_wrong_severity_and_other_roles_do_not_count(self):
         for bad in (" An agent score below 3 is a `blocker`.", " An agent score below 3 is a major finding."):
+            with self.subTest(bad=bad):
+                self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("reviewer") + bad)))
+        for bad in (" A gap is a `blocker`.", " A gap in the matrix is always a `blocker`."):
             with self.subTest(bad=bad):
                 self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("reviewer") + bad)))
         self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("design-reviewer"))))
