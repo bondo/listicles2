@@ -305,5 +305,67 @@ val testLicenseeGate =
         }
     }
 
+// Compose and extra detekt rules gate (issue 38): the fixtures under config/detekt/fixtures are never part of an
+// app source set. The violating fixture must produce every expected rule; the clean one must produce nothing.
+fun registerFixtureDetekt(
+    taskName: String,
+    dirName: String,
+    failOnFindings: Boolean,
+) = tasks.register<Detekt>(taskName) {
+    setSource(layout.projectDirectory.dir("config/detekt/fixtures/$dirName"))
+    include("**/*.kt")
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom("config/detekt/detekt.yml")
+    ignoreFailures = !failOnFindings
+    reports {
+        html.required.set(false)
+        xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/detekt-fixtures/$dirName.xml"))
+    }
+}
+
+val detektFixtureViolating = registerFixtureDetekt("detektFixtureViolating", "violating", failOnFindings = false)
+val detektFixtureClean = registerFixtureDetekt("detektFixtureClean", "clean", failOnFindings = true)
+
+val testDetektRules =
+    tasks.register("testDetektRules") {
+        group = "verification"
+        description = "Compose and extra detekt rules fire on the violating fixture and stay quiet on the clean one."
+        dependsOn(detektFixtureViolating, detektFixtureClean)
+        val violatingReport = layout.buildDirectory.file("reports/detekt-fixtures/violating.xml")
+        val cleanReport = layout.buildDirectory.file("reports/detekt-fixtures/clean.xml")
+        val cleanSources = layout.projectDirectory.dir("config/detekt/fixtures/clean")
+        val expected =
+            listOf(
+                "ModifierMissing",
+                "ComposableNaming",
+                "MutableStateParam",
+                "UnstableCollections",
+                "ParameterNaming",
+                "ComposableParamOrder",
+                "GlobalCoroutineUsage",
+                "InjectDispatcher",
+            )
+        doLast {
+            val found =
+                Regex("source=\"detekt\\.(?:[A-Za-z-]+[:.])?([A-Za-z]+)\"")
+                    .findAll(violatingReport.get().asFile.readText())
+                    .map { it.groupValues[1] }
+                    .toSet()
+            val missing = expected.filter { it !in found }
+            check(missing.isEmpty()) { "detekt did not report on the violating fixture: $missing (found $found)" }
+            val cleanCount = cleanSources.asFile.walkTopDown().count { it.extension == "kt" }
+            check(cleanCount > 0) { "clean fixture has no Kotlin files; the gate is broken" }
+            check(
+                !cleanReport
+                    .get()
+                    .asFile
+                    .readText()
+                    .contains("<error "),
+            ) { "clean fixture has findings" }
+        }
+    }
+
 // Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
 tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }
