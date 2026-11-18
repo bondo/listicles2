@@ -550,7 +550,7 @@ milestone = "M0.5"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26", "M0.5-27", "M0.5-28"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26", "M0.5-27", "M0.5-28", "M0.5-29"]
 
 [[task]]
 id = "M0.5-27"
@@ -742,9 +742,20 @@ milestone = "M0.5"
 status = "done"
 assignee = "retro"
 risk = "normal"
-depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-27", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26"]
+depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-27", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26", "M0.5-29"]
 pr = 137
 notes = "Fresh Opus session (agents/roles.yaml retro), after every other non-owner M0.5 task, done or not, so the list does not change as work progresses (the follow-up burn-down M0.5-FU waits for it, as the validator requires; add each new M0.5 task here); M1 waits for it through milestone:M0.5. Reads docs/agent-metrics.csv (session, round, incident, review and escaped rows), docs/reviews/README.md and a sample of transcripts and PR threads; no docs/agent-tuning.md exists yet, so it creates it. Compares the pilot with the baseline of the proposal (2026-11-17): the 68 owner-input comments split into product answers and process interventions, 51 merged PRs, commits merged without review, escaped defects in security-rules, sync-merge, release or risk:high work, review rounds per PR class, confirmed share of blocker and major findings, usage per PR class. The pilot passes when every hard row holds and at least one other target is met; a broken hard row or no movement means failure. Checks the kill switch (PILOT-STOP on #15, then the roles.yaml fallback set) and that compaction did not precede a handoff note. Proposes at most 3 changes as reviewed PRs with the expected effect logged; the owner merges roles.yaml and threshold changes."
+
+[[task]]
+id = "M0.5-29"
+title = "File-size guard in scripts/guards.sh: an added or changed file over 1 MB, or a PNG over 300 KB outside docs/product/wireframes/, fails"
+milestone = "M0.5"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+pr = 141
+notes = "Tooling env (scripts/guards.sh, scripts/hooks/). Test-first, with negative cases; the guard runs in verify.sh, the pre-commit hook (--staged) and the CI guards job. Owner decision on #15, comment 6974778901 (Git LFS not adopted, guard now, LFS deferred to M6-O4). Owner merge: scripts/ and a guard limit"
 
 # ---------------------------------------------------------------- M1 auth + households
 # The planner (M1-01) breaks M1 into PR-sized tasks and adds them here in its PR.
@@ -1154,3 +1165,13 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M6-O1", "M1-O4"]
 notes = "docs/milestones/M1.md R5 steps 2-4. Before the first external tester and at least two weeks before App Check enforcement"
+
+[[task]]
+id = "M6-O4"
+title = "Adopt Git LFS for screenshot goldens (deferred: only when the revisit trigger fires)"
+milestone = "M6"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M6-O1"]
+notes = "DEFERRED, owner decision on #15, comment 6974778901 (2026-11-18): Git LFS is NOT adopted now. Revisit trigger: tracked binaries on main above 50 MB, OR pack growth above 20 MB per month (for example Roborazzi golden churn), OR any single file above 5 MB. Becomes ready once M6-O1 is done (the release key), whether or not the trigger has fired: at release the owner checks the trigger and either adopts LFS (the 3 PRs below) or drops this task. Before that, if the trigger fires earlier, the owner clears the depends_on. Why not now: cloud agents check LFS files out as pointers, the proxy rejects lfs.github.com, LFS auth through the git proxy is unverified, and CI checkouts would spend LFS bandwidth. If adopted: about 3 PRs (.gitattributes for goldens only, no history migrate; CI lfs: true plus a cache; agent git lfs pull in verify), and the owner allows lfs.github.com and sets an LFS budget. Until then the M0.5-29 guard keeps files small (M1-03 goldens: small fixed device size, one golden per state)"
