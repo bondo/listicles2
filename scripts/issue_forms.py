@@ -15,6 +15,8 @@ INPUT_TYPES = {"textarea", "input", "dropdown", "checkboxes"}
 BODY_TYPES = INPUT_TYPES | {"markdown"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 # Keys GitHub's issue-form schema accepts at the top level.
+# Keys GitHub accepts on a body item.
+ITEM_KEYS = {"type", "id", "attributes", "validations"}
 TOP_LEVEL_KEYS = {"name", "description", "title", "labels", "assignees", "projects", "type", "body"}
 
 
@@ -75,6 +77,7 @@ def _check_body(name, body):
         if item["type"] not in BODY_TYPES:
             errs.append(f"{where} has unknown type {item['type']!r}")
             continue
+        errs += [f"{where} unknown key {k!r}" for k in item if k not in ITEM_KEYS]
         attrs = item.get("attributes")
         if "id" in item:
             bid = item["id"]
@@ -89,6 +92,8 @@ def _check_body(name, body):
                 errs.append(f"{where} (markdown) needs attributes.value")
             elif not isinstance(attrs["value"], str):
                 errs.append(f"{where} attributes.value must be a string")
+            if "id" in item:
+                errs.append(f"{where} (markdown) cannot have an id")
             if "validations" in item:
                 errs.append(f"{where} (markdown) cannot have validations")
             continue
@@ -109,7 +114,7 @@ def _check_body(name, body):
         if item["type"] == "checkboxes" and isinstance(attrs, dict) and isinstance(attrs.get("options"), list):
             required = required or any(isinstance(o, dict) and o.get("required") is True for o in attrs["options"])
     if not required:
-        errs.append(f"{name}: at least one body field must have validations.required: true")
+        errs.append(f"{name}: at least one body field must be required (validations.required: true or a required checkbox option)")
     return errs
 
 
