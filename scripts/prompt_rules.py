@@ -582,7 +582,8 @@ RULES = (
         (
             r"visual check and rules matrix \(review\.md items 12 and 13\)", r"an agent score below 3 is a `minor` finding, never a blocker or major",
             r"taste stays with the owner", r"`area:security-rules`, `area:sync-merge` or `risk:high`",
-            r"covers each changed rule with an allow case and a deny case", r"a gap is a `major` finding \(area `security-rules`\), and a `blocker` when the missing case hides a real security hole",
+            r"covers each changed rule with an allow case and a deny case",
+            r"a gap is a `major` finding \(area `security-rules`\), and a `blocker` when the missing case hides a real security hole",
         ),
         "the reviewer does the R9 visual check (agent score below 3 is a minor) and the R7 allow/deny matrix check (REVIEW.md items 12, 13; M0.5-26)",
         forbidden=(r"score below 3 is a `?(?:blocker|major)", r"below 3 (?:blocks|must block) the merge",
