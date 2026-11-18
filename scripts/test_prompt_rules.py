@@ -1504,6 +1504,48 @@ class NoResolveThreadTests(unittest.TestCase):
                 with self.subTest(role=role, stale=stale):
                     self.assertIn("no-resolve-thread", ids(prompt_rules.check_text(role, real(role) + stale)))
 
+    # R1-02 of #150: the natural permission phrasings (plural, no article, imperative, "feel free").
+    MISSED_PERMISSION = (
+        "You may resolve threads once answered.",
+        "The orchestrator may resolve review threads.",
+        "Resolve the thread after answering.",
+        "Then resolve the conversation.",
+        "Feel free to resolve the thread after replying.",
+        "Agents are allowed to resolve a collaborator's thread.",
+        "Reply and resolve the thread.",
+        "- Resolve the collaborator's review thread.",
+    )
+    # R1-01 of #150: correct ban or owner-only wording must not be flagged.
+    BAN_WORDING = (
+        "Do not resolve a collaborator's review thread.",
+        "Agents must not resolve a collaborator's thread.",
+        "The owner resolves a collaborator's thread when done.",
+        "Only the owner may resolve the thread.",
+        "Agents are not allowed to resolve a collaborator's thread.",
+        "Never resolve a collaborator's review thread.",
+        "The collaborator may resolve their own thread.",
+    )
+    PERMISSION_IDS = {"no-resolve-thread", "orch-no-resolve-thread", "collab-no-resolve"}
+
+    def flagged(self, where, text):
+        if where in ROLES:
+            return ids(prompt_rules.check_text(where, text))
+        return ids(prompt_rules.check_doc_text(where, text))
+
+    def test_the_missed_permission_phrasings_are_rejected_everywhere(self):
+        for stale in self.MISSED_PERMISSION:
+            for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
+                base = real(where) if where in ROLES else self.doc(where)
+                with self.subTest(where=where, stale=stale):
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base + "\n" + stale + "\n"))
+
+    def test_correct_ban_and_owner_only_wording_is_not_rejected(self):
+        for good in self.BAN_WORDING:
+            for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
+                base = real(where) if where in ROLES else self.doc(where)
+                with self.subTest(where=where, good=good):
+                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, base + "\n" + good + "\n"))
+
     def test_every_prompt_still_needs_the_ban_itself(self):
         for role in ROLES:
             for index in range(3):
