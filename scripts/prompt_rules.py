@@ -62,6 +62,14 @@ class DocRule:
 
 
 ALL = ROLES
+
+# Wrong severities that REVIEW.md items 12 and 13 and the reviewer prompt must not carry (M0.5-26, R3-01 and R3-02 of #133). One
+# definition for both files, so the two pins cannot drift apart; wording pins cannot be exhaustive, parity is the goal.
+SCORE_WRONG_SEVERITY = r"scores? below 3 (?:is|are) (?:always |only |just )?(?:a |an )?`?(?:blocker|major)"
+SCORE_BLOCKS_MERGE = r"below 3 (?:blocks|must block) the merge"
+MATRIX_WRONG_SEVERITY = (
+    r"(?:(?:a |the |such a )?(?:matrix )?gaps? (?:in the matrix )?|without both )(?:is|are) (?:always |only |just )?(?:a |an )?`?(?:minor|nit|blocker)"
+)
 RULES = (
     Rule(
         "data-fenced", ALL,
@@ -586,8 +594,7 @@ RULES = (
             r"a gap is a `major` finding \(area `security-rules`\), and a `blocker` when the missing case hides a real security hole",
         ),
         "the reviewer does the R9 visual check (agent score below 3 is a minor) and the R7 allow/deny matrix check (REVIEW.md items 12, 13; M0.5-26)",
-        forbidden=(r"score below 3 is a `?(?:blocker|major)", r"below 3 (?:blocks|must block) the merge",
-                   r"a (?:matrix )?gap (?:in the matrix )?is (?:always )?(?:a |an )?`?(?:minor|nit|blocker)"),
+        forbidden=(SCORE_WRONG_SEVERITY, SCORE_BLOCKS_MERGE, MATRIX_WRONG_SEVERITY),
     ),
     Rule(
         "escalation-role", ("escalation-reviewer",),
@@ -681,7 +688,7 @@ DOC_RULES = (
         ),
         "REVIEW.md item 12 (R9): goldens per state and rubric scores for changed screens; "
         "an agent score below 3 is a minor finding, never a blocker (D-3.4, M0.5-26)",
-        forbidden=(r"score below 3 (?:is|are) (?:a |an )?`?(?:blocker|major)", r"below 3 (?:blocks|must block) the merge"),
+        forbidden=(SCORE_WRONG_SEVERITY, SCORE_BLOCKS_MERGE),
     ),
     DocRule(
         "review-rules-matrix", "REVIEW.md",
@@ -691,7 +698,7 @@ DOC_RULES = (
             r"without both is a `major` finding \(area `security-rules`\), and a `blocker` when the missing case hides a real security hole",
         ),
         "REVIEW.md item 13 (R7): on rules, sync-merge and risk:high PRs the allow/deny matrix must cover each changed rule (D-2.6, M0.5-26)",
-        forbidden=(r"without both is (?:always )?(?:a |an )?`?(?:minor|nit|blocker)",),  # R1-01 of #133: one pattern; an unconditional blocker is wrong too
+        forbidden=(MATRIX_WRONG_SEVERITY,),  # R1-01, R3-01 of #133: one pattern shared with the reviewer prompt rule
     ),
     DocRule(
         "plan-review-loop", "docs/PLAN.md",
