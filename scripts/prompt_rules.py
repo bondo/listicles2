@@ -657,7 +657,7 @@ RULES = (
             r"per `agents/roles\.yaml`",
         ),
         "the reviewer prompt names max effort for risk:high, area:security-rules and area:sync-merge PRs, as roles.yaml and R7 do (#134)",
-        forbidden=(r"max for risk:high prs\)",),
+        forbidden=(r"max for `?risk:high`? prs\)",),
     ),
     Rule(
         "reviewer-visual-matrix", ("reviewer",),
