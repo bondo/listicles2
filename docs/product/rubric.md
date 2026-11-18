@@ -1,6 +1,6 @@
 # Tally visual-quality rubric (draft)
 
-Status: working draft, merged as the baseline for M1; not owner-approved (open owner question T2 text size; see issue #15). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225). R1 decided: reference apps are Todoist and Google Keep (owner, 2026-11-18, issue #15 comment 6991349569).
+Status: owner-approved 2026-11-18 (issue #15 comments 6991799032 and 6991804241); open owner question T2 text size (see issue #15). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225). R1 decided: reference apps are Todoist and Google Keep (owner, 2026-11-18, issue #15 comment 6991349569).
 
 Task M0.5-03. Status: **draft for the owner** (D-3.3): the owner edits and agrees it at D5 (M0.5-O1); the collaborator
 comments, the owner decides. After that, changes go through R6. This file is the detailed form of
