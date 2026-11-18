@@ -376,4 +376,3 @@ flowchart LR
 
 - **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **PR to merge** [#154](https://github.com/bondo/listicles2/issues/154): tooling&#58; design_tokens.py reports malformed tokens as a finding
