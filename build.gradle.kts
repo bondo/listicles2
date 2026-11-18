@@ -47,6 +47,7 @@ tasks.withType<Detekt>().configureEach {
 }
 
 dependencies {
+    detektPlugins(libs.compose.rules.detekt)
     kover(project(":app"))
     kover(project(":core:domain"))
 }
@@ -305,5 +306,96 @@ val testLicenseeGate =
         }
     }
 
+// Compose and extra detekt rules gate (issue 38): the fixtures under config/detekt/fixtures are never part of an
+// app source set. The violating fixture must produce every expected rule; the clean one must produce nothing.
+// Type-resolved fixtures (InjectDispatcher needs types) get kotlinx-coroutines on the detekt classpath.
+val detektFixtureClasspath by configurations.creating { isCanBeConsumed = false }
+
+dependencies { detektFixtureClasspath(libs.kotlinx.coroutines.core) }
+
+fun registerFixtureDetekt(
+    taskName: String,
+    dirName: String,
+    failOnFindings: Boolean,
+    typed: Boolean = false,
+) = tasks.register<Detekt>(taskName) {
+    setSource(layout.projectDirectory.dir("config/detekt/fixtures/$dirName"))
+    include("**/*.kt")
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom("config/detekt/detekt.yml")
+    ignoreFailures = !failOnFindings
+    if (typed) classpath.setFrom(detektFixtureClasspath)
+    reports {
+        html.required.set(false)
+        xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/detekt-fixtures/$dirName.xml"))
+    }
+}
+
+// Each case: fixture directory, whether it is type-resolved, and the rules it must report ("clean" ones: none).
+val detektFixtureCases =
+    mapOf(
+        "violating" to
+            listOf(
+                "ModifierMissing",
+                "ComposableNaming",
+                "MutableStateParam",
+                "ParameterNaming",
+                "ComposableParamOrder",
+                "GlobalCoroutineUsage",
+                "Material2",
+            ),
+        "violating-typed" to listOf("InjectDispatcher"),
+        "clean" to emptyList(),
+        "clean-typed" to emptyList(),
+    )
+val detektFixtureTasks =
+    detektFixtureCases.keys.map { dir ->
+        registerFixtureDetekt(
+            taskName = "detektFixture" + dir.split('-').joinToString("") { it.replaceFirstChar(Char::uppercase) },
+            dirName = dir,
+            failOnFindings = !dir.startsWith("violating"),
+            typed = dir.endsWith("-typed"),
+        )
+    }
+
+val testDetektRules =
+    tasks.register("testDetektRules") {
+        group = "verification"
+        description = "Compose and extra detekt rules fire on the violating fixtures and stay quiet on the clean ones."
+        dependsOn(detektFixtureTasks)
+        val fixtureRoot = layout.projectDirectory.dir("config/detekt/fixtures")
+        val reportDir = layout.buildDirectory.dir("reports/detekt-fixtures")
+        val cases = detektFixtureCases
+        doLast {
+            val ruleId = Regex("source=\"detekt\\.(?:[A-Za-z-]+[:.])?([A-Za-z0-9]+)\"")
+            val problems = mutableListOf<String>()
+            for ((dir, expected) in cases) {
+                val count =
+                    fixtureRoot
+                        .dir(dir)
+                        .asFile
+                        .walkTopDown()
+                        .count { it.extension == "kt" }
+                if (count == 0) problems += "$dir: no Kotlin files; the gate is broken"
+                val report =
+                    reportDir
+                        .get()
+                        .file("$dir.xml")
+                        .asFile
+                        .readText()
+                val found = ruleId.findAll(report).map { it.groupValues[1] }.toSet()
+                if (dir.startsWith("clean")) {
+                    if (found.isNotEmpty()) problems += "$dir: unexpected findings $found"
+                } else {
+                    val missing = expected.filter { it !in found }
+                    if (missing.isNotEmpty()) problems += "$dir: did not report $missing (found $found)"
+                }
+            }
+            check(problems.isEmpty()) { "detekt rules gate:\n" + problems.joinToString("\n") }
+        }
+    }
+
 // Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
-tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }
+tasks.named("detekt") { dependsOn(testLicenseeGate, testDetektRules, ":app:licensee", ":core:domain:licensee") }

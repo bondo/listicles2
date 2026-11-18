@@ -27,6 +27,7 @@ kotlin {
 }
 
 dependencies {
+    detektPlugins(libs.compose.rules.detekt)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotest.runner)
