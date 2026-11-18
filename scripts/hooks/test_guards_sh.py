@@ -1590,6 +1590,30 @@ class LineLengthDiffs(DiffCase):
         self.change("pyproject.toml", "[tool.ruff]\nline-length = 200\n")
         self.assertFails("guard: raised line length:")
 
+    def test_a_deleted_or_renamed_style_file_is_compared_only_with_the_same_tool(self):
+        """R3-01: another tool's larger value must not count (ruff 160 is not a prettier or editorconfig limit)."""
+        self.repo.write("ruff.toml", "line-length = 160\n")
+        self.repo.write(".editorconfig", "[*.kt]\nmax_line_length = 120\n")
+        self.repo.write("firebase/.prettierrc.json", '{ "printWidth": 100 }\n')
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.repo.git("mv", "firebase/.prettierrc.json", "firebase/.prettierrc")
+        self.repo.commit()
+        self.assertPasses()
+        self.repo.git("mv", ".editorconfig", "app/.editorconfig")
+        self.repo.commit()
+        self.assertPasses()
+        self.repo.git("rm", "-q", "-f", "firebase/.prettierrc")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_a_rename_that_raises_the_same_tools_value_still_fails(self):
+        self.base("firebase/.prettierrc.json", '{ "printWidth": 100 }\n')
+        self.repo.write("ruff.toml", "line-length = 160\n")
+        self.repo.git("mv", "firebase/.prettierrc.json", "firebase/.prettierrc")
+        self.change("firebase/.prettierrc", '{ "printWidth": 200 }\n')
+        self.assertFails("guard: raised line length:")
+
     def test_added_settings_that_do_not_raise_pass(self):
         ec = "[*]\nmax_line_length = 100\n"
         self.base(".editorconfig", ec)
