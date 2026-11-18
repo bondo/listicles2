@@ -27,8 +27,10 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
 RETRIES = 5
 
-DOC_PREFIXES = ("docs/product/", "docs/milestones/", "docs/reviews/", "design/")
-DOC_FILES = ("docs/PLAN.md",)
+# An explicit list of working drafts (R3-01): naming, docs/reviews/ and other owner-decided or gate docs are owner-only. A new draft needs an owner merge here.
+DOC_PREFIXES = ("docs/milestones/", "docs/product/wireframes/")
+DOC_FILES = ("docs/PLAN.md", "docs/product/stories.md", "docs/product/flow.md", "docs/product/rubric.md", "design/tokens.json")
+DRAFT_STATUS = "not owner-approved"
 TASKS_FILES = ("docs/tasks.toml",)
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
@@ -123,6 +125,12 @@ def wrapper_only(patch):
     return bool(lines) and all(WRAPPER_LINE_RE.match(ln) for ln in lines)
 
 
+def drops_draft_status(patch):
+    """True if the diff removes more 'not owner-approved' status lines than it adds: a sign-off, which is the owner's."""
+    count = lambda i: sum(DRAFT_STATUS in ln for block in _changed_lines(patch) for ln in block[i])  # noqa: E731  # justified: two-use local helper
+    return count(0) > count(1)
+
+
 def file_problems(kind, files):
     if not files:
         return ["no changed files"]
@@ -132,6 +140,10 @@ def file_problems(kind, files):
             if name and not allowed(kind, name):
                 problems.append(f"path outside kind {kind}: {name}")
         name = f["filename"]
+        if kind == "dependabot" and f.get("status") != "modified":
+            problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
+        if kind == "working-draft-docs" and drops_draft_status(f.get("patch") or ""):
+            problems.append(f"{name}: removes a '{DRAFT_STATUS}' status line (a sign-off is the owner's)")
         check = pin_only if WORKFLOW_RE.match(name) else wrapper_only if name == WRAPPER_PROPS else None
         if kind == "dependabot" and check:
             patch = f.get("patch")
