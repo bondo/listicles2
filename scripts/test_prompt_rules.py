@@ -439,7 +439,7 @@ class M025Tests(unittest.TestCase):
         for old, new in (
             ("if the read still shows limit reached or a 5-hour warning, set a new `paused until` time", "carry on"),
             ("`send_later` again at the new reset time plus 5 minutes", "x"),
-            ("delete the spent reminder and stop", "delete the spent reminder"),
+            ("delete the old reminder, whether or not it fired, and stop", "delete the old reminder and stop"),
             ("resume implementers before reviewers", "resume reviewers first"),
             ("re-arm the 45-minute check-in", "x"), ("post one line", "x"),
             ("a session that has gone is a normal dead worker (§7.4): respawn it from `handoff/<branch>.md`", "x"),
@@ -485,7 +485,7 @@ class M025Tests(unittest.TestCase):
     def test_limit_failure_and_resume_weakened(self):
         for old, new in (
             ("a limit failure is not a stall", "a limit failure is a stall"), ("no respawn", "respawn"),
-            ("two-failure stop", "x"), ("`RESUMED`", "a comment"),
+            ("two-failure stop", "x"), ("post `RESUMED`", "post a comment"),
         ):
             self.assert_fails("orchestrator", "usage-limit-failure", old, new)
 
@@ -1454,6 +1454,111 @@ class Pr4RuleTests(unittest.TestCase):
                     cut = text.replace(m.group(0), m.group(0).replace(phrase, "", 1), 1)
                     found = (prompt_rules.check_text("orchestrator", cut) if "prompts" in where else prompt_rules.check_doc_text(where, cut))
                     self.assertIn("orch-merge-agent", ids(found))
+
+
+class Issue69UsageEdgeTests(unittest.TestCase):
+    """Follow-up for issue 69 (deferred findings of PR 63): resume runs once, skips posted results, one 10-minute second look,
+    a re-pause fallback and a defined cost window. Owner decision of 2026-11-18 (#15): no fixed cap of 5, throttle only near a rate limit."""
+
+    ORCH = "docs/ORCHESTRATION.md"
+    PROMPT_RULES = ("usage-read", "usage-resume")
+    NEW_PROMPT_PATTERNS = (
+        ("usage-read", "set that extra check-in only if none is pending"),
+        ("usage-read", "the second look is the first wake at least 10 minutes after the warning was first seen"),
+        ("usage-resume", "`send_later` again at the new reset time plus 5 minutes (60 minutes from now if `resetsAt` is missing or past)"),
+        ("usage-resume", "delete the old reminder, whether or not it fired, and stop"),
+        ("usage-resume", "does nothing if the newest `PAUSED` comment already has a `RESUMED` after it"),
+        ("usage-resume", "skip a session whose `WORKER-RESULT` is already posted and collect it instead"),
+        ("usage-resume", "delete the resume reminder, whether or not it fired"),
+    )
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def doc_rule(self):
+        return next(r for r in prompt_rules.DOC_RULES if r.id == "orch-usage-edges")
+
+    def test_the_real_text_passes(self):
+        self.assertEqual(prompt_rules.check_text("orchestrator", real("orchestrator")), [])
+        self.assertEqual(prompt_rules.check_doc_text(self.ORCH, self.doc(self.ORCH)), [])
+
+    def test_each_orchestration_clause_is_pinned(self):
+        rule = self.doc_rule()
+        self.assertEqual(len(rule.patterns), 8)
+        norm = prompt_rules.normalize(self.doc(self.ORCH))
+        for pattern in rule.patterns:
+            with self.subTest(pattern=pattern):
+                cut, n = re.subn(pattern, "", norm, flags=re.I)
+                self.assertGreaterEqual(n, 1, "the real doc must carry the clause")
+                self.assertIn("orch-usage-edges", ids(prompt_rules.check_doc_text(self.ORCH, cut)))
+
+    def test_each_orchestrator_prompt_clause_is_pinned(self):
+        norm = prompt_rules.normalize(real("orchestrator"))
+        for rule_id, phrase in self.NEW_PROMPT_PATTERNS:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase.lower(), norm.lower())
+                cut = re.sub(re.escape(phrase), "", norm, flags=re.I)
+                self.assertIn(rule_id, ids(prompt_rules.check_text("orchestrator", cut)))
+
+    def test_old_ambiguous_wording_is_rejected_in_the_doc(self):
+        for old in (
+            "3. Re-arm the 45-minute check-in; delete the spent resume reminder.",
+            "Start no new worker, and set one extra check-in about 10 minutes out.",
+            "then `send_later` at the new `resetsAt` + 5 minutes (delete the spent reminder) and stop.",
+        ):
+            with self.subTest(old=old):
+                self.assertIn("orch-usage-edges", ids(prompt_rules.check_doc_text(self.ORCH, self.doc(self.ORCH) + "\n" + old + "\n")))
+
+    def test_old_ambiguous_wording_is_rejected_in_the_prompt(self):
+        for rule_id, old in (
+            ("usage-read", " Finish their step and look again in about 10 minutes."),
+            ("usage-resume", " Delete the spent reminder and stop."),
+            ("usage-resume", " Then delete the spent resume reminder."),
+        ):
+            with self.subTest(old=old):
+                self.assertIn(rule_id, ids(prompt_rules.check_text("orchestrator", real("orchestrator") + old)))
+
+    def test_the_usage_sections_never_bring_back_a_fixed_cap_of_5(self):  # owner decision, #15 comment 6974903898
+        sec = re.search(r"### 7\.7 Usage limits.*?(?=\n## 8\.)", self.doc(self.ORCH), re.S).group(0)
+        for where, text in (("ORCHESTRATION 7.7", sec), ("orchestrator prompt", real("orchestrator"))):
+            self.assertNotRegex(text, r"(?i)\b(?:cap|limit|at most|up to|max(?:imum)?)\b[^.\n]{0,20}\*{0,2}\b5\b(?![- ]?(?:minutes?|hours?)\b)", where)
+        for old in (" At most 5 worker sessions at once.", " Keep to the cap of 5 workers."):
+            with self.subTest(old=old):
+                self.assertIn("orch-throttle", ids(prompt_rules.check_text("orchestrator", real("orchestrator") + old)))
+
+    FINDINGS_ROLES = ("reviewer", "design-reviewer", "second-reviewer")
+    FINDINGS_RULE = "usage-reviewer-findings"
+
+    def test_reviewer_findings_live_in_the_pr_comment_not_a_scratch_file(self):  # item 4b of #60
+        for role in self.FINDINGS_ROLES:
+            with self.subTest(role=role):
+                self.assertEqual(prompt_rules.check_text(role, real(role)), [])
+                self.assertNotRegex(prompt_rules.normalize(real(role)), r"(?i)scratch file")
+
+    def test_a_scratch_file_alone_is_rejected_for_every_reviewer_role(self):  # the old wording, with nothing else
+        old = "Keep the findings you have proved in a scratch file outside the repo."
+        for role in self.FINDINGS_ROLES:
+            with self.subTest(role=role):
+                self.assertIn(self.FINDINGS_RULE, ids(prompt_rules.check_text(role, old)))
+
+    def test_the_scratch_file_is_rejected_even_next_to_the_comment_rule(self):
+        for role in self.FINDINGS_ROLES:
+            with self.subTest(role=role):
+                text = real(role) + " Also keep a copy in a scratch file."
+                self.assertIn(self.FINDINGS_RULE, ids(prompt_rules.check_text(role, text)))
+
+    def test_each_comment_clause_is_pinned_in_every_reviewer_role(self):
+        for role in self.FINDINGS_ROLES:
+            for phrase in ("`ROUND IN PROGRESS`", "edit that same comment as findings accumulate", "§8.3"):
+                with self.subTest(role=role, phrase=phrase):
+                    norm = prompt_rules.normalize(real(role))
+                    self.assertIn(phrase.lower(), norm.lower())
+                    cut = re.sub(re.escape(phrase), "", norm, flags=re.I)
+                    self.assertIn(self.FINDINGS_RULE, ids(prompt_rules.check_text(role, cut)))
+
+    def test_the_rule_applies_to_no_other_role(self):
+        self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("implementer", "")))
+        self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("escalation-reviewer", "")))
 
 
 class NoResolveThreadTests(unittest.TestCase):
