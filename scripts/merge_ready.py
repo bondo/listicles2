@@ -139,14 +139,13 @@ def file_problems(kind, files):
         for name in (f["filename"], f.get("previous_filename")):
             if name and not allowed(kind, name):
                 problems.append(f"path outside kind {kind}: {name}")
-        name = f["filename"]
+        name, patch = f["filename"], f.get("patch")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
-        if kind == "working-draft-docs" and drops_draft_status(f.get("patch") or ""):
-            problems.append(f"{name}: removes a '{DRAFT_STATUS}' status line (a sign-off is the owner's)")
+        if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
+            problems.append(f"{name}: no patch to check, or removes a '{DRAFT_STATUS}' status line (a sign-off is the owner's)")
         check = pin_only if WORKFLOW_RE.match(name) else wrapper_only if name == WRAPPER_PROPS else None
         if kind == "dependabot" and check:
-            patch = f.get("patch")
             if patch is None:
                 problems.append(f"{name}: no patch from the API, cannot verify a version bump only")
             elif not check(patch):
