@@ -1302,6 +1302,32 @@ class JustifiedReasonWords(GuardsCase):
         self.repo.commit()
         self.assertPasses()
 
+    def test_code_and_directives_after_the_reason_are_not_counted(self):
+        """R1-02: only the reason itself counts, up to a closing */ or the next comment."""
+        for path, text in [
+            (self.KT, '/* justified: */ @Suppress("UNCHECKED_CAST") fun f() {}'),
+            ("a.js", "foo(); /* justified: x */ // eslint-disable-line no-console"),
+            (self.KT, '@Suppress("X") fun f() {} /* justified: ok */ val abc = def'),
+            ("a.py", "x = 1  # justified: x  # noqa: ARG001, PLR0913"),
+            ("a.py", "x = 1  # noqa: ARG001  # justified: x  # more words follow here"),
+        ]:
+            with self.subTest(text=text):
+                self.repo.write(path, text + "\n", raw=True)
+                self.repo.commit()
+                self.assertFails("guard: unjustified suppression:")
+                self.repo.git("rm", "-q", "-f", path)
+                self.repo.commit()
+
+    def test_a_url_or_an_issue_number_inside_the_reason_does_not_cut_it(self):
+        for reason in ["see http://example.invalid/a for details", "tracked in issue #46 upstream", "upstream bug, see https://x.invalid/y"]:
+            with self.subTest(reason=reason):
+                self.repo.write(self.KT, self.line(reason), raw=True)
+                self.repo.commit()
+                self.assertPasses()
+        self.repo.write("a.py", "import os  # noqa: F401  # justified: re-export for callers\n", raw=True)
+        self.repo.commit()
+        self.assertPasses()
+
     def test_the_same_rule_holds_for_linter_directives(self):
         for path, bad, good in [
             ("a.py", "import os  # noqa: F401  # justified: ok", "import os  # noqa: F401  # justified: re-export for callers"),
@@ -1359,7 +1385,7 @@ class CoverageThresholdDiffs(DiffCase):
         self.assertFails("guard: removed check setting:")
 
     def test_lowering_a_metric_on_its_own_line_fails(self):
-        for rel in (self.JEST, "firebase/vitest.config.ts", "firebase/.nycrc.json"):
+        for rel in (self.JEST, "firebase/vitest.config.ts", "firebase/vite.config.ts", "firebase/.nycrc.json"):
             with self.subTest(file=rel):
                 self.base(rel, self.MULTI)
                 self.change(rel, self.MULTI.replace("lines: 90", "lines: 70"))
@@ -1419,6 +1445,19 @@ class EmbeddedPackageJsonConfig(GuardsCase):
         self.repo.commit()
         self.assertPasses()
 
+    def test_nested_keys_with_the_same_names_pass_and_eslintignore_fails(self):
+        """R1-05: only top-level keys are config. `overrides` and `peerDependenciesMeta` hold dependency data."""
+        self.repo.write("firebase/package.json", '{\n  "overrides": {\n    "jest": {\n      "glob": "11.0.0"\n    }\n  },\n'
+                        '  "peerDependenciesMeta": { "prettier": { "optional": true } }\n}\n')
+        self.repo.commit()
+        self.assertPasses()
+        self.repo.write("firebase/package.json", '{ "name": "x", "eslintIgnore": ["src/**"] }\n')
+        self.repo.commit()
+        self.assertFails("guard: embedded config:")
+        self.repo.write("firebase/package.json", '{ "name": "x", "nested": { "a": 1 }, "jest": { "preset": "ts-jest" } }\n')
+        self.repo.commit()
+        self.assertFails("guard: embedded config:")
+
     def test_a_staged_package_json_is_checked_too(self):
         self.repo.write("package.json", '{ "jest": {} }\n')
         self.repo.git("add", "package.json")
@@ -1436,7 +1475,8 @@ class GlobalDirective(GuardsCase):
     in a JS or TS file counts, so ordinary block comments that start with the word pass."""
 
     def test_global_directives_need_a_justification(self):
-        for text in ["/* global foo */", "/*global foo*/", "/* globals foo, bar */", "/* global foo:readonly, bar:writable */", "/* global $, _ */"]:
+        for text in ["/* global foo */", "/*global foo*/", "/* globals foo, bar */", "/* global foo:readonly, bar:writable */", "/* global $, _ */",
+                     "/* global foo -- injected by the emulator */", "/* global foo bar */", "/* global state is kept in the store */"]:
             with self.subTest(text=text):
                 for ext in ("js", "mjs", "ts", "tsx", "cjs"):
                     self.repo.write(f"firebase/a.{ext}", text + "\nexport {};\n")
@@ -1450,8 +1490,7 @@ class GlobalDirective(GuardsCase):
 
     def test_ordinary_block_comments_and_other_files_pass(self):
         for rel, text in [
-            ("firebase/a.ts", "/* global variables are bad */\n"),
-            ("firebase/a.ts", "/* global state is kept in the store, see below */\n"),
+            ("firebase/a.ts", "/* the global state is kept in the store */\n"),
             ("firebase/a.ts", "/*\n * global foo\n */\n"),
             ("app/src/main/kotlin/A.kt", "/* global foo */\n"),
             ("firebase/a.ts", "const globalFoo = 1; // global foo\n"),
@@ -1491,6 +1530,31 @@ class LineLengthDiffs(DiffCase):
                 self.change(rel, tpl % 100)
                 self.assertPasses()
                 self.change(rel, "# nothing here\n")
+                self.assertPasses()
+
+    def test_any_other_edit_of_the_setting_line_does_not_hide_a_raise(self):
+        """R1-01: the setting is keyed by its name, not by the whole line."""
+        for rel, old, new in [
+            ("ruff.toml", "line-length = 100\n", "line-length = 160  # wide tables\n"),
+            ("ruff.toml", "line-length = 100\n", "line-length=160\n"),
+            ("firebase/.prettierrc.json", '{ "printWidth": 100 }\n', '{ "printWidth": 160, "semi": true }\n'),
+            ("firebase/.prettierrc.json", '{ "semi": true, "printWidth": 100 }\n', '{ "printWidth": 160, "semi": true }\n'),
+            (".editorconfig", "[*.kt]\nmax_line_length = 100\n", "[*.kt]\nmax_line_length = off\n"),
+        ]:
+            with self.subTest(file=rel, new=new):
+                self.base(rel, old)
+                self.change(rel, new)
+                self.assertFails("guard: raised line length:")
+
+    def test_other_edits_of_the_setting_line_that_do_not_raise_pass(self):
+        for rel, old, new in [
+            ("ruff.toml", "line-length = 100\n", "line-length = 90  # tighter\n"),
+            ("firebase/.prettierrc.json", '{ "printWidth": 100 }\n', '{ "printWidth": 100, "semi": true }\n'),
+            (".editorconfig", "[*.kt]\nmax_line_length = off\n", "[*.kt]\nmax_line_length = 120\n"),
+        ]:
+            with self.subTest(file=rel, new=new):
+                self.base(rel, old)
+                self.change(rel, new)
                 self.assertPasses()
 
     def test_the_words_outside_the_style_config_files_are_not_a_setting(self):
@@ -1588,6 +1652,57 @@ class NarrowedLists(DiffCase):
         self.change("pyproject.toml", '[tool.other]\nitems = ["a"]\n[tool.ruff.lint]\nselect = ["E"]\n')
         self.assertPasses()
 
+    def test_comments_do_not_hide_a_removed_preset_or_include_entry(self):
+        """R1-04."""
+        base = "export default defineConfig({\n    extends: [tseslint.configs.strictTypeChecked],\n});\n"
+        for new in ["    extends: [tseslint.configs.recommended], // was tseslint.configs.strictTypeChecked\n",
+                    "    extends: [tseslint.configs.recommended], /* tseslint.configs.strictTypeChecked */\n"]:
+            with self.subTest(new=new):
+                self.base("firebase/eslint.config.mjs", base)
+                self.change("firebase/eslint.config.mjs", base.replace("    extends: [tseslint.configs.strictTypeChecked],\n", new))
+                self.assertFails("guard: weaker lint preset:")
+        for new in ['{ "include": ["src/**/*.ts" /* , "test/**/*.ts" */] }\n',
+                    '{\n  "include": [\n    "src/**/*.ts",\n    /*\n    "test/**/*.ts"\n    */\n  ]\n}\n']:
+            with self.subTest(new=new):
+                self.base("firebase/tsconfig.json", '{ "include": ["src/**/*.ts", "test/**/*.ts"] }\n')
+                self.change("firebase/tsconfig.json", new)
+                self.assertFails("guard: narrowed tsconfig include:")
+
+    def test_comments_that_keep_every_item_pass(self):
+        self.base("firebase/tsconfig.json", '{ "include": ["src/**/*.ts", "test/**/*.ts"] }\n')
+        self.change("firebase/tsconfig.json", '{ "include": ["src/**/*.ts", /* tests */ "test/**/*.ts"] } // note\n')
+        self.assertPasses()
+
+    def test_renaming_or_moving_a_config_does_not_hide_a_dropped_item(self):
+        """R1-03: a rename or a move shows as a deleted file plus a new one."""
+        text = '[lint]\nselect = ["E", "F", "W"]\n'
+        less = '[lint]\nselect = ["E", "F"]\n'
+        self.base("ruff.toml", text)
+        self.repo.git("mv", "ruff.toml", ".ruff.toml")
+        self.change(".ruff.toml", less)
+        self.assertFails("guard: narrowed ruff select:")
+        self.repo.git("rm", "-q", "-f", ".ruff.toml")
+        self.base("ruff.toml", text)
+        self.repo.git("rm", "-q", "-f", "ruff.toml")
+        self.change("pyproject.toml", '[tool.ruff.lint]\nselect = ["E", "F"]\n')
+        self.assertFails("guard: narrowed ruff select:")
+        self.base("firebase/tsconfig.json", '{ "include": ["src/**/*.ts", "test/**/*.ts"] }\n')
+        self.repo.git("mv", "firebase/tsconfig.json", "firebase/tsconfig.app.json")
+        self.change("firebase/tsconfig.app.json", '{ "include": ["src/**/*.ts"] }\n')
+        self.assertFails("guard: narrowed tsconfig include:")
+
+    def test_renaming_or_moving_a_config_that_keeps_every_item_passes(self):
+        text = '[lint]\nselect = ["E", "F", "W"]\n'
+        self.base("ruff.toml", text)
+        self.repo.git("mv", "ruff.toml", ".ruff.toml")
+        self.change(".ruff.toml", text + 'extend-select = ["B"]\n')
+        self.assertPasses()
+        self.repo.git("rm", "-q", "-f", ".ruff.toml")
+        self.base("ruff.toml", text)
+        self.repo.git("rm", "-q", "-f", "ruff.toml")
+        self.change("pyproject.toml", '[tool.ruff.lint]\nselect = ["E", "F", "W", "B"]\n')
+        self.assertPasses()
+
     def test_dropping_a_tsconfig_include_entry_fails(self):
         for rel, text in [
             ("firebase/tsconfig.json", '{ "include": ["src/**/*.ts", "test/**/*.ts"] }\n'),
@@ -1619,7 +1734,7 @@ class NarrowedLists(DiffCase):
         self.change("firebase/tsconfig.json", '{\n  "exclude": [\n    ' + nm + '\n    "dist" // justified: build output is generated\n  ]\n}\n')
         self.assertPasses()
         self.change("firebase/tsconfig.json", '{\n  "exclude": [\n    ' + nm + '\n    "dist" // justified: -\n  ]\n}\n')
-        self.assertFails("guard: ")
+        self.assertFails("guard: widened tsconfig exclude:")
 
 
 class SkipLibCheck(GuardsCase):
