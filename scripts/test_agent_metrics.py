@@ -552,7 +552,7 @@ class ReviewRowDocsTests(unittest.TestCase):
         return (ROOT / relative).read_text(encoding="utf-8")
 
     def test_module_docstring_says_review_rows_share_columns_so_filter_by_row_type(self):
-        doc = " ".join((am.__doc__ or "").split())
+        doc = " ".join((am.__doc__ or "").split()).lower()
         self.assertIn("review rows reuse the disputed, deferred and cost_usd columns", doc)
         self.assertIn("filter by row_type", doc)
 
