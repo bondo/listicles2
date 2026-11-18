@@ -20,7 +20,7 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 | Items (v1) | Name + "I have it"; collection lists add an optional release year and re-release year (1900 to the current year + 50, OQ-6, OQ-19). Sorted per type (OQ-8, OQ-33), "show only missing" filter, progress "12 of 30" (OQ-9). Equal names are allowed, with a quiet "Already in this list" hint while typing (OQ-11). An item belongs to its list (OQ-18). No notes, tags, quantity, barcode or search in v1 (stories section 8) |
 | Backup | No Firestore backups (they need Blaze). An in-app export of my lists to a JSON or CSV file through the system file picker, in M2, before the first external tester; it also covers data portability (OQ-38) |
 | Sharing | Households: one per user; members join through a **single-use invite link** (random code of 16+ characters, expires after 7 days, can be revoked). Household, invite and sharing actions need a connection (OQ-22) |
-| After v1 (M3 to M5 and later) | Packing templates, scaling, merging and trips (section 4); barcode scanning (ML Kit + CameraX) and title lookup (UPCitemdb); infinite global undo/redo internally for each list, with conflict handling (owner requirement, 2026-11-18, quoted in section 7; what v1 must leave room for is not decided). Not in M1 or M2 (OQ-36 2026-11-17, OQ-15 2026-11-18, section 7) |
+| After v1 (M3 to M5 and later) | Packing templates, scaling, merging and trips (section 4); barcode scanning (ML Kit + CameraX) and title lookup (UPCitemdb); infinite global undo/redo internally for each list, with conflict handling (owner requirement, 2026-11-18, quoted in section 7; the leave-room constraint on v1 is in section 3.2). Not in M1 or M2 (OQ-36 2026-11-17, OQ-15 2026-11-18, section 7) |
 | i18n | English + Danish; all strings in resources; CI fails on missing translations. Android 13+: the system per-app language setting, made visible by an auto-generated `LocaleConfig`[^lang]; Android 8-12 follow the phone language; no in-app picker, `minSdk` stays 26 (OQ-12, decided 2026-11-17) |
 | Crash reporting | Firebase Crashlytics **off by default**, turned on by an opt-in setting ("Send crash reports")[^crash]; **no Google Analytics**; declared in the privacy text and Play Data safety; in place before the first external tester (decided 2026-11-17) |
 | App Check | Play Integrity provider requiring **device integrity only**, not Play recognition or licensing (the default requires `PLAY_RECOGNIZED`, which a GitHub APK cannot meet[^pi]); debug provider in CI and the emulator; about two weeks of metrics before enforcing; set up before the first external tester (decided 2026-11-17) |
@@ -216,6 +216,10 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]; the owner
   create, so every item create accepts any `createdAt` not later than `request.time` (a forged older value
   only changes a tie-break order). `createdBy` is the caller, so an Undo by another member records them as the
   adder (the planner's default until the owner answers, #15 comment 6992973369 question 2: OQ-18 does not cover an Undo by another member).
+* **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
+  an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 keeps no history and
+  stays last write wins per field, as above; the only constraint on the sync-merge design is that it must not rule
+  out adding, later, a per-list change history and keeping the losing side of a conflict.
 * Timestamps use `serverTimestamp()`. They are read with
   `ServerTimestampBehavior.ESTIMATE` so pending local writes still sort correctly.
 * Losing access while offline (stop sharing, removal, household deleted): the queued writes are rejected
@@ -463,8 +467,8 @@ post-v1 work is planned.
 undo/redo internally for each list. This should include conflict handling, so an undo after a conflict shows the
 other side of the conflict." It has no milestone yet. The orchestrator's reading of it (per-list history across all
 members' changes; a conflict keeps the losing side; so v1 sync design should leave room) was to be confirmed and is
-**not** an owner decision. Draft PR #162 records that reading in section 3.2; until the owner confirms it, the
-sync-merge planning of M2 (`area:sync-merge`) takes the quoted requirement as the source.
+**not** an owner decision. Section 3.2 records the leave-room constraint (added by #162); M2 sync-merge planning
+(`area:sync-merge`) takes the quoted requirement as its source and the owner confirms the reading.
 
 ## 8. What the owner needs to do (no code)
 
