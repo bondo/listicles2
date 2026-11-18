@@ -42,6 +42,12 @@ class Repo:
         with open(path, "w") as f:
             f.write(text)
 
+    def write_bytes(self, rel, size):
+        path = os.path.join(self.dir, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(b"x" * size)
+
     def commit(self, msg="c"):
         self.git("add", "-A")
         self.git("commit", "-q", "-m", msg)
@@ -694,6 +700,128 @@ class DiffChecks(GuardsCase):
         self.assertEqual(rc, 0, out)
         self.assertIn("skipped diff-based checks", out)
         self.assertFails("no base/merge-base", CI="true")
+
+
+class FileSizeChecks(GuardsCase):
+    """Owner decision (#15 comment 6974778901): Git LFS is not adopted, so a guard keeps big binaries out of the repo.
+    Any added or changed file over 1 MB fails, and so does a *.png over 300 KB outside docs/product/wireframes/.
+    Units are binary (1 MB = 1048576 bytes, 300 KB = 307200 bytes); a file exactly at the limit passes."""
+
+    MB = 1024 * 1024
+    PNG = 300 * 1024
+
+    def test_file_at_the_1mb_limit_passes_and_one_byte_over_fails(self):
+        self.repo.write_bytes("data/blob.bin", self.MB)
+        self.repo.commit()
+        self.assertPasses()
+        self.repo.write_bytes("data/blob.bin", self.MB + 1)
+        self.repo.commit()
+        rc, out = self.repo.guards()
+        self.assertNotEqual(rc, 0, out)
+        for needle in ("guard: file too large:", "data/blob.bin", str(self.MB + 1), str(self.MB), "Git LFS"):
+            self.assertIn(needle, out)
+
+    def test_png_at_the_300kb_limit_passes_and_one_byte_over_fails(self):
+        self.repo.write_bytes("app/src/main/res/drawable/art.png", self.PNG)
+        self.repo.commit()
+        self.assertPasses()
+        self.repo.write_bytes("app/src/main/res/drawable/art.png", self.PNG + 1)
+        self.repo.commit()
+        rc, out = self.repo.guards()
+        self.assertNotEqual(rc, 0, out)
+        for needle in ("guard: file too large:", "app/src/main/res/drawable/art.png", str(self.PNG + 1), str(self.PNG), "Git LFS"):
+            self.assertIn(needle, out)
+
+    def test_png_extension_is_matched_case_insensitively(self):
+        self.repo.write_bytes("art/Photo.PNG", self.PNG + 1)
+        self.repo.commit()
+        self.assertFails("guard: file too large: art/Photo.PNG")
+
+    def test_large_png_inside_wireframes_passes_but_the_1mb_limit_still_applies(self):
+        self.repo.write_bytes("docs/product/wireframes/tokens-sheet.png", self.MB)
+        self.repo.commit()
+        self.assertPasses()
+        self.repo.write_bytes("docs/product/wireframes/tokens-sheet.png", self.MB + 1)
+        self.repo.commit()
+        self.assertFails("guard: file too large: docs/product/wireframes/tokens-sheet.png")
+
+    def test_wireframes_exemption_is_only_for_that_directory(self):
+        self.repo.write_bytes("docs/product/wireframes-old/a.png", self.PNG + 1)
+        self.repo.write_bytes("docs/product/other/wireframes/b.png", self.PNG + 1)
+        self.repo.commit()
+        rc, out = self.repo.guards()
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("docs/product/wireframes-old/a.png", out)
+        self.assertIn("docs/product/other/wireframes/b.png", out)
+
+    def test_non_png_between_300kb_and_1mb_passes(self):
+        self.repo.write_bytes("data/photo.jpg", 600 * 1024)
+        self.repo.write_bytes("data/blob.bin", self.MB - 1)
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_deleted_large_files_are_ignored(self):
+        self.repo.write_bytes("data/blob.bin", 2 * self.MB)
+        self.repo.write_bytes("app/art.png", 2 * self.PNG)
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.repo.git("rm", "-q", "data/blob.bin", "app/art.png")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_a_large_file_added_and_removed_on_the_branch_is_ignored(self):
+        self.repo.write_bytes("data/blob.bin", 2 * self.MB)
+        self.repo.commit()
+        self.repo.git("rm", "-q", "data/blob.bin")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_changing_an_already_large_file_fails(self):
+        self.repo.write_bytes("data/blob.bin", 2 * self.MB)
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.assertPasses()  # untouched since the base
+        self.repo.write_bytes("data/blob.bin", 2 * self.MB + 5)
+        self.repo.commit()
+        self.assertFails("guard: file too large: data/blob.bin")
+
+    def test_every_offending_file_is_named_and_odd_paths_work(self):
+        self.repo.write_bytes("data/with space.bin", self.MB + 1)
+        self.repo.write_bytes("data/\u00e6\u00f8.bin", self.MB + 2)
+        self.repo.write_bytes("data/small.bin", 10)
+        self.repo.commit()
+        rc, out = self.repo.guards()
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("data/with space.bin", out)
+        self.assertIn("data/\u00e6\u00f8.bin", out)
+        self.assertNotIn("small.bin", out)
+
+    def test_it_fails_outside_ci_too(self):
+        self.repo.write_bytes("data/blob.bin", self.MB + 1)
+        self.repo.commit()
+        self.assertFails("guard: file too large:")
+        self.assertFails("guard: file too large:", CI="true")
+
+    def test_staged_mode_checks_the_index(self):
+        self.repo.write_bytes("data/blob.bin", self.MB)
+        self.repo.write_bytes("art/a.png", self.PNG)
+        self.repo.git("add", "-A")
+        self.assertPasses("--staged")
+        self.repo.write_bytes("data/blob.bin", self.MB + 1)
+        self.repo.write_bytes("art/a.png", self.PNG + 1)
+        self.repo.git("add", "-A")
+        rc, out = self.repo.guards("--staged")
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("guard: file too large: data/blob.bin", out)
+        self.assertIn("guard: file too large: art/a.png", out)
+
+    def test_staged_mode_ignores_deleted_files_and_unstaged_changes(self):
+        self.repo.write_bytes("data/blob.bin", 2 * self.MB)
+        self.repo.commit()
+        self.repo.git("rm", "-q", "data/blob.bin")
+        self.assertPasses("--staged")
+        self.repo.write_bytes("data/new.bin", 2 * self.MB)  # not staged
+        self.assertPasses("--staged")
 
 
 class ThresholdTestNames(GuardsCase):
