@@ -7,7 +7,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 | Milestone | Name | Done | Open |
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
-| M0.5 | Product design and guardrails | 32/35 (91%) | 3 |
+| M0.5 | Product design and guardrails | 33/35 (94%) | 2 |
 | M1 | Accounts and households | 0/39 (0%) | 39 |
 | M2 | Inventory lists | not planned yet | 0 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
@@ -62,7 +62,7 @@ Nothing open.
 
 User stories, app flow, design tokens and the test, lint and review guardrails, signed off by the owner.
 
-**Progress:** 32/35 done (91%), 3 open.
+**Progress:** 33/35 done (94%), 2 open.
 
 ### Tasks
 
@@ -100,7 +100,7 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-25 | Orchestrator prompt&#58; R3 weekly digest step, ledger row after each review, R10 owner-todo per … | done | M0.5-19, M0.5-21, M0.5-23 | implementer |  |
 | M0.5-26 | REVIEW.md&#58; R9 visual-rubric item (agent score below 3 is a minor finding) and R7 rules allow/… | done | M0.5-03, M0.5-15, M0.5-23 | implementer | [#133](https://github.com/bondo/listicles2/issues/133) |
 | M0.5-O4 | Collaborator invite sent and accepted | done | M0.5-19, M0.5-O3 | owner |  |
-| M0.5-O5 | Confirm the collaborator's 2FA and run the live test | owner to-do | M0.5-O4 | owner |  |
+| M0.5-O5 | Confirm the collaborator's 2FA and run the live test | done | M0.5-O4 | owner |  |
 | M0.5-28 | R6 retro of M0.5&#58; compare the Agent Usage Redesign pilot with its baseline and propose at most … | done | M0.5-01, M0.5-02, M0.5-03, M0.5-04, M0.5-05, M0.5-06, M0.5-07, M0.5-08, M0.5-09, M0.5-10, M0.5-11, M0.5-12, M0.5-13, M0.5-14, M0.5-15, M0.5-27, M0.5-16, M0.5-17, M0.5-18, M0.5-19, M0.5-20, M0.5-21, M0.5-22, M0.5-23, M0.5-24, M0.5-25, M0.5-26, M0.5-29 | retro | [#137](https://github.com/bondo/listicles2/issues/137) |
 | M0.5-29 | File-size guard in scripts/guards.sh&#58; an added or changed file over 1 MB, or a PNG over 300 KB out… | done | none | implementer | [#141](https://github.com/bondo/listicles2/issues/141) |
 
@@ -112,7 +112,6 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 flowchart LR
     n0["M0.5-FU Follow-up burn-down for M0.5 (ready)"]:::ready
     n1["M0.5-O1 Approve stories, flow and design (owner to-do)"]:::owner
-    n2["M0.5-O5 Confirm the collaborator's 2FA and run… (owner to-do)"]:::owner
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -374,5 +373,4 @@ flowchart LR
 
 ## Blockers
 
-- **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
