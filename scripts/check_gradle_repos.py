@@ -184,6 +184,12 @@ def check_verification(meta, props_text, verify_text=""):
     if not components:
         problems.append(f"{META}: no components")
     for comp in components:
+        if comp.get("group") == "com.android.tools.build" and comp.get("name") == "aapt2":
+            names = [a.get("name", "") for a in comp if tag(a) == "artifact"]
+            gone = [o for o in ("linux", "osx", "windows") if not any(n.endswith(f"-{o}.jar") for n in names)]
+            if gone:
+                what = ", ".join(gone) + (" jars" if len(gone) > 1 else " jar")
+                problems.append(f"{META}: aapt2 {comp.get('version')} lacks {what} (see docs/ANDROID-BEST-PRACTICES.md section 11)")
         for art in (e for e in comp if tag(e) == "artifact"):
             hashes = [e.get("value", "") for e in art if tag(e) == "sha256"]
             if not any(re.fullmatch(r"[0-9a-f]{64}", h) for h in hashes):

@@ -167,6 +167,24 @@ rm gradle/verification-metadata.xml
   :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
+The file must be generated on Linux (CI's platform), and then given the other two operating systems' `aapt2` jars. AGP resolves `com.android.tools.build:aapt2:<version>:<os>` for the build host's OS only, so a Linux run records only the `linux` jar and a macOS or Windows build fails verification. Regenerating on macOS or Windows instead would drop the `linux` jar and break CI. After the command above, add the other two from a throwaway project (`<version>` is the `aapt2` version in the file; the write mode only adds entries):
+
+```
+mkdir -p /tmp/aapt2-os/gradle && cp gradle/verification-metadata.xml /tmp/aapt2-os/gradle/ && cd /tmp/aapt2-os
+echo 'dependencyResolutionManagement { repositories { google() } }' > settings.gradle.kts
+cat > build.gradle.kts <<'EOT'
+val cfgs = listOf("linux", "osx", "windows").map { os ->
+    configurations.create("aapt2$os") { isTransitive = false }
+        .also { dependencies.add(it.name, "com.android.tools.build:aapt2:<version>:$os@jar") }
+}
+tasks.register("resolveAll") { doLast { cfgs.forEach { println(it.files) } } }
+EOT
+<repo>/gradlew --no-configuration-cache --write-verification-metadata sha256 resolveAll
+cp gradle/verification-metadata.xml <repo>/gradle/   # the diff against the repo file is only the osx and windows jars
+```
+
+`scripts/check_gradle_repos.py` fails when the `aapt2` component lacks any of the three jars.
+
 `--refresh-dependencies` is required: Gradle does not record BOM and parent POM files it already has in its metadata cache, so without it a warm `~/.gradle` writes an incomplete file that only fails on a fresh CI runner. With it, the result is the same as from an empty cache.
 
 Checksums only, no PGP signatures: most Android and Kotlin artifacts are not signed with keys Gradle can verify, and a checksum is enough to stop a mirror or CDN from silently changing an artifact. Never add `trusted-artifacts` or set `org.gradle.dependency.verification` to `off` or `lenient`; the check rejects both. The `ui` job's `:app:connectedDebugAndroidTest` needs no extra entries beyond the assemble tasks above (it needs a device, so it is not in the command); if an AGP bump adds artifacts only that task resolves, `ui` fails and the file is regenerated again. Add a new CI task to the command above when CI starts running one.
