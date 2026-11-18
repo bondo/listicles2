@@ -6,11 +6,14 @@ request run out, so a single unlucky burst fails the whole build. The setup this
   * Google's Maven Central mirror is listed before mavenCentral() (mavenCentral() stays as fallback),
   * google() only gets the groups it hosts, so other artifacts are not looked up there first,
   * Gradle retries repository requests often enough, with backoff, to ride out a 429 burst.
+It also checks Gradle dependency verification (gradle/verification-metadata.xml, sha256 for every artifact), so a
+mirror or CDN problem cannot silently change an artifact; Gradle itself enforces it in every build.
 Run: python3 -I scripts/check_gradle_repos.py  (exit 1 and one line per problem when the setup is off).
 """
 
 import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 MIRROR = "https://maven-central.storage-download.googleapis.com/maven2"
@@ -136,10 +139,53 @@ def check_properties(text):
     return problems
 
 
+VERIFICATION_PROP = "org.gradle.dependency.verification"
+META = "verification-metadata.xml"
+
+
+def check_verification(meta, props_text):
+    """Problems with the dependency verification metadata (text, or None if the file is missing) and gradle.properties."""
+    problems = []
+    for line in props_text.splitlines():
+        key, _, value = line.strip().partition("=")
+        if key.strip() == VERIFICATION_PROP and value.strip() in ("off", "lenient"):
+            problems.append(f"gradle.properties: {VERIFICATION_PROP}={value.strip()} disables verification")
+    if meta is None:
+        return [f"{META} missing"] + problems
+    try:
+        root = ET.fromstring(meta)
+    except ET.ParseError:
+        return [f"{META} is not well-formed XML"] + problems
+
+    def tag(el):
+        return el.tag.rsplit("}", 1)[-1]
+
+    elements = list(root.iter())
+    flag = [e for e in elements if tag(e) == "verify-metadata"]
+    if not flag or any((e.text or "").strip() != "true" for e in flag):
+        problems.append(f"{META}: verify-metadata must be true")
+    if any(tag(e) == "trusted-artifacts" for e in elements):
+        problems.append(f"{META}: trusted-artifacts bypass verification")
+    components = [e for e in elements if tag(e) == "component"]
+    if not components:
+        problems.append(f"{META}: no components")
+    for comp in components:
+        for art in (e for e in comp if tag(e) == "artifact"):
+            hashes = [e.get("value", "") for e in art if tag(e) == "sha256"]
+            if not any(re.fullmatch(r"[0-9a-f]{64}", h) for h in hashes):
+                gav = f"{comp.get('group')}:{comp.get('name')}:{comp.get('version')}"
+                problems.append(f"{META}: artifact {art.get('name')} of {gav} has no sha256")
+    return problems
+
+
 def main(root):
     root = Path(root)
     problems = check_settings((root / "settings.gradle.kts").read_text(encoding="utf-8"))
     problems += check_properties((root / "gradle.properties").read_text(encoding="utf-8"))
+    meta = root / "gradle" / META
+    problems += check_verification(
+        meta.read_text(encoding="utf-8") if meta.is_file() else None, (root / "gradle.properties").read_text(encoding="utf-8")
+    )
     for p in problems:
         print(f"gradle-repos: {p}")
     return 1 if problems else 0

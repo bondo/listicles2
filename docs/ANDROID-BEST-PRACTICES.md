@@ -155,6 +155,18 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
 | Dependency freshness | Dependabot (lint freshness checks are disabled on purpose with a `// justified:`) |
+| Dependency verification | tooling: `gradle/verification-metadata.xml` holds a sha256 for every resolved artifact (plugins, build tools, lint, test and Android configurations), enforced by Gradle in every build; `scripts/check_gradle_repos.py` fails when the file is missing, verification is switched off, or an artifact has no sha256 |
+
+### Regenerating dependency verification metadata
+After any dependency, plugin or Gradle wrapper bump (including a Dependabot PR), a build fails with "Dependency verification failed" until the file is updated. Regenerate it with the tasks CI runs, then review the diff (only the bumped artifacts should change):
+
+```
+./gradlew --no-configuration-cache --write-verification-metadata sha256 \
+  spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest \
+  :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
+```
+
+Checksums only, no PGP signatures: most Android and Kotlin artifacts are not signed with keys Gradle can verify, and a checksum is enough to stop a mirror or CDN from silently changing an artifact. Never add `trusted-artifacts` or set `org.gradle.dependency.verification` to `off` or `lenient`; the check rejects both. Add a new CI task to the command above when CI starts running one.
 
 ## Proposed follow-ups (not implemented here)
 Each would be its own PR, test-first, per CLAUDE.md.
