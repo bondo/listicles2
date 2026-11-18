@@ -2,7 +2,7 @@
 Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
-docs/PLAN.md, docs/ORCHESTRATION.md, docs/reviews/README.md and handoff/TEMPLATE.md).
+docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/reviews/README.md and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -77,6 +77,13 @@ SCORE_BLOCKS_MERGE = r"below 3 (?:blocks|must block) the merge"
 MATRIX_WRONG_SEVERITY = (
     r"(?:(?:a |the |such a )?(?:matrix )?gaps? (?:in the matrix )?|without both )(?:is|are) (?:always |only |just )?(?:a |an )?`?(?:minor|nit|blocker)"
 )
+# Wording that would allow resolving a thread (follow-up #44). The ban itself is pinned by the patterns; this keeps a later edit from
+# adding permission next to it. "never resolve ..." must not match, hence the lookbehind and the may/can/should forms.
+RESOLVE_PERMISSION = (
+    r"\b(?:may|can|should|must)\s+resolve\s+(?:the|a|any|their)\b[^.]{0,40}\b(?:thread|conversation)",
+    r"(?<!never )\bresolves?\s+(?:the|a)\s+collaborator's\s+(?:review\s+)?(?:thread|conversation)",
+    r"\bagents?\s+resolves?\s+(?:the|a)\s+(?:review\s+)?(?:thread|conversation)",
+)
 RULES = (
     Rule(
         "data-fenced", ALL,
@@ -87,6 +94,12 @@ RULES = (
         "no-resolve-thread", ALL,
         (r"never resolve a collaborator's review thread", r"resolve_review_thread", r"#44"),
         "agents never resolve a collaborator's review thread (follow-up #44)",
+        forbidden=RESOLVE_PERMISSION,
+    ),
+    Rule(
+        "no-resolve-thread-reply", ("implementer", "orchestrator"),
+        (r"never resolve a collaborator's review thread[^.]*: reply and leave it for the collaborator or the owner",),
+        "agents that answer on threads reply and leave a collaborator's review thread for the collaborator or the owner (follow-up #44)",
     ),
     Rule(
         "trust-by-role", ("orchestrator",),
@@ -703,6 +716,21 @@ RULES = (
 
 ORCH = "docs/ORCHESTRATION.md"
 DOC_RULES = (
+    DocRule(
+        "orch-no-resolve-thread", ORCH,
+        (
+            r"delete branches, resolve threads, labels, comment on #15",
+            r"never resolve a collaborator's review thread \(follow-up #44\): reply and leave it for the collaborator or the owner",
+        ),
+        "ORCHESTRATION: the collaborator row lists resolving threads as never, and 7.6 says agents reply and leave the thread (follow-up #44)",
+        forbidden=RESOLVE_PERMISSION,
+    ),
+    DocRule(
+        "collab-no-resolve", "docs/COLLABORATING.md",
+        (r"## please do not press", r"\*\*resolve conversation\*\*"),
+        "COLLABORATING: Resolve conversation is on the collaborator's do-not-press list (follow-up #44)",
+        forbidden=RESOLVE_PERMISSION,
+    ),
     DocRule(
         "claude-reading", "CLAUDE.md",
         (r"read what you need to understand the change", r"read whole files you edit", r"`explorer` subagent"),
