@@ -832,6 +832,18 @@ class FileSizeChecks(GuardsCase):
         self.assertIn("guard: file too large: data/blob.bin", out)
         self.assertIn("guard: file too large: art/a.png", out)
 
+    def test_a_submodule_pointer_is_not_a_file_and_is_skipped(self):
+        """R2-01: a gitlink (mode 160000) has no blob to size. Its commit is not in this repo (a real submodule is not fetched),
+        so without the skip `git cat-file -s` fails."""
+        first, second = "1" * 40, "2" * 40
+        self.repo.git("update-index", "--add", "--cacheinfo", f"160000,{first},sub")
+        self.assertPasses("--staged")
+        self.repo.git("commit", "-q", "-m", "add pointer")  # not commit(): its `add -A` would drop the gitlink
+        self.assertPasses()
+        self.repo.git("update-index", "--cacheinfo", f"160000,{second},sub")  # a changed pointer too
+        self.repo.git("commit", "-q", "-m", "move pointer")
+        self.assertPasses()
+
     def test_staged_mode_ignores_deleted_files_and_unstaged_changes(self):
         self.repo.write_bytes("data/blob.bin", 2 * self.MB)
         self.repo.commit()
