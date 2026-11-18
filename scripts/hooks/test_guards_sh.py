@@ -986,6 +986,40 @@ class ThresholdProse(GuardsCase):
         self.change("pyproject.toml", "\n")
         self.assertFails("guard: removed check setting:")
 
+    def test_a_stray_quote_or_escape_earlier_on_a_code_line_does_not_mask_threshold(self):
+        # PR 135 R2-01: a char literal or an escaped quote must not turn code into "a string".
+        for rel, line in (
+            ("app/build.gradle.kts", "val sep = '\"'; val threshold by extra(LOW)"),
+            ("app/src/main/kotlin/Cfg.kt", 'val cells = line.split("\\""); val threshold by lazy { LOW }'),
+            ("scripts/tool.py", "if c == '\"' or threshold and pct < LOW: sys.exit(EXIT)"),
+            ("scripts/tool.py", "if c == '\"' or threshold and pct < LOW: sys.exit(\"a b\")"),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_quoted_text_that_is_not_a_bare_string_line_still_fails(self):
+        # PR 135 R2-02: comments, help strings and config values are not prose lines; only a line made of nothing but
+        # string literals and punctuation is.
+        for rel, line in (
+            ("scripts/tool.py", 'fail_under = LOW  # see "coverage threshold rules"'),
+            ("scripts/tool.py", 'parser.add_argument("--min", default=LOW, help="fail below this coverage threshold value")'),
+            ("config/x.json", '"mode": "fail on threshold breach",'),
+            ("config/x.yml", 'level: "coverage threshold low"'),
+            ("pyproject.toml", 'mode = "strict threshold check"'),
+            ("scripts/x.sh", 'step "mutation threshold gate" ./gradlew pitest'),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_a_line_of_only_string_literals_is_prose(self):
+        self.base("scripts/tool.py", '    "never for gate or threshold changes",\n    ("a", r"also for gate or threshold changes"),\n')
+        self.change("scripts/tool.py", "\n")
+        self.assertPasses()
+
 
 class StagedMode(GuardsCase):
     def test_staged_flags_only_the_index(self):
