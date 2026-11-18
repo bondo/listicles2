@@ -23,6 +23,11 @@ N = 77
 REQUIRED = ["guards", "tasks", "static"]
 PIN_OLD = "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
 PIN_NEW = "      - uses: actions/checkout@" + "c" * 40 + " # v7.1.0"
+SUB_OLD = "        uses: github/codeql-action/init@" + "d" * 40 + " # v4.1.0"
+SUB_NEW = "        uses: github/codeql-action/init@" + "e" * 40 + " # v4.2.0"
+WRAP_OLD = "distributionUrl=https\\://services.gradle.org/distributions/gradle-9.1-bin.zip"
+WRAP_NEW = "distributionUrl=https\\://services.gradle.org/distributions/gradle-9.2-all.zip"
+WRAP_PATCH = f"@@ -1,2 +1,2 @@\n-{WRAP_OLD}\n+{WRAP_NEW}\n-distributionSha256Sum={'1' * 64}\n+distributionSha256Sum={'2' * 64}"
 
 
 def file_entry(name, status="modified", patch="@@ -1 +1 @@\n-old\n+new", previous=None):
@@ -32,8 +37,8 @@ def file_entry(name, status="modified", patch="@@ -1 +1 @@\n-old\n+new", previou
     return entry
 
 
-def run(name, status="completed", conclusion="success", started="2026-11-18T10:00:00Z"):
-    return {"name": name, "status": status, "conclusion": conclusion, "started_at": started}
+def run(name, status="completed", conclusion="success", rid=1, app=15368):
+    return {"id": rid, "name": name, "status": status, "conclusion": conclusion, "app": {"id": app}}
 
 
 class FakeApi:
@@ -58,16 +63,19 @@ class FakeApi:
 
 
 def make_api(files=None, title="Update the plan", body="Refreshes section 4. See issue 15.", sha=SHA, state="clean", checks=None,
-             required=None, commits=None, base="main"):
+             required=None, commits=None, base="main", counts=None):
     files = files if files is not None else [file_entry("docs/product/flow.md")]
+    commits = commits if commits is not None else [{"commit": {"message": "Edit flow doc"}}]
+    counts = counts or {}
     pulls = f"repos/{REPO}/pulls/{N}"
     contexts = REQUIRED if required is None else required
-    rules = [{"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": c} for c in contexts]}}]
+    rules = [{"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": c, "integration_id": 15368} for c in contexts]}}]
     return FakeApi(
         {
-            pulls: {"head": {"sha": sha}, "base": {"ref": base}, "title": title, "body": body, "mergeable_state": state, "draft": False},
+            pulls: {"head": {"sha": sha}, "base": {"ref": base}, "title": title, "body": body, "mergeable_state": state, "draft": False,
+                     "changed_files": counts.get("files", len(files)), "commits": counts.get("commits", len(commits))},
             pulls + "/files": files,
-            pulls + "/commits": commits if commits is not None else [{"commit": {"message": "Edit flow doc"}}],
+            pulls + "/commits": commits,
             f"repos/{REPO}/rules/branches/{base}": rules,
             f"repos/{REPO}/commits/{SHA}/check-runs": checks if checks is not None else [run(c) for c in REQUIRED],
         }
@@ -85,7 +93,8 @@ class HappyPathTests(unittest.TestCase):
         api = make_api()
         code, text = go(api)
         self.assertEqual(code, 0, text)
-        self.assertEqual(api.merged, [(f"repos/{REPO}/pulls/{N}/merge", {"merge_method": "squash", "sha": SHA})])
+        want = {"merge_method": "squash", "sha": SHA, "commit_title": "Update the plan (#77)", "commit_message": "Refreshes section 4. See issue 15."}
+        self.assertEqual(api.merged, [(f"repos/{REPO}/pulls/{N}/merge", want)])
 
     def test_tasks_sync_with_only_tasks_toml(self):
         api = make_api(files=[file_entry("docs/tasks.toml")])
@@ -99,6 +108,8 @@ class HappyPathTests(unittest.TestCase):
             file_entry("firebase/package-lock.json"),
             file_entry("gradle/libs.versions.toml"),
             file_entry("scripts/requirements-lint.txt"),
+            file_entry("gradle/wrapper/gradle-wrapper.properties", patch=WRAP_PATCH),
+            file_entry(".github/workflows/status.yml", patch=f"@@ -3 +3 @@\n-{SUB_OLD}\n+{SUB_NEW}"),
             file_entry(".github/workflows/ci.yml", patch=patch),
         ]
         api = make_api(files=files)
@@ -110,8 +121,8 @@ class HappyPathTests(unittest.TestCase):
         self.assertEqual(go(api)[0], 0)
 
     def test_latest_run_of_a_check_counts(self):
-        old_red = run("guards", conclusion="failure", started="2026-11-18T09:00:00Z")
-        api = make_api(checks=[old_red, run("guards"), run("tasks"), run("static")])
+        old_red = run("guards", conclusion="failure", rid=1)
+        api = make_api(checks=[old_red, run("guards", rid=2), run("tasks"), run("static")])
         self.assertEqual(go(api)[0], 0)
 
 
@@ -210,6 +221,47 @@ class RefusalTests(unittest.TestCase):
         patch = f"@@ -3 +3 @@\n-{PIN_OLD}\n+{PIN_NEW}"
         self.refused(make_api(files=[file_entry(".github/workflows/ci.yml", patch=patch)]), r"ci\.yml")
 
+    def test_queued_rerun_beats_an_older_green_run(self):
+        queued = run("guards", status="queued", conclusion=None, rid=9)
+        self.refused(make_api(checks=[queued, run("guards", rid=2), run("tasks"), run("static")]), r"guards.*pending")
+
+    def test_success_from_another_app_does_not_count(self):
+        self.refused(make_api(checks=[run("guards", app=999), run("tasks"), run("static")]), r"guards.*missing")
+
+    def test_base_other_than_main_is_refused(self):
+        self.refused(make_api(base="release"), r"base .*release.*main")
+
+    def test_truncated_file_list_is_refused(self):
+        self.refused(make_api(counts={"files": 3001}), r"files.*3001")
+
+    def test_truncated_commit_list_is_refused(self):
+        self.refused(make_api(counts={"commits": 251}), r"commits.*251")
+
+    def pin_patch(self, old, new):
+        return file_entry(".github/workflows/ci.yml", patch=f"@@ -3 +3 @@\n-{old}\n+{new}")
+
+    def test_dependabot_swapped_action_is_refused(self):
+        evil = PIN_NEW.replace("actions/checkout", "attacker/checkout")
+        self.refused(make_api(files=[self.pin_patch(PIN_OLD, evil)]), r"ci\.yml.*(pin|uses)", kind="dependabot")
+
+    def test_dependabot_subpath_swap_is_refused(self):
+        self.refused(make_api(files=[self.pin_patch(SUB_OLD, SUB_NEW.replace("/init@", "/analyze@"))]), r"ci\.yml.*(pin|uses)", kind="dependabot")
+
+    def test_dependabot_added_or_removed_action_is_refused(self):
+        for patch in (f"@@ -3 +3,2 @@\n {PIN_OLD}\n+{PIN_NEW}", f"@@ -3,2 +3 @@\n {PIN_NEW}\n-{PIN_OLD}"):
+            with self.subTest(patch=patch):
+                files = [file_entry(".github/workflows/ci.yml", patch=patch)]
+                self.refused(make_api(files=files), r"ci\.yml.*(pin|uses)", kind="dependabot")
+
+    def test_dependabot_wrapper_url_on_another_host_is_refused(self):
+        evil = "distributionUrl=https\\://evil.example/gradle-9.2-bin.zip"
+        files = [file_entry("gradle/wrapper/gradle-wrapper.properties", patch=f"@@ -1 +1 @@\n-{WRAP_OLD}\n+{evil}")]
+        self.refused(make_api(files=files), r"gradle-wrapper\.properties", kind="dependabot")
+
+    def test_dependabot_wrapper_other_property_is_refused(self):
+        files = [file_entry("gradle/wrapper/gradle-wrapper.properties", patch="@@ -1 +1 @@\n-networkTimeout=10000\n+networkTimeout=1")]
+        self.refused(make_api(files=files), r"gradle-wrapper\.properties", kind="dependabot")
+
     def test_no_changed_files_is_refused(self):
         self.refused(make_api(files=[]), r"no changed files")
 
@@ -270,6 +322,37 @@ class UsageTests(unittest.TestCase):
         self.assertIn("405", text)
 
 
+class GhApiTests(unittest.TestCase):
+    """GhApi retries only reads that failed with a 429 or 5xx HTTP status, never the merge PUT."""
+
+    def fake_gh(self, stderr, calls):
+        def fake_run(cmd, **kwargs):
+            calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 1, "", stderr)
+
+        return fake_run
+
+    def failing(self, stderr, call):
+        calls = []
+        real_run, real_sleep = merge_ready.subprocess.run, merge_ready.time.sleep
+        merge_ready.subprocess.run, merge_ready.time.sleep = self.fake_gh(stderr, calls), lambda s: None
+        try:
+            with self.assertRaises(merge_ready.ApiError):
+                call(merge_ready.GhApi())
+        finally:
+            merge_ready.subprocess.run, merge_ready.time.sleep = real_run, real_sleep
+        return len(calls)
+
+    def test_read_is_retried_on_http_5xx(self):
+        self.assertEqual(self.failing("gh: Bad Gateway (HTTP 502)", lambda a: a.get("repos/x")), merge_ready.RETRIES)
+
+    def test_merge_put_is_never_retried(self):
+        self.assertEqual(self.failing("gh: Bad Gateway (HTTP 502)", lambda a: a.put("repos/x", {"sha": SHA})), 1)
+
+    def test_a_number_in_the_message_is_not_a_status(self):
+        self.assertEqual(self.failing("gh: Not Found (HTTP 404): 500 files", lambda a: a.get("repos/x")), 1)
+
+
 class WiringTests(unittest.TestCase):
     """The tests and the script must run in verify.sh and CI, and the process docs must tell the merge agent to run only the script."""
 
@@ -284,6 +367,14 @@ class WiringTests(unittest.TestCase):
 
     def test_ci_runs_the_tests(self):
         self.assertIn("run: python3 -I scripts/test_merge_ready.py", self.active(self.read(".github/workflows/ci.yml")))
+
+    def test_script_and_tests_are_protected_process_files(self):
+        guard = self.read("scripts/hooks/pretooluse_guard.py")
+        for path in ("scripts/merge_ready.py", "scripts/test_merge_ready.py"):
+            self.assertIn(f'"{path}",', guard)
+
+    def test_docs_tell_the_merge_agent_to_run_from_clean_main(self):
+        self.assertRegex(self.read("docs/ORCHESTRATION.md"), r"(?i)clean checkout of `origin/main`")
 
     def test_docs_tell_the_merge_agent_to_run_only_the_script(self):
         doc = self.read("docs/ORCHESTRATION.md")
