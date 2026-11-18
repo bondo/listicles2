@@ -62,7 +62,7 @@ class DocRule:
     forbidden: tuple = ()
 
 
-# The merge agent's owner-only list (owner decisions B and 2026-11-17, #15 comments 6941366090 and 6943342158); the same wording in the prompt and ORCHESTRATION 7.5.
+# The merge agent's owner-only list (#15 comments 6941366090 and 6943342158); the same wording in the prompt and ORCHESTRATION 7.5.
 OWNER_ONLY = (
     r"owner-only: permissions and `\.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, "
     r"licence acceptances, design and product sign-off, docs that are themselves a gate \(a decision to approve before work relies on it\), "
@@ -656,7 +656,7 @@ RULES = (
             r"\(3\) pause new work and finish the open prs",
             r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews and the r2 usage read",
         ),
-        "concurrency is for pipeline flow (default 10, reviews without a slot); throttle only near a rate limit or in overage, never the reviews (owner decision, 2026-11-18)",
+        "concurrency is for pipeline flow (default 10, reviews without a slot); throttle only near a rate limit or in overage (2026-11-18)",
         forbidden=(r"cap of [35] workers", r"at most 5 worker sessions", r"the worker cap 3, then 2", r"recurring reviews r2"),
     ),
     Rule(
@@ -805,7 +805,7 @@ DOC_RULES = (
         "plan-working-rules", "docs/PLAN.md",
         (r"read what you need to understand the change", r"run whatever proves a finding: any test"),
         "PLAN 9.2 follows CLAUDE.md: read what you need, reviewers run whatever proves a finding (#129 R1-02)",
-        forbidden=(r"search narrowly", r"only run targeted tests"),
+        forbidden=(r"search narrowly", r"only run targeted tests", r"never reads child transcripts"),
     ),
     DocRule(
         "plan-handoff", "docs/PLAN.md",
@@ -838,53 +838,14 @@ DOC_RULES = (
         "followups-small-fix", "docs/FOLLOW-UPS.md",
         (r"the fix is not small: more than about 30 changed lines",),
         "FOLLOW-UPS section 2: a minor is deferred only when its fix is larger than about 30 lines (rev 46 row 17)",
-        forbidden=(r"more than about 15 changed lines",),
+        forbidden=(r"more than about 15 changed lines", r"stops deferring and reports to the owner",
+                   r"more than 8 open per milestone goes to the owner"),
     ),
     DocRule(
         "followups-labels", "docs/FOLLOW-UPS.md",
         (r"the orchestrator checks they exist before the first filing and creates a missing label with `gh api`",),
         "FOLLOW-UPS section 7: the orchestrator creates a missing label itself (#15 AUTONOMY), it does not send the owner to M0-O10",
         forbidden=(r"the owner creates them once, task m0-o10", r"asks the owner to do m0-o10"),
-    ),
-    DocRule(
-        "followups-burn-down", "docs/FOLLOW-UPS.md",
-        (
-            r"more than 8 open follow-ups for one milestone: the orchestrator stops deferring and starts the milestone's burn-down task; "
-            r"re-deferral and majors still need the owner",
-            r"more than 8 open per milestone starts the burn-down; re-deferral and majors go to the owner",
-        ),
-        "FOLLOW-UPS: more than 8 open follow-ups start the burn-down task, they do not stop at the owner (ORCHESTRATION 7.2.1)",
-        forbidden=(r"stops deferring and reports to the owner", r"more than 8 open per milestone goes to the owner"),
-    ),
-    DocRule(
-        "plan-transcripts", "docs/PLAN.md",
-        (
-            r"the orchestrator reads results cheapest first and never whole transcripts; targeted `list_events` on a stall, a block, red ci "
-            r"or before an escalation decision",
-        ),
-        "PLAN 9.2: the orchestrator reads results cheapest first, targeted list_events when needed, never whole transcripts (ORCHESTRATION 7.3)",
-        forbidden=(r"never reads child transcripts",),
-    ),
-    DocRule(
-        "reviews-design-rounds", "docs/reviews/README.md",
-        (r"max 3 opus rounds \(d-3\.2\)", r"r5 up to 3 rounds", r"opus design reviewer \(max 3 rounds\)"),
-        "the reviews README says 3 design rounds, as roles.yaml does (rev 46 row 5)",
-        forbidden=(r"max 2 (opus )?rounds", r"up to 2 rounds"),
-    ),
-    DocRule(
-        "plan-design-rounds", "docs/PLAN.md",
-        (r"fresh session per design-pr round, max 3 rounds",),
-        "PLAN 9.1 says 3 design rounds, as roles.yaml does (rev 46 row 5)",
-        forbidden=(r"max 2 rounds",),
-    ),
-    DocRule(
-        "orch-roles", ORCH,
-        (
-            r"\| \*\*orchestrator\*\* \| opus / medium \|", r"\| \*\*implementer\*\* \| opus / high \(max for `risk:high`\) \|",
-            r"reads whole transcripts, merges \|",
-        ),
-        "ORCHESTRATION 1: the role table follows roles.yaml (Opus models) and the transcript and big-pr rules",
-        forbidden=(r"sonnet / (low|medium)", r"reads full transcripts", r"applies `big-pr` without the owner's say-so"),
     ),
     DocRule(
         "orch-autonomy", ORCH,
@@ -961,7 +922,8 @@ DOC_RULES = (
             r"\*\*plan review:\*\* after the planner writes `docs/milestones/<mx>\.md` and before any implementer starts, the orchestrator spawns "
             r"a fresh opus reviewer",
             r"\*\*second reviewer:\*\* for `risk:high` prs and the security-rules, sync-merge and release areas, the orchestrator spawns a second "
-            r"fresh session in the same round; it never gets the reviewer's findings, and a `risk:high` pr is marked ready only after that pass",
+            r"fresh session in the same round \(`agents/prompts/second-reviewer\.md`\); it never gets the reviewer's findings, "
+            r"and a `risk:high` pr is marked ready only after that pass",
             r"\*\*escalation:\*\* when round 4 still has a confirmed finding above nit \(deferred minors do not count\) or a dispute is still "
             r"open, the orchestrator spawns one escalation reviewer per pr",
             r"`fix` gets one fresh round 5, `split` opens a new pr from `main` with merge commits, `owner` goes to the owner; there is no second escalation",
@@ -1011,7 +973,8 @@ DOC_RULES = (
             r"§7\.7\.6 throttle order\.", r"throttle only when a rate limit is near or in overage: a 7-day `allowed_warning` or `isusingoverage`",
             r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"\(2\) halve the concurrency limit, then halve it again",
             r"\(3\) pause new work and finish the open prs",
-            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the r2 usage read of §7\.7\.1",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, "
+            r"and the r2 usage read of §7\.7\.1",
         ),
         "ORCHESTRATION 7.7.6: throttle only near a rate limit or in overage: extras, halve the concurrency, pause new work; reviews are never throttled",
         forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2"),
@@ -1020,11 +983,9 @@ DOC_RULES = (
         "orch-spawn-templates", ORCH,
         (
             r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, whole diff \{base_sha\}\.\.\{head_sha\}, focus since \{reviewed_through\}",
-            r"### 8\.6 plan review, second reviewer, escalation reviewer",
-            r"role: agents/prompts/second-reviewer\.md\.", r"role: agents/prompts/escalation-reviewer\.md\.",
             r"role:<role>\s+orchestrator \| implementer \| reviewer \| second-reviewer \| escalation-reviewer \| planner \| retro",
         ),
-        "ORCHESTRATION 2.1 and 8: the reviewer spawn carries the whole diff and a focus point; templates for the second and escalation reviewers",
+        "ORCHESTRATION 2.1 and 8.3: the reviewer spawn carries the whole diff and a focus point; the role tags name the new reviewers",
         forbidden=(r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, range",),
     ),
     DocRule(

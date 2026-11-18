@@ -500,8 +500,8 @@ Role definitions are checked in, so they get reviewed and versioned like code:
 * `verify.sh` has quiet output by default (one line per step, plus failure details).
 * One PR = one concern, about 400 lines or fewer. Smaller diffs mean cheaper reviews.
 * Reviewers run whatever proves a finding: any test, the app's JVM screenshots or a script. CI runs the full suite.
-* The orchestrator never reads child transcripts. It reads only the final summary
-  (the `WORKER-RESULT` block, `docs/ORCHESTRATION.md` §7.3); tokens and cost come from
+* The orchestrator reads results cheapest first and never whole transcripts; targeted `list_events` on a stall, a block, red CI or before an escalation decision
+  (the `WORKER-RESULT` block first, `docs/ORCHESTRATION.md` §7.3); tokens and cost come from
   `get_session`, not from the worker.
 
 ### 9.3 Context limits and handoff

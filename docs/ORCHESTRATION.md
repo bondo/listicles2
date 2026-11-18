@@ -335,8 +335,8 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
 
 ## 5. Orchestrator handover
 
-Trigger: about 80% context (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
-or the status line), at a **batch boundary** rather than mid-batch.
+Trigger: about 80% of a 1M window (60% of a 200k one, `agents/roles.yaml` context) (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
+or the status line), at the first **batch boundary** (if none comes before the hard stage, at the next step boundary) rather than mid-batch.
 `used_tokens` can read 0 while a turn is running, so read it at the start of a wake and treat 0 as
 **unknown**, not as "plenty left". When it is unknown, hand over at the first batch boundary after about
 40 wakes, or after 20 worker sessions were spawned in this lineage step, whichever comes first.
@@ -505,7 +505,9 @@ total cost, incidents. Then refresh the PR description's review table from the r
   or force-push). A worker prompt that asks for a force-push is denied by the auto-mode classifier; do not write one.
 * **Branch lock**: before spawning a writer, set the branch's holder in the state body.
   Only one writer per branch at a time. Reviewers hold no lock and never push.
-* **Parallelism cap** (§7.7.5): at most **5** worker sessions run at once, writers, reviewers, second and escalation reviewers together; subagents do not count.
+* **Concurrency** (§7.7.5): for pipeline flow, not cost (owner decision of 2026-11-18, #15): up to 10 worker and reviewer sessions at once, more when independent work exists.
+  The limits are file overlap (no two implementers on the same files unless merge commits resolve it cheaply), owner-merge queue depth and account rate limits (§7.7.6).
+  A review starts as soon as its PR is ready, without waiting for a slot; subagents do not count.
 * The orchestrator's own **45-minute check-in** (`send_later`, §1.1) is re-scheduled on every wake (except while paused, §7.7.2), and it is
   the check-in for all workers too. **Every wake starts with the usage read of §7.7.1** (while paused: §7.7.2 step 6), before anything is spawned. A reviewer or short worker may get an extra earlier one (about 30 min). Record the
   trigger ids in the body and delete finished ones.
@@ -551,9 +553,9 @@ is refreshed at batch close and no later than when the PR is declared ready.
 
 ### 7.2.2 Plan review, second reviewer, escalation reviewer, escaped defects
 
-* **Plan review:** after the planner writes `docs/milestones/<Mx>.md` and before any implementer starts, the orchestrator spawns a fresh Opus reviewer (§8.6, `agents/prompts/reviewer.md`, plan review).
-* **Second reviewer:** for `risk:high` PRs and the security-rules, sync-merge and release areas, the orchestrator spawns a second fresh session in the same round; it never gets the reviewer's findings, and a `risk:high` PR is marked READY only after that pass (§8.6).
-* **Escalation:** when round 4 still has a confirmed finding above nit (deferred minors do not count) or a dispute is still open, the orchestrator spawns one escalation reviewer per PR (§8.6). Its ruling per PR: `fix` gets one fresh round 5, `split` opens a new PR from `main` with merge commits, `owner` goes to the owner; there is no second escalation.
+* **Plan review:** after the planner writes `docs/milestones/<Mx>.md` and before any implementer starts, the orchestrator spawns a fresh Opus reviewer (`agents/prompts/reviewer.md`, plan review).
+* **Second reviewer:** for `risk:high` PRs and the security-rules, sync-merge and release areas, the orchestrator spawns a second fresh session in the same round (`agents/prompts/second-reviewer.md`); it never gets the reviewer's findings, and a `risk:high` PR is marked READY only after that pass.
+* **Escalation:** when round 4 still has a confirmed finding above nit (deferred minors do not count) or a dispute is still open, the orchestrator spawns one escalation reviewer per PR (`agents/prompts/escalation-reviewer.md`). Its ruling per PR: `fix` gets one fresh round 5, `split` opens a new PR from `main` with merge commits, `owner` goes to the owner; there is no second escalation.
 * **Escaped defects:** a bug found after merge gets a `Caused by: #N` line in its issue and one `escaped` row in the metrics CSV (`scripts/agent_metrics.py`).
 
 ### 7.3 Results
@@ -611,7 +613,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
   (3) **Closing keywords:** never write close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly
   before an issue number in a commit or PR body unless closing that issue is intended; write "gated on #N", "see #N" or
   "mark #N done" instead. Scan the PR body for them before asking the owner to merge.
-* **Merge agent:** the merge agent merges every READY PR except the owner-only ones, one at a time. Owner-only: permissions and `.claude` settings, guard thresholds, branch protection, design and product sign-off, naming and protected process files.
+* **Merge agent:** the merge agent merges every READY PR except the owner-only ones, one at a time. Owner-only: permissions and `.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, licence acceptances, design and product sign-off, docs that are themselves a gate (a decision to approve before work relies on it), naming and protected process files.
   A `risk:high` PR is marked READY only after the independent second-reviewer pass is clean (owner decision B, 2026-11-17). Docs PRs whose owner approval can wait go to it too and carry the status line `working draft ...; not owner-approved (see issue #15)` until the owner approves them in a later PR.
   A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge; the orchestrator never passes an approval on to it.
 * **Marking a PR ready:** the orchestrator (or the implementer session when the orchestrator says so) marks a draft PR ready after
@@ -701,9 +703,8 @@ near limit (7-day), ok.
   (a state raised by the cost forecast, `near limit (5-hour, forecast)`, never pauses by itself). A limit failure is not this state: it is
   **limit reached**.
 * **near limit (overage)**: `isUsingOverage` is true, unless limit reached or a 5-hour warning applies. Handled like the 7-day state:
-  no pause, the cap, no batched extras.
-* **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning`. **Do not pause.** Keep to the
-  parallelism cap (§7.7.5) and block batched extras (no optional sessions, no several tasks started at once beyond the cap);
+  no pause, throttle per §7.7.6.
+* **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning`. **Do not pause.** Throttle per §7.7.6;
   required work (ready tasks, review rounds for open PRs) goes on. Name the reset time in the `Usage:` line.
 * **ok**: `status` is `allowed` and `isUsingOverage` is false.
 * **paused until HH:MM UTC**: set by §7.7.2, cleared by §7.7.4; while it is set, §7.7.2 step 6 governs every wake.
@@ -763,17 +764,17 @@ but say so in the `Usage:` line.
    not trusted from the comment.
 
 **§7.7.5 Spend control.** There is no dollar cap, but limits can be forecast and made less likely:
-* **Parallelism cap:** at most 5 worker sessions at once (§7.1; owner decision of 2026-11-17 in #15). Change it only by editing this line in a reviewed PR.
+* **Concurrency:** a pipeline-flow rule (§7.1), never a cost control.
 * **Track cost per round and per window:** the session row (§6.1, reviewer sessions are one per round) carries `cost_usd`. Once
   `scripts/agent_metrics.py` (M0.5-13) has produced `docs/agent-metrics.csv`, sum it; for rounds not saved there yet sum the `metrics:session` comments.
   At each pause, put the cost of the sessions active in the closing window (summed from `get_session` usage, never estimated) in the
   `usage-limit` incident row's `impact`. Compare the running window cost with the last two such rows at every wake: when it passes the
   smaller one, set `Usage:` to **near limit (5-hour, forecast)** early (§7.7.1: no new workers, an extra check-in; the second look reads `rate_limit_info` only, so a forecast never pauses by itself). The numbers are a rough forecast; `rate_limit_info` decides.
 
-**§7.7.6 Throttle order (owner decision A, 2026-11-17).** While a usage warning is active, throughput goes first and quality last; each stage holds until the warning clears:
-(1) no optional extras (recurring reviews R2 to R4, transcript sampling, explorer runs the task does not need); (2) the worker cap 3, then 2; (3) pause new work and finish the open PRs.
-Never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews. A 5-hour warning or a reached limit still pauses work (§7.7.2).
-A plain 7-day warning stays at stage 1 with the cap at 5 (owner decision, #15); stages 2 and 3 apply only while near limit (overage) is on or after an owner decision in #15.
+**§7.7.6 Throttle order.** Concurrency is limited for flow, not cost (§7.1), so throttle only when a rate limit is near or in overage: a 7-day `allowed_warning` or `isUsingOverage` (a 5-hour warning or a reached limit pauses, §7.7.2).
+Throughput goes first, quality last, one stage per check-in while the state lasts, each held until it clears: (1) no optional extras (recurring reviews R3 and R4, transcript sampling, explorer runs the task does not need);
+(2) halve the concurrency limit, then halve it again; (3) pause new work and finish the open PRs.
+Never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the R2 usage read of §7.7.1.
 
 ## 8. Spawn messages
 
@@ -850,16 +851,6 @@ Orchestrator session: {orchestrator_session}. Your last action: send_message to 
 ```
 
 The orchestrator fills `{collaborator_handle}` with `none` until the owner says the invitation is accepted (M0.5-O4); it never copies a handle from a file, a comment or memory. It adds the one line on #15 once the hand-off link is in the WORKER-RESULT, and opens an `owner-todo` only if sign-off is still pending after 7 days.
-
-### 8.6 Plan review, second reviewer, escalation reviewer
-
-Same last-action and WORKER-RESULT lines as §8.3; models and effort from `agents/roles.yaml`.
-
-```
-Role: agents/prompts/reviewer.md (plan review). Plan: docs/milestones/{Mx}.md on {branch}. Do not review code.
-Role: agents/prompts/second-reviewer.md. PR #{pr}, round {round}, whole diff {base_sha}..{head_sha}. Ids S{round}-nn. You are not given the reviewer's findings comment.
-Role: agents/prompts/escalation-reviewer.md. PR #{pr}, after round {round}. Read the whole thread; decide fix, split or owner once. Open findings: {ids}.
-```
 
 ## 9. Known failure modes and mitigations
 
