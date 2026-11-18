@@ -460,8 +460,8 @@ drop) is decided when post-v1 work is planned.
 * Turn on branch protection using the guide from M0.
 * Collaborator: check the Actions settings, invite them, ask for 2FA, create the labels `feedback`, `idea`, `decision`, `needs-collaborator`, `needs-owner`, send them `docs/COLLABORATING.md`, run the live test (tasks M0.5-O3, M0.5-O4).
 * Deferred decisions (2026-11-17): the web account-deletion page (before the first external tester), the Play
-  account type and the 12-tester closed test (when Play release is planned), the palette (T1), the undo
-  snackbar timing and backups/export (M1 planning).
+  account type and the 12-tester closed test (when Play release is planned), the undo
+  snackbar timing and backups/export (M1 planning). The palette (T1) was decided later the same day: Petrol (issue #15 comment 6956773225).
 
 ## 9. Agents, models and effort levels
 

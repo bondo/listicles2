@@ -11,7 +11,7 @@ security review, comment 6927207374), and [the plan](../PLAN.md). Decided questi
 ## How to read this
 
 * **Story ids** are stable and never reused: `AUTH` sign-in and account, `HH` household, `LIST` lists, `ITEM` items,
-  `VIS` private and shared, `SYNC` offline and sync, `LANG` language.
+  `VIS` private and shared, `SYNC` offline and sync, `LANG` language, `THEME` app theme (parked after v1).
 * Each story has a "so that" value and acceptance criteria written as **Given / When / Then**, so a test can check them.
 * **Words used:** *user* = a signed-in person. *Household* = a group of users (PLAN section 1). *Household owner* = the
   one member who manages the household. *List creator* = the user who created a list (not the same as household owner).
@@ -366,9 +366,26 @@ Decided as not in v1 (Q1, Q2, Q4); the ones marked *later* are planned for a lat
 * Sharing a list with one person, with guests, or with people outside the household (Q3 shares with the household).
 * More than one household per user (PLAN section 3: a user record holds one household id).
 * Sign-in with an email link ("magic link", OQ-27); reconsidered only if the project moves to the paid Blaze plan.
+* Choosing an app theme (THEME-01, parked until after v1); v1 has one palette, Petrol (T1).
 * Notes and tags on items, barcode scanning and title lookup, packing templates and trips: in [the plan](../PLAN.md)
   (sections 1 and 7, M2-M5), but not in the v1 item of Q2 (OQ-15). Search and manual order are
   not in v1; sorting and the "show only missing" filter are (OQ-8).
+
+**THEME-01 Choose an app theme** (parked until after v1, like the packing and barcode items of OQ-36; not built, not tested
+and not shown in v1). As a user, I want to pick the app's colour theme, so that the app looks the way I like.
+* Given the app has more than one theme, when I open the theme setting and pick one, then every screen uses it at once,
+  in light and in dark, and it is still in use after I restart the app.
+* Given I have never picked a theme, then the app uses Petrol, the v1 palette (T1).
+* Given any theme, then every text and control pair keeps the WCAG AA contrast (4.5 for text, 3 for the outline), in light
+  and in dark; a theme that fails the check in `design/tokens.json` is not offered.
+* Given the setting, then its name, the theme names and any message are in English and Danish (LANG-01).
+* Which themes are offered, whether the choice follows me to another phone, and whether "follow the phone's colours" is one of them
+  are open and decided when this story is planned.
+**Constraint for v1:** design tokens stay theme-swappable. Colors are Material roles only (`design/tokens.json`), `Theme.kt`
+builds the `ColorScheme` from one color set per theme, and no screen or page hard-codes a palette value, so a theme is a
+new light and dark set with nothing else to change. Enforced today by `scripts/design_tokens.py` (both themes have the same
+roles, every required contrast pair passes) and by the tests against the retired teal values; that `Theme.kt` is built from
+the tokens, and that no screen hard-codes a color, is checked with M1-04 and the M1 screens, not yet.
 
 ## 9. Leave room for
 
@@ -426,6 +443,7 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-31 | **Decided (2026-11-16):** changing the password is in v1 (AUTH-11); changing the email and linking a second method come after v1. | AUTH-10, AUTH-11 |
 | OQ-32 | **Decided (2026-11-16):** a list's type cannot be changed in v1. Turning a plain list into a collection list may come later (section 9). | LIST-02 |
 | OQ-33 | **Decided (2026-11-16):** collection lists put items without a release year last; plain lists sort by name ignoring case, with æ, ø, å after z. | ITEM-05 |
+| T1 | **Decided (2026-11-17, issue #15 comment 6956773225):** the app palette is Petrol (a teal leaning blue, with an amber offline bar), light and dark, in `design/tokens.json`. After v1 users may pick a theme themselves (THEME-01); tokens stay theme-swappable. | THEME-01 |
 | Types | **Decided (2026-11-16, issue #15 comment 6927705004):** two list types, chosen at creation: plain (default; name and "I have it", sorted by name) and collection (also the two optional years under OQ-6 and OQ-19; sorted by release year, then name). | LIST-02, ITEM-01, ITEM-02, ITEM-05 |
 
 ## 11. Open questions
