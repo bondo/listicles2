@@ -218,6 +218,10 @@ class Wiring(unittest.TestCase):
         got = self.mutated(ci=[("  static:\n    name: static\n", "  static:\n    name: static\n    continue-on-error: true\n")])
         self.assertIn("ci.yml static job has if: or continue-on-error", got)
 
+    def test_or_true_after_the_check_does_not_count(self):
+        got = self.mutated(ci=[(f"        run: {CHECK_CMD}", f"        run: {CHECK_CMD} || true")])
+        self.assertEqual(got, [f"ci.yml static job does not run `{CHECK_CMD}`"])
+
     def test_step_level_if_is_flagged(self):
         got = self.mutated(ci=[(f"        run: {CHECK_CMD}", f"        if: false\n        run: {CHECK_CMD}")])
         self.assertEqual(got, ["ci.yml static job has if: or continue-on-error"])
