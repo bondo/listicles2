@@ -140,7 +140,7 @@ class LogicalLineTests(CliFlagCase):
         self.put("scripts/lint.sh", "cd firebase && npx eslint --quiet . || true")
         self.assertFails(MARK)
 
-    def test_chained_commands_each_need_their_own_check(self):
+    def test_one_justification_covers_the_logical_line(self):
         self.put("scripts/lint.sh", "ruff check scripts && mypy --ignore-missing-imports scripts # justified: stubs missing upstream")
         self.assertPasses()
 
@@ -154,6 +154,119 @@ class StagedModeTests(CliFlagCase):
         self.assertFails(MARK, "--staged")
         self.repo.git("add", "scripts/lint.sh")
         self.assertPasses("--staged")
+
+
+class ConfigIndirectionTests(CliFlagCase):
+    """R1-01: config handed over on the command line. An inline override or a path the 2b config scan does not cover is a relaxation."""
+
+    BAD = [
+        "ruff check --config \"lint.ignore = ['F401']\" scripts", "ruff check --config 'lint.ignore=[\"F401\"]' scripts",
+        "ruff check --config ci.toml scripts",
+        "mypy --config-file ci.ini scripts", "mypy --config-file=ci.ini scripts", "eslint -c ci.js .", "eslint --config relaxed.mjs .",
+        "prettier --check --config ci.json .", "tsc -p ci.json", "tsc --project ci.json", "npm run lint -- --config relaxed.mjs",
+    ]
+    GOOD = [
+        "ruff check --config ruff.toml scripts", "ruff check --config=ruff.toml scripts", "ruff check --config pyproject.toml scripts",
+        "ruff check --config sub/.ruff.toml scripts", "mypy --config-file mypy.ini scripts", "mypy --config-file setup.cfg scripts",
+        "eslint -c eslint.config.mjs .", "eslint --config .eslintrc.json .", "prettier --check --config .prettierrc.json .",
+        "prettier --check --config prettier.config.mjs .", "tsc -p tsconfig.json", "tsc -p tsconfig.build.json", "tsc -p .",
+        "tsc --project firebase/tsconfig.json", "npm run lint -- --config eslint.config.mjs",
+    ]
+
+    def test_inline_overrides_and_unscanned_config_files_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_config_files_the_config_scan_covers_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+    def test_justification_waives_a_config_path(self):
+        self.put("scripts/lint.sh", "ruff check --config ci.toml scripts # justified: ci.toml is the generated-code profile, owner approved")
+        self.assertPasses()
+
+
+class QuotingAndEnvironmentTests(CliFlagCase):
+    """R1-02: a quote before the flag or before false, combined short options and SHELLCHECK_OPTS hide a relaxation."""
+
+    BAD = [
+        'ruff check "--ignore" E501 .', "ruff check '--ignore=E501' .", "prettier --check '-u' .", "tsc --strict 'false'",
+        'tsc --strict "false"', "shellcheck -xe SC2086 a.sh", "shellcheck -Ce SC2086 a.sh", "shellcheck -xS error a.sh", "shellcheck -xi SC2086 a.sh",
+        'SHELLCHECK_OPTS="-e SC2086" shellcheck a.sh', "export SHELLCHECK_OPTS='-e SC2086'", "SHELLCHECK_OPTS=-e shellcheck a.sh",
+        'echo " #"; ruff check --ignore E501 .',
+    ]
+    GOOD = [
+        'ruff check "--config" ruff.toml .', "tsc --strict 'true'", "shellcheck -x a.sh", "shellcheck -xS warning a.sh",
+        'SHELLCHECK_OPTS="-S warning" shellcheck a.sh',
+        "export SHELLCHECK_OPTS=-x", "shellcheck -Calways a.sh",
+    ]
+
+    def test_hidden_relaxations_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_neighbouring_strict_forms_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+
+class MoreFlagsTests(CliFlagCase):
+    """R1-03: relaxations the first flag lists missed."""
+
+    BAD = [
+        "mypy --strict --no-strict-bytes scripts", "mypy --no-strict-equality-for-none scripts", "mypy --no-extra-checks scripts",
+        "mypy --untyped-calls-exclude=pkg scripts", "eslint --report-unused-disable-directives-severity off .",
+        "eslint --report-unused-disable-directives-severity=0 .", "eslint --no-error-on-unmatched-pattern .", "eslint --pass-on-no-patterns .",
+    ]
+    GOOD = ["eslint --report-unused-disable-directives-severity error .", "eslint --report-unused-disable-directives-severity=2 .",
+            "mypy --extra-checks scripts"]
+
+    def test_listed_relaxations_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_strict_neighbours_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+
+class FalsePositiveTests(CliFlagCase):
+    """R1-04: ordinary and strict lines must not need a justification."""
+
+    GOOD = [
+        "npm ci --quiet", "npm install --quiet --no-audit", 'npx --quiet firebase emulators:exec "npm test"', "npm run lint --quiet",
+        "eslint --rule 'complexity: [error, {max: 1}]' .", "eslint --rule 'max-depth: [error, 1]' .",
+        "eslint --rule '{\"a\":[\"error\",{\"max\":1}]}' .", "grep -i shellcheck a.log",
+        "ruff check . # --ignore E501 was dropped", "shellcheck a.sh # -e SC2086 was dropped",
+    ]
+    BAD = [
+        "eslint --rule '{\"a\":\"error\",\"b\":\"off\"}' .", "npx --quiet eslint --quiet .", "npm exec -- eslint --quiet .",
+        "ruff check --ignore E501 . # was dropped",
+    ]
+
+    def test_clean_lines_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+    def test_relaxations_next_to_comments_and_wrappers_still_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
 
 
 if __name__ == "__main__":
