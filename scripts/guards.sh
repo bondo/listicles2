@@ -65,7 +65,11 @@ PAT+='mypy:(.*[[:space:],:])?(allow[-_]|implicit[-_](optional|reexport)|no[-_](s
 PAT+='[Pp][Rr][Aa][Gg][Mm][Aa][:[:space:]]?[[:space:]]*[Nn][Oo][[:space:]]*([Cc][Oo][Vv][Ee][Rr]|[Bb][Rr][Aa][Nn][Cc][Hh])|(c8|v8|istanbul) ignore|prettier-ignore|biome-ignore|dprint-ignore|fmt: *(off|skip)|yapf: *disable|isort: *(skip|off)|@formatter:off'
 # Owner decision (#46): the reason after `justified:` needs at least 3 words of letters (a word is a run of 2 or more ASCII letters,
 # so "-", "x", "ok" and "two words" fail); reviewers still judge the content. just() is awk, shared by the line filter and entrycheck.
+# Only the reason counts: it ends at a closing `*/` or `-->` and at a following comment opener (` # word`, ` // word`), so code or a
+# directive after it (`/* justified: x */ // eslint-disable-line no-console`) adds no words. `#46` and `http://` do not end it.
 JUSTFN='function just(l,   i, r, n) { i = index(l, "justified:"); if (!i) return 0; r = substr(l, i + 10); n = 0
+  i = index(r, "*/"); if (i) r = substr(r, 1, i - 1); i = index(r, "-->"); if (i) r = substr(r, 1, i - 1)
+  if (match(r, /[ \t](#|\/\/)[ \t]*[A-Za-z]/)) r = substr(r, 1, RSTART)
   while (match(r, /[A-Za-z][A-Za-z]+/)) { n++; r = substr(r, RSTART + RLENGTH) } return n >= 3 }'
 unjust() { LC_ALL=C awk "$JUSTFN"' !just($0)'; } # keeps the lines that have no valid justification
 out=$(gg "$PAT" -- "${EXCL[@]}" | unjust)
@@ -153,16 +157,35 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
   cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
 [ -n "$out" ] && { echo "$out"; fail=1; }
 
-# 2c. `/* global foo, bar:writable */` (ESLint) switches off no-undef for the names. Only a comma list of identifiers closed on the same
-# line in a JS or TS file counts: the plain word also starts ordinary block comments (`/* global state is ... */`), which do not match.
-GID='[A-Za-z_$][A-Za-z0-9_$]*([[:space:]]*:[[:space:]]*[A-Za-z]+)?'
-out=$(gg '/\*[[:space:]]*globals?[[:space:]]+'"$GID"'([[:space:]]*,[[:space:]]*'"$GID"')*[[:space:]]*\*/' \
+# 2c. `/* global foo, bar:writable */` (ESLint) switches off no-undef for the names. Any block comment that starts with `global` or
+# `globals` and a name, closed on the same line, in a JS or TS file: that is how ESLint reads it (names split on commas and spaces, an
+# optional `-- description`), so `/* global state is kept */` is a directive too. A multi-line comment is not matched.
+out=$(gg '/\*[[:space:]]*globals?[[:space:]]+[A-Za-z_$][^*]*\*/' \
   -- '*.js' '*.mjs' '*.cjs' '*.jsx' '*.ts' '*.mts' '*.cts' '*.tsx' '*.vue' "${EXCL[@]}" | unjust)
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
 # 2d. Linter, formatter and test config embedded in package.json is not scanned by the checks above (and ESLint 9 ignores eslintConfig).
 # JSON has no comment for a justification, so there is no escape hatch: keep that config in the dedicated file. A dependency entry
-# (`"jest": "30.5.2"`) has a string value and does not match; the string form of "prettier" is not detected.
-out=$(gg '"eslintConfig"[[:space:]]*:|"(prettier|jest|nyc|c8)"[[:space:]]*:[[:space:]]*(\{|$)' -- '*package.json' "${EXCL[@]}")
+# (`"jest": "30.5.2"`) has a string value and does not match; the string form of "prettier" is not detected. Only top-level keys count
+# (brace depth 1), so `"overrides": { "jest": { ... } }` and `"peerDependenciesMeta"` are dependency data.
+PKG_AWK='
+{ s = $0; n = length(s); i = 1
+  while (i <= n) {
+    c = substr(s, i, 1)
+    if (c == "\"") {
+      k = ""; j = i + 1
+      while (j <= n && (d = substr(s, j, 1)) != "\"") { if (d == "\\") { j++; d = d substr(s, j, 1) } k = k d; j++ }
+      rest = substr(s, j + 1); i = j + 1
+      if (depth == 1 && rest ~ /^[ \t]*:/) { sub(/^[ \t]*:[ \t]*/, "", rest)
+        if (k == "eslintConfig" || k == "eslintIgnore" || (k ~ /^(prettier|jest|nyc|c8)$/ && rest ~ /^(\{|$)/)) { printf "%s:%d:%s\n", F, NR, $0; next } }
+      continue
+    }
+    if (c == "{" || c == "[") depth++; else if (c == "}" || c == "]") depth--
+    i++
+  }
+}'
+out=$(while IFS= read -r f; do
+  if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$PKG_AWK"; else awk -v F="$f" "$PKG_AWK" "$f" 2>/dev/null; fi
+done < <(git ls-files -- '*package.json' "${EXCL[@]}"))
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: embedded config: package.json must not hold linter or test config (use the dedicated file): /'; fail=1; }
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
@@ -197,12 +220,13 @@ sizecheck() { # sizecheck <git diff args>...: `git diff --raw` lists new modes a
 # 6. Narrowed lists (owner decision in #46: diff-based, against the merge base). `listitems <key regex> <rev:path>` prints
 # key<TAB>item<TAB>line for every quoted item of an array value of that key (single or multi-line, several keys per line). Comments
 # (`#`, `//`) are cut. A removed ruff `select` item or tsconfig `include` entry fails with no escape hatch (a replacement by "ALL" is fine);
-# an added tsconfig `exclude` entry needs `justified:` on its own line (tsconfig allows comments). Files new in the PR are not compared.
+# an added tsconfig `exclude` entry needs `justified:` on its own line (tsconfig allows comments). Files new in the PR are not compared; a deleted one is compared with every config of its kind at HEAD.
 LISTS_AWK='
 BEGIN { RE = "(^|[^A-Za-z_-])[\"\047]?(" KEYRE ")[\"\047]?[ \t]*[:=][ \t]*\\[" }
 {
   s = $0; n = length(s); i = 1; q = ""; gsub(/\t/, " ", s)
   while (i <= n) {
+    if (bc) { j = index(substr(s, i), "*/"); if (!j) break; i += j + 1; bc = 0; continue }
     if (depth == 0) {
       t = substr(s, i)
       if (!match(t, RE)) break
@@ -213,31 +237,36 @@ BEGIN { RE = "(^|[^A-Za-z_-])[\"\047]?(" KEYRE ")[\"\047]?[ \t]*[:=][ \t]*\\[" }
     if (c == "\"" || c == "\047") { q = c; cur = ""; continue }
     if (c == "[") depth++
     else if (c == "]") depth--
+    else if (c == "/" && substr(s, i, 1) == "*") { bc = 1; i++ }
     else if (c == "#" || (c == "/" && substr(s, i, 1) == "/")) break
   }
 }'
 listitems() { git show "$2" 2>/dev/null | LC_ALL=C awk -v KEYRE="$1" "$LISTS_AWK" | sed 's/^extend-//'; }
 narrowcheck() { # narrowcheck <merge-base>
-  local mb="$1" f re base head k it ln
+  local mb="$1" f g re kind base head k it ln
   while IFS= read -r f; do
     git cat-file -e "$mb:$f" 2>/dev/null || continue
     case "$f" in
-      *ruff.toml|*pyproject.toml) re='(extend-)?select' ;;
-      *) re='include|exclude' ;;
+      *ruff.toml|*pyproject.toml) re='(extend-)?select'; kind='ruff\.toml$|pyproject\.toml$' ;;
+      *) re='include|exclude'; kind='(ts|js)config[^/]*\.json$' ;;
     esac
-    base=$(listitems "$re" "$mb:$f"); head=$(listitems "$re" "HEAD:$f")
+    base=$(listitems "$re" "$mb:$f")
+    # A deleted file (a rename or a move shows as delete plus add) is compared with the items of every file of its kind at HEAD.
+    if git cat-file -e "HEAD:$f" 2>/dev/null; then head=$(listitems "$re" "HEAD:$f")
+    else head=$(while IFS= read -r g; do listitems "$re" "HEAD:$g"; done < <(git ls-tree -r --name-only HEAD | grep -E "$kind")); fi
     while IFS=$'\t' read -r k it ln; do
       [ -n "$k" ] || continue
       if printf '%s\n' "$head" | cut -f1,2 | grep -qxF -- "$k"$'\t'"$it"; then continue; fi
       if [ "$k" = select ]; then printf '%s\n' "$head" | cut -f1,2 | grep -qxF -- select$'\t'ALL || bad "narrowed ruff select: $f: $it was removed"
       elif [ "$k" = include ]; then bad "narrowed tsconfig include: $f: $it was removed"; fi
     done <<<"$base"
+    git cat-file -e "HEAD:$f" 2>/dev/null || continue
     while IFS=$'\t' read -r k it ln; do
       [ "$k" = exclude ] || continue
       if printf '%s\n' "$base" | cut -f1,2 | grep -qxF -- "$k"$'\t'"$it"; then continue; fi
       [ -n "$(printf '%s\n' "$ln" | unjust)" ] && bad "widened tsconfig exclude: $f: $it was added without a justified: reason"
     done <<<"$head"
-  done < <(git diff --name-only --no-renames --diff-filter=M "$mb" HEAD -- '*ruff.toml' '*pyproject.toml' '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}")
+  done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- '*ruff.toml' '*pyproject.toml' '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}")
 }
 
 if [ "$STAGED" = 1 ]; then sizecheck --cached; fi
@@ -294,17 +323,23 @@ if [ "$STAGED" = 0 ]; then
       # coverageThreshold (Jest) and fail_under / --cov-fail-under (coverage.py) are named like thresholds but not spelled `threshold`.
       # In a Jest, Vitest, nyc or c8 config the per-metric values sit on their own lines (`branches: 80,`), so those lines count too.
       kw ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ ||
-      (file ~ /(jest|vitest)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
+      (file ~ /(jest|vitest|vite)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n } else { add[key] = l; addn[key] = n }
       }
       # A raised line length is a weaker style check (owner decision in #46); lowered or removed is stricter and passes. Style config files only.
+      # Keyed by file and setting name (several settings may share a line); the value is the number after `=` or `:`, a word such as
+      # `off` counts as unlimited. Per key the smallest removed value is compared with the largest added one.
       file ~ /(ruff\.toml|pyproject\.toml|\.flake8|setup\.cfg|tox\.ini|\.editorconfig|detekt\.yml|prettierrc[^\/]*|prettier\.config\.[^\/]*)$/ && tolower($0) ~ /(line[-_]?length|printwidth)/ {
-        l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key)
-        if (substr($0, 1, 1) == "-") llrem[key] = num(l); else lladd[key] = num(l)
+        lo = tolower(substr($0, 2))
+        while (match(lo, /(max[-_]?line[-_]?length|line[-_]?length|printwidth)["\047]?[ \t]*[:=][ \t]*/)) {
+          k = substr(lo, RSTART, RLENGTH); sub(/["\047]?[ \t]*[:=][ \t]*$/, "", k); gsub(/[-_]/, "", k); k = file "|" k
+          lo = substr(lo, RSTART + RLENGTH); v = match(lo, /^[0-9]+/) ? substr(lo, 1, RLENGTH) + 0 : 999999999
+          if (substr($0, 1, 1) == "-") { if (!(k in llrem) || v < llrem[k]) llrem[k] = v } else if (!(k in lladd) || v > lladd[k]) lladd[k] = v
+        }
       }
       END {
-        for (k in llrem) if (k in lladd && llrem[k] >= 0 && lladd[k] > llrem[k]) { print "guard: raised line length: " k " (" llrem[k] " -> " lladd[k] ")"; bad = 1 }
+        for (k in llrem) if (k in lladd && lladd[k] > llrem[k]) { print "guard: raised line length: " k " (" llrem[k] " -> " (lladd[k] > 99999 ? "no limit" : lladd[k]) ")"; bad = 1 }
         for (k in rem) {
           if (!(k in add)) { print "guard: removed check setting: " rem[k]; bad = 1 }
           else if (remn[k] >= 0 && addn[k] >= 0 && addn[k] < remn[k] && rem[k] !~ /maxIssues/) { print "guard: lowered threshold: " add[k]; bad = 1 }
@@ -319,7 +354,7 @@ if [ "$STAGED" = 0 ]; then
       /^diff --git/ { file = $3; next }
       /^(---|\+\+\+)/ { next }
       /^[-+]/ {
-        sg = substr($0, 1, 1); t = substr($0, 2)
+        sg = substr($0, 1, 1); t = substr($0, 2); gsub(/\/\*[^*]*\*\//, "", t); sub(/(^|[ \t])(\/\/|#).*$/, "", t)
         while (match(t, /[-A-Za-z_@\/]+\.configs\.[A-Za-z]+|plugin:[-A-Za-z_@\/]+\/[-A-Za-z]+/)) {
           tok = substr(t, RSTART, RLENGTH); t = substr(t, RSTART + RLENGTH)
           if (tok ~ /^plugin:/) { g = tok; sub(/\/[^\/]*$/, "", g); p = tok; sub(/^.*\//, "", p); gsub(/-/, "", p) }
