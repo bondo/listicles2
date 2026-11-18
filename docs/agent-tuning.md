@@ -32,7 +32,7 @@ Comment ids below are on issue #15 (`https://github.com/bondo/listicles2/issues/
 
 Before reading the rows, note three things about what the pilot actually tested:
 
-1. **Redesign PR 4 (orchestration) never merged.** It was never opened. It waits on the guard fix #135, which is blocked
+1. **Redesign PR 4 (orchestration) never merged.** It was never opened. It waits on #135, a guard change; PR 4 is blocked
    by a guard false positive on the word "threshold" (owner call 6969709604).
    - Not in effect during the pilot: delta review always, the parallelism and throttle text, and the risk:high merge
      scope.
