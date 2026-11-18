@@ -702,8 +702,7 @@ near limit (7-day), ok.
   only: if it still shows the warning, run the pause protocol (§7.7.2); if it no longer does, the state is whatever §7.7.1 then says
   (a state raised by the cost forecast, `near limit (5-hour, forecast)`, never pauses by itself). A limit failure is not this state: it is
   **limit reached**.
-* **near limit (overage)**: `isUsingOverage` is true, unless limit reached or a 5-hour warning applies. Handled like the 7-day state:
-  no pause, throttle per §7.7.6.
+* **near limit (overage)**: `isUsingOverage` is true, unless limit reached or a 5-hour warning applies. No pause, throttle at stage 2 of §7.7.6.
 * **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning`. **Do not pause.** Throttle per §7.7.6;
   required work (ready tasks, review rounds for open PRs) goes on. Name the reset time in the `Usage:` line.
 * **ok**: `status` is `allowed` and `isUsingOverage` is false.
@@ -771,9 +770,8 @@ but say so in the `Usage:` line.
   `usage-limit` incident row's `impact`. Compare the running window cost with the last two such rows at every wake: when it passes the
   smaller one, set `Usage:` to **near limit (5-hour, forecast)** early (§7.7.1: no new workers, an extra check-in; the second look reads `rate_limit_info` only, so a forecast never pauses by itself). The numbers are a rough forecast; `rate_limit_info` decides.
 
-**§7.7.6 Throttle order.** Concurrency is limited for flow, not cost (§7.1), so throttle only near a rate limit. A 7-day `allowed_warning` holds at stage 1 and required work goes on (§7.7.1); stage 2 applies in overage or when the §7.7.5 forecast says the limit is reached before `resetsAt`; stage 3 only on an owner decision in #15 (a 5-hour warning or a reached limit pauses, §7.7.2).
-Throughput goes first, quality last; the stages are: (1) no optional extras (recurring reviews R3 and R4, transcript sampling, explorer runs the task does not need);
-(2) halve the concurrency limit, once per check-in while stage 2 applies, at most twice; (3) pause new work and finish the open PRs.
+**§7.7.6 Throttle order.** Concurrency is limited for flow, not cost (§7.1), so throttle only near a rate limit. A 7-day `allowed_warning` holds at stage 1 and required work goes on; stage 2 applies in overage; stage 3 only on an owner decision in #15 (a 5-hour warning or a reached limit pauses, §7.7.2).
+Throughput goes first, quality last; the stages are cumulative: (1) no optional extras (recurring reviews R3 and R4, transcript sampling, explorer runs the task does not need); (2) halve the concurrency limit, once per check-in while stage 2 applies, at most twice; (3) pause new work and finish the open PRs. A stage lifts, and the limit returns to the §7.1 default, at the first check-in where its trigger no longer applies.
 Never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the R2 usage read of §7.7.1.
 
 ## 8. Spawn messages

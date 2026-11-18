@@ -1387,6 +1387,7 @@ class Pr4RuleTests(unittest.TestCase):
             ("orch-throttle", " At most 5 worker sessions at once."), ("orch-throttle", " One stage per check-in while it lasts."),
             ("orch-throttle", " (1) no optional extras (recurring reviews R2 to R4)."), ("handover", " Hand over at about 80% context."),
             ("autonomy", " The `big-pr` label is set only with the owner's say-so."), ("orch-deferral", " more than about 15 changed lines"),
+            ("orch-throttle", " (2) the worker cap 3, then 2."), ("orch-throttle", " Stage 2 applies when the §7.7.5 forecast says it."),
         ):
             with self.subTest(old=old):
                 self.assertIn(rid, ids(prompt_rules.check_text("orchestrator", real("orchestrator") + old)))
