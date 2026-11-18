@@ -143,13 +143,20 @@ VERIFICATION_PROP = "org.gradle.dependency.verification"
 META = "verification-metadata.xml"
 
 
-def check_verification(meta, props_text):
+def check_verification(meta, props_text, verify_text=""):
     """Problems with the dependency verification metadata (text, or None if the file is missing) and gradle.properties."""
     problems = []
+    # Gradle reads gradle.properties with java.util.Properties (key ends at =, : or whitespace) and the mode case-insensitively.
+    prop = re.compile(r"\s*" + re.escape(VERIFICATION_PROP) + r"(?:\s*[=:]\s*|\s+)(\S+)")
     for line in props_text.splitlines():
-        key, _, value = line.strip().partition("=")
-        if key.strip() == VERIFICATION_PROP and value.strip() in ("off", "lenient"):
-            problems.append(f"gradle.properties: {VERIFICATION_PROP}={value.strip()} disables verification")
+        m = None if line.lstrip().startswith(("#", "!")) else prop.fullmatch(line.rstrip()) or prop.match(line)
+        if m and m.group(1).lower() in ("off", "lenient"):
+            problems.append(f"gradle.properties: {VERIFICATION_PROP}={m.group(1).lower()} disables verification")
+    flags = re.compile(
+        r"(?:--dependency-verification|\s-F|-D" + re.escape(VERIFICATION_PROP) + r")(?:\s*=\s*|\s+)(?:off|lenient)\b", re.I
+    )
+    if any(flags.search(ln) for ln in verify_text.splitlines() if not ln.lstrip().startswith("#")):
+        problems.append("scripts/verify.sh: switches Gradle dependency verification off")
     if meta is None:
         return [f"{META} missing"] + problems
     try:
@@ -184,7 +191,8 @@ def main(root):
     problems += check_properties((root / "gradle.properties").read_text(encoding="utf-8"))
     meta = root / "gradle" / META
     problems += check_verification(
-        meta.read_text(encoding="utf-8") if meta.is_file() else None, (root / "gradle.properties").read_text(encoding="utf-8")
+        meta.read_text(encoding="utf-8") if meta.is_file() else None, (root / "gradle.properties").read_text(encoding="utf-8"),
+        (root / "scripts" / "verify.sh").read_text(encoding="utf-8"),
     )
     for p in problems:
         print(f"gradle-repos: {p}")
