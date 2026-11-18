@@ -236,6 +236,12 @@ RULES = (
         "reviewers expect an interrupt on the account-wide limit and finish the round from their findings comment (§7.7.4)",
     ),
     Rule(
+        "usage-reviewer-findings", ("reviewer", "design-reviewer", "second-reviewer"),
+        (r"`round in progress`", r"edit that same comment as findings accumulate", r"§8\.3"),
+        "reviewers keep findings in the one PR comment (ROUND IN PROGRESS, edited in place, §8.3), never in a local file that a reclaimed container loses (item 4b of #60)",
+        forbidden=(r"scratch file", r"outside the repo"),
+    ),
+    Rule(
         "r3-digest", ("orchestrator",),
         (
             r"r3 weekly digest", r"first wake after 10:00 UTC on a monday",

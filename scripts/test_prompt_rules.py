@@ -1526,6 +1526,40 @@ class Issue69UsageEdgeTests(unittest.TestCase):
             with self.subTest(old=old):
                 self.assertIn("orch-throttle", ids(prompt_rules.check_text("orchestrator", real("orchestrator") + old)))
 
+    FINDINGS_ROLES = ("reviewer", "design-reviewer", "second-reviewer")
+    FINDINGS_RULE = "usage-reviewer-findings"
+
+    def test_reviewer_findings_live_in_the_pr_comment_not_a_scratch_file(self):  # item 4b of #60
+        for role in self.FINDINGS_ROLES:
+            with self.subTest(role=role):
+                self.assertEqual(prompt_rules.check_text(role, real(role)), [])
+                self.assertNotRegex(prompt_rules.normalize(real(role)), r"(?i)scratch file")
+
+    def test_a_scratch_file_alone_is_rejected_for_every_reviewer_role(self):  # the old wording, with nothing else
+        old = "Keep the findings you have proved in a scratch file outside the repo."
+        for role in self.FINDINGS_ROLES:
+            with self.subTest(role=role):
+                self.assertIn(self.FINDINGS_RULE, ids(prompt_rules.check_text(role, old)))
+
+    def test_the_scratch_file_is_rejected_even_next_to_the_comment_rule(self):
+        for role in self.FINDINGS_ROLES:
+            with self.subTest(role=role):
+                text = real(role) + " Also keep a copy in a scratch file."
+                self.assertIn(self.FINDINGS_RULE, ids(prompt_rules.check_text(role, text)))
+
+    def test_each_comment_clause_is_pinned_in_every_reviewer_role(self):
+        for role in self.FINDINGS_ROLES:
+            for phrase in ("`ROUND IN PROGRESS`", "edit that same comment as findings accumulate", "§8.3"):
+                with self.subTest(role=role, phrase=phrase):
+                    norm = prompt_rules.normalize(real(role))
+                    self.assertIn(phrase.lower(), norm.lower())
+                    cut = re.sub(re.escape(phrase), "", norm, flags=re.I)
+                    self.assertIn(self.FINDINGS_RULE, ids(prompt_rules.check_text(role, cut)))
+
+    def test_the_rule_applies_to_no_other_role(self):
+        self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("implementer", "")))
+        self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("escalation-reviewer", "")))
+
 
 if __name__ == "__main__":
     unittest.main()
