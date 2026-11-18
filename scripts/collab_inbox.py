@@ -26,7 +26,8 @@ without the cap the cursor could pass it (items stamped from --fetched-at on the
 time, never zero times; timestamps are whole seconds and `since` is exclusive, hence the second). Opening
 an issue or PR counts; later edits to an issue or PR body do not (updated_at moves for labels, pushes and
 comments by anyone). Comments edited after `since` are shown as edited. Pending (unsubmitted) reviews are skipped.
-Exit status: 0 ok, 2 bad usage or bad input.
+Times must fall in 1970 or later (as UTC) and still be valid datetimes after conversion to UTC.
+Exit status: 0 ok, 2 bad usage or bad input (including a time out of range).
 """
 
 import argparse
@@ -41,7 +42,8 @@ OWNER_ASSOCIATION = "OWNER"
 WRITE_ROLES = {"write", "maintain", "admin"}
 DEFAULT_MAX_CHARS = 1500
 
-_TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})")
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+_TS_RE =re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})")
 _HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.S)
 _SCRIPT_STYLE = re.compile(r"<(script|style)\b[^>]*>.*?(?:</\1\s*>|\Z)", re.S | re.I)
 _TAG = re.compile(r"<[A-Za-z/!?][^<>]*>")
@@ -60,9 +62,17 @@ def parse_ts(value, what="timestamp"):
     if not isinstance(value, str) or not _TS_RE.fullmatch(value):
         raise ValueError(f"{what} must be an ISO 8601 time with a zone, like 2026-11-12T12:00:00Z")
     try:
-        return datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
+        dt = datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
+        utc = dt.astimezone(UTC)  # overflows near datetime.min or max when the offset pushes it out of range
     except ValueError:
         raise ValueError(f"{what} is not a valid time") from None
+    except OverflowError:
+        raise ValueError(f"{what} is out of range (use a time from 1970 on)") from None
+    if utc < _EPOCH:
+        # The API has no earlier times, and the cursor arithmetic (one second before --fetched-at) would
+        # overflow at datetime.min.
+        raise ValueError(f"{what} is out of range (use a time from 1970 on)")
+    return dt
 
 
 def fmt_ts(dt):
