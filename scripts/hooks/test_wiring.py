@@ -7,7 +7,12 @@ import sys
 import unittest
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-TYPE_RESOLVED = (":core:domain:detektMain", ":core:domain:detektTest")
+TYPE_RESOLVED = (
+    ":core:domain:detektMain",
+    ":core:domain:detektTest",
+    ":core:testing:detektMain",
+    ":core:testing:detektTest",
+)
 
 
 def read(*parts):
@@ -99,6 +104,22 @@ class TypeResolvedDetekt(unittest.TestCase):
         verify = read("scripts", "verify.sh")
         for task in TYPE_RESOLVED:
             self.assertIn(task, verify)
+
+    def test_verify_runs_them_in_the_detekt_step(self):
+        """A mention elsewhere (a comment, another step) does not count: the `step detekt` line itself must name the tasks."""
+        lines = [ln for ln in read("scripts", "verify.sh").splitlines() if ln.startswith("step detekt ")]
+        self.assertEqual(len(lines), 1, lines)
+        for task in TYPE_RESOLVED:
+            self.assertIn(task, lines[0])
+
+    def test_every_module_applying_detekt_is_type_resolved_in_verify(self):
+        """#68 R2-07: a module that applies the detekt plugin gets detektMain and detektTest, or they run nowhere."""
+        step = [ln for ln in read("scripts", "verify.sh").splitlines() if ln.startswith("step detekt ")][0]
+        for module in sorted(os.listdir(os.path.join(ROOT, "core"))):
+            gradle = os.path.join(ROOT, "core", module, "build.gradle.kts")
+            if os.path.exists(gradle) and "libs.plugins.detekt" in read("core", module, "build.gradle.kts"):
+                for task in ("detektMain", "detektTest"):
+                    self.assertIn(f":core:{module}:{task}", step)
 
     def test_negative_job_lookup_fails_loudly(self):
         with self.assertRaises(AssertionError):
