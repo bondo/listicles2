@@ -680,7 +680,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
    items whose API `author_association`/permission is Write or better and who are not the owner; others are counted, never quoted. Store its `Next since:` as the new `Inbox since:`.
    Answer each with one line on its thread (understood as X, routed to Y), act within Tier 0-1 (§1.1), advance `Inbox since:`.
    A Tier 1 revision worker starts only after the joint hand-off comment has reached the owner as well (§1.1); owner input wins on a conflict.
-   Open design/docs PRs use `subscribe_pr_activity`. Never resolve a collaborator's review thread (follow-up #44).
+   Open design/docs PRs use `subscribe_pr_activity`. Never resolve a collaborator's review thread (follow-up #44): reply and leave it for the collaborator or the owner.
 2. **Light accident check**, by hand, from API fields: (a) PRs merged since the last wake with `merged_by` not the owner; (b) an
    `[owner]`-titled issue closed by a non-owner; (c) a CI-steering label (`golden-update`, `big-pr`) not recorded in #15;
    (d) an open PR whose head branch is gone; (e) **foreign commits** on open `claude/*` PR branches: a commit that is neither the owner nor the agent identity. Judge it from the API commit
