@@ -1,5 +1,6 @@
 """Tests for scripts/check_gradle_repos.py. Run: python3 -I scripts/test_check_gradle_repos.py"""
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -15,6 +16,8 @@ GOOD_REPOS = f"""
         maven("{c.MIRROR}")
         mavenCentral()
 """
+CHECK_CMD = "python3 -I scripts/check_gradle_repos.py"
+TEST_CMD = "python3 -I scripts/test_check_gradle_repos.py"
 GOOD_PROPS = f"{c.TENTATIVES}=6\n{c.BACKOFF}=1000\n"
 
 
@@ -127,6 +130,113 @@ class Properties(unittest.TestCase):
 class Repo(unittest.TestCase):
     def test_repo_config_passes(self):
         self.assertEqual(c.main(ROOT), 0)
+
+
+def read(*parts):
+    return ROOT.joinpath(*parts).read_text(encoding="utf-8")
+
+
+def active_lines(text):
+    return [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+
+
+def runs(text, command):
+    """True if an active line is exactly the command as a verify.sh `step <name> <cmd>` or a workflow `run: <cmd>`."""
+    pattern = re.compile(rf"^(?:step\s+[\w-]+\s+|(?:-\s+)?run:\s+){re.escape(command)}$")
+    return any(pattern.match(ln) for ln in active_lines(text))
+
+
+def job(text, name):
+    m = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z][\w-]*:\n|\Z)", text, re.S | re.M)
+    return m.group(1) if m else None
+
+
+def wiring_problems(verify, ci):
+    """Problems with how verify.sh and ci.yml run the check and its tests (both must run in verify.sh even with --fast)."""
+    problems = []
+    top_level = "\n".join(ln for ln in verify.splitlines() if ln == ln.lstrip())
+    for cmd in (CHECK_CMD, TEST_CMD):
+        if not runs(top_level, cmd):
+            problems.append(f"verify.sh does not run `{cmd}` as a top-level step")
+    static = job(ci, "static")
+    if static is None:
+        return problems + ["ci.yml has no static job"]
+    for cmd in (CHECK_CMD, TEST_CMD):
+        if not runs(static, cmd):
+            problems.append(f"ci.yml static job does not run `{cmd}`")
+    if re.search(r"(?m)^\s*if:", static) or "continue-on-error" in static:
+        problems.append("ci.yml static job has if: or continue-on-error")
+    if re.search(r"(?m)^    permissions:", static) or not re.search(r"(?m)^permissions:\n  contents: read\n(?!  )", ci):
+        problems.append("ci.yml permissions must stay contents: read only, with no job-level override on static")
+    return problems
+
+GOOD_VERIFY = f"step gradle-repos {CHECK_CMD}\nstep gradle-repos-tests {TEST_CMD}\nif [ x ]; then\n  step unit-tests gradle test\nfi\n"
+GOOD_CI = (
+    "permissions:\n  contents: read\n\njobs:\n"
+    "  static:\n    name: static\n    runs-on: ubuntu-latest\n    steps:\n"
+    f"      - name: gradle repos tests\n        run: {TEST_CMD}\n"
+    f"      - name: gradle repos\n        run: {CHECK_CMD}\n"
+    "  python-lint:\n    name: python-lint\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n"
+)
+
+
+class Wiring(unittest.TestCase):
+    def test_real_wiring_is_complete(self):
+        self.assertEqual(wiring_problems(read("scripts", "verify.sh"), read(".github", "workflows", "ci.yml")), [])
+
+    def mutated(self, verify=(), ci=()):
+        v, c = GOOD_VERIFY, GOOD_CI
+        for old, new in verify:
+            self.assertIn(old, v)
+            v = v.replace(old, new)
+        for old, new in ci:
+            self.assertIn(old, c)
+            c = c.replace(old, new)
+        return wiring_problems(v, c)
+
+    def test_good_synthetic_wiring_passes(self):
+        self.assertEqual(wiring_problems(GOOD_VERIFY, GOOD_CI), [])
+
+    def test_check_missing_from_ci(self):
+        got = self.mutated(ci=[(f"        run: {CHECK_CMD}", "        run: echo skipped")])
+        self.assertEqual(got, [f"ci.yml static job does not run `{CHECK_CMD}`"])
+
+    def test_tests_missing_from_ci(self):
+        got = self.mutated(ci=[(f"        run: {TEST_CMD}", "        run: echo skipped")])
+        self.assertEqual(got, [f"ci.yml static job does not run `{TEST_CMD}`"])
+
+    def test_check_in_the_wrong_ci_job_does_not_count(self):
+        moved = [(f"        run: {CHECK_CMD}\n", ""), ("      - run: echo hi\n", f"      - run: {CHECK_CMD}\n")]
+        got = self.mutated(ci=moved)
+        self.assertIn(f"ci.yml static job does not run `{CHECK_CMD}`", got)
+
+    def test_commented_out_step_in_ci_does_not_count(self):
+        got = self.mutated(ci=[(f"        run: {CHECK_CMD}", f"        # run: {CHECK_CMD}")])
+        self.assertIn(f"ci.yml static job does not run `{CHECK_CMD}`", got)
+
+    def test_continue_on_error_is_flagged(self):
+        got = self.mutated(ci=[("  static:\n    name: static\n", "  static:\n    name: static\n    continue-on-error: true\n")])
+        self.assertIn("ci.yml static job has if: or continue-on-error", got)
+
+    def test_job_level_permissions_on_static_are_flagged(self):
+        got = self.mutated(ci=[("  static:\n    name: static\n", "  static:\n    name: static\n    permissions:\n      contents: write\n")])
+        self.assertTrue(any("permissions" in p for p in got), got)
+
+    def test_wider_top_level_permissions_are_flagged(self):
+        got = self.mutated(ci=[("permissions:\n  contents: read\n", "permissions:\n  contents: read\n  issues: write\n")])
+        self.assertTrue(any("permissions" in p for p in got), got)
+
+    def test_check_missing_from_verify(self):
+        got = self.mutated(verify=[(f"step gradle-repos {CHECK_CMD}", "")])
+        self.assertEqual(got, [f"verify.sh does not run `{CHECK_CMD}` as a top-level step"])
+
+    def test_check_moved_into_the_fast_branch_is_flagged(self):
+        got = self.mutated(verify=[(f"step gradle-repos {CHECK_CMD}", f"  step gradle-repos {CHECK_CMD}")])
+        self.assertEqual(got, [f"verify.sh does not run `{CHECK_CMD}` as a top-level step"])
+
+    def test_tests_missing_from_verify(self):
+        got = self.mutated(verify=[(f"step gradle-repos-tests {TEST_CMD}", "")])
+        self.assertEqual(got, [f"verify.sh does not run `{TEST_CMD}` as a top-level step"])
 
 
 if __name__ == "__main__":
