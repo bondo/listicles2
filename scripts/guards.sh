@@ -167,7 +167,7 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
 # Strict flags (--strict, --max-warnings 0, -S warning, ...) never match. Not covered: action `with: args:` lines, YAML folded scalars,
 # Makefiles, composite actions and .pre-commit-config.yaml (none exists today; issue 164), and flags held in shell variables
-# (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable. yarn and pnpm forms that forward
+# (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, and tools run from Python (subprocess). yarn and pnpm forms that forward
 # arguments without `--` (`yarn lint --quiet`) are not covered either: the repo is npm-only.
 CLI_AWK='
 function has(p, tool) { return p ~ ("(^|[^A-Za-z0-9_.-])" tool "([^A-Za-z0-9_.-]|$)") }
@@ -263,7 +263,7 @@ function numflag(p, flag, valre,   t) {
   }
   return 0
 }
-function ruff(s) { return hit(s, "(extend-)?ignore|per-file-ignores|extend-per-file-ignores|exclude|extend-exclude|exit-zero|isolated|select|fix-only|add-noqa", "on") || (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|$)")) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$") }
+function ruff(s) { return hit(s, "(extend-)?ignore|per-file-ignores|extend-per-file-ignores|exclude|extend-exclude|exit-zero|isolated|select|fix-only|add-noqa|line-length", "on") || (s ~ /^[ \t"\047]*check([ \t"\047]|$)/ && hit(s, "diff", "on")) || (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|$)")) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$") }
 function mypy(s) {
   return hit(s, "ignore-missing-imports|allow-[a-z-]+|no-strict-[a-z-]+|no-check-untyped-defs|no-warn-[a-z-]+|no-extra-checks|disable-error-code|implicit-optional|implicit-reexport|exclude|untyped-calls-exclude", "on") || \
     abbr(s, MYPYN) || (s ~ SP "@[^ \t\"\047]") || (s ~ (SP "--(" pre("follow-imports", 3) ")[ \t=]+[\"\047]?(skip|silent)([ \t\"\047]|$)")) || \
@@ -285,7 +285,7 @@ function prettier(s, ok) {
 }
 function shellcheck(s) {
   return (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|SC[0-9]|$)")) || (s ~ (SP "-[A-Za-z]*i([ \t\"\047]|SC[0-9]|$)")) || hit(s, "exclude|include|rcfile", "on") || abbr(s, "exclude include rcfile") || \
-    (s ~ (SP "(-[A-Za-z]*S[ \t]*|--(" pre("severity", 3) ")[ \t=]+)[\"\047]?error([ \t\"\047]|$)"))
+    (s ~ (SP "(-[A-Za-z]*S[ \t]*|--(" pre("severity", 2) ")[ \t=]+)[\"\047]?error([ \t\"\047]|$)"))
 }
 function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
