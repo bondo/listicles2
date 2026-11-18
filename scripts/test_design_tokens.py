@@ -134,12 +134,6 @@ def _run_main(content: bytes | None) -> tuple[int, str]:
     return status, out.getvalue()
 
 
-def _mutated(mutate) -> dict:
-    tokens = copy.deepcopy(REAL)
-    mutate(tokens)
-    return tokens
-
-
 MALFORMED = {
     "top level is a list": lambda t: [],
     "top level is a string": lambda t: "tokens",
@@ -148,6 +142,9 @@ MALFORMED = {
     "contrastPairs is missing": lambda t: t.pop("contrastPairs") and t,
     "color is a list": lambda t: t.update(color=[]) or t,
     "color is null": lambda t: t.update(color=None) or t,
+    "the dark theme is missing": lambda t: t["color"].pop("dark") and t,
+    "the light theme is missing": lambda t: t["color"].pop("light") and t,
+    "color is empty": lambda t: t.update(color={}) or t,
     "a theme is a list": lambda t: t["color"].update(light=["#FFFFFF"]) or t,
     "a theme is null": lambda t: t["color"].update(dark=None) or t,
     "contrastPairs is an object": lambda t: t.update(contrastPairs={}) or t,
@@ -163,6 +160,7 @@ MALFORMED = {
     "a pair min is null": lambda t: t["contrastPairs"][0].update(min=None) or t,
     "a pair min is NaN": lambda t: t["contrastPairs"][0].update(min=float("nan")) or t,
     "a pair min is infinite": lambda t: t["contrastPairs"][0].update(min=float("inf")) or t,
+    "a pair min is a huge integer": lambda t: t["contrastPairs"][0].update(min=10**400) or t,
     "a pair min is a boolean": lambda t: t["contrastPairs"][0].update(min=True) or t,
 }
 
@@ -199,11 +197,22 @@ class Malformed(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn("t.json", out)
 
-    def test_a_valid_extra_key_or_a_valid_float_minimum_is_not_a_structure_finding(self):
-        tokens = copy.deepcopy(REAL)
-        tokens["extra"] = {"anything": [1, 2]}
-        tokens["contrastPairs"][0]["min"] = 5  # an int above AA (and below the real ratio) is fine
-        self.assertEqual(dt.check(tokens), [])
+    def test_main_reports_json_that_the_parser_refuses_to_read_without_a_traceback(self):
+        too_many_digits = b'{"min": ' + b"9" * 5000 + b"}"  # over Python's int digit limit: ValueError, not JSONDecodeError
+        too_deep = b"[" * 200_000 + b"]" * 200_000  # RecursionError
+        for name, content in (("an integer over the digit limit", too_many_digits), ("nesting too deep to parse", too_deep)):
+            with self.subTest(name):
+                status, out = _run_main(content)
+                self.assertEqual(status, 1)
+                self.assertIn("t.json", out)
+
+    def test_an_extra_key_and_an_int_or_float_minimum_are_not_findings(self):
+        for minimum in (5, 5.5):
+            tokens = copy.deepcopy(REAL)
+            tokens["extra"] = {"anything": [1, 2]}
+            tokens["contrastPairs"][0]["min"] = minimum  # above AA and below the real ratio
+            with self.subTest(minimum=minimum):
+                self.assertEqual(dt.check(tokens), [])
 
 
 class PetrolDecision(unittest.TestCase):
