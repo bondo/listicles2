@@ -128,7 +128,8 @@ way, so that I never get two accounts or lose my lists.
 * Email-enumeration protection is on, so the app cannot tell which method an email used, and no screen or message of
   the app reveals whether an account exists for an email. Whether Firebase's own sign-up service still reports an
   existing email to someone who calls it directly, outside the app, is checked in M1 (OQ-34); if it does, sign-up
-  reveals that an account exists to such a caller, and the owner decides whether to accept that (OQ-34).
+  reveals that an account exists to such a caller; the owner accepted that for v1 (OQ-34(d), section 10; App Check,
+  M1-26, makes scripted calls harder).
 * Given one email with an account (either method) and one without, when I create a password account with each, then
   both end on the same "check your email" screen (AUTH-05, AUTH-06) with the same text and buttons, and tapping
   "Continue" (link not opened: "not verified yet") or "Send again" shows the same messages for both; only the email
@@ -182,11 +183,14 @@ lists.
 * Given I confirm leaving, then I no longer see lists other members shared, and my open invites are deleted.
 * Given I confirm leaving, then every list I created goes with me: it stays mine and is private to me, and the other
   members lose the lists I had shared (OQ-5). The confirmation says so. (Household deletion works differently: HH-06.)
+* Given I added items to lists other members created, then those items stay in those lists, shown as added by a former
+  member (OQ-18).
 
 **HH-06 Manage the household (household owner).** As the household owner, I want to remove a member, hand over
 ownership or delete the household, so that the household stays under control.
 * Given I remove a member, then they lose access to the lists others shared, their open invites stop working, and the
-  lists they created go with them as in HH-05, so the other members lose the lists they had shared (OQ-5).
+  lists they created go with them as in HH-05, so the other members lose the lists they had shared (OQ-5); items they
+  added to other members' lists stay, as in HH-05 (OQ-18).
 * Given I transfer ownership to another member, then that member is the household owner and I am a plain member.
 * Given I choose to delete the household, then I am asked to confirm, and the confirmation says that shared lists go
   back to their creators and that the household cannot be restored.
@@ -245,7 +249,7 @@ my list holds what I collect.
 * Given a re-release year earlier than the release year, when I confirm, then the item is saved: the two years have no
   rule between them, each only has to be in the valid range (OQ-19).
 * Given I add several items in a row, then the input stays open for the next item.
-* Given an item name already in the list, then two items may have the same name: a quiet hint ("Already in this list") shows while typing, but nothing is blocked (OQ-11).
+* Given an item with that name is already in the list, when I add another with the same name, then it is saved; a quiet hint ("Already in this list") shows while typing (OQ-11).
 
 **ITEM-02 Edit an item.** As a user, I want to fix an item's name (or years), so that a typo doesn't stay.
 * Given an item, when I change its name, or in a collection list its release year or re-release year (same rules as
@@ -410,7 +414,7 @@ These are constraints for the data model and screens; v1 builds none of them (M2
 
 ## 10. Decided questions
 
-Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the stories above follow them.
+Answered by the owner on 2026-11-15 to 2026-11-18 (state issue #15); the stories above follow them.
 
 **Labels for the M1 strings** (decided): the re-release year is "re-release year" in English and "Genudgivelsesår" in Danish
 (OQ-19); an item is "ting" in Danish; the checkbox is "I have it", Danish "Jeg har den" (OQ-7).
@@ -421,15 +425,19 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-2 | **Decided:** only the creator of a list can stop sharing it; everything else is equal for everyone the list is shared with (OQ-3). | LIST-03, LIST-04, VIS-04 |
 | OQ-3 | **Decided:** in v1 everyone a list is shared with has the same rights as its creator: add, edit, check and remove items, rename the list, delete the list. Per-list permissions come later (section 9). | VIS-03, LIST-03, LIST-04, ITEM-01..04 |
 | OQ-4 | **Decided:** stopping sharing is in v1; the list becomes private to its creator again and the other members lose access. | VIS-04 |
-| OQ-5 | **Decided:** in v1 everything a person created goes with them when they leave the household, are removed, or delete their account, including the shared lists they created (the other members lose those lists). Later the leaver chooses per shared list whether it stays (section 9). | AUTH-04, HH-05, HH-06 |
+| OQ-5 | **Decided:** in v1 every list a person created goes with them when they leave the household, are removed, or delete their account, including the shared lists they created (the other members lose those lists); items they added to other people's lists stay (OQ-18). Later the leaver chooses per shared list whether it stays (section 9). | AUTH-04, HH-05, HH-06 |
 | OQ-6 | **Decided:** the year is optional, valid from 1900 to the current year plus 50. An item can have two years: the original release year and, optionally, a re-release year (rules between them: OQ-19). | ITEM-01, ITEM-02, ITEM-05 |
 | OQ-7 | **Decided (2026-11-16):** the checkbox is always "I have it" ("Jeg har den") in v1; it may depend on the list type later. | ITEM-04 |
 | OQ-8 | **Decided (2026-11-16):** items sorted per list type (ITEM-05); lists by most recently used; a "show only missing" filter in v1; no search and no manual order. Checked items stay in place. | LIST-01, ITEM-05 |
 | OQ-9 | **Decided (2026-11-16):** progress ("12 of 30") as small text under the list name and at the top of the list. | LIST-01, ITEM-05 |
 | OQ-10 | **Decided (2026-11-16):** deleting an item has no confirmation and an undo (timing: OQ-39); deleting a list asks to confirm first. | LIST-04, ITEM-03 |
+| OQ-11 | **Decided (2026-11-18, issue #15 comment 6991876940):** two items in one list may have the same name; the app shows a quiet hint ("Already in this list") while typing but does not block; in collection lists the years tell them apart. | ITEM-01 |
+| OQ-13 | **Decided (2026-11-17, see M1-14 in [M1](../milestones/M1.md)):** signing out removes the local copy of the user's data from the phone. | AUTH-03 |
 | OQ-12 | **Decided (2026-11-16):** only Android's per-app language setting in v1, no switch inside the app. | LANG-02 |
 | OQ-14 | **Decided (2026-11-16):** a small banner shows the offline state and that changes wait to be sent. | SYNC-01 |
-| OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes what they created with them. | AUTH-04, HH-05, HH-06 |
+| OQ-16 | **Confirmed (2026-11-18, issue #15 comment 6991888410):** a member who joins later sees all lists already shared with the household (sharing is per household, not per person). | VIS-02 |
+| OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes the lists they created with them. | AUTH-04, HH-05, HH-06 |
+| OQ-18 | **Decided (2026-11-18, issue #15 comment 6992089109):** an item belongs to the list it is in. (a) Items a person added to other people's lists stay there (shown as added by a former member); (b) items others added to that person's shared lists go with those lists. On account deletion the person's name on remaining items is removed (anonymised). | AUTH-04, HH-05, HH-06 |
 | OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 | OQ-20..22 | **Decided (2026-11-16):** see [flow section 10](flow.md#10-new-open-questions): sharing without a household is disabled; an invite page "install, then tap the link again"; household, invite and sharing actions need a connection. | VIS-02, HH-03, SYNC-03 |
 | OQ-23 | **Decided (2026-11-16):** email and password sign-in is built together with Google in v1 (M1), not later. Google stays the main button. | AUTH-01, AUTH-05..08, AUTH-10 |
@@ -443,10 +451,6 @@ Answered by the owner on 2026-11-15 and 2026-11-16 (state issue #15); the storie
 | OQ-31 | **Decided (2026-11-16):** changing the password is in v1 (AUTH-11); changing the email and linking a second method come after v1. | AUTH-10, AUTH-11 |
 | OQ-32 | **Decided (2026-11-16):** a list's type cannot be changed in v1. Turning a plain list into a collection list may come later (section 9). | LIST-02 |
 | OQ-33 | **Decided (2026-11-16):** collection lists put items without a release year last; plain lists sort by name ignoring case, with æ, ø, å after z. | ITEM-05 |
-| OQ-11 | **Decided (2026-11-18, issue #15 comment 6991876940):** two items in one list may have the same name; the app shows a quiet hint ("Already in this list") while typing but does not block; in collection lists the years tell them apart. | ITEM-01 |
-| OQ-13 | **Decided (2026-11-17, see M1-14 in [M1](../milestones/M1.md)):** signing out removes the local copy of the user's data from the phone. | AUTH-03 |
-| OQ-16 | **Confirmed (2026-11-18, issue #15 comment 6991888410):** a member who joins later sees all lists already shared with the household (sharing is per household, not per person). | VIS-02 |
-| OQ-18 | **Decided (2026-11-18, issue #15 comment 6992089109):** an item belongs to the list it is in. (a) Items a person added to other people's lists stay there (shown as added by a former member); (b) items others added to that person's shared lists go with those lists. On account deletion the person's name on remaining items is removed (anonymised). | AUTH-04, HH-05, HH-06 |
 | OQ-34(d) | **Decided (2026-11-18, issue #15 comment 6991970000):** accept for v1 that Firebase sign-up reveals an existing email to direct API callers; the app shows the same screen either way (AUTH-10); App Check (M1-26) makes scripted calls harder. Parts (a) to (c) are in M1. | AUTH-10 |
 | OQ-35 | **Decided (2026-11-18, issue #15 comment 6991995012):** "most recently used" (LIST-01) = last opened by me, kept on the device only (no Firestore writes or reads); lists never opened on this device follow `updatedAt`. | LIST-01 |
 | OQ-38 | **Decided (2026-11-18, issue #15 comment 6992014550):** no Blaze backups; an in-app export of my lists to a JSON or CSV file through the system file picker, in M2, before the first external tester (also covers data portability). | none yet (M2) |
@@ -463,7 +467,7 @@ diagram (M0.5-02) any more.
 | Id | Question | Stories | Blocks |
 |---|---|---|---|
 | OQ-34 | Google is a trusted provider, and the project uses one account per email. Check in M1 with a test project: (a) When someone signs in with Google and the email already has a password account (verified or not), does Firebase link Google to it, replace the password sign-in, or refuse? (b) Reverse: a Google-only email asks for a password reset (AUTH-08). Is a reset email sent, and does opening it add a password to the account (a second method, which OQ-31 puts after v1)? (c) Password sign-in (AUTH-07) for a Google-only email shows "Wrong email or password" with no hint to use Google: should that message, shown to everyone, add "If you created your account with Google, use Google"? (d) is decided: see section 10. In every case the app must not lose lists or create a second account, and its screens must not reveal whether an account exists (AUTH-10). | AUTH-01, AUTH-05, AUTH-07, AUTH-08, AUTH-10 | M1 planning |
-| OQ-15 | **Decided 2026-11-18 (issue #15 comment 6991933333), PLAN update in progress** (packing, trips and barcodes come after v1). Earlier question: the plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | PLAN update, M1/M2 scope |
+| OQ-15 | **Decided 2026-11-18 (issue #15 comment 6991933333), PLAN update in progress** (packing, trips and barcodes come after v1, M3 or later; a planner agent updates `docs/PLAN.md`). Earlier question: the plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | waiting for the PLAN update PR |
 
 **Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
 creator (OQ-5), but PLAN section 3 stores every list under a household. Lists need a creator and a sharing state, and new
