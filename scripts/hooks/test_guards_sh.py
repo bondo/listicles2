@@ -962,6 +962,30 @@ class ThresholdProse(GuardsCase):
         self.change("scripts/tool.py", "threshold = 40  # a threshold with a comment\n")
         self.assertFails("guard: lowered threshold:")
 
+    def test_code_with_a_word_on_each_side_of_threshold_still_fails(self):
+        # PR 135 R1-01: only prose (a markdown file, or inside a double-quoted string, and no digit) is masked.
+        for rel, line in (
+            ("app/build.gradle.kts", "val threshold by extra(80)"),
+            ("app/build.gradle.kts", "val threshold by extra(DEFAULT)"),
+            ("app/src/main/kotlin/Cfg.kt", "private val threshold get() = 80"),
+            ("scripts/tool.py", "sys.exit(1) if threshold and pct < 80 else None"),
+            ("scripts/tool.py", "sys.exit(1) if threshold and pct < LOW else None"),
+            ("scripts/tool.py", 'x = 80  # say "a threshold b"'),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_lowering_a_number_on_a_line_whose_comment_mentions_threshold_still_fails(self):
+        # PR 135 R1-02.
+        self.base("pyproject.toml", "fail_under = 80  # coverage threshold in percent\n")
+        self.change("pyproject.toml", "fail_under = 40  # coverage threshold in percent\n")
+        self.assertFails("guard: lowered threshold:")
+        self.base("pyproject.toml", "fail_under = LOW  # coverage threshold in percent\n")
+        self.change("pyproject.toml", "\n")
+        self.assertFails("guard: removed check setting:")
+
 
 class StagedMode(GuardsCase):
     def test_staged_flags_only_the_index(self):
