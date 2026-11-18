@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 
@@ -31,10 +32,13 @@ class Context(unittest.TestCase):
         self.assertEqual(hook(), "")  # no data yet
         self.assertIn("ctx 30%", status(30.4))
         self.assertEqual(hook(), "")
-        self.assertIn("HANDOFF NOW", status(52.9))
+        self.assertIn("HANDOFF SOON", status(62.9))
         out = json.loads(hook())
-        self.assertIn("52%", out["hookSpecificOutput"]["additionalContext"])
-        self.assertEqual(hook(), "")  # only once
+        self.assertIn("62%", out["hookSpecificOutput"]["additionalContext"])
+        self.assertEqual(hook(), "")  # only once per stage
+        self.assertIn("HANDOFF NOW", status(82.9))
+        self.assertIn("82%", json.loads(hook())["hookSpecificOutput"]["additionalContext"])
+        self.assertEqual(hook(), "")
 
 
 def assistant(total_tokens, model="claude-sonnet-5-5", mid="m", sidechain=False):
@@ -71,17 +75,21 @@ class Headless(unittest.TestCase):
 
     def test_warns_once_from_transcript_at_threshold(self):
         w = {"LISTICLES_CONTEXT_WINDOW": "200000"}
-        self.write([assistant(80000)])
-        self.assertEqual(self.hook(env=w), "")  # 40%
-        self.write([assistant(80000), assistant(100000, mid="b")])  # exactly 50%
+        self.write([assistant(79999)])
+        self.assertEqual(self.hook(env=w), "")  # just under 40%
+        self.write([assistant(80000, mid="b")])  # exactly 40%: the step-boundary reminder
         out = json.loads(self.hook(env=w))
-        self.assertIn("50%", out["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("40%", out["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("next step boundary", out["hookSpecificOutput"]["additionalContext"])
         self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "PostToolUse")
-        self.assertEqual(self.hook(env=w), "")  # only once per session
+        self.assertEqual(self.hook(env=w), "")  # once per stage
+        self.write([assistant(120000, mid="c")])  # exactly 60%: the hard reminder
+        self.assertIn("Do not start new work", self.hook(env=w))
+        self.assertEqual(self.hook(env=w), "")
         self.assertNotEqual(self.hook(sid="other", env=w), "")  # other sessions warn separately
 
     def test_below_threshold_is_silent(self):
-        self.write([assistant(99999)])
+        self.write([assistant(79999)])
         self.assertEqual(self.hook(env={"LISTICLES_CONTEXT_WINDOW": "200000"}), "")
 
     def test_uses_the_last_main_thread_usage_and_skips_noise(self):
@@ -112,18 +120,52 @@ class Headless(unittest.TestCase):
             self.write([assistant(120000, model=model)])
             self.assertEqual(self.hook(sid="d" + model[-4:]), "", model)
 
-    def test_default_window_warns_at_500k(self):
-        self.write([assistant(499999)])
+    def test_1m_window_has_a_step_boundary_reminder_at_60_and_a_hard_one_at_80(self):
+        self.write([assistant(599999)])
         self.assertEqual(self.hook(sid="d1"), "")
-        self.write([assistant(500000, mid="b")])
-        self.assertIn("50%", json.loads(self.hook(sid="d1"))["hookSpecificOutput"]["additionalContext"])
+        self.write([assistant(600000, mid="b")])
+        soft = json.loads(self.hook(sid="d1"))["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("60%", soft)
+        self.assertIn("next step boundary", soft)
+        self.assertNotIn("Do not start new work", soft)
+        self.assertEqual(self.hook(sid="d1"), "")
+        self.write([assistant(799999, mid="c")])
+        self.assertEqual(self.hook(sid="d1"), "")  # still the soft stage, already given
+        self.write([assistant(800000, mid="d")])
+        hard = json.loads(self.hook(sid="d1"))["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("80%", hard)
+        self.assertIn("Do not start new work", hard)
+        self.assertEqual(self.hook(sid="d1"), "")
 
-    def test_200k_window_still_warns_at_its_own_50_percent(self):
+    def test_200k_window_has_its_own_40_and_60_percent_stages(self):
         w = {"LISTICLES_CONTEXT_WINDOW": "200000"}
-        self.write([assistant(99999)])
+        self.write([assistant(79999)])
         self.assertEqual(self.hook(sid="e1", env=w), "")
-        self.write([assistant(100000, mid="b")])
-        self.assertIn("50%", self.hook(sid="e1", env=w))
+        self.write([assistant(80000, mid="b")])
+        self.assertIn("40%", self.hook(sid="e1", env=w))
+        self.write([assistant(119999, mid="c")])
+        self.assertEqual(self.hook(sid="e1", env=w), "")
+        self.write([assistant(120000, mid="d")])
+        self.assertIn("Do not start new work", self.hook(sid="e1", env=w))
+
+    def test_window_of_exactly_200k_is_small_and_one_token_more_is_large(self):
+        self.write([assistant(130000)])  # 65% of either window
+        small = self.hook(sid="m1", env={"LISTICLES_CONTEXT_WINDOW": "200000"})
+        large = self.hook(sid="m2", env={"LISTICLES_CONTEXT_WINDOW": "200001"})
+        self.assertIn("Do not start new work", small)  # 65% >= 60%
+        self.assertIn("next step boundary", large)  # 65% is between 60% and 80%
+        self.assertNotIn("Do not start new work", large)
+
+    def test_a_jump_past_the_hard_threshold_gives_only_the_hard_reminder_and_no_later_soft_one(self):
+        self.write([assistant(900000)])
+        self.assertIn("Do not start new work", self.hook(sid="j1"))
+        self.assertEqual(self.hook(sid="j1"), "")
+
+    def test_threshold_env_overrides_the_hard_stage_and_drops_the_soft_one(self):
+        self.write([assistant(600000)])
+        self.assertEqual(self.hook(sid="o1", env={"LISTICLES_CONTEXT_THRESHOLD": "70"}), "")  # no soft stage at 60%
+        self.write([assistant(700000, mid="b")])
+        self.assertIn("70%", self.hook(sid="o1", env={"LISTICLES_CONTEXT_THRESHOLD": "70"}))
 
     def test_context_window_in_hook_input_is_ignored(self):
         """R10-55: PostToolUse input never carries context_window (statusline JSON only); do not trust an invented shape."""
@@ -164,16 +206,16 @@ class Headless(unittest.TestCase):
                                env=dict(os.environ, TMPDIR=self.tmp, LISTICLES_CONTEXT_THRESHOLD=bad, LISTICLES_CONTEXT_WINDOW=bad),
                                capture_output=True, text=True)
             self.assertEqual(r.stderr, "", bad)
-            self.assertIn("60%", r.stdout, bad)  # both fall back to 50% of 1M
+            self.assertIn("60%", r.stdout, bad)  # both fall back to the 1M defaults (soft stage at 60%)
 
     def test_garbage_window_env_falls_back_to_1m(self):
         self.write([assistant(600000)])
         for i, bad in enumerate(("abc", "0", "-5", "1.5")):
             self.assertIn("60%", self.hook(sid=f"g{i}", env={"LISTICLES_CONTEXT_WINDOW": bad}), bad)
 
-    def test_garbage_threshold_env_falls_back_to_50(self):
+    def test_garbage_threshold_env_falls_back_to_the_window_defaults(self):
         self.write([assistant(600000)])
-        self.assertIn("60%", self.hook(sid="t1", env={"LISTICLES_CONTEXT_THRESHOLD": "abc"}))
+        self.assertIn("next step boundary", self.hook(sid="t1", env={"LISTICLES_CONTEXT_THRESHOLD": "abc"}))  # 60% of 1M: soft stage
 
     def test_statusline_threshold_follows_env(self):
         env = dict(os.environ, TMPDIR=self.tmp, LISTICLES_CONTEXT_THRESHOLD="80")
@@ -181,20 +223,114 @@ class Headless(unittest.TestCase):
                              env=env, capture_output=True, text=True).stdout
         self.assertNotIn("HANDOFF", out)
 
-    def test_statusline_threshold_boundaries_and_garbage(self):
-        def status(pct, thr):
-            env = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
-            env.update(TMPDIR=self.tmp, **({"LISTICLES_CONTEXT_THRESHOLD": thr} if thr is not None else {}))
-            return subprocess.run(["bash", STATUS], input=json.dumps({"session_id": "s2", "context_window": {"used_percentage": pct}}),
-                                  env=env, capture_output=True, text=True).stdout
+    def status(self, pct, thr=None, window=None, env_window=None):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
+        env.update(TMPDIR=self.tmp)
+        if thr is not None:
+            env["LISTICLES_CONTEXT_THRESHOLD"] = thr
+        if env_window is not None:
+            env["LISTICLES_CONTEXT_WINDOW"] = env_window
+        cw = {"used_percentage": pct}
+        if window is not None:
+            cw["context_window_size"] = window
+        return subprocess.run(["bash", STATUS], input=json.dumps({"session_id": "s2", "context_window": cw}), env=env,
+                              capture_output=True, text=True).stdout
 
-        self.assertNotIn("HANDOFF", status(49, None))
-        self.assertIn("HANDOFF NOW", status(50, None))
-        self.assertNotIn("HANDOFF", status(79, "80"))
-        self.assertIn("HANDOFF NOW", status(80, "80"))
+    def test_statusline_default_1m_stages(self):
+        self.assertNotIn("HANDOFF", self.status(59))
+        self.assertIn("HANDOFF SOON", self.status(60))
+        self.assertIn("HANDOFF SOON", self.status(79))
+        self.assertIn("HANDOFF NOW", self.status(80))
+
+    def test_statusline_200k_stages_come_from_the_window_size_in_its_input(self):
+        self.assertNotIn("HANDOFF", self.status(39, window=200000))
+        self.assertIn("HANDOFF SOON", self.status(40, window=200000))
+        self.assertIn("HANDOFF SOON", self.status(59, window=200000))
+        self.assertIn("HANDOFF NOW", self.status(60, window=200000))
+        self.assertNotIn("HANDOFF", self.status(59, window=1000000))  # the same 59% on a 1M window is quiet
+
+    def test_statusline_falls_back_to_the_window_env_then_to_1m(self):
+        self.assertIn("HANDOFF NOW", self.status(60, env_window="200000"))
+        self.assertIn("HANDOFF SOON", self.status(60, env_window="garbage"))
+        self.assertIn("HANDOFF SOON", self.status(60, window="abc"))  # a garbage window size in the input counts as unknown
+
+    # R1-01 (#126 review): the statusline knows the real window; it records it next to the % and the hook uses it.
+    def record(self, pct, window, sid="r1"):
+        """Run the statusline for session `sid` (window=None: the status JSON has no context_window_size) in self.tmp."""
+        cw = {"used_percentage": pct}
+        if window is not None:
+            cw["context_window_size"] = window
+        env = {k: v for k, v in os.environ.items() if not k.startswith("LISTICLES_CONTEXT")}
+        env.update(TMPDIR=self.tmp)
+        return subprocess.run(["bash", STATUS], input=json.dumps({"session_id": sid, "context_window": cw}), env=env,
+                              capture_output=True, text=True).stdout
+
+    def test_a_200k_session_at_65_percent_gets_the_hard_reminder_like_its_status_line_says(self):
+        self.assertIn("HANDOFF NOW", self.record(65, 200000))
+        out = self.hook(sid="r1")  # no LISTICLES_CONTEXT_WINDOW: the recorded window is used
+        self.assertIn("Do not start new work", out)
+        self.assertIn("65%", out)
+
+    def test_the_recorded_window_beats_the_env_window(self):
+        self.record(45, 200000)  # 45% of a 200k window is past the 40% soft stage
+        self.assertIn("next step boundary", self.hook(sid="r1", env={"LISTICLES_CONTEXT_WINDOW": "1000000"}))
+
+    def test_the_recorded_window_sizes_the_transcript_percentage_too(self):
+        self.record(10, 200000)  # the statusline % is low; the transcript says 130k tokens = 65% of 200k (13% of 1M)
+        self.write([assistant(130000)])
+        self.assertIn("Do not start new work", self.hook(sid="r1"))
+
+    def test_without_a_recorded_window_the_env_then_1m_still_apply(self):
+        self.assertNotIn("HANDOFF", self.record(50, None))  # 50% of the 1M default: quiet
+        self.assertEqual(self.hook(sid="r1"), "")
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "listicles-ctx", "r1.window")))
+        self.record(45, None, sid="r2")
+        self.assertIn("next step boundary", self.hook(sid="r2", env={"LISTICLES_CONTEXT_WINDOW": "200000"}))
+
+    def test_a_garbage_window_is_neither_recorded_nor_used(self):
+        for bad in ("abc", 0, -5, 1.5):
+            self.record(45, bad, sid="r3")
+            self.assertFalse(os.path.exists(os.path.join(self.tmp, "listicles-ctx", "r3.window")), bad)
+        base = os.path.join(self.tmp, "listicles-ctx")
+        for i, junk in enumerate(("abc", "0", "-5", "\u00b2", "")):
+            with open(os.path.join(base, f"r4{i}.window"), "w") as f:
+                f.write(junk)
+            with open(os.path.join(base, f"r4{i}"), "w") as f:
+                f.write("45")
+            self.assertEqual(self.hook(sid=f"r4{i}"), "", repr(junk))  # 45% of the 1M default: quiet, no crash
+
+    # R2-01 (#126 review): a window recorded earlier must not outlive a status JSON that no longer carries one.
+    def test_a_stale_window_file_is_removed_when_the_status_json_has_no_valid_window(self):
+        path = os.path.join(self.tmp, "listicles-ctx", "r5.window")
+        for later in (None, "abc", 0):
+            self.record(65, 200000, sid="r5")
+            self.assertTrue(os.path.exists(path))
+            self.record(45, later, sid="r5")
+            self.assertFalse(os.path.exists(path), later)
+            self.assertEqual(self.hook(sid="r5"), "", later)  # 45% of the 1M default is quiet, not 45% of a stale 200k
+
+    def test_a_valid_window_stays_recorded_and_is_replaced_by_a_newer_one(self):
+        path = os.path.join(self.tmp, "listicles-ctx", "r6.window")
+        self.record(65, 200000, sid="r6")
+        self.record(66, 200000, sid="r6")
+        self.assertEqual(Path(path).read_text(), "200000")
+        self.record(66, 1000000, sid="r6")
+        self.assertEqual(Path(path).read_text(), "1000000")
+        self.record(10, None, sid="r7")  # removing a window file that was never there is not an error
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "listicles-ctx", "r7.window")))
+
+    def test_the_recorded_window_stays_per_session(self):
+        self.record(65, 200000, sid="ra")
+        self.record(65, 1000000, sid="rb")
+        self.assertIn("Do not start new work", self.hook(sid="ra"))
+        self.assertIn("next step boundary", self.hook(sid="rb"))
+
+    def test_statusline_threshold_env_is_a_single_stage(self):
+        self.assertNotIn("HANDOFF", self.status(79, thr="80"))
+        self.assertIn("HANDOFF NOW", self.status(80, thr="80"))
         for bad in ("abc", "0", "-1", ""):
-            self.assertIn("HANDOFF NOW", status(60, bad), bad)  # garbage falls back to 50
-            self.assertNotIn("HANDOFF", status(40, bad), bad)
+            self.assertIn("HANDOFF SOON", self.status(60, thr=bad), bad)  # garbage falls back to the window defaults
+            self.assertNotIn("HANDOFF", self.status(40, thr=bad), bad)
 
 
 if __name__ == "__main__":

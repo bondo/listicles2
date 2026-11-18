@@ -18,7 +18,8 @@ import tasks
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPTS = ROOT / "agents" / "prompts"
-ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer")
+ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer", "second-reviewer", "verifier",
+         "escalation-reviewer")
 
 TIER0 = {"feedback", "idea", "decision", "needs-collaborator", "needs-owner"}
 NEVER = {"golden-update", "big-pr", "owner-todo", "orchestrator-state", "follow-up", "severity:*", "target:*", "owner-ok", "area:*"}
@@ -652,7 +653,8 @@ class M015Tests(unittest.TestCase):
             ("max 2 opus rounds per design pr", "max 3 opus rounds per design pr"),
             ("a third round never happens", "a third round is fine"),
             ("goes into the hand-off as a question for the owner", "is dropped"),
-            ("round 2: only the commits since round 1 and your open findings", "round 2: the whole pr again"),
+            ("every round: the whole pr diff and the findings json of earlier rounds", "round 2: the whole pr again"),
+            ("focus on the commits since the last round", "look at nothing"),  # #129 R1-01: row 3 for design rounds too
         ):
             self.assert_fails("design-reviewer", "dr-rounds", old, new)
 
@@ -693,8 +695,9 @@ class M015Tests(unittest.TestCase):
             ("delta review (orchestration §7.2)", "full review"),
             ("a commit after the last round", "any commit"),
             ("`reviewed_through..head_sha`", "`main..head_sha`"),
-            ("review that range only", "review the whole pr"),
-            ("do not re-review unchanged code", "re-review everything"),
+            ("the whole pr diff and the findings json", "the new commits only"),  # redesign PR 3, row 3
+            ("focus on that range", "review that range only"),
+            ("how the new commits interact with the old code", "nothing else"),
         ):
             self.assert_fails("reviewer", "reviewer-delta", old, new)
 
@@ -925,6 +928,297 @@ class CliTests(unittest.TestCase):
         r = self.run_cli("--prompts", "/nonexistent-dir-for-test")
         self.assertEqual(r.returncode, 2)
         self.assertIn("error:", r.stderr)
+
+
+class Pr2CheckTests(unittest.TestCase):
+    """Agent Usage Redesign PR 2 (rev 46, "New quality checks"): plan review, self-review, finding verification and the
+    second reviewer live in the role prompts. Each clause is pinned by a rule that fails when it is deleted or weakened."""
+
+    RULES = {
+        "plan-review": ("reviewer",),
+        "plan-reviewed-before-implementers": ("planner",),
+        "self-review": ("implementer",),
+        "finding-verification": ("reviewer", "second-reviewer"),
+        "second-reviewer-role": ("second-reviewer",),
+        "verifier-role": ("verifier",),
+        "verifier-handoff": ("implementer", "reviewer", "second-reviewer"),  # R1-02 of #128
+    }
+
+    def mutate(self, role, old, new=""):
+        text = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), text.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), new, text, count=1, flags=re.I)))
+
+    def test_rules_exist_for_the_right_roles_and_the_real_prompts_pass_them(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        for rid, roles in self.RULES.items():
+            self.assertEqual(by_id[rid].roles, roles, rid)
+            for role in roles:
+                self.assertNotIn(rid, ids(prompt_rules.check_text(role, real(role))), (rid, role))
+
+    def test_each_new_prompt_exists_and_roles_yaml_names_it(self):
+        roles_yaml = (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8")
+        for role in ("second-reviewer", "verifier"):
+            self.assertTrue((PROMPTS / f"{role}.md").is_file(), role)
+            self.assertIn(f"prompt: agents/prompts/{role}.md", roles_yaml)
+
+    def test_other_roles_wording_does_not_count(self):
+        self.assertIn("plan-review", ids(prompt_rules.check_text("reviewer", real("implementer"))))
+        self.assertIn("self-review", ids(prompt_rules.check_text("implementer", real("reviewer"))))
+        self.assertIn("verifier-role", ids(prompt_rules.check_text("verifier", real("reviewer"))))
+        self.assertIn("second-reviewer-role", ids(prompt_rules.check_text("second-reviewer", real("reviewer"))))
+
+    def test_deleting_a_clause_fails_its_rule(self):
+        for role, rid, clause in (
+            ("reviewer", "plan-review", "docs/milestones/<Mx>.md"),
+            ("reviewer", "plan-review", "wrong task order"),
+            ("reviewer", "plan-review", "missing tasks"),
+            ("planner", "plan-reviewed-before-implementers", "before any implementer starts"),
+            ("implementer", "self-review", "only the diff and the task"),
+            ("implementer", "self-review", "it is not a new session"),
+            ("reviewer", "finding-verification", "never your reasoning"),
+            ("reviewer", "finding-verification", "not reproduced"),
+            ("second-reviewer", "finding-verification", "never your reasoning"),
+            ("second-reviewer", "second-reviewer-role", "you are not given the first reviewer's findings"),
+            ("second-reviewer", "second-reviewer-role", "security-rules, sync-merge and release"),
+            ("second-reviewer", "second-reviewer-role", "report only"),
+            ("implementer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("reviewer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("second-reviewer", "verifier-handoff", "give it the text of agents/prompts/verifier.md first"),
+            ("verifier", "verifier-role", "never edit"),
+            ("verifier", "verifier-role", "confirmed"),
+        ):
+            with self.subTest(role=role, clause=clause):
+                self.assertIn(rid, self.mutate(role, clause))
+
+    def test_the_second_reviewer_has_no_effort_escalation_that_roles_yaml_does_not_back(self):  # R1-06 of #128
+        self.assertNotIn("max_effort_when", (ROOT / "agents" / "roles.yaml").read_text().split("  escalation-reviewer:")[0]
+                         .split("  second-reviewer:")[1])
+        text = real("second-reviewer") + " Opus, high effort (max for risk:high PRs when `agents/roles.yaml` says so)."
+        self.assertIn("second-reviewer-role", ids(prompt_rules.check_text("second-reviewer", text)))
+        self.assertNotIn("max for", real("second-reviewer"))
+
+    def test_second_reviewer_ids_never_collide_with_the_reviewers(self):  # R2-01 of #128 (was R1-03)
+        norm = prompt_rules.normalize(real("second-reviewer"))
+        self.assertIn("ids `s<round>-<nn>`", norm.lower())
+        self.assertIn("never `r<round>-<nn>`", norm.lower())
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", "ids `S<round>-<nn>`"))
+        old_wording = "with ids `R<round>-<nn>` continuing after the highest id you were given"
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", "with ids `S<round>-<nn>`", old_wording))
+
+    def test_a_second_reviewer_that_sees_the_first_reviewers_findings_is_rejected(self):
+        self.assertIn("second-reviewer-role", self.mutate(
+            "second-reviewer", "you are not given the first reviewer's findings", "you are given the first reviewer's findings"))
+
+    def test_the_new_prompts_must_carry_the_common_rules(self):
+        for role in ("second-reviewer", "verifier"):
+            got = ids(prompt_rules.check_text(role, "report only"))
+            self.assertIn("data-fenced", got)
+            self.assertIn("no-resolve-thread", got)
+
+    def test_check_dir_reports_a_missing_new_prompt(self):
+        with tempfile.TemporaryDirectory() as d:
+            for role in ROLES:
+                if role != "verifier":
+                    shutil.copy(PROMPTS / f"{role}.md", d)
+            self.assertIn("verifier.md: cannot read (No such file or directory)", prompt_rules.check_dir(d))
+
+
+class Pr3RuleTests(unittest.TestCase):
+    """Agent Usage Redesign PR 3 (rev 46, rollout step 4): reading rules, full-diff review context, an implementer kept
+    across rounds, minors fixed by default and the single escalation, in the role prompts and in CLAUDE.md, REVIEW.md and
+    docs/FOLLOW-UPS.md. Each clause is pinned by a rule that fails when it is deleted, weakened or replaced by the old text."""
+
+    PROMPT_RULES = {
+        "reviewer-delta": ("reviewer",),
+        "reviewer-proof": ("reviewer", "second-reviewer"),
+        "reviewer-ids": ("reviewer",),
+        "impl-kept-across-rounds": ("implementer",),
+        "impl-model-and-handoff": ("implementer",),
+        "impl-minors-and-triage": ("implementer",),
+        "planner-gaps": ("planner",),
+        "escalation-role": ("escalation-reviewer",),
+    }
+    DOC_RULES = {
+        "claude-reading": "CLAUDE.md",
+        "claude-handoff-and-implementer": "CLAUDE.md",
+        "claude-reviews": "CLAUDE.md",
+        "review-full-diff": "REVIEW.md",
+        "review-verified": "REVIEW.md",
+        "review-ids": "REVIEW.md",
+        "review-minors-and-cap": "REVIEW.md",
+        "review-escalation": "REVIEW.md",
+        "followups-small-fix": "docs/FOLLOW-UPS.md",
+        "plan-review-loop": "docs/PLAN.md",  # #129 R1-02, R1-03: PLAN section 6 and 9 follow CLAUDE.md and roles.yaml
+        "plan-working-rules": "docs/PLAN.md",
+        "plan-handoff": "docs/PLAN.md",
+        "plan-roles": "docs/PLAN.md",
+        "template-handoff": "handoff/TEMPLATE.md",
+        "reviews-retro": "docs/reviews/README.md",  # #129 R2-02: the R6 retro is Opus/high as in PLAN 9.4 and roles.yaml
+    }
+    # (file, rule id, the old wording that must now be rejected)
+    STALE = (
+        ("CLAUDE.md", "claude-reading", "Search narrowly and read files in parts."),
+        ("CLAUDE.md", "claude-reading", "Do not re-read files you just edited."),
+        ("CLAUDE.md", "claude-handoff-and-implementer", "At about 50% a hook reminds you."),
+        ("CLAUDE.md", "claude-handoff-and-implementer", "One PR per implementer session; one review round per reviewer session."),
+        ("CLAUDE.md", "claude-reviews", "Max 4 rounds per batch; then stop and report to the owner."),
+        ("REVIEW.md", "review-full-diff", "Round N>1: only the commits since the last round, the open findings, and this file."),
+        ("REVIEW.md", "review-full-diff", "Rely on CI for the full suite. Run targeted tests only when a finding needs proof."),
+        ("REVIEW.md", "review-escalation", "Fixes made after round 4 are not re-reviewed unless the owner asks."),
+        ("REVIEW.md", "review-escalation", "Disputes: the reviewer either withdraws or restates; the owner breaks ties."),
+        ("docs/FOLLOW-UPS.md", "followups-small-fix", "The fix is not small: more than about 15 changed lines."),
+        ("docs/PLAN.md", "plan-review-loop", "Each later round sees only the commits since the last round. The loop stops and you decide."),
+        ("docs/PLAN.md", "plan-working-rules", "Read files in parts and search narrowly. They only run targeted tests."),
+        ("docs/PLAN.md", "plan-handoff", "At **about 50%** context, the session finishes its current step."),
+        ("docs/PLAN.md", "plan-handoff", "**One PR per implementer session. One review round per reviewer session.**"),
+        ("docs/PLAN.md", "plan-roles", "| **Orchestrator** | Sonnet / low | One long-lived session |"),
+        ("docs/PLAN.md", "plan-roles", "The single source of truth for each role's model, effort and token budget."),
+        ("docs/PLAN.md", "plan-roles", "A retro session (Sonnet / medium) reads only the CSV. Escaped defects get the label `escaped`."),
+        ("docs/PLAN.md", "plan-roles", "Starting budgets (calibrated after M0): implementer about 300k tokens/PR."),  # R2-01
+        ("docs/reviews/README.md", "reviews-retro", "| R6 | Sonnet medium worker | PLAN 9.4 + section 5 | exists |"),
+        ("docs/reviews/README.md", "reviews-retro", "| Sonnet medium worker | the CSV, `docs/agent-tuning.md` |"),
+        ("handoff/TEMPLATE.md", "template-handoff", "Write it at about 50% context, commit it, and end the session."),
+        ("REVIEW.md", "review-escalation", "A dropped finding stays open."),
+    )
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def doc_problems(self, path, text):
+        return ids(prompt_rules.check_doc_text(path, text))
+
+    def test_rules_exist_for_the_right_roles_and_files_and_the_real_text_passes_them(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        for rid, roles in self.PROMPT_RULES.items():
+            self.assertEqual(by_id[rid].roles, roles, rid)
+            for role in roles:
+                self.assertNotIn(rid, ids(prompt_rules.check_text(role, real(role))), (rid, role))
+        by_doc = {r.id: r for r in prompt_rules.DOC_RULES}
+        for rid, path in self.DOC_RULES.items():
+            self.assertEqual(by_doc[rid].path, path, rid)
+            self.assertNotIn(rid, self.doc_problems(path, self.doc(path)), rid)
+
+    def test_deleting_any_pattern_of_a_doc_rule_fails_that_rule(self):
+        self.assertTrue(prompt_rules.DOC_RULES)
+        for rule in prompt_rules.DOC_RULES:
+            norm = prompt_rules.normalize(self.doc(rule.path))
+            for i, pattern in enumerate(rule.patterns):
+                with self.subTest(rule=rule.id, pattern=i):
+                    text, n = re.subn(pattern, "", norm, flags=re.I)
+                    self.assertTrue(n, f"{rule.id} does not match {rule.path}")
+                    self.assertIn(rule.id, self.doc_problems(rule.path, text))
+
+    def test_the_old_wording_is_rejected(self):
+        for path, rid, old in self.STALE:
+            with self.subTest(path=path, old=old):
+                self.assertIn(rid, self.doc_problems(path, self.doc(path) + "\n" + old + "\n"))
+
+    def test_a_doc_rule_is_not_met_by_another_file(self):
+        self.assertIn("review-full-diff", self.doc_problems("REVIEW.md", self.doc("CLAUDE.md")))
+        self.assertIn("claude-reviews", self.doc_problems("CLAUDE.md", self.doc("REVIEW.md")))
+
+    def test_empty_doc_reports_every_rule_of_its_file(self):
+        for path in {r.path for r in prompt_rules.DOC_RULES}:
+            want = {r.id for r in prompt_rules.DOC_RULES if r.path == path}
+            self.assertEqual(self.doc_problems(path, ""), want)
+
+    def test_doc_text_inside_an_html_comment_does_not_count(self):
+        self.assertIn("review-verified", self.doc_problems("REVIEW.md", "<!-- " + self.doc("REVIEW.md") + " -->"))
+
+    def test_the_old_prompt_wording_is_rejected(self):
+        for role, rid, old in (
+            ("reviewer", "reviewer-delta", " Review that range only. Do not re-review unchanged code."),
+            ("reviewer", "reviewer-proof", " Run targeted tests only to prove a finding."),
+            ("second-reviewer", "reviewer-proof", " Run targeted tests only to prove a finding."),
+            ("implementer", "impl-model-and-handoff", " Sonnet, medium effort. At about 50% context write the handoff file."),
+            ("planner", "planner-gaps", " Flag plan gaps for the owner instead of deciding them."),
+        ):
+            with self.subTest(role=role, old=old):
+                self.assertIn(rid, ids(prompt_rules.check_text(role, real(role) + old)))
+
+    def test_the_escalation_reviewer_prompt_exists_and_roles_yaml_names_it(self):
+        self.assertTrue((PROMPTS / "escalation-reviewer.md").is_file())
+        self.assertIn("prompt: agents/prompts/escalation-reviewer.md", (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8"))
+
+    def test_the_escalation_reviewer_cannot_escalate_again_or_edit_the_branch(self):
+        norm = prompt_rules.normalize(real("escalation-reviewer")).lower()
+        for needle in ("`fix`, `split` or `owner`", "no second escalation", "never edit or push the pr branch: report only"):
+            self.assertIn(needle, norm)
+        self.assertIn("escalation-role", ids(prompt_rules.check_text("escalation-reviewer", real("reviewer"))))
+
+    def test_check_docs_reports_a_missing_file_and_passes_on_the_repo(self):
+        self.assertEqual(prompt_rules.check_docs(ROOT), [])
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIn("REVIEW.md: cannot read (No such file or directory)", prompt_rules.check_docs(d))
+
+    def test_cli_checks_the_docs_of_the_given_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = subprocess.run([sys.executable, "-I", str(ROOT / "scripts" / "prompt_rules.py"), "--root", d],
+                               capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("CLAUDE.md: cannot read", r.stdout)
+        r = subprocess.run([sys.executable, "-I", str(ROOT / "scripts" / "prompt_rules.py"), "--root", "/nonexistent-dir-for-test"],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2)
+
+    def test_the_verified_field_is_in_the_findings_example(self):
+        self.assertIn('"verified": "confirmed"', self.doc("REVIEW.md"))
+        self.assertNotIn("review-verified", self.doc_problems("REVIEW.md", self.doc("REVIEW.md")))
+        self.assertIn("review-verified", self.doc_problems("REVIEW.md", self.doc("REVIEW.md").replace('"verified"', '"checked"')))
+
+    def test_review_md_names_the_second_reviewer_id_prefix_beside_r_and_d(self):  # #128 round 3, assigned to PR 3
+        text = self.doc("REVIEW.md")
+        for prefix in ("`R<round>-<nn>`", "`S<round>-<nn>`", "`D<round>-<nn>`"):
+            self.assertIn(prefix, text)
+        self.assertIn("review-ids", self.doc_problems("REVIEW.md", text.replace("`S<round>-<nn>`", "")))
+
+    def test_design_reviewer_gets_the_whole_diff_every_round(self):  # R1-01 of #129 (row 3)
+        norm = prompt_rules.normalize(real("design-reviewer")).lower()
+        self.assertIn("every round: the whole pr diff and the findings json of earlier rounds", norm)
+        self.assertNotIn("only the commits since round 1", norm)
+        old = " Round 2: only the commits since round 1 and your open findings."
+        self.assertIn("dr-rounds", ids(prompt_rules.check_text("design-reviewer", real("design-reviewer") + old)))
+        self.assertIn("max 2 opus rounds per design pr", norm, "the round count stays for PR 4")
+
+    def test_an_escalation_drop_becomes_withdrawn_and_an_owner_finding_stays_open(self):  # R1-04 of #129
+        prompt = prompt_rules.normalize(real("escalation-reviewer")).lower()
+        self.assertIn("a `drop` sets the finding to `withdrawn`", prompt)
+        self.assertIn("an `owner` finding stays open for the owner", prompt)
+        self.assertIn("a dropped finding becomes `withdrawn`", prompt_rules.normalize(self.doc("REVIEW.md")).lower())
+        for old, new in (("a `drop` sets the finding to `withdrawn`", "a `drop` closes the finding"),
+                         ("an `owner` finding stays open for the owner", "")):
+            text = re.sub(re.escape(old), new, prompt_rules.normalize(real("escalation-reviewer")), flags=re.I)
+            self.assertIn("escalation-role", ids(prompt_rules.check_text("escalation-reviewer", text)), old)
+
+    def test_the_escalation_reviewer_resumes_after_a_usage_limit_without_a_second_decision(self):  # R1-05 of #129
+        norm = prompt_rules.normalize(real("escalation-reviewer")).lower()
+        self.assertIn("usage limit reset: re-read the pr head, the thread and your notes", norm)
+        self.assertIn("post the one decision comment if it is not posted yet", norm)
+
+    def test_plan_and_template_follow_the_new_rules(self):  # R1-02, R1-03 of #129
+        plan = prompt_rules.normalize(self.doc("docs/PLAN.md")).lower()
+        for needle in ("agents/roles.yaml", "**second reviewer**", "**escalation reviewer**", "`caused by: #n`",
+                       "one implementer session per pr, kept across its review rounds"):
+            self.assertIn(needle, plan)
+        for stale in ("sonnet / low", "haiku", "token budget", "search narrowly", "label `escaped`", "once 50% is crossed",
+                      "starting budgets", "tokens/pr", "tokens per round"):  # R2-01 of #129: the budgets in section 9.4
+            self.assertNotIn(stale, plan)
+        self.assertIn("60% of a 1m window, 40% of a 200k one", prompt_rules.normalize(self.doc("handoff/TEMPLATE.md")).lower())
+        self.assertIn("deferred minors do not count", plan)  # the M0-11 pin in test_wiring.py
+
+    def test_plan_prompt_list_and_triage_bullet_match_the_prompts(self):  # R2-03 of #129
+        plan = prompt_rules.normalize(self.doc("docs/PLAN.md")).lower()
+        self.assertIn("agents/prompts/{orchestrator,planner,implementer,reviewer,design-reviewer}.md", plan)  # M0.5-15 pin
+        self.assertRegex(plan, r"second-reviewer\.md.{0,40}escalation-reviewer\.md.{0,40}verifier\.md")
+        self.assertIn("runs a ci-triage pass first, then, if it does not explain the failure, stops and reports", plan)
+        self.assertIn("repository files", prompt_rules.DocRule.__doc__)
+
+    def test_the_r6_retro_is_opus_high_with_transcripts_in_the_reviews_readme(self):  # R2-02 of #129
+        readme = prompt_rules.normalize(self.doc("docs/reviews/README.md")).lower()
+        self.assertNotIn("sonnet medium worker", readme)
+        self.assertIn("| r6 | opus high worker | plan 9.4", readme)
+        self.assertIn("a sample of transcripts and pr threads", readme)
 
 
 if __name__ == "__main__":

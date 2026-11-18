@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tally wireframes</title>
+<!--
+  Tally v1 wireframes and tokens sheet (task M0.5-03). Draft for the owner's sign-off (M0.5-O1).
+  Colors, type, spacing, shape and sizes come from design/tokens.json (fetched; nothing here hard-codes a token value
+  except the neutral page and phone frame around the screens).
+  Serve the repository root over HTTP (the fetch does not work from file://):
+    python3 -m http.server 8765        then open  http://localhost:8765/docs/product/wireframes/wireframes.html
+  ?screen=05&theme=dark   one screen, English and Danish side by side (the PNGs are made from this view)
+  ?screen=tokens          the tokens sheet
+  ?tokens=URL             read the tokens from another place
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block" rel="stylesheet">
+<style>
+  :root { --page: #ECEEED; --pageText: #1B1F1E; --frame: #9AA19E; --muted: #5A625F; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --page: #121514; --pageText: #E2E6E4; --frame: #4A524F; --muted: #9AA39F; }
+  }
+  :root[data-theme="dark"] { --page: #121514; --pageText: #E2E6E4; --frame: #4A524F; --muted: #9AA39F; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--pageText); font-family: Roboto, system-ui, sans-serif; }
+  .ms { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; display: inline-block; -webkit-font-smoothing: antialiased; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .ms.fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+  /* Gallery and shot layout (outside the phone; not part of the design) */
+  .shot { padding: 20px 24px 16px; width: 816px; }
+  .cap { display: flex; gap: 12px; align-items: baseline; margin: 0 0 4px; } .cap .num { font-size: 22px; font-weight: 500; }
+  .cap .ttl { font-size: 20px; font-weight: 500; } .cap .th { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .refs { font-size: 13px; color: var(--muted); margin: 0 0 14px; min-height: 36px; line-height: 18px; }
+  .pair { display: flex; gap: 48px; } .pair figure { margin: 0; }
+  .pair figcaption { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .gallery { padding: 16px; } .gallery h1 { font-size: 24px; font-weight: 500; margin: 8px 8px 4px; }
+  .gallery .intro { margin: 0 8px 16px; color: var(--muted); max-width: 70ch; font-size: 14px; line-height: 20px; }
+  .toolbar { position: sticky; top: 0; z-index: 9; display: flex; gap: 8px; padding: 8px; background: var(--page); flex-wrap: wrap; }
+  .toolbar button { font: 500 14px Roboto, sans-serif; padding: 8px 16px; border-radius: 20px; border: 1px solid var(--frame); background: transparent; color: var(--pageText); cursor: pointer; min-height: 40px; }
+  .toolbar button[aria-pressed="true"] { background: var(--pageText); color: var(--page); }
+  .gallery .shot { width: auto; max-width: 100%; overflow-x: auto; }
+  @media (max-width: 860px) { .pair { gap: 16px; } }
+
+  /* Phone: every value below comes from token custom properties set on .phone */
+  .phone { width: 360px; height: 760px; border-radius: 36px; border: 8px solid var(--frameBezel, #202423); position: relative; overflow: hidden; background: var(--surface); color: var(--onSurface); flex: none; font-family: Roboto, sans-serif; }
+  .phone.dark { --frameBezel: #000; }
+  .status { height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-l); font-size: 12px; color: var(--onSurface); }
+  .status .ms { font-size: 16px; }
+  .body { position: absolute; top: 24px; left: 0; right: 0; bottom: 20px; display: flex; flex-direction: column; }
+  .gesture { position: absolute; bottom: 6px; left: 50%; width: 108px; height: 4px; margin-left: -54px; border-radius: 2px; background: var(--onSurface); opacity: .4; }
+  .scroll { flex: 1; overflow: hidden; position: relative; }
+  .t-headlineSmall { font-size: var(--headlineSmall-size); line-height: var(--headlineSmall-lh); font-weight: var(--headlineSmall-w); }
+  .t-titleLarge { font-size: var(--titleLarge-size); line-height: var(--titleLarge-lh); font-weight: var(--titleLarge-w); }
+  .t-titleMedium { font-size: var(--titleMedium-size); line-height: var(--titleMedium-lh); font-weight: var(--titleMedium-w); }
+  .t-bodyLarge { font-size: var(--bodyLarge-size); line-height: var(--bodyLarge-lh); font-weight: var(--bodyLarge-w); }
+  .t-bodyMedium { font-size: var(--bodyMedium-size); line-height: var(--bodyMedium-lh); font-weight: var(--bodyMedium-w); }
+  .t-bodySmall { font-size: var(--bodySmall-size); line-height: var(--bodySmall-lh); font-weight: var(--bodySmall-w); }
+  .t-labelLarge { font-size: var(--labelLarge-size); line-height: var(--labelLarge-lh); font-weight: var(--labelLarge-w); }
+  .t-labelMedium { font-size: var(--labelMedium-size); line-height: var(--labelMedium-lh); font-weight: var(--labelMedium-w); }
+  .var { color: var(--onSurfaceVariant); }
+
+  .topbar { height: var(--sz-topAppBar); display: flex; align-items: center; padding: 0 var(--sp-xs); gap: var(--sp-xs); flex: none; }
+  .topbar .title { flex: 1; padding: 0 var(--sp-m); min-width: 0; } .topbar .icon + .title { padding-left: var(--sp-xs); }
+  .icon { width: var(--sz-minTouchTarget); height: var(--sz-minTouchTarget); display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--onSurfaceVariant); flex: none; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primaryContainer); color: var(--onPrimaryContainer); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; flex: none; }
+  .avatar.lg { width: 40px; height: 40px; font-size: 16px; }
+  .avatar.sec { background: var(--secondaryContainer); color: var(--onSecondaryContainer); }
+  .avatar.ter { background: var(--tertiaryContainer); color: var(--onTertiaryContainer); }
+
+  .row { display: flex; align-items: center; gap: var(--sp-l); min-height: var(--sz-listRowMin); padding: var(--sp-s) var(--sp-l); }
+  .row .txt { flex: 1; min-width: 0; }
+  .row.card { background: var(--surfaceContainerLow); border-radius: var(--sh-medium); margin: 0 var(--sp-l) var(--sp-s); padding: var(--sp-m) var(--sp-l); }
+  .lead { color: var(--onSurfaceVariant); flex: none; }
+  .divider { height: 1px; background: var(--outlineVariant); margin: var(--sp-s) 0; }
+  .section { padding: var(--sp-l) var(--sp-l) var(--sp-xs); color: var(--primary); }
+
+  .cbw { width: var(--sz-minTouchTarget); height: var(--sz-minTouchTarget); display: inline-flex; align-items: center; justify-content: center; margin: calc(-1 * var(--sp-s)) calc(-1 * var(--sp-m)) calc(-1 * var(--sp-s)) calc(-1 * var(--sp-m)); flex: none; }
+  .cb { width: 18px; height: 18px; border-radius: 2px; border: 2px solid var(--onSurfaceVariant); display: inline-flex; align-items: center; justify-content: center; }
+  .cb.on { background: var(--primary); border-color: var(--primary); color: var(--onPrimary); }
+  .cb.on .ms { font-size: 16px; font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 20; }
+  .item.row { gap: var(--sp-l); padding-left: var(--sp-l); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-s); height: 40px; padding: 0 var(--sp-xl); border-radius: 20px; white-space: nowrap; }
+  .btn.filled { background: var(--primary); color: var(--onPrimary); }
+  .btn.tonal { background: var(--secondaryContainer); color: var(--onSecondaryContainer); }
+  .btn.text { color: var(--primary); padding: 0 var(--sp-m); } .btn.outlined { border: 1px solid var(--outline); color: var(--primary); }
+  .btn.danger { color: var(--error); } .btn.dangerFilled { background: var(--error); color: var(--onError); } .btn .ms { font-size: 18px; }
+  .btn.wide { width: 100%; }
+
+  .fab { position: absolute; right: var(--sp-l); bottom: var(--sp-l); height: var(--sz-fab); border-radius: var(--sh-large); background: var(--primaryContainer); color: var(--onPrimaryContainer); display: flex; align-items: center; gap: var(--sp-m); padding: 0 var(--sp-l) 0 var(--sp-l); box-shadow: 0 3px 6px rgba(0,0,0,.18); }
+  .chip { display: inline-flex; align-items: center; gap: var(--sp-s); height: 32px; padding: 0 var(--sp-l); border-radius: var(--sh-small); border: 1px solid var(--outline); color: var(--onSurfaceVariant); white-space: nowrap; }
+  .chip.on { background: var(--secondaryContainer); color: var(--onSecondaryContainer); border-color: var(--secondaryContainer); padding-left: var(--sp-s); }
+  .chip .ms { font-size: 18px; }
+  .chipwrap { height: var(--sz-minTouchTarget); display: inline-flex; align-items: center; }
+
+  .offline { display: flex; align-items: center; gap: var(--sp-s); min-height: var(--sz-offlineBar); padding: var(--sp-xs) var(--sp-l); background: var(--tertiaryContainer); color: var(--onTertiaryContainer); flex: none; }
+  .offline .ms { font-size: 18px; } .offline .txt { flex: 1; }
+  .pending { white-space: nowrap; }
+
+  .snack { position: absolute; left: var(--sp-s); right: var(--sp-s); bottom: var(--sp-s); min-height: 48px; border-radius: 4px; background: var(--inverseSurface); color: var(--inverseOnSurface); display: flex; align-items: center; padding: var(--sp-s) var(--sp-s) var(--sp-s) var(--sp-l); gap: var(--sp-s); box-shadow: 0 3px 8px rgba(0,0,0,.25); z-index: 5; }
+  .snack .txt { flex: 1; }
+  .snack .act { color: var(--inversePrimary); padding: 0 var(--sp-m); height: 40px; display: inline-flex; align-items: center; }
+
+  .scrim { position: absolute; inset: -24px 0 -20px 0; background: var(--scrim); opacity: .32; z-index: 6; }
+  .dialog { position: absolute; left: var(--sp-xl); right: var(--sp-xl); top: 50%; transform: translateY(-50%); z-index: 7; background: var(--surfaceContainerHigh); border-radius: var(--sh-extraLarge); padding: var(--sp-xl); }
+  .dialog .hd { margin-bottom: var(--sp-l); }
+  .dialog .hi { display: flex; justify-content: center; color: var(--secondary); margin-bottom: var(--sp-l); }
+  .dialog .hi + .hd { text-align: center; }
+  .dialog .acts { display: flex; justify-content: flex-end; gap: var(--sp-s); margin-top: var(--sp-xl); flex-wrap: wrap; }
+  .dialog .acts .btn { padding: 0 var(--sp-m); }
+
+  .field { position: relative; border: 1px solid var(--outline); border-radius: 4px; min-height: 56px; padding: var(--sp-l); display: flex; align-items: center; color: var(--onSurface); margin-top: var(--sp-s); }
+  .field.focus { border: 2px solid var(--primary); padding: calc(var(--sp-l) - 1px); }
+  .field.err { border: 2px solid var(--error); padding: calc(var(--sp-l) - 1px); }
+  .field .lbl { position: absolute; top: -9px; left: var(--sp-m); padding: 0 var(--sp-xs); background: var(--fieldBg, var(--surface)); color: var(--onSurfaceVariant); }
+  .field.focus .lbl { color: var(--primary); } .field.err .lbl { color: var(--error); } .field .ph { color: var(--onSurfaceVariant); }
+  .field .caret { display: inline-block; width: 2px; height: 20px; background: var(--primary); margin-left: 1px; vertical-align: middle; }
+  .field .trail { margin-left: auto; color: var(--error); }
+  .support { padding: var(--sp-xs) var(--sp-l) 0; color: var(--onSurfaceVariant); } .support.err { color: var(--error); }
+  .dialog .field { --fieldBg: var(--surfaceContainerHigh); }
+
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--surfaceContainerLow); border-radius: var(--sh-extraLarge) var(--sh-extraLarge) 0 0; padding: var(--sp-s) var(--sp-l) var(--sp-l); --fieldBg: var(--surfaceContainerLow); }
+  .sheet .handle { width: 32px; height: 4px; border-radius: 2px; background: var(--onSurfaceVariant); opacity: .4; margin: var(--sp-s) auto var(--sp-l); }
+  .sheet .two { display: flex; gap: var(--sp-l); } .sheet .two > div { flex: 1; min-width: 0; }
+  .sheet .acts { display: flex; gap: var(--sp-s); justify-content: flex-end; margin-top: var(--sp-l); align-items: center; }
+  .kbd { background: var(--surfaceContainerHighest); padding: var(--sp-s) var(--sp-s) var(--sp-l); display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-s); margin: var(--sp-l) calc(-1 * var(--sp-l)) calc(-1 * var(--sp-l)); }
+  .kbd span { height: 44px; border-radius: var(--sh-small); background: var(--surfaceContainerLowest); display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--onSurface); }
+
+  .menu { position: absolute; z-index: 7; background: var(--surfaceContainer); border-radius: 4px; padding: var(--sp-s) 0; box-shadow: 0 4px 12px rgba(0,0,0,.22); min-width: 200px; max-width: 290px; }
+  .menu .mi { display: flex; gap: var(--sp-m); align-items: flex-start; padding: var(--sp-m) var(--sp-m); min-height: var(--sz-minTouchTarget); }
+  .menu .mi .ms { color: var(--onSurfaceVariant); } .menu .dis { opacity: .38; }
+  .menu .mi.danger, .menu .mi.danger .ms { color: var(--error); } .menu .disnote { display: block; margin-top: 2px; color: var(--onSurface); }
+
+  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--sp-xl) var(--sp-xxl); gap: var(--sp-m); }
+  .bubble { width: 96px; height: 96px; border-radius: 50%; background: var(--secondaryContainer); color: var(--onSecondaryContainer); display: flex; align-items: center; justify-content: center; margin-bottom: var(--sp-s); }
+  .bubble .ms { font-size: 44px; }
+  .stack { display: flex; flex-direction: column; gap: var(--sp-s); width: 100%; margin-top: var(--sp-l); }
+  .logo { width: 72px; height: 72px; border-radius: 20px; background: var(--primary); display: flex; align-items: center; justify-content: center; }
+  .head { padding: var(--sp-s) var(--sp-l) var(--sp-s); }
+  .meta { display: flex; align-items: center; gap: var(--sp-s); flex-wrap: wrap; }
+  .browser { background: var(--surfaceContainerHigh); display: flex; align-items: center; gap: var(--sp-s); padding: var(--sp-s) var(--sp-m); flex: none; }
+  .browser .url { flex: 1; background: var(--surfaceContainerHighest); border-radius: 20px; height: 36px; display: flex; align-items: center; padding: 0 var(--sp-m); gap: var(--sp-xs); color: var(--onSurfaceVariant); min-width: 0; overflow: hidden; white-space: nowrap; }
+  .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; background: linear-gradient(transparent, var(--surface)); }
+
+  /* Tokens sheet */
+  .tsheet { padding: 24px; width: 1180px; } .tsheet h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; }
+  .tsheet h2 { font-size: 18px; font-weight: 500; margin: 24px 0 8px; } .tsheet .sub { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+  .tcols { display: flex; gap: 16px; }
+  .tpanel { flex: 1; border-radius: 16px; padding: 16px; }
+  .swgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .sw { border-radius: 8px; padding: 8px 10px; min-height: 52px; font-size: 12px; line-height: 16px; border: 1px solid rgba(127,127,127,.25); }
+  .sw b { font-weight: 500; display: block; }
+  .ttable { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .ttable td, .ttable th { padding: 3px 6px; text-align: left; border-bottom: 1px solid rgba(127,127,127,.25); }
+  .typerow { display: flex; align-items: baseline; gap: 16px; padding: 4px 0; border-bottom: 1px solid rgba(127,127,127,.2); }
+  .typerow .k { width: 200px; font-size: 12px; color: var(--muted); flex: none; }
+  .bar { height: 12px; border-radius: 2px; display: inline-block; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div id="app"><p style="padding:24px">Loading design/tokens.json (serve the repository root over HTTP; see the comment at the top of this file).</p></div>
+<script>
+'use strict';
+/* safe-helpers:begin (run under node by scripts/test_wireframes_safety.py: keep this block self-contained) */
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function esc(s) { return String(s).replace(/[&<>\x22\x27]/g, c => ESC[c]); }
+function escDeep(v) {
+  if (typeof v === 'string') return esc(v);
+  if (Array.isArray(v)) return v.map(escDeep);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [esc(k), escDeep(x)]));
+  return v;
+}
+function storedTheme(v) { return ['light', 'dark', 'tokens'].includes(v) ? v : 'light'; }
+function sameOriginUrl(value, base, fallback) {
+  try {
+    const u = new URL(value, base);
+    return /^https?:$/.test(u.protocol) && u.origin === new URL(base).origin ? u.href : fallback;
+  } catch (e) { return fallback; }
+}
+/* safe-helpers:end */
+const params = new URLSearchParams(location.search);
+const DEFAULT_TOKENS = '../../../design/tokens.json';
+const TOKENS_URL = sameOriginUrl(params.get('tokens') || DEFAULT_TOKENS, location.href, DEFAULT_TOKENS);
+
+/* ---------- Strings (English, Danish). List, item and household names are user data: never translated. ---------- */
+const S = {
+  en: {
+    appTag: 'Collections and lists, shared with your household',
+    signIn: 'Sign in with Google', signInNote: 'Your lists are kept with your account, so they follow you to a new phone.',
+    needsConnection: 'This needs a connection',
+    lists: 'Lists', createList: 'Create list', noListsTitle: 'No lists yet',
+    noListsBody: 'Make a list of what you collect or need, and tick off what you have. A new list is private until you share it.',
+    of: (a, b) => `${a} of ${b}`, private: 'Private', shared: 'Shared', sharedBy: n => `Shared by ${n}`,
+    noItems: 'No items yet',
+    listType: 'List type', plainList: 'Plain list', plainNote: 'Items with a name, sorted by name', collection: 'Collection',
+    collectionNote: 'Items with release and re-release year, sorted by year', typeFixed: 'The type cannot be changed later.',
+    signInEmail: 'Use email and password', createAccount: 'Create account', email: 'Email', password: 'Password',
+    signInBtn: 'Sign in', forgot: 'Forgot password?', wrongCreds: 'Wrong email or password', tooMany: 'Too many attempts, try again later',
+    pwRule: 'At least 12 characters', pwShort: 'Use at least 12 characters', noAccount: 'No account yet?',
+    checkEmail: 'Check your email', checkEmailBody: e => `We sent a link to ${e}. Open it, then tap Continue.`,
+    cont: 'Continue', sendAgain: 'Send again', notVerified: 'Your email is not verified yet',
+    resetTitle: 'Reset password', resetBody: 'Enter your email. We will send a link to choose a new password.', sendLink: 'Send link',
+    resetSent: 'If an account exists for this email, we sent an email with a link.',
+    twoStep: 'Two-step verification', off: 'Off', tsQ: 'Turn on two-step verification?',
+    tsBody: 'Each time you sign in with your password, you also enter a code from an authenticator app. If you lose your authenticator app, you may lose access to your account.',
+    tsSetup: 'Scan the QR code with your authenticator app, or enter the key. Then enter the 6-digit code it shows.',
+    key: 'Key', code: 'Code', turnOn: 'Turn on', codeTitle: 'Enter code', codeBody: 'Open your authenticator app and enter the 6-digit code for Tally.',
+    verify: 'Verify', changePw: 'Change password', currentPw: 'Current password', newPw: 'New password',
+    changePwNote: 'To keep your account safe, sign in again with your current password first.', iHaveIt: 'I have it',
+    newList: 'New list', listName: 'List name', enterName: 'Enter a name', cancel: 'Cancel', create: 'Create',
+    showMissing: 'Show only missing', addItem: 'Add item', reReleased: 'Re-released',
+    offline: 'Offline: changes are sent when you are online again', pending: n => n === 1 ? '1 waiting' : `${n} waiting`,
+    name: 'Name', releaseYear: 'Release year', reReleaseYear: 'Re-release year', optional: 'Optional',
+    yearRange: 'Use a year from 1900 to 2076', done: 'Done', add: 'Add', editItem: 'Edit item', remove: 'Remove', save: 'Save',
+    removed: n => `“${n}” removed`, undo: 'Undo',
+    rename: 'Rename list', share: 'Share with household', needHousehold: 'You need a household to share',
+    deleteList: 'Delete list', deleteListQ: 'Delete list?',
+    deleteListBody: (n, c) => `“${n}” and its ${c} items will be deleted for everyone who can see it. This cannot be undone.`,
+    delete: 'Delete', shareQ: h => `Share with ${h}?`,
+    shareBody: 'Everyone in the household can see and change this list. Only you can stop sharing it.', shareBtn: 'Share',
+    emptyListTitle: 'This list is empty', emptyPlainBody: 'Add the first item.', emptyCollBody: 'Add the first item. You can add years now or later.',
+    household: 'Household', hhNoneTitle: 'Share lists with your household',
+    hhNoneBody: 'A household is the people you live with. You need one only to share a list; your lists work without it.',
+    hhName: 'Household name', createHh: 'Create household', haveLink: 'Have an invite link?',
+    haveLinkBody: 'Open the link on this phone to join that household.',
+    members: n => n === 1 ? '1 member' : `${n} members`, you: 'you', owner: 'Household owner', member: 'Member',
+    makeOwner: 'Make household owner', removeMember: 'Remove from household', openInvites: 'Open invites',
+    inviteLink: 'Invite link', expiresIn: d => d === 1 ? 'Expires in 1 day' : `Expires in ${d} days`, revoke: 'Revoke',
+    invite: 'Invite someone', deleteHh: 'Delete household',
+    invited: 'You are invited to join',
+    joinBody: 'You will see the lists shared with this household. Your own lists stay private until you share them.',
+    join: 'Join household', notNow: 'Not now',
+    linkDead: 'This invite link no longer works',
+    linkDeadBody: 'It has expired, was already used or was revoked. Ask someone in the household for a new link.',
+    toLists: 'Go to my lists',
+    account: 'Account', signOut: 'Sign out',
+    signOutNote: 'Removes your lists from this phone', deleteAccount: 'Delete account',
+    deleteAccountQ: 'Delete your account?',
+    deleteAccountBody: 'Your account and every list you created, private and shared, are deleted. Household members lose the lists you shared. This cannot be undone.',
+    hhDeleted: 'Household deleted',
+    hhDeletedBody: h => `${h} was deleted. The lists you had shared are private to you again, with all their items. You can share them again when you are in a household.`,
+    ok: 'OK',
+    webTitle: 'You are invited to a household in Tally', webBody: 'Install the app, then tap the link again.',
+    webPlay: 'Open Google Play', webSmall: 'Already installed? Tap the link in your message again.',
+  },
+  da: {
+    appTag: 'Samlinger og lister, delt med din husstand',
+    signIn: 'Log ind med Google', signInNote: 'Dine lister gemmes med din konto, så de følger med til en ny telefon.',
+    needsConnection: 'Det kræver internetforbindelse',
+    lists: 'Lister', createList: 'Opret liste', noListsTitle: 'Ingen lister endnu',
+    noListsBody: 'Lav en liste over det, du samler på eller mangler, og sæt flueben ved det, du har. En ny liste er privat, indtil du deler den.',
+    of: (a, b) => `${a} af ${b}`, private: 'Privat', shared: 'Delt', sharedBy: n => `Delt af ${n}`,
+    noItems: 'Ingen ting endnu',
+    listType: 'Listetype', plainList: 'Almindelig liste', plainNote: 'Ting med et navn, sorteret efter navn', collection: 'Samling',
+    collectionNote: 'Ting med udgivelses- og genudgivelsesår, sorteret efter år', typeFixed: 'Typen kan ikke ændres senere.',
+    signInEmail: 'Brug e-mail og adgangskode', createAccount: 'Opret konto', email: 'E-mail', password: 'Adgangskode',
+    signInBtn: 'Log ind', forgot: 'Glemt adgangskode?', wrongCreds: 'Forkert e-mail eller adgangskode', tooMany: 'For mange forsøg. Prøv igen senere',
+    pwRule: 'Mindst 12 tegn', pwShort: 'Brug mindst 12 tegn', noAccount: 'Har du ingen konto?',
+    checkEmail: 'Tjek din e-mail', checkEmailBody: e => `Vi har sendt et link til ${e}. Åbn det, og tryk så på Fortsæt.`,
+    cont: 'Fortsæt', sendAgain: 'Send igen', notVerified: 'Din e-mail er ikke bekræftet endnu',
+    resetTitle: 'Nulstil adgangskode', resetBody: 'Skriv din e-mail. Vi sender et link, så du kan vælge en ny adgangskode.', sendLink: 'Send link',
+    resetSent: 'Hvis der findes en konto til denne e-mail, har vi sendt en e-mail med et link.',
+    twoStep: 'Totrinsbekræftelse', off: 'Fra', tsQ: 'Slå totrinsbekræftelse til?',
+    tsBody: 'Hver gang du logger ind med din adgangskode, skal du også skrive en kode fra en godkendelsesapp. Hvis du mister din godkendelsesapp, kan du miste adgangen til din konto.',
+    tsSetup: 'Scan QR-koden med din godkendelsesapp, eller skriv nøglen. Skriv derefter den 6-cifrede kode, som appen viser.',
+    key: 'Nøgle', code: 'Kode', turnOn: 'Slå til', codeTitle: 'Skriv koden', codeBody: 'Åbn din godkendelsesapp, og skriv den 6-cifrede kode til Tally.',
+    verify: 'Bekræft', changePw: 'Skift adgangskode', currentPw: 'Nuværende adgangskode', newPw: 'Ny adgangskode',
+    changePwNote: 'For at beskytte din konto skal du først logge ind igen med din nuværende adgangskode.', iHaveIt: 'Jeg har den',
+    newList: 'Ny liste', listName: 'Listens navn', enterName: 'Skriv et navn', cancel: 'Annuller', create: 'Opret',
+    showMissing: 'Vis kun manglende', addItem: 'Tilføj ting', reReleased: 'Genudgivet',
+    offline: 'Offline: ændringer sendes, når du er online igen', pending: n => `${n} venter`,
+    name: 'Navn', releaseYear: 'Udgivelsesår', reReleaseYear: 'Genudgivelsesår', optional: 'Valgfrit',
+    yearRange: 'Brug et år fra 1900 til 2076', done: 'Færdig', add: 'Tilføj', editItem: 'Rediger ting', remove: 'Fjern', save: 'Gem',
+    removed: n => `»${n}« er fjernet`, undo: 'Fortryd',
+    rename: 'Omdøb liste', share: 'Del med husstanden', needHousehold: 'Du skal være i en husstand for at dele',
+    deleteList: 'Slet liste', deleteListQ: 'Slet liste?',
+    deleteListBody: (n, c) => `»${n}« og dens ${c} ting slettes for alle, der kan se den. Det kan ikke fortrydes.`,
+    delete: 'Slet', shareQ: h => `Del med ${h}?`,
+    shareBody: 'Alle i husstanden kan se og ændre listen. Kun du kan stoppe delingen.', shareBtn: 'Del',
+    emptyListTitle: 'Listen er tom', emptyPlainBody: 'Tilføj den første ting.', emptyCollBody: 'Tilføj den første ting. Årstal kan du tilføje nu eller senere.',
+    household: 'Husstand', hhNoneTitle: 'Del lister med din husstand',
+    hhNoneBody: 'En husstand er dem, du bor med. Du skal kun bruge en for at dele en liste; dine lister virker uden.',
+    hhName: 'Husstandens navn', createHh: 'Opret husstand', haveLink: 'Har du et invitationslink?',
+    haveLinkBody: 'Åbn linket på denne telefon for at blive medlem af husstanden.',
+    members: n => n === 1 ? '1 medlem' : `${n} medlemmer`, you: 'dig', owner: 'Husstandens ejer', member: 'Medlem',
+    makeOwner: 'Gør til husstandens ejer', removeMember: 'Fjern fra husstanden', openInvites: 'Åbne invitationer',
+    inviteLink: 'Invitationslink', expiresIn: d => d === 1 ? 'Udløber om 1 dag' : `Udløber om ${d} dage`, revoke: 'Tilbagekald',
+    invite: 'Inviter nogen', deleteHh: 'Slet husstand',
+    invited: 'Du er inviteret til at blive medlem af',
+    joinBody: 'Du vil kunne se de lister, der er delt med husstanden. Dine egne lister forbliver private, indtil du deler dem.',
+    join: 'Bliv medlem', notNow: 'Ikke nu',
+    linkDead: 'Dette invitationslink virker ikke længere',
+    linkDeadBody: 'Det er udløbet, allerede brugt eller tilbagekaldt. Bed en i husstanden om et nyt link.',
+    toLists: 'Gå til mine lister',
+    account: 'Konto', signOut: 'Log ud',
+    signOutNote: 'Fjerner dine lister fra denne telefon', deleteAccount: 'Slet konto',
+    deleteAccountQ: 'Slet din konto?',
+    deleteAccountBody: 'Din konto og alle lister, du har oprettet, private og delte, slettes. Husstandens medlemmer mister de lister, du har delt. Det kan ikke fortrydes.',
+    hhDeleted: 'Husstanden er slettet',
+    hhDeletedBody: h => `${h} er slettet. De lister, du havde delt, er private for dig igen med alle deres ting. Du kan dele dem igen, når du er i en husstand.`,
+    ok: 'OK',
+    webTitle: 'Du er inviteret til en husstand i Tally', webBody: 'Installer appen, og tryk så på linket igen.',
+    webPlay: 'Åbn Google Play', webSmall: 'Har du allerede appen? Tryk på linket i din besked igen.',
+  },
+};
+
+/* ---------- Sample data (user data, same in both languages) ---------- */
+const HH = 'Vestergade 12';
+const LISTS = [
+  { name: 'Christmas mobiles', have: 12, total: 30, by: 'Anna' },
+  { name: 'Indkøb', have: 2, total: 11, shared: true },
+  { name: 'Christmas plates 1970–1999', have: 7, total: 30 },
+  { name: 'Board games', have: 0, total: 0, type: 'collection' },
+];
+// Sorted by release year, then name (OQ-8); items without a release year come last (OQ-33).
+const ITEMS = [
+  { n: 'Bell', y: 1984, c: true }, { n: 'Star', y: 1985, r: 2015, c: true }, { n: 'Heart', y: 1986 },
+  { n: 'Snowflake', y: 1987, c: true }, { n: 'Christmas tree', y: 1988 },
+  { n: 'Angel with trumpet and two small stars, gold-plated', y: 1989, c: true }, { n: 'Reindeer', y: 1990, r: 2020 },
+  { n: 'Dove', y: 1991, c: true }, { n: 'Candle', y: 1992 }, { n: 'Sleigh', r: 2018 },
+];
+
+// A plain list (owner decision 2026-11-16): name and the check only, sorted by name.
+const PLAIN = [
+  { n: 'Bananer' }, { n: 'Brød', c: true }, { n: 'Havregryn' }, { n: 'Kaffe' }, { n: 'Mælk', c: true }, { n: 'Ost' },
+  { n: 'Rugbrød' }, { n: 'Smør' }, { n: 'Æg' },
+];
+
+/* ---------- Building blocks ---------- */
+const ic = (n, cls = '') => `<span class="ms ${cls}">${n}</span>`;
+const iconBtn = (n, cls = '') => `<span class="icon">${ic(n, cls)}</span>`;
+const topbar = (title, { back = false, close = false, actions = '' } = {}) =>
+  `<div class="topbar">${back ? iconBtn('arrow_back') : ''}${close ? iconBtn('close') : ''}<div class="title t-titleLarge">${title}</div>${actions}</div>`;
+const cb = on => `<span class="cbw"><span class="cb ${on ? 'on' : ''}">${on ? ic('check') : ''}</span></span>`;
+const years = (s, it) => [it.y, it.r ? `${s.reReleased} ${it.r}` : null].filter(Boolean).join(' · ');
+const itemRow = (s, it) => `<div class="row item">${cb(it.c)}<div class="txt"><div class="t-bodyLarge">${it.n}</div>${
+  it.y || it.r ? `<div class="t-bodyMedium var">${years(s, it)}</div>` : ''}</div></div>`;
+const listRow = (s, l) => {
+  const prog = l.total ? s.of(l.have, l.total) : s.noItems;
+  const vis = l.by ? s.sharedBy(l.by) : l.shared ? s.shared : s.private;
+  const icn = l.by || l.shared ? 'group' : 'lock';
+  return `<div class="row card"><div class="txt"><div class="t-titleMedium">${l.name}</div>
+    <div class="t-bodySmall var meta"><span>${prog}</span><span aria-hidden="true">·</span><span class="meta" style="gap:4px">${ic(icn).replace('class="ms ', 'style="font-size:14px" class="ms ')}${vis}</span></div></div>${ic('chevron_right', 'lead')}</div>`;
+};
+const listsBar = s => topbar(s.lists, { actions: `${iconBtn('group')}<span class="icon"><span class="avatar">S</span></span>` });
+const fab = (label, icon = 'add') => `<div class="fab t-labelLarge">${ic(icon)}<span>${label}</span></div>`;
+const snack = (text, act) => `<div class="snack t-bodyMedium"><span class="txt">${text}</span>${act ? `<span class="act t-labelLarge">${act}</span>` : ''}</div>`;
+const dialog = ({ icon, title, body = '', extra = '', acts }) => `<div class="scrim"></div><div class="dialog">${
+  icon ? `<div class="hi">${ic(icon)}</div>` : ''}<div class="hd t-headlineSmall">${title}</div>${
+  body ? `<div class="t-bodyMedium var">${body}</div>` : ''}${extra}<div class="acts t-labelLarge">${acts}</div></div>`;
+const field = ({ label, value = '', ph = '', state = '', caret = false, trail = '', icon = '' }) =>
+  `<div class="field ${state} t-bodyLarge"><span class="lbl t-bodySmall">${label}</span><span>${value || `<span class="ph">${ph}</span>`}${
+    caret ? '<span class="caret"></span>' : ''}</span>${trail ? `<span class="trail">${ic(trail)}</span>` : icon ? `<span class="trail" style="color:var(--onSurfaceVariant)">${ic(icon)}</span>` : ''}</div>`;
+const support = (t, err) => `<div class="support t-bodySmall ${err ? 'err' : ''}">${t}</div>`;
+const offline = (s, n) => `<div class="offline t-bodySmall">${ic('cloud_off')}<span class="txt">${s.offline}</span><span class="pending t-labelMedium">${s.pending(n)}</span></div>`;
+const logo = () => `<div class="logo"><svg width="44" height="40" viewBox="0 0 44 40" aria-hidden="true">
+  <g stroke="var(--onPrimary)" stroke-width="4" stroke-linecap="round"><path d="M8 6v28M16 6v28M24 6v28M32 6v28"/><path d="M3 30L39 10"/></g></svg></div>`;
+
+const listHead = (s, l, filterOn) => `<div class="head"><div class="meta t-bodyMedium var"><span>${s.of(l.have, l.total)}</span><span>·</span><span class="meta" style="gap:4px">${
+  ic('group').replace('class="ms ', 'style="font-size:16px" class="ms ')}${l.by ? s.sharedBy(l.by) : s.shared}</span></div>
+  <div class="chipwrap"><span class="chip t-labelLarge ${filterOn ? 'on' : ''}">${filterOn ? ic('check') : ''}${s.showMissing}</span></div></div>`;
+const openList = (s, { items = ITEMS, filterOn = false, extraTop = '', overlay = '', fabOn = true, l = LISTS[0] } = {}) => {
+  return `${topbar(l.name, { back: true, actions: iconBtn('more_vert') })}${extraTop}${listHead(s, l, filterOn)}
+  <div class="scroll">${items.map(it => itemRow(s, it)).join('')}<div class="fade"></div>${fabOn ? fab(s.addItem) : ''}</div>${overlay}`;
+};
+const sheetItem = (s, { title, name, y, r, yErr = false, rErr = false, focus = '', kbd = false, edit = false, plain = false }) => `<div class="scrim"></div><div class="sheet">
+  <div class="handle"></div><div class="t-titleLarge" style="margin-bottom:var(--sp-m)">${title}</div>
+  ${field({ label: s.name, value: name, state: focus === 'n' ? 'focus' : '', caret: focus === 'n' })}
+  ${plain ? '' : `<div class="two" style="margin-top:var(--sp-s)">
+    <div>${field({ label: s.releaseYear, value: y, state: yErr ? 'err' : focus === 'y' ? 'focus' : '', caret: focus === 'y', trail: yErr ? 'error' : '' })}${support(yErr ? s.yearRange : s.optional, yErr)}</div>
+    <div>${field({ label: s.reReleaseYear, value: r, state: rErr ? 'err' : focus === 'r' ? 'focus' : '', caret: focus === 'r', trail: rErr ? 'error' : '' })}${support(rErr ? s.yearRange : s.optional, rErr)}</div>
+  </div>`}
+  ${edit ? `<div class="row" style="padding:var(--sp-xs) 0;gap:var(--sp-m)"><span style="margin-left:var(--sp-m)">${cb(true)}</span><span class="t-bodyLarge">${s.iHaveIt}</span></div>` : ''}
+  <div class="acts t-labelLarge">${edit ? `<span class="btn text danger" style="margin-right:auto">${ic('delete')}${s.remove}</span><span class="btn text">${s.cancel}</span><span class="btn filled">${s.save}</span>`
+    : `<span class="btn text">${s.done}</span><span class="btn filled">${s.add}</span>`}</div>
+  ${kbd ? `<div class="kbd">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', ic('backspace')].map(k => `<span>${k}</span>`).join('')}</div>` : ''}
+</div>`;
+
+const radio = (on, label, note) => `<div class="row" style="padding:var(--sp-xs) 0;gap:var(--sp-xs);align-items:flex-start"><span class="icon" style="color:var(--${on ? 'primary' : 'onSurfaceVariant'})">${ic(on ? 'radio_button_checked' : 'radio_button_unchecked', on ? 'fill' : '')}</span><div class="txt" style="padding-top:var(--sp-m)"><div class="t-bodyLarge">${label}</div><div class="t-bodySmall var">${note}</div></div></div>`;
+const typeChoice = s => `<div class="t-labelLarge var" style="margin-top:var(--sp-l)">${s.listType}</div>${radio(true, s.plainList, s.plainNote)}${radio(false, s.collection, s.collectionNote)}<div class="t-bodySmall var">${s.typeFixed}</div>`;
+
+const dots = n => '\u2022'.repeat(n);
+const pw = (label, n, o = {}) => field({ label, value: n ? dots(n) : '', icon: o.trail ? '' : 'visibility', ...o });
+const auth = (title, body, inner) => `${topbar(title, { back: true })}<div style="padding:0 var(--sp-l);display:flex;flex-direction:column;gap:var(--sp-s)">${
+  body ? `<div class="t-bodyMedium var" style="margin-bottom:var(--sp-s)">${body}</div>` : ''}${inner}</div>`;
+const qr = () => { let r = ''; let x = 7;
+  for (let i = 0; i < 21; i++) for (let j = 0; j < 21; j++) { x = (x * 1103515245 + 12345) & 0x7fffffff;
+    const fin = (a, b) => i >= a && i < a + 7 && j >= b && j < b + 7;
+    const inF = fin(0, 0) || fin(0, 14) || fin(14, 0);
+    const on = inF ? ((i % 14 === 0 || i % 14 === 6 || j % 14 === 0 || j % 14 === 6 || (i % 14 >= 2 && i % 14 <= 4 && j % 14 >= 2 && j % 14 <= 4))) : (x >> 16) & 1;
+    if (on) r += `<rect x="${j}" y="${i}" width="1" height="1"/>`; }
+  return `<svg width="148" height="148" viewBox="-1 -1 23 23" style="background:#fff;border-radius:8px;align-self:center"><g fill="#000">${r}</g></svg>`; };
+const linkRow = (a, b) => `<div class="t-bodyMedium" style="text-align:center;margin-top:var(--sp-s)">${a}</div>${b ? `<div class="t-bodyMedium" style="text-align:center">${b}</div>` : ''}`;
+
+/* ---------- Screens: id, title, story and decision refs, content(strings) ---------- */
+const SCREENS = [
+  { id: '01', t: 'Sign-in', refs: 'AUTH-01, AUTH-02, SYNC-03, OQ-22, OQ-23. Google is the main button; "Use email and password" leads to sign in, create account and reset (24 to 28). Shown only when signed out. No connection: snackbar, nothing else happens. Cancelling the account picker shows nothing.',
+    f: s => `<div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-l)">Tally</div>
+      <div class="t-bodyLarge var">${s.appTag}</div>
+      <div class="stack"><span class="btn filled wide t-labelLarge">${ic('login')}${s.signIn}</span><span class="btn outlined wide t-labelLarge">${ic('mail')}${s.signInEmail}</span></div>
+      <div class="t-bodySmall var" style="margin-top:var(--sp-s)">${s.signInNote}</div></div>${snack(s.needsConnection)}` },
+  { id: '02', t: 'Lists, empty', refs: 'LIST-01, VIS-01, OQ-1. First start of a new account.',
+    f: s => `${listsBar(s)}<div class="center"><div class="bubble">${ic('checklist')}</div><div class="t-titleLarge">${s.noListsTitle}</div>
+      <div class="t-bodyMedium var">${s.noListsBody}</div></div>${fab(s.createList)}` },
+  { id: '03', t: 'Lists', refs: 'LIST-01, VIS-03, OQ-8 (most recently used first), OQ-9 (progress under the name). Private or shared, and who shared it, on every row.',
+    f: s => `${listsBar(s)}<div class="scroll" style="padding-top:var(--sp-s)">${LISTS.map(l => listRow(s, l)).join('')}${fab(s.createList)}</div>` },
+  { id: '04', t: 'Create list, name missing', refs: 'LIST-02, list types (owner, 2026-11-16): plain (default) or collection, chosen here and fixed. Empty name: field error, nothing created. Rename (LIST-03) has only the name.',
+    f: s => `${listsBar(s)}<div class="scroll" style="padding-top:var(--sp-s)">${LISTS.map(l => listRow(s, l)).join('')}</div>${dialog({
+      title: s.newList, extra: `<div style="margin-top:var(--sp-s)">${field({ label: s.listName, state: 'err', trail: 'error' })}${support(s.enterName, true)}</div>${typeChoice(s)}`,
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.create}</span>` })}` },
+  { id: '05', t: 'Open list, collection', refs: 'Collection list. ITEM-04, ITEM-05, VIS-03, OQ-8 (release year, then name), OQ-9 ("12 of 30" at the top). The box is always "I have it" / "Jeg har den" (OQ-7; its accessible label). Ticked items stay in place. Items without a release year come last. Tap the row: edit.',
+    f: s => openList(s) },
+  { id: '06', t: 'Show only missing, offline', refs: 'OQ-8 filter, OQ-14 offline bar with waiting changes, SYNC-01. Ticking works offline; the bar goes away when everything is sent.',
+    f: s => openList(s, { items: ITEMS.filter(i => !i.c), filterOn: true, extraTop: offline(s, 3) }) },
+  { id: '07', t: 'Add item, collection, year out of range', refs: 'ITEM-01, OQ-6, OQ-19. Both years optional, any order, 1900 to this year + 50. The sheet stays open for the next item.',
+    f: s => openList(s, { fabOn: false, overlay: sheetItem(s, { title: s.addItem, name: 'Candle', y: '1992', r: '1890', rErr: true, focus: 'r', kbd: true }) }) },
+  { id: '08', t: 'Edit item', refs: 'ITEM-02, ITEM-03. Clearing a year removes it; clearing the name keeps the old one with an error. Remove is here, and the "I have it" box with its label.',
+    f: s => openList(s, { fabOn: false, overlay: sheetItem(s, { title: s.editItem, name: 'Star', y: '1985', r: '2015', edit: true }) }) },
+  { id: '09', t: 'Item removed, undo', refs: 'ITEM-03, OQ-10: no confirmation, undo in the snackbar. The same snackbar style carries the SYNC-02 messages.',
+    f: s => openList(s, { items: ITEMS.filter(i => i.n !== 'Heart'), fabOn: false, overlay: snack(s.removed('Heart'), s.undo) }) },
+  { id: '10', t: 'List menu, no household', refs: 'LIST-03, LIST-04, VIS-02, OQ-20: Share is disabled with the reason. A list creator in a household sees Share (or Stop sharing); others never see Stop sharing.',
+    f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}<div class="center"><div class="bubble">${ic('playlist_add')}</div>
+      <div class="t-titleLarge">${s.emptyListTitle}</div></div><div class="menu t-bodyLarge" style="top:56px;right:8px">
+      <div class="mi">${ic('edit')}<span>${s.rename}</span></div>
+      <div class="mi">${ic('group_add', 'dis')}<span><span class="dis">${s.share}</span><span class="disnote t-bodySmall">${s.needHousehold}</span></span></div>
+      <div class="mi danger">${ic('delete')}<span>${s.deleteList}</span></div></div>` },
+  { id: '11', t: 'Delete list', refs: 'LIST-04, OQ-10: confirmation first, naming the list and its number of items.',
+    f: s => openList(s, { overlay: dialog({ icon: 'delete', title: s.deleteListQ, body: s.deleteListBody('Christmas mobiles', 30),
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.delete}</span>` }) }) },
+  { id: '12', t: 'Share with household', refs: 'VIS-02, VIS-04. Creator of a private list who is in a household. Sharing and stopping sharing need a connection (33).',
+    f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}<div class="center"></div>${dialog({ icon: 'group_add', title: s.shareQ(HH), body: s.shareBody,
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.shareBtn}</span>` })}` },
+  { id: '13', t: 'Open list, empty (collection)', refs: 'ITEM-05, VIS-01. A collection: progress line shows "No items yet" until the first item. A plain list shows only "Add the first item." (no years).',
+    f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}<div class="head t-bodyMedium var meta"><span>${s.noItems}</span><span>·</span><span class="meta" style="gap:4px">${
+      ic('lock').replace('class="ms ', 'style="font-size:16px" class="ms ')}${s.private}</span><span>·</span><span>${s.collection}</span></div>
+      <div class="center"><div class="bubble">${ic('playlist_add')}</div><div class="t-titleLarge">${s.emptyListTitle}</div>
+      <div class="t-bodyMedium var">${LISTS[3].type === 'plain' ? s.emptyPlainBody : s.emptyCollBody}</div></div>${fab(s.addItem)}` },
+  { id: '14', t: 'Household, none yet', refs: 'HH-01, HH-03, OQ-1, OQ-22 (creating needs a connection). Empty name: field error.',
+    f: s => `${topbar(s.household, { back: true })}<div class="center" style="justify-content:flex-start;padding-top:var(--sp-xl)">
+      <div class="bubble">${ic('home')}</div><div class="t-titleLarge">${s.hhNoneTitle}</div><div class="t-bodyMedium var">${s.hhNoneBody}</div>
+      <div style="width:100%;text-align:left;margin-top:var(--sp-s)">${field({ label: s.hhName, value: 'Vestergade 12', state: 'focus', caret: true })}</div>
+      <span class="btn filled wide t-labelLarge">${s.createHh}</span>
+      <div class="divider" style="width:100%;margin:var(--sp-l) 0 var(--sp-s)"></div>
+      <div class="t-titleMedium">${s.haveLink}</div><div class="t-bodyMedium var">${s.haveLinkBody}</div></div>` },
+  { id: '15', t: 'Household members (household owner)', refs: 'HH-02, HH-04, HH-06. Member menu open. A plain member sees Leave household instead of Delete and no member menu. All of these need a connection (OQ-22).',
+    f: s => `${topbar(s.household, { back: true })}<div class="head"><div class="t-headlineSmall">${HH}</div><div class="t-bodyMedium var">${s.members(3)}</div></div>
+      <div class="row"><span class="avatar lg">S</span><div class="txt"><div class="t-bodyLarge">Sam Jensen (${s.you})</div><div class="t-bodyMedium var">${s.owner}</div></div></div>
+      <div class="row"><span class="avatar lg sec">A</span><div class="txt"><div class="t-bodyLarge">Anna Jensen</div><div class="t-bodyMedium var">${s.member}</div></div>${iconBtn('more_vert')}</div>
+      <div class="row"><span class="avatar lg ter">M</span><div class="txt"><div class="t-bodyLarge">Mikkel</div><div class="t-bodyMedium var">${s.member}</div></div>${iconBtn('more_vert')}</div>
+      <div class="menu t-bodyLarge" style="top:262px;right:16px"><div class="mi">${ic('shield_person')}<span>${s.makeOwner}</span></div><div class="mi danger">${ic('person_remove')}<span>${s.removeMember}</span></div></div>
+      <div class="section t-titleMedium">${s.openInvites}</div>
+      <div class="row">${ic('link', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.inviteLink}</div><div class="t-bodyMedium var">${s.expiresIn(6)}</div></div><span class="btn text t-labelLarge">${s.revoke}</span></div>
+      <div style="padding:var(--sp-s) var(--sp-l)"><span class="btn filled wide t-labelLarge">${ic('share')}${s.invite}</span></div>
+      <div style="padding:0 var(--sp-l)"><span class="btn text danger wide t-labelLarge">${s.deleteHh}</span></div>` },
+  { id: '16', t: 'Join household', refs: 'HH-03, OQ-16. Opened from an invite link, after sign-in if needed. Joining needs a connection (OQ-22).',
+    f: s => `${topbar('', { close: true })}<div class="center"><div class="bubble">${ic('home')}</div><div class="t-bodyLarge var">${s.invited}</div>
+      <div class="t-headlineSmall">${HH}</div><div class="t-bodyMedium var">${s.joinBody}</div>
+      <div class="stack"><span class="btn filled wide t-labelLarge">${s.join}</span><span class="btn text wide t-labelLarge">${s.notNow}</span></div></div>` },
+  { id: '17', t: 'Invite link does not work', refs: 'HH-03, SYNC-03. The same layout says "leave your household first" and "this needs a connection", each with its own text.',
+    f: s => `${topbar('', { close: true })}<div class="center"><div class="bubble">${ic('link_off')}</div><div class="t-titleLarge">${s.linkDead}</div>
+      <div class="t-bodyMedium var">${s.linkDeadBody}</div><div class="stack"><span class="btn tonal wide t-labelLarge">${s.toLists}</span></div></div>` },
+  { id: '18', t: 'Account', refs: 'AUTH-03, AUTH-04, AUTH-09, OQ-31. Password account shown; a Google account has no password rows. No language row: v1 uses only Android per-app language (OQ-12). Sign out removes the local copy (OQ-13, assumed).',
+    f: s => `${topbar(s.account, { back: true })}<div class="row" style="padding:var(--sp-l)"><span class="avatar lg">S</span><div class="txt"><div class="t-titleMedium">Sam Jensen</div><div class="t-bodyMedium var">sam@example.com</div></div></div>
+      <div class="divider"></div>
+      <div class="row">${ic('password', 'lead')}<div class="txt t-bodyLarge">${s.changePw}</div>${ic('chevron_right', 'lead')}</div>
+      <div class="row">${ic('phonelink_lock', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.twoStep}</div><div class="t-bodyMedium var">${s.off}</div></div>${ic('chevron_right', 'lead')}</div>
+      <div class="row">${ic('home', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.household}</div><div class="t-bodyMedium var">${HH}</div></div>${ic('chevron_right', 'lead')}</div>
+      <div class="divider"></div>
+      <div class="row">${ic('logout', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.signOut}</div><div class="t-bodyMedium var">${s.signOutNote}</div></div></div>
+      <div class="row" style="color:var(--error)">${ic('delete_forever')}<div class="txt t-bodyLarge">${s.deleteAccount}</div></div>
+      <div class="t-bodySmall var" style="margin-top:auto;padding:var(--sp-l);text-align:center">Tally 1.0</div>` },
+  { id: '19', t: 'Delete account', refs: 'AUTH-04, OQ-5. A household owner with other members is first told to transfer ownership; nothing is deleted. Needs a connection.',
+    f: s => `${topbar(s.account, { back: true })}${dialog({ icon: 'delete_forever', title: s.deleteAccountQ, body: s.deleteAccountBody,
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.deleteAccount}</span>` })}` },
+  { id: '20', t: 'Household deleted notice', refs: 'HH-06, OQ-17. Shown once to each list creator at the next app start.',
+    f: s => `${listsBar(s)}<div class="scroll" style="padding-top:var(--sp-s)">${LISTS.filter(l => !l.by).map(l => listRow(s, { ...l, shared: false })).join('')}</div>${dialog({
+      icon: 'info', title: s.hhDeleted, body: s.hhDeletedBody(HH), acts: `<span class="btn text">${s.ok}</span>` })}` },
+  { id: '21', t: 'Invite link without the app (web page)', refs: 'HH-02, HH-03, OQ-21. A plain web page in the phone browser; host and address not decided (owner item).',
+    f: s => `<div class="browser t-bodyMedium"><span class="url">${ic('lock').replace('class="ms ', 'style="font-size:16px" class="ms ')}&lt;host not decided&gt;/join/…</span>${iconBtn('more_vert')}</div>
+      <div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-s)">${s.webTitle}</div><div class="t-bodyLarge var">${s.webBody}</div>
+      <div class="stack"><span class="btn filled wide t-labelLarge">${ic('shop')}${s.webPlay}</span></div><div class="t-bodySmall var">${s.webSmall}</div></div>` },
+  { id: '22', t: 'Plain list', refs: 'List types (owner, 2026-11-16): a plain list has name and the check only, sorted by name; same progress, filter and offline bar as a collection.',
+    f: s => openList(s, { l: LISTS[1], items: PLAIN }) },
+  { id: '23', t: 'Add item, plain list', refs: 'ITEM-01 for a plain list: the name only; the sheet stays open for the next item. Edit (08) is the same without years.',
+    f: s => openList(s, { l: LISTS[1], items: PLAIN, fabOn: false, overlay: sheetItem(s, { title: s.addItem, name: 'Kaffeb', focus: 'n', plain: true }) }) },
+  { id: '24', t: 'Sign in with email, wrong email or password', refs: 'AUTH-07. One message that never says which part was wrong or whether the account exists. No connection: "This needs a connection".',
+    f: s => auth(s.signInBtn, '', `${field({ label: s.email, value: 'sam@example.com' })}${pw(s.password, 14, { state: 'err', trail: 'error' })}${support(s.wrongCreds, true)}
+      <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-l)">${s.signInBtn}</span>${linkRow(`<span class="btn text t-labelLarge">${s.forgot}</span>`, `<span class="var">${s.noAccount}</span> <span class="btn text t-labelLarge">${s.createAccount}</span>`)}`) },
+  { id: '25', t: 'Sign in with email, too many attempts', refs: 'AUTH-07, AUTH-09. After many failed attempts (also wrong codes): the message replaces the error until the server allows tries again.',
+    f: s => auth(s.signInBtn, '', `${field({ label: s.email, value: 'sam@example.com' })}${pw(s.password, 14)}
+      <div class="row card" style="margin:var(--sp-s) 0;background:var(--errorContainer);color:var(--onErrorContainer)">${ic('timer')}<div class="txt t-bodyMedium">${s.tooMany}</div></div>
+      <span class="btn filled wide t-labelLarge" style="opacity:.38">${s.signInBtn}</span>${linkRow(`<span class="btn text t-labelLarge">${s.forgot}</span>`)}`) },
+  { id: '26', t: 'Create account, password too short', refs: 'AUTH-05, OQ-26: at least 12 characters and no other rules. Invalid email: field error. An existing email never makes a second account (AUTH-10).',
+    f: s => auth(s.createAccount, '', `${field({ label: s.email, value: 'kim@example.com' })}${pw(s.password, 8, { state: 'err', trail: 'error', caret: true })}${support(s.pwShort, true)}
+      <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-l)">${s.createAccount}</span>`) + '<div style="flex:1"></div>' },
+  { id: '27', t: 'Verify email', refs: 'AUTH-06. Continue before the link is opened: snackbar. Send again many times: "Try again later". Unverified users see this screen again at sign-in.',
+    f: s => `${topbar('', {})}<div class="center"><div class="bubble">${ic('mark_email_unread')}</div><div class="t-titleLarge">${s.checkEmail}</div>
+      <div class="t-bodyMedium var">${s.checkEmailBody('kim@example.com')}</div><div class="stack"><span class="btn filled wide t-labelLarge">${s.cont}</span>
+      <span class="btn outlined wide t-labelLarge">${s.sendAgain}</span><span class="btn text wide t-labelLarge">${s.signOut}</span></div></div>${snack(s.notVerified)}` },
+  { id: '28', t: 'Reset password, link sent', refs: 'AUTH-08. The same message whether or not an account exists. The new password follows the 12-character rule on the Firebase default page (OQ-29).',
+    f: s => auth(s.resetTitle, s.resetBody, `${field({ label: s.email, value: 'sam@example.com' })}
+      <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-s)">${s.sendLink}</span>
+      <div class="row card" style="margin:var(--sp-l) 0 0;background:var(--secondaryContainer);color:var(--onSecondaryContainer)">${ic('mark_email_read')}<div class="txt t-bodyMedium">${s.resetSent}</div></div>`) },
+  { id: '29', t: 'Turn on two-step verification', refs: 'AUTH-09, OQ-24, OQ-28. Optional, password accounts only; asks for a recent sign-in first. The warning names no administrator.',
+    f: s => `${topbar(s.account, { back: true })}${dialog({ icon: 'phonelink_lock', title: s.tsQ, body: s.tsBody,
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.cont}</span>` })}` },
+  { id: '30', t: 'Two-step verification setup', refs: 'AUTH-09. QR code and key for an authenticator app; it is on only after a correct code.',
+    f: s => auth(s.twoStep, s.tsSetup, `${qr()}<div class="t-bodySmall var" style="text-align:center">${s.key}</div>
+      <div class="t-bodyLarge" style="text-align:center;letter-spacing:1px;font-family:monospace">JBSW Y3DP EHPK 3PXP</div>
+      ${field({ label: s.code, value: '4821', state: 'focus', caret: true })}<span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-s)">${s.turnOn}</span>`) },
+  { id: '31', t: 'Two-step code at sign-in', refs: 'AUTH-09, AUTH-04. After the password, and when signing in again before deleting the account or changing the password. Wrong code: field error.',
+    f: s => auth(s.codeTitle, s.codeBody, `${field({ label: s.code, value: '', ph: '000 000', state: 'focus', caret: true })}
+      <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-s)">${s.verify}</span>`) },
+  { id: '32', t: 'Change password', refs: 'OQ-31: changing the password is in v1, after signing in again (plus a code if two-step is on). New password: at least 12 characters.',
+    f: s => auth(s.changePw, s.changePwNote, `${pw(s.currentPw, 14)}${pw(s.newPw, 13, { state: 'focus', caret: true })}${support(s.pwRule)}
+      <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-l)">${s.changePw}</span>`) },
+  { id: '33', t: 'Share while offline', refs: 'VIS-02, VIS-04, OQ-22 (owner, 2026-11-16): sharing and stopping sharing need a connection; nothing changes. List and item changes still work offline.',
+    f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}${offline(s, 1)}<div class="center"><div class="bubble">${ic('playlist_add')}</div>
+      <div class="t-titleLarge">${s.emptyListTitle}</div></div>${snack(s.needsConnection)}` },
+];
+
+/* ---------- Token plumbing ---------- */
+function themeVars(T, theme) {
+  const v = [];
+  for (const [k, c] of Object.entries(T.color[theme])) v.push(`--${k}:${c}`);
+  for (const [k, t] of Object.entries(T.type)) v.push(`--${k}-size:${t.size}px`, `--${k}-lh:${t.lineHeight}px`, `--${k}-w:${t.weight}`);
+  for (const [k, n] of Object.entries(T.spacing)) v.push(`--sp-${k}:${n}px`);
+  for (const [k, n] of Object.entries(T.shape)) v.push(`--sh-${k}:${n}px`);
+  for (const [k, n] of Object.entries(T.size)) v.push(`--sz-${k}:${n}px`);
+  return v.join(';');
+}
+const phone = (T, theme, lang, sc) => `<div class="phone ${theme}" lang="${lang}" style="${themeVars(T, theme)}">
+  <div class="status"><span>9:41</span><span>${ic('signal_cellular_alt')} ${ic('wifi')} ${ic('battery_full')}</span></div>
+  <div class="body">${sc.f(S[lang])}</div><div class="gesture"></div></div>`;
+const shot = (T, sc, theme) => `<section class="shot" id="s${sc.id}-${theme}"><div class="cap"><span class="num">${sc.id}</span><span class="ttl">${sc.t}</span>
+  <span class="th">${theme === 'dark' ? 'Dark theme' : 'Light theme'} · draft, not approved</span></div><p class="refs">${sc.refs}</p>
+  <div class="pair"><figure>${phone(T, theme, 'en', sc)}<figcaption>English</figcaption></figure><figure>${phone(T, theme, 'da', sc)}<figcaption>Dansk</figcaption></figure></div></section>`;
+
+function lum(h) {
+  const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(x => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+
+function tokensSheet(T) {
+  const panel = th => {
+    const C = T.color[th];
+    const sw = Object.entries(C).map(([k, c]) => {
+      const fg = ratio(c, '#000000') > ratio(c, '#FFFFFF') ? '#000000' : '#FFFFFF';
+      return `<div class="sw" style="background:${c};color:${fg}"><b>${k}</b>${c}</div>`;
+    }).join('');
+    const rows = T.contrastPairs.map(p => {
+      const r = ratio(C[p.fg], C[p.bg]);
+      return `<tr><td><span style="background:${C[p.bg]};color:${C[p.fg]};padding:1px 6px;border-radius:4px">Aa 12 af 30</span></td><td>${p.fg} on ${p.bg}</td><td>${r.toFixed(2)}</td><td>${r >= p.min ? 'pass' : 'FAIL'} (min ${p.min})</td></tr>`;
+    }).join('');
+    return `<div class="tpanel" style="background:${C.surface};color:${C.onSurface}"><h2 style="margin-top:0">${th === 'light' ? 'Light' : 'Dark'}</h2>
+      <div class="swgrid">${sw}</div><h2>Contrast pairs (WCAG AA)</h2><table class="ttable"><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>Result</th></tr>${rows}</table></div>`;
+  };
+  const types = Object.entries(T.type).map(([k, t]) => `<div class="typerow"><span class="k">${k} · ${t.size}/${t.lineHeight} sp · ${t.weight}</span>
+    <span style="font-size:${t.size}px;line-height:${t.lineHeight}px;font-weight:${t.weight}">Genudgivelsesår 1985 · Re-release year</span></div>`).join('');
+  const sp = Object.entries(T.spacing).map(([k, n]) => `<div class="typerow"><span class="k">spacing.${k} · ${n} dp</span><span class="bar" style="width:${n * 4}px;background:${T.color.light.primary}"></span></div>`).join('');
+  const sh = Object.entries(T.shape).map(([k, n]) => `<div style="text-align:center;font-size:12px"><div style="width:72px;height:48px;border-radius:${n}px;background:${T.color.light.primaryContainer};border:1px solid ${T.color.light.outline};margin:0 auto 4px"></div>shape.${k} · ${n} dp</div>`).join('');
+  const sz = Object.entries(T.size).map(([k, n]) => `<tr><td>size.${k}</td><td>${n} dp</td></tr>`).join('') + Object.entries(T.motion).map(([k, n]) => `<tr><td>motion.${k}</td><td>${n} ms</td></tr>`).join('');
+  return `<section class="tsheet"><h1>Tally design tokens</h1><p class="sub">Read from design/tokens.json · ${T.meta.units} · font: ${T.meta.font} · draft, not approved</p>
+    <div class="tcols">${panel('light')}${panel('dark')}</div>
+    <div class="tcols"><div style="flex:3"><h2>Type scale (sp)</h2>${types}</div><div style="flex:2"><h2>Spacing (dp)</h2>${sp}
+    <h2>Shape (corner radius, dp)</h2><div style="display:flex;gap:16px">${sh}</div><h2>Sizes and motion</h2><table class="ttable">${sz}</table></div></div></section>`;
+}
+
+/* ---------- Page ---------- */
+/* Text from the URL or an error is shown with textContent, never through innerHTML (scripts/wireframes_safety.py). */
+function showText(msg) {
+  const p = document.createElement('p');
+  p.style.padding = '24px';
+  p.textContent = msg;
+  document.getElementById('app').replaceChildren(p);
+}
+function render(T) {
+  const app = document.getElementById('app');
+  const one = params.get('screen');
+  if (one === 'tokens') { app.innerHTML = tokensSheet(T); return; }
+  if (one) {
+    const sc = SCREENS.find(x => x.id === one);
+    const shotTheme = params.get('theme') === 'dark' ? 'dark' : 'light';
+    if (sc) { document.documentElement.dataset.theme = shotTheme; app.innerHTML = shot(T, sc, shotTheme); }
+    else showText(`No screen ${/^[a-z0-9-]{1,40}$/i.test(one) ? one : '?'}`);
+    return;
+  }
+  let theme = 'light';
+  try { theme = storedTheme(localStorage.getItem('tally-wf-theme')); } catch (e) { /* storage may be blocked */ }
+  const draw = () => {
+    app.innerHTML = `<div class="gallery"><h1>Tally v1 wireframes</h1><p class="intro">Status: working draft, not owner-approved (open: T2, R1, screen 32a; see issue #15). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225).</p><p class="intro">Draft for the owner's sign-off (task M0.5-03). Each screen is shown in English and Danish.
+      Numbers match the review sheet in the pull request. Story ids refer to docs/product/stories.md, OQ ids to its open and decided questions.</p>
+      <div class="toolbar"><button data-t="light" aria-pressed="${theme === 'light'}">Light</button><button data-t="dark" aria-pressed="${theme === 'dark'}">Dark</button>
+      <button data-t="tokens" aria-pressed="${theme === 'tokens'}">Tokens</button></div>
+      ${theme === 'tokens' ? tokensSheet(T) : SCREENS.map(sc => shot(T, sc, theme)).join('')}</div>`;
+    document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+    app.querySelectorAll('.toolbar button').forEach(b => b.addEventListener('click', () => {
+      theme = b.dataset.t;
+      try { localStorage.setItem('tally-wf-theme', theme); } catch (e) { /* ignore */ }
+      draw();
+    }));
+  };
+  draw();
+}
+
+fetch(TOKENS_URL).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(data => render(escDeep(data)))
+  .catch(e => showText(`Could not read ${TOKENS_URL} (${e}). Serve the repository root over HTTP.`));
+</script>
+</body>
+</html>
