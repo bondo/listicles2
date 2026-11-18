@@ -2,6 +2,7 @@ package dev.listicles.architecture
 
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -98,6 +99,100 @@ class UiNoRawValuesTest {
     @Test
     fun rejectsSpFromIntVariable() {
         violationsOf("val n = 3\nval p = n.sp").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsEmLiteral() {
+        violationsOf("val s = 1.em").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsFractionalEmLiteral() {
+        violationsOf("val s = 0.5.em").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsEmFromIntVariable() {
+        violationsOf("val n = 3\nval s = n.em").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsIdentifiersThatOnlyStartWithEm() {
+        violationsOf("val a = item.emit()\nval b = list.empty\nval c = text.emoji\nval d = em").shouldBeEmpty()
+    }
+
+    @Test
+    fun acceptsEmImportAndComment() {
+        violationsOf("import androidx.compose.ui.unit.em\n// 2.em is wrong\nval a = 1").shouldBeEmpty()
+    }
+
+    @Test
+    fun allowsEmInTheThemePackage() {
+        violationsOf("val s = 2.em", "theme/Type.kt").shouldBeEmpty()
+    }
+
+    @Test
+    fun rejectsColorWithNamedColorArgument() {
+        violationsOf("val c = Color(color = 0xFF112233)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsColorWithNamedValueArgument() {
+        violationsOf("val c = Color(value = 0xFF112233uL)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsColorWithNamedArgumentFromAVariable() {
+        violationsOf("val n = 1\nval c = Color(color = n)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsColorWhoseFirstNamedArgumentIsNotRed() {
+        violationsOf("val c = Color(blue = 1f, red = 0f, green = 0f)").shouldNotBeEmpty()
+        violationsOf("val c = Color(alpha = 1f, red = 0f, green = 0f, blue = 0f)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsColorWhoseArgumentsStartOnTheNextLine() {
+        violationsOf("val a = Color(\n    0xFF112233,\n)").shouldNotBeEmpty()
+        violationsOf("val b = Color(\n    color = 0xFF112233,\n)").shouldNotBeEmpty()
+        violationsOf("val c = Color(\n    red = 1f,\n    green = 0f,\n    blue = 0f,\n)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun reportsTheLineWhereAMultiLineColorCallStarts() {
+        violationsOf("val a = 1\nval c = Color(\n    0xFF112233,\n)").single().shouldContain(":4:")
+    }
+
+    @Test
+    fun rejectsNamedColorConstants() {
+        listOf("Red", "Green", "Blue", "Yellow", "Cyan", "Magenta", "Black", "White", "Gray", "LightGray", "DarkGray")
+            .forEach { name -> violationsOf("val c = Color.$name").shouldNotBeEmpty() }
+    }
+
+    @Test
+    fun rejectsNamedColorConstantWithItsPackage() {
+        violationsOf("val c = androidx.compose.ui.graphics.Color.Red").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsTransparentAndUnspecifiedColorConstants() {
+        violationsOf("val a = Color.Transparent\nval b = Color.Unspecified").shouldBeEmpty()
+    }
+
+    @Test
+    fun acceptsNamesThatOnlyLookLikeColorCalls() {
+        violationsOf(
+            "val a = Color.Redwood\nval b = MyColor.Red\nval c = BrandColor(color = 1)\nval d = Color.Red2",
+        ).shouldBeEmpty()
+    }
+
+    @Test
+    fun allowsColorConstantsAndColorCallsInTheThemePackage() {
+        violationsOf(
+            "val a = Color.Red\nval b = Color(color = 1)\nval c = Color(\n    0xFF112233,\n)",
+            "theme/Tokens.kt",
+        ).shouldBeEmpty()
     }
 
     @Test
