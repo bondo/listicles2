@@ -707,7 +707,8 @@ near limit (7-day), ok.
   days away: say so in the `PAUSED` comment and ask the owner whether to wait.
 * **near limit (5-hour)**: `status` is `allowed_warning` and `rateLimitType` is `five_hour`, **or missing or unknown** (an unknown type
   is treated as the strict case; write `rateLimitType unknown` in the `Usage:` line). **Start no new worker and no review round**, let
-  the running ones finish their current step, and set one extra check-in about 10 minutes out. The second look reads `rate_limit_info`
+  the running ones finish their current step, and set one extra check-in about 10 minutes out, only if none is pending (a later wake during
+  the warning sets none, so the second look is never pushed back). The second look is the first wake at least 10 minutes after the warning was first seen. It reads `rate_limit_info`
   only: if it still shows the warning, run the pause protocol (§7.7.2); if it no longer does, the state is whatever §7.7.1 then says
   (a state raised by the cost forecast, `near limit (5-hour, forecast)`, never pauses by itself). A limit failure is not this state: it is
   **limit reached**.
@@ -757,16 +758,15 @@ but say so in the `Usage:` line.
 * log one `usage-limit` incident row (§6.3) for the pause, not one per session; start the pause protocol (§7.7.2) if not already paused, otherwise add the session to the `PAUSED` comment (§7.7.2 step 5);
 * a failure whose detail names something else still counts as a failure, limit or no limit.
 
-**§7.7.4 Resume** (the reminder wake, or a successor that finds a `PAUSED` comment with no `RESUMED` after it):
+**§7.7.4 Resume** (the reminder wake, or a successor that finds a `PAUSED` comment with no `RESUMED` after it). §7.7.4 does nothing if the newest `PAUSED` comment already has a `RESUMED` after it (an early resume, §7.7.2 step 6, already ran and the reminder fired late): end the turn.
 1. `get_session` (own) and redo §7.7.1: if the state is still **limit reached** or **near limit (5-hour)**, set `Usage:` to the new
-   `paused until HH:MM UTC`, post one line, `send_later` at the new `resetsAt + 5 minutes` (delete the spent reminder) and stop.
-   Otherwise continue.
-2. For each session on the `interrupted:` and `limit-failed:` lines of the newest `PAUSED` comment: `get_session`, then `send_message`
+   `paused until HH:MM UTC`, post one line, `send_later` at the new `resetsAt` + 5 minutes (60 minutes from now if `resetsAt` is missing or already past, as in §7.7.2 step 1),
+   delete the old reminder, whether or not it fired, and stop. Otherwise continue.
+2. For each session on the `interrupted:` and `limit-failed:` lines of the newest `PAUSED` comment: `get_session`. Skip a session whose `WORKER-RESULT` is already posted (collect it instead, §7.3). `send_message` the others
    "usage limit reset: continue from your last pushed commit and finish your task" (priority `later`). Reviewers: "re-check your
    findings comment and finish the round". A session that has gone (archived, no longer reachable) is a normal dead worker (§7.4),
    respawned from `handoff/<branch>.md` and the pushed branch. Resume implementers before reviewers.
-3. **Re-arm the 45-minute check-in** and the post-spawn checks of anything resumed; record the trigger ids; delete the spent
-   resume reminder.
+3. **Re-arm the 45-minute check-in** and the post-spawn checks of anything resumed; record the trigger ids; delete the resume reminder, whether or not it fired.
 4. Post a `RESUMED` comment (one line: time, who was resumed, who was respawned), set `Usage:` from a fresh §7.7.1 read (it may well be `near limit (7-day)`), then run the
    normal wake steps (§4.3 ready query, §7.6 inbox and accident check). The PRs listed as open in `PAUSED` are re-read from GitHub,
    not trusted from the comment.
@@ -776,7 +776,7 @@ but say so in the `Usage:` line.
 * **Track cost per round and per window:** the session row (§6.1, reviewer sessions are one per round) carries `cost_usd`. Once
   `scripts/agent_metrics.py` (M0.5-13) has produced `docs/agent-metrics.csv`, sum it; for rounds not saved there yet sum the `metrics:session` comments.
   At each pause, put the cost of the sessions active in the closing window (summed from `get_session` usage, never estimated) in the
-  `usage-limit` incident row's `impact`. Compare the running window cost with the last two such rows at every wake: when it passes the
+  `usage-limit` incident row's `impact`. The window is from `resetsAt` minus 5 hours (`five_hour`) or from the last `RESUMED` comment (any other `rateLimitType`), up to now. Compare the running window cost with the last two such rows at every wake: when it passes the
   smaller one, set `Usage:` to **near limit (5-hour, forecast)** early (§7.7.1: no new workers, an extra check-in; the second look reads `rate_limit_info` only, so a forecast never pauses by itself). The numbers are a rough forecast; `rate_limit_info` decides.
 
 **§7.7.6 Throttle order.** Concurrency is limited for flow, not cost (§7.1), so throttle only near a rate limit. A 7-day `allowed_warning` holds at stage 1 and required work goes on; stage 2 applies in overage; stage 3 only on an owner decision in #15 (a 5-hour warning or a reached limit pauses, §7.7.2).

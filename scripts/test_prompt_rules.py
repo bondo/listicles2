@@ -485,7 +485,7 @@ class M025Tests(unittest.TestCase):
     def test_limit_failure_and_resume_weakened(self):
         for old, new in (
             ("a limit failure is not a stall", "a limit failure is a stall"), ("no respawn", "respawn"),
-            ("two-failure stop", "x"), ("`RESUMED`", "a comment"),
+            ("two-failure stop", "x"), ("post `RESUMED`", "post a comment"),
         ):
             self.assert_fails("orchestrator", "usage-limit-failure", old, new)
 

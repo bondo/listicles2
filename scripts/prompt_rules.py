@@ -198,7 +198,7 @@ RULES = (
     ),
     Rule(
         "usage-limit-failure", ("orchestrator",),
-        (r"a limit failure is not a stall", r"no respawn", r"two-failure stop", r"§7\.7\.4", r"`RESUMED`"),
+        (r"a limit failure is not a stall", r"no respawn", r"two-failure stop", r"§7\.7\.4", r"post `RESUMED`"),
         "a limit failure is not a stall (no respawn, not counted); resume per §7.7.4 and post RESUMED (§7.7.3)",
     ),
     Rule(
