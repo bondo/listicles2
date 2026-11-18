@@ -10,15 +10,24 @@ updates:
     directory: /firebase
     schedule: { interval: weekly }
     groups:
+      # firebase and @firebase/rules-unit-testing have tied peer ranges (rules-unit-testing N needs firebase ^N), so they arrive in one PR.
+      # This group is listed first: a dependency joins the first group it matches, so the catch-all below never splits them.
+      firebase-sdk:
+        patterns: ["firebase", "@firebase/rules-unit-testing"]
       npm-minor-patch:
         update-types: [minor, patch]
     # TypeScript 7 is not supported by ts-jest (typescript <7) or typescript-eslint (typescript <6.1), so a major bump
     # fails the firebase job. Revisit when both support it, then remove this ignore and bump TypeScript by hand.
-    # firebase is not ignored: firebase, @firebase/rules-unit-testing and the Temporal lib in firebase/tsconfig.json move together
-    # (issue 106). A firebase major needs a matching @firebase/rules-unit-testing major (peer firebase ^N.0.0), so bump them by hand.
+    # firebase and @firebase/rules-unit-testing: majors are ignored, minor and patch updates flow (grouped, see firebase-sdk). firebase 13
+    # and rules-unit-testing 6 require Node >=24.12 but CI runs Node 22, and firebase 12.19 and later typings need the Temporal lib in
+    # firebase/tsconfig.json. Revisit with the Node 24 move (issue 161), then remove these two ignores and bump both by hand.
     # @types/node 26 declares APIs that the Node 22 used in CI lacks. Revisit when CI moves to a newer Node LTS.
     ignore:
       - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: firebase
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@firebase/rules-unit-testing"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
