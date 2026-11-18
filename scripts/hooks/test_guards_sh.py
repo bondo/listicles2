@@ -1502,6 +1502,126 @@ class LineLengthDiffs(DiffCase):
         self.assertPasses()
 
 
+class WeakerPresets(DiffCase):
+    """#46: a lint preset swapped for a weaker one (strictTypeChecked, strict, recommendedTypeChecked, recommended, in that order)."""
+
+    FLAT = "firebase/eslint.config.mjs"
+
+    def flat(self, *presets):
+        return "export default defineConfig({\n    extends: [" + ", ".join(presets) + "],\n});\n"
+
+    def test_swapping_a_flat_config_preset_for_a_weaker_one_fails(self):
+        order = ["strictTypeChecked", "strict", "recommendedTypeChecked", "recommended"]
+        for i, strong in enumerate(order):
+            for weak in order[i + 1:]:
+                with self.subTest(strong=strong, weak=weak):
+                    self.base(self.FLAT, self.flat("eslint.configs.recommended", f"tseslint.configs.{strong}"))
+                    self.change(self.FLAT, self.flat("eslint.configs.recommended", f"tseslint.configs.{weak}"))
+                    self.assertFails("guard: weaker lint preset:")
+
+    def test_removing_the_preset_fails(self):
+        self.base(self.FLAT, self.flat("eslint.configs.recommended", "tseslint.configs.strictTypeChecked"))
+        self.change(self.FLAT, self.flat("eslint.configs.recommended"))
+        self.assertFails("guard: weaker lint preset:")
+
+    def test_eslintrc_plugin_presets_count_too(self):
+        self.base(".eslintrc.json", '{ "extends": ["plugin:@typescript-eslint/strict-type-checked"] }\n')
+        self.change(".eslintrc.json", '{ "extends": ["plugin:@typescript-eslint/recommended"] }\n')
+        self.assertFails("guard: weaker lint preset:")
+
+    def test_stronger_equal_moved_and_unrelated_presets_pass(self):
+        self.base(self.FLAT, self.flat("eslint.configs.recommended", "tseslint.configs.recommended"))
+        self.change(self.FLAT, self.flat("eslint.configs.recommended", "tseslint.configs.strictTypeChecked"))
+        self.assertPasses()
+        self.change(self.FLAT, self.flat("tseslint.configs.strictTypeChecked", "eslint.configs.recommended"))  # reordered
+        self.assertPasses()
+        self.change(self.FLAT, self.flat("eslint.configs.recommended", "tseslint.configs.strictTypeChecked", "tseslint.configs.stylistic"))
+        self.assertPasses()
+        self.change(self.FLAT, self.flat("eslint.configs.recommended", "tseslint.configs.strictTypeChecked").replace("    extends", "        extends"))
+        self.assertPasses()
+
+    def test_a_weaker_preset_of_another_plugin_does_not_hide_behind_a_stronger_one(self):
+        self.base(self.FLAT, self.flat("tseslint.configs.strictTypeChecked", "react.configs.strict"))
+        self.change(self.FLAT, self.flat("tseslint.configs.strictTypeChecked", "react.configs.recommended"))
+        self.assertFails("guard: weaker lint preset:")
+
+    def test_the_same_names_outside_eslint_config_files_pass(self):
+        self.base("app/src/main/kotlin/P.kt", "val p = tseslint.configs.strictTypeChecked\n")
+        self.change("app/src/main/kotlin/P.kt", "val p = tseslint.configs.recommended\n")
+        self.assertPasses()
+
+
+class NarrowedLists(DiffCase):
+    """#46: ruff select, tsconfig include and tsconfig exclude, compared with the base. Arrays may span lines."""
+
+    def test_dropping_a_ruff_select_item_fails(self):
+        for rel, text in [
+            ("ruff.toml", '[lint]\nselect = ["E", "F", "W"]\n'),
+            ("ruff.toml", '[lint]\nselect = [\n    "E",\n    "F",\n    "W",\n]\n'),
+            ("ruff.toml", "[lint]\nselect = ['E', 'F', 'W']\n"),
+            ("ruff.toml", 'lint.select = ["E", "F", "W"]\n'),
+            ("ruff.toml", '[lint]\nextend-select = ["E", "F", "W"]\n'),
+            ("pyproject.toml", '[tool.ruff.lint]\nselect = ["E", "F", "W"]\n'),
+        ]:
+            with self.subTest(file=rel, text=text):
+                self.base(rel, text)
+                self.change(rel, text.replace('"W"', '"E"').replace("'W'", "'E'").replace('    "W",\n', ""))
+                self.assertFails("guard: narrowed ruff select:")
+
+    def test_adding_reordering_or_widening_a_ruff_select_passes(self):
+        text = '[lint]\nselect = ["E", "F", "W"]\n'
+        self.base("ruff.toml", text)
+        self.change("ruff.toml", '[lint]\nselect = ["E", "F", "W", "B"]\n')
+        self.assertPasses()
+        self.change("ruff.toml", '[lint]\nselect = ["W", "F", "E"]\n')
+        self.assertPasses()
+        self.change("ruff.toml", '[lint]\nselect = ["ALL"]\n')
+        self.assertPasses()
+        self.change("ruff.toml", '[lint]\nselect = [\n    "E",\n    "F",\n    "W",\n]\n')
+        self.assertPasses()
+
+    def test_a_new_ruff_config_and_other_arrays_pass(self):
+        self.base("notes.txt", "hello\n")
+        self.change("ruff.toml", '[lint]\nselect = ["E"]\n')
+        self.assertPasses()
+        self.base("pyproject.toml", '[tool.other]\nitems = ["a", "b"]\n[tool.ruff.lint]\nselect = ["E"]\n')
+        self.change("pyproject.toml", '[tool.other]\nitems = ["a"]\n[tool.ruff.lint]\nselect = ["E"]\n')
+        self.assertPasses()
+
+    def test_dropping_a_tsconfig_include_entry_fails(self):
+        for rel, text in [
+            ("firebase/tsconfig.json", '{ "include": ["src/**/*.ts", "test/**/*.ts"] }\n'),
+            ("firebase/tsconfig.json", '{\n  "include": [\n    "src/**/*.ts",\n    "test/**/*.ts"\n  ]\n}\n'),
+            ("tsconfig.app.json", '{ "include": ["src/**/*.ts", "test/**/*.ts"] }\n'),
+        ]:
+            with self.subTest(file=rel, text=text):
+                self.base(rel, text)
+                self.change(rel, text.replace('"test/**/*.ts"', '"src/other.ts"').replace(', "src/other.ts"', "").replace(',\n    "src/other.ts"', ""))
+                self.assertFails("guard: narrowed tsconfig include:")
+
+    def test_adding_an_include_entry_or_dropping_an_exclude_entry_passes(self):
+        self.base("firebase/tsconfig.json", '{ "include": ["src/**/*.ts"], "exclude": ["node_modules", "dist"] }\n')
+        self.change("firebase/tsconfig.json", '{ "include": ["src/**/*.ts", "test/**/*.ts"], "exclude": ["node_modules"] }\n')
+        self.assertPasses()
+
+    def test_adding_a_tsconfig_exclude_entry_needs_a_justification(self):
+        self.base("firebase/tsconfig.json", '{ "exclude": ["node_modules"] }\n')
+        self.change("firebase/tsconfig.json", '{ "exclude": ["node_modules", "test"] }\n')
+        self.assertFails("guard: widened tsconfig exclude:")
+        self.change("firebase/tsconfig.json", '{ "exclude": ["node_modules", "test"] } // justified: tests have their own project\n')
+        self.assertPasses()
+        self.change("firebase/tsconfig.json", '{ "exclude": ["node_modules", "dist"] } // justified: ok\n'.replace("ok", "-"))
+        self.assertFails("guard: widened tsconfig exclude:")
+
+    def test_a_multi_line_exclude_needs_the_justification_on_the_added_entry(self):
+        nm = '"node_modules", // justified: dependencies are not ours'
+        self.base("firebase/tsconfig.json", '{\n  "exclude": [\n    ' + nm + '\n  ]\n}\n')
+        self.change("firebase/tsconfig.json", '{\n  "exclude": [\n    ' + nm + '\n    "dist" // justified: build output is generated\n  ]\n}\n')
+        self.assertPasses()
+        self.change("firebase/tsconfig.json", '{\n  "exclude": [\n    ' + nm + '\n    "dist" // justified: -\n  ]\n}\n')
+        self.assertFails("guard: ")
+
+
 class SkipLibCheck(GuardsCase):
     """#46: skipLibCheck hides errors in declaration files; it does not touch our own code, so a short justification is enough."""
 
