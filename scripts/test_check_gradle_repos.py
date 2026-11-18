@@ -218,6 +218,20 @@ class Wiring(unittest.TestCase):
         got = self.mutated(ci=[("  static:\n    name: static\n", "  static:\n    name: static\n    continue-on-error: true\n")])
         self.assertIn("ci.yml static job has if: or continue-on-error", got)
 
+    def test_step_level_if_is_flagged(self):
+        got = self.mutated(ci=[(f"        run: {CHECK_CMD}", f"        if: false\n        run: {CHECK_CMD}")])
+        self.assertEqual(got, ["ci.yml static job has if: or continue-on-error"])
+
+    def test_step_starting_with_if_is_flagged(self):
+        step = f"      - name: gradle repos\n        run: {CHECK_CMD}"
+        got = self.mutated(ci=[(step, f"      - if: false\n        name: gradle repos\n        run: {CHECK_CMD}")])
+        self.assertEqual(got, ["ci.yml static job has if: or continue-on-error"])
+
+    def test_next_job_key_with_a_comment_still_ends_the_static_job(self):
+        moved = [(f"      - name: gradle repos\n        run: {CHECK_CMD}\n", ""), ("  python-lint:\n", "  python-lint: # lint\n"),
+                 ("      - run: echo hi\n", f"      - run: {CHECK_CMD}\n")]
+        self.assertEqual(self.mutated(ci=moved), [f"ci.yml static job does not run `{CHECK_CMD}`"])
+
     def test_job_level_permissions_on_static_are_flagged(self):
         got = self.mutated(ci=[("  static:\n    name: static\n", "  static:\n    name: static\n    permissions:\n      contents: write\n")])
         self.assertTrue(any("permissions" in p for p in got), got)
