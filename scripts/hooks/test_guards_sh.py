@@ -1015,6 +1015,37 @@ class ThresholdProse(GuardsCase):
                 self.change(rel, "\n")
                 self.assertFails("guard: removed check setting:")
 
+    def test_quoted_words_that_run_code_or_sit_in_config_still_fail(self):
+        # PR 135 R3-01: shell/Makefile lines of only quoted words are commands, `$` and `{}` inside a literal run code,
+        # an f-string is code, and a quoted list element in a config file is a config value. Only a .py file counts.
+        for rel, line in (
+            ("scripts/x.sh", '"$ROOT/scripts/step" "coverage threshold check" "$ROOT/gradlew" "koverVerify"'),
+            ("scripts/x.sh", '"$STEP" "mutation threshold gate" "$GRADLEW" "pitest"'),
+            ("scripts/x.sh", '"$(fail_below threshold LOW)"'),
+            ("Makefile", '\t"$(PITEST)" "mutation threshold gate"'),
+            ("scripts/tool.py", 'f"{check threshold LOW}"'),
+            ("scripts/tool.py", '"${check threshold LOW}",'),
+            ("config/x.json", '["coverage threshold check"],'),
+            ("app/build.gradle.kts", '"coverage threshold check",'),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_only_markdown_is_prose_by_file_type(self):
+        # PR 135 R3-02: .txt and .rst files are gate config or code here (allowlists, pins, CMake), not prose.
+        for rel, line in (
+            ("scripts/gate.txt", "fail on threshold breach"),
+            ("config/licensee/x.txt", "coverage threshold check"),
+            ("CMakeLists.txt", "set(CHECK threshold ON)"),
+            ("app/x.rst", "val threshold by extra(LOW)"),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
     def test_a_line_of_only_string_literals_is_prose(self):
         self.base("scripts/tool.py", '    "never for gate or threshold changes",\n    ("a", r"also for gate or threshold changes"),\n')
         self.change("scripts/tool.py", "\n")
