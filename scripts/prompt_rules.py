@@ -587,7 +587,7 @@ RULES = (
         ),
         "the reviewer does the R9 visual check (agent score below 3 is a minor) and the R7 allow/deny matrix check (REVIEW.md items 12, 13; M0.5-26)",
         forbidden=(r"score below 3 is a `?(?:blocker|major)", r"below 3 (?:blocks|must block) the merge",
-                   r"a gap (?:in the matrix )?is (?:always )?(?:a |an )?`?blocker"),
+                   r"a (?:matrix )?gap (?:in the matrix )?is (?:always )?(?:a |an )?`?(?:minor|nit|blocker)"),
     ),
     Rule(
         "escalation-role", ("escalation-reviewer",),
