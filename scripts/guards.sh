@@ -170,9 +170,9 @@ sizecheck() { # sizecheck <git diff args>...: `git diff --raw` lists new modes a
     [ "$nm" = 160000 ] && continue # submodule pointer, not a file
     size=$(git cat-file -s "$nsha") || { bad "cannot read the size of $f"; continue; }
     lim=$MAX_FILE; why="1 MB"
-    case "$f" in # git paths are case-sensitive: only the extension is matched case-insensitively
+    case "$f" in # git paths are case-sensitive: only the extension is matched case-insensitively (no ${f,,}: macOS bash 3.2)
       docs/product/wireframes/*) ;;
-      *) case "${f,,}" in *.png) lim=$MAX_PNG; why="300 KB for a PNG outside docs/product/wireframes/" ;; esac ;;
+      *.[pP][nN][gG]) lim=$MAX_PNG; why="300 KB for a PNG outside docs/product/wireframes/" ;;
     esac
     [ "$size" -gt "$lim" ] && bad "file too large: $f is $size bytes (limit $lim bytes: $why). Git LFS is not adopted (docs/tasks.toml, M6-O4); shrink it, keep it out of the repo, or ask the owner"
   done < <(git diff --raw -z --no-abbrev --no-renames --diff-filter=AMT "$@")
