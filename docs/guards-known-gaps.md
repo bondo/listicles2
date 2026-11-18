@@ -19,7 +19,7 @@ reason is true and specific (`REVIEW.md`, item 8).
 | per-metric values on their own lines (`branches: 80,`) | the same check, in `jest`, `vitest` and `vite` config, `.nycrc` and `.c8rc` files only |
 | config embedded in `package.json` (`eslintConfig`, `eslintIgnore`, `prettier`, `jest`, `nyc`, `c8`) | refused (`embedded config`), top-level keys only (nested `overrides` and `peerDependenciesMeta` entries are dependency data); JSON has no comment for a justification, so no escape hatch |
 | `/* global foo */` | needs `justified:`; any block comment that starts with `global` or `globals` and a name, closed on the same line, in JS and TS files. ESLint reads `/* global state is kept */` as a directive too, so it is matched; an optional `-- description` is fine |
-| `line-length` raised (ruff, flake8, `.editorconfig`, detekt, prettier `printWidth`) | diff check `raised line length`: per style file the largest value of the setting family (`line-length`, `max-line-length`, `max_line_length`, `maxLineLength`, `printWidth`; quotes and comments ignored) against the merge base, so an added setting counts like an edited one; a value such as `off` counts as no limit; a deleted file is compared with the style files at `HEAD` |
+| `line-length` raised (ruff, flake8, `.editorconfig`, detekt, prettier `printWidth`) | diff check `raised line length`: per style file the largest value of the setting family (`line-length`, `max-line-length`, `max_line_length`, `maxLineLength`, `printWidth`; quotes and comments ignored) against the merge base, so an added setting counts like an edited one; a value such as `off` counts as no limit; a deleted file is compared with the style files of the same tool at `HEAD` (prettier, `.editorconfig`, detekt, ruff, flake8 kin) |
 | `strictTypeChecked` to `recommended` and the other ESLint presets | diff check `weaker lint preset`, ranked per plugin (strictTypeChecked > strict > recommendedTypeChecked > recommended); a renamed import alias reads as a removal |
 | ruff `select` shrinking | diff check `narrowed ruff select`: a head item that is a prefix of the removed one (`E` for `E4`, `PL` for `PLR`) or `ALL` covers it; no escape hatch |
 | tsconfig `include` narrowing, `exclude` growing | diff checks; a dropped `include` entry has no escape hatch, a new `exclude` entry needs `justified:` on its own line |
@@ -31,8 +31,10 @@ reason is true and specific (`REVIEW.md`, item 8).
   loosens the check and is not caught. A base file without the setting is not compared, because the tool default is not known. The largest
   value per file is compared, so one setting raised while another in the same file is lowered by more is missed. The same setting family
   split over two files that both stay (a `line-length` in ruff.toml, a new `max-line-length` in pyproject.toml) is not compared across
-  them. Follow-up issue proposal: compare the largest value per tool across all style files, once ruff and flake8 settings are mapped to
-  their defaults.
+  them. A raise below a larger value already in the same file is missed too: `[*.md] max_line_length = off` makes the base maximum "no
+  limit", and the ktlint property `ktlint_standard_max-line-length = enabled` is read as a `max-line-length` value, so as no limit.
+  Tracked in issue 176: compare the largest value per tool across all style files, once ruff and flake8 settings are mapped to their
+  defaults.
 - **A raised ESLint `max-len`**, a preset added that turns checks off (`tseslint.configs.disableTypeChecked`), and Vitest thresholds in a
   config file not named `jest|vitest|vite.config.*`, `.nycrc*` or `.c8rc*`.
 - **ruff `select` is read from every table** of ruff.toml or pyproject.toml, so another table's `select = ["W"]` keeps `W` counted as present. The

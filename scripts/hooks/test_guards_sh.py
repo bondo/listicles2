@@ -1600,6 +1600,7 @@ class LineLengthDiffs(DiffCase):
         self.repo.git("mv", "firebase/.prettierrc.json", "firebase/.prettierrc")
         self.repo.commit()
         self.assertPasses()
+        os.makedirs(os.path.join(self.repo.dir, "app"))
         self.repo.git("mv", ".editorconfig", "app/.editorconfig")
         self.repo.commit()
         self.assertPasses()

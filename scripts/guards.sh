@@ -283,7 +283,8 @@ narrowcheck() { # narrowcheck <merge-base>
 # 7. A raised line length (owner decision in #46). Per style config file the largest value of the setting family (line-length,
 # max-line-length, max_line_length, maxLineLength, printWidth; quotes and comments ignored, a word such as `off` counts as no limit)
 # is compared with the same file at the merge base, so an added setting counts as well as an edited one. A deleted file (rename or
-# move) is compared with the largest value in the style files at HEAD. Lowered or removed is stricter and passes. Not compared: a base
+# move) is compared with the largest value in the style files of the same tool at HEAD (prettier, editorconfig, detekt, ruff, flake8
+# and their kin each form one group). Lowered or removed is stricter and passes. Not compared: a base
 # without the setting (the tool default is not known), and the same family split over two files when neither is deleted.
 STYLERE='(ruff\.toml|pyproject\.toml|\.flake8|setup\.cfg|tox\.ini|\.editorconfig|detekt\.yml|prettierrc[^/]*|prettier\.config\.[^/]*)$'
 LL_AWK='{ lo = tolower($0); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
@@ -291,14 +292,23 @@ LL_AWK='{ lo = tolower($0); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
     lo = substr(lo, RSTART + RLENGTH); if (lo ~ /^[ \t]*$/) continue  # a YAML parent key (`MaxLineLength:`) has no value
     v = match(lo, /^[0-9]+/) ? substr(lo, 1, RLENGTH) + 0 : 999999999; if (!f || v > m) m = v; f = 1 } }
   END { if (f) print m }'
+stylekind() { # the style files of the same tool as <path>
+  case "$1" in
+    *prettierrc*|*prettier.config.*) echo 'prettierrc[^/]*$|prettier\.config\.[^/]*$' ;;
+    *.editorconfig) echo '\.editorconfig$' ;;
+    *detekt.yml) echo 'detekt\.yml$' ;;
+    *ruff.toml|*pyproject.toml) echo 'ruff\.toml$|pyproject\.toml$' ;;
+    *) echo '\.flake8$|setup\.cfg$|tox\.ini$' ;;
+  esac
+}
 linemax() { git show "$1" 2>/dev/null | LC_ALL=C awk "$LL_AWK"; }
 linecheck() { # linecheck <merge-base>
-  local mb="$1" f g b h
+  local mb="$1" f g b h kind
   while IFS= read -r f; do
     git cat-file -e "$mb:$f" 2>/dev/null || continue
     b=$(linemax "$mb:$f"); [ -n "$b" ] || continue
     if git cat-file -e "HEAD:$f" 2>/dev/null; then h=$(linemax "HEAD:$f")
-    else h=$(while IFS= read -r g; do linemax "HEAD:$g"; done < <(git ls-tree -r --name-only HEAD | grep -E "$STYLERE") | sort -n | tail -1); fi
+    else kind=$(stylekind "$f"); h=$(while IFS= read -r g; do linemax "HEAD:$g"; done < <(git ls-tree -r --name-only HEAD | grep -E "$kind") | sort -n | tail -1); fi
     [ -n "$h" ] && [ "$h" -gt "$b" ] && bad "raised line length: $f: $([ "$b" -gt 99999 ] && echo "no limit" || echo "$b") -> $([ "$h" -gt 99999 ] && echo "no limit" || echo "$h")"
   done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- . "${EXCL[@]}" | grep -E "$STYLERE")
 }
