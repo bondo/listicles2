@@ -112,6 +112,12 @@ class HappyPathTests(unittest.TestCase):
         self.assertEqual(go(api, kind="dependabot")[0], 0)
         self.assertEqual(len(api.merged), 1)
 
+    def test_every_listed_working_draft_is_accepted(self):
+        names = ("docs/PLAN.md", "docs/product/stories.md", "docs/product/flow.md", "docs/product/rubric.md", "design/tokens.json",
+                 "docs/milestones/M1.md", "docs/product/wireframes/wireframes.html", "docs/product/wireframes/01-sign-in-dark.png")
+        files = [file_entry(n) for n in names[:-1]] + [{"filename": names[-1], "status": "added"}]  # a png has no patch
+        self.assertEqual(go(make_api(files=files))[0], 0)
+
     def test_extra_check_runs_not_required_do_not_matter(self):
         api = make_api(checks=[run(c) for c in REQUIRED] + [run("optional", conclusion="failure")])
         self.assertEqual(go(api)[0], 0)
@@ -182,7 +188,8 @@ class RefusalTests(unittest.TestCase):
         self.assertEqual(go(api)[0], 0)
 
     def test_path_outside_docs_kind(self):
-        for name in ("scripts/merge_ready.py", "docs/tasks.toml", "docs/ORCHESTRATION.md", "CLAUDE.md", ".github/workflows/ci.yml", "app/src/Main.kt"):
+        owner_only = ("docs/product/naming.md", "docs/reviews/README.md", "docs/reviews/collaborator-workflow.md", "docs/reviews/new.md")  # R3-01
+        for name in ("scripts/merge_ready.py", "docs/tasks.toml", "docs/ORCHESTRATION.md", "CLAUDE.md", ".github/workflows/ci.yml", *owner_only):
             with self.subTest(name=name):
                 files = [file_entry("docs/product/flow.md"), file_entry(name)]
                 self.refused(make_api(files=files), re.escape(name))
@@ -250,6 +257,25 @@ class RefusalTests(unittest.TestCase):
             with self.subTest(patch=patch):
                 files = [file_entry(".github/workflows/ci.yml", patch=patch)]
                 self.refused(make_api(files=files), r"ci\.yml.*(pin|uses)", kind="dependabot")
+
+    def test_status_line_edit_that_keeps_not_owner_approved_is_fine(self):
+        tail = "; not owner-approved (see issue #15)."
+        keep = f"@@ -3 +3 @@\n-Status: working draft, 2026-11-15{tail}\n+Status: working draft, 2026-11-18{tail}"
+        self.assertEqual(go(make_api(files=[file_entry("docs/product/stories.md", patch=keep)]))[0], 0)
+
+    def test_sign_off_that_removes_not_owner_approved_is_refused(self):
+        """R3-01: turning a working draft into an approved doc is the owner's call, whatever the file."""
+        flip = "@@ -3 +3 @@\n-Status: working draft, merged as the baseline; not owner-approved (see issue #15).\n+Status: approved by the owner, 2026-11-18."
+        for name in ("docs/product/stories.md", "docs/PLAN.md", "design/tokens.json"):
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry(name, patch=flip)]), r"not owner-approved")
+
+    def test_dependabot_renamed_or_deleted_file_is_refused(self):
+        """R3-02: a dependency bump only modifies files."""
+        for status in ("renamed", "removed", "added"):
+            with self.subTest(status=status):
+                files = [file_entry("gradle/wrapper/gradle-wrapper.jar", status=status)]
+                self.refused(make_api(files=files), rf"gradle-wrapper\.jar.*{status}", kind="dependabot")
 
     def test_dependabot_manifests_go_to_the_owner(self):
         """R2-01: manifests whose content is not checked (a `test` script, postinstall, a requirement URL) are outside the kind."""
