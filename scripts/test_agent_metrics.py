@@ -4,6 +4,7 @@ import csv
 import io
 import sys
 import tempfile
+import tomllib
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -373,7 +374,15 @@ class ReviewTests(unittest.TestCase):
         for field in ("review_id", "run_ref", "date", "window_end"):
             for lead in "=+-@":
                 _, errors = self.errors(review_row(**{field: lead + "1"}))
-                self.assertTrue(errors, (field, lead))
+                # These values are also invalid for another reason (unknown id, bad ref, bad date), so assert the
+                # formula error itself: a bare "errors is not empty" would pass without the formula check.
+                self.assertIn(f"input1:3: {field} starts with {lead!r} (spreadsheet formula risk)", errors)
+
+    def test_a_bad_value_without_a_formula_lead_gets_no_formula_error(self):
+        for field, bad in (("review_id", "R2"), ("run_ref", "abc"), ("date", "x1"), ("window_end", "x1")):
+            _, errors = self.errors(review_row(**{field: bad}))
+            self.assertTrue(errors, (field, bad))
+            self.assertFalse(any("formula" in e for e in errors), (field, bad, errors))
 
     def test_control_characters(self):
         for bad in ("a\x00b", "a\x07b", "a\x7fb", "a\tb"):
@@ -534,6 +543,31 @@ class CausedByLineTests(unittest.TestCase):
             self.assertEqual(out.getvalue(), "121\n")
             self.assertIn("bad.md: no single 'Caused by: #N' line", err.getvalue())
             self.assertNotIn("Traceback", err.getvalue())
+
+
+class ReviewRowDocsTests(unittest.TestCase):
+    """Review rows reuse the disputed/deferred/cost_usd columns of round and session rows (issue 75, R1-02, R1-03)."""
+
+    def text(self, relative):
+        return (ROOT / relative).read_text(encoding="utf-8")
+
+    def test_module_docstring_says_review_rows_share_columns_so_filter_by_row_type(self):
+        doc = " ".join((am.__doc__ or "").split()).lower()
+        self.assertIn("review rows reuse the disputed, deferred and cost_usd columns", doc)
+        self.assertIn("filter by row_type", doc)
+
+    def test_orchestration_6_3a_says_the_same(self):
+        text = self.text("docs/ORCHESTRATION.md")
+        section = text.split("### 6.3a", 1)[1].split("### 6.4", 1)[0]
+        flat = " ".join(section.split())
+        self.assertIn("reuse the `disputed`, `deferred` and `cost_usd` columns", flat)
+        self.assertIn("filter by `row_type`", flat)
+
+    def test_task_notes_say_r1_to_r12_except_r2(self):
+        tasks = tomllib.loads(self.text("docs/tasks.toml"))["task"]
+        notes = next(t for t in tasks if t["id"] == "M0.5-24")["notes"]
+        self.assertIn("review_id (R1..R12 except R2, README 5.1)", notes)
+        self.assertNotIn("review_id (R1..R12)", notes)
 
 
 if __name__ == "__main__":

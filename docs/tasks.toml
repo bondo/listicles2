@@ -691,7 +691,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-23"]
-notes = "Tooling env (scripts/, CI wiring). Effort M. Test-first: commit the failing test first, wired into scripts/verify.sh and CI. Columns: date, review_id (R1..R12), run_ref, findings, acted_on, ignored, disputed, deferred, cost_usd, window_end. Negatives: unknown review_id, counts that do not add up to findings, window_end before date, non-integer counts, formula-looking text. Replaces the by-hand R3 digest numbers (D-4.4) once the first two digests are done."
+notes = "Tooling env (scripts/, CI wiring). Effort M. Test-first: commit the failing test first, wired into scripts/verify.sh and CI. Columns: date, review_id (R1..R12 except R2, README 5.1), run_ref, findings, acted_on, ignored, disputed, deferred, cost_usd, window_end. Negatives: unknown review_id, counts that do not add up to findings, window_end before date, non-integer counts, formula-looking text. Replaces the by-hand R3 digest numbers (D-4.4) once the first two digests are done."
 
 [[task]]
 id = "M0.5-25"

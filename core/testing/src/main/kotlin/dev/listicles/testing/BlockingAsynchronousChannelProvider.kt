@@ -11,6 +11,8 @@ import java.util.concurrent.ThreadFactory
  * `AsynchronousSocketChannel` and `AsynchronousServerSocketChannel` use their own provider, not the
  * `SelectorProvider`, so this wraps the JDK's default one the same way [BlockingSelectorProvider] does: everything
  * is delegated, but opening a socket or server socket channel fails once [NoNetwork] is installed.
+ * A custom `AsynchronousChannelGroup` is blocked too: a channel opened in a group goes through the group's own
+ * provider (this one, when it is the default), so creating the group is where the block applies.
  * Set with `-Djava.nio.channels.spi.AsynchronousChannelProvider` (the class name of this provider)
  * and `--add-exports java.base/sun.nio.ch=ALL-UNNAMED` (see `build.gradle.kts`).
  */
@@ -20,12 +22,18 @@ class BlockingAsynchronousChannelProvider : AsynchronousChannelProvider() {
     override fun openAsynchronousChannelGroup(
         nThreads: Int,
         threadFactory: ThreadFactory,
-    ): AsynchronousChannelGroup = delegate.openAsynchronousChannelGroup(nThreads, threadFactory)
+    ): AsynchronousChannelGroup {
+        if (NoNetwork.installed) NoNetwork.blocked("asynchronous channel group")
+        return delegate.openAsynchronousChannelGroup(nThreads, threadFactory)
+    }
 
     override fun openAsynchronousChannelGroup(
         executor: ExecutorService,
         initialSize: Int,
-    ): AsynchronousChannelGroup = delegate.openAsynchronousChannelGroup(executor, initialSize)
+    ): AsynchronousChannelGroup {
+        if (NoNetwork.installed) NoNetwork.blocked("asynchronous channel group")
+        return delegate.openAsynchronousChannelGroup(executor, initialSize)
+    }
 
     override fun openAsynchronousServerSocketChannel(
         group: AsynchronousChannelGroup?,

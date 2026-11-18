@@ -294,6 +294,28 @@ class TimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             digest([], fetched_at="2026-11-12T13:00:00")
 
+    def test_extreme_times_are_a_value_error_not_an_overflow(self):
+        # Issue 66: near datetime.min the cursor arithmetic (UTC conversion, minus one second) overflowed.
+        for bad in ("0001-01-01T00:00:00Z", "0001-01-01T00:00:00+01:00", "1969-12-31T23:59:59Z",
+                    "9999-12-31T23:59:59-01:00"):
+            with self.subTest(fetched_at=bad), self.assertRaises(ValueError) as ctx:
+                digest([], fetched_at=bad)
+            self.assertIn("fetched_at", str(ctx.exception))
+            with self.subTest(since=bad), self.assertRaises(ValueError) as ctx:
+                collab_inbox.build_digest([], bad)
+            self.assertIn("since", str(ctx.exception))
+
+    def test_item_timestamps_out_of_range_are_a_value_error(self):
+        for bad in ("0001-01-01T00:00:00+01:00", "9999-12-31T23:59:59-01:00"):
+            with self.subTest(created=bad), self.assertRaises(ValueError):
+                digest([comment(1, "alex", 7, "COLLABORATOR", "a", created=bad)])
+
+    def test_range_edges_that_still_work(self):
+        out = digest([], fetched_at="1970-01-01T00:00:01Z")  # one second after the epoch: minus one is the epoch
+        self.assertIn(f"Next since: {SINCE}", out)  # capped result is below since, so since wins
+        self.assertIn("Next since:", digest([], fetched_at="9999-12-31T23:59:59Z"))  # datetime.max
+        self.assertIn("Next since:", digest([], fetched_at="1970-01-01T00:00:00Z"))  # exactly the epoch
+
     def test_without_fetched_at_the_docstring_tells_how_to_fetch(self):
         self.assertIn("--fetched-at", collab_inbox.__doc__)
         self.assertIn("snapshot", collab_inbox.__doc__.lower())
@@ -678,6 +700,45 @@ class CliTests(unittest.TestCase):
         r = self.run_cli("--since", SINCE, "--fetched-at", "soon", "-", stdin="[]")
         self.assertEqual(r.returncode, 2)
         self.assertNotIn("Traceback", r.stderr)
+
+    def test_extreme_fetched_at_exits_2_with_a_message(self):
+        for bad in ("0001-01-01T00:00:00Z", "0001-01-01T00:00:00+01:00", "1969-12-31T23:59:59Z",
+                    "9999-12-31T23:59:59-01:00"):
+            with self.subTest(fetched_at=bad):
+                r = self.run_cli("--since", SINCE, "--fetched-at", bad, "-", stdin="[]")
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+                self.assertIn("error: --fetched-at", r.stderr)
+                self.assertEqual(r.stdout, "")
+
+    def test_extreme_since_exits_2_with_a_message(self):
+        for bad in ("0001-01-01T00:00:00+01:00", "9999-12-31T23:59:59-01:00"):
+            with self.subTest(since=bad):
+                r = self.run_cli("--since", bad, "-", stdin="[]")
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+                self.assertIn("error: --since", r.stderr)
+
+    def test_extreme_item_timestamp_in_a_file_exits_2(self):
+        item = comment(1, "alex", 7, "COLLABORATOR", "a", created="9999-12-31T23:59:59-01:00")
+        r = self.run_cli("--since", SINCE, "-", stdin=json.dumps([item]))
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertIn("created_at", r.stderr)
+
+    def test_edge_fetched_at_values_still_work(self):
+        for ok in ("1970-01-01T00:00:00Z", "9999-12-31T23:59:59Z", "2026-11-12T13:30:00+02:00"):
+            with self.subTest(fetched_at=ok):
+                r = self.run_cli("--since", SINCE, "--fetched-at", ok, "-", stdin="[]")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(f"Next since: {SINCE}", r.stdout)
+
+    def test_malformed_fetched_at_still_exits_2(self):
+        for bad in ("", "2026-13-45T25:61:61Z", "2026-11-12", "2026-11-12T13:00:00", "0000-01-01T00:00:00Z"):
+            with self.subTest(fetched_at=bad):
+                r = self.run_cli("--since", SINCE, "--fetched-at", bad, "-", stdin="[]")
+                self.assertEqual(r.returncode, 2)
+                self.assertNotIn("Traceback", r.stderr)
 
     def test_pending_review_in_a_file_is_skipped(self):
         pending = review(8, "alex", 7, "COLLABORATOR", "PENDINGBODY", state="PENDING")
