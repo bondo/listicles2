@@ -16,8 +16,7 @@ CASES = [
     ("ruff",
      ["ruff check --ignore E501 scripts", "ruff check --extend-ignore=E501 scripts", "ruff check --per-file-ignores 'a.py:E501' .",
       "ruff check --exclude build .", "ruff check --extend-exclude=gen .", "ruff check --exit-zero .", "ruff check --isolated ."],
-     ["ruff check --config ruff.toml --no-cache --output-format concise scripts", "ruff check --select E,F .",
-      "ruff format --check ."]),
+     ["ruff check --config ruff.toml --no-cache --output-format concise scripts", "ruff format --check ."]),
     ("mypy",
      ["mypy --ignore-missing-imports scripts", "mypy --allow-untyped-defs scripts", "mypy --allow-redefinition scripts",
       "mypy --no-strict-optional scripts", "mypy --no-check-untyped-defs scripts", "mypy --no-warn-unused-ignores scripts",
@@ -334,6 +333,49 @@ class ConfigPathReachTests(CliFlagCase):
             with self.subTest(line=line):
                 self.put("scripts/lint.sh", line)
                 self.assertPasses()
+
+
+class RoundThreeTests(CliFlagCase):
+    """R3-01 to R3-05: ESLint suppressions, ruff short and extra flags, abbreviated options, tsc -b arguments, shellcheck --rcfile."""
+
+    BAD = [
+        "eslint --suppress-all .", "eslint --suppress-rule no-console .", "eslint --suppressions-location x.json .",
+        "eslint --pass-on-unpruned-suppressions .", "npm run lint -- --suppress-all",
+        "ruff check -e .", "ruff check -ne .", "ruff check --select E .", "ruff check --select=E,F .", "ruff check --fix-only .",
+        "mypy --ignore-missing c.py", "mypy --disable-error no-untyped-def b.py", "mypy @args.txt b.py", 'mypy --config-file "" b.py',
+        "mypy --config-f ci.ini b.py", "mypy --config ci.ini b.py", "mypy --follow-imp=skip b.py",
+        "tsc -b --verbose ci.json", "tsc --build --force ci.json", "tsc -b tsconfig.json ci.json",
+        "shellcheck -S warning --rcfile ci.rc a.sh", "shellcheck --rc ci.rc a.sh", "shellcheck --exc=SC2086 a.sh", "shellcheck --incl=SC2086 a.sh",
+        "shellcheck --sev=error a.sh",
+    ]
+    GOOD = [
+        "eslint --prune-suppressions .", "ruff check --extend-select E .", "mypy --config-file mypy.ini b.py", "mypy --config mypy.ini b.py",
+        "mypy --follow-imports=normal b.py", "mypy --strict --warn-unused-ignores b.py", "tsc -b --verbose", "tsc -b tsconfig.json --force",
+        "shellcheck --norc a.sh", "shellcheck --sev=style a.sh", "shellcheck --rcfile=.shellcheckrc a.sh",
+    ]
+
+    def test_relaxing_forms_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_strict_neighbours_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+    def test_ruff_add_inline_ignore_flag_fails(self):
+        self.put("scripts/lint.sh", "ruff check --add-noqa .")  # justified: fixture text for the CLI flag check, written to a throwaway repo, never run
+        self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_eslint_suppressions_are_a_baseline_and_no_justification_waives_them(self):
+        for line in ["eslint --suppress-all . # justified: legacy code", "npm run lint -- --suppress-rule x # justified: legacy code",
+                     "eslint --suppressions-location s.json . # justified: legacy code"]:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
 
 
 if __name__ == "__main__":
