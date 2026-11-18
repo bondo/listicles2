@@ -38,7 +38,8 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
     An agent score below 3 is a `minor` finding, never a `blocker` or `major`. Agent scores are advisory and taste stays with the owner; a disagreement with the
     owner's scores is a calibration note for the rubric, not a finding. Do not judge motion, touch feel, real-device size or density, felt speed or taste.
 13. **Rules allow/deny matrix (R7)**: on a PR labelled `area:security-rules`, `area:sync-merge` or `risk:high`, check that the rules allow/deny matrix (D-2.6, `firebase/test`)
-    covers each changed rule with an allow case and a deny case. A changed rule without both is a `major` finding (area `security-rules`); name the rule and the missing case.
+    covers each changed rule with an allow case and a deny case. A changed rule without both is a `major` finding (area `security-rules`), and a `blocker` when the missing case hides a real security hole
+    (a non-member, or a member without the right, could read or write); name the rule and the missing case.
 
 ## Severity
 | Severity | Meaning | Author must |
