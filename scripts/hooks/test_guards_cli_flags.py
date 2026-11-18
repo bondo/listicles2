@@ -283,5 +283,58 @@ class FalsePositiveTests(CliFlagCase):
                 self.assertFails(MARK + ": scripts/lint.sh:1:")
 
 
+class ShellcheckOptsFormsTests(CliFlagCase):
+    """R2-02: SHELLCHECK_OPTS as a workflow env: key or with += is the same relaxation as SHELLCHECK_OPTS=."""
+
+    def test_yaml_env_key_and_append_forms_fail(self):
+        yaml = ['        SHELLCHECK_OPTS: "-e SC2086"', "      SHELLCHECK_OPTS: -e SC2086", "      SHELLCHECK_OPTS: '--exclude=SC2086'"]
+        for line in yaml:
+            with self.subTest(line=line):
+                self.put(".github/workflows/ci.yml", line)
+                self.assertFails(MARK + ": .github/workflows/ci.yml:1:")
+        for line in ['SHELLCHECK_OPTS+=" -e SC2086"', 'export SHELLCHECK_OPTS+=" -S error"']:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_strict_env_forms_pass(self):
+        for line in ["      SHELLCHECK_OPTS: -S warning", '        SHELLCHECK_OPTS: "-x"']:
+            with self.subTest(line=line):
+                self.put(".github/workflows/ci.yml", line)
+                self.assertPasses()
+        self.put("scripts/lint.sh", 'SHELLCHECK_OPTS+=" -x"')
+        self.assertPasses()
+
+    def test_justification_waives_the_env_form(self):
+        self.put(".github/workflows/ci.yml", '        SHELLCHECK_OPTS: "-e SC2086" # justified: generated file, owner approved')
+        self.assertPasses()
+
+
+class ConfigPathReachTests(CliFlagCase):
+    """R2-03: a config path the 2b scan cannot read (absolute, variable, outside the tree) and tsc forms that skip tsconfig."""
+
+    BAD = [
+        'ruff check --config "$tmp/ruff.toml" .', "ruff check --config /tmp/x/pyproject.toml .", "ruff check --config ~/ruff.toml .",
+        "ruff check --config ../ruff.toml .", "mypy --config-file=$CFG scripts", 'tsc -p "$CFG"', "tsc -p $CFG", "tsc --project `mktemp`",
+        "tsc -b ci.json", "tsc --build ci.json", "tsc --noEmit src/index.ts", "tsc index.ts", "npx tsc --noEmit lib/a.mts",
+    ]
+    GOOD = [
+        "ruff check --config scripts/ruff.toml .", "tsc -p .", "tsc -b tsconfig.json", "tsc --build", "tsc -b --verbose", "tsc --noEmit -p tsconfig.json",
+        "tsc --version", "npm run build -- src/index.ts",
+    ]
+
+    def test_unreachable_config_and_tsc_forms_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_reachable_config_and_ordinary_tsc_forms_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
