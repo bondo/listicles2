@@ -17,5 +17,5 @@ coroutines:
   InjectDispatcher:
     active: true
 Compose:
-  UnstableCollections:
+  Material2:
     active: true

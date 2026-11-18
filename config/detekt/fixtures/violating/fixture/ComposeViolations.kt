@@ -26,15 +26,6 @@ fun Counter(
     Text("${count.value}", modifier = modifier)
 }
 
-// UnstableCollections: List is unstable for Compose, use an immutable collection.
-@Composable
-fun NameList(
-    names: List<String>,
-    modifier: Modifier = Modifier,
-) {
-    Text(names.joinToString(), modifier = modifier)
-}
-
 // ParameterNaming: event callbacks are present tense (onClick), not past tense.
 @Composable
 fun Tapper(

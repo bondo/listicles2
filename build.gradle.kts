@@ -398,4 +398,4 @@ val testDetektRules =
     }
 
 // Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
-tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }
+tasks.named("detekt") { dependsOn(testLicenseeGate, testDetektRules, ":app:licensee", ":core:domain:licensee") }
