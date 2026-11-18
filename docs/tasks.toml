@@ -728,12 +728,12 @@ notes = "Owner confirmed on 2026-11-16 (#15) that the invite was sent and accept
 id = "M0.5-O5"
 title = "Confirm the collaborator's 2FA and run the live test"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0.5-O4"]
 issue = 119
-notes = "Owner only. Send COLLABORATING.md; confirm 2FA is on. Live test: docs/reviews/collaborator-workflow.md section 6 (comment, PR review, form issue, and what Merge does on a green PR), results noted on #15"
+notes = "Owner only. Send COLLABORATING.md; confirm 2FA is on. Live test: docs/reviews/collaborator-workflow.md section 6 (comment, PR review, form issue, and what Merge does on a green PR), results noted on #15. Done 2026-11-18 (#15 comments 6992188913: 2FA on; 6992334477: live test step 1 passed; 6992364151: owner dropped steps 2-4 and recorded M0.5-O5 done, accepting that whether the collaborator can press Merge is unknown, the working agreement is the guard)"
 
 [[task]]
 id = "M0.5-28"
