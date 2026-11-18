@@ -405,6 +405,12 @@ These are constraints for the data model and screens; v1 builds none of them (M2
   (OQ-32).
 * **Recipes and meal planning** (Q4): other features must be able to add items to a shared list (a recipe's ingredients
   to the shopping list; a week's meal plan to the shopping list).
+* **Infinite undo/redo per list** (owner, 2026-11-18, #15 comment 6991020343): "After v1, we need to have infinite global
+  undo/redo internally for each list. This should include conflict handling, so an undo after a conflict shows the other
+  side of the conflict." v1 builds none of it: it keeps no history and stays last write wins per field (SYNC-02, PLAN
+  section 3.2). The constraint is only that the v1 design must not rule out adding, later, a per-list history of changes
+  across all members that undo and redo can replay in order, and keeping the side that lost a conflict so an undo can
+  show it.
 * **Photos**: storing images likely needs Cloud Storage, which may require the paid Firebase plan (PLAN section 1 says
   free Spark); to check when photos are planned.
 

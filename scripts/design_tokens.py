@@ -1,7 +1,8 @@
 """Checks on design/tokens.json: colors are well-formed, both themes define the same roles, and every contrast pair passes.
 
 Usage: python3 -I scripts/design_tokens.py [tokens.json]   (default: design/tokens.json)
-Exit status: 0 clean, 1 findings (one line per finding).
+Exit status: 0 clean, 1 findings (one line per finding). A file that is missing, is not JSON or has a malformed structure
+(a wrong type, a missing key) is reported as a finding too, never as a traceback.
 
 Rules: every color is #RRGGBB in upper case; the light and dark themes have exactly the same roles (so a theme can be swapped
 whole, post-v1); every pair in REQUIRED_PAIRS is listed in contrastPairs (an empty or shortened list fails); every
@@ -11,6 +12,7 @@ more than AA, never less.
 """
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -62,7 +64,44 @@ def contrast(a: str, b: str) -> float:
     return (hi + 0.05) / (lo + 0.05)
 
 
-def check(tokens: dict, required: tuple[tuple[str, str], ...] = REQUIRED_PAIRS) -> list[str]:
+def _is_number(value: object) -> bool:
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, int) or (isinstance(value, float) and math.isfinite(value))  # NaN would pass every comparison
+
+
+def check_structure(tokens: object) -> list[str]:
+    """Structural findings: the shape check() relies on (color: theme -> role -> value; contrastPairs: list of fg/bg/min)."""
+    if not isinstance(tokens, dict):
+        return [f"top level must be an object, not {type(tokens).__name__}"]
+    found: list[str] = []
+    colors = tokens.get("color")
+    if not isinstance(colors, dict):
+        found.append(f"color must be an object of themes, not {type(colors).__name__}")
+    else:
+        found.extend(f"color.{theme} is missing" for theme in ("light", "dark") if theme not in colors)
+        found.extend(f"color.{theme} must be an object of roles, not {type(roles).__name__}" for theme, roles in colors.items() if not isinstance(roles, dict))
+    pairs = tokens.get("contrastPairs")
+    if not isinstance(pairs, list):
+        found.append(f"contrastPairs must be a list, not {type(pairs).__name__}")
+        return found
+    for i, pair in enumerate(pairs):
+        if not isinstance(pair, dict):
+            found.append(f"contrastPairs[{i}] must be an object, not {type(pair).__name__}")
+            continue
+        for key in ("fg", "bg"):
+            if not isinstance(pair.get(key), str):
+                found.append(f"contrastPairs[{i}].{key} must be a role name (string), not {type(pair.get(key)).__name__}")
+        if not _is_number(pair.get("min")):
+            found.append(f"contrastPairs[{i}].min must be a finite number, not {type(pair.get('min')).__name__}")
+    return found
+
+
+def check(tokens: object, required: tuple[tuple[str, str], ...] = REQUIRED_PAIRS) -> list[str]:
+    malformed = check_structure(tokens)
+    if malformed:
+        return malformed
+    assert isinstance(tokens, dict)  # check_structure proved it; narrows the type
     found: list[str] = []
     listed = {(p["fg"], p["bg"]) for p in tokens["contrastPairs"]}
     for fg, bg in required:
@@ -98,7 +137,15 @@ def check(tokens: dict, required: tuple[tuple[str, str], ...] = REQUIRED_PAIRS) 
 
 def main(argv: list[str]) -> int:
     path = Path(argv[0]) if argv else TOKENS
-    found = check(json.loads(path.read_text(encoding="utf-8")))
+    try:
+        tokens = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"{path}: cannot read the file: {exc}")
+        return 1
+    except (ValueError, RecursionError) as exc:  # JSONDecodeError is a ValueError; so is the int digit limit
+        print(f"{path}: not readable as JSON: {type(exc).__name__}: {str(exc)[:200]}")
+        return 1
+    found = check(tokens)
     for line in found:
         print(f"{path}: {line}")
     return 1 if found else 0
