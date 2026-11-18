@@ -25,10 +25,10 @@ GIT_ENV = {
 def pad_short_reasons(text):
     """Owner decision (#46): a `justified:` reason needs 3 words. Most fixtures below predate that and use a short reason
     ("CLI output") only as the marker that must waive a hit, so write() pads a reason of 1 or 2 words. A reason with no
-    word at all is left alone, and the tests of the rule itself write with raw=True."""
+    letter or digit at all is left alone, and the tests of the rule itself write with raw=True."""
     def pad(m):
         n = len(re.findall(r"[A-Za-z]{2,}", m.group(2)))
-        return m.group(1) + ("fixture padding words " if 0 < n < 3 else "") + m.group(2)
+        return m.group(1) + ("fixture padding words " if n < 3 and re.search(r"[A-Za-z0-9]", m.group(2)) else "") + m.group(2)
     return re.sub(r"(justified:[ \t]*)([^\n]*)", pad, text)
 
 
@@ -386,7 +386,7 @@ MULTILINE_RELAXATIONS = [
 CONFIG_CLEAN = [
     ("pyproject.toml", "[tool.ruff.lint]\nselect = [\"E\", \"F\", \"B\"]\n[tool.mypy]\nstrict = true\nwarn_unused_ignores = true\n"),
     ("mypy.ini", "[mypy]\nstrict = True\ndisallow_untyped_defs = True\nignore_errors = False\n"),
-    ("tsconfig.json", "{\n  \"compilerOptions\": {\"strict\": true, \"noImplicitAny\": true, \"skipLibCheck\": true}\n}\n"),
+    ("tsconfig.json", "{\n  \"compilerOptions\": {\"strict\": true, \"noImplicitAny\": true, \"noEmit\": true}\n}\n"),
     ("eslint.config.js", "export default [{rules: {'no-console': 'error', 'eqeqeq': ['error', 'always'], 'max-len': [2, 120]}}];\n"),
     # R1-09: option objects hold numbers that are not rule severities
     ("eslint.config.js", "export default [{rules: {'max-params': ['error', { max: 1 }], 'max-depth': ['error', { max: 0 }]}}];\n"),
@@ -1315,10 +1315,13 @@ class JustifiedReasonWords(GuardsCase):
                 self.repo.commit()
                 self.assertPasses()
 
+    HDR = '[lint.per-file-ignores]  # justified: the table header is covered\n'
+
     def test_the_same_rule_holds_for_config_relaxations(self):
         for path, bad, good in [
-            ("tsconfig.json", '{ "compilerOptions": { "strict": false // justified: x\n } }', '{ "compilerOptions": { "strict": false // justified: migration in progress\n } }'),
-            ("ruff.toml", '[lint.per-file-ignores]  # justified: the table header is covered\n"a.py" = ["E501"]  # justified: ok\n', '[lint.per-file-ignores]  # justified: the table header is covered\n"a.py" = ["E501"]  # justified: long URLs here\n'),
+            ("tsconfig.json", '{ "compilerOptions": { "strict": false // justified: x\n } }',
+             '{ "compilerOptions": { "strict": false // justified: migration in progress\n } }'),
+            ("ruff.toml", self.HDR + '"a.py" = ["E501"]  # justified: ok\n', self.HDR + '"a.py" = ["E501"]  # justified: long URLs here\n'),
             ("tsconfig.json", '{ "extends": "@org/base" // justified: -\n }', '{ "extends": "@org/base" // justified: shared strict base\n }'),
         ]:
             with self.subTest(line=bad):
@@ -1332,7 +1335,7 @@ class JustifiedReasonWords(GuardsCase):
                 self.repo.commit()
 
     def test_a_multi_line_table_checks_each_entry_reason(self):
-        self.repo.write("ruff.toml", '[lint.per-file-ignores]  # justified: the table header is covered\n"a.py" = ["E501"]  # justified: long URLs here\n"b.py" = ["F401"]  # justified: ok\n', raw=True)
+        self.repo.write("ruff.toml", self.HDR + '"a.py" = ["E501"]  # justified: long URLs here\n"b.py" = ["F401"]  # justified: ok\n', raw=True)
         self.repo.commit()
         self.assertFails("b.py")
 
