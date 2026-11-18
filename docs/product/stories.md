@@ -1,8 +1,8 @@
 # Tally user stories (v1)
 
-Status: working draft, merged as the baseline for M1 planning; not owner-approved (see issue #15).
+Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); open: T2 text size, screen 32a.
 
-Task M0.5-01. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
+Task M0.5-01. Status: **owner-approved 2026-11-18** (M0.5-O1, issue #15 comment 6991804241).
 Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17, OQ-19 and
 OQ-23 to OQ-27 and the other answers of 2026-11-16 in section 10 (state issue #15; OQ-23 to OQ-27 follow the sign-in
 security review, comment 6927207374), and [the plan](../PLAN.md). Decided questions are in [section 10](#10-decided-questions); anything still unsettled is marked
