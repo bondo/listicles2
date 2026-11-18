@@ -1749,6 +1749,13 @@ class Issue134ReviewerEffortTests(unittest.TestCase):
         first = text.split(". Fresh session")[0]  # the opening line carrying the effort
         self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", text.replace(first, self.OLD.rstrip("."), 1))))
 
+    def test_a_stale_old_spelling_next_to_the_new_line_is_rejected(self):  # R1-01 of #155: only `forbidden` can catch this
+        for old in ("Opus, high effort (max for risk:high PRs).", "Opus, high effort (max for `risk:high` PRs).",
+                    "Opus, high effort (MAX FOR `RISK:HIGH` PRs)."):
+            with self.subTest(old=old):
+                self.assertNotIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer"))))
+                self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer") + "\n" + old)))
+
     def test_dropping_either_label_or_the_even_without_clause_is_rejected(self):
         text = prompt_rules.normalize(real("reviewer"))
         for clause in ("`area:security-rules`", "`area:sync-merge`", "even without `risk:high`"):
