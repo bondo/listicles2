@@ -9,5 +9,5 @@ if [ "$scope" = skip ]; then
   echo "pre-commit: no staged file can affect Kotlin or Gradle, skipping spotless and detekt"
   exit 0
 fi
-./gradlew -q --console=plain spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest 2>&1 | grep -v '^Picked up' | tail -25
+./gradlew -q --console=plain spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest 2>&1 | grep -v '^Picked up' | tail -25
 exit "${PIPESTATUS[0]}"

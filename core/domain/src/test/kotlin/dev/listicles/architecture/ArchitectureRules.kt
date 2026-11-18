@@ -9,8 +9,12 @@ import java.io.File
  * with comments and string literal text blanked (code inside `${...}` templates is kept), so a rule never fires on
  * prose but does fire on code hidden in a template. Line numbers are preserved.
  *
- * The UI rule is: outside the theme, no `Color(` built from numbers or `red =`, no `Dp(` or `TextUnit(`, and no
- * `.dp` or `.sp` at all (so `16.dp`, `0.5.dp` and `n.dp` all fail); import lines are not code.
+ * The UI rule is: outside the theme, no `Color(` call that starts with a number or a named `red`, `green`, `blue`,
+ * `alpha`, `color` or `value` argument (also when the arguments start on the next line), no named hue constant
+ * (`Color.Red`, `Color.Black`, `Color.Gray` and so on; `Color.Transparent` and `Color.Unspecified` are not a colour
+ * choice and stay allowed), no `Dp(` or `TextUnit(`, and no `.dp`, `.sp` or `.em` at all (so `16.dp`, `0.5.dp`, `n.dp`
+ * and `2.em` all fail); import lines are not code. Matches are found in the whole file text, so a call split over
+ * several lines is reported at the line where it starts.
  */
 object ArchitectureRules {
     private val floatingPatterns =
@@ -30,9 +34,10 @@ object ArchitectureRules {
 
     private val rawUiPatterns =
         listOf(
-            Regex("""\bColor\(\s*(?:\d|red\s*=)"""),
+            Regex("""\bColor\(\s*(?:\d|(?:red|green|blue|alpha|color|value)\s*=)"""),
+            Regex("""\bColor\.(?:Black|DarkGray|Gray|LightGray|White|Red|Green|Blue|Yellow|Cyan|Magenta)\b"""),
             Regex("""\b(?:Dp|TextUnit)\("""),
-            Regex("""\.(?:dp|sp)\b"""),
+            Regex("""\.(?:dp|sp|em)\b"""),
         )
 
     private val importLine = Regex("""^\s*import\s""")
@@ -79,14 +84,25 @@ object ArchitectureRules {
     ): List<String> =
         files(dir).filter(applies).flatMap { file ->
             val name = File(file.path).canonicalFile.relativeTo(dir.canonicalFile).path
-            blankCommentsAndStrings(file.text).lines().flatMapIndexed { index, line ->
-                if (skipImports && importLine.containsMatchIn(line)) {
-                    emptyList()
-                } else {
-                    patterns.filter { it.containsMatchIn(line) }.map { "$name:${index + 1}: ${line.trim()}" }
-                }
-            }
+            val text = blankCommentsAndStrings(file.text)
+            val lines = text.split('\n')
+            patterns
+                .flatMap { pattern ->
+                    pattern
+                        .findAll(text)
+                        .map { lineIndex(text, it.range.first) }
+                        .distinct()
+                        .toList()
+                }.filterNot { skipImports && importLine.containsMatchIn(lines[it]) }
+                .sorted()
+                .map { "$name:${it + 1}: ${lines[it].trim()}" }
         }
+
+    // Zero-based line of a character offset; matches run over the whole text so a call may span several lines.
+    private fun lineIndex(
+        text: String,
+        offset: Int,
+    ): Int = text.take(offset).count { it == '\n' }
 
     internal fun blankCommentsAndStrings(text: String): String = Blanker(text).run()
 

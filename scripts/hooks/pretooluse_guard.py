@@ -37,6 +37,8 @@ PROTECTED = (
     ".githooks/",
     "scripts/guards.sh",
     "scripts/install-hooks.sh",
+    "scripts/merge_ready.py",  # the merge agent runs it
+    "scripts/test_merge_ready.py",
     "scripts/mark-ready.sh",  # the project allow rule approves this path; see MARK_READY below
     "scripts/hooks/",
     ".tools/",  # linter binaries that the allow rules in .claude/settings.json run

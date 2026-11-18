@@ -35,6 +35,7 @@ step tasks-tests python3 -I scripts/test_tasks.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
 step collab-inbox-tests python3 -I scripts/test_collab_inbox.py
+step merge-ready-tests python3 -I scripts/test_merge_ready.py
 step status-visual-tests python3 -I scripts/test_status_visual.py
 step status-page-tests python3 -I scripts/test_status_page.py
 step status-publish-tests python3 -I scripts/test_status_publish.py
@@ -57,7 +58,7 @@ step python-lint ./scripts/lint_python.sh
 step workflow-lint-tests python3 -I scripts/test_lint_workflows.py
 step workflow-lint ./scripts/lint_workflows.sh
 step spotless gradle spotlessCheck
-step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest
+step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest
 step lint gradle :app:lintDebug
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test
