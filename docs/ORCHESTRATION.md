@@ -553,7 +553,7 @@ is refreshed at batch close and no later than when the PR is declared ready.
 
 ### 7.2.2 Plan review, second reviewer, escalation reviewer, escaped defects
 
-* **Plan review:** after the planner writes `docs/milestones/<Mx>.md` and before any implementer starts, the orchestrator spawns a fresh Opus reviewer (`agents/prompts/reviewer.md`, plan review).
+* **Plan review:** after the planner writes `docs/milestones/<Mx>.md` and before any implementer starts, the orchestrator spawns a fresh Opus reviewer (`agents/prompts/reviewer.md`, plan review). Every spawn in §7.2.2 uses the §8.3 message (last-action `send_message`, WORKER-RESULT, incremental findings comment) with its own role line.
 * **Second reviewer:** for `risk:high` PRs and the security-rules, sync-merge and release areas, the orchestrator spawns a second fresh session in the same round (`agents/prompts/second-reviewer.md`); it never gets the reviewer's findings, and a `risk:high` PR is marked READY only after that pass.
 * **Escalation:** when round 4 still has a confirmed finding above nit (deferred minors do not count) or a dispute is still open, the orchestrator spawns one escalation reviewer per PR (`agents/prompts/escalation-reviewer.md`). Its ruling per PR: `fix` gets one fresh round 5, `split` opens a new PR from `main` with merge commits, `owner` goes to the owner; there is no second escalation.
 * **Escaped defects:** a bug found after merge gets a `Caused by: #N` line in its issue and one `escaped` row in the metrics CSV (`scripts/agent_metrics.py`).
@@ -771,9 +771,9 @@ but say so in the `Usage:` line.
   `usage-limit` incident row's `impact`. Compare the running window cost with the last two such rows at every wake: when it passes the
   smaller one, set `Usage:` to **near limit (5-hour, forecast)** early (§7.7.1: no new workers, an extra check-in; the second look reads `rate_limit_info` only, so a forecast never pauses by itself). The numbers are a rough forecast; `rate_limit_info` decides.
 
-**§7.7.6 Throttle order.** Concurrency is limited for flow, not cost (§7.1), so throttle only when a rate limit is near or in overage: a 7-day `allowed_warning` or `isUsingOverage` (a 5-hour warning or a reached limit pauses, §7.7.2).
-Throughput goes first, quality last, one stage per check-in while the state lasts, each held until it clears: (1) no optional extras (recurring reviews R3 and R4, transcript sampling, explorer runs the task does not need);
-(2) halve the concurrency limit, then halve it again; (3) pause new work and finish the open PRs.
+**§7.7.6 Throttle order.** Concurrency is limited for flow, not cost (§7.1), so throttle only near a rate limit. A 7-day `allowed_warning` holds at stage 1 and required work goes on (§7.7.1); stage 2 applies in overage or when the §7.7.5 forecast says the limit is reached before `resetsAt`; stage 3 only on an owner decision in #15 (a 5-hour warning or a reached limit pauses, §7.7.2).
+Throughput goes first, quality last; the stages are: (1) no optional extras (recurring reviews R3 and R4, transcript sampling, explorer runs the task does not need);
+(2) halve the concurrency limit, once per check-in while stage 2 applies, at most twice; (3) pause new work and finish the open PRs.
 Never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the R2 usage read of §7.7.1.
 
 ## 8. Spawn messages

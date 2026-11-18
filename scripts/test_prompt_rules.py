@@ -1354,8 +1354,7 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-autonomy", "**Labels:** the orchestrator applies `big-pr` only with the owner's explicit say-so."),
         ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 80% context, at a **batch boundary** rather than mid-batch."),  # R1-05 of #138
         ("docs/ORCHESTRATION.md", "orch-parallel", "At most **5** worker sessions run at once, reviewers inside the cap."),  # R1-02 of #138
-        ("docs/ORCHESTRATION.md", "orch-throttle", "(2) the worker cap 3, then 2. (1) no optional extras (recurring reviews R2 to R4)"),
-        ("docs/ORCHESTRATION.md", "orch-throttle", "One stage per check-in while the state lasts."),  # R2-01 of #138
+        ("docs/ORCHESTRATION.md", "orch-throttle", "(2) the worker cap 3, then 2. One stage per check-in while the state lasts (R2-01 of #138)."),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the next round covers it, or until the owner explicitly accepts it."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Round 4 with findings above `nit`: stop and ask the owner."),
         ("docs/ORCHESTRATION.md", "orch-design-rounds", "Round {round} of max 2."),
@@ -1382,8 +1381,7 @@ class Pr4RuleTests(unittest.TestCase):
     def test_the_old_orchestrator_prompt_wording_is_rejected(self):
         for rid, old in (
             ("orch-model", " Sonnet, low effort, one long-lived session."), ("orch-transcripts", " Never read child transcripts."),
-            ("orch-throttle", " At most 5 worker sessions at once."), ("orch-throttle", " One stage per check-in while it lasts."),
-            ("handover", " Hand over at about 80% context."),
+            ("orch-throttle", " At most 5 worker sessions at once."), ("handover", " Hand over at about 80% context."),
             ("autonomy", " The `big-pr` label is set only with the owner's say-so."), ("orch-deferral", " more than about 15 changed lines"),
         ):
             with self.subTest(old=old):
@@ -1400,8 +1398,7 @@ class Pr4RuleTests(unittest.TestCase):
     def test_design_round_count_is_one_number_everywhere(self):  # #129 follow-up: roles.yaml, prompts, ORCHESTRATION, README, PLAN
         want = re.search(r"max (\d+) rounds per design PR", (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8")).group(1)
         self.assertEqual(want, "3")
-        for path in ("agents/prompts/design-reviewer.md", "agents/prompts/orchestrator.md", "docs/ORCHESTRATION.md", "docs/reviews/README.md",
-                     "docs/PLAN.md"):  # R2-06 of #138: README and PLAN too, any other number fails
+        for path in ("agents/prompts/design-reviewer.md", "agents/prompts/orchestrator.md", "docs/ORCHESTRATION.md", "docs/reviews/README.md", "docs/PLAN.md"):
             text = self.doc(path)
             self.assertEqual(set(re.findall(r"(?i)max (\d+) (?:Opus )?rounds(?! per batch)", text)), {want}, path)
             self.assertNotRegex(text, r"(?i)max 2 (opus )?rounds|of max 2\b|up to 2 rounds", path)
