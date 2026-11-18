@@ -195,6 +195,16 @@ if [ "$STAGED" = 0 ]; then
           }
         }
         if (decl) { body = substr(body, 1, 1) "test(" rest; if (bare) kw = body }
+        # The word `threshold` in prose is not a check setting (owner decision, #15; PR 135 R1-R3). Prose = a letter-word
+        # and spaces on each side (`gate or threshold changes`) on a line with no digit, and either the file is markdown
+        # or it is a .py file and the line is made of nothing but double-quoted string literals (optional r/b/u prefix,
+        # no backslash, `$`, `{` or `}` inside) and punctuation `( ) [ ] { } , ;`. Shell and config files, f-strings,
+        # code, comments, keys, assignments, calls, config values and every other keyword on the line still count; a
+        # stray `"`, a char literal or an escape leaves letters or symbols outside the literals.
+        lit = $0; gsub(/[rRbBuU]?"[^"\\${}]*"/, "", lit)
+        if ($0 !~ /[0-9]/ && (file ~ /\.md$/ || (file ~ /\.py$/ && lit ~ /^[-+][][ \t(){},;]*$/))) {
+          while (match(kw, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
+        }
       }
       kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
