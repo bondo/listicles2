@@ -1514,6 +1514,16 @@ class NoResolveThreadTests(unittest.TestCase):
         "Agents are allowed to resolve a collaborator's thread.",
         "Reply and resolve the thread.",
         "- Resolve the collaborator's review thread.",
+        # R2-02 of #150
+        "Once answered, resolve the thread.",
+        "After replying, resolve the thread.",
+        "When done, resolve the collaborator's thread.",
+        "Resolve threads once answered.",
+        "Resolve review threads after replying.",
+        "Reviewers may resolve the thread.",
+        "Workers may resolve threads.",
+        "Implementers can resolve threads.",
+        "You may now resolve the thread.",
     )
     # R1-01 of #150: correct ban or owner-only wording must not be flagged.
     BAN_WORDING = (
@@ -1524,6 +1534,20 @@ class NoResolveThreadTests(unittest.TestCase):
         "Agents are not allowed to resolve a collaborator's thread.",
         "Never resolve a collaborator's review thread.",
         "The collaborator may resolve their own thread.",
+        # R2-01 of #150
+        "No agent may resolve a collaborator's review thread.",
+        "No agent can resolve the thread.",
+        "Neither the orchestrator nor the reviewer may resolve the thread.",
+        "Do not reply and resolve the thread.",
+        "Never approve and resolve the thread yourself.",
+        # a hard-wrapped ban must not read as a new sentence
+        "Agents must not\nresolve the collaborator's review thread.",
+    )
+    # R2-03 of #150: a line-start imperative under a heading (normalize joins lines, so the sentence break has to come from the layout).
+    HEADING_LAYOUTS = (
+        "\n## Threads\n\nResolve the thread after answering.\n",
+        "\n## Threads\nResolve the conversation once answered.\n",
+        "\n\n* Resolve the collaborator's review thread once answered.\n",
     )
     PERMISSION_IDS = {"no-resolve-thread", "orch-no-resolve-thread", "collab-no-resolve"}
 
@@ -1537,14 +1561,26 @@ class NoResolveThreadTests(unittest.TestCase):
             for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
                 base = real(where) if where in ROLES else self.doc(where)
                 with self.subTest(where=where, stale=stale):
-                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base.rstrip() + ".\n" + stale + "\n"))
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base + "\n\n" + stale + "\n"))
 
     def test_correct_ban_and_owner_only_wording_is_not_rejected(self):
         for good in self.BAN_WORDING:
             for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
                 base = real(where) if where in ROLES else self.doc(where)
                 with self.subTest(where=where, good=good):
-                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, base.rstrip() + ".\n" + good + "\n"))
+                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, base + "\n\n" + good + "\n"))
+
+    def test_an_imperative_under_a_heading_or_bullet_is_rejected(self):
+        for layout in self.HEADING_LAYOUTS:
+            for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
+                base = real(where) if where in ROLES else self.doc(where)
+                with self.subTest(where=where, layout=layout):
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base + layout))
+
+    def test_a_hard_wrapped_continuation_line_is_not_a_new_sentence(self):
+        for where in ROLES:
+            with self.subTest(where=where):
+                self.assertFalse(self.PERMISSION_IDS & self.flagged(where, real(where) + "\nAgents must not\nresolve the thread.\n"))
 
     def test_every_prompt_still_needs_the_ban_itself(self):
         for role in ROLES:
