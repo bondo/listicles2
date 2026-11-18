@@ -450,9 +450,9 @@ class M025Tests(unittest.TestCase):
     def test_usage_read_unknown_type_and_overage_weakened(self):  # R1-03
         for old, new in (
             ("an unknown or missing `rateLimitType` counts as 5-hour", "an unknown `rateLimitType` counts as ok"),
-            ("`isUsingOverage` is true the state is near limit (overage): it never pauses either (same cap, no batched extras)",
+            ("`isUsingOverage` is true the state is near limit (overage): it never pauses either (throttle per §7.7.6)",
              "`isUsingOverage` is true the state is near limit (overage): pause"),
-            ("never pauses either (same cap, no batched extras)", "never pauses either"),
+            ("never pauses either (throttle per §7.7.6)", "never pauses either"),
         ):
             self.assert_fails("orchestrator", "usage-read", old, new)
 
@@ -1357,6 +1357,14 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-autonomy", "**Labels:** the orchestrator applies `big-pr` only with the owner's explicit say-so."),
         ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 50% context. The owner archives you."),
         ("docs/ORCHESTRATION.md", "orch-parallel", "at most 3 worker sessions run at once"),
+        ("docs/ORCHESTRATION.md", "orch-parallel", "At most **5** worker sessions run at once, reviewers inside the cap."),
+        ("docs/ORCHESTRATION.md", "orch-parallel", "Keep to the parallelism cap (§7.7.5) and block batched extras. no batched extras"),
+        ("docs/ORCHESTRATION.md", "orch-throttle", "(2) the worker cap 3, then 2. A plain 7-day warning stays at stage 1 with the cap at 5."),
+        ("docs/ORCHESTRATION.md", "orch-throttle", "(1) no optional extras (recurring reviews R2 to R4, transcript sampling)"),
+        ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 80% context, at a **batch boundary** rather than mid-batch."),
+        ("docs/FOLLOW-UPS.md", "followups-burn-down", "More than 8 open follow-ups for one milestone: the orchestrator stops deferring and reports to the owner."),
+        ("docs/FOLLOW-UPS.md", "followups-burn-down", "more than 8 open per milestone goes to the owner"),
+        ("docs/PLAN.md", "plan-transcripts", "* The orchestrator never reads child transcripts. It reads only the final summary"),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the next round covers it, or until the owner explicitly accepts it."),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Owner acceptance (the bullet above) is the only alternative."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Round 4 with findings above `nit`: stop and ask the owner."),
@@ -1388,7 +1396,9 @@ class Pr4RuleTests(unittest.TestCase):
     def test_the_old_orchestrator_prompt_wording_is_rejected(self):
         for rid, old in (
             ("orch-model", " Sonnet, low effort, one long-lived session."), ("orch-transcripts", " Never read child transcripts."),
-            ("orch-throttle", " Keep to the cap of 3 workers."), ("autonomy", " The `big-pr` label is set only with the owner's say-so."),
+            ("orch-throttle", " Keep to the cap of 3 workers."), ("orch-throttle", " At most 5 worker sessions at once."),
+            ("orch-throttle", " (2) the worker cap 3, then 2."), ("orch-throttle", " (1) no optional extras (recurring reviews R2 to R4)."),
+            ("handover", " Hand over at about 80% context."), ("autonomy", " The `big-pr` label is set only with the owner's say-so."),
             ("autonomy", " Stop and ask the owner for: the 4-round cap being hit."), ("handover", " Hand over at about 50% context."),
             ("orch-deferral", " more than about 15 changed lines"), ("orch-deferral", " ask the owner to do M0-O10"),
             ("orch-delta-review", " Owner acceptance is the only alternative."),
@@ -1428,8 +1438,33 @@ class Pr4RuleTests(unittest.TestCase):
         for path in {r.path for r in prompt_rules.DOC_RULES}:
             self.assertIn(path, prompt_rules.__doc__, path)
 
-    def test_the_merge_agent_rules_name_no_prompt_file_that_does_not_exist(self):
-        self.assertFalse((PROMPTS / "merge-agent.md").exists())  # its rules live in ORCHESTRATION 7.5 and the orchestrator prompt
+    def test_a_merge_agent_prompt_needs_its_role_in_roles_yaml(self):  # R1-06: no assertion that a file is absent
+        if (PROMPTS / "merge-agent.md").exists():
+            roles = (ROOT / "agents" / "roles.yaml").read_text(encoding="utf-8")
+            self.assertRegex(roles, r"(?m)^  merge-agent:\n(?:    .*\n)*?    prompt: agents/prompts/merge-agent\.md")
+
+    OWNER_ONLY_PHRASES = ("repository settings", "network allowlists", "licence acceptances", "docs that are themselves a gate",
+                          "guard thresholds", "branch protection", "naming", "design and product sign-off")
+
+    def test_the_merge_agent_owner_only_list_names_every_category_in_both_texts(self):  # R1-01 of #138 (6941366090, 6943342158)
+        for where in ("orchestrator", "docs/ORCHESTRATION.md"):
+            text = prompt_rules.normalize(real("orchestrator") if where == "orchestrator" else self.doc(where))
+            m = re.search(r"owner-only: [^.]*?protected process files", text)
+            self.assertTrue(m, where)
+            for phrase in self.OWNER_ONLY_PHRASES:
+                with self.subTest(where=where, phrase=phrase):
+                    self.assertIn(phrase, m.group(0))
+                    cut = text.replace(m.group(0), m.group(0).replace(phrase, "", 1), 1)
+                    problems = (prompt_rules.check_text("orchestrator", cut) if where == "orchestrator"
+                                else prompt_rules.check_doc_text(where, cut))
+                    self.assertIn("orch-merge-agent", ids(problems))
+
+    def test_the_concurrency_rule_is_pipeline_flow_with_10_as_default_and_no_slot_for_reviews(self):  # R1-02 of #138 (6974903898)
+        for text in (prompt_rules.normalize(real("orchestrator")), prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))):
+            self.assertIn("up to 10 worker and reviewer sessions at once", text)
+            self.assertIn("without waiting for a slot", text)
+            self.assertIn("file overlap", text)
+            self.assertNotRegex(text, r"(?i)at most \*{0,2}[35]\*{0,2} worker sessions|cap of [35] workers|worker cap 3, then 2|cap at 5")
 
 
 if __name__ == "__main__":

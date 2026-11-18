@@ -1,6 +1,6 @@
 """Checks that agents/prompts/*.md carry the collaborator-workflow and review-process rules (M0.5-19, M0.5-25, M0.5-15,
 Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
-full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (cap 5, throttle,
+full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
 docs/PLAN.md, docs/ORCHESTRATION.md, docs/reviews/README.md and handoff/TEMPLATE.md).
 
@@ -62,6 +62,12 @@ class DocRule:
     forbidden: tuple = ()
 
 
+# The merge agent's owner-only list (owner decisions B and 2026-11-17, #15 comments 6941366090 and 6943342158); the same wording in the prompt and ORCHESTRATION 7.5.
+OWNER_ONLY = (
+    r"owner-only: permissions and `\.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, "
+    r"licence acceptances, design and product sign-off, docs that are themselves a gate \(a decision to approve before work relies on it\), "
+    r"naming and protected process files"
+)
 ALL = ROLES
 
 # Wrong severities that REVIEW.md items 12 and 13 and the reviewer prompt must not carry (M0.5-26, R3-01 and R3-02 of #133). One
@@ -172,7 +178,7 @@ RULES = (
             r"`rateLimitType` and `status` together, never from `status` alone", r"`Usage:` line", r"§7\.7\.1",
             r"7-day warning never pauses", r"missing `rate_limit_info` counts as ok",
             r"an unknown or missing `rateLimitType` counts as 5-hour",
-            r"`isUsingOverage` is true[^.;]*never pauses either \(same cap, no batched extras\)",
+            r"`isUsingOverage` is true[^.;]*never pauses either \(throttle per §7\.7\.6\)",
         ),
         "the first step of every wake reads rate_limit_info and sets Usage:; a 7-day warning never pauses (§7.7.1)",
     ),
@@ -284,14 +290,15 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 80% context", r"at a batch boundary: run §5\.1",
+            r"handover \(§5, two-phase\), at about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
             r"a successor does §5\.2",
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 80% context at a batch boundary: handover comment, successor, lock until the ack, then release (§5)",
-        forbidden=(r"at about 50% context",),
+        "two-phase handover at about 80% of a 1M window (60% of 200k), first batch boundary: comment, successor, ack, release (§5)",
+        forbidden=(r"at about 50% context", r"at about 80% context"),
     ),
     Rule(
         "lock-takeover", ("orchestrator",),
@@ -640,13 +647,17 @@ RULES = (
     Rule(
         "orch-throttle", ("orchestrator",),
         (
-            r"parallelism and throttle \(§7\.1, §7\.7\.6\)", r"at most 5 worker sessions at once", r"subagents do not count",
-            r"\(1\) no optional extras", r"\(2\) the worker cap 3, then 2", r"\(3\) pause new work and finish the open prs",
-            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews",
-            r"a plain 7-day warning stays at stage 1 with the cap at 5",
+            r"concurrency and throttle \(§7\.1, §7\.7\.6\)",
+            r"the limit is for pipeline flow, not cost: up to 10 worker and reviewer sessions at once, more when independent work exists",
+            r"the limits are file overlap, owner-merge queue depth and account rate limits",
+            r"a review starts as soon as its pr is ready, without waiting for a slot",
+            r"throttle only when a rate limit is near or in overage \(a 7-day warning or `isusingoverage`\)",
+            r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"\(2\) halve the concurrency limit, then halve it again",
+            r"\(3\) pause new work and finish the open prs",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews and the r2 usage read",
         ),
-        "cap of 5 workers; while a usage warning is active throttle extras, then the cap, then new work; reviews are never throttled (rows 18, 28)",
-        forbidden=(r"cap of 3 workers",),
+        "concurrency is for pipeline flow (default 10, reviews without a slot); throttle only near a rate limit or in overage, never the reviews (owner decision, 2026-11-18)",
+        forbidden=(r"cap of [35] workers", r"at most 5 worker sessions", r"the worker cap 3, then 2", r"recurring reviews r2"),
     ),
     Rule(
         "orch-spawn-checks", ("orchestrator",),
@@ -666,8 +677,7 @@ RULES = (
         "orch-merge-agent", ("orchestrator",),
         (
             r"merge agent \(§7\.5\): the merge agent merges every ready pr except the owner-only ones, one at a time",
-            r"owner-only: permissions and `\.claude` settings, guard thresholds, branch protection, design and product sign-off, naming "
-            r"and protected process files",
+            OWNER_ONLY,
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
@@ -837,6 +847,25 @@ DOC_RULES = (
         forbidden=(r"the owner creates them once, task m0-o10", r"asks the owner to do m0-o10"),
     ),
     DocRule(
+        "followups-burn-down", "docs/FOLLOW-UPS.md",
+        (
+            r"more than 8 open follow-ups for one milestone: the orchestrator stops deferring and starts the milestone's burn-down task; "
+            r"re-deferral and majors still need the owner",
+            r"more than 8 open per milestone starts the burn-down; re-deferral and majors go to the owner",
+        ),
+        "FOLLOW-UPS: more than 8 open follow-ups start the burn-down task, they do not stop at the owner (ORCHESTRATION 7.2.1)",
+        forbidden=(r"stops deferring and reports to the owner", r"more than 8 open per milestone goes to the owner"),
+    ),
+    DocRule(
+        "plan-transcripts", "docs/PLAN.md",
+        (
+            r"the orchestrator reads results cheapest first and never whole transcripts; targeted `list_events` on a stall, a block, red ci "
+            r"or before an escalation decision",
+        ),
+        "PLAN 9.2: the orchestrator reads results cheapest first, targeted list_events when needed, never whole transcripts (ORCHESTRATION 7.3)",
+        forbidden=(r"never reads child transcripts",),
+    ),
+    DocRule(
         "reviews-design-rounds", "docs/reviews/README.md",
         (r"max 3 opus rounds \(d-3\.2\)", r"r5 up to 3 rounds", r"opus design reviewer \(max 3 rounds\)"),
         "the reviews README says 3 design rounds, as roles.yaml does (rev 46 row 5)",
@@ -874,21 +903,27 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 80% context", r"at a \*\*batch boundary\*\*", r"after about 40 wakes, or after 20 worker sessions",
+            r"trigger: about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
+            r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
         "ORCHESTRATION 5: hand over at about 80% at a batch boundary (40 wakes or 20 sessions when unknown); the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"the owner archives you"),
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"the owner archives you"),
     ),
     DocRule(
         "orch-parallel", ORCH,
         (
-            r"\*\*parallelism cap\*\* \(§7\.7\.5\): at most \*\*5\*\* worker sessions run at once, writers, reviewers, second and escalation "
-            r"reviewers together; subagents do not count",
-            r"\* \*\*parallelism cap:\*\* at most 5 worker sessions at once \(§7\.1; owner decision of 2026-11-17 in #15\)",
+            r"\* \*\*concurrency\*\* \(§7\.7\.5\): for pipeline flow, not cost \(owner decision of 2026-11-18, #15\): up to 10 worker and "
+            r"reviewer sessions at once, more when independent work exists",
+            r"the limits are file overlap \(no two implementers on the same files unless merge commits resolve it cheaply\), owner-merge queue "
+            r"depth and account rate limits \(§7\.7\.6\)",
+            r"a review starts as soon as its pr is ready, without waiting for a slot; subagents do not count",
+            r"\* \*\*concurrency:\*\* a pipeline-flow rule \(§7\.1\), never a cost control",
+            r"no pause, throttle per §7\.7\.6", r"\*\*do not pause\.\*\* throttle per §7\.7\.6",
         ),
-        "ORCHESTRATION 7.1 and 7.7.5: the parallelism cap is 5 (owner decision of 2026-11-17)",
-        forbidden=(r"at most \*{0,2}3\*{0,2} worker sessions",),
+        "ORCHESTRATION 7.1, 7.7.1 and 7.7.5: concurrency is a pipeline-flow rule, default 10, reviews without a slot (owner decision of 2026-11-18)",
+        forbidden=(r"at most \*{0,2}[35]\*{0,2} worker sessions", r"the parallelism cap", r"no batched extras"),
     ),
     DocRule(
         "orch-review-rounds", ORCH,
@@ -962,8 +997,7 @@ DOC_RULES = (
         "orch-merge-agent", ORCH,
         (
             r"\* \*\*merge agent:\*\* the merge agent merges every ready pr except the owner-only ones, one at a time",
-            r"owner-only: permissions and `\.claude` settings, guard thresholds, branch protection, design and product sign-off, naming "
-            r"and protected process files",
+            OWNER_ONLY,
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
@@ -974,12 +1008,13 @@ DOC_RULES = (
     DocRule(
         "orch-throttle", ORCH,
         (
-            r"§7\.7\.6 throttle order \(owner decision a, 2026-11-17\)", r"\(1\) no optional extras", r"\(2\) the worker cap 3, then 2",
+            r"§7\.7\.6 throttle order\.", r"throttle only when a rate limit is near or in overage: a 7-day `allowed_warning` or `isusingoverage`",
+            r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"\(2\) halve the concurrency limit, then halve it again",
             r"\(3\) pause new work and finish the open prs",
-            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews",
-            r"a plain 7-day warning stays at stage 1 with the cap at 5",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the r2 usage read of §7\.7\.1",
         ),
-        "ORCHESTRATION 7.7.6: the throttle order (extras, worker cap, new work); reviews are never throttled (owner decision A)",
+        "ORCHESTRATION 7.7.6: throttle only near a rate limit or in overage: extras, halve the concurrency, pause new work; reviews are never throttled",
+        forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2"),
     ),
     DocRule(
         "orch-spawn-templates", ORCH,
