@@ -1354,7 +1354,10 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-autonomy", "**Labels:** the orchestrator applies `big-pr` only with the owner's explicit say-so."),
         ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 80% context, at a **batch boundary** rather than mid-batch."),  # R1-05 of #138
         ("docs/ORCHESTRATION.md", "orch-parallel", "At most **5** worker sessions run at once, reviewers inside the cap."),  # R1-02 of #138
-        ("docs/ORCHESTRATION.md", "orch-throttle", "(2) the worker cap 3, then 2. One stage per check-in while the state lasts (R2-01 of #138)."),
+        ("docs/ORCHESTRATION.md", "orch-throttle", "(2) the worker cap 3, then 2."),  # R3-01 of #138: one case per forbidden phrase
+        ("docs/ORCHESTRATION.md", "orch-throttle", "One stage per check-in while the state lasts."),
+        ("docs/ORCHESTRATION.md", "orch-throttle", "(1) no optional extras (recurring reviews R2 to R4)"),
+        ("docs/ORCHESTRATION.md", "orch-throttle", "Stage 2 applies when the §7.7.5 forecast says the limit is reached."),  # R3-02
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the next round covers it, or until the owner explicitly accepts it."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Round 4 with findings above `nit`: stop and ask the owner."),
         ("docs/ORCHESTRATION.md", "orch-design-rounds", "Round {round} of max 2."),
@@ -1381,7 +1384,8 @@ class Pr4RuleTests(unittest.TestCase):
     def test_the_old_orchestrator_prompt_wording_is_rejected(self):
         for rid, old in (
             ("orch-model", " Sonnet, low effort, one long-lived session."), ("orch-transcripts", " Never read child transcripts."),
-            ("orch-throttle", " At most 5 worker sessions at once."), ("handover", " Hand over at about 80% context."),
+            ("orch-throttle", " At most 5 worker sessions at once."), ("orch-throttle", " One stage per check-in while it lasts."),
+            ("orch-throttle", " (1) no optional extras (recurring reviews R2 to R4)."), ("handover", " Hand over at about 80% context."),
             ("autonomy", " The `big-pr` label is set only with the owner's say-so."), ("orch-deferral", " more than about 15 changed lines"),
         ):
             with self.subTest(old=old):
