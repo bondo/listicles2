@@ -11,8 +11,8 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 | Role | Model / effort | Lifetime | Writes to | Never |
 |---|---|---|---|---|
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
-| **Orchestrator** | Sonnet / low | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, draft PRs, Dependabot PR closes, scheduled tasks, session tags | Commits, pushes (the one exception: the server-side `update_pull_request_branch` of §7.5), edits files, reviews code, reads full transcripts, merges, applies `big-pr` without the owner's say-so |
-| **Implementer** | Sonnet / medium (high on escalation or `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
+| **Orchestrator** | Opus / medium | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, draft PRs, Dependabot PR closes, scheduled tasks, session tags | Commits, pushes (the one exception: the server-side `update_pull_request_branch` of §7.5), edits files, reviews code, reads whole transcripts, merges |
+| **Implementer** | Opus / high (max for `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
 | **Reviewer** | Opus / high (max for `risk:high`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
 | **Collaborator** (human, trusted Write role, [`COLLABORATING.md`](COLLABORATING.md)) | n/a | n/a | Comments, issues from the forms, PR reviews; nothing else | Merge, enable auto-merge, mark ready, edit files, close, delete branches, resolve threads, labels, comment on #15; sign off design (owner only) |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
@@ -29,17 +29,17 @@ by the early warning and pause protocol of §7.7. It keeps one
 (except while paused, §7.7.2, when the single resume reminder replaces it).
 
 **Without asking**, it may:
-* start workers for tasks the ready query lists (§4.3) and run review rounds (max 4 per batch, §6.2);
+* start workers for tasks the ready query lists (§4.3) and run review rounds (max 4 per batch, §6.2) and the one escalation reviewer after round 4;
 * keep the state issue and the metrics comments current;
 * run the usage-limit pause and resume protocol (§7.7), including interrupting sessions and posting `PAUSED`/`RESUMED`;
 * open draft PRs, and spawn fix rounds, escalation respawns and status-sync sessions (§7.1);
 * close individual Dependabot PRs once the grouped Dependabot PR has merged (§7.5; §9 F6);
-* create issues for owner-only tasks (§4.5).
+* create issues for owner-only tasks (§4.5);
+* mark a PR READY and send it to the merge agent (a `risk:high` PR only after the independent second-reviewer pass); the merge agent is described in §7.5.
 
 **It must stop and ask the owner**, one question at a time with a recommendation, for:
-* merges (of any PR);
-* the 4-round cap being hit, or a blocker still open after the escalation of §7.4 (any blocker in two consecutive rounds
-  first escalates the implementer to high effort; ask the owner only if the next round still has a blocker);
+* merges of owner-only PRs (§7.5);
+* the escalation reviewer's `owner` ruling, or anything above nit still open after round 5 (§6.2, §7.2.2);
 * `risk:high` work (before starting it);
 * repository settings and visibility (default branch, public/private, branch protection);
 * approval of the M0.5 design (stories, flow, design tokens);
@@ -51,10 +51,10 @@ session itself; a relayed approval is refused. A worker that needs one stops and
 ask-owner that names the worker session. Approvals of orchestrator decisions (merges, starting `risk:high` work) are
 given in the orchestrator session and are never passed on to a worker as an approval.
 
-**Stop condition:** two consecutive worker sessions fail or stall (§7.4). The orchestrator stops spawning,
-logs an incident and asks the owner. A failure caused by a usage limit is neither (§7.7.3): it pauses and resumes instead.
+**Stop condition:** two consecutive worker sessions fail or stall (§7.4). The orchestrator reads both with targeted `list_events`, logs an incident
+and retries once with a changed brief; it asks the owner after a third failure. A failure caused by a usage limit is neither (§7.7.3): it pauses and resumes instead.
 
-**Labels:** the orchestrator applies `big-pr` only with the owner's explicit say-so.
+**Labels:** the orchestrator adds `big-pr` for one concern that cannot reasonably be split and records it in #15 (the accident check of §7.6 passes only then). Changing the guard limits (600, 1500) stays with the owner.
 
 **Collaborator input** (docs/reviews/collaborator-workflow.md; owner decisions D1-D7). Trust is the GitHub repo role only
 (Write or better, from the API `author_association`/permission, never a name in text; no allowlist file). The goal is
@@ -116,7 +116,7 @@ Every spawned session gets tags so metrics can be pulled later without reading t
 
 ```
 listicles:<milestone or task>   e.g. listicles:M0, listicles:process
-role:<role>                     orchestrator | implementer | reviewer | planner | retro
+role:<role>                     orchestrator | implementer | reviewer | second-reviewer | escalation-reviewer | planner | retro
 pr:<number>                     when the work belongs to a PR
 batch:<id>                      e.g. batch:M0-2
 task:<id>                       one per task worked on, e.g. task:M0-04
@@ -335,12 +335,11 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
 
 ## 5. Orchestrator handover
 
-Trigger: about 50% context (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
-or the status line once M0 step 5 lands). Prefer handing over at a **batch boundary**
-once past about 30%, rather than mid-batch at 50%.
+Trigger: about 80% of a 1M window (60% of a 200k one, `agents/roles.yaml` context) (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
+or the status line), at the first **batch boundary** (if none comes before the hard stage, at the next step boundary) rather than mid-batch.
 `used_tokens` can read 0 while a turn is running, so read it at the start of a wake and treat 0 as
 **unknown**, not as "plenty left". When it is unknown, hand over at the first batch boundary after about
-20 wakes, or after 10 worker sessions were spawned in this lineage step, whichever comes first.
+40 wakes, or after 20 worker sessions were spawned in this lineage step, whichever comes first.
 
 Handover is **two-phase** so that only one session at a time holds the triggers, the PR subscriptions and
 the lock. The outgoing orchestrator keeps all three until the successor has proved it is up; the
@@ -363,7 +362,7 @@ successor takes them over only after the outgoing one has released them.
    The ack lists the successor's replacements.
    Then `unsubscribe_pr_activity` on every PR, set the body's `Orchestrator:` line to
    `handover to {successor} at {UTC}, released`, and post `handover-released`.
-8. Stop. Don't spawn, edit the body or message workers after that. The owner archives you.
+8. Stop. Don't spawn, edit the body or message workers after that. The new orchestrator archives you in its sweep (§5.2 step 7).
 
 ### 5.2 Incoming orchestrator checklist
 
@@ -385,6 +384,7 @@ successor takes them over only after the outgoing one has released them.
    and repeat it every 15 minutes until the lease is presumed dead (90 minutes without `Updated:`) or the owner answers.
 6. Child-session failure events go to the session that **spawned** a worker, so a predecessor's
    workers will not wake you. Schedule a check-in (`send_later`) for each one that is still running.
+7. Archive sweep (§7.4), once you hold the lock.
 
 ### 5.3 Lease, arbitration and recovery
 
@@ -452,7 +452,7 @@ date,batch,pr,round,reviewer_session,base_sha,head_sha,blocker,major,minor,nit,d
 Rounds are numbered **per PR**, globally and monotonically (1, 2, … giving IDs R1-…, R2-…) and never reset per batch.
 The 4-round cap is **per batch** (the accepted plan: "max 4 rounds per batch"). A batch is the unit one implementer
 delivers and one review loop covers; a PR of a single batch is capped per PR, and a multi-batch PR such as M0 #1 gets
-a fresh 4 per batch. Round 4 with findings above `nit`: stop and ask the owner. Blockers follow §1.1 (escalate first).
+a fresh 4 per batch. Round 4 with findings above `nit`: the escalation of §7.2.2 decides `fix`, `split` or `owner`; it does not stop at the owner.
 `REVIEW.md`, `CLAUDE.md` and `PLAN.md` §6 say "max 4 rounds per batch" (aligned by M0-11). A finding ID is `R<round>-<nn>` (e.g. `R8-01`).
 `verdict` is the reviewer's (`changes_requested | ready_nits_only`), or `cap_reached`, which the orchestrator
 sets after round 4 of a batch, or one the decider sets (the orchestrator; in a manual loop the implementer, in its PR comment): `ready_deferred`
@@ -494,7 +494,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
   (from `review`), fix-round implementers after `changes_requested` (their tasks are in `review`, §7.2), the escalation and
   failure respawns of §7.4, the status-sync sessions of §4.4, and the environment smoke tasks (§7.1 smoke bullet; spawn with the §8.4 one-off template, role implementer). Batching several ready
   tasks of one PR into one session is fine; claim them all. **One batch = one PR, no stacking** (retro R3): the next batch
-  branches from `main` after the previous PR is squash-merged. `big-pr` is only for generated or mechanical diffs.
+  branches from `main` after the previous PR is squash-merged. `big-pr` is for generated or mechanical diffs and for one concern that cannot reasonably be split (§1.1).
 * `create_session` with the spawn message (§8), the tags from §2.1, the model and effort
   from PLAN §9.1, and for writers `outcome_branch` = the branch they hold.
 * **Pick the environment before `create_session`** (retro R8). Tasks that touch a process file (`CLAUDE.md`, `REVIEW.md`,
@@ -508,19 +508,20 @@ total cost, incidents. Then refresh the PR description's review table from the r
   or force-push). A worker prompt that asks for a force-push is denied by the auto-mode classifier; do not write one.
 * **Branch lock**: before spawning a writer, set the branch's holder in the state body.
   Only one writer per branch at a time. Reviewers hold no lock and never push.
-* **Parallelism cap** (§7.7.5): at most 3 worker sessions run at once, writers and reviewers together.
+* **Concurrency** (§7.7.6): for pipeline flow, not cost (owner decision of 2026-11-18, #15): up to 10 worker and reviewer sessions at once, more when independent work exists.
+  The limits are file overlap (no two implementers on the same files unless merge commits resolve it cheaply), owner-merge queue depth and account rate limits (§7.7.6).
+  A review starts as soon as its PR is ready, without waiting for a slot; subagents do not count.
 * The orchestrator's own **45-minute check-in** (`send_later`, §1.1) is re-scheduled on every wake (except while paused, §7.7.2), and it is
   the check-in for all workers too. **Every wake starts with the usage read of §7.7.1** (while paused: §7.7.2 step 6), before anything is spawned. A reviewer or short worker may get an extra earlier one (about 30 min). Record the
   trigger ids in the body and delete finished ones.
 
 ### 7.2 Review rounds
 
-* The orchestrator gives the reviewer the PR number, `base_sha` (= the branch's
-  `reviewed_through`), `head_sha`, the round ID, the IDs of findings that are still open, and the IDs of deferred findings with their issue
+* The orchestrator gives the reviewer the PR number, `base_sha` (the merge base), `head_sha`, `reviewed_through`, the round ID, the IDs of findings that are still open, and the IDs of deferred findings with their issue
   links (the reviewer re-checks each deferral record against FOLLOW-UPS.md §2).
-* The reviewer reviews `base_sha..head_sha` only, plus re-checks of open findings, and posts **one**
+* The reviewer reviews the whole PR diff `base_sha..head_sha` with the findings JSON of every earlier round and focuses on `reviewed_through..head_sha`, plus re-checks of open findings, and posts **one**
   PR comment with the fenced `json` block defined in `REVIEW.md` (`round` as a number,
-  `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>` (design-review rounds use `D<round>-<nn>`, §8.5), `verdict`
+  `reviewed_range` = `base_sha..head_sha`, finding IDs `R<round>-<nn>` (`S<round>-<nn>` for the second reviewer, `D<round>-<nn>` for design-review rounds, §8.5), `verdict`
   `changes_requested | ready_nits_only`), followed by its `WORKER-RESULT` block (§7.3).
   `REVIEW.md` owns the format; this file does not repeat it. Each finding carries `area`, `recommend` (`fix-now | defer`) and
   `recommend_reason`, and `status` may be `deferred` ([`FOLLOW-UPS.md`](FOLLOW-UPS.md) §5). The reviewer recommends only. The orchestrator decides deferral (§7.2.1).
@@ -529,18 +530,15 @@ total cost, incidents. Then refresh the PR description's review table from the r
   afterwards. Every reviewer prompt says so (§8.3).
 * After the round, the orchestrator sets `reviewed_through = head_sha`. The round is started from the
   `review` list (§4.3).
-* Any commit after `reviewed_through` is **unreviewed** until the next round covers it, or until the
-  owner explicitly accepts it. That acceptance goes in a `decision` log comment and in the branch row.
-  Handoff-only and docs-only commits still count. They are listed, not silently skipped.
+* Any commit after `reviewed_through` is **unreviewed** until the next round covers it. Handoff-only and docs-only commits still count. They are listed, not silently skipped.
 * **Delta review** (retro R4): a commit after the last round gets one delta review before the merge request: a fresh
-  reviewer, range `reviewed_through..head_sha` only (about $1-2). Default: a delta review. Owner acceptance (the bullet above) is the only
-  alternative, and never for gate or threshold changes, which always get a delta review. Record
-  `reviewed_through` afterwards. Reviewers see what changed since the last round, not the whole PR again.
+  reviewer with the whole PR diff, focused on `reviewed_through..head_sha` (about $1-2). A delta review always runs; there is no owner-acceptance alternative, for any PR. Record
+  `reviewed_through` afterwards.
 
 ### 7.2.1 Deferring findings
 
-**Default (retro R9):** once a round has no blocker and no major, the orchestrator defers the remaining minors and nits
-(follow-up issues) instead of running another round, unless a minor is in a gate (guards, hooks, thresholds, CI checks). The default is subject to the rules below and
+**Default:** fix a minor in the PR when its fix is small (about 30 changed lines or fewer), and always when it is in a gate (guards, hooks, thresholds, CI checks). Once a round has no blocker and no major, the orchestrator defers a minor with a larger or out-of-scope fix,
+and any nit, instead of running another round. The default is subject to the rules below and
 [`FOLLOW-UPS.md`](FOLLOW-UPS.md): the owner-OK areas (`security-rules`, `sync-merge`, `release`, `risk:high` tasks, majors) and the limit of 8 open follow-ups per milestone.
 
 Rules, labels and the issue template: [`FOLLOW-UPS.md`](FOLLOW-UPS.md). In short: after each round the orchestrator
@@ -552,9 +550,16 @@ and the "only nits remain" test count only unresolved, non-deferred findings. If
 commit followed the reviewed range, the PR needs no further round: the orchestrator posts a `decision` comment
 `accepted: all findings above nit deferred (#a, #b)` and sets the round's verdict to `ready_deferred` (taking precedence
 over `cap_reached`); that is the owner's signal to merge. An implementer deciding without an orchestrator posts the
-`accepted:` comment on the PR with the round row inside it, and writes nothing to the state issue; the next orchestrator copies the row into the log. More than 8 open follow-ups for one milestone: stop deferring and report to the owner (count targets
+`accepted:` comment on the PR with the round row inside it, and writes nothing to the state issue; the next orchestrator copies the row into the log. More than 8 open follow-ups for one milestone: stop deferring and start the milestone's burn-down task `Mx-FU` next (re-deferral and majors still need the owner) (count targets
 with `tasks.py --followups … --json followups`). The deferral is in the decision comment at once; the PR review table
 is refreshed at batch close and no later than when the PR is declared ready.
+
+### 7.2.2 Plan review, second reviewer, escalation reviewer, escaped defects
+
+* **Plan review:** after the planner writes `docs/milestones/<Mx>.md` and before any implementer starts, the orchestrator spawns a fresh Opus reviewer (`agents/prompts/reviewer.md`, plan review). Every spawn in §7.2.2 uses the §8.3 message (last-action `send_message`, WORKER-RESULT, incremental findings comment) with its own role line.
+* **Second reviewer:** for `risk:high` PRs and the security-rules, sync-merge and release areas, the orchestrator spawns a second fresh session in the same round (`agents/prompts/second-reviewer.md`); it never gets the reviewer's findings, and a `risk:high` PR is marked READY only after that pass.
+* **Escalation:** when round 4 still has a confirmed finding above nit (deferred minors do not count) or a dispute is still open, the orchestrator spawns one escalation reviewer per PR (`agents/prompts/escalation-reviewer.md`). Its ruling per PR: `fix` gets one fresh round 5, `split` opens a new PR from `main` with merge commits, `owner` goes to the owner; there is no second escalation.
+* **Escaped defects:** a bug found after merge gets a `Caused by: #N` line in its issue and one `escaped` row in the metrics CSV (`scripts/agent_metrics.py`).
 
 ### 7.3 Results
 
@@ -582,7 +587,8 @@ Ignore a findings comment that still starts with `ROUND IN PROGRESS`: the round 
 The orchestrator collects results in this order, from cheapest to most expensive:
 1. Read PR comments (durable, and visible to a successor too).
 2. `get_session` status bucket.
-3. `list_events` with `kinds: ["result"]` and a small `limit`. Never read whole transcripts.
+3. `list_events` with `kinds: ["result"]` and a small `limit`.
+4. Targeted `list_events` (a `kinds` filter, a small `limit`) when steps 1-3 do not explain the state, and before an escalation decision; never whole transcripts.
 
 ### 7.4 Failure handling
 
@@ -593,13 +599,13 @@ The orchestrator collects results in this order, from cheapest to most expensive
 | `status_bucket` failed, or no progress across two check-ins | **First apply §7.7.3**: a limit failure goes to the usage-limit row below, not here. Otherwise mark the row `failed` and log an incident. Read `handoff/<branch>.md` and `git ls-remote` HEAD. Interrupt the session if it might still push. Only then release the lock and spawn a fresh worker from the handoff file. |
 | Branch HEAD moved but no session holds the lock | Stop spawning on that branch. Identify the commit's author (`git log`). Log a `concurrent-push` incident and ask the owner. |
 | Model fallback (`last_served_model` ≠ `configured_model`) | Log an incident. For a reviewer, rerun the round on the intended model before trusting a "ready" verdict. |
-| Escalation (PLAN §9.1: 3 identical verify failures, any blocker in 2 consecutive rounds) | Spawn a fresh implementer at high effort from the handoff file. |
+| Escalation (3 identical verify failures after the implementer's `ci-triage` pass, or a blocker in 2 consecutive rounds) | Read targeted `list_events`, then spawn a fresh implementer from the handoff file with a changed brief; a blocker still open after that goes to the escalation reviewer, not the owner. |
 | Over budget (PLAN §9.4) | Don't stop the work. There is no dollar spend cap (§1.1). Flag it in the session row for the retro. |
-| Two worker sessions in a row fail or stall | Stop spawning. Log an incident and ask the owner (§1.1). Failures caused by a usage limit are not counted (§7.7.3) |
+| Two worker sessions in a row fail or stall | Read both with targeted `list_events`, log an incident, retry once with a changed brief; ask the owner after a third failure (§1.1). Usage-limit failures are not counted (§7.7.3) |
 | Failures with a usage-limit message (the 5-hour limit) | Confirm with the detection step of §7.7.3, then run the pause protocol (§7.7.2) if not already paused. Do not respawn: after the reset, resume with `send_message` (§7.7.4). A limit failure never counts toward the two-failure stop rule above, and is not a `dead-session`. |
 
-Archive finished worker sessions once their metrics row is logged and the owner has
-seen the batch report.
+**Archive** (`archive_session`) each worker, reviewer and planner session as soon as you are done with it (result read, no follow-up planned); keep an implementer until its PR is merged or handed elsewhere.
+**Sweep** after every handover (§5.2 step 7): the new orchestrator archives every finished worker, reviewer, planner and previous-orchestrator session of this project; it keeps itself, the merge agent and any session still running or with unpushed work, and never archives a session that does not clearly belong to this project (it lists it for the owner).
 
 ### 7.5 Pull requests and the merge request
 
@@ -610,6 +616,9 @@ seen the batch report.
   (3) **Closing keywords:** never write close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly
   before an issue number in a commit or PR body unless closing that issue is intended; write "gated on #N", "see #N" or
   "mark #N done" instead. Scan the PR body for them before asking the owner to merge.
+* **Merge agent:** the merge agent merges every READY PR except the owner-only ones, one at a time. Owner-only: permissions and `.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, licence acceptances, design and product sign-off, docs that are themselves a gate (a decision to approve before work relies on it), naming and protected process files.
+  A `risk:high` PR is marked READY only after the independent second-reviewer pass is clean (owner decision B, 2026-11-17). Docs PRs whose owner approval can wait go to it too and carry the status line `working draft ...; not owner-approved (see issue #15)` until the owner approves them in a later PR.
+  A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge; the orchestrator never passes an approval on to it.
 * **Marking a PR ready:** the orchestrator (or the implementer session when the orchestrator says so) marks a draft PR ready after
   clean review rounds with `scripts/mark-ready.sh <N>`. Reviewers never mark PRs ready. The script accepts exactly one argument,
   the PR number as digits only, and makes one fixed POST to the `ready_for_review` route of this repo; it refuses anything else
@@ -702,10 +711,8 @@ near limit (7-day), ok.
   only: if it still shows the warning, run the pause protocol (§7.7.2); if it no longer does, the state is whatever §7.7.1 then says
   (a state raised by the cost forecast, `near limit (5-hour, forecast)`, never pauses by itself). A limit failure is not this state: it is
   **limit reached**.
-* **near limit (overage)**: `isUsingOverage` is true, unless limit reached or a 5-hour warning applies. Handled like the 7-day state:
-  no pause, the cap, no batched extras.
-* **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning`. **Do not pause.** Keep to the
-  parallelism cap (§7.7.5) and block batched extras (no optional sessions, no several tasks started at once beyond the cap);
+* **near limit (overage)**: `isUsingOverage` is true, unless limit reached or a 5-hour warning applies. No pause, throttle at stage 2 of §7.7.6.
+* **near limit (7-day)**: `rateLimitType` is `seven_day` and `status` is `allowed_warning`. **Do not pause.** Throttle per §7.7.6;
   required work (ready tasks, review rounds for open PRs) goes on. Name the reset time in the `Usage:` line.
 * **ok**: `status` is `allowed` and `isUsingOverage` is false.
 * **paused until HH:MM UTC**: set by §7.7.2, cleared by §7.7.4; while it is set, §7.7.2 step 6 governs every wake.
@@ -765,13 +772,16 @@ but say so in the `Usage:` line.
    not trusted from the comment.
 
 **§7.7.5 Spend control.** There is no dollar cap, but limits can be forecast and made less likely:
-* **Parallelism cap:** at most 3 worker sessions at once (§7.1), writers and reviewers together. Raise it only by editing this line
-  in a reviewed PR, after the metrics show room.
+* **Concurrency:** a pipeline-flow rule (§7.1), never a cost control.
 * **Track cost per round and per window:** the session row (§6.1, reviewer sessions are one per round) carries `cost_usd`. Once
   `scripts/agent_metrics.py` (M0.5-13) has produced `docs/agent-metrics.csv`, sum it; for rounds not saved there yet sum the `metrics:session` comments.
   At each pause, put the cost of the sessions active in the closing window (summed from `get_session` usage, never estimated) in the
   `usage-limit` incident row's `impact`. Compare the running window cost with the last two such rows at every wake: when it passes the
   smaller one, set `Usage:` to **near limit (5-hour, forecast)** early (§7.7.1: no new workers, an extra check-in; the second look reads `rate_limit_info` only, so a forecast never pauses by itself). The numbers are a rough forecast; `rate_limit_info` decides.
+
+**§7.7.6 Throttle order.** Concurrency is limited for flow, not cost (§7.1), so throttle only near a rate limit. A 7-day `allowed_warning` holds at stage 1 and required work goes on; stage 2 applies in overage; stage 3 only on an owner decision in #15 (a 5-hour warning or a reached limit pauses, §7.7.2).
+Throughput goes first, quality last; the stages are cumulative: (1) no optional extras (recurring reviews R3 and R4, transcript sampling, explorer runs the task does not need); (2) halve the concurrency limit, once per check-in while stage 2 applies, at most twice; (3) pause new work and finish the open PRs. A stage lifts, and the limit returns to the §7.1 default, at the first check-in where its trigger no longer applies.
+Never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the R2 usage read of §7.7.1.
 
 ## 8. Spawn messages
 
@@ -809,7 +819,7 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3) as a comment on 
 ### 8.3 Reviewer
 
 ```
-Role: agents/prompts/reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}.
+Role: agents/prompts/reviewer.md. PR #{pr}, round {round}, whole diff {base_sha}..{head_sha}, focus since {reviewed_through}.
 Open findings to re-check: {ids with one line each}. Tasks this PR claims to finish: {task ids}.
 Check that docs/tasks.toml marks exactly those as done (not on a PR whose branch is the tasks ref, §4.4; status-sync commits that mark other PRs' tasks are fine).
 You NEVER edit files on, or push to, the PR branch. You only report findings (severity, file:line,
@@ -837,13 +847,13 @@ Finish with a WORKER-RESULT block (docs/ORCHESTRATION.md §7.3).
 
 ### 8.5 Design reviewer
 
-Role R5 (`docs/reviews/README.md` §1, §2). Spawn it with the §8.3 reviewer message, but with this role line and inputs (Opus high, tag `round:D<n>`; max 2 rounds per design PR):
+Role R5 (`docs/reviews/README.md` §1, §2). Spawn it with the §8.3 reviewer message, but with this role line and inputs (Opus high, tag `round:D<n>`; max 3 rounds per design PR):
 
 ```
 Role: agents/prompts/design-reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}.
-Open findings to re-check: {ids with one line each or none}. Round {round} of max 2; the prompt decides whether this round posts the hand-off.
+Open findings to re-check: {ids with one line each or none}. Round {round} of max 3; the prompt decides whether this round posts the hand-off.
 owner_handle: {owner_handle}. collaborator_handle: {collaborator_handle or none}.
-Post the one joint hand-off comment (round 2, or round 1 when nothing above nit is open) mentioning @{owner_handle} and @{collaborator_handle} together; with `none`, mention only the owner.
+Post the one joint hand-off comment (round 3, or an earlier round when nothing above nit is open) mentioning @{owner_handle} and @{collaborator_handle} together; with `none`, mention only the owner.
 Orchestrator session: {orchestrator_session}. Your last action: send_message to {orchestrator_session} with the compact one-line WORKER-RESULT, including the hand-off comment link.
 ```
 
@@ -859,7 +869,7 @@ The orchestrator fills `{collaborator_handle}` with `none` until the owner says 
 | F4 | Scheduled tasks and PR subscriptions are bound to one session and don't follow a handover | Two-phase handover: the successor recreates triggers and acks, the predecessor deletes its triggers and unsubscribes, then the successor subscribes (§5) |
 | F5 | Child failure events go only to the spawning session | Check-ins via `send_later` plus `get_session` polling (§7.1, §5.2) |
 | F6 | Two writers on one branch (two implementers, or the owner merging a Dependabot PR into a feature branch) | Branch lock (§7.1). Don't merge PRs whose base is a feature branch |
-| F7 | Unreviewed commits reach a merge | `reviewed_through` per branch, with explicit owner acceptance logged (§7.2) |
+| F7 | Unreviewed commits reach a merge | `reviewed_through` per branch; every later commit gets a delta review (§7.2) |
 | F8 | Review findings exist only in transcripts and commit messages, so metrics and re-checks lose them | A findings JSON comment on the PR per round (§7.2) |
 | F9 | Cost numbers without a source | Read `get_session` usage only. Leave unknown values empty (§6) |
 | F10 | The owner has to relay "done" to the orchestrator | The orchestrator checks `owner-todo` issues itself on each wake (§4) |
@@ -871,4 +881,4 @@ The orchestrator fills `{collaborator_handle}` with `none` until the owner says 
 | F16 | A reviewer "helpfully" fixes the PR and so is both author and reviewer | Reviewers never edit or push to the PR branch (§7.2, §8.3) |
 | F17 | Minor findings block acceptance, or are deferred and forgotten | Follow-up issues with a mandatory burn-down task per milestone that the ready query enforces ([`FOLLOW-UPS.md`](FOLLOW-UPS.md)) |
 | F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. Do not extend its shell model. The boundary is branch protection, required CODEOWNERS review and squash-only. "By design" closing of #21-#26 (all open) applies only once M0-O6 is done (branch protection confirmed on). Until then hook-bypass findings are recorded, not dismissed, and are deferred only as §7.2.1 allows (minors and nits; a major needs owner OK) |
-| F19 | The 5-hour limit stops all workers and the check-in together; the loop does not resume, work is lost, or limit failures are mistaken for stalls and trip the stop rule | Early warning from `rate_limit_info` on every wake, one pause protocol with a single resume reminder at reset + 5 minutes, limit failures excluded from the stop rule, push after each step, a parallelism cap (§7.7, §7.1, §8) |
+| F19 | The 5-hour limit stops all workers and the check-in together; the loop does not resume, work is lost, or limit failures are mistaken for stalls and trip the stop rule | Early warning from `rate_limit_info` on every wake, one pause protocol with a single resume reminder at reset + 5 minutes, limit failures excluded from the stop rule, push after each step, throttling near a rate limit (§7.7, §7.1, §8) |

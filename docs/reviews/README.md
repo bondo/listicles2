@@ -22,7 +22,7 @@ exceeded, R3 reports it and R4 waits until the next week. Costs below are estima
 | R2 | Usage + reliability check | 4, 5 | every orchestrator wake (45 min) | orchestrator | `get_session` usage, `rate_limit_info`, failed or stalled sessions | `usage:` line in #15; pause protocol (ORCH 7.7); incident rows | ~0 | now |
 | R3 | Weekly ops digest | 4, 5, 7, 8; 1 | Mondays, first wake after 10:00 UTC; skipped if nothing merged | orchestrator, inside that wake | `docs/agent-metrics.csv`, `owner-todo` ages, `escaped` and `follow-up` counts | one #15 comment (section 3.1) | $0.3-1 | now |
 | R4 | Dependency triage | 2, 8 | weekly, only if Dependabot PRs are open | Sonnet worker | open Dependabot PRs | one grouped draft PR; licence and verification flags | $0-2 | now |
-| R5 | Design review | 3, 6; 11 | per design PR; max 2 Opus rounds (D-3.2) | Opus design reviewer, then the owner and the collaborator together | review sheet, `design/tokens.json`, wireframes light/dark, rubric | findings on the PR; rubric scores per screen | $2-3 per round | now |
+| R5 | Design review | 3, 6; 11 | per design PR; max 3 Opus rounds (D-3.2) | Opus design reviewer, then the owner and the collaborator together | review sheet, `design/tokens.json`, wireframes light/dark, rubric | findings on the PR; rubric scores per screen | $2-3 per round | now |
 | R6 | Milestone retro + meta-review | 4, 5, 8; the reviews | end of each milestone | Opus high worker | the CSV, `docs/agent-tuning.md` and a sample of transcripts and PR threads | at most 3 changes as reviewed PRs; expected effect logged | $1-3 | end of M0.5 |
 | R7 | Security / rules review | 2 | per PR labelled `area:security-rules`, `area:sync-merge` or `risk:high` | fresh Opus reviewer, max effort | diff, data model, rules allow/deny matrix (D-2.6) | findings JSON; matrix gaps; CSV round row | $3-5 | M1 |
 | R8 | Milestone quality review | 1, 2; 10 from M2 | end of each milestone | Opus worker | story to test trace, Kover/PIT trend, `escaped` issues, ADRs vs checklist, read counter (M2) | one comment on the milestone issue + follow-up issues | $2-4 | M1 |
@@ -31,7 +31,7 @@ exceeded, R3 reports it and R4 waits until the next week. Costs below are estima
 | R11 | Pre-release review | 9, 10, 2 | before each release (first: the M6 tag) | Opus worker + owner go/no-go | Play checks, data inventory, timing logs, manifest | release checklist comment; owner fills Data safety | $4-6 | M6 |
 | R12 | Screens vs wireframes | 3, 6 | end of each UI milestone (M1, M2, M4, M5) | Opus worker; result to owner and collaborator together | wireframes (M0.5-03), goldens per state, rubric, design ADRs | one comment on the milestone issue (section 3.4) | $2-3 | M1 |
 
-Weekly total: R2 ~0 + R3 up to $1 + R4 $0-2, about **$3 or less**. Per milestone about **$8-16** (R5 up to 2 rounds, R6, R8, R12; R8/R12 from M1).
+Weekly total: R2 ~0 + R3 up to $1 + R4 $0-2, about **$3 or less**. Per milestone about **$8-16** (R5 up to 3 rounds, R6, R8, R12; R8/R12 from M1).
 Not reviews on purpose: CI flake and lead-time numbers (D-2.7, a rollout script), a separate docs-drift review (R1 and the
 wake checks catch it; revisit at R6).
 
@@ -45,7 +45,7 @@ Protected files (`agents/`, `REVIEW.md`, `.github/`, `CLAUDE.md`) change only in
 | R2 | inside every orchestrator wake | ORCHESTRATION 7.7 (pause protocol, usage line); prompt text: M0.5-25 | protocol exists |
 | R3 | inside one orchestrator wake (D-3.1), no separate session | section 3.1; prompt step: M0.5-25 | by hand until then (D-4.4) |
 | R4 | Sonnet worker, only if Dependabot PRs are open | ORCHESTRATION 7.5 | exists |
-| R5 | Opus design reviewer (max 2 rounds), then **one** hand-off comment on the PR to the owner and the collaborator (same review sheet and screenshots) plus one line in #15; `owner-todo` only if sign-off is still pending after 7 days (D-4.5) | design-reviewer role (M0.5-15), `docs/product/rubric.md` drafted in M0.5-03 | exists (M0.5-15) |
+| R5 | Opus design reviewer (max 3 rounds), then **one** hand-off comment on the PR to the owner and the collaborator (same review sheet and screenshots) plus one line in #15; `owner-todo` only if sign-off is still pending after 7 days (D-4.5) | design-reviewer role (M0.5-15), `docs/product/rubric.md` drafted in M0.5-03 | exists (M0.5-15) |
 | R6 | Opus high worker | PLAN 9.4 + section 5 | exists, extended here |
 | R7 | Opus worker, max effort | reviewer prompt + a `REVIEW.md` allow/deny-matrix item (M0.5-26) | M1 |
 | R8 | Opus worker, one-off prompt (ORCHESTRATION 8.4) | section 3.2 | M1 |

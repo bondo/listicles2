@@ -1,7 +1,8 @@
 """Checks that agents/prompts/*.md carry the collaborator-workflow and review-process rules (M0.5-19, M0.5-25, M0.5-15,
 Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
-full-diff review, kept implementer, minors fixed by default, the single escalation; the PR 3 rules also pin CLAUDE.md,
-REVIEW.md and docs/FOLLOW-UPS.md, see DOC_RULES).
+full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
+gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
+docs/PLAN.md, docs/ORCHESTRATION.md, docs/reviews/README.md and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -61,6 +62,12 @@ class DocRule:
     forbidden: tuple = ()
 
 
+# The merge agent's owner-only list (#15 comments 6941366090 and 6943342158); the same wording in the prompt and ORCHESTRATION 7.5.
+OWNER_ONLY = (
+    r"owner-only: permissions and `\.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, "
+    r"licence acceptances, design and product sign-off, docs that are themselves a gate \(a decision to approve before work relies on it\), "
+    r"naming and protected process files"
+)
 ALL = ROLES
 
 # Wrong severities that REVIEW.md items 12 and 13 and the reviewer prompt must not carry (M0.5-26, R3-01 and R3-02 of #133). One
@@ -171,7 +178,7 @@ RULES = (
             r"`rateLimitType` and `status` together, never from `status` alone", r"`Usage:` line", r"§7\.7\.1",
             r"7-day warning never pauses", r"missing `rate_limit_info` counts as ok",
             r"an unknown or missing `rateLimitType` counts as 5-hour",
-            r"`isUsingOverage` is true[^.;]*never pauses either \(same cap, no batched extras\)",
+            r"`isUsingOverage` is true[^.;]*never pauses either \(throttle per §7\.7\.6\)",
         ),
         "the first step of every wake reads rate_limit_info and sets Usage:; a 7-day warning never pauses (§7.7.1)",
     ),
@@ -261,13 +268,19 @@ RULES = (
         "autonomy", ("orchestrator",),
         (
             r"autonomy \(§1\.1\)", r"unattended until usage limits stop you", r"without asking:",
+            r"run review rounds \(max 4 per batch, §6\.2\) and the one escalation reviewer after round 4",
+            r"add the `big-pr` label for one concern that cannot reasonably be split and record it in #15",
+            r"mark a pr ready and send it to the merge agent",
             r"stop and ask the owner, one question at a time with a recommendation",
-            r"for: merges of any pr;", r"the 4-round cap being hit", r"`risk:high` work before starting it",
+            r"for: merges of owner-only prs", r"the escalation reviewer's `owner` ruling",
+            r"`risk:high` work before starting it",
             r"repository settings and visibility", r"licence and permission acceptances",
-            r"and a relayed approval is refused", r"two consecutive worker sessions fail or stall \(§7\.4\)",
-            r"`big-pr` label is set only with the owner's say-so",
+            r"and a relayed approval is refused",
+            r"two consecutive worker sessions fail or stall \(§7\.4\): read both with targeted `list_events`, log an incident "
+            r"and retry once with a changed brief; ask the owner after a third failure",
         ),
-        "autonomy rules: what the orchestrator does unasked, what it asks the owner, no relayed approvals, the stop condition (§1.1)",
+        "autonomy rules: what the orchestrator does unasked (escalation, big-pr, READY), what it asks the owner, no relayed approvals (§1.1)",
+        forbidden=(r"`big-pr` label is set only with the owner's say-so", r"the 4-round cap being hit"),
     ),
     Rule(
         "checkin", ("orchestrator",),
@@ -277,11 +290,15 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\)", r"at about 50% context", r"batch boundary", r"run §5\.1", r"a successor does §5\.2",
+            r"handover \(§5, two-phase\), at about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
+            r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
+            r"a successor does §5\.2",
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover: handover comment, successor, keep the lock until the ack, then release (§5)",
+        "two-phase handover at about 80% of a 1M window (60% of 200k), first batch boundary: comment, successor, ack, release (§5)",
+        forbidden=(r"at about 50% context", r"at about 80% context"),
     ),
     Rule(
         "lock-takeover", ("orchestrator",),
@@ -322,21 +339,24 @@ RULES = (
             r"deferral \(docs/follow-ups\.md §2, §4\): you decide deferral, not the reviewer",
             r"decide each recommendation by §2 from the finding's severity, `area` and `recommend`",
             r"a minor or nit only once no blocker or major is open on the pr",
-            r"and a minor only if its fix is not small \(more than about 15 changed lines or outside the pr's scope\)",
+            r"and a minor only if its fix is not small \(more than about 30 changed lines or outside the pr's scope\)",
             r"the pr's own acceptance criteria and tests do not depend on it",
             r"and it is not a regression this pr introduced",
             r"never defer a blocker; never defer a major, or a finding in the security-rules, sync-merge or release areas "
             r"or on a `risk:high` task, without owner ok \(`owner-ok` label\)",
             r"then file the follow-up issue from `\.github/issue_template/follow-up\.md` with all its labels \(`target:<mx>` per §3\)",
             r"and record a `decision` comment on the state issue",
-            r"check that the returned issue carries every label; if one is missing, close it, keep the finding open, "
-            r"stop deferring and ask the owner to do m0-o10\.",
+            r"check that the returned issue carries every label; if one is missing, create it with `gh api` and re-label the issue; "
+            r"if that fails, close the issue, keep the finding open, stop deferring and ask the owner\.",
             r"the 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings",
-            r"with more than 8 open follow-ups for one milestone: stop deferring and ask the owner",
+            r"with more than 8 open follow-ups for one milestone: stop deferring and start the milestone's burn-down task `mx-fu` next "
+            r"\(re-deferral and majors still need the owner\)",
             r"if everything above nit was deferred and no commit followed the reviewed range, "
             r"post `accepted: all findings above nit deferred \(#a, #b\)` \(verdict `ready_deferred`\)",
         ),
-        "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: never blockers, never majors or protected areas without owner OK, limit 8 per milestone",
+        "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: small minors (30 lines) are fixed, never blockers, "
+        "majors or protected areas without owner OK, limit 8 per milestone",
+        forbidden=(r"more than about 15 changed lines", r"ask the owner to do m0-o10"),
     ),
     Rule(
         "impl-deferral", ("implementer",),
@@ -379,12 +399,13 @@ RULES = (
         "orch-delta-review", ("orchestrator",),
         (
             r"delta review \(§7\.2, retro r4\)",
-            r"a commit after `reviewed_through` gets one delta review before the merge request",
-            r"a fresh reviewer on the range `reviewed_through\.\.head_sha` only",
-            r"owner acceptance is the only alternative, and never for gate or threshold changes, which always get a delta review",
+            r"a commit after `reviewed_through` always gets one delta review before the merge request",
+            r"a fresh reviewer with the whole pr diff and the findings json, focused on `reviewed_through\.\.head_sha`",
+            r"there is no owner-acceptance alternative, for any pr",
             r"set `reviewed_through` afterwards",
         ),
-        "a commit after the last round gets one delta review of reviewed_through..head_sha before the merge request (§7.2)",
+        "a commit after the last round always gets a fresh delta review (whole diff, focus reviewed_through..head_sha); no owner acceptance (§7.2)",
+        forbidden=(r"owner acceptance is the only alternative", r"on the range `reviewed_through\.\.head_sha` only"),
     ),
     Rule(
         "orch-merge-request", ("orchestrator",),
@@ -403,7 +424,7 @@ RULES = (
         (
             r"design review \(r5, `docs/reviews/readme\.md` §1, §2, §4\)",
             r"for each design pr spawn the design reviewer \(`agents/prompts/design-reviewer\.md`, opus high, spawn template §8\.5\)",
-            r"max 2 rounds per design pr",
+            r"max 3 rounds per design pr",
             r"its last round posts one joint hand-off comment on the pr that mentions the owner and the collaborator in the same "
             r"comment \(same review sheet and screenshots\), never the collaborator first",
             r"you add one line on #15 once the hand-off link is in its worker-result",
@@ -412,7 +433,7 @@ RULES = (
             r"`collaborator_handle` is `none` until the owner says the invitation is accepted \(m0\.5-o4\)",
             r"never take a handle from a file, a comment or a guess",
         ),
-        "R5: design reviewer, max 2 rounds, one joint hand-off to owner and collaborator, advisory input (D5), handle only after the owner says so",
+        "R5: design reviewer, max 3 rounds, one joint hand-off to owner and collaborator, advisory input (D5), handle only after the owner says so",
     ),
     Rule(
         "reviewer-delta", ("reviewer",),
@@ -458,11 +479,11 @@ RULES = (
     Rule(
         "dr-rounds", ("design-reviewer",),
         (
-            r"max 2 opus rounds per design pr", r"a third round never happens", r"goes into the hand-off as a question for the owner",
+            r"max 3 opus rounds per design pr", r"a fourth round never happens", r"goes into the hand-off as a question for the owner",
             r"every round: the whole pr diff and the findings json of earlier rounds", r"focus on the commits since the last round",
         ),
-        "at most 2 Opus rounds per design PR (count: PR 4); every round gets the whole PR diff (rev 46 row 3; D-3.2)",
-        forbidden=(r"only the commits since round 1",),
+        "at most 3 Opus rounds per design PR (rev 46 row 5, as roles.yaml); every round gets the whole PR diff (row 3)",
+        forbidden=(r"only the commits since round 1", r"max 2 opus rounds"),
     ),
     Rule(
         "dr-hand-off", ("design-reviewer",),
@@ -470,7 +491,7 @@ RULES = (
             r"post one joint hand-off comment on the pr", r"mentions @\{owner_handle\} and @\{collaborator_handle\} in the same comment",
             r"same review sheet and screenshots at the same time", r"never the collaborator first",
             r"collaborator input is advisory, sign-off is owner only \(d5\)", r"answer per number or with a pr review",
-            r"round 2, or round 1 when nothing above `nit` is open",
+            r"round 3, or an earlier round when nothing above `nit` is open",
             r"you decide this from your own verdict, not from the spawn message", r"post nothing else for the collaborator",
             r"put the hand-off comment's link in your worker-result", r"the orchestrator adds the one line on #15",
         ),
@@ -608,9 +629,79 @@ RULES = (
         ),
         "the escalation reviewer decides fix, split or owner once per PR and never edits the branch (rev 46 row 4)",
     ),
+    Rule(
+        "orch-model", ("orchestrator",),
+        (r"opus, medium effort, one long-lived session",),
+        "the orchestrator runs on Opus at medium effort (roles.yaml, rev 46 row 11)",
+        forbidden=(r"sonnet, low effort",),
+    ),
+    Rule(
+        "orch-transcripts", ("orchestrator",),
+        (
+            r"collect results cheapest first", r"targeted `list_events` \(a `kinds` filter, a small `limit`\)",
+            r"\(a stall, a block or red ci\) or before an escalation decision", r"never read whole transcripts",
+        ),
+        "results cheapest first; targeted list_events on a stall, block, red CI or before an escalation; never whole transcripts (rows 16, 25)",
+        forbidden=(r"never read child transcripts",),
+    ),
+    Rule(
+        "orch-throttle", ("orchestrator",),
+        (
+            r"concurrency and throttle \(§7\.1, §7\.7\.6\)", r"a review starts as soon as its pr is ready, without waiting for a slot",
+            r"pipeline flow, not cost: up to 10 worker and reviewer sessions at once", r"file overlap, owner-merge queue depth and account rate limits",
+            r"a 7-day warning holds at stage 1 and required work goes on; stage 2 applies in overage; stage 3 only on an owner decision in #15",
+            r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"the stages are cumulative",
+            r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice", r"\(3\) pause new work and finish the open prs",
+            r"a stage lifts, and the limit returns to the §7\.1 default, at the first check-in where its trigger no longer applies",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews and the r2 usage read",
+        ),
+        "concurrency is for pipeline flow (default 10, reviews without a slot); throttle only near a rate limit or in overage (2026-11-18)",
+        forbidden=(r"cap of [35] workers|at most 5 worker sessions|worker cap 3, then 2|recurring reviews r2|one stage per check-in|§7\.7\.5 forecast says",),
+    ),
+    Rule(
+        "orch-spawn-checks", ("orchestrator",),
+        (
+            r"plan review \(§7\.2\.2\): after the planner writes `docs/milestones/<mx>\.md` and before any implementer starts, spawn a fresh reviewer",
+            r"second reviewer \(§7\.2\.2\): for `risk:high` prs and the security-rules, sync-merge and release areas, spawn a second fresh "
+            r"session in the same round, never showing it the reviewer's findings, and merge both reports",
+            r"escalation reviewer \(§7\.2\.2\): when round 4 still has a confirmed finding above nit \(deferred minors do not count\) "
+            r"or a dispute is still open, spawn one escalation reviewer per pr",
+            r"every spawn in §7\.2\.2 uses the §8\.3 message \(.*?\) with its own role line",
+            r"a `fix` ruling gets one fresh round 5, a `split` opens a new pr from `main` with merge commits, `owner` goes to the owner; "
+            r"there is no second escalation",
+            r"escaped defect: when a bug is found after merge, put a `caused by: #n` line in the bug issue and add one `escaped` row to the metrics csv",
+        ),
+        "the orchestrator spawns the plan review, the second reviewer and the one escalation reviewer, and records escaped defects (rev 46 checks)",
+    ),
+    Rule(
+        "orch-merge-agent", ("orchestrator",),
+        (
+            r"merge agent \(§7\.5\): the merge agent merges every ready pr except the owner-only ones, one at a time",
+            OWNER_ONLY,
+            r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
+            r"docs prs whose owner approval can wait go to it too and carry the status line "
+            r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
+            r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
+            r"and you never pass an approval on to it",
+        ),
+        "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
+    ),
+    Rule(
+        "orch-archive", ("orchestrator",),
+        (
+            r"archive \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it",
+            r"keep an implementer until its pr is merged or handed elsewhere",
+            r"after every handover the new orchestrator sweeps: it archives every finished worker, reviewer, planner "
+            r"and previous-orchestrator session of this project",
+            r"keeps itself, the merge agent and any session still running or with unpushed work",
+            r"never archive a session that does not clearly belong to this project \(list it for the owner\)",
+        ),
+        "worker sessions are archived as soon as done; the new orchestrator sweeps after every handover (owner decisions of 2026-11-17)",
+    ),
 )
 
 
+ORCH = "docs/ORCHESTRATION.md"
 DOC_RULES = (
     DocRule(
         "claude-reading", "CLAUDE.md",
@@ -714,7 +805,7 @@ DOC_RULES = (
         "plan-working-rules", "docs/PLAN.md",
         (r"read what you need to understand the change", r"run whatever proves a finding: any test"),
         "PLAN 9.2 follows CLAUDE.md: read what you need, reviewers run whatever proves a finding (#129 R1-02)",
-        forbidden=(r"search narrowly", r"only run targeted tests"),
+        forbidden=(r"search narrowly", r"only run targeted tests", r"never reads child transcripts"),
     ),
     DocRule(
         "plan-handoff", "docs/PLAN.md",
@@ -747,7 +838,166 @@ DOC_RULES = (
         "followups-small-fix", "docs/FOLLOW-UPS.md",
         (r"the fix is not small: more than about 30 changed lines",),
         "FOLLOW-UPS section 2: a minor is deferred only when its fix is larger than about 30 lines (rev 46 row 17)",
-        forbidden=(r"more than about 15 changed lines",),
+        forbidden=(r"more than about 15 changed lines", r"stops deferring and reports to the owner",
+                   r"more than 8 open per milestone goes to the owner"),
+    ),
+    DocRule(
+        "followups-labels", "docs/FOLLOW-UPS.md",
+        (r"the orchestrator checks they exist before the first filing and creates a missing label with `gh api`",),
+        "FOLLOW-UPS section 7: the orchestrator creates a missing label itself (#15 AUTONOMY), it does not send the owner to M0-O10",
+        forbidden=(r"the owner creates them once, task m0-o10", r"asks the owner to do m0-o10"),
+    ),
+    DocRule(
+        "orch-autonomy", ORCH,
+        (
+            r"run review rounds \(max 4 per batch, §6\.2\) and the one escalation reviewer after round 4",
+            r"mark a pr ready and send it to the merge agent \(a `risk:high` pr only after the independent second-reviewer pass\)",
+            r"\* merges of owner-only prs",
+            r"the escalation reviewer's `owner` ruling, or anything above nit still open after round 5",
+            r"two consecutive worker sessions fail or stall \(§7\.4\)\. the orchestrator reads both with targeted `list_events`, logs an incident "
+            r"and retries once with a changed brief; it asks the owner after a third failure",
+            r"\*\*labels:\*\* the orchestrator adds `big-pr` for one concern that cannot reasonably be split and records it in #15",
+        ),
+        "ORCHESTRATION 1.1: escalation reviewer, merge agent, big-pr and the retry before the owner (owner decisions of 2026-11-17)",
+        forbidden=(r"applies `big-pr` only with the owner's explicit say-so", r"\* merges \(of any pr\)", r"the 4-round cap being hit"),
+    ),
+    DocRule(
+        "orch-handover", ORCH,
+        (
+            r"trigger: about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
+            r"after about 40 wakes, or after 20 worker sessions",
+            r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
+        ),
+        "ORCHESTRATION 5: hand over at about 80% at a batch boundary (40 wakes or 20 sessions when unknown); the successor archives the predecessor",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"the owner archives you"),
+    ),
+    DocRule(
+        "orch-parallel", ORCH,
+        (
+            r"\* \*\*concurrency\*\* \(§7\.7\.6\): for pipeline flow, not cost \(owner decision of 2026-11-18, #15\): up to 10 worker and "
+            r"reviewer sessions at once, more when independent work exists",
+            r"the limits are file overlap \(no two implementers on the same files unless merge commits resolve it cheaply\), owner-merge queue "
+            r"depth and account rate limits \(§7\.7\.6\)",
+            r"a review starts as soon as its pr is ready, without waiting for a slot; subagents do not count",
+            r"\* \*\*concurrency:\*\* a pipeline-flow rule \(§7\.1\), never a cost control",
+            r"no pause, throttle at stage 2 of §7\.7\.6", r"\*\*do not pause\.\*\* throttle per §7\.7\.6",
+        ),
+        "ORCHESTRATION 7.1, 7.7.1 and 7.7.5: concurrency is a pipeline-flow rule, default 10, reviews without a slot (owner decision of 2026-11-18)",
+        forbidden=(r"at most \*{0,2}[35]\*{0,2} worker sessions", r"the parallelism cap", r"no batched extras"),
+    ),
+    DocRule(
+        "orch-review-rounds", ORCH,
+        (
+            r"finding ids `r<round>-<nn>` \(`s<round>-<nn>` for the second reviewer, `d<round>-<nn>` for design-review rounds, §8\.5\)",
+            r"`base_sha` \(the merge base\), `head_sha`, `reviewed_through`",
+            r"the reviewer reviews the whole pr diff `base_sha\.\.head_sha` with the findings json of every earlier round and focuses on "
+            r"`reviewed_through\.\.head_sha`",
+            r"is \*\*unreviewed\*\* until the next round covers it\.",
+            r"a delta review always runs; there is no owner-acceptance alternative, for any pr",
+        ),
+        "ORCHESTRATION 7.2: whole-diff rounds with a focus range, S ids for the second reviewer, a delta review always, no owner acceptance",
+        forbidden=(
+            r"or until the owner explicitly accepts it", r"owner acceptance \(the bullet above\) is the only alternative",
+            r"reviews `base_sha\.\.head_sha` only", r"with explicit owner acceptance logged",
+        ),
+    ),
+    DocRule(
+        "orch-cap-and-minors", ORCH,
+        (
+            r"round 4 with findings above `nit`: the escalation of §7\.2\.2 decides `fix`, `split` or `owner`; it does not stop at the owner",
+            r"\*\*default:\*\* fix a minor in the pr when its fix is small \(about 30 changed lines or fewer\)",
+            r"stop deferring and start the milestone's burn-down task `mx-fu` next \(re-deferral and majors still need the owner\)",
+        ),
+        "ORCHESTRATION 6.2 and 7.2.1: round 4 goes to the escalation reviewer; minors are fixed by default; the burn-down starts at 8 follow-ups",
+        forbidden=(
+            r"round 4 with findings above `nit`: stop and ask the owner", r"defers the remaining minors and nits \(follow-up issues\) instead of running",
+            r"stop deferring and report to the owner",
+        ),
+    ),
+    DocRule(
+        "orch-spawn-checks", ORCH,
+        (
+            r"### 7\.2\.2 plan review, second reviewer, escalation reviewer, escaped defects",
+            r"\*\*plan review:\*\* after the planner writes `docs/milestones/<mx>\.md` and before any implementer starts, the orchestrator spawns "
+            r"a fresh opus reviewer",
+            r"\*\*second reviewer:\*\* for `risk:high` prs and the security-rules, sync-merge and release areas, the orchestrator spawns a second "
+            r"fresh session in the same round \(`agents/prompts/second-reviewer\.md`\); it never gets the reviewer's findings, "
+            r"and a `risk:high` pr is marked ready only after that pass",
+            r"\*\*escalation:\*\* when round 4 still has a confirmed finding above nit \(deferred minors do not count\) or a dispute is still "
+            r"open, the orchestrator spawns one escalation reviewer per pr",
+            r"every spawn in §7\.2\.2 uses the §8\.3 message \(.*?\) with its own role line",
+            r"`fix` gets one fresh round 5, `split` opens a new pr from `main` with merge commits, `owner` goes to the owner; there is no second escalation",
+            r"\*\*escaped defects:\*\* a bug found after merge gets a `caused by: #n` line in its issue and one `escaped` row in the metrics csv",
+        ),
+        "ORCHESTRATION 7.2.2: spawn steps for the plan review, the second reviewer and the one escalation reviewer, and the Caused-by step",
+    ),
+    DocRule(
+        "orch-results-and-failures", ORCH,
+        (
+            r"4\. targeted `list_events` \(a `kinds` filter, a small `limit`\) when steps 1-3 do not explain the state, and before an escalation "
+            r"decision; never whole transcripts",
+            r"\| two worker sessions in a row fail or stall \| read both with targeted `list_events`, log an incident, retry once with a changed "
+            r"brief; ask the owner after a third failure \(§1\.1\)",
+            r"a blocker still open after that goes to the escalation reviewer, not the owner",
+        ),
+        "ORCHESTRATION 7.3 and 7.4: targeted list_events as step 4; two failures get one retry with a changed brief before the owner",
+    ),
+    DocRule(
+        "orch-archive", ORCH,
+        (
+            r"\*\*archive\*\* \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it",
+            r"keep an implementer until its pr is merged or handed elsewhere",
+            r"\*\*sweep\*\* after every handover \(§5\.2 step 7\): the new orchestrator archives every finished worker, reviewer, planner and "
+            r"previous-orchestrator session of this project",
+            r"keeps itself, the merge agent and any session still running or with unpushed work",
+            r"never archives a session that does not clearly belong to this project \(it lists it for the owner\)",
+        ),
+        "ORCHESTRATION 7.4: archive each finished worker at once; the new orchestrator sweeps after every handover (owner decisions of 2026-11-17)",
+        forbidden=(r"once their metrics row is logged and the owner has seen the batch report",),
+    ),
+    DocRule(
+        "orch-merge-agent", ORCH,
+        (
+            r"\* \*\*merge agent:\*\* the merge agent merges every ready pr except the owner-only ones, one at a time",
+            OWNER_ONLY,
+            r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
+            r"docs prs whose owner approval can wait go to it too and carry the status line "
+            r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
+            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge",
+        ),
+        "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
+    ),
+    DocRule(
+        "orch-throttle", ORCH,
+        (
+            r"§7\.7\.6 throttle order\.", r"\(1\) no optional extras \(recurring reviews r3 and r4,",
+            r"a 7-day `allowed_warning` holds at stage 1 and required work goes on; stage 2 applies in overage; stage 3 only on an owner decision in #15",
+            r"the stages are cumulative", r"\(3\) pause new work and finish the open prs",
+            r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice",
+            r"a stage lifts, and the limit returns to the §7\.1 default, at the first check-in where its trigger no longer applies",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the r2 usage read",
+        ),
+        "ORCHESTRATION 7.7.6: throttle only near a rate limit or in overage: extras, halve the concurrency, pause new work; reviews are never throttled",
+        forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2", r"one stage per check-in",
+                   r"§7\.7\.5 forecast says"),
+    ),
+    DocRule(
+        "orch-spawn-templates", ORCH,
+        (
+            r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, whole diff \{base_sha\}\.\.\{head_sha\}, focus since \{reviewed_through\}",
+            r"role:<role>\s+orchestrator \| implementer \| reviewer \| second-reviewer \| escalation-reviewer \| planner \| retro",
+        ),
+        "ORCHESTRATION 2.1 and 8.3: the reviewer spawn carries the whole diff and a focus point; the role tags name the new reviewers",
+        forbidden=(r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, range",),
+    ),
+    DocRule(
+        "orch-design-rounds", ORCH,
+        (
+            r"max 3 rounds per design pr", r"round \{round\} of max 3", r"\(round 3, or an earlier round when nothing above nit is open\)",
+        ),
+        "ORCHESTRATION 8.5: 3 design rounds, as roles.yaml, design-reviewer.md and orchestrator.md (rev 46 row 5)",
+        forbidden=(r"round \{round\} of max 2", r"max 2 rounds per design pr"),
     ),
 )
 
