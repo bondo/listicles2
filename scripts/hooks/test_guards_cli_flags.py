@@ -347,12 +347,13 @@ class RoundThreeTests(CliFlagCase):
         "tsc -b --verbose ci.json", "tsc --build --force ci.json", "tsc -b tsconfig.json ci.json",
         "shellcheck -S warning --rcfile ci.rc a.sh", "shellcheck --rcfile=.shellcheckrc a.sh", "shellcheck --rc ci.rc a.sh",
         "shellcheck --exc=SC2086 a.sh", "shellcheck --incl=SC2086 a.sh",
-        "shellcheck --sev=error a.sh",
+        "shellcheck --sev=error a.sh", "shellcheck --se=error a.sh", "shellcheck --se error a.sh", 'SHELLCHECK_OPTS="--se=error" shellcheck a.sh',
+        "ruff check --diff .", "ruff check --line-length 200 .", "ruff check --line-length=100 .",
     ]
     GOOD = [
         "eslint --prune-suppressions .", "ruff check --extend-select E .", "mypy --config-file mypy.ini b.py", "mypy --config mypy.ini b.py",
         "mypy --follow-imports=normal b.py", "mypy --strict --warn-unused-ignores b.py", "tsc -b --verbose", "tsc -b tsconfig.json --force",
-        "shellcheck --norc a.sh", "shellcheck --sev=style a.sh",
+        "shellcheck --norc a.sh", "shellcheck --sev=style a.sh", "shellcheck --se=warning a.sh", "ruff format --diff .", "ruff format --check .",
     ]
 
     def test_relaxing_forms_fail(self):
