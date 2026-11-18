@@ -632,6 +632,15 @@ seen the batch report.
   documented exception to "the orchestrator never commits or pushes" (§1 role table): it is a server-side merge of `main`,
   not authored code. Do it only when no worker holds that branch (F6, two writers); otherwise the branch-holding worker
   merges `main` itself, or the orchestrator waits.
+* **Merge agent (issue 136):** for the owner-authorized kinds only (`working-draft-docs`, `tasks-sync` = a status sync that changes only
+  `docs/tasks.toml`, `dependabot`), the merge agent runs only `scripts/merge_ready.py <N> <sha> <kind>`, where `<sha>` is the head the
+  owner or orchestrator named. It makes no other merge call and does not repeat the checks by hand. The script refuses (exit 1, reasons on stderr, nothing
+  merged) unless the head equals `<sha>`, `mergeable_state` is `clean`, every ruleset-required check has a successful latest run, no closing
+  keyword precedes an issue number in the title, body or commit messages, and every changed file is inside the kind's paths
+  (docs: `docs/product/`, `docs/milestones/`, `docs/reviews/`, `design/`, `docs/PLAN.md`; tasks-sync: `docs/tasks.toml`; dependabot: manifests,
+  lockfiles and `uses:` version pins in workflows). Otherwise it squash-merges through the REST API with `<sha>` pinned. On a refusal the agent
+  stops and reports the reasons; it never retries with other flags or merges another way. Changing the script or the paths is an owner-only
+  tooling change (`scripts/merge_ready.py`, tested by `scripts/test_merge_ready.py` in `verify.sh` and CI).
 * **Dependabot weekly routine:** once a week one batch triage worker reads the open Dependabot PRs and groups the bumps
   into one new branch cut from `main` (never a feature branch, F6), opens a draft PR and posts a "ready" comment on it.
   The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since its bumps then supersede them.

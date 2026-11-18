@@ -61,7 +61,8 @@ def make_api(files=None, title="Update the plan", body="Refreshes section 4. See
              required=None, commits=None, base="main"):
     files = files if files is not None else [file_entry("docs/product/flow.md")]
     pulls = f"repos/{REPO}/pulls/{N}"
-    rules = [{"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": c} for c in (required or REQUIRED)]}}]
+    contexts = REQUIRED if required is None else required
+    rules = [{"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": c} for c in contexts]}}]
     return FakeApi(
         {
             pulls: {"head": {"sha": sha}, "base": {"ref": base}, "title": title, "body": body, "mergeable_state": state, "draft": False},
