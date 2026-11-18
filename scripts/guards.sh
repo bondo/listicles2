@@ -149,6 +149,88 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
   cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
 [ -n "$out" ] && { echo "$out"; fail=1; }
 
+# 2c. Relaxations passed as command-line flags on tool invocation lines (issue 45): ruff, mypy, tsc, ESLint, Prettier, shellcheck, in
+# shell scripts, git hooks, CI workflows and package.json. A backslash continuation is one logical line; a logical line is split at
+# ; & | so a flag only counts for the tool in its own command; `npm run`, `npx`, `yarn` and `pnpm` commands count as the JS tools
+# (a `-- --quiet` passes through). The same-line `justified: <reason>` rule applies to the whole logical line. Full-line comments are
+# skipped. Strict flags (--strict, --max-warnings 0, -S warning, ...) never match.
+CLI_AWK='
+function has(p, tool) { return p ~ ("(^|[^A-Za-z0-9_.-])" tool "([^A-Za-z0-9_.-]|$)") }
+# hit: a long flag from names; mode on = relaxing unless set to false, mode off = relaxing only when set to false.
+function hit(p, names, mode,   re, t, a) {
+  re = "(^|[ \t])--(" names ")"
+  while (match(p, re)) {
+    p = substr(p, RSTART + RLENGTH); t = p
+    if (t !~ /^([ \t="\047]|$)/) continue
+    a = (t ~ /^[ \t]*=?[ \t]*false([ \t"\047]|$)/)
+    if (mode == "on" ? !a : a) return 1
+  }
+  return 0
+}
+function eslintrule(p,   t, i) {
+  while (match(p, /(^|[ \t])--rule([ \t=]|$)/)) {
+    t = substr(p, RSTART + RLENGTH); p = t
+    gsub(/\\/, "", t)
+    if (match(t, /[ \t]--?[A-Za-z]/)) t = substr(t, 1, RSTART)
+    if (t ~ /:[ \t]*(\[[ \t]*)?["\047]?(off|warn)([^A-Za-z0-9_-]|$)/ || t ~ /:[ \t]*(\[[ \t]*)?["\047]?[01]([^0-9A-Za-z._-]|$)/) return 1
+  }
+  return 0
+}
+function maxwarn(p,   t) {
+  while (match(p, /(^|[ \t])--max-warnings([ \t=]|$)/)) {
+    t = substr(p, RSTART + RLENGTH); p = t
+    if (t ~ /^[ \t=]*["\047]?(-1|[1-9][0-9]*)([^0-9]|$)/) return 1
+  }
+  return 0
+}
+function relaxed(p,   js, sp) {
+  sp = "(^|[ \t])"
+  js = (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm)([^A-Za-z0-9_.-]|$)/)
+  if (has(p, "ruff") && hit(p, "(extend-)?ignore|per-file-ignores|extend-per-file-ignores|exclude|extend-exclude|exit-zero|isolated", "on")) return 1
+  if (has(p, "mypy")) {
+    if (hit(p, "ignore-missing-imports|allow-[a-z-]+|no-strict-optional|no-strict-equality|no-check-untyped-defs|no-warn-[a-z-]+|disable-error-code|implicit-optional|implicit-reexport|exclude", "on")) return 1
+    if (p ~ (sp "--follow-imports[ \t=]+[\"\047]?(skip|silent)([ \t\"\047]|$)")) return 1
+  }
+  if ((js || has(p, "tsc")) && (hit(p, "noCheck|skipLibCheck|skipDefaultLibCheck|allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors", "on") || \
+      hit(p, "strict[A-Za-z]*|noImplicit[A-Za-z]*|noUnused[A-Za-z]*|alwaysStrict|useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noFallthroughCasesInSwitch|noPropertyAccessFromIndexSignature|checkJs", "off"))) return 1
+  if ((js || has(p, "eslint")) && (hit(p, "quiet|ignore-pattern|ignore-path|no-eslintrc|no-config-lookup", "on") || eslintrule(p) || maxwarn(p))) return 1
+  if ((js || has(p, "prettier")) && hit(p, "ignore-path|require-pragma|no-error-on-unmatched-pattern|ignore-unknown", "on")) return 1
+  if (has(p, "prettier") && p ~ (sp "-u([ \t]|$)")) return 1
+  if (has(p, "shellcheck")) {
+    if (p ~ (sp "-e([ \t]|SC[0-9]|$)") || p ~ (sp "-i([ \t]|SC[0-9]|$)") || hit(p, "exclude|include", "on")) return 1
+    if (p ~ (sp "(-S[ \t]*|--severity[ \t=]+)[\"\047]?error([ \t\"\047]|$)")) return 1
+  }
+  return 0
+}
+function flush(   n, i, parts) {
+  if (cur == "") return
+  if (cur !~ JUSTRE) {
+    n = split(cur, parts, /[;&|]+/)
+    for (i = 1; i <= n; i++) if (relaxed(parts[i])) { printf "%s:%d:%s\n", F, start, cur; break }
+  }
+  cur = ""
+}
+BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; cur = ""; cont = 0 }
+{
+  line = $0; sub(/\r$/, "", line)
+  if (!cont && line ~ /^[ \t]*#/) next
+  if (!cont) start = NR
+  cont = (line ~ /\\[ \t]*$/)
+  if (cont) sub(/\\[ \t]*$/, "", line)
+  cur = (cur == "" ? "" : cur " ") line
+  if (!cont) flush()
+}
+END { flush() }'
+cliflags() { # cliflags <pathspec>...
+  local f
+  while IFS= read -r f; do
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$CLI_AWK"
+    else awk -v F="$f" "$CLI_AWK" "$f" 2>/dev/null; fi
+  done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
+}
+out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '*package.json')
+[ -n "$out" ] && { echo "$out"; fail=1; }
+
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
 out=$("${LS[@]}" | grep -iE 'baseline')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline file: /'; fail=1; }
