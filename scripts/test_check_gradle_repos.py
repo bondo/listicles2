@@ -147,7 +147,7 @@ def runs(text, command):
 
 
 def job(text, name):
-    m = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z][\w-]*:\n|\Z)", text, re.S | re.M)
+    m = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z][\w-]*:[ \t]*(?:#.*)?$|\Z)", text, re.S | re.M)
     return m.group(1) if m else None
 
 
@@ -164,7 +164,7 @@ def wiring_problems(verify, ci):
     for cmd in (CHECK_CMD, TEST_CMD):
         if not runs(static, cmd):
             problems.append(f"ci.yml static job does not run `{cmd}`")
-    if re.search(r"(?m)^\s*if:", static) or "continue-on-error" in static:
+    if re.search(r"(?m)^\s*(?:-\s+)?if:", static) or "continue-on-error" in static:
         problems.append("ci.yml static job has if: or continue-on-error")
     if re.search(r"(?m)^    permissions:", static) or not re.search(r"(?m)^permissions:\n  contents: read\n(?!  )", ci):
         problems.append("ci.yml permissions must stay contents: read only, with no job-level override on static")
