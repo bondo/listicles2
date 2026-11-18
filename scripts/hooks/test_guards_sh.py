@@ -832,6 +832,18 @@ class FileSizeChecks(GuardsCase):
         self.assertIn("guard: file too large: data/blob.bin", out)
         self.assertIn("guard: file too large: art/a.png", out)
 
+    def test_a_symlink_replaced_by_a_large_file_is_a_type_change_and_fails(self):
+        """R3-01: git reports file-for-symlink at the same path as status T; --diff-filter must include it (AMT, not AM)."""
+        os.symlink("target", os.path.join(self.repo.dir, "data-link"))
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        os.remove(os.path.join(self.repo.dir, "data-link"))
+        self.repo.write_bytes("data-link", 2 * self.MB)
+        self.repo.git("add", "-A")
+        self.assertFails("guard: file too large: data-link", "--staged")
+        self.repo.commit()
+        self.assertFails("guard: file too large: data-link")
+
     def test_a_submodule_pointer_is_not_a_file_and_is_skipped(self):
         """R2-01: a gitlink (mode 160000) has no blob to size. Its commit is not in this repo (a real submodule is not fetched),
         so without the skip `git cat-file -s` fails."""
@@ -841,6 +853,7 @@ class FileSizeChecks(GuardsCase):
         self.repo.git("commit", "-q", "-m", "add pointer")  # not commit(): its `add -A` would drop the gitlink
         self.assertPasses()
         self.repo.git("update-index", "--cacheinfo", f"160000,{second},sub")  # a changed pointer too
+        self.assertPasses("--staged")  # index against HEAD is a real modification (M) here (R3-02)
         self.repo.git("commit", "-q", "-m", "move pointer")
         self.assertPasses()
 
