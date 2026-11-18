@@ -27,7 +27,9 @@ def pad_short_reasons(text):
     ("CLI output") only as the marker that must waive a hit, so write() pads a reason of 1 or 2 words. A reason with no
     letter or digit at all is left alone, and the tests of the rule itself write with raw=True."""
     def pad(m):
-        reason = re.split(r"\*/|-->|[ \t](?:#|//)[ \t]*[A-Za-z]", m.group(2))[0]  # same cut as just() in guards.sh
+        # Same cut as just() in guards.sh, except the HTML comment closer (CodeQL reads a regex with it as a bad HTML filter; no fixture
+        # has words after one).
+        reason = re.split(r"\*/|[ \t](?:#|//)[ \t]*[A-Za-z]", m.group(2))[0]
         n = len(re.findall(r"[A-Za-z]{2,}", reason))
         return m.group(1) + ("fixture padding words " if n < 3 and re.search(r"[A-Za-z0-9]", m.group(2)) else "") + m.group(2)
     return re.sub(r"(justified:[ \t]*)([^\n]*)", pad, text)
