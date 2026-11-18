@@ -195,6 +195,12 @@ if [ "$STAGED" = 0 ]; then
           }
         }
         if (decl) { body = substr(body, 1, 1) "test(" rest; if (bare) kw = body }
+        # The word `threshold` in prose (a letter-word and spaces on each side: `gate or threshold changes`) is not a
+        # check setting (owner decision, #15). Only that occurrence is masked, so identifiers, keys (`threshold: 5`,
+        # `"threshold": 5`), assignments, calls and every other keyword on the same line still count.
+        while (match(kw, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) {
+          kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
+        }
       }
       kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
