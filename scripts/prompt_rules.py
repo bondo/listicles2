@@ -50,6 +50,7 @@ class Rule:
     patterns: tuple  # regexes, all must match (case-insensitive) in the normalized text
     message: str
     forbidden: tuple = ()  # regexes, none may match (case-insensitive): stale instructions the prompt must not carry
+    forbidden_lines: tuple = ()  # like forbidden, but matched on normalize_sentences(text): headings, blank lines and bullets end a sentence
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ class DocRule:
     patterns: tuple
     message: str
     forbidden: tuple = ()
+    forbidden_lines: tuple = ()
 
 
 # The merge agent's owner-only list (#15 comments 6941366090 and 6943342158); the same wording in the prompt and ORCHESTRATION 7.5.
@@ -77,17 +79,26 @@ SCORE_BLOCKS_MERGE = r"below 3 (?:blocks|must block) the merge"
 MATRIX_WRONG_SEVERITY = (
     r"(?:(?:a |the |such a )?(?:matrix )?gaps? (?:in the matrix )?|without both )(?:is|are) (?:always |only |just )?(?:a |an )?`?(?:minor|nit|blocker)"
 )
-# Wording that would allow an agent to resolve a thread (follow-up #44; R1-01 and R1-02 of #150). The ban itself is pinned by the patterns
-# of the rules; this keeps a later edit from adding permission next to it. Each pattern needs an agent subject or a sentence-start
-# imperative, so "never/do not/must not resolve ..." and "only the owner may resolve ..." do not match. Wording pins are not exhaustive.
-_AGENT = r"(?:you|agents?|the (?:orchestrator|implementer|reviewer|planner|worker)s?)"
+# Wording that would allow an agent to resolve a thread (follow-up #44; R1-01, R1-02 of #150, R2-01 to R2-03). The ban itself is pinned by
+# the patterns of the rules; this keeps a later edit from adding permission next to it. Subject patterns need an agent or "you" and no
+# negating word in front ("no agent may", "neither ... nor ... may"); imperatives are matched per sentence (normalize_sentences), so
+# "never/do not/must not resolve ..." and "only the owner may resolve ..." do not match. Wording pins are not exhaustive.
+_NOT_NEGATED = r"(?<!\bno )(?<!\bnor )(?<!\bnor the )(?<!\bneither )(?<!\bneither the )"
+_AGENT = _NOT_NEGATED + r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
 _NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
 _THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
+_ADVERB = r"(?:(?:also|then|now|still|just)\s+)?"
 RESOLVE_PERMISSION = (
-    rf"\b{_AGENT}\s+(?:may|can|could|should|must|will)\s+(?:also\s+|then\s+)?resolve\s+{_THREAD}",
+    rf"{_AGENT}\s+(?:may|can|could|should|must|will)\s+{_ADVERB}resolve\s+{_THREAD}",
     rf"\b(?:feel free|(?:is|are) (?:allowed|permitted|free)) to resolve\s+{_THREAD}",
-    rf"\b{_AGENT}\s+(?:also\s+)?resolves?\s+{_THREAD}",
-    rf"(?:^|[.:;]\s+|[-*]\s+|\b(?:then|and)\s+)resolve\s+(?:the|a|an|any|their|all)\s+{_NOUN}",
+    rf"{_AGENT}\s+{_ADVERB}resolves?\s+{_THREAD}",
+    rf"(?<!\bnot )(?<!\bnever )(?<!n't )\breply\s+(?:and|then)\s+resolve\s+{_THREAD}",
+)
+# Imperatives, per sentence: "Resolve the thread ...", "Then resolve ...", "Once answered, resolve the thread". The article stays required after
+# a comma, so the never-cell "delete branches, resolve threads, labels" does not match; article-free plurals only start a sentence or bullet.
+RESOLVE_IMPERATIVE = (
+    rf"(?:^|[.:;,]\s+|[-*]\s+|\bthen\s+)resolve\s+(?:the|a|an|any|their|all)\s+{_NOUN}",
+    rf"(?:^|[.:;]\s+|[-*]\s+)resolve\s+{_NOUN}",
 )
 RULES = (
     Rule(
@@ -99,7 +110,7 @@ RULES = (
         "no-resolve-thread", ALL,
         (r"never resolve a collaborator's review thread", r"resolve_review_thread", r"#44"),
         "agents never resolve a collaborator's review thread (follow-up #44)",
-        forbidden=RESOLVE_PERMISSION,
+        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
     ),
     Rule(
         "no-resolve-thread-reply", ("implementer", "orchestrator"),
@@ -728,13 +739,13 @@ DOC_RULES = (
             r"never resolve a collaborator's review thread \(follow-up #44\): reply and leave it for the collaborator or the owner",
         ),
         "ORCHESTRATION: the collaborator row lists resolving threads as never, and 7.6 says agents reply and leave the thread (follow-up #44)",
-        forbidden=RESOLVE_PERMISSION,
+        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
     ),
     DocRule(
         "collab-no-resolve", "docs/COLLABORATING.md",
         (r"## please do not press", r"\*\*resolve conversation\*\*"),
         "COLLABORATING: Resolve conversation is on the collaborator's do-not-press list (follow-up #44)",
-        forbidden=RESOLVE_PERMISSION,
+        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
     ),
     DocRule(
         "claude-reading", "CLAUDE.md",
@@ -1040,6 +1051,23 @@ def normalize(text):
     return " ".join(_HTML_COMMENT.sub(" ", text).split())
 
 
+_BLOCK_START = re.compile(r"\s*(?:[-*]\s|\d+\.\s|\|)")
+
+
+def normalize_sentences(text):
+    """normalize(), but a blank line, a heading line, a bullet, a numbered item or a table row also ends the sentence before it (and a
+    heading after it), written as " . ". A hard-wrapped continuation line stays part of its sentence."""
+    out = []
+    for line in _HTML_COMMENT.sub(" ", text).splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or _BLOCK_START.match(line):
+            out.append(" . ")
+        out.append(stripped)
+        if stripped.startswith("#"):
+            out.append(" . ")
+    return " ".join(" ".join(out).split())
+
+
 def parse_label_lists(text, line_pattern):
     """Every `<line_pattern> a, b, c.` marker in normalized text, as a list of label lists."""
     found = re.finditer(line_pattern + r"\s*([^.]*)\.", text, re.I)
@@ -1090,6 +1118,9 @@ def check_text(role, text):
             for pattern in rule.forbidden:
                 if re.search(pattern, norm, re.I):
                     problems.append(f"{rule.id}: {rule.message} (found /{pattern}/)")
+            if rule.forbidden_lines:
+                sentences = normalize_sentences(text)
+                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_lines if re.search(p, sentences, re.I))
             if rule.id in ("tier0-labels", "never-labels"):
                 line, want = (TIER0_LINE, TIER0_LABELS) if rule.id == "tier0-labels" else (NEVER_LINE, NEVER_LABELS)
                 got = parse_label_lists(norm, line)
@@ -1115,6 +1146,9 @@ def check_doc_text(path, text):
                 break
         else:
             problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden if re.search(p, norm, re.I))
+            if rule.forbidden_lines:
+                sentences = normalize_sentences(text)
+                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_lines if re.search(p, sentences, re.I))
     return problems
 
 
