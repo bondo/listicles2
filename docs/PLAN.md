@@ -366,7 +366,9 @@ enforce the rules rather than goodwill.
      * `@Ignore`, `@Disabled`, `xit`, `.only`
      * `@Suppress`, `tools:ignore`, `ktlint-disable`, `detekt:` suppressions, or
        `lint.disable` / `.editorconfig` rule-offs, unless the line carries
-       `// justified: <reason>` (the reviewer checks these)
+       `// justified: <reason>` of at least 3 words of letters (the reviewer checks the content)
+     * a raised line length or a lowered `coverageThreshold` / `fail_under`, by comparing against `main`; linter or test config embedded
+       in `package.json`. What is still not caught: `docs/guards-known-gaps.md`
      * any detekt or lint baseline file
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label

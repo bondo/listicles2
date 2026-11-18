@@ -63,8 +63,12 @@ PAT+='[Nn][Oo][Qq][Aa]|type: *ignore|eslint-disable|@ts-(ignore|expect-error)|@[
 # mypy inline flags that relax (ignore-*, allow-*, no-*, =False, follow-imports=skip); ignore-without-code and =True are strict.
 PAT+='mypy:(.*[[:space:],:])?(allow[-_]|implicit[-_](optional|reexport)|no[-_](strict|check[-_]untyped[-_]defs|(disallow|warn)[-_]))|mypy:.*(ignore[-_](errors|missing[-_]imports)|disable[-_]error[-_]code|follow[-_]imports[[:space:]]*=[[:space:]]*(skip|silent)|=[[:space:]]*([Ff]alse|0))|'
 PAT+='[Pp][Rr][Aa][Gg][Mm][Aa][:[:space:]]?[[:space:]]*[Nn][Oo][[:space:]]*([Cc][Oo][Vv][Ee][Rr]|[Bb][Rr][Aa][Nn][Cc][Hh])|(c8|v8|istanbul) ignore|prettier-ignore|biome-ignore|dprint-ignore|fmt: *(off|skip)|yapf: *disable|isort: *(skip|off)|@formatter:off'
-JUST='justified:[[:space:]]*[^[:space:]*/]'
-out=$(gg "$PAT" -- "${EXCL[@]}" | grep -vE "$JUST")
+# Owner decision (#46): the reason after `justified:` needs at least 3 words of letters (a word is a run of 2 or more ASCII letters,
+# so "-", "x", "ok" and "two words" fail); reviewers still judge the content. just() is awk, shared by the line filter and entrycheck.
+JUSTFN='function just(l,   i, r, n) { i = index(l, "justified:"); if (!i) return 0; r = substr(l, i + 10); n = 0
+  while (match(r, /[A-Za-z][A-Za-z]+/)) { n++; r = substr(r, RSTART + RLENGTH) } return n >= 3 }'
+unjust() { LC_ALL=C awk "$JUSTFN"' !just($0)'; } # keeps the lines that have no valid justification
+out=$(gg "$PAT" -- "${EXCL[@]}" | unjust)
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
 
 # 2b. Relaxed settings in the linter config files themselves (same justification rule). Each pattern only applies to the files
@@ -77,8 +81,8 @@ ENTRY_AWK='
 function strip(l) { sub(/[ \t]*(#|\/\/).*$/, "", l); return l }
 function blank(l) { gsub(/"[^"]*"/, "\"\"", l); gsub(/\047[^\047]*\047/, "\047\047", l); return l }
 function nest(l,   t, o) { t = l; gsub(/[^[({]/, "", t); o = length(t); t = l; gsub(/[^])}]/, "", t); return o - length(t) }
-function check() { if (line !~ JUSTRE) printf "%s:%d:%s\n", F, NR, line }
-BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
+function check() { if (!just(line)) printf "%s:%d:%s\n", F, NR, line }
+BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
 {
   line = $0; nc = strip(line); c = blank(nc); lc = tolower(nc)
   if (c ~ /^[ \t]*$/) next
@@ -96,13 +100,13 @@ BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; ini = (F ~ /(\.ini|\.cfg|\.flake8|\
 entrycheck() { # entrycheck <pathspec>...
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$ENTRY_AWK"
-    else awk -v F="$f" "$ENTRY_AWK" "$f" 2>/dev/null; fi
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$ENTRY_AWK"
+    else LC_ALL=C awk -v F="$f" "$JUSTFN$ENTRY_AWK" "$f" 2>/dev/null; fi
   done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified suppression: /'
 }
 cfgcheck() { # cfgcheck <pattern> <pathspec>...
   local pat="$1" o; shift
-  o=$(gg "$pat" -- "$@" "${EXCL[@]}" | grep -vE "$JUST")
+  o=$(gg "$pat" -- "$@" "${EXCL[@]}" | unjust)
   [ -n "$o" ] && echo "$o" | sed 's/^/guard: unjustified suppression: /'
   entrycheck "$@"
   return 0
@@ -112,7 +116,7 @@ extcheck() {
   local ok='"extends"[[:space:]]*:[[:space:]]*("[^"]*(tsconfig|jsconfig)[^"]*"[[:space:]]*(,|$|//)|'
   ok+='\[[[:space:]]*"[^"]*(tsconfig|jsconfig)[^"]*"([[:space:]]*,[[:space:]]*"[^"]*(tsconfig|jsconfig)[^"]*")*[[:space:]]*\])'
   local o
-  o=$(gg '"extends"[[:space:]]*:' -- '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}" | grep -vE "$ok" | grep -vE "$JUST")
+  o=$(gg '"extends"[[:space:]]*:' -- '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}" | grep -vE "$ok" | unjust)
   [ -n "$o" ] && echo "$o" | sed 's/^/guard: unjustified suppression: /'
   return 0
 }
@@ -130,7 +134,7 @@ PYPAT+='follow_imports[[:space:]]*[=:][[:space:]]*.?(skip|silent)|disable_error_
 TSPAT='"(strict|noImplicitAny|strictNullChecks|strictFunctionTypes|strictBindCallApply|strictPropertyInitialization|noImplicitThis|alwaysStrict|'
 TSPAT+='useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noImplicitReturns|noImplicitOverride|noFallthroughCasesInSwitch|'
 TSPAT+='noUnusedLocals|noUnusedParameters|noPropertyAccessFromIndexSignature|checkJs)"[[:space:]]*:[[:space:]]*false|'
-TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors|noCheck)"[[:space:]]*:[[:space:]]*true'
+TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors|noCheck|skipLibCheck)"[[:space:]]*:[[:space:]]*true'
 # ESLint (rules off or downgraded to warn, ignored files, unused-directive reporting off) and biome
 # Numbers only count as severities after a rule key (line start or first key of `rules: {`), so option objects like { max: 1 } do not.
 ESPAT=':[[:space:]]*(\[[[:space:]]*)?.?(off|warn).?[[:space:]]*([],}]|$|//)|'
@@ -148,6 +152,18 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
   # prettier: requirePragma makes it skip every file without the pragma; ignorePath points it at another ignore file
   cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
 [ -n "$out" ] && { echo "$out"; fail=1; }
+
+# 2c. `/* global foo, bar:writable */` (ESLint) switches off no-undef for the names. Only a comma list of identifiers closed on the same
+# line in a JS or TS file counts: the plain word also starts ordinary block comments (`/* global state is ... */`), which do not match.
+GID='[A-Za-z_$][A-Za-z0-9_$]*([[:space:]]*:[[:space:]]*[A-Za-z]+)?'
+out=$(gg '/\*[[:space:]]*globals?[[:space:]]+'"$GID"'([[:space:]]*,[[:space:]]*'"$GID"')*[[:space:]]*\*/' \
+  -- '*.js' '*.mjs' '*.cjs' '*.jsx' '*.ts' '*.mts' '*.cts' '*.tsx' '*.vue' "${EXCL[@]}" | unjust)
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
+# 2d. Linter, formatter and test config embedded in package.json is not scanned by the checks above (and ESLint 9 ignores eslintConfig).
+# JSON has no comment for a justification, so there is no escape hatch: keep that config in the dedicated file. A dependency entry
+# (`"jest": "30.5.2"`) has a string value and does not match; the string form of "prettier" is not detected.
+out=$(gg '"eslintConfig"[[:space:]]*:|"(prettier|jest|nyc|c8)"[[:space:]]*:[[:space:]]*(\{|$)' -- '*package.json' "${EXCL[@]}")
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: embedded config: package.json must not hold linter or test config (use the dedicated file): /'; fail=1; }
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
 out=$("${LS[@]}" | grep -iE 'baseline')
@@ -229,11 +245,20 @@ if [ "$STAGED" = 0 ]; then
           while (match(kw, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
         }
       }
-      kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
+      # coverageThreshold (Jest) and fail_under / --cov-fail-under (coverage.py) are named like thresholds but not spelled `threshold`.
+      # In a Jest, Vitest, nyc or c8 config the per-metric values sit on their own lines (`branches: 80,`), so those lines count too.
+      kw ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ ||
+      (file ~ /(jest|vitest)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n } else { add[key] = l; addn[key] = n }
       }
+      # A raised line length is a weaker style check (owner decision in #46); lowered or removed is stricter and passes. Style config files only.
+      file ~ /(ruff\.toml|pyproject\.toml|\.flake8|setup\.cfg|tox\.ini|\.editorconfig|detekt\.yml|prettierrc[^\/]*|prettier\.config\.[^\/]*)$/ && tolower($0) ~ /(line[-_]?length|printwidth)/ {
+        l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key)
+        if (substr($0, 1, 1) == "-") llrem[key] = num(l); else lladd[key] = num(l)
+      }
       END {
+        for (k in llrem) if (k in lladd && llrem[k] >= 0 && lladd[k] > llrem[k]) { print "guard: raised line length: " k " (" llrem[k] " -> " lladd[k] ")"; bad = 1 }
         for (k in rem) {
           if (!(k in add)) { print "guard: removed check setting: " rem[k]; bad = 1 }
           else if (remn[k] >= 0 && addn[k] >= 0 && addn[k] < remn[k] && rem[k] !~ /maxIssues/) { print "guard: lowered threshold: " add[k]; bad = 1 }
