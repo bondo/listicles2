@@ -127,6 +127,117 @@ class IssueFormTests(unittest.TestCase):
         self.assertNotIn("Traceback", r.stderr)
 
 
+DROPDOWN = """\
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - One
+        - Two
+"""
+CHECKBOXES = """\
+  - type: checkboxes
+    id: agree
+    attributes:
+      label: Agree
+      options:
+        - label: I agree
+"""
+
+
+class ShapeTests(unittest.TestCase):
+    """Shapes GitHub's issue-form schema rejects (follow-up for issue 61, R2-01)."""
+
+    def rejects(self, text, needle):
+        errs = check(text)
+        self.assertTrue(any(needle in e for e in errs), errs)
+
+    def test_valid_dropdown_and_checkboxes_pass(self):
+        self.assertEqual(check(GOOD + DROPDOWN + CHECKBOXES), [])
+
+    def test_dropdown_without_options_rejected(self):
+        self.rejects(GOOD + DROPDOWN.split("      options:")[0], "(dropdown) needs a non-empty attributes.options")
+
+    def test_dropdown_with_empty_options_rejected(self):
+        self.rejects(GOOD + DROPDOWN.split("      options:")[0] + "      options: []\n", "(dropdown) needs a non-empty attributes.options")
+
+    def test_dropdown_duplicate_options_rejected(self):
+        self.rejects(GOOD + DROPDOWN.replace("- Two", "- One"), "duplicate option")
+
+    def test_dropdown_non_string_option_rejected(self):
+        self.rejects(GOOD + DROPDOWN.replace("- Two", "- {a: b}"), "must be a non-empty string")
+
+    def test_checkboxes_without_options_rejected(self):
+        self.rejects(GOOD + CHECKBOXES.split("      options:")[0], "(checkboxes) needs a non-empty attributes.options")
+
+    def test_checkbox_option_without_label_rejected(self):
+        self.rejects(GOOD + CHECKBOXES.replace("label: I agree", "required: true"), "needs a label string")
+
+    def test_checkbox_option_required_must_be_boolean(self):
+        bad = CHECKBOXES.replace("label: I agree", "label: I agree\n          required: yes please")
+        self.rejects(GOOD + bad, "required")
+
+    def test_required_checkbox_option_satisfies_required_rule(self):
+        only = GOOD.split("  - type: textarea")[0] + CHECKBOXES.replace(
+            "label: I agree", "label: I agree\n          required: true"
+        )
+        self.assertEqual(check(only), [])
+
+    def test_duplicate_labels_across_fields_rejected(self):
+        self.rejects(GOOD + DROPDOWN.replace("label: Area", "label: What do you think?"), "duplicate label")
+
+    def test_distinct_labels_still_pass(self):
+        self.assertEqual(check(GOOD + DROPDOWN.replace("label: Area", "label: Other")), [])
+
+    def test_unknown_top_level_key_rejected(self):
+        self.rejects(GOOD + "label: [feedback]\n", "unknown top-level key")
+
+    def test_allowed_top_level_keys_pass(self):
+        extra = "title: '[Feedback]: '\nassignees: [bondo]\nprojects: [bondo/1]\ntype: Bug\n"
+        self.assertEqual(check(extra + GOOD), [])
+
+    def test_validations_on_markdown_rejected(self):
+        md = "  - type: markdown\n    attributes:\n      value: hi\n    validations:\n      required: true\n"
+        self.rejects(GOOD + md, "validations")
+
+    def test_required_must_be_boolean(self):
+        self.rejects(GOOD.replace("required: true", 'required: "true"'), "must be a boolean")
+
+    def test_validations_must_be_mapping(self):
+        self.rejects(GOOD.replace("      required: true\n", "").replace("validations:", "validations: x"), "validations must be a mapping")
+
+    def test_label_must_be_string(self):
+        self.rejects(GOOD.replace("label: What do you think?", "label: 42"), "label must be a string")
+
+    def test_label_must_not_be_blank(self):
+        self.rejects(GOOD.replace("label: What do you think?", "label: ' '"), "needs attributes.label")
+
+    def test_markdown_value_must_be_string(self):
+        md = "  - type: markdown\n    attributes:\n      value: 123\n"
+        self.rejects(GOOD + md, "value must be a string")
+
+    def test_input_value_must_be_string(self):
+        self.rejects(GOOD.replace("label: What do you think?", "label: L\n      value: 7"), "value must be a string")
+
+    def test_title_must_be_string(self):
+        self.rejects("title: [a]\n" + GOOD, "title must be a string")
+
+    def test_unknown_body_item_key_rejected(self):
+        extra = "  - type: input\n    attributes:\n      label: L2\n    validation:\n      required: true\n"
+        self.rejects(GOOD + extra, "unknown key 'validation'")
+
+    def test_id_on_markdown_rejected(self):
+        md = "  - type: markdown\n    id: intro\n    attributes:\n      value: hi\n"
+        self.rejects(GOOD + md, "(markdown) cannot have an id")
+
+    def test_known_body_item_keys_still_pass(self):
+        self.assertEqual(check(GOOD + DROPDOWN), [])
+
+    def test_required_message_names_checkbox_option_path(self):
+        self.rejects(GOOD.replace("required: true", "required: false"), "required checkbox option")
+
+
 class RealFormsTests(unittest.TestCase):
     def test_repo_forms_valid(self):
         d = ROOT / ".github" / "ISSUE_TEMPLATE"
@@ -137,6 +248,13 @@ class RealFormsTests(unittest.TestCase):
         for p in d.glob("*.yml"):
             if p.name != "config.yml":
                 self.assertIn("This is public", p.read_text(encoding="utf-8"), p.name)
+
+    def test_repo_forms_have_danish_public_notice(self):
+        d = ROOT / ".github" / "ISSUE_TEMPLATE"
+        notice = "Dette er offentligt: udelad adresser, telefonnumre, rigtige navne og billeder af dit hjem."
+        for p in d.glob("*.yml"):
+            if p.name != "config.yml":
+                self.assertIn(notice, p.read_text(encoding="utf-8"), p.name)
 
     def test_repo_has_three_forms_and_config(self):
         d = ROOT / ".github" / "ISSUE_TEMPLATE"
