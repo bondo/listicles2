@@ -160,7 +160,11 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # Config handed over on the command line (ruff --config, mypy --config-file, eslint -c/--config, prettier --config, tsc -p/--project/-b/--build)
 # must name a file the config scan above (2b) reads, or `justified:`: an inline `--config "key = value"`, an absolute or
 # `~` path, a `..` path and a path built from `$` or backticks (it may be generated at run time) are relaxations. `tsc` with a source
-# file argument and no -p/-b ignores tsconfig.json, so it is flagged too.
+# file argument and no -p/-b ignores tsconfig.json, so it is flagged too; every project argument of `tsc -b` is checked, and an empty
+# quoted config (`--config-file ""`) disables the config, so it is flagged. mypy and shellcheck accept unique prefixes of long options
+# (`mypy --ignore-missing`, `shellcheck --exc=SC2086`), so a proper prefix of a flagged option is flagged, and a mypy `@argfile` is too.
+# ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
+# which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
 # Strict flags (--strict, --max-warnings 0, -S warning, ...) never match. Not covered: action `with: args:` lines, YAML folded scalars,
 # Makefiles, composite actions and .pre-commit-config.yaml (none exists today; issue 164), and flags held in shell variables
 # (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable. yarn and pnpm forms that forward
