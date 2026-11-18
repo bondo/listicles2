@@ -179,8 +179,11 @@ RULES = (
             r"7-day warning never pauses", r"missing `rate_limit_info` counts as ok",
             r"an unknown or missing `rateLimitType` counts as 5-hour",
             r"`isUsingOverage` is true[^.;]*never pauses either \(throttle per §7\.7\.6\)",
+            r"set that extra check-in only if none is pending",
+            r"the second look is the first wake at least 10 minutes after the warning was first seen",
         ),
-        "the first step of every wake reads rate_limit_info and sets Usage:; a 7-day warning never pauses (§7.7.1)",
+        "the first step of every wake reads rate_limit_info and sets Usage:; a 7-day warning never pauses; one 10-minute second look (§7.7.1)",
+        forbidden=(r"look again in about 10 minutes",),
     ),
     Rule(
         "usage-pause-protocol", ("orchestrator",),
@@ -195,19 +198,25 @@ RULES = (
     ),
     Rule(
         "usage-limit-failure", ("orchestrator",),
-        (r"a limit failure is not a stall", r"no respawn", r"two-failure stop", r"§7\.7\.4", r"`RESUMED`"),
+        (r"a limit failure is not a stall", r"no respawn", r"two-failure stop", r"§7\.7\.4", r"post `RESUMED`"),
         "a limit failure is not a stall (no respawn, not counted); resume per §7.7.4 and post RESUMED (§7.7.3)",
     ),
     Rule(
         "usage-resume", ("orchestrator",),
         (
             r"if the read still shows limit reached or a 5-hour warning, set a new `paused until` time",
-            r"`send_later` again at the new reset time plus 5 minutes", r"delete the spent reminder and stop",
+            r"`send_later` again at the new reset time plus 5 minutes \(60 minutes from now if `resetsat` is missing or past\)",
+            r"delete the old reminder, whether or not it fired, and stop",
+            r"does nothing if the newest `paused` comment already has a `resumed` after it",
+            r"skip a session whose `worker-result` is already posted and collect it instead",
+            r"delete the resume reminder, whether or not it fired",
             r"`send_message` each interrupted or limit-failed session", r"resume implementers before reviewers",
             r"re-arm the 45-minute check-in", r"post one line",
             r"a session that has gone is a normal dead worker \(§7\.4\): respawn it from `handoff/<branch>\.md`",
         ),
-        "resume re-checks the limit first (re-pause, new reminder, stop), then resumes implementers before reviewers (§7.7.4)",
+        "resume re-checks the limit first (re-pause, new reminder, stop), then resumes implementers before reviewers (§7.7.4); "
+        "it runs once, skips sessions whose result is posted and deletes the reminder fired or not",
+        forbidden=(r"delete the spent reminder", r"delete the spent resume reminder"),
     ),
     Rule(
         "usage-worker", ("implementer", "planner"),
@@ -225,6 +234,12 @@ RULES = (
             r"usage limit reset: re-check your findings comment and finish the round",
         ),
         "reviewers expect an interrupt on the account-wide limit and finish the round from their findings comment (§7.7.4)",
+    ),
+    Rule(
+        "usage-reviewer-findings", ("reviewer", "design-reviewer", "second-reviewer"),
+        (r"`round in progress`", r"edit that same comment as findings accumulate", r"§8\.3"),
+        "reviewers keep findings in the one PR comment (ROUND IN PROGRESS, edited in place, §8.3), not a local file (item 4b of #60)",
+        forbidden=(r"scratch file", r"outside the repo"),
     ),
     Rule(
         "r3-digest", ("orchestrator",),
@@ -981,6 +996,24 @@ DOC_RULES = (
         "ORCHESTRATION 7.7.6: throttle only near a rate limit or in overage: extras, halve the concurrency, pause new work; reviews are never throttled",
         forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2", r"one stage per check-in",
                    r"§7\.7\.5 forecast says"),
+    ),
+    DocRule(
+        "orch-usage-edges", ORCH,
+        (
+            r"set one extra check-in about 10 minutes out, only if none is pending",
+            r"the second look is the first wake at least 10 minutes after the warning was first seen",
+            r"§7\.7\.4 does nothing if the newest `paused` comment already has a `resumed` after it",
+            r"`send_later` at the new `resetsat` \+ 5 minutes \(60 minutes from now if `resetsat` is missing or already past, as in §7\.7\.2 step 1\)",
+            r"delete the old reminder, whether or not it fired",
+            r"skip a session whose `worker-result` is already posted \(collect it instead, §7\.3\)",
+            r"delete the resume reminder, whether or not it fired",
+            r"the window is from `resetsat` minus 5 hours \(`five_hour`\) or from the last `resumed` comment \(any other `ratelimittype`\), up to now",
+        ),
+        "ORCHESTRATION 7.7.1, 7.7.4, 7.7.5: one 10-minute check-in, resume runs once, skips posted results, re-pause fallback, window defined (#69)",
+        forbidden=(
+            r"delete the spent resume reminder", r"set one extra check-in about 10 minutes out(?!, only if none is pending)",
+            r"send_later` at the new `resetsat` \+ 5 minutes \(delete the spent",
+        ),
     ),
     DocRule(
         "orch-spawn-templates", ORCH,
