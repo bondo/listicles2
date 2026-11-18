@@ -201,8 +201,8 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]).
   adder (acceptable while OQ-18 is open; revisit then).
 * **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
   an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 keeps no history and
-  stays last write wins per field, as above; the sync-merge design only must not rule out adding, later, a per-list
-  change history and keeping the losing side of a conflict.
+  stays last write wins per field, as above; the only constraint on the sync-merge design is that it must not rule
+  out adding, later, a per-list change history and keeping the losing side of a conflict.
 * Timestamps use `serverTimestamp()`. They are read with
   `ServerTimestampBehavior.ESTIMATE` so pending local writes still sort correctly.
 * Losing access while offline (stop sharing, removal, household deleted): the queued writes are rejected
