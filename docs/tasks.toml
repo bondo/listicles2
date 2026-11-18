@@ -739,10 +739,11 @@ notes = "Owner only. Send COLLABORATING.md; confirm 2FA is on. Live test: docs/r
 id = "M0.5-28"
 title = "R6 retro of M0.5: compare the Agent Usage Redesign pilot with its baseline and propose at most 3 changes (redesign rollout step 6)"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "retro"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-27", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26"]
+pr = 137
 notes = "Fresh Opus session (agents/roles.yaml retro), after every other non-owner M0.5 task, done or not, so the list does not change as work progresses (the follow-up burn-down M0.5-FU waits for it, as the validator requires; add each new M0.5 task here); M1 waits for it through milestone:M0.5. Reads docs/agent-metrics.csv (session, round, incident, review and escaped rows), docs/reviews/README.md and a sample of transcripts and PR threads; no docs/agent-tuning.md exists yet, so it creates it. Compares the pilot with the baseline of the proposal (2026-11-17): the 68 owner-input comments split into product answers and process interventions, 51 merged PRs, commits merged without review, escaped defects in security-rules, sync-merge, release or risk:high work, review rounds per PR class, confirmed share of blocker and major findings, usage per PR class. The pilot passes when every hard row holds and at least one other target is met; a broken hard row or no movement means failure. Checks the kill switch (PILOT-STOP on #15, then the roles.yaml fallback set) and that compaction did not precede a handoff note. Proposes at most 3 changes as reviewed PRs with the expected effect logged; the owner merges roles.yaml and threshold changes."
 
 # ---------------------------------------------------------------- M1 auth + households
