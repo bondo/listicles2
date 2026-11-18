@@ -14,6 +14,9 @@ Output: one CSV, first column row_type (session, round, incident, review, escape
 not apply, rows sorted deterministically. Input is validated; every problem is reported as `file:line: message`,
 exit 1, and nothing is written.
 
+Review rows reuse the disputed, deferred and cost_usd columns that round and session rows also have (the output has
+one column per name), so filter by row_type before summing or averaging them.
+
 Escaped defects (Agent Usage Redesign): a bug found after merge gets the line `Caused by: #N` (N = the PR that caused
 it) in its issue and one `escaped` row (date, bug, caused_by, area). No per-PR labels. `--caused-by FILE` reads the line.
 

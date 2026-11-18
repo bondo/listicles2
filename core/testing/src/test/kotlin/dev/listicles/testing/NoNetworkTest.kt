@@ -18,11 +18,13 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.DatagramChannel
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
+import java.util.concurrent.Executors
 
 /** Every way a test could reach the network must fail with NetworkAccessBlockedException (PLAN 5.4, P13). */
 class NoNetworkTest {
@@ -66,6 +68,28 @@ class NoNetworkTest {
 
     @Test
     fun blocksAsynchronousClientChannel() = shouldBeBlocked { AsynchronousSocketChannel.open().close() }
+
+    // R3-01 (#68): a channel opened in a custom group goes through group.provider(), so creating the group is blocked.
+    @Test
+    fun blocksAsynchronousChannelGroupWithThreadFactory() =
+        shouldBeBlocked {
+            AsynchronousChannelGroup
+                .withFixedThreadPool(
+                    1,
+                    Executors.defaultThreadFactory(),
+                ).shutdownNow()
+        }
+
+    @Test
+    fun blocksAsynchronousChannelGroupWithExecutor() {
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            shouldBeBlocked { AsynchronousChannelGroup.withCachedThreadPool(executor, 1).shutdownNow() }
+            shouldBeBlocked { AsynchronousChannelGroup.withThreadPool(executor).shutdownNow() }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
 
     @Test
     fun blocksNioClientChannelWithProtocolFamily() =
