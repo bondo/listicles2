@@ -14,37 +14,100 @@ ALLOWED_LABELS = {"feedback", "idea", "decision", "needs-collaborator", "needs-o
 INPUT_TYPES = {"textarea", "input", "dropdown", "checkboxes"}
 BODY_TYPES = INPUT_TYPES | {"markdown"}
 ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+# Keys GitHub's issue-form schema accepts at the top level.
+TOP_LEVEL_KEYS = {"name", "description", "title", "labels", "assignees", "projects", "type", "body"}
+
+
+def _is_text(v):
+    return isinstance(v, str) and bool(v.strip())
+
+
+def _check_attrs(where, item, attrs):
+    """Errors for the attributes of one non-markdown field (label, value, options)."""
+    errs = []
+    if not isinstance(attrs, dict):
+        return [f"{where} ({item['type']}) needs attributes.label"]
+    if "label" not in attrs:
+        errs.append(f"{where} ({item['type']}) needs attributes.label")
+    elif not isinstance(attrs["label"], str):
+        errs.append(f"{where} attributes.label must be a string")
+    elif not attrs["label"].strip():
+        errs.append(f"{where} ({item['type']}) needs attributes.label")
+    if "value" in attrs and not isinstance(attrs["value"], str):
+        errs.append(f"{where} attributes.value must be a string")
+    if item["type"] == "dropdown":
+        errs += _check_dropdown(where, attrs.get("options"))
+    elif item["type"] == "checkboxes":
+        errs += _check_checkboxes(where, attrs.get("options"))
+    return errs
+
+
+def _check_dropdown(where, options):
+    if not isinstance(options, list) or not options:
+        return [f"{where} (dropdown) needs a non-empty attributes.options list"]
+    errs = [f"{where} dropdown option {o!r} must be a non-empty string" for o in options if not _is_text(o)]
+    texts = [o.strip() for o in options if _is_text(o)]
+    errs += [f"{where} duplicate option {o!r}" for o in sorted({t for t in texts if texts.count(t) > 1})]
+    return errs
+
+
+def _check_checkboxes(where, options):
+    if not isinstance(options, list) or not options:
+        return [f"{where} (checkboxes) needs a non-empty attributes.options list"]
+    errs = []
+    for j, o in enumerate(options):
+        if not isinstance(o, dict) or not _is_text(o.get("label")):
+            errs.append(f"{where} checkboxes option {j} needs a label string")
+        elif "required" in o and not isinstance(o["required"], bool):
+            errs.append(f"{where} checkboxes option {j} required must be a boolean")
+    return errs
 
 
 def _check_body(name, body):
     if not isinstance(body, list) or not body:
         return [f"{name}: body must be a non-empty list"]
-    errs, required, seen = [], False, set()
+    errs, required, seen, labels = [], False, set(), set()
     for i, item in enumerate(body):
+        where = f"{name}: body[{i}]"
         if not isinstance(item, dict) or not isinstance(item.get("type"), str):
-            errs.append(f"{name}: body[{i}] needs a type")
+            errs.append(f"{where} needs a type")
             continue
         if item["type"] not in BODY_TYPES:
-            errs.append(f"{name}: body[{i}] has unknown type {item['type']!r}")
+            errs.append(f"{where} has unknown type {item['type']!r}")
             continue
         attrs = item.get("attributes")
         if "id" in item:
             bid = item["id"]
             if not isinstance(bid, str) or not ID_RE.match(bid):
-                errs.append(f"{name}: body[{i}] id must match [A-Za-z0-9_-]+")
+                errs.append(f"{where} id must match [A-Za-z0-9_-]+")
             elif bid in seen:
-                errs.append(f"{name}: body[{i}] duplicate id {bid!r}")
+                errs.append(f"{where} duplicate id {bid!r}")
             else:
                 seen.add(bid)
         if item["type"] == "markdown":
             if not isinstance(attrs, dict) or not str(attrs.get("value", "")).strip():
-                errs.append(f"{name}: body[{i}] (markdown) needs attributes.value")
+                errs.append(f"{where} (markdown) needs attributes.value")
+            elif not isinstance(attrs["value"], str):
+                errs.append(f"{where} attributes.value must be a string")
+            if "validations" in item:
+                errs.append(f"{where} (markdown) cannot have validations")
             continue
-        if item["type"] in INPUT_TYPES:
-            if not isinstance(attrs, dict) or not attrs.get("label"):
-                errs.append(f"{name}: body[{i}] ({item['type']}) needs attributes.label")
-            if isinstance(item.get("validations"), dict) and item["validations"].get("required") is True:
+        errs += _check_attrs(where, item, attrs)
+        label = attrs.get("label") if isinstance(attrs, dict) else None
+        if _is_text(label):
+            if label.strip() in labels:
+                errs.append(f"{where} duplicate label {label.strip()!r}")
+            labels.add(label.strip())
+        vals = item.get("validations")
+        if vals is not None and not isinstance(vals, dict):
+            errs.append(f"{where} validations must be a mapping")
+        elif isinstance(vals, dict) and "required" in vals:
+            if not isinstance(vals["required"], bool):
+                errs.append(f"{where} validations.required must be a boolean")
+            elif vals["required"]:
                 required = True
+        if item["type"] == "checkboxes" and isinstance(attrs, dict) and isinstance(attrs.get("options"), list):
+            required = required or any(isinstance(o, dict) and o.get("required") is True for o in attrs["options"])
     if not required:
         errs.append(f"{name}: at least one body field must have validations.required: true")
     return errs
@@ -57,10 +120,12 @@ def validate_form(name, text, allowed):
         return [f"{name}: invalid YAML: {str(e).splitlines()[0]}"]
     if not isinstance(doc, dict):
         return [f"{name}: top level must be a mapping"]
-    errs = []
+    errs = [f"{name}: unknown top-level key {k!r}" for k in doc if k not in TOP_LEVEL_KEYS]
     for key in ("name", "description"):
         if not isinstance(doc.get(key), str) or not doc[key].strip():
             errs.append(f"{name}: missing {key}")
+    if "title" in doc and not isinstance(doc["title"], str):
+        errs.append(f"{name}: title must be a string")
     labels = doc.get("labels")
     if not isinstance(labels, list) or not labels:
         errs.append(f"{name}: missing labels")
