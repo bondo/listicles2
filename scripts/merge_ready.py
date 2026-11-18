@@ -30,14 +30,9 @@ RETRIES = 5
 DOC_PREFIXES = ("docs/product/", "docs/milestones/", "docs/reviews/", "design/")
 DOC_FILES = ("docs/PLAN.md",)
 TASKS_FILES = ("docs/tasks.toml",)
-DEPENDABOT_FILES = (
-    "firebase/package.json",
-    "firebase/package-lock.json",
-    "gradle/libs.versions.toml",
-    "gradle/wrapper/gradle-wrapper.properties",
-    "gradle/wrapper/gradle-wrapper.jar",
-    "scripts/requirements-lint.txt",
-)
+# Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
+# pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
+DEPENDABOT_FILES = ("gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar")
 WORKFLOW_RE = re.compile(r"^\.github/workflows/[\w.-]+\.ya?ml$")
 WRAPPER_PROPS = "gradle/wrapper/gradle-wrapper.properties"
 PIN_LINE_RE = re.compile(r"^(\s*(?:-\s+)?uses:\s*[\w.-]+/[\w./-]+)@[0-9a-f]{40}\s*(?:#.*)?$")
@@ -45,7 +40,7 @@ WRAPPER_LINE_RE = re.compile(
     r"^(?:distributionUrl=https\\://services\.gradle\.org/distributions/gradle-[\w.-]+-(?:bin|all)\.zip|distributionSha256Sum=[0-9a-f]{64})$"
 )
 CLOSING_RE = re.compile(
-    r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b[:\s]+(?:[\w.-]+/[\w.-]+#\d+|#\d+|https://github\.com/[\w.-]+/[\w.-]+/issues/\d+)",
+    r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b[:\s]+(?:[\w.-]+/[\w.-]+#\d+|#\d+|https?://(?:www\.)?github\.com/[\w.-]+/[\w.-]+/issues/\d+)",
     re.I,
 )
 SHA_RE = re.compile(r"[0-9a-f]{40}")
@@ -98,10 +93,10 @@ def allowed(kind, name):
 
 
 def _changed_lines(patch):
-    """The (removed, added) lines of each hunk of a diff, without the +/- marker."""
+    """The (removed, added) lines of each change block of a diff, without the +/- marker."""
     hunks, removed, added = [], [], []
     for ln in patch.splitlines():
-        if ln.startswith("@@"):
+        if ln.startswith("@@") or ln[:1] == " ":  # a hunk header or a context line ends a change block
             hunks.append((removed, added))
             removed, added = [], []
         elif ln[:1] == "-":
@@ -112,7 +107,7 @@ def _changed_lines(patch):
 
 
 def pin_only(patch):
-    """True if the diff only re-pins actions: in each hunk the removed and added `uses:` lines pair up one to one with the same
+    """True if the diff only re-pins actions: in each change block the removed and added `uses:` lines pair up one to one with the same
     indentation and owner/repo[/path]; only the sha and trailing comment may differ. An added or removed step fails."""
     hunks = _changed_lines(patch)
     for removed, added in hunks:
