@@ -1456,5 +1456,90 @@ class Pr4RuleTests(unittest.TestCase):
                     self.assertIn("orch-merge-agent", ids(found))
 
 
+class NoResolveThreadTests(unittest.TestCase):
+    """Follow-up #44 (R1-07): agents never resolve a collaborator's review thread; they reply and leave it for the collaborator or the owner.
+    The prompts already carry the ban (rule no-resolve-thread); these pin the reply-and-leave half and the process docs."""
+
+    REPLY_ROLES = ("implementer", "orchestrator")  # the roles that answer on threads; read-only roles only carry the ban
+    DOCS = {
+        "docs/ORCHESTRATION.md": ("orch-no-resolve-thread", "never resolve a collaborator's review thread (follow-up #44): reply and leave it for the collaborator or the owner"),
+        "docs/COLLABORATING.md": ("collab-no-resolve", "**Resolve conversation**"),
+    }
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def test_the_real_prompts_and_docs_pass(self):
+        for role in self.REPLY_ROLES:
+            self.assertNotIn("no-resolve-thread-reply", ids(prompt_rules.check_text(role, real(role))))
+        for path in self.DOCS:
+            self.assertEqual(prompt_rules.check_doc_text(path, self.doc(path)), [], path)
+
+    def test_the_reply_rule_exists_for_exactly_the_reply_roles(self):
+        rule = next((r for r in prompt_rules.RULES if r.id == "no-resolve-thread-reply"), None)
+        self.assertIsNotNone(rule)
+        self.assertEqual(set(rule.roles), set(self.REPLY_ROLES))
+
+    def test_dropping_the_reply_and_leave_it_half_is_rejected(self):
+        for role in self.REPLY_ROLES:
+            text = real(role)
+            self.assertRegex(prompt_rules.normalize(text), r"reply and leave it for the collaborator or the owner")
+            cut = re.sub(r"reply\s+and\s+leave\s+it\s+for\s+the\s+collaborator\s+or\s+the\s+owner", "", text, count=1)
+            with self.subTest(role=role):
+                self.assertIn("no-resolve-thread-reply", ids(prompt_rules.check_text(role, cut)))
+
+    def test_reply_then_leave_it_to_the_owner_alone_is_rejected(self):
+        for role in self.REPLY_ROLES:
+            cut = re.sub(r"for\s+the\s+collaborator\s+or\s+the\s+owner", "for nobody", real(role), count=1)
+            with self.subTest(role=role):
+                self.assertIn("no-resolve-thread-reply", ids(prompt_rules.check_text(role, cut)))
+
+    def test_permission_to_resolve_is_rejected(self):
+        for role in ROLES:
+            for stale in (" You may resolve the thread once you have replied.", " Resolve the collaborator's review thread after answering.",
+                          " Agents can resolve a review thread when the question is answered."):
+                with self.subTest(role=role, stale=stale):
+                    self.assertIn("no-resolve-thread", ids(prompt_rules.check_text(role, real(role) + stale)))
+
+    def test_every_prompt_still_needs_the_ban_itself(self):
+        for role in ROLES:
+            for index in range(3):
+                with self.subTest(role=role, pattern=index):
+                    self.assertIn("no-resolve-thread", ids(prompt_rules.check_text(role, delete_match(role, "no-resolve-thread", index))))
+
+    def test_the_process_docs_carry_the_ban(self):
+        for path, (rid, needle) in self.DOCS.items():
+            with self.subTest(path=path):
+                self.assertIn(needle.lower(), prompt_rules.normalize(self.doc(path)).lower())
+                self.assertTrue(any(r.id == rid and r.path == path for r in prompt_rules.DOC_RULES), rid)
+
+    def test_deleting_the_doc_wording_is_rejected(self):
+        for path, (rid, needle) in self.DOCS.items():
+            text = prompt_rules.normalize(self.doc(path))
+            cut = re.sub(re.escape(needle), "", text, count=1, flags=re.I)
+            with self.subTest(path=path):
+                self.assertNotEqual(cut, text)
+                self.assertIn(rid, ids(prompt_rules.check_doc_text(path, cut)))
+
+    def test_the_orchestration_role_table_keeps_resolve_threads_in_the_collaborator_never_cell(self):
+        text = prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))
+        cut = text.replace("delete branches, resolve threads, labels", "delete branches, labels", 1)
+        self.assertNotEqual(cut, text)
+        self.assertIn("orch-no-resolve-thread", ids(prompt_rules.check_doc_text("docs/ORCHESTRATION.md", cut)))
+
+    def test_stale_doc_wording_is_rejected(self):
+        for path, stale in (
+            ("docs/ORCHESTRATION.md", "Agents may resolve a collaborator's review thread once answered."),
+            ("docs/ORCHESTRATION.md", "The orchestrator resolves the collaborator's thread after replying."),
+            ("docs/COLLABORATING.md", "Agents resolve the conversation when your question is answered."),
+        ):
+            with self.subTest(path=path, stale=stale):
+                self.assertTrue({"orch-no-resolve-thread", "collab-no-resolve"} & ids(prompt_rules.check_doc_text(path, self.doc(path) + "\n" + stale + "\n")))
+
+    def test_check_docs_on_the_repo_passes_and_names_both_files(self):
+        self.assertEqual(prompt_rules.check_docs(ROOT), [])
+        self.assertTrue({"docs/ORCHESTRATION.md", "docs/COLLABORATING.md"} <= {r.path for r in prompt_rules.DOC_RULES})
+
+
 if __name__ == "__main__":
     unittest.main()
