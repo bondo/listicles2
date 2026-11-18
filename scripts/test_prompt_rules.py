@@ -1240,15 +1240,30 @@ class M026Tests(unittest.TestCase):
         ("review-rules-matrix", "`area:security-rules`, `area:sync-merge` or `risk:high`", "`area:security-rules`"),
         ("review-rules-matrix", "with an allow case and a deny case", "with an allow case"),
     )
-    # (file, rule id, wording the rule must reject when it is added to the real file)
-    STALE = (
-        ("REVIEW.md", "review-visual", "An agent score below 3 is a `blocker`."),
-        ("REVIEW.md", "review-visual", "An agent score below 3 is a major finding."),
-        ("REVIEW.md", "review-visual", "A score below 3 blocks the merge."),
-        ("REVIEW.md", "review-rules-matrix", "A changed rule without both is a `minor` finding."),
-        ("REVIEW.md", "review-rules-matrix", "A changed rule without both is a nit."),
-        ("REVIEW.md", "review-rules-matrix", "A changed rule without both is a `blocker`."),
-        ("REVIEW.md", "review-rules-matrix", "A changed rule without both is always a blocker."),
+    # Wrong severities for a matrix gap (R3-01 of #133): the REVIEW.md pin and the reviewer pin must reject every one of them.
+    BAD_MATRIX = (
+        "A changed rule without both is a `minor` finding.",
+        "A changed rule without both is a nit.",
+        "A changed rule without both is a `blocker`.",
+        "A changed rule without both is always a blocker.",
+        "A gap is a `blocker`.",
+        "A gap is always a blocker.",
+        "A gap in the matrix is always a `blocker`.",
+        "A matrix gap is always a `blocker`.",
+        "A matrix gap is a nit.",
+        "A gap is a `minor` finding.",
+        "A gap is a nit.",
+        "A gap is only a `minor` finding.",
+        "Gaps are `minor` findings.",
+    )
+    # Wrong severities for an agent score below 3, singular and plural (R3-02 of #133).
+    BAD_SCORE = (
+        "An agent score below 3 is a `blocker`.",
+        "An agent score below 3 is a major finding.",
+        "A score below 3 is a `major` finding.",
+        "Scores below 3 are a `major` finding.",
+        "Scores below 3 are blockers.",
+        "A rubric score below 3 blocks the merge.",
     )
 
     def doc(self, path):
@@ -1273,10 +1288,26 @@ class M026Tests(unittest.TestCase):
                 self.assertIn(old, text)
                 self.assertIn(rid, self.doc_problems("REVIEW.md", text.replace(old, new, 1)))
 
-    def test_wrong_severity_wording_is_rejected(self):
-        for path, rid, bad in self.STALE:
-            with self.subTest(old=bad):
-                self.assertIn(rid, self.doc_problems(path, self.doc(path) + "\n" + bad + "\n"))
+    def test_wrong_severity_wording_is_rejected_by_the_review_md_pins(self):
+        for rid, bads in (("review-rules-matrix", self.BAD_MATRIX), ("review-visual", self.BAD_SCORE)):
+            for bad in bads:
+                with self.subTest(rule=rid, old=bad):
+                    self.assertIn(rid, self.doc_problems("REVIEW.md", self.doc("REVIEW.md") + "\n" + bad + "\n"))
+
+    def test_the_reviewer_pin_rejects_the_same_wrong_wordings(self):  # R3-01, R3-02 of #133: parity between the two files
+        for bad in self.BAD_MATRIX + self.BAD_SCORE:
+            with self.subTest(bad=bad):
+                self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("reviewer") + " " + bad)))
+
+    def test_both_files_use_the_same_forbidden_patterns(self):  # R3-01 of #133
+        doc = next(r for r in prompt_rules.DOC_RULES if r.id == "review-rules-matrix")
+        vis = next(r for r in prompt_rules.DOC_RULES if r.id == "review-visual")
+        rev = next(r for r in prompt_rules.RULES if r.id == "reviewer-visual-matrix")
+        self.assertIn(prompt_rules.MATRIX_WRONG_SEVERITY, doc.forbidden)
+        self.assertIn(prompt_rules.MATRIX_WRONG_SEVERITY, rev.forbidden)
+        for pattern in (prompt_rules.SCORE_WRONG_SEVERITY, prompt_rules.SCORE_BLOCKS_MERGE):
+            self.assertIn(pattern, vis.forbidden)
+            self.assertIn(pattern, rev.forbidden)
 
     def test_the_wording_in_another_file_does_not_count(self):
         for rid in self.DOC_RULES:
@@ -1298,16 +1329,15 @@ class M026Tests(unittest.TestCase):
                 self.assertTrue(n)
                 self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", text)))
 
-    def test_the_reviewer_prompt_rejects_the_wrong_severity_and_other_roles_do_not_count(self):
-        for bad in (" An agent score below 3 is a `blocker`.", " An agent score below 3 is a major finding."):
-            with self.subTest(bad=bad):
-                self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("reviewer") + bad)))
-        for bad in (" A gap is a `blocker`.", " A gap in the matrix is always a `blocker`.", " A matrix gap is always a `blocker`.",
-                    " A gap is a `minor` finding.", " A gap is a nit."):  # R2-02 of #133: as wide as the REVIEW.md pin
-            with self.subTest(bad=bad):
-                self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("reviewer") + bad)))
+    def test_other_roles_wording_does_not_count_for_the_reviewer_pin(self):
         self.assertIn("reviewer-visual-matrix", ids(prompt_rules.check_text("reviewer", real("design-reviewer"))))
         self.assertNotIn("reviewer-visual-matrix", ids(prompt_rules.check_text("design-reviewer", real("design-reviewer"))))
+
+    def test_the_real_wording_is_not_rejected_as_wrong_severity(self):  # the forbidden patterns must not hit the owner's wording
+        for path in ("REVIEW.md", "agents/prompts/reviewer.md"):
+            text = prompt_rules.normalize(self.doc(path))
+            for pattern in (prompt_rules.MATRIX_WRONG_SEVERITY, prompt_rules.SCORE_WRONG_SEVERITY, prompt_rules.SCORE_BLOCKS_MERGE):
+                self.assertIsNone(re.search(pattern, text, re.I), (path, pattern))
 
 
 if __name__ == "__main__":
