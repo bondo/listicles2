@@ -18,8 +18,8 @@ with the gap recorded if 2.x is not stable enough.
 
 ## Decision
 Stay on 1.23.8 (stable). Use the type-resolved `detektMain` and `detektTest` on `:core:domain`, where the
-business logic lives (wired into `verify.sh`; CI needs the same tasks added to the `static` job, an owner-reviewed
-change because it touches the workflow files). `:app` gets source-only detekt.
+business logic lives, and on `:core:testing` (the shared test-JVM network block): both are wired into `verify.sh`,
+the pre-commit hook and the CI `static` job. `:app` gets source-only detekt.
 
 ## Known gap
 No type-resolved detekt on `:app` until 2.x is stable. Rules that need types (for example always-true checks,
