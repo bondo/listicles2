@@ -226,9 +226,11 @@ class RefusalTests(unittest.TestCase):
     def test_sign_off_that_removes_not_owner_approved_is_refused(self):
         """R3-01: turning a working draft into an approved doc is the owner's call, whatever the file."""
         flip = "@@ -3 +3 @@\n-Status: working draft, merged as the baseline; not owner-approved (see issue #15).\n+Status: approved by the owner, 2026-11-18."
-        for name in ("docs/product/stories.md", "docs/PLAN.md", "design/tokens.json"):
-            with self.subTest(name=name):
-                self.refused(make_api(files=[file_entry(name, patch=flip)]), r"not owner-approved")
+        no_patch = [{"filename": "docs/product/stories.md", "status": "modified"}, {"filename": "docs/PLAN.md", "status": "removed"},
+                    {"filename": "docs/product/wireframes/p.png", "status": "renamed", "previous_filename": "docs/PLAN.md"}]  # R4-01
+        for f in [file_entry(n, patch=flip) for n in ("docs/product/stories.md", "docs/PLAN.md", "design/tokens.json")] + no_patch:
+            with self.subTest(f=f):
+                self.refused(make_api(files=[f]), re.escape(f["filename"]) + r".*not owner-approved")
 
     def test_dependabot_renamed_or_deleted_file_is_refused(self):
         """R3-02: a dependency bump only modifies files."""
