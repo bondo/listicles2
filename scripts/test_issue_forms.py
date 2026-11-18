@@ -157,22 +157,22 @@ class ShapeTests(unittest.TestCase):
         self.assertEqual(check(GOOD + DROPDOWN + CHECKBOXES), [])
 
     def test_dropdown_without_options_rejected(self):
-        self.rejects(GOOD + DROPDOWN.split("      options:")[0], "options")
+        self.rejects(GOOD + DROPDOWN.split("      options:")[0], "(dropdown) needs a non-empty attributes.options")
 
     def test_dropdown_with_empty_options_rejected(self):
-        self.rejects(GOOD + DROPDOWN.split("      options:")[0] + "      options: []\n", "options")
+        self.rejects(GOOD + DROPDOWN.split("      options:")[0] + "      options: []\n", "(dropdown) needs a non-empty attributes.options")
 
     def test_dropdown_duplicate_options_rejected(self):
         self.rejects(GOOD + DROPDOWN.replace("- Two", "- One"), "duplicate option")
 
     def test_dropdown_non_string_option_rejected(self):
-        self.rejects(GOOD + DROPDOWN.replace("- Two", "- {a: b}"), "option")
+        self.rejects(GOOD + DROPDOWN.replace("- Two", "- {a: b}"), "must be a non-empty string")
 
     def test_checkboxes_without_options_rejected(self):
-        self.rejects(GOOD + CHECKBOXES.split("      options:")[0], "options")
+        self.rejects(GOOD + CHECKBOXES.split("      options:")[0], "(checkboxes) needs a non-empty attributes.options")
 
     def test_checkbox_option_without_label_rejected(self):
-        self.rejects(GOOD + CHECKBOXES.replace("label: I agree", "required: true"), "option")
+        self.rejects(GOOD + CHECKBOXES.replace("label: I agree", "required: true"), "needs a label string")
 
     def test_checkbox_option_required_must_be_boolean(self):
         bad = CHECKBOXES.replace("label: I agree", "label: I agree\n          required: yes please")
@@ -211,7 +211,7 @@ class ShapeTests(unittest.TestCase):
         self.rejects(GOOD.replace("label: What do you think?", "label: 42"), "label must be a string")
 
     def test_label_must_not_be_blank(self):
-        self.rejects(GOOD.replace("label: What do you think?", "label: ' '"), "label")
+        self.rejects(GOOD.replace("label: What do you think?", "label: ' '"), "needs attributes.label")
 
     def test_markdown_value_must_be_string(self):
         md = "  - type: markdown\n    attributes:\n      value: 123\n"
@@ -221,7 +221,21 @@ class ShapeTests(unittest.TestCase):
         self.rejects(GOOD.replace("label: What do you think?", "label: L\n      value: 7"), "value must be a string")
 
     def test_title_must_be_string(self):
-        self.rejects("title: [a]\n" + GOOD, "title")
+        self.rejects("title: [a]\n" + GOOD, "title must be a string")
+
+    def test_unknown_body_item_key_rejected(self):
+        extra = "  - type: input\n    attributes:\n      label: L2\n    validation:\n      required: true\n"
+        self.rejects(GOOD + extra, "unknown key 'validation'")
+
+    def test_id_on_markdown_rejected(self):
+        md = "  - type: markdown\n    id: intro\n    attributes:\n      value: hi\n"
+        self.rejects(GOOD + md, "(markdown) cannot have an id")
+
+    def test_known_body_item_keys_still_pass(self):
+        self.assertEqual(check(GOOD + DROPDOWN), [])
+
+    def test_required_message_names_checkbox_option_path(self):
+        self.rejects(GOOD.replace("required: true", "required: false"), "required checkbox option")
 
 
 class RealFormsTests(unittest.TestCase):
