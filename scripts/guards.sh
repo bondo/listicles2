@@ -164,9 +164,9 @@ out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=' -- "${EXCL[@]}
 MAX_FILE=$((1024 * 1024))
 MAX_PNG=$((300 * 1024))
 sizecheck() { # sizecheck <git diff args>...: `git diff --raw` lists new modes and blob ids, so sizes come from the changed side only
-  local meta f om nm osha nsha st size lim why
+  local meta f nm nsha size lim why
   while IFS= read -r -d '' meta && IFS= read -r -d '' f; do
-    read -r om nm osha nsha st <<<"$meta"
+    read -r _ nm _ nsha _ <<<"$meta"
     [ "$nm" = 160000 ] && continue # submodule pointer, not a file
     size=$(git cat-file -s "$nsha") || { bad "cannot read the size of $f"; continue; }
     lim=$MAX_FILE; why="1 MB"
