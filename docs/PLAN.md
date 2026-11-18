@@ -18,7 +18,7 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 | Sync | Firestore snapshot listeners; offline cache on; one document per item; updates write only the changed fields; same-field conflicts resolve last write wins |
 | Lists | Private to their creator by default (Q3, VIS-01); the creator may share a list with their household (VIS-02) and stop sharing it (VIS-04). A household is needed only to share (OQ-1). Type `kind` is `PLAIN` or `COLLECTION`, chosen at creation and fixed (OQ-32). Access: the creator does everything; household members of a list shared with their household do everything except stop the share or change its creator or household (OQ-2, OQ-3, OQ-4). A member who joins later sees every list already shared (OQ-16, confirmed 2026-11-18) |
 | Items (v1) | Name + "I have it"; collection lists add an optional release year and re-release year (1900 to the current year + 50, OQ-6, OQ-19). Sorted per type (OQ-8, OQ-33), "show only missing" filter, progress "12 of 30" (OQ-9). Equal names are allowed, with a quiet "Already in this list" hint while typing (OQ-11). An item belongs to its list (OQ-18). No notes, tags, quantity, barcode or search in v1 (stories section 8) |
-| Backup | No Firestore backups (they need Blaze). An in-app export of my lists to a JSON or CSV file through the system file picker, in M2, before the first external tester; it also covers data portability (OQ-38) |
+| Backup | No Firestore backups (they need Blaze). An in-app export of my lists to a JSON or CSV file through the system file picker, in M2, before the first external tester; it also covers data portability (OQ-38). Whether "my lists" means the lists I created or every list I can see is open for M2 planning (section 3.3) |
 | Sharing | Households: one per user; members join through a **single-use invite link** (random code of 16+ characters, expires after 7 days, can be revoked). Household, invite and sharing actions need a connection (OQ-22) |
 | After v1 (M3 to M5 and later) | Packing templates, scaling, merging and trips (section 4); barcode scanning (ML Kit + CameraX) and title lookup (UPCitemdb); infinite global undo/redo internally for each list, with conflict handling (owner requirement, 2026-11-18, quoted in section 7; the leave-room constraint on v1 is in section 3.2). Not in M1 or M2 (OQ-36 2026-11-17, OQ-15 2026-11-18, section 7) |
 | i18n | English + Danish; all strings in resources; CI fails on missing translations. Android 13+: the system per-app language setting, made visible by an auto-generated `LocaleConfig`[^lang]; Android 8-12 follow the phone language; no in-app picker, `minSdk` stays 26 (OQ-12, decided 2026-11-17) |
@@ -159,10 +159,11 @@ fails, the fallback is to nest invites under the household, with a top-level
 **Field validation** on every write:
 * types, string lengths and allowed enum values;
 * years: whole numbers from 1900 to `request.time.year() + 50`, both optional, no rule between them (OQ-6, OQ-19);
-* `updatedBy == request.auth.uid` and `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`
-  (the item anonymise write of section 3.1 is the one exception: it only sets `createdBy`/`updatedBy` to `null`);
+* `updatedBy == request.auth.uid` and `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`;
 * `createdAt` and `createdBy` can't change on update; on create `createdBy == request.auth.uid` and
-  `createdAt == request.time`, except items, where `createdAt <= request.time` (OQ-37, decided 2026-11-17).
+  `createdAt == request.time`, except items, where `createdAt <= request.time` (OQ-37, decided 2026-11-17);
+* one exception to the two bullets above: the item anonymise write of section 3.1 (the planner's proposal for
+  OQ-18) only sets `createdBy` and/or `updatedBy` to `null`, changes nothing else, and leaves `updatedAt` as it is.
 
 **Account deletion** (required by Google Play): in-app "Delete my account" (AUTH-04). A member
 leaves; an owner with other members must transfer ownership first, and the UI
@@ -256,9 +257,10 @@ Rules of thumb:
   reads where the emulator can.
 * GitHub Actions: the repo is public, so minutes are unlimited.
 * No backups on Spark (scheduled backups and point-in-time recovery need Blaze[^backup]), and any member can
-  delete a shared list. OQ-38 (decided 2026-11-18): no Blaze; M2 builds an in-app export of the user's lists
-  (lists they can see) to a JSON or CSV file through the system file picker, before the first external tester. The
-  export reads every item once, so it is counted in the M2 read-cost estimate.
+  delete a shared list. OQ-38 (decided 2026-11-18): no Blaze; M2 builds an in-app export of my lists to a JSON or CSV file through the
+  system file picker, before the first external tester (the owner's words). Whether that means the lists I created
+  or every list I can see is settled in M2 planning (planner's proposal: every list I can see, because any member
+  can delete a shared list). The export reads every item once, so it is counted in the M2 read-cost estimate.
 
 [^quota]: https://firebase.google.com/docs/firestore/quotas
 [^price]: https://firebase.google.com/docs/firestore/pricing
