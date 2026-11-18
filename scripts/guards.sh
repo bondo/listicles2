@@ -153,12 +153,18 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # shell scripts, git hooks, CI workflows and package.json. A backslash continuation is one logical line, and one same-line
 # `justified: <reason>` waives the whole logical line (every command on it). A logical line loses its unquoted trailing ` # comment`
 # and is split at ; & | so a flag only counts for the tool in its own command; only the text after the tool name is read (so
-# `grep -i shellcheck` is not a flag). For npm, npx, yarn and pnpm the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`);
-# npm's own options never count. Flags may be quoted, shellcheck short options may be combined (-xe) and SHELLCHECK_OPTS counts.
-# Config handed over on the command line (ruff --config, mypy --config-file, eslint -c/--config, prettier --config, tsc -p/--project)
-# must name a file the config scan above (2b) reads, or `justified:`; an inline `--config "key = value"` is a relaxation.
+# `grep -i shellcheck` is not a flag). For npm and npx (and yarn, pnpm and bunx when they use `--`) the JS tools also see what follows a
+# bare `--` (`npm run lint -- --quiet`); the options of npm itself never count. That passthrough is checked against every JS tool, so
+# `npm test -- -u` or `npm run e2e -- -c x.ts` need a `justified:` too (issue 164). Flags may be quoted, shellcheck short options may be
+# combined (-xe) and SHELLCHECK_OPTS counts as `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
+# Config handed over on the command line (ruff --config, mypy --config-file, eslint -c/--config, prettier --config, tsc -p/--project/-b/--build)
+# must name a file the config scan above (2b) reads, or `justified:`: an inline `--config "key = value"`, an absolute or
+# `~` path, a `..` path and a path built from `$` or backticks (it may be generated at run time) are relaxations. `tsc` with a source
+# file argument and no -p/-b ignores tsconfig.json, so it is flagged too.
 # Strict flags (--strict, --max-warnings 0, -S warning, ...) never match. Not covered: action `with: args:` lines, YAML folded scalars,
-# Makefiles, composite actions and .pre-commit-config.yaml (none exists today).
+# Makefiles, composite actions and .pre-commit-config.yaml (none exists today; issue 164), and flags held in shell variables
+# (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable. yarn and pnpm forms that forward
+# arguments without `--` (`yarn lint --quiet`) are not covered either: the repo is npm-only.
 CLI_AWK='
 function has(p, tool) { return p ~ ("(^|[^A-Za-z0-9_.-])" tool "([^A-Za-z0-9_.-]|$)") }
 function after(p, tool) { match(p, "(^|[^A-Za-z0-9_.-])" tool "([^A-Za-z0-9_.-]|$)"); return substr(p, RSTART + RLENGTH - 1) }
@@ -194,7 +200,8 @@ function cfg(p, flags, okre,   re, t, v, q, i) {
     q = substr(t, 1, 1)
     if (q == "\"" || q == "\047") { t = substr(t, 2); i = index(t, q); v = (i ? substr(t, 1, i - 1) : t) }
     else { v = t; sub(/[ \t].*$/, "", v); sub(/["\047,]+$/, "", v) }
-    if (v !~ okre) return 1
+    if (v == "" || v ~ /^-/) continue
+    if (v ~ /^[\/~]/ || v ~ /[$`]/ || v ~ /(^|\/)\.\.(\/|$)/ || v !~ okre) return 1
   }
   return 0
 }
@@ -235,10 +242,11 @@ function mypy(s) {
   return hit(s, "ignore-missing-imports|allow-[a-z-]+|no-strict-[a-z-]+|no-check-untyped-defs|no-warn-[a-z-]+|no-extra-checks|disable-error-code|implicit-optional|implicit-reexport|exclude|untyped-calls-exclude", "on") || \
     (s ~ (SP "--follow-imports[ \t=]+[\"\047]?(skip|silent)([ \t\"\047]|$)")) || cfg(s, "--config-file", "^[^= \t]*(mypy\\.ini|setup\\.cfg|tox\\.ini|pyproject\\.toml)$")
 }
-function tsc(s) {
+function tsc(s, direct) {
+  if (direct && s !~ SP "(-p|--project|-b|--build)([ \t=\"\047]|$)" && s ~ (SP "[^ \t\"\047=-][^ \t\"\047=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)([ \t\"\047]|$)")) return 1
   return hit(s, "noCheck|skipLibCheck|skipDefaultLibCheck|allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors", "on") || \
     hit(s, "strict[A-Za-z]*|noImplicit[A-Za-z]*|noUnused[A-Za-z]*|alwaysStrict|useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noFallthroughCasesInSwitch|noPropertyAccessFromIndexSignature|checkJs", "off") || \
-    cfg(s, "-p|--project", "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)")
+    cfg(s, "-p|--project|-b|--build", "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)")
 }
 function eslint(s, ok) {
   return hit(s, "quiet|ignore-pattern|ignore-path|no-eslintrc|no-config-lookup|no-error-on-unmatched-pattern|pass-on-no-patterns", "on") || eslintrule(s) || \
@@ -255,11 +263,11 @@ function relaxed(p,   js, dd, s, ok) {
   js = (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bunx)([^A-Za-z0-9_.-]|$)/)
   dd = ""
   if (js && match(p, /(^|[ \t])--([ \t]|$)/)) dd = substr(p, RSTART + RLENGTH)
-  if (match(p, /SHELLCHECK_OPTS=/) && shellcheck(substr(p, RSTART + RLENGTH))) return 1
+  if (match(p, /SHELLCHECK_OPTS(\+?=|:[ \t])/) && shellcheck(substr(p, RSTART + RLENGTH))) return 1
   if (has(p, "ruff") && ruff(after(p, "ruff"))) return 1
   if (has(p, "mypy") && mypy(after(p, "mypy"))) return 1
   if (has(p, "shellcheck") && shellcheck(after(p, "shellcheck"))) return 1
-  if ((has(p, "tsc") || dd != "") && tsc((has(p, "tsc") ? after(p, "tsc") : "") " " dd)) return 1
+  if ((has(p, "tsc") || dd != "") && tsc((has(p, "tsc") ? after(p, "tsc") : "") " " dd, has(p, "tsc"))) return 1
   if (has(p, "eslint")) ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*)$)"
   else if (has(p, "prettier")) ok = "((^|/)[^= \t]*(prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
   else ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*|prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
