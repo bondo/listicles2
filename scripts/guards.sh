@@ -158,6 +158,28 @@ out=$("${LS[@]}" | grep -E '(^|/)\.(prettier|eslint|stylelint|dprint)ignore$')
 out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline wiring: /'; fail=1; }
 
+# 5. File size (owner decision, #15 comment 6974778901: Git LFS is not adopted, so big binaries stay out of the repo).
+# An added or changed file over 1 MB fails, and so does a *.png over 300 KB outside docs/product/wireframes/. Binary units;
+# a file exactly at a limit passes. Deleted files are ignored. No escape hatch: shrink the file, keep it out of the repo, or ask the owner.
+MAX_FILE=$((1024 * 1024))
+MAX_PNG=$((300 * 1024))
+sizecheck() { # sizecheck <git diff args>...: `git diff --raw` lists new modes and blob ids, so sizes come from the changed side only
+  local meta f om nm osha nsha st size lim why
+  while IFS= read -r -d '' meta && IFS= read -r -d '' f; do
+    read -r om nm osha nsha st <<<"$meta"
+    [ "$nm" = 160000 ] && continue # submodule pointer, not a file
+    size=$(git cat-file -s "$nsha") || { bad "cannot read the size of $f"; continue; }
+    lim=$MAX_FILE; why="1 MB"
+    case "${f,,}" in
+      docs/product/wireframes/*) ;;
+      *.png) lim=$MAX_PNG; why="300 KB for a PNG outside docs/product/wireframes/" ;;
+    esac
+    [ "$size" -gt "$lim" ] && bad "file too large: $f is $size bytes (limit $lim bytes: $why). Git LFS is not adopted (docs/tasks.toml, M6-O4); shrink it, keep it out of the repo, or ask the owner"
+  done < <(git diff --raw -z --no-abbrev --no-renames --diff-filter=AMT "$@")
+}
+
+if [ "$STAGED" = 1 ]; then sizecheck --cached; fi
+
 if [ "$STAGED" = 0 ]; then
   # 4. Diff checks need the base ref.
   MB=""
@@ -166,6 +188,7 @@ if [ "$STAGED" = 0 ]; then
     if [ "${CI:-}" = true ]; then bad "no base/merge-base '$BASE' (CI checkout needs fetch-depth: 0)"
     else echo "guard: note: base '$BASE' not found, skipped diff-based checks"; fi
   else
+    sizecheck "$MB" HEAD
     DSPEC=(. ':!docs' ':!handoff' ':!scripts/guards.sh' ':!scripts/hooks/test_guards_sh.py' ':!*package-lock.json')
     # Lowered or removed thresholds and severities.
     git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
