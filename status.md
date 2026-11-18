@@ -377,6 +377,6 @@ flowchart LR
 
 - **owner to-do** [#119](https://github.com/bondo/listicles2/issues/119): &#91;owner&#93; M0.5-O5&#58; Confirm the collaborator 2FA and run the live test
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **PR to merge** [#110](https://github.com/bondo/listicles2/issues/110): build(deps)&#58; Bump gradle/actions/wrapper-validation from 4.4.3 to 6.4.1
+- **PR to merge** [#108](https://github.com/bondo/listicles2/issues/108): build(deps)&#58; Bump actions/checkout from 4.4.0 to 7.0.1
 - **task** M0.5-FU: waits on M0.5-26, M0.5-28
 - **task** M0.5-28: waits on M0.5-26
