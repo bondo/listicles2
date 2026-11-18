@@ -179,6 +179,31 @@ class Verification(unittest.TestCase):
                 [f"gradle.properties: org.gradle.dependency.verification={value} disables verification"],
             )
 
+    def test_gradle_properties_equivalent_spellings(self):
+        for line in (
+            "org.gradle.dependency.verification=LENIENT",
+            "org.gradle.dependency.verification:lenient",
+            "org.gradle.dependency.verification lenient",
+            "org.gradle.dependency.verification = Off",
+            "  org.gradle.dependency.verification\t=\toff  ",
+        ):
+            with self.subTest(line=line):
+                self.assertEqual(len(self.check(props=GOOD_PROPS + line + "\n")), 1)
+
+    def test_cli_flags_in_verify_script(self):
+        for text in ("./gradlew -F off build", "./gradlew -F=lenient build", "./gradlew --dependency-verification=lenient x",
+                     "./gradlew --dependency-verification off x", "./gradlew -Dorg.gradle.dependency.verification=off x",
+                     "./gradlew --DEPENDENCY-VERIFICATION=Off x"):
+            with self.subTest(text=text):
+                self.assertEqual(
+                    c.check_verification(GOOD_META, GOOD_PROPS, text),
+                    ["scripts/verify.sh: switches Gradle dependency verification off"],
+                )
+
+    def test_verify_script_without_flags_and_commented_flag_pass(self):
+        ok = './gradlew -q --console=plain "$@"\n# ./gradlew -F off build\nstep x python3 -F foo\n'
+        self.assertEqual(c.check_verification(GOOD_META, GOOD_PROPS, ok), [])
+
     def test_gradle_properties_strict_is_fine_and_commented_off_ignored(self):
         self.assertEqual(self.check(props=GOOD_PROPS + "org.gradle.dependency.verification=strict\n"), [])
         self.assertEqual(self.check(props=GOOD_PROPS + "# org.gradle.dependency.verification=off\n"), [])
