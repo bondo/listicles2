@@ -77,7 +77,7 @@ Source: [Coroutines best practices](https://developer.android.com/kotlin/corouti
 | Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | review; detekt `InjectDispatcher` enabled but active only where detekt is type-resolved (core modules today, not `:app`) |
 | Suspend functions are main-safe: the class doing blocking work moves it with `withContext` | review |
 | The ViewModel creates the coroutines; the data layer exposes `suspend` for one-shot calls and `Flow` for streams | review |
-| No `GlobalScope`; work that must outlive a screen uses an injected external scope | review; detekt rule evaluation proposed |
+| No `GlobalScope`; work that must outlive a screen uses an injected external scope | review; detekt `GlobalCoroutineUsage` enabled and fixture-gated (`testDetektRules`) |
 | Structured concurrency (`coroutineScope` or `supervisorScope`); never swallow `CancellationException`; catch specific exceptions | review |
 
 ## 6. Testing
