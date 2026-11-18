@@ -896,6 +896,162 @@ class ThresholdTestNames(GuardsCase):
         self.assertFails("guard: lowered threshold: threshold = 40")
 
 
+class ThresholdProse(GuardsCase):
+    """Owner decision (#15, comment 6969709604): the word `threshold` inside prose is not a check setting.
+
+    Only an occurrence with a word on each side (`gate or threshold changes`) is prose. Identifiers, keys,
+    assignments and calls still count, and so does every other keyword on the same line.
+    """
+
+    def base(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+
+    def change(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def test_prose_lines_that_merely_mention_a_threshold_pass(self):
+        # The three real false positives from redesign PR 4: role-prompt prose, a test pair and a rule regex.
+        for rel, old in (
+            (
+                "agents/prompts/orchestrator.md",
+                "Owner acceptance is the only alternative, and never for gate or threshold changes, which always get a delta review.\n",
+            ),
+            (
+                "scripts/test_prompt_rules.py",
+                '    ("never for gate or threshold changes, which always get a delta review", "also for gate or threshold changes"),\n',
+            ),
+            (
+                "scripts/prompt_rules.py",
+                '    r"owner acceptance is the only alternative, and never for gate or threshold changes, which always get a delta review",\n',
+            ),
+        ):
+            with self.subTest(rel=rel):
+                self.base(rel, old)
+                self.change(rel, "\n")
+                self.assertPasses()
+
+    def test_real_settings_still_fail(self):
+        for rel, line in (
+            ("scripts/tool.py", "threshold = 50"),
+            ("scripts/tool.py", "limit = env.get('X', threshold=50)"),
+            ("scripts/tool.py", 'CONFIG = {"threshold": 50}'),
+            ("config/detekt.yml", "  threshold: 11"),
+            ("pyproject.toml", "fail_threshold = 50"),
+            ("app/build.gradle.kts", "val mutationThreshold = 80"),
+            ("app/build.gradle.kts", "kover { minBound(80) }"),
+            ("app/src/main/kotlin/Cfg.kt", "val threshold = 80"),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_a_setting_with_a_prose_comment_on_the_same_line_still_fails(self):
+        self.base("scripts/tool.py", "threshold = 50  # only raise the threshold with a review\n")
+        self.change("scripts/tool.py", "\n")
+        self.assertFails("guard: removed check setting:")
+        self.base("scripts/tool.py", "limit = 50  # the maxIssues of this threshold are fixed\n")
+        self.change("scripts/tool.py", "\n")
+        self.assertFails("guard: removed check setting:")
+
+    def test_lowering_a_setting_next_to_prose_still_fails(self):
+        self.base("scripts/tool.py", "threshold = 50  # a threshold with a comment\n")
+        self.change("scripts/tool.py", "threshold = 40  # a threshold with a comment\n")
+        self.assertFails("guard: lowered threshold:")
+
+    def test_code_with_a_word_on_each_side_of_threshold_still_fails(self):
+        # PR 135 R1-01: only prose (a markdown file, or inside a double-quoted string, and no digit) is masked.
+        for rel, line in (
+            ("app/build.gradle.kts", "val threshold by extra(80)"),
+            ("app/build.gradle.kts", "val threshold by extra(DEFAULT)"),
+            ("app/src/main/kotlin/Cfg.kt", "private val threshold get() = 80"),
+            ("scripts/tool.py", "sys.exit(1) if threshold and pct < 80 else None"),
+            ("scripts/tool.py", "sys.exit(1) if threshold and pct < LOW else None"),
+            ("scripts/tool.py", 'x = 80  # say "a threshold b"'),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_lowering_a_number_on_a_line_whose_comment_mentions_threshold_still_fails(self):
+        # PR 135 R1-02.
+        self.base("pyproject.toml", "fail_under = 80  # coverage threshold in percent\n")
+        self.change("pyproject.toml", "fail_under = 40  # coverage threshold in percent\n")
+        self.assertFails("guard: lowered threshold:")
+        self.base("pyproject.toml", "fail_under = LOW  # coverage threshold in percent\n")
+        self.change("pyproject.toml", "\n")
+        self.assertFails("guard: removed check setting:")
+
+    def test_a_stray_quote_or_escape_earlier_on_a_code_line_does_not_mask_threshold(self):
+        # PR 135 R2-01: a char literal or an escaped quote must not turn code into "a string".
+        for rel, line in (
+            ("app/build.gradle.kts", "val sep = '\"'; val threshold by extra(LOW)"),
+            ("app/src/main/kotlin/Cfg.kt", 'val cells = line.split("\\""); val threshold by lazy { LOW }'),
+            ("scripts/tool.py", "if c == '\"' or threshold and pct < LOW: sys.exit(EXIT)"),
+            ("scripts/tool.py", "if c == '\"' or threshold and pct < LOW: sys.exit(\"a b\")"),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_quoted_text_that_is_not_a_bare_string_line_still_fails(self):
+        # PR 135 R2-02: comments, help strings and config values are not prose lines; only a line made of nothing but
+        # string literals and punctuation is.
+        for rel, line in (
+            ("scripts/tool.py", 'fail_under = LOW  # see "coverage threshold rules"'),
+            ("scripts/tool.py", 'parser.add_argument("--min", default=LOW, help="fail below this coverage threshold value")'),
+            ("config/x.json", '"mode": "fail on threshold breach",'),
+            ("config/x.yml", 'level: "coverage threshold low"'),
+            ("pyproject.toml", 'mode = "strict threshold check"'),
+            ("scripts/x.sh", 'step "mutation threshold gate" ./gradlew pitest'),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_quoted_words_that_run_code_or_sit_in_config_still_fail(self):
+        # PR 135 R3-01: shell/Makefile lines of only quoted words are commands, `$` and `{}` inside a literal run code,
+        # an f-string is code, and a quoted list element in a config file is a config value. Only a .py file counts.
+        for rel, line in (
+            ("scripts/x.sh", '"$ROOT/scripts/step" "coverage threshold check" "$ROOT/gradlew" "koverVerify"'),
+            ("scripts/x.sh", '"$STEP" "mutation threshold gate" "$GRADLEW" "pitest"'),
+            ("scripts/x.sh", '"$(fail_below threshold LOW)"'),
+            ("Makefile", '\t"$(PITEST)" "mutation threshold gate"'),
+            ("scripts/tool.py", 'f"{check threshold LOW}"'),
+            ("scripts/tool.py", '"${check threshold LOW}",'),
+            ("config/x.json", '["coverage threshold check"],'),
+            ("app/build.gradle.kts", '"coverage threshold check",'),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_only_markdown_is_prose_by_file_type(self):
+        # PR 135 R3-02: .txt and .rst files are gate config or code here (allowlists, pins, CMake), not prose.
+        for rel, line in (
+            ("scripts/gate.txt", "fail on threshold breach"),
+            ("config/licensee/x.txt", "coverage threshold check"),
+            ("CMakeLists.txt", "set(CHECK threshold ON)"),
+            ("app/x.rst", "val threshold by extra(LOW)"),
+        ):
+            with self.subTest(rel=rel, line=line):
+                self.base(rel, line + "\n")
+                self.change(rel, "\n")
+                self.assertFails("guard: removed check setting:")
+
+    def test_a_line_of_only_string_literals_is_prose(self):
+        self.base("scripts/tool.py", '    "never for gate or threshold changes",\n    ("a", r"also for gate or threshold changes"),\n')
+        self.change("scripts/tool.py", "\n")
+        self.assertPasses()
+
+
 class StagedMode(GuardsCase):
     def test_staged_flags_only_the_index(self):
         self.repo.write("app/src/main/kotlin/S.kt", "@Suppress(\"X\") fun f() {}\n")
