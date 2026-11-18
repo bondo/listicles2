@@ -194,6 +194,52 @@ sizecheck() { # sizecheck <git diff args>...: `git diff --raw` lists new modes a
   done < <(git diff --raw -z --no-abbrev --no-renames --diff-filter=AMT "$@")
 }
 
+# 6. Narrowed lists (owner decision in #46: diff-based, against the merge base). `listitems <key regex> <rev:path>` prints
+# key<TAB>item<TAB>line for every quoted item of an array value of that key (single or multi-line, several keys per line). Comments
+# (`#`, `//`) are cut. A removed ruff `select` item or tsconfig `include` entry fails with no escape hatch (a replacement by "ALL" is fine);
+# an added tsconfig `exclude` entry needs `justified:` on its own line (tsconfig allows comments). Files new in the PR are not compared.
+LISTS_AWK='
+BEGIN { RE = "(^|[^A-Za-z_-])[\"\047]?(" KEYRE ")[\"\047]?[ \t]*[:=][ \t]*\\[" }
+{
+  s = $0; n = length(s); i = 1; q = ""; gsub(/\t/, " ", s)
+  while (i <= n) {
+    if (depth == 0) {
+      t = substr(s, i)
+      if (!match(t, RE)) break
+      st = RSTART; ln = RLENGTH; m = substr(t, st, ln); match(m, KEYRE); key = substr(m, RSTART, RLENGTH); i += st + ln - 1; depth = 1; continue
+    }
+    c = substr(s, i, 1); i++
+    if (q != "") { if (c == q) { q = ""; print key "\t" cur "\t" s } else cur = cur c; continue }
+    if (c == "\"" || c == "\047") { q = c; cur = ""; continue }
+    if (c == "[") depth++
+    else if (c == "]") depth--
+    else if (c == "#" || (c == "/" && substr(s, i, 1) == "/")) break
+  }
+}'
+listitems() { git show "$2" 2>/dev/null | LC_ALL=C awk -v KEYRE="$1" "$LISTS_AWK" | sed 's/^extend-//'; }
+narrowcheck() { # narrowcheck <merge-base>
+  local mb="$1" f re base head k it ln
+  while IFS= read -r f; do
+    git cat-file -e "$mb:$f" 2>/dev/null || continue
+    case "$f" in
+      *ruff.toml|*pyproject.toml) re='(extend-)?select' ;;
+      *) re='include|exclude' ;;
+    esac
+    base=$(listitems "$re" "$mb:$f"); head=$(listitems "$re" "HEAD:$f")
+    while IFS=$'\t' read -r k it ln; do
+      [ -n "$k" ] || continue
+      if printf '%s\n' "$head" | cut -f1,2 | grep -qxF -- "$k"$'\t'"$it"; then continue; fi
+      if [ "$k" = select ]; then printf '%s\n' "$head" | cut -f1,2 | grep -qxF -- select$'\t'ALL || bad "narrowed ruff select: $f: $it was removed"
+      elif [ "$k" = include ]; then bad "narrowed tsconfig include: $f: $it was removed"; fi
+    done <<<"$base"
+    while IFS=$'\t' read -r k it ln; do
+      [ "$k" = exclude ] || continue
+      if printf '%s\n' "$base" | cut -f1,2 | grep -qxF -- "$k"$'\t'"$it"; then continue; fi
+      [ -n "$(printf '%s\n' "$ln" | unjust)" ] && bad "widened tsconfig exclude: $f: $it was added without a justified: reason"
+    done <<<"$head"
+  done < <(git diff --name-only --no-renames --diff-filter=M "$mb" HEAD -- '*ruff.toml' '*pyproject.toml' '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}")
+}
+
 if [ "$STAGED" = 1 ]; then sizecheck --cached; fi
 
 if [ "$STAGED" = 0 ]; then
@@ -265,6 +311,25 @@ if [ "$STAGED" = 0 ]; then
         }
         exit bad
       }' || fail=1
+    # Weaker lint presets: per plugin, the strictest preset named on removed lines must not outrank the one on added lines.
+    # Flat config (`tseslint.configs.strictTypeChecked`) and eslintrc (`plugin:@typescript-eslint/strict-type-checked`) forms; the order is
+    # strictTypeChecked > strict > recommendedTypeChecked > recommended, other presets (stylistic, ...) are not ranked.
+    git diff -U0 "$MB" HEAD -- '*eslint.config.*' '*eslintrc*' "${EXCL[@]}" | awk '
+      BEGIN { R["stricttypechecked"] = 4; R["strict"] = 3; R["recommendedtypechecked"] = 2; R["recommended"] = 1 }
+      /^diff --git/ { file = $3; next }
+      /^(---|\+\+\+)/ { next }
+      /^[-+]/ {
+        sg = substr($0, 1, 1); t = substr($0, 2)
+        while (match(t, /[-A-Za-z_@\/]+\.configs\.[A-Za-z]+|plugin:[-A-Za-z_@\/]+\/[-A-Za-z]+/)) {
+          tok = substr(t, RSTART, RLENGTH); t = substr(t, RSTART + RLENGTH)
+          if (tok ~ /^plugin:/) { g = tok; sub(/\/[^\/]*$/, "", g); p = tok; sub(/^.*\//, "", p); gsub(/-/, "", p) }
+          else { g = tok; sub(/\.configs\.[A-Za-z]+$/, "", g); p = tok; sub(/^.*\./, "", p) }
+          r = R[tolower(p)] + 0
+          if (r) { k = file "|" g; if (sg == "-") { if (r > rem[k]) rem[k] = r } else if (r > add[k]) add[k] = r }
+        }
+      }
+      END { for (k in rem) if (rem[k] > add[k] + 0) { print "guard: weaker lint preset: " k " (strictness " rem[k] " -> " add[k] + 0 ")"; bad = 1 } exit bad }' || fail=1
+    narrowcheck "$MB"
     # Screenshot references.
     if [ "${GOLDEN_UPDATE:-0}" != 1 ] && git diff --name-only "$MB" HEAD \
       | grep -E '(screenshots|golden|snapshots|roborazzi)/.*\.png$|src/[A-Za-z]*[Tt]est[A-Za-z]*/.*\.png$' | grep -q .; then

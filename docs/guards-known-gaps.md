@@ -19,14 +19,13 @@ reason is true and specific (`REVIEW.md`, item 8).
 | config embedded in `package.json` (`eslintConfig`, `prettier`, `jest`, `nyc`, `c8`) | refused (`embedded config`); JSON has no comment for a justification, so no escape hatch |
 | `/* global foo */` | needs `justified:`; only a comma list of identifiers closed on the same line, in JS and TS files |
 | `line-length` raised (ruff, flake8, `.editorconfig`, detekt, prettier `printWidth`) | diff check `raised line length` |
+| `strictTypeChecked` to `recommended` and the other ESLint presets | diff check `weaker lint preset`, ranked per plugin (strictTypeChecked > strict > recommendedTypeChecked > recommended); a renamed import alias reads as a removal |
+| ruff `select` shrinking | diff check `narrowed ruff select` (a replacement by `"ALL"` passes); no escape hatch |
+| tsconfig `include` narrowing, `exclude` growing | diff checks; a dropped `include` entry has no escape hatch, a new `exclude` entry needs `justified:` on its own line |
 | `skipLibCheck: true` | content check, needs `justified:` (cheap: it hides errors in declaration files, not in our code) |
 
 ## Not done, and why
 
-- **Next batch (kept out only to stay near 600 changed lines): diff-based narrowing of lists and presets.** A weaker ESLint preset
-  (`strictTypeChecked` to `recommended`, ranked per plugin), a dropped ruff `select` item, a dropped tsconfig `include` entry and a new
-  tsconfig `exclude` entry. They need the file at the merge base and at `HEAD` compared as quoted-item lists (arrays may span lines,
-  several keys may share a line), so they are one concern for their own PR.
 - **Multi-line `extends` arrays and bases not named `*tsconfig*.json`**: the opener line is flagged and needs a justification today,
   which is the safe direction. Following `extends` to the base files needs a JSON parser, and no config here extends another one yet.
 - **The ESLint option-object approximation** (`max: 1,` on its own line read as a severity): a false positive, never a miss; the
