@@ -1734,11 +1734,6 @@ class Issue134ReviewerEffortTests(unittest.TestCase):
     RULE = "reviewer-effort"
     OLD = "Opus, high effort (max for risk:high PRs)."
 
-    def mutate(self, old, new):
-        text = real("reviewer")
-        self.assertIn(old, text)
-        return prompt_rules.check_text("reviewer", text.replace(old, new, 1))
-
     def test_the_rule_exists_for_the_reviewer_only_and_the_real_prompt_passes(self):
         by_id = {r.id: r for r in prompt_rules.RULES}
         self.assertEqual(by_id[self.RULE].roles, ("reviewer",))
