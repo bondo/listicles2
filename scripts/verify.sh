@@ -58,7 +58,7 @@ step python-lint ./scripts/lint_python.sh
 step workflow-lint-tests python3 -I scripts/test_lint_workflows.py
 step workflow-lint ./scripts/lint_workflows.sh
 step spotless gradle spotlessCheck
-step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest
+step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest
 step lint gradle :app:lintDebug
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test

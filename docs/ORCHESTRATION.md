@@ -478,6 +478,9 @@ meaning, window rules and the usefulness rule are in `docs/reviews/README.md` §
 (`R1`..`R12`, not R2), a bad `run_ref` (PR number, ISO week or milestone), counts that do not add up to `findings`,
 `window_end` before `date`, non-whole-number counts, over-long fields and a repeated `(review_id, run_ref)`.
 
+The output file has one column per name, so review rows reuse the `disputed`, `deferred` and `cost_usd` columns that round
+and session rows also have: filter by `row_type` before summing or averaging them.
+
 ### 6.4 Batch summary
 
 When a batch closes, update the batch table in the state body: rounds, findings per round,

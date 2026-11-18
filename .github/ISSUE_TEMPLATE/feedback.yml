@@ -7,6 +7,8 @@ body:
       value: |
         This is public: please leave out addresses, phone numbers, real names and photos of your home.
 
+        Dette er offentligt: udelad adresser, telefonnumre, rigtige navne og billeder af dit hjem.
+
         Thanks for taking the time. Write in English or Danish, whichever is easier. No special format needed.
   - type: textarea
     id: feedback
