@@ -14,9 +14,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
-fun ListiclesApp(darkTheme: Boolean = isSystemInDarkTheme()) {
+fun ListiclesApp(
+    modifier: Modifier = Modifier,
+    darkTheme: Boolean = isSystemInDarkTheme(),
+) {
     ListiclesTheme(darkTheme) {
-        Scaffold { padding ->
+        Scaffold(modifier = modifier) { padding ->
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
