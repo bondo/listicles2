@@ -875,7 +875,7 @@ DOC_RULES = (
     DocRule(
         "orch-parallel", ORCH,
         (
-            r"\* \*\*concurrency\*\* \(§7\.7\.5\): for pipeline flow, not cost \(owner decision of 2026-11-18, #15\): up to 10 worker and "
+            r"\* \*\*concurrency\*\* \(§7\.7\.6\): for pipeline flow, not cost \(owner decision of 2026-11-18, #15\): up to 10 worker and "
             r"reviewer sessions at once, more when independent work exists",
             r"the limits are file overlap \(no two implementers on the same files unless merge commits resolve it cheaply\), owner-merge queue "
             r"depth and account rate limits \(§7\.7\.6\)",

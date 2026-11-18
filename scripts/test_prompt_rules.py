@@ -1363,6 +1363,23 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-design-rounds", "Round {round} of max 2."),
         ("docs/FOLLOW-UPS.md", "followups-labels", "Labels (the owner creates them once, task M0-O10;"),
         ("docs/FOLLOW-UPS.md", "followups-small-fix", "More than 8 open per milestone goes to the owner."),  # R1-04 of #138
+        ("docs/ORCHESTRATION.md", "orch-throttle", "A 7-day warning stays at stage 1 with the cap at 5."),  # escalation of #138: one case per forbidden entry
+        ("docs/ORCHESTRATION.md", "orch-autonomy", "* merges (of any PR);"),
+        ("docs/ORCHESTRATION.md", "orch-autonomy", "* the 4-round cap being hit"),
+        ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 50% context."),
+        ("docs/ORCHESTRATION.md", "orch-handover", "8. Stop. The owner archives you."),
+        ("docs/ORCHESTRATION.md", "orch-parallel", "Keep to the parallelism cap."),
+        ("docs/ORCHESTRATION.md", "orch-parallel", "No batched extras."),
+        ("docs/ORCHESTRATION.md", "orch-review-rounds", "Owner acceptance (the bullet above) is the only alternative."),
+        ("docs/ORCHESTRATION.md", "orch-review-rounds", "The reviewer reviews `base_sha..head_sha` only."),
+        ("docs/ORCHESTRATION.md", "orch-review-rounds", "`reviewed_through` per branch, with explicit owner acceptance logged"),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "The orchestrator defers the remaining minors and nits (follow-up issues) instead of running another round."),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Stop deferring and report to the owner."),
+        ("docs/ORCHESTRATION.md", "orch-archive", "Archive finished worker sessions once their metrics row is logged and the owner has seen the batch report."),
+        ("docs/ORCHESTRATION.md", "orch-spawn-templates", "Role: agents/prompts/reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}."),
+        ("docs/ORCHESTRATION.md", "orch-design-rounds", "Max 2 rounds per design PR."),
+        ("docs/FOLLOW-UPS.md", "followups-labels", "It stops deferring and asks the owner to do M0-O10."),
+        ("docs/FOLLOW-UPS.md", "followups-small-fix", "The orchestrator stops deferring and reports to the owner."),
         ("docs/PLAN.md", "plan-working-rules", "* The orchestrator never reads child transcripts. It reads only the final summary"),
     )
 
@@ -1382,15 +1399,22 @@ class Pr4RuleTests(unittest.TestCase):
                 self.assertIn(rid, ids(prompt_rules.check_doc_text(path, self.doc(path) + "\n" + old + "\n")))
 
     def test_the_old_orchestrator_prompt_wording_is_rejected(self):
-        for rid, old in (
-            ("orch-model", " Sonnet, low effort, one long-lived session."), ("orch-transcripts", " Never read child transcripts."),
-            ("orch-throttle", " At most 5 worker sessions at once."), ("orch-throttle", " One stage per check-in while it lasts."),
-            ("orch-throttle", " (1) no optional extras (recurring reviews R2 to R4)."), ("handover", " Hand over at about 80% context."),
-            ("autonomy", " The `big-pr` label is set only with the owner's say-so."), ("orch-deferral", " more than about 15 changed lines"),
-            ("orch-throttle", " (2) the worker cap 3, then 2."), ("orch-throttle", " Stage 2 applies when the §7.7.5 forecast says it."),
+        for role, rid, old in (
+            ("orchestrator", "orch-model", " Sonnet, low effort, one long-lived session."), ("orchestrator", "orch-transcripts", " Never read child transcripts."),
+            ("orchestrator", "orch-throttle", " At most 5 worker sessions at once."), ("orchestrator", "orch-throttle", " Keep to the cap of 3 workers."),
+            ("orchestrator", "orch-throttle", " One stage per check-in while it lasts."), ("orchestrator", "orch-throttle", " (2) the worker cap 3, then 2."),
+            ("orchestrator", "orch-throttle", " (1) no optional extras (recurring reviews R2 to R4)."),
+            ("orchestrator", "orch-throttle", " Stage 2 applies when the §7.7.5 forecast says it."),
+            ("orchestrator", "autonomy", " The `big-pr` label is set only with the owner's say-so."), ("orchestrator", "autonomy", " The 4-round cap being hit."),
+            ("orchestrator", "handover", " Hand over at about 80% context."), ("orchestrator", "handover", " Hand over at about 50% context."),
+            ("orchestrator", "orch-deferral", " more than about 15 changed lines"),
+            ("orchestrator", "orch-deferral", " Stop deferring and ask the owner to do M0-O10."),
+            ("orchestrator", "orch-delta-review", " Owner acceptance is the only alternative."),
+            ("orchestrator", "orch-delta-review", " A fresh reviewer on the range `reviewed_through..head_sha` only."),
+            ("design-reviewer", "dr-rounds", " Max 2 Opus rounds per design PR."),
         ):
             with self.subTest(old=old):
-                self.assertIn(rid, ids(prompt_rules.check_text("orchestrator", real("orchestrator") + old)))
+                self.assertIn(rid, ids(prompt_rules.check_text(role, real(role) + old)))
 
     def test_every_pr4_orchestrator_pattern_matches_one_place_only(self):
         norm = prompt_rules.normalize(real("orchestrator"))
