@@ -65,7 +65,9 @@ def contrast(a: str, b: str) -> float:
 
 
 def _is_number(value: object) -> bool:
-    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value)  # NaN would pass every comparison
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, int) or (isinstance(value, float) and math.isfinite(value))  # NaN would pass every comparison
 
 
 def check_structure(tokens: object) -> list[str]:
@@ -77,6 +79,7 @@ def check_structure(tokens: object) -> list[str]:
     if not isinstance(colors, dict):
         found.append(f"color must be an object of themes, not {type(colors).__name__}")
     else:
+        found.extend(f"color.{theme} is missing" for theme in ("light", "dark") if theme not in colors)
         found.extend(f"color.{theme} must be an object of roles, not {type(roles).__name__}" for theme, roles in colors.items() if not isinstance(roles, dict))
     pairs = tokens.get("contrastPairs")
     if not isinstance(pairs, list):
@@ -139,8 +142,8 @@ def main(argv: list[str]) -> int:
     except (OSError, UnicodeDecodeError) as exc:
         print(f"{path}: cannot read the file: {exc}")
         return 1
-    except json.JSONDecodeError as exc:
-        print(f"{path}: not valid JSON: {exc}")
+    except (ValueError, RecursionError) as exc:  # JSONDecodeError is a ValueError; so is the int digit limit
+        print(f"{path}: not readable as JSON: {type(exc).__name__}: {str(exc)[:200]}")
         return 1
     found = check(tokens)
     for line in found:
