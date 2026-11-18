@@ -47,6 +47,7 @@ tasks.withType<Detekt>().configureEach {
 }
 
 dependencies {
+    detektPlugins(libs.compose.rules.detekt)
     kover(project(":app"))
     kover(project(":core:domain"))
 }
@@ -345,7 +346,6 @@ val testDetektRules =
                 "ParameterNaming",
                 "ComposableParamOrder",
                 "GlobalCoroutineUsage",
-                "InjectDispatcher",
             )
         doLast {
             val found =
@@ -368,4 +368,4 @@ val testDetektRules =
     }
 
 // Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
-tasks.named("detekt") { dependsOn(testLicenseeGate, ":app:licensee", ":core:domain:licensee") }
+tasks.named("detekt") { dependsOn(testLicenseeGate, testDetektRules, ":app:licensee", ":core:domain:licensee") }

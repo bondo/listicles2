@@ -11,3 +11,11 @@ style:
     excludes: ['**/test/**', '**/androidTest/**']  # justified: test literals are not magic numbers
   UnusedPrivateMember:
     ignoreAnnotated: ['Preview']
+coroutines:
+  GlobalCoroutineUsage:
+    active: true
+  InjectDispatcher:
+    active: true
+Compose:
+  UnstableCollections:
+    active: true

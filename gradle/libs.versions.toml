@@ -11,12 +11,14 @@ junit = "6.1.3"
 androidxTestJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 detekt = "1.23.8"
+composeRulesDetekt = "0.4.28"
 spotless = "8.11.0"
 ktlint = "1.8.0"
 kover = "0.9.11"
 licensee = "1.14.1"
 
 [libraries]
+compose-rules-detekt = { module = "io.nlopez.compose.rules:detekt", version.ref = "composeRulesDetekt" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
