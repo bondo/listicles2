@@ -104,10 +104,6 @@ class HappyPathTests(unittest.TestCase):
     def test_dependabot_manifests_and_workflow_pin(self):
         patch = f"@@ -3 +3 @@\n-{PIN_OLD}\n+{PIN_NEW}"
         files = [
-            file_entry("firebase/package.json"),
-            file_entry("firebase/package-lock.json"),
-            file_entry("gradle/libs.versions.toml"),
-            file_entry("scripts/requirements-lint.txt"),
             file_entry("gradle/wrapper/gradle-wrapper.properties", patch=WRAP_PATCH),
             file_entry(".github/workflows/status.yml", patch=f"@@ -3 +3 @@\n-{SUB_OLD}\n+{SUB_NEW}"),
             file_entry(".github/workflows/ci.yml", patch=patch),
@@ -173,7 +169,9 @@ class RefusalTests(unittest.TestCase):
         self.refused(make_api(title="Fix #12 in the plan"), r"closing keyword")
 
     def test_closing_keyword_with_issue_url(self):
-        self.refused(make_api(body="fixes https://github.com/bondo/listicles2/issues/12"), r"closing keyword")
+        for host in ("https://github.com", "http://github.com", "https://www.github.com"):
+            with self.subTest(host=host):
+                self.refused(make_api(body=f"fixes {host}/bondo/listicles2/issues/12"), r"closing keyword")
 
     def test_closing_keyword_in_a_commit_message(self):
         commits = [{"commit": {"message": "Edit flow doc\n\nCloses #12"}}]
@@ -247,10 +245,17 @@ class RefusalTests(unittest.TestCase):
         self.refused(make_api(files=[self.pin_patch(SUB_OLD, SUB_NEW.replace("/init@", "/analyze@"))]), r"ci\.yml.*(pin|uses)", kind="dependabot")
 
     def test_dependabot_added_or_removed_action_is_refused(self):
-        for patch in (f"@@ -3 +3,2 @@\n {PIN_OLD}\n+{PIN_NEW}", f"@@ -3,2 +3 @@\n {PIN_NEW}\n-{PIN_OLD}"):
+        moved = f"@@ -3,3 +3,3 @@\n-{PIN_OLD}\n     with: {{}}\n+{PIN_NEW}"  # R2-02: a pin moved across context lines
+        for patch in (f"@@ -3 +3,2 @@\n {PIN_OLD}\n+{PIN_NEW}", f"@@ -3,2 +3 @@\n {PIN_NEW}\n-{PIN_OLD}", moved):
             with self.subTest(patch=patch):
                 files = [file_entry(".github/workflows/ci.yml", patch=patch)]
                 self.refused(make_api(files=files), r"ci\.yml.*(pin|uses)", kind="dependabot")
+
+    def test_dependabot_manifests_go_to_the_owner(self):
+        """R2-01: manifests whose content is not checked (a `test` script, postinstall, a requirement URL) are outside the kind."""
+        for name in ("firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt"):
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry(name)]), rf"outside kind dependabot: {re.escape(name)}", kind="dependabot")
 
     def test_dependabot_wrapper_other_host_or_property_is_refused(self):
         evil = "distributionUrl=https\\://evil.example/gradle-9.2-bin.zip"
