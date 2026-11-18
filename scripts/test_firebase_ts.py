@@ -20,7 +20,7 @@ BIN = os.path.join(FB, "node_modules", ".bin")
 EXACT = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 REQUIRED_DEV = {
     "@eslint/js", "@firebase/rules-unit-testing", "@types/jest", "@types/node", "eslint", "firebase", "firebase-tools", "jest",
-    "prettier", "ts-jest", "typescript", "typescript-eslint",
+    "prettier", "semver", "ts-jest", "typescript", "typescript-eslint",
 }
 SCRIPTS = {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -32,16 +32,23 @@ NPM = "bash -c 'cd firebase && npm {} --silent'"
 VERIFY = [NPM.format(c) for c in ("ci", "run typecheck", "run lint", "run format:check")] + ["python3 -I scripts/test_firebase_ts.py", NPM.format("test")]
 CI = ["npm ci --silent", "npm run typecheck --silent", "npm run lint --silent", "npm run format:check --silent", "npm test --silent"]
 CI_ROOT_CMD = "python3 -I scripts/test_firebase_ts.py"
-# Dependabot ignores these npm packages in /firebase, and nothing else. typescript and @types/node: semver-major only (TypeScript 7
-# is not supported by ts-jest or typescript-eslint; @types/node 26 declares APIs that the Node 22 used in CI lacks). firebase: every
-# version update (major, minor, patch), because firebase 12.19 declarations need the Temporal namespace that TypeScript 6 lacks, so
-# `npm run typecheck` fails, and firebase 13 cannot resolve against @firebase/rules-unit-testing 5.0.0 (peer firebase ^12.0.0).
-# Revisit when TypeScript and @firebase/rules-unit-testing are bumped together by hand.
+# Dependabot ignores these npm packages in /firebase, and nothing else: semver-major only. typescript: TypeScript 7 is not supported by
+# ts-jest (typescript <7) or typescript-eslint (typescript <6.1). @types/node: 26 declares APIs that the Node 22 used in CI lacks.
+# firebase and @firebase/rules-unit-testing: firebase 13 and rules-unit-testing 6 need Node >=24.12 (CI runs Node 22), so their majors
+# wait for the Node 24 follow-up (issue 161); minor and patch updates flow, grouped so both packages move in one PR.
 MAJOR = ["version-update:semver-major"]
 ALL_TYPES = ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
-IGNORE_POLICY = {"typescript": MAJOR, "firebase": ALL_TYPES, "@types/node": MAJOR}
+IGNORE_POLICY = {"typescript": MAJOR, "firebase": MAJOR, "@firebase/rules-unit-testing": MAJOR, "@types/node": MAJOR}
+# One Dependabot group holds exactly these two packages, ahead of the catch-all npm-minor-patch group (a dependency joins the first group
+# it matches), for every update type: their peer ranges are tied (rules-unit-testing N needs firebase ^N), so they must arrive together.
+SDK_GROUP = "firebase-sdk"
+SDK_PATTERNS = ["firebase", "@firebase/rules-unit-testing"]
 # tsconfig compilerOptions allowlist: anything else (skipLibCheck, strict: false, a lone strict flag turned off) is a problem.
-TS_OPTIONS = {"target", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns"}
+TS_OPTIONS = {"target", "lib", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns"}
+# firebase 12.19 and later declarations reference the Temporal namespace, which TypeScript 6 provides only through lib esnext.temporal.
+# Setting lib replaces the default (lib.es2022.full: es2022, dom, dom.iterable, dom.asynciterable, webworker.importscripts, scripthost),
+# so the list is the subset of that default that firebase's types need (es2022, dom, dom.iterable), plus esnext.temporal.
+TS_LIB = ["es2022", "dom", "dom.iterable", "esnext.temporal"]
 CLEAN_TS = 'export function add(a: number, b: number): number {\n    return a + b;\n}\n'
 # Each violation must fail tsc and name its error code.
 TSC_VIOLATIONS = {
@@ -119,6 +126,56 @@ def dependabot_ignore_problems(cfg, policy=IGNORE_POLICY):
     return problems
 
 
+def dependabot_group_problems(cfg):
+    """Problems with the groups of the npm entry for /firebase: the SDK group holds exactly SDK_PATTERNS for every update type, and
+    comes before every other group, because a dependency joins the first group that matches it."""
+    entries = [e for e in cfg.get("updates", []) if e.get("package-ecosystem") == "npm" and e.get("directory") == "/firebase"]
+    if len(entries) != 1:
+        return [f"expected one npm entry for /firebase, found {len(entries)}"]
+    groups = entries[0].get("groups") or {}
+    if SDK_GROUP not in groups:
+        return [f"no {SDK_GROUP} group"]
+    problems = []
+    group = groups[SDK_GROUP]
+    if group.get("patterns") != SDK_PATTERNS:
+        problems.append(f"{SDK_GROUP} patterns are {group.get('patterns')!r}, expected {SDK_PATTERNS!r}")
+    if group.get("update-types") not in (None, ALL_TYPES, ["major", "minor", "patch"]):
+        problems.append(f"{SDK_GROUP} update-types are {group.get('update-types')!r}, expected all of major, minor and patch")
+    if set(group) - {"patterns", "update-types"}:
+        problems.append(f"{SDK_GROUP} has keys {sorted(group)}")
+    if list(groups)[0] != SDK_GROUP:
+        problems.append(f"{SDK_GROUP} must be the first group, order is {list(groups)}")
+    return problems
+
+
+def ci_node_version(workflow_text):
+    """The Node the CI firebase job's setup-node installs, as a concrete version to test engines against, or None when it cannot be
+    resolved. A bare major (`22`) means the newest 22.x, so it maps to major.999.999 (engines ranges are lower bounds in practice)."""
+    body = job(workflow_text, "firebase")
+    m = body and re.search(r"^\s+node-version:\s*[\"']?([^\s\"'#]+)", body, re.M)
+    if not m:
+        return None
+    value = m.group(1)
+    if re.fullmatch(r"\d+(?:\.x)?", value):
+        return value.split(".")[0] + ".999.999"
+    return value if re.fullmatch(r"\d+\.\d+\.\d+", value) else None
+
+
+ENGINES_JS = (
+    "const semver = require('semver'); const lock = JSON.parse(require('fs').readFileSync(0, 'utf8')); const node = process.argv[1];"
+    "const bad = Object.entries(lock.packages ?? {}).flatMap(([name, pkg]) => { const range = pkg.engines?.node;"
+    "return range !== undefined && !semver.satisfies(node, range) ? [name + ' ' + range] : []; });"
+    "console.log(JSON.stringify(bad));"
+)
+
+
+def lockfile_engine_offenders(lock, node_version):
+    """Packages in a package-lock (as a dict) whose engines.node range excludes node_version, as `name range` strings."""
+    done = subprocess.run(["node", "-e", ENGINES_JS, node_version], cwd=FB, input=json.dumps(lock), capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stdout + done.stderr
+    return json.loads(done.stdout)
+
+
 def tsconfig_problems(cfg):
     problems = []
     opts = cfg.get("compilerOptions", {})
@@ -128,6 +185,8 @@ def tsconfig_problems(cfg):
         problems.append("noEmit is not true")
     if opts.get("noUncheckedIndexedAccess") is not True:
         problems.append("noUncheckedIndexedAccess is not true")
+    if opts.get("lib") != TS_LIB:
+        problems.append(f"lib is {opts.get('lib')!r}, expected {TS_LIB!r}")
     extra = set(opts) - TS_OPTIONS
     if extra:
         problems.append(f"compilerOptions keys outside the allowlist: {sorted(extra)}")
@@ -205,31 +264,32 @@ class HelperNegativeCases(unittest.TestCase):
         def cfg(rules, eco="npm", directory="/firebase"):
             return {"updates": [{"package-ecosystem": eco, "directory": directory, "ignore": rules}]}
 
-        ts, fb, node = rule("typescript"), rule("firebase"), rule("@types/node")
-        full = [ts, fb, node]
+        ts, node = rule("typescript"), rule("@types/node")
+        fb, rut = rule("firebase"), rule("@firebase/rules-unit-testing")
+        full = [ts, fb, rut, node]
         self.assertEqual(dependabot_ignore_problems(cfg(full)), [])
         bad = {
             "no ignore": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]},
-            "typescript missing": cfg([fb, node]),
-            "firebase missing": cfg([ts, node]),
-            "@types/node missing": cfg([ts, fb]),
+            "typescript missing": cfg([fb, rut, node]),
+            "firebase missing": cfg([ts, rut, node]),
+            "rules-unit-testing missing": cfg([ts, fb, node]),
+            "@types/node missing": cfg([ts, fb, rut]),
             "extra package": cfg([*full, rule("eslint")]),
             "firebase-tools ignored for major": cfg([*full, rule("firebase-tools", (major,))]),
             "firebase-tools ignored for all": cfg([*full, rule("firebase-tools", ALL_TYPES)]),
-            "firebase major only": cfg([ts, rule("firebase", (major,)), node]),
-            "firebase major and minor": cfg([ts, rule("firebase", (major, minor)), node]),
-            "firebase minor and patch": cfg([ts, rule("firebase", (minor, patch)), node]),
-            "firebase minor only": cfg([ts, rule("firebase", (minor,)), node]),
-            "firebase patch only": cfg([ts, rule("firebase", (patch,)), node]),
-            "firebase version ignore": cfg([ts, {"dependency-name": "firebase", "versions": [">=12.19.0"]}, node]),
-            "firebase version ignore beside major": cfg([ts, rule("firebase", (major,)), {"dependency-name": "firebase", "versions": [">=12.19.0"]}, node]),
-            "firebase version ignore added to all": cfg([ts, {**fb, "versions": [">=12.19.0"]}, node]),
-            "@types/node minor and patch": cfg([ts, fb, rule("@types/node", (minor, patch))]),
-            "@types/node ignored for all": cfg([ts, fb, rule("@types/node", ALL_TYPES)]),
-            "@types/node no update types": cfg([ts, fb, {"dependency-name": "@types/node"}]),
-            "typescript ignored for all": cfg([rule("typescript", ALL_TYPES), fb, node]),
-            "typescript minor only": cfg([rule("typescript", (minor,)), fb, node]),
-            "typescript version ignore": cfg([{"dependency-name": "typescript", "versions": [">=7"]}, fb, node]),
+            "firebase ignored for all": cfg([ts, rule("firebase", ALL_TYPES), rut, node]),
+            "firebase ignored for minor only": cfg([ts, rule("firebase", (minor,)), rut, node]),
+            "firebase minor and patch frozen": cfg([ts, rule("firebase", (minor, patch)), rut, node]),
+            "firebase version ignore": cfg([ts, {"dependency-name": "firebase", "versions": [">=13.0.0"]}, rut, node]),
+            "firebase version ignore beside major": cfg([*full, {"dependency-name": "firebase", "versions": [">=12.19.0"]}]),
+            "rules-unit-testing ignored for all": cfg([ts, fb, rule("@firebase/rules-unit-testing", ALL_TYPES), node]),
+            "rules-unit-testing minor only": cfg([ts, fb, rule("@firebase/rules-unit-testing", (minor,)), node]),
+            "@types/node minor and patch": cfg([ts, fb, rut, rule("@types/node", (minor, patch))]),
+            "@types/node ignored for all": cfg([ts, fb, rut, rule("@types/node", ALL_TYPES)]),
+            "@types/node no update types": cfg([ts, fb, rut, {"dependency-name": "@types/node"}]),
+            "typescript ignored for all": cfg([rule("typescript", ALL_TYPES), fb, rut, node]),
+            "typescript minor only": cfg([rule("typescript", (minor,)), fb, rut, node]),
+            "typescript version ignore": cfg([{"dependency-name": "typescript", "versions": [">=7"]}, fb, rut, node]),
             "firebase twice": cfg([*full, fb]),
             "other directory": cfg(full, directory="/"),
             "other ecosystem": cfg(full, eco="pip"),
@@ -238,9 +298,60 @@ class HelperNegativeCases(unittest.TestCase):
             with self.subTest(name):
                 self.assertNotEqual(dependabot_ignore_problems(c), [])
 
+    def test_dependabot_group_check_rejects_a_missing_split_or_late_sdk_group(self):
+        def cfg(groups, directory="/firebase"):
+            return {"updates": [{"package-ecosystem": "npm", "directory": directory, "groups": groups}]}
+
+        sdk = {"patterns": list(SDK_PATTERNS)}
+        rest = {"update-types": ["minor", "patch"]}
+        self.assertEqual(dependabot_group_problems(cfg({SDK_GROUP: sdk, "npm-minor-patch": rest})), [])
+        self.assertEqual(dependabot_group_problems(cfg({SDK_GROUP: {**sdk, "update-types": ["major", "minor", "patch"]}, "npm-minor-patch": rest})), [])
+        bad = {
+            "no groups": {"updates": [{"package-ecosystem": "npm", "directory": "/firebase"}]},
+            "no sdk group": cfg({"npm-minor-patch": rest}),
+            "sdk group after the catch-all": cfg({"npm-minor-patch": rest, SDK_GROUP: sdk}),
+            "firebase only": cfg({SDK_GROUP: {"patterns": ["firebase"]}, "npm-minor-patch": rest}),
+            "rules-unit-testing only": cfg({SDK_GROUP: {"patterns": ["@firebase/rules-unit-testing"]}, "npm-minor-patch": rest}),
+            "extra pattern": cfg({SDK_GROUP: {"patterns": [*SDK_PATTERNS, "firebase-tools"]}, "npm-minor-patch": rest}),
+            "wildcard pattern": cfg({SDK_GROUP: {"patterns": ["*firebase*"]}, "npm-minor-patch": rest}),
+            "minor and patch only": cfg({SDK_GROUP: {**sdk, "update-types": ["minor", "patch"]}, "npm-minor-patch": rest}),
+            "major only": cfg({SDK_GROUP: {**sdk, "update-types": ["major"]}, "npm-minor-patch": rest}),
+            "extra key": cfg({SDK_GROUP: {**sdk, "dependency-type": "development"}, "npm-minor-patch": rest}),
+            "other directory": cfg({SDK_GROUP: sdk, "npm-minor-patch": rest}, directory="/"),
+        }
+        for name, c in bad.items():
+            with self.subTest(name):
+                self.assertNotEqual(dependabot_group_problems(c), [])
+
+    def test_ci_node_version_is_read_from_the_firebase_job_only(self):
+        def wf(version, job_name="firebase"):
+            return f"jobs:\n  {job_name}:\n    steps:\n      - uses: actions/setup-node@x\n        with:\n          node-version: {version}\n"
+
+        self.assertEqual(ci_node_version(wf("22")), "22.999.999")
+        self.assertEqual(ci_node_version(wf("'24'")), "24.999.999")
+        self.assertEqual(ci_node_version(wf("24.x")), "24.999.999")
+        self.assertEqual(ci_node_version(wf("24.12.1")), "24.12.1")
+        for bad in ("lts/*", "latest", "22.x.x", ">=22", "$NODE"):
+            with self.subTest(bad):
+                self.assertIsNone(ci_node_version(wf(bad)))
+        self.assertIsNone(ci_node_version(wf("22", job_name="unit")), "another job's node-version must not count")
+        self.assertIsNone(ci_node_version("jobs:\n  firebase:\n    steps: []\n"))
+
+    def test_engines_check_rejects_a_lockfile_that_needs_a_newer_node(self):
+        def lock(*ranges):
+            return {"packages": {"": {"name": "x"}, **{f"node_modules/p{i}": {"engines": {"node": r}} for i, r in enumerate(ranges)}}}
+
+        self.assertEqual(lockfile_engine_offenders(lock(">=20.0.0", "^22.13.0 || >=24", "18 || 20 || >=22"), "22.999.999"), [])
+        self.assertEqual(lockfile_engine_offenders({"packages": {"node_modules/p": {"version": "1.0.0"}}}, "22.999.999"), [])
+        # The case of PR 156 round 1: firebase 13 and rules-unit-testing 6 declare node >=24.12.0 while CI ran Node 22.
+        self.assertEqual(lockfile_engine_offenders(lock(">=20.0.0", ">=24.12.0"), "22.999.999"), ["node_modules/p1 >=24.12.0"])
+        self.assertEqual(lockfile_engine_offenders(lock(">=24.12.0"), "24.11.9"), ["node_modules/p0 >=24.12.0"])
+        self.assertEqual(lockfile_engine_offenders(lock(">=24.12.0"), "24.12.0"), [])
+        self.assertEqual(lockfile_engine_offenders(lock("^20.19.0 || ^22.13.0 || >=24"), "22.5.0"), ["node_modules/p0 ^20.19.0 || ^22.13.0 || >=24"])
+
     def test_tsconfig_allowlist_rejects_every_weakening(self):
         good = {
-            "compilerOptions": {"strict": True, "noEmit": True, "noUncheckedIndexedAccess": True, "types": ["jest"]},
+            "compilerOptions": {"strict": True, "noEmit": True, "noUncheckedIndexedAccess": True, "lib": TS_LIB, "types": ["jest"]},
             "include": ["**/*.ts"],
             "exclude": ["node_modules"],
         }
@@ -254,6 +365,10 @@ class HelperNegativeCases(unittest.TestCase):
             "allowJs": {**good, "compilerOptions": {**opts, "allowJs": True}},
             "noEmit off": {**good, "compilerOptions": {**opts, "noEmit": False}},
             "no unchecked access flag": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "noUncheckedIndexedAccess"}},
+            "lib missing": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "lib"}},
+            "lib without temporal": {**good, "compilerOptions": {**opts, "lib": ["es2022", "dom", "dom.iterable"]}},
+            "lib without dom": {**good, "compilerOptions": {**opts, "lib": ["es2022", "esnext.temporal"]}},
+            "lib with extra entry": {**good, "compilerOptions": {**opts, "lib": [*TS_LIB, "esnext"]}},
             "narrow include": {**good, "include": ["test/other.ts"]},
             "wider exclude": {**good, "exclude": ["node_modules", "test"]},
             "files": {**good, "files": ["a.ts"]},
@@ -314,8 +429,17 @@ class Config(unittest.TestCase):
             self.assertIn(case, text, case)
         self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
 
-    def test_dependabot_ignores_every_firebase_update_and_only_the_major_updates_of_typescript_and_types_node(self):
+    def test_dependabot_ignores_only_the_major_updates_of_typescript_firebase_rules_unit_testing_and_types_node(self):
         self.assertEqual(dependabot_ignore_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
+
+    def test_dependabot_groups_firebase_and_rules_unit_testing_ahead_of_the_catch_all(self):
+        self.assertEqual(dependabot_group_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
+
+    def test_ci_node_satisfies_every_engines_range_in_the_lockfile(self):
+        node = ci_node_version(read(".github", "workflows", "ci.yml"))
+        self.assertIsNotNone(node, "the ci.yml firebase job needs a literal node-version (22, 22.x or 22.1.2)")
+        lock = json.loads(read("firebase", "package-lock.json"))
+        self.assertEqual(lockfile_engine_offenders(lock, node), [], f"packages whose engines.node excludes the CI Node {node}")
 
     def test_fixture_directories_are_gitignored(self):
         self.assertIn("firebase/fixture-tmp-*/", active_lines(read(".gitignore")))
