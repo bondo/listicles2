@@ -4,7 +4,6 @@
 
 # Planned: owned by a task in docs/tasks.toml.
 scripts/screenshots.sh  # planned: Roborazzi screenshots, M1
-docs/agent-tuning.md  # planned: end-of-M0.5 retro output (docs/reviews/README.md R6, PLAN section 9.4)
 docs/milestones/Mx.md  # placeholder: the planner writes docs/milestones/M1.md and so on (M1-01)
 
 # Named as absent on purpose (stale names the docs warn about, or things decided against). Scoped with @file: only those
