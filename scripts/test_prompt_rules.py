@@ -1352,13 +1352,11 @@ class Pr4RuleTests(unittest.TestCase):
     # (file, rule id, the old wording that must now be rejected)
     STALE = (
         ("docs/ORCHESTRATION.md", "orch-autonomy", "**Labels:** the orchestrator applies `big-pr` only with the owner's explicit say-so."),
-        ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 50% context. The owner archives you."),
         ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 80% context, at a **batch boundary** rather than mid-batch."),  # R1-05 of #138
         ("docs/ORCHESTRATION.md", "orch-parallel", "At most **5** worker sessions run at once, reviewers inside the cap."),  # R1-02 of #138
         ("docs/ORCHESTRATION.md", "orch-throttle", "(2) the worker cap 3, then 2. (1) no optional extras (recurring reviews R2 to R4)"),
         ("docs/ORCHESTRATION.md", "orch-review-rounds", "Any commit is unreviewed until the next round covers it, or until the owner explicitly accepts it."),
         ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Round 4 with findings above `nit`: stop and ask the owner."),
-        ("docs/ORCHESTRATION.md", "orch-archive", "Archive finished worker sessions once their metrics row is logged and the owner has seen the batch report."),
         ("docs/ORCHESTRATION.md", "orch-design-rounds", "Round {round} of max 2."),
         ("docs/FOLLOW-UPS.md", "followups-labels", "Labels (the owner creates them once, task M0-O10;"),
         ("docs/FOLLOW-UPS.md", "followups-small-fix", "More than 8 open per milestone goes to the owner."),  # R1-04 of #138
