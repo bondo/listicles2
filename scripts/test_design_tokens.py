@@ -3,7 +3,9 @@
 Run: python3 -I scripts/test_design_tokens.py
 """
 
+import contextlib
 import copy
+import io
 import json
 import sys
 import tempfile
@@ -118,6 +120,88 @@ class Check(unittest.TestCase):
             p = Path(d) / "t.json"
             p.write_text(json.dumps(bad), encoding="utf-8")
             self.assertEqual(dt.main([str(p)]), 1)
+
+
+def _run_main(content: bytes | None) -> tuple[int, str]:
+    """Run main() on a temp file holding content (None: the file does not exist); return (status, stdout). Any exception fails the test."""
+    out = io.StringIO()
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "t.json"
+        if content is not None:
+            p.write_bytes(content)
+        with contextlib.redirect_stdout(out):
+            status = dt.main([str(p)])
+    return status, out.getvalue()
+
+
+def _mutated(mutate) -> dict:
+    tokens = copy.deepcopy(REAL)
+    mutate(tokens)
+    return tokens
+
+
+MALFORMED = {
+    "top level is a list": lambda t: [],
+    "top level is a string": lambda t: "tokens",
+    "top level is null": lambda t: None,
+    "color is missing": lambda t: t.pop("color") and t,
+    "contrastPairs is missing": lambda t: t.pop("contrastPairs") and t,
+    "color is a list": lambda t: t.update(color=[]) or t,
+    "color is null": lambda t: t.update(color=None) or t,
+    "a theme is a list": lambda t: t["color"].update(light=["#FFFFFF"]) or t,
+    "a theme is null": lambda t: t["color"].update(dark=None) or t,
+    "contrastPairs is an object": lambda t: t.update(contrastPairs={}) or t,
+    "contrastPairs is null": lambda t: t.update(contrastPairs=None) or t,
+    "a pair is a string": lambda t: t["contrastPairs"].append("onPrimary on primary") or t,
+    "a pair is null": lambda t: t["contrastPairs"].append(None) or t,
+    "a pair has no fg": lambda t: t["contrastPairs"][0].pop("fg") and t,
+    "a pair has no bg": lambda t: t["contrastPairs"][0].pop("bg") and t,
+    "a pair has no min": lambda t: t["contrastPairs"][0].pop("min") and t,
+    "a pair fg is a number": lambda t: t["contrastPairs"][0].update(fg=7) or t,
+    "a pair bg is a list": lambda t: t["contrastPairs"][0].update(bg=["surface"]) or t,
+    "a pair min is a string": lambda t: t["contrastPairs"][0].update(min="4.5") or t,
+    "a pair min is null": lambda t: t["contrastPairs"][0].update(min=None) or t,
+    "a pair min is a boolean": lambda t: t["contrastPairs"][0].update(min=True) or t,
+}
+
+
+class Malformed(unittest.TestCase):
+    """A malformed token file is a finding (status 1, one line, no traceback), never an exception."""
+
+    def test_a_malformed_structure_is_reported_by_check_not_raised(self):
+        for name, mutate in MALFORMED.items():
+            tokens = copy.deepcopy(REAL)
+            tokens = mutate(tokens)
+            with self.subTest(name):
+                found = dt.check(tokens)
+                self.assertTrue(found, "no finding")
+                self.assertTrue(all(isinstance(f, str) and "\n" not in f for f in found), found)
+
+    def test_main_reports_each_malformed_structure_with_status_one_and_the_path(self):
+        for name, mutate in MALFORMED.items():
+            with self.subTest(name):
+                status, out = _run_main(json.dumps(mutate(copy.deepcopy(REAL))).encode())
+                self.assertEqual(status, 1)
+                self.assertIn("t.json", out)
+                self.assertNotIn("Traceback", out)
+
+    def test_main_reports_a_file_that_is_not_json(self):
+        for content in (b"", b"{", b"not json", b'{"color": }', b"\xff\xfe\x00bad"):
+            with self.subTest(content=content):
+                status, out = _run_main(content)
+                self.assertEqual(status, 1)
+                self.assertIn("t.json", out)
+
+    def test_main_reports_a_missing_file(self):
+        status, out = _run_main(None)
+        self.assertEqual(status, 1)
+        self.assertIn("t.json", out)
+
+    def test_a_valid_extra_key_or_a_valid_float_minimum_is_not_a_structure_finding(self):
+        tokens = copy.deepcopy(REAL)
+        tokens["extra"] = {"anything": [1, 2]}
+        tokens["contrastPairs"][0]["min"] = 7  # an int above AA is fine
+        self.assertEqual(dt.check(tokens), [])
 
 
 class PetrolDecision(unittest.TestCase):
