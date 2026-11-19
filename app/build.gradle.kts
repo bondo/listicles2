@@ -82,6 +82,9 @@ dependencies {
     testImplementation(libs.kotest.assertions)
     testImplementation(project(":core:testing"))
     testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testRuntimeOnly(libs.junit.vintage.engine)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
