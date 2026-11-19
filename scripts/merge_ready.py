@@ -20,7 +20,8 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * for owner-batch, the comment is the owner's account (it cannot tell the person from an agent), on #15 and unedited, its first non-empty line is
     `batch approval: #N@sha, ...` (only entries and (notes)) and lists this PR once with a sha
     (7+ hex) of one of its commits; earlier listed PRs are merged; the head is that commit or only adds update-branch merges of main (second parent
-    in main) with the same patch against main (compare main...head vs main...approved; a truncated compare refuses).
+    in main) whose tree equals git's automatic merge of their two parents (`git merge-tree --write-tree`, no conflicts, run in this checkout after
+    fetching main and pull/N/head; R1-02 of #245). A hand-resolved conflict, an edit or an extra file in the merge commit refuses (a fresh owner approval is needed).
 Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the head moved) and the checked title and body as commit text.
 Exit status: 0 merged, 1 refused (or timed out waiting) or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
@@ -39,7 +40,7 @@ BASE = "main"
 RETRIES = 5
 STATE_ISSUE = 15  # the issue that holds owner decisions and batch approvals
 WAIT_SECONDS, WAIT_POLL = 900, 30  # --wait: how long to wait for required checks, and the poll interval
-COMPARE_CAP = 300  # the compare API lists at most 300 files
+MERGE_TREE_TIMEOUT = 120  # seconds for one git fetch or merge-tree
 
 # An explicit list of working drafts (R3-01): naming, docs/reviews/ and other owner-decided or gate docs are owner-only. A new draft needs an owner merge here.
 DOC_PREFIXES = ("docs/milestones/", "docs/product/wireframes/")
@@ -329,20 +330,41 @@ def approval_entries(body):
     return [(int(num), sha.lower()) for num, sha in ENTRY_RE.findall(rest)]
 
 
-def _changes(f):
-    """What one compared file does to the base, without hunk positions or context (main moving only shifts those); a file with no patch by its blob."""
-    if f.get("patch") is None:
-        return ("blob", f.get("sha"))
-    return ("patch", tuple(ln for ln in f["patch"].splitlines() if ln[:1] in "+-" and not ln.startswith("@@")))
+class MergeCheckError(Exception):
+    """git could not tell what the automatic merge is (fetch or merge-tree failed): the check refuses rather than guesses."""
 
 
-def _compare_files(api, repo, base, sha):
-    got = api.get(f"repos/{repo}/compare/{base}...{sha}").get("files") or []
-    return got, {(f["filename"], f.get("status"), f.get("previous_filename"), _changes(f)) for f in got}
+class GitMergeTree:
+    """`merge_tree(p1, p2)`: the tree git makes by merging p2 (a commit of main) into p1 (a commit of the PR), or None if that has conflicts.
+    Runs in this checkout (the merge agent's clean checkout of origin/main), after fetching main and refs/pull/N/head once."""
+
+    def __init__(self, n, cwd=None, run=subprocess.run):
+        self.n, self.cwd, self.run, self.fetched = n, cwd, run, False
+
+    def _git(self, *args):
+        try:
+            return self.run(["git", *args], cwd=self.cwd, capture_output=True, text=True, timeout=MERGE_TREE_TIMEOUT,
+                            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+        except (OSError, subprocess.SubprocessError) as e:
+            raise MergeCheckError(f"git {args[0]} failed: {type(e).__name__}") from e
+
+    def __call__(self, p1, p2):
+        if not self.fetched:
+            res = self._git("fetch", "--quiet", "origin", BASE, f"refs/pull/{self.n}/head")
+            if res.returncode != 0:
+                raise MergeCheckError(f"git fetch of {BASE} and pull/{self.n}/head failed: {(res.stderr or '').strip()[:120] or res.returncode}")
+            self.fetched = True
+        res = self._git("merge-tree", "--write-tree", "--no-messages", p1, p2)
+        lines = (res.stdout or "").splitlines()
+        if res.returncode == 1:
+            return None  # conflicts
+        if res.returncode != 0 or not lines or not SHA_RE.fullmatch(lines[0]):
+            raise MergeCheckError(f"git merge-tree {p1[:7]} {p2[:7]} failed: {(res.stderr or '').strip()[:120] or res.returncode}")
+        return lines[0]
 
 
-def update_branch_problems(api, repo, base, head, approved, commits):
-    """Reasons the head is not the approved commit plus update-branch merges of the base with the same patch against the base (D2)."""
+def update_branch_problems(api, repo, base, head, approved, commits, merge_tree):
+    """Reasons the head is not the approved commit plus update-branch merges of the base whose tree is git's automatic merge (D2, R1-02 of #245)."""
     by = {c["sha"]: c for c in commits}
     parents = lambda c: [p["sha"] for p in c["parents"]]  # noqa: E731  # justified: two-use local helper
 
@@ -367,15 +389,20 @@ def update_branch_problems(api, repo, base, head, approved, commits):
             problems.append(f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base} (its second parent is not in {base})")
     if problems:
         return problems
-    (head_files, head_changes), (old_files, old_changes) = _compare_files(api, repo, base, head), _compare_files(api, repo, base, approved)
-    if max(len(head_files), len(old_files)) >= COMPARE_CAP:
-        return [f"the compare lists {COMPARE_CAP} or more files: truncated, cannot prove the patch is unchanged"]
-    if head_changes != old_changes:
-        return [f"the patch against {base} at {head[:7]} differs from the approved {approved[:7]} (more than {base}'s own commits was merged)"]
+    for sha in sorted(seen - old):  # the merge of a commit of the PR with a commit of the base must be exactly what git makes without help
+        p1, p2 = parents(by[sha])
+        try:
+            auto = merge_tree(p1, p2)
+        except MergeCheckError as e:
+            return [f"cannot check the merge {sha[:7]}: {e}"]
+        if auto is None:
+            return [f"merge {sha[:7]} of {base} conflicts in git: a hand-resolved conflict needs a fresh owner approval"]
+        if auto != by[sha]["commit"]["tree"]["sha"]:
+            return [f"the tree of merge {sha[:7]} is not git's automatic merge of its parents (an edit or an extra file in the merge commit needs a fresh owner approval)"]
     return []
 
 
-def batch_problems(api, repo, n, head, base, commits, approval_id):
+def batch_problems(api, repo, n, head, base, commits, approval_id, merge_tree):
     """Reasons PR n is not covered by the owner's batch approval (the comment on the state issue), see the module header."""
     comment = api.get(f"repos/{repo}/issues/comments/{approval_id}")
     if (comment.get("user") or {}).get("login") != repo.split("/")[0] or comment.get("author_association") != "OWNER":
@@ -401,11 +428,11 @@ def batch_problems(api, repo, n, head, base, commits, approval_id):
         if not api.get(f"repos/{repo}/pulls/{earlier}").get("merged"):
             problems.append(f"PR {earlier} comes earlier in the batch and is not merged yet (the batch is merged in order)")
     if head != approved[0]:
-        problems += update_branch_problems(api, repo, base, head, approved[0], commits)
+        problems += update_branch_problems(api, repo, base, head, approved[0], commits, merge_tree)
     return problems
 
 
-def evaluate(api, repo, n, sha, kind, resolve, approval=None):
+def evaluate(api, repo, n, sha, kind, resolve, approval=None, merge_tree=None):
     """(the PR, all reasons it must not be merged); no reasons means ready."""
     pr = api.get(f"repos/{repo}/pulls/{n}")
     problems = []
@@ -428,7 +455,7 @@ def evaluate(api, repo, n, sha, kind, resolve, approval=None):
             problems.append(f"closing keyword in {where}: {m.group(0)!r} (rephrase, e.g. 'see issue N')")
     problems += file_problems(kind, files, resolve)
     if kind == "owner-batch" and pr["head"]["sha"] == sha:  # a moved head is already refused above
-        problems += batch_problems(api, repo, n, sha, pr["base"]["ref"], commits, approval)
+        problems += batch_problems(api, repo, n, sha, pr["base"]["ref"], commits, approval, merge_tree or GitMergeTree(n))
     problems += check_problems(api, repo, pr["base"]["ref"], sha)
     return pr, problems
 
@@ -462,7 +489,7 @@ def parse_args(argv):
     return wait, approval, int(rest[0]), rest[1], rest[2]
 
 
-def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=time.sleep, clock=time.monotonic):
+def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=time.sleep, clock=time.monotonic, merge_tree=None):
     args = parse_args(argv)
     if args is None:
         print("usage: merge_ready.py [--wait] [--approval <comment-id>] <N> <40-hex head sha> <kind>", file=err)
@@ -479,7 +506,7 @@ def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=ti
     try:
         deadline = clock() + WAIT_SECONDS
         while True:
-            pr, problems = evaluate(api, REPO, n, sha, kind, resolve, approval)
+            pr, problems = evaluate(api, REPO, n, sha, kind, resolve, approval, merge_tree)
             if not (problems and wait and only_waiting(problems)):
                 break
             if clock() >= deadline:
