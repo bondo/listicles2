@@ -8,7 +8,7 @@ second batch of issue 46 added, and what it left out and why. Each addition has 
 
 Owner decision (issue 46): the reason needs at least 3 words of letters. A word is a run of 2 or more ASCII letters, so `-`, `x`, `ok`,
 `two words` and `123 456 789` fail; Danish words count by their ASCII letters. Only the reason counts: it ends at a closing `*/` or `-->` and at the next comment opener (` # word`, ` // word`), so code or a
-directive after it adds no words; `#46` and `http://` do not end it. The guard only counts. Reviewers judge whether the
+directive after it adds no words; `#46` and `http://` do not end it. It holds on every check that reads `justified:`, including the command-line flag check (2c, issue 45). The guard only counts. Reviewers judge whether the
 reason is true and specific (`REVIEW.md`, item 8).
 
 ## Added

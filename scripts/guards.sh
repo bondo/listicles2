@@ -159,7 +159,7 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 
 # 2c. Relaxations passed as command-line flags on tool invocation lines (issue 45): ruff, mypy, tsc, ESLint, Prettier, shellcheck, in
 # shell scripts, git hooks, CI workflows and package.json. A backslash continuation is one logical line, and one same-line
-# `justified: <reason>` waives the whole logical line (every command on it). A logical line loses its unquoted trailing ` # comment`
+# `justified: <reason>` (3 words, just() above) waives the whole logical line (every command on it). A logical line loses its unquoted trailing ` # comment`
 # and is split at ; & | so a flag only counts for the tool in its own command; only the text after the tool name is read (so
 # `grep -i shellcheck` is not a flag). For npm and npx (and yarn, pnpm and bunx when they use `--`) the JS tools also see what follows a
 # bare `--` (`npm run lint -- --quiet`); the options of npm itself never count. That passthrough is checked against every JS tool, so
@@ -317,12 +317,12 @@ function relaxed(p,   js, dd, s, ok) {
 }
 function flush(   n, i, parts, j) {
   if (cur == "") return
-  j = (cur ~ JUSTRE)
+  j = just(cur)
   n = split(stripc(cur), parts, /[;&|]+/)
   for (i = 1; i <= n; i++) if (baseline(parts[i]) || (!j && relaxed(parts[i]))) { printf "%s:%d:%s\n", F, start, cur; break }
   cur = ""
 }
-BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)"
+BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)"
   MYPYN = "ignore-missing-imports allow-untyped-defs allow-untyped-globals allow-redefinition allow-redefinition-new no-strict-optional no-strict-equality no-strict-bytes no-check-untyped-defs no-warn-no-return no-warn-unused-ignores no-warn-redundant-casts no-warn-unused-configs no-extra-checks disable-error-code implicit-optional implicit-reexport exclude untyped-calls-exclude"
   SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0 }
 {
@@ -338,8 +338,8 @@ END { flush() }'
 cliflags() { # cliflags <pathspec>...
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$CLI_AWK"
-    else awk -v F="$f" "$CLI_AWK" "$f" 2>/dev/null; fi
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
+    else LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
   done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
 }
 out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '*package.json')
