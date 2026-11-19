@@ -176,10 +176,12 @@ member leaves, and the app deletes the lists the user created (items first, whic
 them), `users/{uid}` and the Auth user. Deletion needs a recent sign-in[^reauth]
 (`FirebaseAuthRecentLoginRequiredException`): the app asks for Google, or the password plus a TOTP code when
 two-step verification is on, before it starts, so nothing is left half-done.
-**Open for the owner (#15 comment 6992973369, PR #171):** the proposal works only while the person can still write
+**Open for the owner (#15 comments 6992973369 and 6994571090, PR #171):** the proposal works only while the person can still write
 to the list. If they already left or were removed, or the list's creator stopped sharing it (VIS-04), or the
 household was deleted, and they delete their account later, their uid stays in `createdBy`/`updatedBy` on those items
-(no name or profile remains, and the UI shows "former member"). Accept this, or anonymise at leave and removal too?
+(no name or profile remains, and the UI shows "former member"). Accept this, or anonymise in those cases too (at leave,
+removal, stop sharing and household deletion)? The last two need a different mechanism than the proposal above,
+because the person loses write access at that moment.
 Until the owner answers, M2 planning must not treat the proposal as complete.
 Play also requires a **web** way to request deletion, besides the in-app path[^playdel]. The owner deferred
 this decision (2026-11-17): it must be settled before the first external tester and must exist before a Play
