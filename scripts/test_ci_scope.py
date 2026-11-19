@@ -24,17 +24,17 @@ REQUIRED_JOBS = ("wrapper", "static", "unit", "firebase", "ui", "guards", "secre
 
 class Classify(unittest.TestCase):
     def test_prose_and_tooling_paths_skip(self):
-        for p in ("docs/PLAN.md", "handoff/x.md", "agents/prompts/reviewer.md", "firebase/test/rules.test.ts", "scripts/tasks.py",
-                  ".githooks/pre-push", ".claude/settings.json", "CLAUDE.md", "README.md", "app/src/main/kotlin/A.kt",
-                  "core/domain/src/test/kotlin/B.kt", "app/src/main/res/values-da/strings.xml"):
+        for p in ("docs/PLAN.md", "handoff/x.md", "agents/prompts/reviewer.md", "firebase/test/rules.test.ts", "scripts/tasks.py", ".githooks/pre-push",
+                  ".claude/settings.json", "CLAUDE.md", "README.md", "app/src/main/kotlin/A.kt", "core/domain/src/test/kotlin/B.kt",
+                  "app/src/main/res/values-da/strings.xml"):
             self.assertEqual(ci_scope.gradle_selftests([p]), "skip", p)
 
     def test_every_gradle_input_runs(self):
-        for p in ("build.gradle.kts", "settings.gradle.kts", "app/build.gradle.kts", "core/domain/build.gradle.kts",
-                  "gradle/libs.versions.toml", "gradle/verification-metadata.xml", "gradle/wrapper/gradle-wrapper.properties",
-                  "gradle.properties", "gradlew", "config/licensee/fixture/build.gradle.kts", "config/detekt/detekt.yml",
-                  "buildSrc/src/main/kotlin/x.kt", "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py",
-                  "scripts/ci_scope.py", ".github/workflows/ci.yml", "app/src/main/build.gradle.kts"):
+        for p in ("build.gradle.kts", "settings.gradle.kts", "app/build.gradle.kts", "core/domain/build.gradle.kts", "gradle/libs.versions.toml",
+                  "gradle/verification-metadata.xml", "gradle/wrapper/gradle-wrapper.properties", "gradle.properties", "gradlew",
+                  "config/licensee/fixture/build.gradle.kts", "config/detekt/detekt.yml", "buildSrc/src/main/kotlin/x.kt",
+                  "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/ci_scope.py", ".github/workflows/ci.yml",
+                  "app/src/main/build.gradle.kts"):
             self.assertEqual(ci_scope.gradle_selftests([p]), "run", p)
 
     def test_unknown_paths_run(self):
@@ -208,6 +208,7 @@ class CiWiring(unittest.TestCase):
             ("static: no two-commit checkout", "fetch-depth: 2", "fetch-depth: 1"),
             ("static: calls scripts/test_warnings_gate.py directly", step, "      - run: python3 -I scripts/test_warnings_gate.py\n" + step),
             ("guards: hook tests not run with --jobs 4", "run_hook_tests.py --jobs 4", "run_hook_tests.py"),
+            ("ci.yml does not run test_ci_scope.py", "python3 -I scripts/test_ci_scope.py", "python3 -I scripts/test_nothing.py"),
         ]
         for problem, old, new in cases:
             self.assertIn(problem, self.mutated(old, new), problem)

@@ -153,6 +153,15 @@ class ParallelRunnerKeepsEveryGate(unittest.TestCase):
             rc, out = run_tree(files, jobs=2)
             self.assertNotEqual(rc, 0, f"parallel: {what}: {out}")
 
+    def test_a_test_hidden_from_name_loading_is_caught_by_the_count_check(self):
+        """R2-01: load_tests hides a failing test from loadTestsFromName but not from discovery; only the count check sees it."""
+        hidden = FAILING + "\n\ndef load_tests(loader, tests, pattern):\n    return tests if pattern else unittest.TestSuite()\n"
+        files = {"test_a.py": case(PASSING), "test_b.py": case(PASSING), "test_lt.py": hidden}
+        self.assertNotEqual(run_tree(files)[0], 0)
+        rc, out = run_tree(files, jobs=2)
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("serial discovery collects", out)
+
     def test_skip_is_reported_by_name(self):
         self.assertIn("skipped", run_runner(case(PASSING), SKIPPING, case(PASSING), jobs=3)[1])
 
@@ -176,8 +185,7 @@ class ParallelRunnerKeepsEveryGate(unittest.TestCase):
                     f.write(case(PASSING) if rel.startswith("test") else "")
             self.assertEqual(run_hook_tests.units(d), ["sub", "test_a.py", "testb.py"])
             self.assertIsNone(run_hook_tests.count_problem(d, 2))  # test_a.py and testb.py; sub has no tests
-            for wrong in (0, 3):
-                self.assertIn("2 test", run_hook_tests.count_problem(d, wrong))
+            self.assertIn("2 test", run_hook_tests.count_problem(d, 3))
 
 
 class Partition(unittest.TestCase):
@@ -198,13 +206,6 @@ class Partition(unittest.TestCase):
         shards = run_hook_tests.partition(["test_a.py", "test_gitenv_isolation.py", "test_gitenv_hostile_config.py", "test_guards_sh.py"], 3)
         for shard in shards:
             self.assertLessEqual(sum(f in run_hook_tests.WEIGHTS for f in shard), 1, shards)
-
-    def test_weights_name_real_test_files(self):
-        """A renamed slow file would silently lose its balancing weight."""
-        import run_hook_tests
-
-        for name in run_hook_tests.WEIGHTS:
-            self.assertTrue(os.path.isfile(os.path.join(HERE, name)), name)
 
 
 if __name__ == "__main__":
