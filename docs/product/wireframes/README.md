@@ -12,4 +12,4 @@ Re-render it (lossless, truecolour, no palette quantisation; the file must stay 
    `screenshot({ path: 'docs/product/wireframes/tokens-sheet.png', fullPage: true })`).
 3. Optional: lossless recompression only (maximum zlib level); never reduce colours.
 
-The per-screen PNGs (`01-...` to `33-...`) come from the same page with `?screen=05&theme=dark` and similar.
+The per-screen PNGs (`01-...` to `45-...`) come from the same page with `?screen=05&theme=dark` and similar.
