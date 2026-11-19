@@ -1803,9 +1803,21 @@ class LineLengthPerTool(DiffCase):
     PP = "[tool.ruff]\nline-length = %d\n"
     PYCODESTYLE = "[tool.ruff.lint.pycodestyle]\nmax-line-length = %d\n"
 
+    def put(self, rel, text):
+        """Write a file; `None` removes it, a ("link", target) tuple makes a symlink."""
+        path = os.path.join(self.repo.dir, rel)
+        if text is None or isinstance(text, tuple):
+            if os.path.lexists(path):
+                self.repo.git("rm", "-q", "-f", rel)
+        if isinstance(text, tuple):
+            os.makedirs(os.path.dirname(path) or self.repo.dir, exist_ok=True)
+            os.symlink(text[1], path)
+        elif text is not None:
+            self.repo.write(rel, text, raw=True)
+
     def base_files(self, files):
         for rel, text in files.items():
-            self.repo.write(rel, text)
+            self.put(rel, text)
         self.repo.commit()
         self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
 
@@ -1816,18 +1828,14 @@ class LineLengthPerTool(DiffCase):
                 self.base_files(base)
                 try:
                     for rel, text in head.items():
-                        if text is None:
-                            self.repo.git("rm", "-q", "-f", rel)
-                        else:
-                            self.repo.write(rel, text)
+                        self.put(rel, text)
                     self.repo.commit()
                     if expect:
                         self.assertFails("guard: raised line length:")
                     else:
                         self.assertPasses()
                 finally:
-                    for rel in {**base, **head}:
-                        self.repo.git("rm", "-q", "-f", "--ignore-unmatch", rel)
+                    self.repo.git("rm", "-q", "-f", "--ignore-unmatch", "--", *{**base, **head})
                     if self.repo.git("status", "--porcelain"):
                         self.repo.commit()
 
@@ -1893,8 +1901,14 @@ class LineLengthPerTool(DiffCase):
             "ruff 88 removed": ({"ruff.toml": "line-length = 88\n"}, {"ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
             "ruff 100 removed": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
             "flake8 79 removed": ({".flake8": "[flake8]\nmax-line-length = 79\n"}, {".flake8": "[flake8]\nselect = E\n"}),
+        }, False)
+
+    def test_known_gaps_dropping_every_ruff_config_and_a_prettier_removal_pass(self):
+        """Both loosen the limit and pass on purpose (docs/guards-known-gaps.md: no default is mapped for prettier, and a tool that is no
+        longer configured has no default). A later fix flips these cases."""
+        self.assertRaised({
             "ruff dropped altogether": ({"ruff.toml": "line-length = 60\n"}, {"ruff.toml": None}),
-            "prettier removed (no default is mapped)": ({"firebase/.prettierrc.json": '{ "printWidth": 60 }\n'}, {"firebase/.prettierrc.json": "{}\n"}),
+            "prettier removed": ({"firebase/.prettierrc.json": '{ "printWidth": 60 }\n'}, {"firebase/.prettierrc.json": "{}\n"}),
         }, False)
 
     def test_a_base_without_the_setting_is_compared_with_the_tool_default(self):
@@ -1914,6 +1928,108 @@ class LineLengthPerTool(DiffCase):
                 {"pyproject.toml": "[tool.black]\nfoo = 1\n[tool.ruff]\nline-length = 120\n"},
             ),
             "prettier without the setting is not compared": ({"firebase/.prettierrc.json": "{}\n"}, {"firebase/.prettierrc.json": '{ "printWidth": 200 }\n'}),
+        }, False)
+
+    def test_a_setting_group_alone_catches_a_raise(self):
+        """R1-09: the per-setting group (K). Per file, per tool and per section nothing is raised here: ruff's `line-length` moves from
+        pyproject.toml (100) to a new ruff.toml (200) while the pyproject keeps a larger `max-line-length`."""
+        py = self.PP % 100 + self.PYCODESTYLE % 300
+        self.assertRaised({
+            "line-length moved to ruff.toml": ({"pyproject.toml": py}, {"pyproject.toml": "[tool.ruff]\n" + self.PYCODESTYLE % 300, "ruff.toml": "line-length = 200\n"}),
+        }, True)
+
+    def test_a_deleted_file_is_compared_with_the_tool_at_head(self):
+        """R1-09: only the deleted-file fallback sees this: scripts/ruff.toml keeps 200, the root ruff.toml (100) goes, and the
+        pyproject.toml that replaces it has 150."""
+        self.assertRaised({
+            "deleted ruff.toml": (
+                {"ruff.toml": "line-length = 100\n", "scripts/ruff.toml": "line-length = 200\n"},
+                {"ruff.toml": None, "pyproject.toml": self.PP % 150},
+            ),
+        }, True)
+
+    def test_many_changed_paths_do_not_skip_the_check(self):
+        """R1-10: under pipefail `git diff | grep -q` died of SIGPIPE when the path list was longer than the pipe buffer."""
+        many = {"app/src/main/kotlin/dev/listicles/app/ui/f%05d_%s.kt" % (i, "x" * 60): "" for i in range(1100)}
+        ec = "[*.kt]\nmax_line_length = %d\n"
+        self.assertRaised({"raise with 100 KB of other paths": ({".editorconfig": ec % 100}, {".editorconfig": ec % 300, **many})}, True)
+        self.assertRaised({"no raise with 100 KB of other paths": ({".editorconfig": ec % 100}, {".editorconfig": ec % 90, **many})}, False)
+
+    def test_a_section_that_is_new_or_renamed_cannot_pass_the_widest_limit(self):
+        """R1-01: with `[*.md] max_line_length = off` in the file, the groups of the tool and the setting are already no limit."""
+        md = "[*.md]\nmax_line_length = off\n"
+        self.assertRaised({
+            "reordered header": ({".editorconfig": md + "[*.{kt,kts}]\nmax_line_length = 120\n"}, {".editorconfig": md + "[*.{kts,kt}]\nmax_line_length = 300\n"}),
+            "split section": ({".editorconfig": md + "[*.{kt,kts}]\nmax_line_length = 120\n"}, {".editorconfig": md + "[*.kt]\nmax_line_length = 120\n[*.kts]\nmax_line_length = 300\n"}),
+            "added section": ({".editorconfig": "[*]\nmax_line_length = 100\n" + md}, {".editorconfig": "[*]\nmax_line_length = 100\n" + md + "[*.kt]\nmax_line_length = 300\n"}),
+            "new section off": ({".editorconfig": "[*]\nmax_line_length = 100\n" + md}, {".editorconfig": "[*]\nmax_line_length = 100\n" + md + "[*.kt]\nmax_line_length = off\n"}),
+        }, True)
+        self.assertRaised({
+            "renamed with the same value": ({".editorconfig": md + "[*.{kt,kts}]\nmax_line_length = 120\n"}, {".editorconfig": md + "[*.{kts,kt}]\nmax_line_length = 120\n"}),
+            "added lower section": ({".editorconfig": "[*]\nmax_line_length = 100\n" + md}, {".editorconfig": "[*]\nmax_line_length = 100\n" + md + "[*.kt]\nmax_line_length = 80\n"}),
+        }, False)
+
+    def test_the_default_counts_per_file_and_only_values_of_the_tool_count(self):
+        """R1-02: another tool's value in the same file, or another file of the tool, must not hide a removal below the default."""
+        black = "[tool.black]\nline-length = 60\n"
+        self.assertRaised({
+            "black value beside a removed ruff one": ({"pyproject.toml": self.PP % 60 + black}, {"pyproject.toml": "[tool.ruff]\n" + black}),
+            "isort value beside a removed flake8 one": ({"setup.cfg": "[flake8]\nmax-line-length = 60\n[isort]\nline_length = 60\n"}, {"setup.cfg": "[flake8]\nselect = E\n[isort]\nline_length = 60\n"}),
+            "removed from the nearer ruff.toml": ({"ruff.toml": "line-length = 60\n", "scripts/ruff.toml": "line-length = 60\n"}, {"scripts/ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
+            "a nearer ruff.toml without the setting": ({"ruff.toml": "line-length = 60\n"}, {"scripts/ruff.toml": "[lint]\nselect = [\"E501\"]\n"}),
+        }, True)
+        self.assertRaised({
+            "a nearer ruff.toml that extends": ({"ruff.toml": "line-length = 60\n"}, {"scripts/ruff.toml": "extend = \"../ruff.toml\"\n"}),
+            "black raised, not ruff": ({"pyproject.toml": self.PP % 60 + black}, {"pyproject.toml": self.PP % 60 + black.replace("60", "200")}),
+        }, False)
+
+    def test_a_kept_file_that_lost_its_setting_is_not_compared_with_other_files(self):
+        """R1-03: a removal is stricter than the larger value in another config of the tool (ruff falls back to 88, prettier to 80)."""
+        self.assertRaised({
+            "ruff.toml": ({"ruff.toml": "line-length = 100\n", "scripts/ruff.toml": "line-length = 120\n"}, {"ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
+            "pyproject.toml": ({"pyproject.toml": self.PP % 100, "tools/ruff.toml": "line-length = 120\n"}, {"pyproject.toml": "[tool.ruff]\n"}),
+            "prettier": ({"firebase/.prettierrc.json": '{ "printWidth": 100 }\n', "web/.prettierrc.json": '{ "printWidth": 120 }\n'}, {"firebase/.prettierrc.json": "{}\n"}),
+        }, False)
+
+    def test_crlf_files_are_read_like_lf_files(self):
+        """R1-04: a trailing carriage return hid every section header and the ruff and flake8 markers."""
+        md = "[*.md]\r\nmax_line_length = off\r\n[*.kt]\r\nmax_line_length = %d\r\n"
+        self.assertRaised({
+            "off section": ({".editorconfig": md % 100}, {".editorconfig": md % 300}),
+            "removal below the ruff default": ({"pyproject.toml": "[tool.ruff]\r\nline-length = 60\r\n"}, {"pyproject.toml": "[tool.ruff]\r\ntarget-version = \"py311\"\r\n"}),
+        }, True)
+        self.assertRaised({"lowered": ({".editorconfig": md % 100}, {".editorconfig": md % 80})}, False)
+
+    def test_values_that_are_not_a_plain_number_are_no_limit(self):
+        """R1-05: valid spellings of a raise were read as their leading digits, and a value on the next line was skipped."""
+        pj = '{ "printWidth": 100 }\n'
+        yml = "style:\n  MaxLineLength:\n    maxLineLength: %s\n"
+        self.assertRaised({
+            "TOML 1_60": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": "line-length = 1_60\n"}),
+            "TOML hex": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": "line-length = 0xA0\n"}),
+            "JS exponent": ({"firebase/prettier.config.js": "export default { printWidth: 100 };\n"}, {"firebase/prettier.config.js": "export default { printWidth: 2e2 };\n"}),
+            "JS product": ({"firebase/prettier.config.js": "export default { printWidth: 100 };\n"}, {"firebase/prettier.config.js": "export default { printWidth: 100 * 2 };\n"}),
+            "JSON next line": ({"firebase/.prettierrc.json": pj}, {"firebase/.prettierrc.json": '{\n  "printWidth":\n    300\n}\n'}),
+            "YAML next line": ({"config/detekt/detekt.yml": yml % "100"}, {"config/detekt/detekt.yml": yml % "\n      300"}),
+            "INI continuation": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "[flake8]\nmax-line-length =\n    300\n"}),
+        }, True)
+        self.assertRaised({
+            "digits then a delimiter": ({"firebase/.prettierrc.json": pj}, {"firebase/.prettierrc.json": '{ "printWidth": 90, "semi": true }\n'}),
+            "JSON next line, lowered": ({"firebase/.prettierrc.json": pj}, {"firebase/.prettierrc.json": '{\n  "printWidth":\n    90\n}\n'}),
+            "YAML parent key": ({"config/detekt/detekt.yml": yml % "100"}, {"config/detekt/detekt.yml": yml % "90"}),
+            "INI continuation, lowered": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "[flake8]\nmax-line-length =\n    90\n"}),
+        }, False)
+
+    def test_symlinks_and_non_ascii_paths_are_read(self):
+        """R1-06: a symlink is no limit (its target is not read), and a non-ASCII path is read like any other."""
+        self.assertRaised({
+            ".editorconfig to a symlink": ({".editorconfig": "[*.kt]\nmax_line_length = 100\n"}, {".editorconfig": ("link", "config/editorconfig")}),
+            "ruff.toml to a symlink": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": ("link", "config/ruff-base.toml")}),
+            "non-ASCII directory": ({"\u00f8velser/.prettierrc.json": '{ "printWidth": 100 }\n'}, {"\u00f8velser/.prettierrc.json": '{ "printWidth": 300 }\n'}),
+        }, True)
+        self.assertRaised({
+            "non-ASCII directory, lowered": ({"\u00f8velser/.prettierrc.json": '{ "printWidth": 100 }\n'}, {"\u00f8velser/.prettierrc.json": '{ "printWidth": 90 }\n'}),
+            "a symlink that stays": ({".editorconfig": ("link", "config/editorconfig")}, {".editorconfig": ("link", "config/other")}),
         }, False)
 
 
