@@ -32,18 +32,32 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      # Issue 229 / 216: the Gradle gate self-tests (about 20 cold builds each) only run when the PR touches something
+      # they inspect, and always on pushes to main. Step-level conditions only: this job always runs and reports.
+      - name: scope (can this PR affect the Gradle gate self-tests?)
+        id: scope
+        run: python3 -I scripts/ci_scope.py >> "$GITHUB_OUTPUT"
       - name: warnings-as-errors gate tests
+        if: steps.scope.outputs.gradle_selftests == 'run'
         run: python3 -I scripts/test_warnings_gate.py
+      - name: JDK release gate tests
+        if: steps.scope.outputs.gradle_selftests == 'run'
+        run: python3 -I scripts/test_jdk_release_gate.py
       - name: gradle repos check tests (config and CI wiring)
         run: python3 -I scripts/test_check_gradle_repos.py
       - name: gradle repos (Maven Central mirror first, google() filtered, retries with backoff)
         run: python3 -I scripts/check_gradle_repos.py
       - name: spotless, detekt (incl. type-resolved on :core:domain and :core:testing), lint
+        if: steps.scope.outputs.gradle_selftests == 'run'
         run: ./gradlew -q --console=plain spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest :app:lintDebug
+      - name: spotless, detekt, lint (licensee gate self-test skipped, its inputs are unchanged)
+        if: steps.scope.outputs.gradle_selftests == 'skip'
+        run: ./gradlew -q --console=plain spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest :app:lintDebug -x testLicenseeGate
 
   unit:
     name: unit
@@ -127,8 +141,8 @@ jobs:
           GOLDEN_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'golden-update') && '1' || '0' }}
           GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '1500' || '600' }}
         run: ./scripts/guards.sh
-      - name: hook tests
-        run: python3 -I scripts/hooks/run_hook_tests.py
+      - name: hook tests (four shards in parallel)
+        run: python3 -I scripts/hooks/run_hook_tests.py --jobs 4
 
   tasks:
     name: tasks
@@ -141,6 +155,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: ci scope tests (classification, merge-commit CLI, required checks keep reporting)
+        run: python3 -I scripts/test_ci_scope.py
       - name: tasks.py tests
         run: python3 -I scripts/test_tasks.py
       - name: issue form tests
