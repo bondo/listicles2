@@ -157,26 +157,120 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
   cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
 [ -n "$out" ] && { echo "$out"; fail=1; }
 
-# 2c. Relaxations passed as command-line flags on tool invocation lines (issue 45): ruff, mypy, tsc, ESLint, Prettier, shellcheck, in
-# shell scripts, git hooks, CI workflows and package.json. A backslash continuation is one logical line, and one same-line
-# `justified: <reason>` (3 words, just() above) waives the whole logical line (every command on it). A logical line loses its unquoted trailing ` # comment`
-# and is split at ; & | so a flag only counts for the tool in its own command; only the text after the tool name is read (so
-# `grep -i shellcheck` is not a flag). For npm and npx (and yarn, pnpm and bunx when they use `--`) the JS tools also see what follows a
-# bare `--` (`npm run lint -- --quiet`); the options of npm itself never count. That passthrough is checked against every JS tool, so
-# `npm test -- -u` or `npm run e2e -- -c x.ts` need a `justified:` too (issue 164). Flags may be quoted, shellcheck short options may be
-# combined (-xe) and SHELLCHECK_OPTS counts as `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
-# Config handed over on the command line (ruff --config, mypy --config-file, eslint -c/--config, prettier --config, tsc -p/--project/-b/--build)
-# must name a file the config scan above (2b) reads, or `justified:`: an inline `--config "key = value"`, an absolute or
-# `~` path, a `..` path and a path built from `$` or backticks (it may be generated at run time) are relaxations. `tsc` with a source
-# file argument and no -p/-b ignores tsconfig.json, so it is flagged too; every project argument of `tsc -b` is checked, and an empty
-# quoted config (`--config-file ""`) disables the config, so it is flagged. mypy and shellcheck accept unique prefixes of long options
-# (`mypy --ignore-missing`, `shellcheck --exc=SC2086`), so a proper prefix of a flagged option is flagged, and a mypy `@argfile` is too.
+# 2c. Command-line flags on tool invocation lines (issues 45 and 177): ruff, mypy, tsc, ESLint, Prettier, shellcheck and actionlint, in shell
+# scripts, git hooks, CI workflows, composite actions, Makefiles, pre-commit config and package.json. Per-tool ALLOWLIST (owner decision, #15):
+# a flag passes only when CLI_ALLOW below lists it for that tool (ruff: for that subcommand) and its value passes the check of its kind.
+# Any other flag, listed or not by anyone before, fails unless the logical line has one `justified: <reason>` (3 words, just() above), which waives
+# every command on the line. A backslash continuation is one logical line; it loses its unquoted trailing ` # comment` and is split at ; & | so
+# a flag only counts for the tool in its own command; only the text after the tool name is read (`grep -i shellcheck` has no flag), and a bare
+# `--` ends the flags. A tool named as the thing being installed (`pip install ruff --upgrade`, `npm i -D eslint`, `cargo install`) is not run, so datacmd skips it.
+# For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
+# there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known, so `npm test -- -u` needs a `justified:`
+# too (issue 164 item 3). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
+# tsc names are read case-insensitively (as tsc does), mypy and shellcheck accept unique prefixes of long options so a proper prefix of a
+# listed option counts as that option (a prefix that is ambiguous is an error in the tool itself), and SHELLCHECK_OPTS counts as
+# `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
+# Kinds: f = plain flag; v = takes a value, any; c = takes a config path that must be a file the config scan (2b) reads, not an inline
+# `key = value`, an absolute, `~` or `..` path or one built from `$` or backticks (they may be generated at run time); nf = switch that
+# may not be set to false; z = value must be 0; e = value must be error or 2; s = shellcheck severity, not error; fi = mypy follow-imports,
+# normal or error; fm = an ESLint built-in formatter name (stylish, json, json-with-metadata, html); o = optional value attached to the flag (shellcheck colour: always, never or auto); r = ESLint --rule, no severity of off, warn, 0 or 1; n = the last part of the value must be the flag name (`-shellcheck=$d/shellcheck`); an empty value or a stub program disables the integration.
+# Beyond the allowlist: `tsc` with a source file argument and no -p/-b ignores tsconfig.json, so it fails; every project argument of `tsc -b` is
+# checked; a mypy `@argfile` fails; an empty quoted config (`--config-file ""`) disables the config, so it fails.
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
-# Strict flags (--strict, --max-warnings 0, -S warning, ...) never match. Not covered: action `with: args:` lines, YAML folded scalars,
-# Makefiles, composite actions and .pre-commit-config.yaml (none exists today; issue 164), and flags held in shell variables
-# (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, and tools run from Python (subprocess). yarn and pnpm forms that forward
-# arguments without `--` (`yarn lint --quiet`) are not covered either: the repo is npm-only.
+# Not covered: action `with: args:` lines, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (2b does not read it), flags held in
+# shell variables (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, tools run from Python (subprocess),
+# and yarn, pnpm and bun forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
+# is added only with a reason a reviewer can check, in scripts/hooks/test_guards_cli_flags.py too (docs/guards-known-gaps.md has the rationale).
+CLI_ALLOW='
+ruff --config c a config file that 2b reads, so its settings are reviewed there
+ruff --no-cache f the cache never changes a result
+ruff --output-format v only changes how findings are printed
+ruff --version f prints the version
+ruff:check --extend-select v adds rules to the selection and never removes one
+ruff:format --check f reports unformatted files and writes nothing
+ruff:format --diff f like --check, printing the diff
+mypy --config-file c a config file that 2b reads
+mypy --follow-imports fi only normal or error: skip and silent hide errors in imported code
+mypy --strict f switches every strict check on
+mypy --check-untyped-defs f switches a check on
+mypy --strict-equality f switches a check on
+mypy --strict-bytes f switches a check on
+mypy --extra-checks f switches a check on
+mypy --no-implicit-reexport f stricter than the default
+mypy --no-implicit-optional f stricter than the default
+mypy --warn-* f every --warn- option switches a warning on (the --no-warn- ones relax and stay off the list)
+mypy --disallow-* f every --disallow- option switches a check on
+mypy --version f prints the version
+tsc --noEmit f type-checks and writes nothing
+tsc --project c the config file tsc reads
+tsc -p c the config file tsc reads
+tsc --build f build mode, every project argument is checked by tscbuild
+tsc -b f build mode, every project argument is checked by tscbuild
+tsc --verbose f only changes the output
+tsc --force f rebuilds everything, skipping nothing
+tsc --pretty f only changes the output
+tsc --outDir v where build output goes
+tsc --outFile v where build output goes
+tsc --version f prints the version
+tsc -v f prints the version
+tsc --strict* nf every --strict option switches a check on, unless it is set to false
+tsc --noImplicitAny nf switches a check on, unless it is set to false
+tsc --noImplicitThis nf switches a check on, unless it is set to false
+tsc --noImplicitReturns nf switches a check on, unless it is set to false
+tsc --noImplicitOverride nf switches a check on, unless it is set to false
+tsc --noUnused* nf switches a check on, unless it is set to false
+tsc --alwaysStrict nf switches a check on, unless it is set to false
+tsc --useUnknownInCatchVariables nf switches a check on, unless it is set to false
+tsc --noUncheckedIndexedAccess nf switches a check on, unless it is set to false
+tsc --exactOptionalPropertyTypes nf switches a check on, unless it is set to false
+tsc --noFallthroughCasesInSwitch nf switches a check on, unless it is set to false
+tsc --noPropertyAccessFromIndexSignature nf switches a check on, unless it is set to false
+tsc --checkJs nf switches a check on, unless it is set to false
+eslint --max-warnings z only 0 makes a warning fail the run
+eslint --config c a config file that 2b reads
+eslint -c c a config file that 2b reads
+eslint --rule r a rule may be set to error, never to off, warn, 0 or 1
+eslint --report-unused-disable-directives f switches a check on
+eslint --report-unused-disable-directives-severity e only error or 2 keeps unused directives failing
+eslint --no-inline-config f makes inline directives inert
+eslint --prune-suppressions f only removes entries from a suppressions file (check 3 refuses the file itself)
+eslint --format fm only a built-in formatter: a formatter module is code and can exit 0
+eslint -f fm only a built-in formatter: a formatter module is code and can exit 0
+eslint --color f only changes the output
+eslint --no-color f only changes the output
+eslint --version f prints the version
+prettier --check f reports unformatted files and writes nothing
+prettier --write f formats in place; like a bare run it never fails on formatting, which no flag check can see
+prettier --list-different f reports unformatted files
+prettier --config c a config file that 2b reads
+prettier --log-level v only changes the output
+prettier --version f prints the version
+shellcheck -S s a severity of warning, info or style, never error
+shellcheck --severity s a severity of warning, info or style, never error
+shellcheck -x f follows sourced files, so more is checked
+shellcheck --external-sources f follows sourced files, so more is checked
+shellcheck -a f checks sourced files too
+shellcheck --check-sourced f checks sourced files too
+shellcheck -o v enables optional checks
+shellcheck --enable v enables optional checks
+shellcheck -C o only changes the colour of the output
+shellcheck --color o only changes the colour of the output
+shellcheck -f v only changes how findings are printed
+shellcheck --format v only changes how findings are printed
+shellcheck -P v where sourced files are looked up
+shellcheck --source-path v where sourced files are looked up
+shellcheck --norc f ignores any .shellcheckrc, and none may exist (scripts/test_lint_workflows.py)
+shellcheck --version f prints the version
+actionlint -shellcheck n a path whose last part is shellcheck; an empty value or another program can switch shellcheck off
+actionlint -pyflakes n a path whose last part is pyflakes; an empty value or another program can switch pyflakes off
+actionlint -color f only changes the output
+actionlint -no-color f only changes the output
+actionlint -oneline f only changes the output
+actionlint -verbose f only changes the output
+actionlint -format v only changes how findings are printed
+actionlint -version f prints the version
+'
 CLI_AWK='
 function has(p, tool) { return p ~ ("(^|[^A-Za-z0-9_.-])" tool "([^A-Za-z0-9_.-]|$)") }
 function after(p, tool) { match(p, "(^|[^A-Za-z0-9_.-])" tool "([^A-Za-z0-9_.-]|$)"); return substr(p, RSTART + RLENGTH - 1) }
@@ -191,14 +285,13 @@ function stripc(s,   i, c, q, n) {
   }
   return s
 }
-# hit: a long flag from names; mode on = relaxing unless set to false, mode off = relaxing only when set to false.
-function hit(p, names, mode,   re, t, a) {
+# hit: a long flag from names, relaxing unless set to false (only the ESLint suppressions baseline uses it).
+function hit(p, names,   re, t) {
   re = SP "--(" names ")"
   while (match(p, re)) {
     p = substr(p, RSTART + RLENGTH); t = p
     if (t !~ /^([ \t="\047]|$)/) continue
-    a = (t ~ /^[ \t]*=?[ \t]*["\047]?false([ \t"\047]|$)/)
-    if (mode == "on" ? !a : a) return 1
+    if (t !~ /^[ \t]*=?[ \t]*["\047]?false([ \t"\047]|$)/) return 1
   }
   return 0
 }
@@ -219,23 +312,18 @@ function cfg(p, flags, okre,   re, t, v, q, i) {
   return 0
 }
 function badpath(v, okre) { return (v ~ /^[\/~]/ || v ~ /[$`]/ || v ~ /(^|\/)\.\.(\/|$)/ || v !~ okre) }
-# pre: the prefixes of a long option name from m characters up, as a regex alternation (argparse and getopt accept unique prefixes).
+# pre: the prefixes of a long option name from m characters up, as a regex alternation (the cfg flags of mypy accept unique prefixes).
 function pre(n, m,   i, r) { for (i = m; i <= length(n); i++) r = r (r == "" ? "" : "|") substr(n, 1, i); return r }
-# abbr: a long option that is a proper prefix of one of the space-separated names (mypy and shellcheck accept `--ignore-missing`).
-function abbr(p, names,   t, n, k, i) {
-  n = split(names, k, " ")
-  while (match(p, SP "--[A-Za-z][A-Za-z-]*")) {
-    t = substr(p, RSTART, RLENGTH); sub(/^[ \t"\047]*--/, "", t); p = substr(p, RSTART + RLENGTH)
-    for (i = 1; i <= n; i++) if (length(t) >= 2 && length(t) < length(k[i]) && index(k[i], t) == 1) return 1
-  }
-  return 0
-}
-# tscbuild: every project argument of tsc -b / --build (any number, in any position among flags) must be a scanned tsconfig.
+# tscbuild: every project argument of tsc -b / --build (any number, in any position among flags) must be a scanned tsconfig. A redirection
+# and its target are not projects (`tsc -b > build.log`).
 function tscbuild(p,   t, n, w, i) {
   while (match(p, SP "(-b|--build)([ \t=]|$)")) {
     t = substr(p, RSTART + RLENGTH); p = t
     n = split(t, w, /[ \t]+/)
-    for (i = 1; i <= n; i++) { gsub(/["\047,]/, "", w[i]); if (w[i] != "" && w[i] !~ /^-/ && badpath(w[i], TSOK)) return 1 }
+    for (i = 1; i <= n; i++) {
+      if (w[i] ~ /^[0-9]*[<>]/) { if (w[i] ~ /^[0-9]*(>>?|<)$/) i++; continue }
+      gsub(/["\047,]/, "", w[i]); if (w[i] != "" && w[i] !~ /^-/ && badpath(w[i], TSOK)) return 1
+    }
   }
   return 0
 }
@@ -264,67 +352,143 @@ function eslintrule(p,   t) {
   }
   return 0
 }
-function numflag(p, flag, valre,   t) {
-  while (match(p, SP flag "([ \t=]|$)")) {
-    t = substr(p, RSTART + RLENGTH); p = t
-    if (t ~ valre) return 1
+# look: the kind of flag nm for the first of the tools (space separated) that lists it, for subcommand sb or for any; "" when none does.
+function look(tools, sb, nm,   n, tl, i, t, j) {
+  n = split(tools, tl, " ")
+  for (i = 1; i <= n; i++) {
+    t = tl[i]
+    if ((t, sb, nm) in K) return K[t, sb, nm]
+    if ((t, "", nm) in K) return K[t, "", nm]
+    for (j = 1; j <= NG[t]; j++) if ((GS[t, j] == "" || GS[t, j] == sb) && index(nm, GP[t, j]) == 1) return GK[t, j]
+  }
+  return ""
+}
+# abbr: mypy and shellcheck take a unique prefix of a long option; one that is a proper prefix of a listed option is that option.
+function abbr(tool, nm,   m, n, f, i) {
+  m = (tool == "mypy" ? 5 : (tool == "shellcheck" ? 4 : 0))
+  if (!m || nm !~ /^--/ || length(nm) < m) return ""
+  n = split(EX[tool], f, " ")
+  for (i = 1; i <= n; i++) if (length(nm) < length(f[i]) && index(f[i], nm) == 1) return K[tool, "", f[i]]
+  return ""
+}
+function unq(v) { gsub(/^["\047]+|["\047,;)]+$/, "", v); return v }
+# scan: 1 when a flag in s (the text after the tool name) is not allowed for one of the tools, or its value fails the check of its kind.
+function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest, hp, one) {
+  n = split(s, w, /[ \t]+/); one = (index(tools, " ") == 0); sb = ""
+  if (tools == "ruff") for (i = 1; i <= n; i++) { t = w[i]; gsub(/^["\047]+|["\047]+$/, "", t); if (t ~ RUFFSUB) { sb = t; break } }
+  hp = (s ~ (SP "(-p|--project|-b|--build)([ \t=\"\047]|$)"))
+  for (i = 1; i <= n; i++) {
+    t = w[i]; sub(/^["\047]+/, "", t)
+    if (t == "") continue
+    if (t == "--") break
+    if (index(tools, "tsc") && substr(t, 1, 1) == "@") return 1
+    if (t == "-" || substr(t, 1, 1) != "-") {
+      v = t; sub(/["\047,]+$/, "", v)
+      if (direct && !hp && v !~ /=/ && v ~ SRCRE) return 1
+      continue
+    }
+    if (tools == "shellcheck" && t ~ /^-[^-]/) {
+      body = t; sub(/^-/, "", body); sub(/["\047,;]+$/, "", body)
+      for (j = 1; j <= length(body); j++) {
+        c = substr(body, j, 1); k = look(tools, "", "-" c)
+        if (k == "") return 1
+        if (k == "f") continue
+        rest = substr(body, j + 1)
+        if (k == "o") { if (rest != "" && rest !~ COLOROK) return 1; break }
+        if (rest == "") { i++; rest = w[i] }
+        if (k == "s" && unq(rest) !~ SEVOK) return 1
+        break
+      }
+      continue
+    }
+    nm = t; eq = 0; v = ""
+    if (index(nm, "=")) { eq = 1; v = substr(nm, index(nm, "=") + 1); nm = substr(nm, 1, index(nm, "=") - 1) } else sub(/["\047,;]+$/, "", nm)
+    if (index(tools, "tsc")) nm = tolower(nm)
+    if (tools == "actionlint") sub(/^--/, "-", nm)
+    k = look(tools, sb, nm)
+    if (k == "" && one) k = abbr(tools, nm)
+    if (k == "") return 1
+    if (k == "f") continue
+    if (k == "o") { if (eq && unq(v) !~ COLOROK) return 1; continue }
+    if (k == "nf") {
+      if (!eq) { v = tolower(unq(w[i + 1])); if (v == "true" || v == "false") i++; else v = "" } else v = tolower(unq(v))
+      if (v == "false") return 1
+      continue
+    }
+    if (!eq) { i++; v = w[i] }
+    v = unq(v)
+    if (k == "z" && v != "0") return 1
+    if (k == "fm" && v !~ /^(stylish|json|json-with-metadata|html)$/) return 1
+    if (k == "e" && v !~ /^(error|2)$/) return 1
+    if (k == "s" && v !~ SEVOK) return 1
+    if (k == "fi" && v !~ /^(normal|error)$/) return 1
+    if (k == "n" && v !~ ("(^|/)" substr(nm, 2) "$")) return 1
   }
   return 0
 }
-function ruff(s) { return hit(s, "(extend-)?ignore|per-file-ignores|extend-per-file-ignores|exclude|extend-exclude|exit-zero|isolated|select|fix-only|add-noqa|line-length", "on") || (s ~ /^[ \t"\047]*check([ \t"\047]|$)/ && hit(s, "diff", "on")) || (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|$)")) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$") }
-function mypy(s) {
-  return hit(s, "ignore-missing-imports|allow-[a-z-]+|no-strict-[a-z-]+|no-check-untyped-defs|no-warn-[a-z-]+|no-extra-checks|disable-error-code|implicit-optional|implicit-reexport|exclude|untyped-calls-exclude", "on") || \
-    abbr(s, MYPYN) || (s ~ SP "@[^ \t\"\047]") || (s ~ (SP "--(" pre("follow-imports", 3) ")[ \t=]+[\"\047]?(skip|silent)([ \t\"\047]|$)")) || \
-    cfg(s, "--(" pre("config-file", 3) ")", "^[^= \t]*(mypy\\.ini|setup\\.cfg|tox\\.ini|pyproject\\.toml)$")
-}
-function tsc(s, direct) {
-  if (direct && s !~ SP "(-p|--project|-b|--build)([ \t=\"\047]|$)" && s ~ (SP "[^ \t\"\047=-][^ \t\"\047=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)([ \t\"\047]|$)")) return 1
-  return hit(s, "noCheck|skipLibCheck|skipDefaultLibCheck|allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors", "on") || \
-    hit(s, "strict[A-Za-z]*|noImplicit[A-Za-z]*|noUnused[A-Za-z]*|alwaysStrict|useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noFallthroughCasesInSwitch|noPropertyAccessFromIndexSignature|checkJs", "off") || \
-    cfg(s, "-p|--project", TSOK) || tscbuild(s)
-}
-function eslintbase(s) { return hit(s, "suppress-all|suppress-rule|suppressions-location|pass-on-unpruned-suppressions", "on") }
-function eslint(s, ok) {
-  return hit(s, "quiet|ignore-pattern|ignore-path|no-eslintrc|no-config-lookup|no-error-on-unmatched-pattern|pass-on-no-patterns", "on") || eslintrule(s) || \
-    numflag(s, "--max-warnings", "^[ \t=]*[\"\047]?(-1|[1-9][0-9]*)([^0-9]|$)") || numflag(s, "--report-unused-disable-directives-severity", "^[ \t=]*[\"\047]?(off|0)([^A-Za-z0-9_-]|$)") || cfg(s, "-c|--config", ok)
-}
-function prettier(s, ok) {
-  return hit(s, "ignore-path|require-pragma|no-error-on-unmatched-pattern|ignore-unknown", "on") || (s ~ (SP "-u([ \t\"\047]|$)")) || cfg(s, "--config", ok)
-}
-function shellcheck(s) {
-  return (s ~ (SP "-[A-Za-z]*e([ \t\"\047]|SC[0-9]|$)")) || (s ~ (SP "-[A-Za-z]*i([ \t\"\047]|SC[0-9]|$)")) || hit(s, "exclude|include|rcfile", "on") || abbr(s, "exclude include rcfile") || \
-    (s ~ (SP "(-[A-Za-z]*S[ \t]*|--(" pre("severity", 2) ")[ \t=]+)[\"\047]?error([ \t\"\047]|$)"))
-}
-function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
+function eslintbase(s) { return hit(s, "suppress-all|suppress-rule|suppressions-location|pass-on-unpruned-suppressions") }
+function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bun|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
 function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
-function relaxed(p,   js, dd, s, ok) {
-  js = (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bunx)([^A-Za-z0-9_.-]|$)/)
-  dd = ""
-  if (js && match(p, /(^|[ \t])--([ \t]|$)/)) dd = substr(p, RSTART + RLENGTH)
-  if (match(p, /SHELLCHECK_OPTS(\+?=|:[ \t])/) && shellcheck(substr(p, RSTART + RLENGTH))) return 1
-  if (has(p, "ruff") && ruff(after(p, "ruff"))) return 1
-  if (has(p, "mypy") && mypy(after(p, "mypy"))) return 1
-  if (has(p, "shellcheck") && shellcheck(after(p, "shellcheck"))) return 1
-  if ((has(p, "tsc") || dd != "") && tsc((has(p, "tsc") ? after(p, "tsc") : "") " " dd, has(p, "tsc"))) return 1
-  if (has(p, "eslint")) ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*)$)"
-  else if (has(p, "prettier")) ok = "((^|/)[^= \t]*(prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
+# datacmd: the command installs a tool (its name is an argument, not a command): `pip install ruff --upgrade`, `npm i -D eslint`.
+function datacmd(p,   n, w, i, j, k, a, b, c, m) {
+  if (ddseg(p) != "") return 0  # a `--` tail after npm, yarn, pnpm or bun is passed to a script, so the segment runs something
+  n = split(p, w, /[ \t]+/); i = 1
+  while (i <= n && (w[i] == "" || w[i] == "-" || w[i] ~ /:$/ || w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[i] ~ /^(sudo|env|time|export|exec|command)$/)) i++
+  a = w[i]; sub(/^["\047]+/, "", a); sub(/^.*\//, "", a)
+  for (m = i + 1; m <= n; m++) if (w[m] ~ /^(run|exec|dlx|run-script|test|start|stop|restart)$/ || (a == "npm" && w[m] ~ /^(x|rum|urn|t|tst)$/)) return 0  # a run verb: the tool is run, whatever else precedes
+  j = i + 1; while (j <= n && w[j] ~ /^-/) j++; b = w[j]; k = j + 1; while (k <= n && w[k] ~ /^-/) k++; c = w[k]
+  if (a ~ /^(pip|pip3|pipx)$/ && b ~ /^(install|uninstall|upgrade|upgrade-all|inject|reinstall|reinstall-all|download)$/) return 1
+  if (a == "conda" && b ~ /^(install|create|update|remove|uninstall)$/) return 1
+  if (a ~ /^(apt|apt-get|apk|brew|dnf|yum|gem)$/ && b ~ /^(install|add|reinstall|upgrade|update|remove|uninstall)$/) return 1
+  if (a ~ /^(npm|pnpm|yarn|bun)$/ && b ~ /^(install|i|ci|add|update|upgrade|uninstall|remove|rm|link)$/) return 1
+  if (a == "uv" && (b ~ /^(pip|add|sync|lock|remove)$/ || (b == "tool" && c ~ /^(install|upgrade|uninstall)$/))) return 1
+  if (a ~ /^python[0-9.]*$/ && w[i + 1] == "-m" && w[i + 2] ~ /^(pip|ensurepip|venv)$/) return 1
+  return (a ~ /^(cargo|go)$/ && b == "install")
+}
+function relaxed(p,   dd, e, pr, t, ok, s) {
+  dd = ddseg(p)
+  if (match(p, /SHELLCHECK_OPTS(\+?=|:[ \t])/) && scan(substr(p, RSTART + RLENGTH), "shellcheck", 0)) return 1
+  if (datacmd(p)) return 0
+  if (has(p, "ruff")) { s = after(p, "ruff"); if (scan(s, "ruff", 0) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$")) return 1 }
+  if (has(p, "mypy")) {
+    s = after(p, "mypy")
+    if (scan(s, "mypy", 0) || (s ~ "[ \t][\"\047]?@[^ \t\"\047]") || cfg(s, "--(" pre("config-file", 3) ")", "^[^= \t]*(mypy\\.ini|setup\\.cfg|tox\\.ini|pyproject\\.toml)$")) return 1
+  }
+  if (has(p, "shellcheck") && scan(after(p, "shellcheck"), "shellcheck", 0)) return 1
+  if (has(p, "actionlint") && scan(after(p, "actionlint"), "actionlint", 0)) return 1
+  e = has(p, "eslint"); pr = has(p, "prettier"); t = has(p, "tsc")
+  if (dd != "" && scan(dd, "eslint prettier tsc", 0)) return 1
+  if (e) ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*)$)"
+  else if (pr) ok = "((^|/)[^= \t]*(prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
   else ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*|prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
-  if ((has(p, "eslint") || dd != "") && eslint((has(p, "eslint") ? after(p, "eslint") : "") " " dd, ok)) return 1
-  if ((has(p, "prettier") || dd != "") && prettier((has(p, "prettier") ? after(p, "prettier") : "") " " dd, ok)) return 1
+  if (t || dd != "") { s = (t ? after(p, "tsc") : "") " " dd; if ((t && scan(s, "tsc", 1)) || cfg(s, "-p|--project", TSOK) || tscbuild(s)) return 1 }
+  if (e || dd != "") { s = (e ? after(p, "eslint") : "") " " dd; if ((e && scan(s, "eslint", 0)) || eslintrule(s) || cfg(s, "-c|--config", ok)) return 1 }
+  if (pr || dd != "") { s = (pr ? after(p, "prettier") : "") " " dd; if ((pr && scan(s, "prettier", 0)) || cfg(s, "--config", ok)) return 1 }
   return 0
 }
 function flush(   n, i, parts, j) {
   if (cur == "") return
   j = just(cur)
   n = split(stripc(cur), parts, /[;&|]+/)
+  if (F ~ /([Mm]akefile|\.mk)$/) for (i = 1; i <= n; i++) sub(/^[ \t@+-]+/, "", parts[i])  # recipe prefixes: silent, always run, ignore errors
   for (i = 1; i <= n; i++) if (baseline(parts[i]) || (!j && relaxed(parts[i]))) { printf "%s:%d:%s\n", F, start, cur; break }
   cur = ""
 }
 BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)"
-  MYPYN = "ignore-missing-imports allow-untyped-defs allow-untyped-globals allow-redefinition allow-redefinition-new no-strict-optional no-strict-equality no-strict-bytes no-check-untyped-defs no-warn-no-return no-warn-unused-ignores no-warn-redundant-casts no-warn-unused-configs no-extra-checks disable-error-code implicit-optional implicit-reexport exclude untyped-calls-exclude"
-  SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0 }
+  SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0
+  RUFFSUB = "^(check|format|rule|config|linter|clean|server|analyze|version|help|generate-shell-completion)$"
+  SRCRE = "^[^-][^=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$"; SEVOK = "^(warning|info|style)$"; COLOROK = "^(always|never|auto)$"
+  nl = split(ENVIRON["CLI_ALLOW"], L, "\n")
+  for (i = 1; i <= nl; i++) {
+    if (L[i] ~ /^[ \t]*$/) continue
+    split(L[i], f, " "); t = f[1]; sb = ""
+    if (index(t, ":")) { sb = substr(t, index(t, ":") + 1); t = substr(t, 1, index(t, ":") - 1) }
+    fl = (t == "tsc" ? tolower(f[2]) : f[2])
+    if (fl ~ /\*$/) { NG[t]++; GP[t, NG[t]] = substr(fl, 1, length(fl) - 1); GK[t, NG[t]] = f[3]; GS[t, NG[t]] = sb }
+    else { K[t, sb, fl] = f[3]; if (sb == "") EX[t] = EX[t] " " fl }
+  } }
 {
   line = $0; sub(/\r$/, "", line)
   if (!cont && line ~ /^[ \t]*#/) next
@@ -338,11 +502,11 @@ END { flush() }'
 cliflags() { # cliflags <pathspec>...
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
-    else LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
+    else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
   done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
 }
-out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '*package.json')
+out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*makefile' '*.mk' '*pre-commit-config.yaml')
 [ -n "$out" ] && { echo "$out"; fail=1; }
 # 2d. `/* global foo, bar:writable */` (ESLint) switches off no-undef for the names. Any block comment that starts with `global` or
 # `globals` and a name, closed on the same line, in a JS or TS file: that is how ESLint reads it (names split on commas and spaces, an
