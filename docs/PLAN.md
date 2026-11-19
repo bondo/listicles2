@@ -385,6 +385,7 @@ enforce the rules rather than goodwill.
      was started for a `tooling` task (an environment flag set at spawn).
    * A context-% warning (section 9.3).
 4. **CI (GitHub Actions)**, required checks on `main`:
+   * `wrapper`: Gradle wrapper validation (the checksum of `gradle-wrapper.jar`)
    * `static`: spotless, detekt, Android Lint (warnings are errors, `MissingTranslation`
      and `ExtraTranslation` are errors, `HardcodedText` is an error). `targetSdk`
      follows `compileSdk`; if they differ, `OldTargetApi` is disabled with a
@@ -414,6 +415,8 @@ enforce the rules rather than goodwill.
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label
      * a diff over 600 changed lines outside generated files
+   * `python-lint`: ruff and mypy on `scripts/`, versions pinned, with tests that deliberate violations fail
+   * `workflow-lint`: shellcheck, actionlint and zizmor on `.github/` and `scripts/`, pinned binaries
    * `secrets`: gitleaks
    * `tasks`: `scripts/test_tasks.py` and `scripts/tasks.py validate` (the task graph in
      `docs/tasks.toml`); also run by `scripts/verify.sh`, including `--fast`
@@ -426,8 +429,8 @@ enforce the rules rather than goodwill.
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
    trusted on their own; the owner's merge is the review.
-6. **Branch protection** on `main`: PR required, all 8 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
-   `guards`, `secrets`, `tasks`; source: GitHub Actions),
+6. **Branch protection** on `main`: PR required, all 10 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
+   `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never
