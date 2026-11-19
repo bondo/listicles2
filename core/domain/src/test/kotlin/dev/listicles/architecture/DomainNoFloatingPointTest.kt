@@ -264,4 +264,21 @@ class DomainNoFloatingPointTest {
                 "fun nextGaussianish() = 1",
         ).shouldBeEmpty()
     }
+
+    @Test
+    fun rejectsLessCommonDoubleReturningNames() {
+        violationsOf("val x = s.flatMapToDouble(f)").shouldNotBeEmpty()
+        violationsOf("val x = items.sumByDouble(Item::weight)").shouldNotBeEmpty()
+        violationsOf("val x: DoubleSummaryStatistics? = null").shouldNotBeEmpty()
+        violationsOf("val x = DoubleAdder()").shouldNotBeEmpty()
+        violationsOf("val x = DoubleAccumulator(f, 0)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsLookAlikesOfLessCommonDoubleNames() {
+        violationsOf(
+            "fun sumByDoubleish() = 1\nclass MyDoubleAdder\nval flatMapToDoubles = 2\n" +
+                "val averageCount = 3\nval x = s.summaryStatistics().max",
+        ).shouldBeEmpty()
+    }
 }
