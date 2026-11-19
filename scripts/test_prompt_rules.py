@@ -1681,7 +1681,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
         prompt = self.norm(self.ORCH_MD)
         self.assertRegex(prompt, r"the owner authorizes it there before its first merge, and you never pass an approval on to it\.")
-        self.assertRegex(prompt, r"The merge agent " + self.STANDING)
+        self.assertRegex(prompt, r"the merge agent " + self.STANDING)
         self.assertEqual(len(re.findall(r"owner authorizes it there", prompt)), 1)
         for text in (doc, prompt):  # the per-window form is gone
             self.assertNotRegex(text, r"one authorization covers exactly the time window|records a new authorization")

@@ -618,7 +618,11 @@ The orchestrator collects results in this order, from cheapest to most expensive
   "mark #N done" instead. Scan the PR body for them before asking the owner to merge.
 * **Merge agent:** the merge agent merges every READY PR except the owner-only ones, one at a time. Owner-only: permissions and `.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, licence acceptances, design and product sign-off, docs that are themselves a gate (a decision to approve before work relies on it), naming and protected process files.
   A `risk:high` PR is marked READY only after the independent second-reviewer pass is clean (owner decision B, 2026-11-17). Docs PRs whose owner approval can wait go to it too and carry the status line `working draft ...; not owner-approved (see issue #15)` until the owner approves them in a later PR.
-  A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, and it merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the PRs it names, whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one (owner decision, #15 comment 7002904192); the orchestrator never passes an approval on to it.
+  A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, and then the merge agent merges under the owner's standing authorization (#15 comment 7005366747, replacing the per-window rule of comment 7002904192) until the owner revokes it there; the orchestrator never passes an approval on to it.
+  An owner-only PR is merged by the merge agent as kind `owner-batch` once the owner's batch approval lists it, every other READY PR as kind `general` (D3, #15 comment 7007421567). Owner's own hands: settings outside git (repository settings, branch protection and rulesets, network allowlists, environments, licence acceptances, collaborator access).
+  Batch approval (D1): the owner posts one ordered list `batch approval: #N@sha, #M@sha` on #15 (or in the merge agent's session, recorded on #15); the merge agent merges the listed PRs in that order, one at a time, with update-branch and green CI between merges. The script reads that comment (`--approval <comment-id>`): it must be the owner's, on #15 and unedited, and an edited list is posted again.
+  A listed PR may be merged at a head that differs from its approved SHA only by update-branch merge commits of `main` with the same patch against `main` (D2); any other change needs a new approval.
+  Merge order (#15 comment 7005414860): the orchestrator sends every ready `general` PR to the merge agent first, and asks the owner for a batch approval of owner-only PRs only once no `general` PR is ready to go; an exception needs a stated reason in the merge request (a dependency between PRs, a blocker fix).
 * **Marking a PR ready:** the orchestrator (or the implementer session when the orchestrator says so) marks a draft PR ready after
   clean review rounds with `scripts/mark-ready.sh <N>`. Reviewers never mark PRs ready. The script accepts exactly one argument,
   the PR number as digits only, and makes one fixed POST to the `ready_for_review` route of this repo; it refuses anything else
@@ -644,13 +648,12 @@ The orchestrator collects results in this order, from cheapest to most expensive
   documented exception to "the orchestrator never commits or pushes" (§1 role table): it is a server-side merge of `main`,
   not authored code. Do it only when no worker holds that branch (F6, two writers); otherwise the branch-holding worker
   merges `main` itself, or the orchestrator waits.
-* **Merge agent (issue 136):** for the owner-authorized kinds only (`working-draft-docs`, `tasks-sync` = only `docs/tasks.toml`, `dependabot`) the
-  merge agent runs only `scripts/merge_ready.py <N> <sha> <kind>` (`<sha>` = the head the owner or orchestrator named), from a clean checkout of `origin/main` (`git status --porcelain` empty),
-  never from a branch or a modified tree. No other merge call, no hand-repeated checks. The script refuses (exit 1, reasons on stderr, nothing merged) unless head == `<sha>`, `mergeable_state` is `clean`, the ruleset-required checks succeeded,
-  no closing keyword precedes an issue number, and every changed file is in the kind's paths (see its header); for `dependabot`, a workflow change may only re-pin actions, and each new
+* **Merge agent (issue 136):** the merge agent runs only `scripts/merge_ready.py <N> <sha> <kind>` (`<sha>` = the head the owner or orchestrator named; optional `--wait` and, for `owner-batch`, `--approval <comment-id>` come before the arguments), from a clean checkout of `origin/main` (`git status --porcelain` empty),
+  never from a branch or a modified tree. Kinds: the owner-authorized `working-draft-docs`, `tasks-sync` (only `docs/tasks.toml`) and `dependabot`, plus `general` and `owner-batch` (above). No other merge call, no hand-repeated checks. The script refuses (exit 1, reasons on stderr, nothing merged) unless head == `<sha>`, `mergeable_state` is `clean`, the ruleset-required checks succeeded,
+  no closing keyword precedes an issue number, and every changed file is in the kind's paths (see its header; `general` refuses the owner-only paths and dependency manifests, `owner-batch` has no path limit but needs the batch approval, the earlier listed PRs merged, and a head that is the approved commit or only adds update-branch merges of `main` with the same patch, D2); for `dependabot`, a workflow change may only re-pin actions, and each new
   `uses: owner/repo@<sha> # <tag>` pin must carry its tag comment and its `<sha>` must equal the commit that tag points to in `owner/repo` (`git ls-remote`, annotated tags dereferenced; a failed lookup refuses, R2-06); else it squash-merges via REST with
-  `<sha>` pinned. On a refusal the agent stops and reports. The script and its test are protected process files (PreToolUse guard); changing them is
-  an owner-only tooling change (`scripts/test_merge_ready.py` runs in `verify.sh` and CI).
+  `<sha>` pinned. With `--wait` only pending or not-yet-reported required checks are waited for (up to 15 minutes); anything else refuses at once. On a refusal the agent stops and reports. The script and its test are protected process files (PreToolUse guard); changing them is
+  an owner-only tooling change (`scripts/test_merge_ready.py` runs in `verify.sh` and CI). Strict up-to-date stays ON (D5): once the branch is updated, `--wait` replaces the manual wait for CI.
 * **Dependabot weekly routine:** once a week one batch triage worker reads the open Dependabot PRs and groups the bumps
   into one new branch cut from `main` (never a feature branch, F6), opens a draft PR and posts a "ready" comment on it.
   The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since its bumps then supersede them.
@@ -800,7 +803,7 @@ Working recipes of the orchestrator (owner decisions, #15 comment 7001335975); `
 * **Worker prompts:** `source_revision` is the PR branch name, never a SHA. Wait for CI and verify.sh with a Monitor/until-loop and do not end the turn while waiting.
   A red/green pair may go up in one push (say so in the PR body), because pre-push runs the hook tests. PR bodies only through the GitHub MCP tools.
 * **After a merge:** comment on the completed issue, then close it with `state=closed`, `state_reason=completed`.
-* **Merge agent, archive, owner-only:** the merge agent merges only after a new owner-recorded authorization on #15 (§7.5).
+* **Merge agent, archive, owner-only:** the merge agent merges under the standing authorization on #15 (§7.5); owner-only PRs need the owner's batch approval.
   Archive policy: keep implementers until their PR merges; archive the others when they are done (§7.4). The owner-only merge list is in §7.5.
 
 ## 8. Spawn messages
