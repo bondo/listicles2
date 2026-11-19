@@ -12,7 +12,9 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
 import merge_ready  # noqa: E402  # justified: must follow the sys.path insert above
+import pretooluse_guard  # noqa: E402  # justified: its PROTECTED list is the source of the process files (R1-03)
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "merge_ready.py"
@@ -490,7 +492,7 @@ class GeneralKindTests(unittest.TestCase):
 
     def test_non_gate_scripts_docs_and_build_files_are_merged(self):
         names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md", "docs/FOLLOW-UPS.md",
-                 "core/domain/src/Lists.kt", "docs/product/flow.md", "docs/milestones/M1.md", "firebase/test/rules.test.ts")
+                 "core/domain/src/Lists.kt", "docs/PLAN.md", "design/tokens.json", "docs/milestones/M1.md", "firebase/test/rules.test.ts")
         api = make_api(files=[file_entry(n) for n in names])
         self.assertEqual(go(api, kind="general")[0], 0)
         self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
@@ -514,10 +516,45 @@ class GeneralKindTests(unittest.TestCase):
 
     def test_a_working_draft_sign_off_or_removal_is_still_the_owners(self):
         flip = "@@ -3 +3 @@\n-Status: working draft; not owner-approved (see issue #15).\n+Status: approved by the owner."
-        for f in (file_entry("docs/product/stories.md", patch=flip), {"filename": "docs/PLAN.md", "status": "removed"},
+        for f in (file_entry("docs/PLAN.md", patch=flip), {"filename": "docs/PLAN.md", "status": "removed"},
                   {"filename": "docs/milestones/M1.md", "status": "renamed", "previous_filename": "docs/milestones/old.md"}):
             with self.subTest(f=f):
                 self.refused(make_api(files=[f]), r"(not owner-approved|sign-off|removal)")
+
+    def test_process_files_from_the_guard_list_are_owner_only(self):  # R1-03: the set comes from pretooluse_guard.PROTECTED, not a second list
+        for entry in pretooluse_guard.PROTECTED:
+            with self.subTest(entry=entry):
+                self.assertTrue(merge_ready.owner_only(entry + ("x" if entry.endswith("/") else "")))
+        for name in ("scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", ".tools/bin/shellcheck", "app/mark-ready.sh",
+                     "x/update-branch.sh", "scripts/update-branch.sh"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_approved_product_docs_and_gate_docs_are_owner_only(self):  # R1-04: only the real drafts are not
+        for name in ("docs/product/flow.md", "docs/product/stories.md", "docs/product/rubric.md", "docs/product/wireframes/01-sign-in-dark.png",
+                     "docs/ANDROID-BEST-PRACTICES.md"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_every_script_a_required_ci_job_runs_is_owner_only(self):  # R1-05: read from ci.yml, so a new CI script needs no list edit
+        ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        found = set(re.findall(r"scripts/[\w./-]+\.(?:py|sh)", ci))
+        self.assertIn("scripts/check_gradle_repos.py", found)
+        for name in sorted(found):
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+        self.assertFalse(merge_ready.owner_only("scripts/verify.sh"), "not run by a CI job, so a non-gate script")
+
+    def test_without_a_readable_ci_yml_every_scripts_path_is_owner_only(self):  # fails closed
+        merge_ready.ci_scripts.cache_clear()
+        try:
+            orig, merge_ready.CI_YML = merge_ready.CI_YML, ROOT / "no" / "such.yml"
+            self.assertTrue(merge_ready.owner_only("scripts/verify.sh"))
+        finally:
+            merge_ready.CI_YML = orig
+            merge_ready.ci_scripts.cache_clear()
+
+    def test_case_variants_of_owner_only_paths_are_refused(self):  # R1-06
+        for name in ("claude.md", ".Claude/settings.local.json", ".Githooks/post-checkout", "Scripts/Hooks/x.py", "DOCS/orchestration.md", "Agents/x.md"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
 
     def test_the_common_checks_still_apply(self):
         self.refused(make_api(files=[file_entry("scripts/x.py")], state="behind"), r"mergeable_state.*behind")
@@ -537,7 +574,7 @@ def commit(sha, parents, message="Edit"):
 
 def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=False, line="batch approval: "):
     return {"user": {"login": login}, "author_association": assoc, "issue_url": f"https://api.github.com/repos/{REPO}/issues/{issue}",
-            "body": f"decision (owner): {line}{listed}\nThanks.", "created_at": "2026-11-19T12:00:00Z",
+            "body": f"{line}{listed}\nThanks.", "created_at": "2026-11-19T12:00:00Z",
             "updated_at": "2026-11-19T12:05:00Z" if edited else "2026-11-19T12:00:00Z"}
 
 
@@ -611,8 +648,22 @@ class OwnerBatchTests(unittest.TestCase):
     def test_a_pr_listed_twice_is_ambiguous(self):
         self.refused(batch_api(listed=f"#{N}@{C1[:7]}, #{N}@{M1[:7]}"), r"(twice|duplicate)")
 
-    def test_a_comment_without_a_batch_approval_line(self):
-        self.refused(batch_api(comment=approval_comment(f"#{N}@{C1[:7]}", line="I think we could merge ")), r"batch approval")
+    def test_a_comment_without_an_anchored_batch_approval_first_line(self):  # R1-01: agents post as the owner, so the form is the control
+        listed = f"#{N}@{C1[:7]}"
+        verbatim = ('decision (owner, 2026-11-19 ~11:12 UTC): D1 batch approval: the owner posts ONE ordered list '
+                    '(e.g. "batch approval: #223@0e12ac0, #222@9b86383") on #15 ...')  # the start of #15 comment 7007421567
+        bodies = {"no line": f"I think we could merge {listed}", "decision record (7007421567)": f"{verbatim}\nbatch approval: {listed}",
+                  "a request": f"asking the owner for batch approval: {listed} (not approved yet)", "a refusal": f"Owner declined the batch approval: {listed}",
+                  "second line": f"Thanks!\nbatch approval: {listed}", "words after the list": f"batch approval: {listed} but only if CI is green",
+                  "a quoted line": f"> batch approval: {listed}"}
+        for name, body in bodies.items():
+            with self.subTest(name):
+                comment = approval_comment("", line=body)
+                self.refused(batch_api(comment=comment), r"batch approval")
+
+    def test_notes_in_parentheses_and_blank_lines_before_the_list_are_fine(self):
+        listed = f"#70@{'7' * 7} (docs), #{N}@{C1[:7]} (the wrapper PR)"
+        self.merged(batch_api(listed=listed, earlier={70: True}, comment=approval_comment(listed, line="\n  batch approval: ")))
 
     def test_comment_not_by_the_owner_or_not_on_the_state_issue_or_edited(self):
         cases = {"login": approval_comment(f"#{N}@{C1[:7]}", login="mallory"), "association": approval_comment(f"#{N}@{C1[:7]}", assoc="NONE"),

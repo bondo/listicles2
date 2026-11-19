@@ -92,6 +92,10 @@ SAME_PATCH = (
     r"a listed pr may be merged at a head that differs from its approved sha only by update-branch merge commits of `main` with the same patch "
     r"against `main` \(d2\); any other change needs a new approval"
 )
+APPROVAL_FORM = (
+    r"an owner approval given in a decision comment or in the owner's chat is recorded as one anchored `batch approval: #n@sha` first line "
+    r"\(#15 comment 7014222068\); the check proves the account only, not the person"
+)
 ORDER_TAIL = (
     r"every ready `general` pr to the merge agent first, and asks? the owner for a batch approval of owner-only prs "
     r"only once no `general` pr is ready to go; an exception needs a stated reason in the merge request"
@@ -765,7 +769,8 @@ RULES = (
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and you never pass an approval on to it",
-            STANDING, CLASSES, OWNER_HANDS, BATCH, SAME_PATCH,
+            r"the owner-only exception above means not under the standing authorization",
+            STANDING, CLASSES, OWNER_HANDS, BATCH, APPROVAL_FORM, SAME_PATCH,
             r"merge order \(#15 comment 7005414860\): send " + ORDER_TAIL,
         ),
         "the merge agent merges general PRs under the standing authorization and owner-only PRs from the owner's batch approval (D1-D3 of #229)",
@@ -1060,14 +1065,15 @@ DOC_RULES = (
     DocRule(
         "orch-merge-agent", ORCH,
         (
-            r"\* \*\*merge agent:\*\* the merge agent merges every ready pr except the owner-only ones, one at a time",
+            r"\* \*\*merge agent:\*\* the merge agent merges every ready pr that is not owner-only under the owner's standing authorization, one at a time, "
+            r"and an owner-only pr only as kind `owner-batch`",
             OWNER_ONLY,
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and then " + STANDING + r"; the orchestrator never passes an approval on to it",
-            CLASSES, OWNER_HANDS, BATCH, SAME_PATCH,
+            CLASSES, OWNER_HANDS, BATCH, APPROVAL_FORM, SAME_PATCH,
             r"merge order \(#15 comment 7005414860\): the orchestrator sends " + ORDER_TAIL,
         ),
         "ORCHESTRATION 7.5: the merge agent merges general PRs under the standing authorization and owner-only PRs from the batch approval (D1-D3 of #229)",
