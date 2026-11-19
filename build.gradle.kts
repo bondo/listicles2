@@ -128,6 +128,89 @@ val checkWarningsAsErrors =
 
 tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
 
+// Issue 211: every JVM module (Kotlin JVM plugin) compiles against the JDK 17 API, not the JDK 21 one the build runs
+// on. minSdk is 26 and Android has java.util.List.removeFirst()/removeLast()/reversed() only from API 35, so a call
+// that resolves to the JDK 21 member crashes on Android 8 to 14. Kotlin (-Xjdk-release) and Java (--release) must both
+// say 17. The task first runs its own negative cases on the predicate, then checks every real compile task.
+// Run: ./gradlew checkJdkRelease (wired into detekt, so verify.sh and CI run it).
+val checkJdkRelease =
+    tasks.register("checkJdkRelease") {
+        group = "verification"
+        description = "Fails if a JVM module's Kotlin or Java compile task does not target the JDK 17 API."
+        val wanted = "17"
+
+        // The last -Xjdk-release value wins, as on the Kotlin command line; a bare flag has no value.
+        fun kotlinRelease(args: List<String>): String? =
+            args.lastOrNull { it.startsWith("-Xjdk-release") }?.substringAfter('=', "")
+
+        fun kotlinOk(args: List<String>) = kotlinRelease(args) == wanted
+
+        fun javaOk(release: String) = release == wanted
+
+        val jvmProjects = provider { allprojects.filter { it.plugins.hasPlugin("org.jetbrains.kotlin.jvm") } }
+        val kotlinTasks =
+            jvmProjects.map { ps ->
+                ps.flatMap { p ->
+                    p.tasks
+                        .withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>()
+                        .map { it.path to it.compilerOptions.freeCompilerArgs.getOrElse(emptyList()) }
+                }
+            }
+        val javaTasks =
+            jvmProjects.map { ps ->
+                ps.flatMap { p ->
+                    p.tasks.withType<JavaCompile>().map {
+                        it.path to (
+                            it.options.release.orNull
+                                ?.toString() ?: ""
+                        )
+                    }
+                }
+            }
+        val moduleCount = jvmProjects.map { it.size }
+        inputs.property("kotlinTasks", kotlinTasks)
+        inputs.property("javaTasks", javaTasks)
+        inputs.property("moduleCount", moduleCount)
+        doLast {
+            // Negative cases first: a predicate that accepts everything would make the real check pass.
+            val selfTest =
+                listOf(
+                    kotlinOk(listOf("-Xjdk-release=17")),
+                    kotlinOk(listOf("-Xfoo", "-Xjdk-release=17", "-Xbar")),
+                    !kotlinOk(emptyList()),
+                    !kotlinOk(listOf("-Xjdk-release=21")),
+                    !kotlinOk(listOf("-Xjdk-release=1.8")),
+                    !kotlinOk(listOf("-Xjdk-release=17", "-Xjdk-release=21")),
+                    !kotlinOk(listOf("-Xjdk-release")),
+                    !kotlinOk(listOf("-Xjdk-release=")),
+                    !kotlinOk(listOf("-Xjdk-release=170")),
+                    javaOk("17"),
+                    !javaOk(""),
+                    !javaOk("21"),
+                    !javaOk("1.8"),
+                )
+            check(selfTest.all { it }) { "checkJdkRelease self-test failed: $selfTest" }
+            check(moduleCount.get() > 0 && kotlinTasks.get().isNotEmpty() && javaTasks.get().isNotEmpty()) {
+                "checkJdkRelease found no JVM module compile tasks; the check is broken"
+            }
+            val offenders =
+                kotlinTasks.get().filterNot { (_, args) -> kotlinOk(args) }.map { (path, args) ->
+                    val flags = args.filter { it.startsWith("-Xjdk-release") }.ifEmpty { listOf("no -Xjdk-release") }
+                    "$path (Kotlin: $flags)"
+                } +
+                    javaTasks.get().filterNot { (_, release) -> javaOk(release) }.map { (path, release) ->
+                        "$path (Java release: ${release.ifEmpty { "unset" }})"
+                    }
+            check(offenders.isEmpty()) {
+                "JVM modules must compile against the JDK $wanted API (-Xjdk-release=$wanted, " +
+                    "options.release=$wanted) so Android API 26 to 34 has every method called; " +
+                    "offenders: ${offenders.joinToString()}"
+            }
+        }
+    }
+
+// (wired into detekt in the green commit)
+
 // Every test JVM blocks network access (core/testing: NoNetwork). NIO sockets need the JDK's selector provider
 // replaced, which is only possible through a system property read when the JVM first needs one.
 subprojects {
