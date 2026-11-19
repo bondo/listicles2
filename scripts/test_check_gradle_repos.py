@@ -132,7 +132,9 @@ class Hardening(unittest.TestCase):
         self.assertEqual(self.dep(GOOGLE + "/* a /* b */ c */\n" + MIRROR_CALL + "mavenCentral()\n"), [])
 
     def test_unterminated_nested_comment_hides_the_rest(self):
-        self.assertEqual(self.dep(GOOGLE + f"/* a /* b */ {MIRROR_CALL}mavenCentral()\n"), MISSING)
+        # the swallowed closing braces leave no repositories block, which is an error as well
+        got = self.dep(GOOGLE + f"/* a /* b */ {MIRROR_CALL}mavenCentral()\n")
+        self.assertEqual(got, ["dependencyResolutionManagement: no repositories block"])
 
     def test_comment_markers_inside_strings_do_not_open_a_comment(self):
         self.assertEqual(self.dep(GOOGLE + 'val s = "/*"\n' + MIRROR_CALL + "mavenCentral()\n"), [])
