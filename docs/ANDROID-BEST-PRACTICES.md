@@ -2,10 +2,10 @@
 
 Owner rule (issue #15, 2026-11-12): from M1 on, product code follows Google's Android guidance. Implementers cite this
 file in their prompts, reviewers check against it (`REVIEW.md` item 11), and a deviation needs a recorded decision
-(an ADR in `docs/adr/` or a `decision` comment on the state issue). **Status: approved. Approved by the owner 2026-11-15.** Decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569
+(an ADR in `docs/adr/` or a `decision` comment on the state issue). **Status: approved. Approved by the owner 2026-11-15; the issue 197 rows are re-approved by the owner's merge of PR #221.** Decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569
 
 Every item below was taken from a page that was fetched and read on 2026-11-12, except the Play Data safety item in section 9
-(read 2026-11-15). Priorities in the architecture
+(read 2026-11-15) and the issue 197 rows (read 2026-11-19, PR #221). Priorities in the architecture
 section ("strongly recommended" and so on) are Google's own labels. Google says these are recommendations, not strict requirements.
 
 **Status column**
@@ -14,8 +14,8 @@ section ("strongly recommended" and so on) are Google's own labels. Google says 
 - `later`: not applicable until the code exists (the milestone is stated), then `review` unless a follow-up automates it.
 
 Facts about this repo were read from `build.gradle.kts`, `app/build.gradle.kts`, `gradle.properties`,
-`config/detekt/detekt.yml`, `scripts/verify.sh`, `docs/PLAN.md` and `REVIEW.md` on `main` at `99e4d4c`.
-Konsist rules (M0.5-11, PR #59) are **not on main yet**, so they count as `later`.
+`config/detekt/detekt.yml`, `scripts/verify.sh`, `docs/PLAN.md` and `REVIEW.md` on `main` at `ed6ec5b`.
+The architecture rules (M0.5-11) are on main: plain JUnit tests in `core/domain/src/test/kotlin/dev/listicles/architecture/` (`ArchitectureRules.kt`, `DomainNoFloatingPointTest.kt`, `UiNoRawValuesTest.kt`) run in `verify.sh` unit tests. They are JUnit tests that use Konsist to collect the files and regex rules to check their text: no floating point in domain code, and no raw colours, `dp`, `sp` or `em` in UI outside the theme.
 
 ## 1. Architecture
 Sources: [Guide to app architecture](https://developer.android.com/topic/architecture) and
@@ -32,7 +32,7 @@ Sources: [Guide to app architecture](https://developer.android.com/topic/archite
 | Collect with `collectAsStateWithLifecycle`; do not send one-off events from the ViewModel to the UI, update state instead | review (M1) |
 | Reusable UI components use plain state holder classes, not ViewModels | review (M1) |
 | Dependency injection, constructor injection first; Hilt when the app has several screens with ViewModels (PLAN section 1 already chooses Hilt) | later (M1) |
-| Pure-Kotlin domain code with no Android classes | tooling in part: `core/domain` is its own JVM module; the no-float rule is Konsist (later, M0.5-11) |
+| Pure-Kotlin domain code with no Android classes | tooling in part: `core/domain` is its own JVM module; the no-float rule is tooling: `DomainNoFloatingPointTest` in the unit tests |
 | Use Jetpack libraries instead of hand-written boilerplate | review |
 
 ## 2. Jetpack Compose
@@ -46,6 +46,7 @@ Sources: [State hoisting](https://developer.android.com/develop/ui/compose/state
 | Hoist state to the lowest common ancestor that reads or writes it; pass immutable state and event lambdas down. Purely internal UI-element state may stay inside the composable | review |
 | A screen has two composables: a stateful one that gets the ViewModel and a stateless one that takes state and events, so the stateless one can be previewed and tested | review |
 | Stability: with Kotlin 2.0.20+ strong skipping is on by default, so do not add `@Stable` or `@Immutable` or immutable-collection wrappers without a measured problem; do not allocate new instances of unstable parameters on every recomposition | review; compiler reports proposed |
+| Saved state across process death: UI state the user typed (form fields, selection) uses `rememberSerializable` (or `rememberSaveable` without kotlinx.serialization) in composables or `SavedStateHandle` in the ViewModel, not just in-memory state ([Save UI states](https://developer.android.com/topic/libraries/architecture/saving-states)) | review (M1) |
 | Previews for every stateless screen and component, using multipreview (`@PreviewLightDark`, `@PreviewFontScales`) and a `locale` preview for Danish; previews cannot build ViewModels | review |
 | Follow the Compose API guidelines (naming, `modifier` parameter, Kotlin style) | tooling in part: spotless and ktlint, detekt `FunctionNaming` with `Composable` exempted, plus the Compose detekt rules (compose-rules 0.4.28: modifier parameter, naming, parameter order, no `MutableState` parameters, no Material 2 imports; `UnstableCollections` stays off on purpose, see the stability row above), gated by `testDetektRules` on fixtures in `config/detekt/fixtures`; the rest `review` |
 
@@ -100,10 +101,12 @@ Sources: [Make apps more accessible](https://developer.android.com/guide/topics/
 | Rule | Status |
 |---|---|
 | Touch targets at least 48dp x 48dp for interactive elements (Material components already do this; custom ones must set it) | review now (REVIEW.md item 6); tooling later (UI accessibility checks) |
-| Text contrast at least 4.5:1 (text under 18sp, or bold under 14sp) and 3:1 for other text | review now; tooling later |
+| Text contrast at least 4.5:1, except large text (18sp and up, or 14sp bold and up), which needs 3:1 ([WCAG 1.4.3](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)) | review now; tooling later |
+| Non-text contrast at least 3:1 for UI components and graphical objects needed to understand the UI: text-field outlines, checkbox borders, icons, focus indicators ([WCAG 1.4.11](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html); [Android design: accessibility](https://developer.android.com/design/ui/mobile/guides/foundations/accessibility#design-vision)) | review now; tooling later |
 | `contentDescription` for every icon button; `null` for decorative images; no "button" in the text; unique per list item | review now (Google says Android Lint, Compose tests and test tools can flag common issues; which lint checks fire here is not verified) |
 | Use `Role`, `stateDescription`, `heading()`, `mergeDescendants` for groups; custom accessibility actions for swipe or drag gestures | review |
 | Do not rely on colour alone; test with TalkBack | review |
+| Text is in `sp`; layouts still work at 200% font scale (no clipped or overlapping text; no fixed heights on text containers) ([Android 14: non-linear font scaling to 200%](https://developer.android.com/about/versions/14/features#non-linear-font-scaling), [Android design: accessibility](https://developer.android.com/design/ui/mobile/guides/foundations/accessibility#design-vision), [WCAG 1.4.4](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html)) | review (`@PreviewFontScales`, see section 2) |
 
 ## 8. Performance
 Sources: [Baseline Profiles](https://developer.android.com/topic/performance/baselineprofiles/overview) and the performance rows of the architecture recommendations.
@@ -116,7 +119,7 @@ Sources: [Baseline Profiles](https://developer.android.com/topic/performance/bas
 | Defer state reads and avoid allocating in recomposition when a measured issue shows up | review |
 
 ## 9. Security and privacy
-Sources: [Security best practices](https://developer.android.com/topic/security/best-practices),
+Sources: [Security checklist](https://developer.android.com/privacy-and-security/security-tips),
 [Network security config](https://developer.android.com/privacy-and-security/security-config),
 [Auto Backup](https://developer.android.com/identity/data/autobackup) and
 [Provide information for Google Play's Data safety section](https://support.google.com/googleplay/android-developer/answer/10787469) (Play Console Help, read 2026-11-15).
@@ -126,6 +129,8 @@ Sources: [Security best practices](https://developer.android.com/topic/security/
 | Never commit API keys; keep them out of the source repository | tooling: `secrets` (gitleaks) CI job and the guards; `google-services.json` rule in CLAUDE.md |
 | Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding) |
 | Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change) |
+| Deep links and intents: App Links use `android:autoVerify="true"` plus a hosted `assetlinks.json`; treat data from an incoming link or intent (invite code) as untrusted input and validate it; set `android:exported` explicitly and keep components unexported unless needed ([Verify App Links](https://developer.android.com/training/app-links/verify-applinks), [Security checklist](https://developer.android.com/privacy-and-security/security-tips)) | review (M1-20) |
+| Sign-in uses Credential Manager (`androidx.credentials`), not legacy `GoogleSignIn`; on sign-out call `clearCredentialState()` ([About Credential Manager](https://developer.android.com/identity/credential-manager), [Implement Sign in with Google](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation)) | review (M1-14) |
 | Request the fewest permissions; validate input; keep data minimal (also Firestore rules, covered in REVIEW.md item 2) | review |
 | Play Data safety form must match what the app collects. The page states that the developer alone is responsible for complete and accurate declarations, including data handled by third-party libraries and SDKs, and that Google may take enforcement action on a discrepancy between app behaviour and declaration. A privacy policy is required to complete the form, even for an app that collects no user data | review (the form is filled in Play Console, outside the repo) |
 
@@ -143,6 +148,9 @@ Sources: [Target API requirement](https://developer.android.com/google/play/requ
 | Predictive back: do not intercept back with `onBackPressed` or `KEYCODE_BACK`; do not opt out | review |
 | Adaptive layouts by window size class (compact under 600dp, medium 600 to 840dp, expanded 840 to 1200dp, large 1200 to 1600dp, extra-large from 1600dp; large and extra-large need the `supportLargeAndXLargeWidth` opt-in); do not use "is tablet" logic; state survives configuration changes | review (M1+) |
 | All strings in resources, with a complete default `app/src/main/res/values/strings.xml` and `app/src/main/res/values-da/` | tooling: lint `MissingTranslation` is an error and `warningsAsErrors` is on (`app/build.gradle.kts`); `<plurals>` and "no hardcoded text" are CLAUDE.md rules checked by review plus lint |
+| Account deletion: an app that lets users create an account must let them delete it in the app and give a web link for the deletion request ([Play account deletion requirements](https://support.google.com/googleplay/android-developer/answer/13327111)) | review (M1-32, AUTH-04; the web page lives on the OQ-21 domain) |
+| Per-app language: declare supported locales with `generateLocaleConfig` (Android 13+ system picker) ([Per-app language preferences](https://developer.android.com/guide/topics/resources/app-languages)) | review (M1-24) |
+| Dark theme: every screen supports light and dark ([Material 3 colour scheme in Compose](https://developer.android.com/develop/ui/compose/designsystems/material3#color-scheme), [Dark theme](https://developer.android.com/develop/ui/views/theming/darktheme)) | review (`@PreviewLightDark`, section 2) |
 | Give translators context comments; mark non-translatable parts with `xliff:g` | review |
 
 ## 11. Dependency and Gradle hygiene
