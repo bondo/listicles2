@@ -114,10 +114,10 @@ class Check(unittest.TestCase):
 
     def test_a_pair_just_under_its_minimum_fails_and_at_the_minimum_passes(self):
         toks = {"color": {th: {"a": "#777777", "b": "#FFFFFF"} for th in ("light", "dark")}, "contrastPairs": [{"fg": "a", "bg": "b", "min": 4.5}]}
-        self.assertEqual(len(dt.check(toks, required=())), 2)  # 4.48 < 4.5, once per theme
+        self.assertEqual(len(dt.check(toks, required=(), roles_required=())), 2)  # 4.48 < 4.5, once per theme
         for th in toks["color"]:
             toks["color"][th]["a"] = "#767676"  # 4.54
-        self.assertEqual(dt.check(toks, required=()), [])
+        self.assertEqual(dt.check(toks, required=(), roles_required=()), [])
 
     def test_a_role_in_one_theme_only_is_reported(self):
         bad = copy.deepcopy(REAL)
