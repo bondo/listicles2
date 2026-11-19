@@ -22,9 +22,10 @@ Origin: owner decision on issue 187 (also logged on issue 15). Version-update PR
 
 * **npm** (`firebase/`): update `package.json` (`overrides` for a transitive package) and `package-lock.json`, then run
   `cd firebase && npm ci && npm run typecheck && npm run lint && npm test`.
-* **Gradle** (build classpath and project configurations): raise the version with a dependency constraint in
-  `build.gradle.kts`, then regenerate the checksums: add the new entries to `gradle/verification-metadata.xml` and
-  remove the superseded ones (PR review checks that only the bumped coordinates changed).
+* **Gradle** (build classpath and project configurations): add `group:artifact=fixed version` to
+  `gradle/patched-dependencies.properties` (`build.gradle.kts` raises every older request to it), then run the checks with
+  `--write-verification-metadata sha256` to add the new checksums to `gradle/verification-metadata.xml`, and remove the
+  superseded entries (the PR review checks that only the bumped coordinates changed).
 * `scripts/dependency_floors.py` (run by `scripts/verify.sh`) fails if a version that a triaged alert flagged comes
   back in `firebase/package-lock.json` or `gradle/verification-metadata.xml`. A new bump adds its row there.
 
