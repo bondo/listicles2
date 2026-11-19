@@ -1,14 +1,18 @@
+# cooldown: a new release waits 7 days before it is proposed, so a compromised release pulled within days is not picked up (issue 186).
+# Security updates are not delayed by cooldown.
 version: 2
 updates:
   - package-ecosystem: gradle
     directory: /
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     groups:
       gradle-minor-patch:
         update-types: [minor, patch]
   - package-ecosystem: npm
     directory: /firebase
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     groups:
       # firebase and @firebase/rules-unit-testing have tied peer ranges (rules-unit-testing N needs firebase ^N), so they arrive in one PR.
       # This group is listed first: a dependency joins the first group it matches, so the catch-all below never splits them.
@@ -34,6 +38,8 @@ updates:
   - package-ecosystem: pip
     directory: /scripts
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
