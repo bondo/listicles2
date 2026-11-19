@@ -645,6 +645,52 @@ class Baselines(GuardsCase):
         self.repo.commit()
         self.assertFails("guard: baseline wiring:")
 
+    # ESLint loads a committed eslint-suppressions.json (bulk suppressions) on its own: it is a baseline, in any directory (#173).
+    def test_eslint_suppressions_file_at_the_root_fails(self):
+        self.repo.write("eslint-suppressions.json", "{}\n")
+        self.repo.commit()
+        self.assertFails("guard: baseline file: eslint-suppressions.json")
+
+    def test_eslint_suppressions_file_in_a_subdirectory_fails(self):
+        self.repo.write("firebase/test/eslint-suppressions.json", '{"a.ts": {"no-console": {"count": 1}}}\n')
+        self.repo.commit()
+        self.assertFails("guard: baseline file: firebase/test/eslint-suppressions.json")
+
+    def test_eslint_suppressions_file_changed_fails(self):
+        self.repo.write("web/eslint-suppressions.json", "{}\n")
+        self.repo.commit("base file")
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.repo.write("web/eslint-suppressions.json", '{"a.ts": {"no-console": {"count": 2}}}\n')
+        self.repo.commit()
+        self.assertFails("guard: baseline file: web/eslint-suppressions.json")
+
+    def test_staged_eslint_suppressions_file_fails(self):
+        self.repo.write("web/eslint-suppressions.json", "{}\n")
+        self.repo.git("add", "web/eslint-suppressions.json")
+        self.assertFails("guard: baseline file: web/eslint-suppressions.json", "--staged")
+
+    def test_other_file_names_pass(self):
+        for name in ("eslint-suppressions.txt", "web/my-eslint-suppressions.json", "web/eslint-suppressions.json.bak",
+                     "web/eslint-config.json", "suppressions/notes.json"):
+            with self.subTest(name=name):
+                self.repo.write(name, "{}\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    def test_deleting_the_eslint_suppressions_file_passes(self):
+        self.repo.write("web/eslint-suppressions.json", "{}\n")
+        self.repo.commit("base file")
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.repo.git("rm", "-q", "web/eslint-suppressions.json")
+        self.repo.commit("delete it")
+        self.assertPasses()
+
+    def test_staged_deletion_of_the_eslint_suppressions_file_passes(self):
+        self.repo.write("web/eslint-suppressions.json", "{}\n")
+        self.repo.commit("base file")
+        self.repo.git("rm", "-q", "web/eslint-suppressions.json")
+        self.assertPasses("--staged")
+
 
 class DiffChecks(GuardsCase):
     def test_lowered_threshold_fails_and_raised_passes(self):
