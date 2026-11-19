@@ -35,7 +35,7 @@ def run_suites(suites, env):
                               capture_output=True, text=True)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(suites)) as pool:
-        return dict(zip(suites, pool.map(run, suites)))
+        return dict(zip(suites, pool.map(run, suites), strict=True))
 
 
 def snapshot(d):

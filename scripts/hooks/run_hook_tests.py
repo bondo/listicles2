@@ -79,10 +79,7 @@ def main(argv):
     if jobs > 1 and only is None:
         return run_parallel(start, jobs)
     loader = unittest.TestLoader()
-    if only is None:
-        suite = loader.discover(start)
-    else:
-        suite = unittest.TestSuite(loader.discover(start, pattern=name) for name in only)
+    suite = loader.discover(start) if only is None else unittest.TestSuite(loader.discover(start, pattern=n) for n in only)
     result = unittest.TextTestRunner(stream=sys.stdout, verbosity=1).run(suite)
     problems = []
     if result.testsRun == 0:

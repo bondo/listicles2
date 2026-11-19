@@ -135,7 +135,10 @@ class Selftests(unittest.TestCase):
             f.write(MARK % "bad" + "raise SystemExit(1)\n")
 
     def ran(self):
-        return open(self.marker, encoding="utf-8").read().split() if os.path.exists(self.marker) else []
+        if not os.path.exists(self.marker):
+            return []
+        with open(self.marker, encoding="utf-8") as f:
+            return f.read().split()
 
     def selftests(self, repo, *scripts, event="pull_request"):
         return run_cli(repo, "selftests", "--scripts", *scripts, event=event)
