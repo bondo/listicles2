@@ -373,3 +373,4 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
+- **PR to merge** [#223](https://github.com/bondo/listicles2/issues/223): tooling&#58; harden check_gradle_repos.py (nested comments, valid forms)
