@@ -722,6 +722,7 @@ class ReviewRound3Tests(CliFlagCase):
         "npm --prefix install test -- --quiet", "npm -w install t -- --quiet", "npm --prefix ci start -- --quiet", "npm --prefix install test -- @relax.txt",
         "npm --prefix install urn typecheck -- --noCheck", "pnpm --dir add test -- --quiet", "yarn --cwd add test -- --quiet",
         "npm --prefix install rum lint -- --quiet", "npm --prefix install restart -- --quiet", "npm --prefix install tst -- --quiet",
+        "pnpm --dir add lint -- --quiet", "yarn --cwd add lint -- --quiet",
     ]
 
     def test_npm_script_verbs_after_an_option_value_do_not_hide_the_tail(self):
