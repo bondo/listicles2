@@ -86,6 +86,14 @@ class M3Roles(unittest.TestCase):
             bad["color"][theme].pop("surfaceTint", None)
         self.assertTrue(any("surfaceTint" in f and "M3" in f for f in dt.check(bad)))
 
+    def test_each_fixed_variant_role_is_gated_on_both_fixed_backgrounds(self):
+        for palette in ("Primary", "Secondary", "Tertiary"):
+            fg, low = f"on{palette}FixedVariant", palette.lower()
+            for bg in (f"{low}Fixed", f"{low}FixedDim"):
+                with self.subTest(pair=(fg, bg)):
+                    self.assertIn((fg, bg), dt.REQUIRED_PAIRS)
+                    self.assertTrue(any(p["fg"] == fg and p["bg"] == bg for p in REAL["contrastPairs"]))
+
     def test_an_extra_non_m3_role_is_not_a_finding(self):
         ok = copy.deepcopy(REAL)
         for theme in ("light", "dark"):
