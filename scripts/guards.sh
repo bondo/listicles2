@@ -638,10 +638,12 @@ narrowcheck() { # narrowcheck <merge-base>
 # maxLineLength, printWidth) is read from every style file of a tool, at the merge base and at HEAD, and the largest value is compared per
 # group: per file, per tool (all its style files), per tool and setting name, and per tool, setting name and section (an `.editorconfig`
 # section or a TOML table). A group that is larger at HEAD fails, so an added setting counts like an edited one, a family split over two
-# kept files is one group, and a raise is not masked by a lowering of another setting or section (a section new at HEAD is bounded only as said below). A value is a number only when its digits
-# end at a delimiter; anything else (`off`, `1_60`, `100 * 2`) is no limit, and a value on the next line is read. In pyproject.toml only
-# `[tool.ruff*]` tables are ruff's, and in setup.cfg and tox.ini only `[flake8]` is flake8's. A ruff or flake8 file that is in use (ruff.toml,
-# `[tool.ruff`, .flake8, `[flake8]`) with no setting counts the tool default (ruff 88, flake8 79) for that file, unless it has `extend =`.
+# kept files is one group, and a raise is not masked by a lowering of another setting or section (a section new at HEAD is bounded only as
+# said below). A value is a number only when its digits end at a delimiter; anything else (`off`, `1_60`, `100 * 2`) is no limit, and a
+# value on the next line is read. Files are not parsed, so it fails closed: every value in a pyproject.toml, setup.cfg or tox.ini counts as
+# the tool's, whatever table or spelling holds it (another tool's raise there fails too). Only the default needs to know what is the
+# tool's own: a ruff or flake8 file that is in use (ruff.toml, a `[tool.ruff` table or ruff key, .flake8, `[flake8]`) with no setting of its
+# own counts the tool default (ruff 88, flake8 79) for that file, unless a ruff file has `extend =`.
 # A section that is new at HEAD, while the setting is already no limit at the base, is compared with the largest finite base value. A file
 # that is gone at HEAD is compared with the same tool at HEAD; a symlink is no limit. Lowered is stricter and passes. Not compared: a
 # setting removed from a kept file (prettier, `.editorconfig` and detekt map no default), the same setting twice in one file.
@@ -655,10 +657,14 @@ LL_AWK='function num(x) { if (!match(x, /^[0-9]+/)) return 999999999
     if (f ~ /(^|\/)pyproject\.toml$/) return (sec ~ /^\[tool\.ruff/ || (sec == "[tool]" && l ~ /ruff/) || (sec == "" && l ~ /tool\.ruff/))
     if (f ~ /(^|\/)(setup\.cfg|tox\.ini)$/) return (sec ~ /^\[flake8\]/)
     return 1 }
-  function emit(k, v, o) { if (o) { any = 1; print sd, f, t, sec, k, v } }
+  function emit(k, v, o) { if (o) any = 1; print sd, f, t, sec, k, v }  # every value counts (fail closed); o: it is the tool'"'"'s own, so no default
   BEGIN { OFS = "\t"; use = (f ~ /(^|\/)\.?(ruff\.toml|flake8)$/) }
-  { lo = tolower($0); gsub(/\/\*([^*]|\*+[^*\/])*\*+\//, "", lo)
-    hd = (lo ~ /^[ \t]*\[[^]]*\][ \t]*([#;].*)?$/); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
+  { lo = tolower($0); if (NR == 1) sub(/^\357\273\277/, "", lo)  # a BOM
+    if (t == "prettier") {  # block comments, also over several lines (only one that opens at the start of a line, `src/*` is a glob)
+      if (inc) { if (!match(lo, /\*\//)) next; lo = substr(lo, RSTART + 2); inc = 0 }
+      gsub(/\/\*([^*]|\*+[^*\/])*\*+\//, "", lo)
+      if (lo ~ /^[ \t]*\/\*/) { inc = 1; next } }
+    hd = (f ~ /(setup\.cfg|tox\.ini|\.flake8)$/ ? lo ~ /^[ \t]*\[[^]]*\]/ : lo ~ /^[ \t]*\[[^]]*\][ \t]*([#;].*)?$/); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
     if (pk != "" && lo !~ /^[ \t]*$/) {  # the value of the last key was empty: it is on this line, unless this line is a key or a header
       if (lo !~ /^[ \t]*(\[.*\]|["\047]?[a-z0-9_.-]+["\047]?[ \t]*[:=])/) { sub(/^[ \t]*["\047]?/, "", lo); emit(pk, num(lo), po) }
       pk = "" }

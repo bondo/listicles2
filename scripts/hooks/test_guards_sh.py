@@ -2187,6 +2187,14 @@ class LineLengthPerTool(DiffCase):
                 {"pyproject.toml": 'tool.ruff.line-length = 60\ntool.ruff.lint.select = ["E501"]\n'},
                 {"pyproject.toml": 'tool.ruff.lint.select = ["E501"]\n'},
             ),
+            "BOM before the ruff table": (
+                {"pyproject.toml": "\ufeff[tool.ruff]\nline-length = 60\n"},
+                {"pyproject.toml": "\ufeff[tool.ruff]\ntarget-version = \"py311\"\n"},
+            ),
+            "text after the flake8 header": (
+                {"setup.cfg": "[flake8] (style)\nmax-line-length = 60\n"},
+                {"setup.cfg": "[flake8] (style)\nselect = E\n"},
+            ),
             "isort value on the next line": (
                 {"setup.cfg": "[isort]\nline_length =\n    60\n[flake8]\nmax-line-length = 60\n"},
                 {"setup.cfg": "[isort]\nline_length =\n    60\n[flake8]\nselect = E\n"},
