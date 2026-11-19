@@ -6,6 +6,7 @@ Run: python3 -I -m unittest discover -s scripts/hooks"""
 import hashlib
 import os
 import re
+import shutil
 import unittest
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
@@ -59,6 +60,8 @@ class UpdateBranchGuard(unittest.TestCase):
             "{ " + CALL + "; }", "( " + CALL + " )", "coproc " + CALL, "trap '" + CALL + "' EXIT", "f() { " + CALL + "; }; f",
             "bash -c '" + CALL + "'", "echo '" + CALL + "' | sh", "eval '" + CALL + "'",
             "scripts/update-branch.sh\\ 12 " + SHA, '"' + CALL + '"', "cd app && " + CALL,
+            # R5-02 (as for mark-ready.sh): a backslash-newline right after the name joins to `update-branch.sh12`, a file name nobody protects
+            f"scripts/update-branch.sh\\\n12 {SHA}", f"scripts/update-branch.sh\\\r\n12 {SHA}", f"scripts/update-branch.sh\\\n 12 {SHA}",
         ]
         for c in forms:
             self.assertEqual(self.bash(c), 2, c)
@@ -92,6 +95,22 @@ class UpdateBranchGuard(unittest.TestCase):
             self.assertEqual(run("Bash", {"command": CALL}, d), 2, name)
             self.assertEqual(run("Bash", {"command": CALL}, d, TOOLING), 2, name + " (tooling)")
         self.assertEqual(run("Bash", {"command": CALL}, repo()), 2, "missing wrapper")
+
+    def test_a_symlinked_wrapper_directory_or_scripts_dir_is_denied_even_with_the_exact_content(self):  # R3-01 as for mark-ready.sh
+        call = lambda d: run("Bash", {"command": CALL}, d)  # noqa: E731  # justified: one-use local helper
+        d = fresh()  # a symlink to a copy with the exact pinned content
+        copy = os.path.join(d, "copy.sh")
+        shutil.copy(os.path.join(d, "scripts", "update-branch.sh"), copy)
+        os.remove(os.path.join(d, "scripts", "update-branch.sh"))
+        os.symlink(copy, os.path.join(d, "scripts", "update-branch.sh"))
+        self.assertEqual(call(d), 2, "symlinked file")
+        d = fresh()  # scripts/ swapped for a symlink to a directory holding the exact content
+        shutil.move(os.path.join(d, "scripts"), os.path.join(d, "scripts.real"))
+        os.symlink(os.path.join(d, "scripts.real"), os.path.join(d, "scripts"))
+        self.assertEqual(call(d), 2, "symlinked scripts dir")
+        d = repo()  # a directory with the right name
+        os.makedirs(os.path.join(d, "scripts", "update-branch.sh"))
+        self.assertEqual(call(d), 2, "directory")
 
     def test_the_mark_ready_wrapper_is_not_confused_with_it(self):
         self.assertEqual(self.bash("scripts/mark-ready.sh 12"), 2, "no mark-ready.sh in this repo copy: denied by its own pin, not allowed by this one")

@@ -99,7 +99,7 @@ class AllowList(unittest.TestCase):
             "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review *)",
             "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review)", "Bash(gh pr merge *)", "Bash",
             "Bash(scripts/*)", "Bash(scripts/mark-ready.sh)", "Bash(bash scripts/mark-ready.sh *)", "Bash(scripts/update-branch.sh)",
-            "Bash(bash scripts/update-branch.sh *)", "Bash(scripts/update-branch.sh)", "Bash(gh api -X PUT repos/bondo/listicles2/pulls/*/update-branch *)",
+            "Bash(bash scripts/update-branch.sh *)", "Bash(./scripts/update-branch.sh *)", "Bash(gh api -X PUT repos/bondo/listicles2/pulls/*/update-branch *)",
             "mcp__github__merge_pull_request", "Bash(gh api -X PUT repos/bondo/listicles2/pulls/*/merge *)",
         ]
         for extra in bad_extras:
@@ -168,6 +168,23 @@ class WrapperRule(unittest.TestCase):
         self.assertNotIn("any command that runs", bullet)
         for stale in ("any agent session", "no wildcard on the repo", "gh api"):
             self.assertNotIn(stale, bullet, stale)
+
+
+class WrapperResidualRisksAreDocumented(unittest.TestCase):
+    """R1-03 of #237: the owner accepts the wrappers' residual risks by merging, so the list names them all."""
+
+    def bullet(self, title):
+        m = re.search(r"\* \*\*" + title + r".*?(?=\n\* \*\*|\n\n)", read("docs", "ORCHESTRATION.md"), re.S)
+        self.assertIsNotNone(m, title)
+        return m.group(0)
+
+    def test_both_wrapper_bullets_name_the_planted_gh_and_the_injected_environment(self):
+        marking, updating = self.bullet("Marking a PR ready:"), self.bullet("Updating a branch")
+        for needle in ("fixed directories", "root session", "LD_PRELOAD", "shell snapshot"):
+            self.assertIn(needle, marking, needle)
+        self.assertRegex(updating, r"residual risks are those of `mark-ready\.sh`")
+        self.assertIn("GH_HOST/GH_REPO cannot redirect the call", updating)
+        self.assertNotIn("no environment redirect", updating)
 
 
 class RuleMatching(unittest.TestCase):

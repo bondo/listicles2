@@ -87,9 +87,30 @@ class UpdateBranch(unittest.TestCase):
         self.assertNotEqual(p.returncode, 0)
         self.assertFalse(called or os.path.exists(os.path.join(self.tmp.name, "decoy.out")), "no fallback to a gh found through PATH")
 
+    def test_bash_env_and_exported_functions_cannot_run_code_under_the_allow_rule(self):
+        """R1-02 of #237: run each wrapper through its shebang (`bash -p` reads no BASH_ENV and imports no functions) with both injected."""
+        for name, args in (("update-branch.sh", ("7", SHA)), ("mark-ready.sh", ("7",))):
+            with self.subTest(name):
+                marker = os.path.join(self.tmp.name, "pwned-" + name)
+                rc = os.path.join(self.tmp.name, "evil.sh")
+                with open(rc, "w", encoding="utf-8") as f:
+                    f.write(f"touch {marker}\n")
+                with open(os.path.join(ROOT, "scripts", name), encoding="utf-8") as f:
+                    src = f.read()
+                copy = os.path.join(self.tmp.name, "direct-" + name)
+                with open(copy, "w", encoding="utf-8") as f:
+                    f.write(GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed}"', src))
+                os.chmod(copy, 0o755)
+                if os.path.exists(self.out):
+                    os.remove(self.out)
+                env = {"PATH": "/usr/bin:/bin", "FAKE_GH_OUT": self.out, "BASH_ENV": rc, "ENV": rc, "BASH_FUNC_exec%%": f"() {{ touch {marker}; }}"}
+                p = subprocess.run([copy, *args], capture_output=True, text=True, env=env, cwd=ROOT, timeout=30)
+                self.assertFalse(os.path.exists(marker), "injected code ran")
+                self.assertEqual((p.returncode, os.path.exists(self.out)), (0, True), p.stderr)
+
     def test_source_has_one_fixed_route_no_passthrough_and_a_fixed_interpreter(self):
         src = read_wrapper()
-        self.assertEqual(src.splitlines()[0], "#!/bin/bash")
+        self.assertEqual(src.splitlines()[0], "#!/bin/bash -p")
         for bad in ['"$@"', "$*", "merge", "POST", "DELETE", "--input", "--hostname", "eval ", "-H ", "command -v", "which ", "env bash"]:
             self.assertNotIn(bad, src, bad)
         self.assertEqual(src.count("api -X PUT"), 1)
