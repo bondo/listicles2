@@ -123,7 +123,7 @@ class NotIgnored(unittest.TestCase):
 
 
 class IndependentOfDeveloperMachine(unittest.TestCase):
-    """A global excludes file (core.excludesFile) must not change the answers."""
+    """A global excludes file must not change the answers: one set by core.excludesFile and the default one in XDG_CONFIG_HOME/git/ignore."""
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -132,7 +132,11 @@ class IndependentOfDeveloperMachine(unittest.TestCase):
         excludes.write_text("poison-*.txt\nREADME.md\n")
         config = Path(tmp.name) / "gitconfig"
         config.write_text(f"[core]\n\texcludesFile = {excludes}\n")
-        patcher = mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config)})
+        xdg_ignore = Path(tmp.name) / "xdg" / "git" / "ignore"  # git reads this without any config naming it
+        xdg_ignore.parent.mkdir(parents=True)
+        xdg_ignore.write_text("poison-*.txt\nREADME.md\n")
+        env = {"GIT_CONFIG_GLOBAL": str(config), "XDG_CONFIG_HOME": str(Path(tmp.name) / "xdg")}
+        patcher = mock.patch.dict(os.environ, env)
         patcher.start()
         self.addCleanup(patcher.stop)
 
