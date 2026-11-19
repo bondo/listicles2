@@ -196,4 +196,89 @@ class DomainNoFloatingPointTest {
         File(nested, "Sample.kt").writeText("package sample\n\nval x: Double = 0\n")
         ArchitectureRules.floatingPointViolations(nested).shouldNotBeEmpty()
     }
+
+    @Test
+    fun rejectsNullSafeConversionToFloatingPoint() {
+        violationsOf("val x = \"1.5\".toDoubleOrNull()").shouldNotBeEmpty()
+        violationsOf("val y = s.toFloatOrNull() ?: 0").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsBigDecimalInAnyForm() {
+        violationsOf("val x = \"1\".toBigDecimal()").shouldNotBeEmpty()
+        violationsOf("val x = s.toBigDecimalOrNull()").shouldNotBeEmpty()
+        violationsOf("val x = BigDecimal(\"1.5\")").shouldNotBeEmpty()
+        violationsOf("val x: BigDecimal? = null").shouldNotBeEmpty()
+        violationsOf("import java.math.BigDecimal").shouldNotBeEmpty()
+        violationsOf("val x = java.math.BigDecimal.ONE").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsBigIntegerBecauseItIsWholeNumber() {
+        violationsOf("import java.math.BigInteger\nval x = BigInteger.ONE + \"2\".toBigInteger()").shouldBeEmpty()
+    }
+
+    @Test
+    fun acceptsIdentifiersThatMerelyContainTheForbiddenWords() {
+        violationsOf(
+            "val bigDecimalCount = 1\nfun toBigDecimalish() = 1\nclass MyBigDecimal\n" +
+                "val toDoubleOrNullable = 2\nfun a(s: String) = s.toDoubleOrNullish()\n" +
+                "val doubleOrNull = 3\nfun toFloatOrNullCount() = 4",
+        ).shouldBeEmpty()
+    }
+
+    @Test
+    fun wholeNumberParsingIsAccepted() {
+        violationsOf("val x = \"12\".toLongOrNull() ?: \"3\".toIntOrNull() ?: 0").shouldBeEmpty()
+    }
+
+    @Test
+    fun rejectsFloatingConversionsWithoutALeadingDot() {
+        violationsOf("val x = listOf(\"1\").mapNotNull(String::toDoubleOrNull)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(\"1\").mapNotNull(String::toFloatOrNull)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).map(Int::toDouble)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).map(Int::toFloat)").shouldNotBeEmpty()
+        violationsOf("val x = with(\"1\") { toDoubleOrNull() }").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsFloatingArraysStreamsAndRandomHelpers() {
+        violationsOf("val x = DoubleArray(3)").shouldNotBeEmpty()
+        violationsOf("val x = FloatArray(3)").shouldNotBeEmpty()
+        violationsOf("val x = doubleArrayOf(1)").shouldNotBeEmpty()
+        violationsOf("val x = floatArrayOf(1)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).toDoubleArray()").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).stream().mapToDouble { it * 1 }.sum()").shouldNotBeEmpty()
+        violationsOf("val x = s.asDoubleStream()").shouldNotBeEmpty()
+        violationsOf("val x: DoubleStream? = null").shouldNotBeEmpty()
+        violationsOf("val x = java.util.Random().nextGaussian()").shouldNotBeEmpty()
+        violationsOf("val x: OptionalDouble? = null").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsWholeNumberArraysStreamsAndLookAlikes() {
+        violationsOf(
+            "val a = IntArray(3)\nval b = LongArray(3)\nval c = intArrayOf(1)\nval d = s.mapToInt { it }\n" +
+                "val e = s.mapToLong { it }\nval doubleArrayCount = 1\nclass MyDoubleArray\n" +
+                "fun mapToDoubleish() = 1\n" +
+                "fun nextGaussianish() = 1",
+        ).shouldBeEmpty()
+    }
+
+    @Test
+    fun rejectsLessCommonDoubleReturningNames() {
+        violationsOf("val x = s.flatMapToDouble(f)").shouldNotBeEmpty()
+        violationsOf("val x = items.sumByDouble(Item::weight)").shouldNotBeEmpty()
+        violationsOf("val x: DoubleSummaryStatistics? = null").shouldNotBeEmpty()
+        violationsOf("val x = DoubleAdder()").shouldNotBeEmpty()
+        violationsOf("val x = DoubleAccumulator(f, 0)").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsLookAlikesOfLessCommonDoubleNames() {
+        violationsOf(
+            "fun sumByDoubleish() = 1\nclass MyDoubleAdder\nval flatMapToDoubles = 2\n" +
+                "val averageCount = 3\nval x = s.summaryStatistics().max",
+        ).shouldBeEmpty()
+    }
 }
