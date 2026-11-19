@@ -1670,9 +1670,10 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         self.assertNotIn("for other sessions", text)
 
     # Owner decision on #15, comment 7002904192 (R2-01 of #179): one authorization covers exactly its window and the PRs it names.
-    SCOPE = (r"one authorization covers exactly the time window and the prs it names, whichever merge agent session runs under it, "
-             r"and ends with the window, and a merge outside a recorded window or list needs a new one")
-    AUTH = (r"owner authorizes it there before its first merge and records a new authorization for it on #15; " + SCOPE
+    # R3-01 of #179: the record is a condition on merging, not a per-agent action.
+    SCOPE = (r"an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
+             r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one")
+    AUTH = (r"owner authorizes it there before its first merge, and it merges only under " + SCOPE
             + r" \(owner decision, #15 comment 7002904192\)")
 
     def test_merge_agent_authorization_is_stated_once_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179
@@ -1682,8 +1683,9 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
         prompt = self.norm(self.ORCH_MD)
         self.assertRegex(prompt, r"the owner authorizes it there before its first merge, and you never pass an approval on to it\.")
-        self.assertRegex(prompt, r"the owner also records a new authorization for it on #15: " + self.SCOPE + r" \(§7\.5, #15 comment 7002904192\); "
-                                 r"the merge agent does not merge before that")
+        self.assertRegex(prompt, r"the merge agent merges only under " + self.SCOPE + r" \(§7\.5, #15 comment 7002904192\)\.")
+        self.assertNotIn("records a new authorization", prompt)
+        self.assertNotIn("records a new authorization", self.norm(self.ORCH_DOC))
         self.assertEqual(len(re.findall(r"owner authorizes it there", prompt)), 1)
 
     def test_no_per_merge_agent_unit_of_authorization_is_left(self):  # R2-01 of #179: no owner source states it
