@@ -196,6 +196,8 @@ class M011AlignmentTests(unittest.TestCase):
         for role, rule_id, old in (
             ("orchestrator", "autonomy", "merges of owner-only PRs; "),
             ("orchestrator", "autonomy", "and a relayed approval is refused"),
+            ("orchestrator", "handover", "From lineage depth 6 or more"),  # R1-01 of #179: the depth-6 clause is pinned
+            ("orchestrator", "handover", "ask the owner to start the next orchestrator from a top-level session"),  # R1-04 of #179
             ("orchestrator", "lock-takeover", "and if nothing follows, ask the owner"),
             ("orchestrator", "lock-takeover", "and `get_session` shows it is not working"),
             ("orchestrator", "lock-takeover", "A holder that is working but has a stale `Updated:` is stalled, not dead:"),
@@ -1367,6 +1369,7 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-autonomy", "* merges (of any PR);"),
         ("docs/ORCHESTRATION.md", "orch-autonomy", "* the 4-round cap being hit"),
         ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 50% context."),
+        ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 80% of a 1M window (60% of a 200k one, `agents/roles.yaml` context)"),  # R1-01 of #179
         ("docs/ORCHESTRATION.md", "orch-handover", "8. Stop. The owner archives you."),
         ("docs/ORCHESTRATION.md", "orch-parallel", "Keep to the parallelism cap."),
         ("docs/ORCHESTRATION.md", "orch-parallel", "No batched extras."),
@@ -1409,6 +1412,7 @@ class Pr4RuleTests(unittest.TestCase):
             ("orchestrator", "autonomy", " The `big-pr` label is set only with the owner's say-so."),
             ("orchestrator", "autonomy", " The 4-round cap being hit."),
             ("orchestrator", "handover", " Hand over at about 80% context."), ("orchestrator", "handover", " Hand over at about 50% context."),
+            ("orchestrator", "handover", " Hand over at about 80% of a 1M window (60% of a 200k one)."),  # R1-01 of #179
             ("orchestrator", "orch-deferral", " more than about 15 changed lines"),
             ("orchestrator", "orch-deferral", " Stop deferring and ask the owner to do M0-O10."),
             ("orchestrator", "orch-delta-review", " Owner acceptance is the only alternative."),
@@ -1602,12 +1606,13 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_the_bootstrap_prompt_states_threshold_and_depth_rule(self):
         boot = self.norm(self.ORCH_DOC).split("### 8.1 orchestrator bootstrap", 1)[1].split("### 8.2", 1)[0]
-        self.assertRegex(boot, r"hand over at about 50% of a 1m window")
+        big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
+        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k one)", boot)
         self.assertRegex(boot, r"lineage depth (?:is )?6 or more.{0,80}the owner starts the next orchestrator")
 
     def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):
         text = self.norm(self.ORCH_MD)
-        self.assertRegex(text, r"lineage depth 6 or more.{0,120}the owner starts the next orchestrator from a top-level session")
+        self.assertRegex(text, r"lineage depth 6 or more.{0,120}ask the owner to start the next orchestrator from a top-level session with the same prompt \(§5\.1 step 5\)")
         self.assertRegex(text, r"§9, f3")
         self.assertNotRegex(text, r"depth (?:of )?7|lineage depth \u2265 ?7|depth 7")
 
@@ -1648,26 +1653,42 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_orchestrator_prompt_has_every_recipe_in_a_short_section(self):
         section = self.recipe_text(self.ORCH_MD)
-        for label, pattern in self.RECIPES:
-            with self.subTest(recipe=label):
-                self.assertRegex(section, pattern)
+        self.assertEqual(self.missing_recipes(section), [])
         self.assertRegex(section, r"docs/orchestration\.md`? §7\.8")  # the pointer to the detailed section
 
     def test_orchestration_md_holds_the_detailed_section_7_8(self):
         text = self.norm(self.ORCH_DOC)
         self.assertIn("### 7.8 repo access and worker-prompt recipes", text)
         section = text.split("### 7.8 repo access and worker-prompt recipes", 1)[1].split("## 8. spawn messages", 1)[0]
-        for label, pattern in self.RECIPES[:5]:
-            with self.subTest(recipe=label):
-                self.assertRegex(section, pattern)
+        self.assertEqual(self.missing_recipes(section), [])  # all 15, not only the repo-access ones (R1-05 of #179)
 
-    def test_a_missing_recipe_is_detected(self):
-        section = self.recipe_text(self.ORCH_MD)
-        for label, pattern in self.RECIPES:
-            with self.subTest(recipe=label):
-                cut = re.sub(pattern, "", section)
-                self.assertNotEqual(cut, section)
-                self.assertIsNone(re.search(pattern, cut))
+    def test_section_5_says_the_orchestrator_follows_it_not_the_soft_hook_reminder(self):  # R1-03 of #179
+        text = self.norm(self.ORCH_DOC).split("## 5. orchestrator handover", 1)[1].split("### 5.1", 1)[0]
+        self.assertRegex(text, r"earlier than the hook stages every session gets \(60% / 80%\)")
+        self.assertRegex(text, r"until the hard stage, the orchestrator follows this section, not the soft reminder")
+        self.assertNotIn("for other sessions", text)
+
+    AUTH = r"owner authorizes it there before its first merge and records a new authorization for it on #15 \(per merge agent\)"
+
+    def test_merge_agent_authorization_is_stated_once_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179
+        doc = self.norm(self.ORCH_DOC).split("### 7.5 pull requests and the merge request", 1)[1].split("### 7.6", 1)[0]
+        self.assertRegex(doc, self.AUTH)
+        self.assertEqual(len(re.findall(r"owner authorizes it there", self.norm(self.ORCH_DOC))), 1)
+        self.assertRegex(self.norm(self.ORCH_MD), self.AUTH)
+        self.assertEqual(len(re.findall(r"owner authorizes it there", self.norm(self.ORCH_MD))), 1)
+
+    def missing_recipes(self, section):
+        return [label for label, pattern in self.RECIPES if not re.search(pattern, section)]
+
+    def test_a_section_missing_one_recipe_is_reported_for_both_files(self):  # R1-01 of #179: the check itself can fail
+        for path in (self.ORCH_MD, self.ORCH_DOC):
+            heading = self.RECIPE_HEADING if path == self.ORCH_MD else "### 7.8 repo access and worker-prompt recipes"
+            section = self.norm(path).split(heading, 1)[1].split("## 8. spawn messages", 1)[0]
+            for label, pattern in self.RECIPES:
+                with self.subTest(path=path.name, recipe=label):
+                    cut = re.sub(pattern, "", section)
+                    self.assertNotEqual(cut, section)
+                    self.assertEqual(self.missing_recipes(cut), [label])
 
 
 if __name__ == "__main__":
