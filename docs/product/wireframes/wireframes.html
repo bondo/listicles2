@@ -101,6 +101,8 @@
 
   .snack { position: absolute; left: var(--sp-s); right: var(--sp-s); bottom: var(--sp-s); min-height: 48px; border-radius: 4px; background: var(--inverseSurface); color: var(--inverseOnSurface); display: flex; align-items: center; padding: var(--sp-s) var(--sp-s) var(--sp-s) var(--sp-l); gap: var(--sp-s); box-shadow: 0 3px 8px rgba(0,0,0,.25); z-index: 5; }
   .snack .txt { flex: 1; }
+  .switch { width: 52px; height: 32px; border-radius: 16px; border: 2px solid var(--outline); background: var(--surfaceContainerHighest); position: relative; flex: none; box-sizing: border-box; }
+  .switch::after { content: ''; position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; border-radius: 50%; background: var(--outline); }
   .snack .act { color: var(--inversePrimary); padding: 0 var(--sp-m); height: 40px; display: inline-flex; align-items: center; }
 
   .scrim { position: absolute; inset: -24px 0 -20px 0; background: var(--scrim); opacity: .32; z-index: 6; }
@@ -188,7 +190,7 @@ const TOKENS_URL = sameOriginUrl(params.get('tokens') || DEFAULT_TOKENS, locatio
 const S = {
   en: {
     appTag: 'Collections and lists, shared with your household',
-    signIn: 'Sign in with Google', signInNote: 'Your lists are kept with your account, so they follow you to a new phone.',
+    signIn: 'Continue with Google', signInNote: 'Your lists are kept with your account, so they follow you to a new phone.',
     needsConnection: 'This needs a connection',
     lists: 'Lists', createList: 'Create list', noListsTitle: 'No lists yet',
     noListsBody: 'Make a list of what you collect or need, and tick off what you have. A new list is private until you share it.',
@@ -197,7 +199,7 @@ const S = {
     listType: 'List type', plainList: 'Plain list', plainNote: 'Items with a name, sorted by name', collection: 'Collection',
     collectionNote: 'Items with release and re-release year, sorted by year', typeFixed: 'The type cannot be changed later.',
     signInEmail: 'Use email and password', createAccount: 'Create account', email: 'Email', password: 'Password',
-    signInBtn: 'Sign in', forgot: 'Forgot password?', wrongCreds: 'Wrong email or password', tooMany: 'Too many attempts, try again later',
+    signInBtn: 'Sign in', forgot: 'Forgot password?', wrongCreds: 'Wrong email or password. If you signed up with Google, use Continue with Google.', tooMany: 'Too many attempts, try again later',
     pwRule: 'At least 12 characters', pwShort: 'Use at least 12 characters', noAccount: 'No account yet?',
     checkEmail: 'Check your email', checkEmailBody: e => `We sent a link to ${e}. Open it, then tap Continue.`,
     cont: 'Continue', sendAgain: 'Send again', notVerified: 'Your email is not verified yet',
@@ -242,12 +244,33 @@ const S = {
     hhDeleted: 'Household deleted',
     hhDeletedBody: h => `${h} was deleted. The lists you had shared are private to you again, with all their items. You can share them again when you are in a household.`,
     ok: 'OK',
+    collision: 'This email already has an account. Sign in with your email and password.',
+    checkEmailNote: 'If you already have an account with this email, no new email is sent: sign in the way you created it.',
+    yourName: 'Your name', nameHelp: 'Your household sees this name. Your email is never shown.', enterYourName: 'Enter your name',
+    nameTitle: 'What should we call you?', nameGoogleBody: 'We filled this in from your Google account. Your household sees this name, never your email.',
+    editName: 'Edit your name',
+    crash: 'Send crash reports', crashNote: 'Off until you turn it on. Helps fix crashes.',
+    leaveQ: 'Leave household?', leave: 'Leave',
+    leaveBody: h => `You will leave ${h}. The lists you created will go with you and stay private. The other members will lose the lists you shared.`,
+    removeQ: n => `Remove ${n}?`,
+    removeBody: n => `${n} will lose access to the lists others shared. The lists ${n} created will go with ${n}, so the other members will lose the lists ${n} shared.`,
+    ownerQ: n => `Make ${n} household owner?`, makeOwnerBtn: 'Make owner',
+    ownerBody: n => `${n} will become the household owner and you will become a plain member. Only the household owner can remove members, transfer ownership and delete the household.`,
+    deleteHhQ: 'Delete household?',
+    deleteHhBody: h => `${h} will be deleted for all members and cannot be restored. Shared lists will go back to the people who created them, private, with all their items.`,
+    transferFirst: 'Transfer ownership first', toHousehold: 'Go to household',
+    transferFirstBody: 'You are the household owner and other members remain. Make another member the household owner, then delete your account. Nothing has been deleted.',
+    leaveHh: 'Leave household', signOutQ: 'Sign out?', signOutBody2: 'Changes you made may not have been sent yet. If you sign out now, they may be lost.', signOutBody: 'Some changes have not been sent yet. If you sign out now, they will be lost.', signOutAnyway: 'Sign out anyway',
+    removedQ: 'You were removed from the household',
+    removedBody: h => `You were removed from ${h}. The lists you created will stay with you and stay private. You will no longer see lists others shared.`,
+    updateTitle: 'Update the app', updateBody: 'This version of Tally is too old to work. Get the new version, then open it.',
+    updateBtn: 'Get the update', updateNote: 'Opens the releases page on GitHub.',
     webTitle: 'You are invited to a household in Tally', webBody: 'Install the app, then tap the link again.',
     webPlay: 'Open Google Play', webSmall: 'Already installed? Tap the link in your message again.',
   },
   da: {
     appTag: 'Samlinger og lister, delt med din husstand',
-    signIn: 'Log ind med Google', signInNote: 'Dine lister gemmes med din konto, så de følger med til en ny telefon.',
+    signIn: 'Fortsæt med Google', signInNote: 'Dine lister gemmes med din konto, så de følger med til en ny telefon.',
     needsConnection: 'Det kræver internetforbindelse',
     lists: 'Lister', createList: 'Opret liste', noListsTitle: 'Ingen lister endnu',
     noListsBody: 'Lav en liste over det, du samler på eller mangler, og sæt flueben ved det, du har. En ny liste er privat, indtil du deler den.',
@@ -256,7 +279,7 @@ const S = {
     listType: 'Listetype', plainList: 'Almindelig liste', plainNote: 'Ting med et navn, sorteret efter navn', collection: 'Samling',
     collectionNote: 'Ting med udgivelses- og genudgivelsesår, sorteret efter år', typeFixed: 'Typen kan ikke ændres senere.',
     signInEmail: 'Brug e-mail og adgangskode', createAccount: 'Opret konto', email: 'E-mail', password: 'Adgangskode',
-    signInBtn: 'Log ind', forgot: 'Glemt adgangskode?', wrongCreds: 'Forkert e-mail eller adgangskode', tooMany: 'For mange forsøg. Prøv igen senere',
+    signInBtn: 'Log ind', forgot: 'Glemt adgangskode?', wrongCreds: 'Forkert e-mail eller adgangskode. Hvis du oprettede dig med Google, så brug Fortsæt med Google.', tooMany: 'For mange forsøg. Prøv igen senere',
     pwRule: 'Mindst 12 tegn', pwShort: 'Brug mindst 12 tegn', noAccount: 'Har du ingen konto?',
     checkEmail: 'Tjek din e-mail', checkEmailBody: e => `Vi har sendt et link til ${e}. Åbn det, og tryk så på Fortsæt.`,
     cont: 'Fortsæt', sendAgain: 'Send igen', notVerified: 'Din e-mail er ikke bekræftet endnu',
@@ -301,6 +324,27 @@ const S = {
     hhDeleted: 'Husstanden er slettet',
     hhDeletedBody: h => `${h} er slettet. De lister, du havde delt, er private for dig igen med alle deres ting. Du kan dele dem igen, når du er i en husstand.`,
     ok: 'OK',
+    collision: 'Der findes allerede en konto med denne <span style="white-space:nowrap">e-mail</span>. Log ind med din <span style="white-space:nowrap">e-mail</span> og adgangskode.',
+    checkEmailNote: 'Har du allerede en konto med denne e-mail, sendes der ingen ny e-mail. Log ind på den måde, du oprettede kontoen.',
+    yourName: 'Dit navn', nameHelp: 'Din husstand ser dette navn. Din e-mail vises aldrig.', enterYourName: 'Skriv dit navn',
+    nameTitle: 'Hvad skal vi kalde dig?', nameGoogleBody: 'Vi har udfyldt det fra din Google-konto. Din husstand ser dette navn, aldrig din e-mail.',
+    editName: 'Rediger dit navn',
+    crash: 'Send nedbrudsrapporter', crashNote: 'Slået fra, indtil du slår det til. Hjælper med at rette nedbrud.',
+    leaveQ: 'Forlad husstanden?', leave: 'Forlad',
+    leaveBody: h => `Du forlader ${h}. De lister, du har oprettet, følger med dig og er private. De andre medlemmer mister de lister, du har delt.`,
+    removeQ: n => `Fjern ${n}?`,
+    removeBody: n => `${n} mister adgang til de lister, andre har delt. De lister, ${n} har oprettet, følger med ${n}, så de andre medlemmer mister de lister, ${n} har delt.`,
+    ownerQ: n => `Gør ${n} til husstandens ejer?`, makeOwnerBtn: 'Gør til ejer',
+    ownerBody: n => `${n} bliver husstandens ejer, og du bliver almindeligt medlem. Kun husstandens ejer kan fjerne medlemmer, overdrage ejerskab og slette husstanden.`,
+    deleteHhQ: 'Slet husstanden?',
+    deleteHhBody: h => `${h} slettes for alle medlemmer og kan ikke gendannes. Delte lister går tilbage til dem, der har oprettet dem, som private lister med alle deres ting.`,
+    transferFirst: 'Overdrag ejerskab først', toHousehold: 'Gå til husstanden',
+    transferFirstBody: 'Du er husstandens ejer, og der er andre medlemmer. Gør et andet medlem til husstandens ejer, og slet så din konto. Intet er slettet.',
+    leaveHh: 'Forlad husstanden', signOutQ: 'Log ud?', signOutBody2: 'Ændringer, du har lavet, er måske ikke sendt endnu. Hvis du logger ud nu, kan de gå tabt.', signOutBody: 'Nogle ændringer er ikke sendt endnu. Hvis du logger ud nu, går de tabt.', signOutAnyway: 'Log ud alligevel',
+    removedQ: 'Du er fjernet fra husstanden',
+    removedBody: h => `Du er fjernet fra ${h}. De lister, du har oprettet, er stadig dine og private. Du kan ikke længere se lister, andre har delt.`,
+    updateTitle: 'Opdater appen', updateBody: 'Denne version af Tally er for gammel til at virke. Hent den nye version, og åbn den.',
+    updateBtn: 'Hent opdateringen', updateNote: 'Åbner siden med udgivelser på GitHub.',
     webTitle: 'Du er inviteret til en husstand i Tally', webBody: 'Installer appen, og tryk så på linket igen.',
     webPlay: 'Åbn Google Play', webSmall: 'Har du allerede appen? Tryk på linket i din besked igen.',
   },
@@ -394,13 +438,36 @@ const qr = () => { let r = ''; let x = 7;
   return `<svg width="148" height="148" viewBox="-1 -1 23 23" style="background:#fff;border-radius:8px;align-self:center"><g fill="#000">${r}</g></svg>`; };
 const linkRow = (a, b) => `<div class="t-bodyMedium" style="text-align:center;margin-top:var(--sp-s)">${a}</div>${b ? `<div class="t-bodyMedium" style="text-align:center">${b}</div>` : ''}`;
 
+const signInScreen = (s, msg) => `<div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-l)">Tally</div>
+  <div class="t-bodyLarge var">${s.appTag}</div>${msg}
+  <div class="stack"><span class="btn filled wide t-labelLarge">${ic('login')}${s.signIn}</span><span class="btn outlined wide t-labelLarge">${ic('mail')}${s.signInEmail}</span></div>
+  <div class="t-bodySmall var" style="margin-top:var(--sp-s)">${s.signInNote}</div></div>`;
+const msgCard = (icon, text) => `<div class="row card" style="width:100%;margin:var(--sp-s) 0 0;background:var(--errorContainer);color:var(--onErrorContainer);text-align:left">${ic(icon)}<div class="txt t-bodyMedium">${text}</div></div>`;
+const hhMembers = (s, menu, plain = false) => `${topbar(s.household, { back: true })}<div class="head"><div class="t-headlineSmall">${HH}</div><div class="t-bodyMedium var">${s.members(3)}</div></div>
+  <div class="row"><span class="avatar lg">S</span><div class="txt"><div class="t-bodyLarge">Sam Jensen (${s.you})</div><div class="t-bodyMedium var">${plain ? s.member : s.owner}</div></div></div>
+  <div class="row"><span class="avatar lg sec">A</span><div class="txt"><div class="t-bodyLarge">Anna Jensen</div><div class="t-bodyMedium var">${plain ? s.owner : s.member}</div></div>${plain ? '' : iconBtn('more_vert')}</div>
+  <div class="row"><span class="avatar lg ter">M</span><div class="txt"><div class="t-bodyLarge">Mikkel</div><div class="t-bodyMedium var">${s.member}</div></div>${plain ? '' : iconBtn('more_vert')}</div>
+  ${menu ? `<div class="menu t-bodyLarge" style="top:262px;right:16px"><div class="mi">${ic('shield_person')}<span>${s.makeOwner}</span></div><div class="mi danger">${ic('person_remove')}<span>${s.removeMember}</span></div></div>` : ''}
+  <div class="section t-titleMedium">${s.openInvites}</div>
+  <div class="row">${ic('link', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.inviteLink}</div><div class="t-bodyMedium var">${s.expiresIn(6)}</div></div><span class="btn text t-labelLarge">${s.revoke}</span></div>
+  <div style="padding:var(--sp-s) var(--sp-l)"><span class="btn filled wide t-labelLarge">${ic('share')}${s.invite}</span></div>
+  <div style="padding:0 var(--sp-l)"><span class="btn text danger wide t-labelLarge">${plain ? s.leaveHh : s.deleteHh}</span></div>`;
+const accountScreen = s => `${topbar(s.account, { back: true })}<div class="row" style="padding:var(--sp-l)"><span class="avatar lg">S</span><div class="txt"><div class="t-titleMedium">Sam Jensen</div><div class="t-bodyMedium var">sam@example.com</div></div></div>
+  <div class="divider"></div>
+  <div class="row">${ic('badge', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.yourName}</div><div class="t-bodyMedium var">Sam Jensen</div></div>${ic('edit', 'lead')}</div>
+  <div class="row">${ic('password', 'lead')}<div class="txt t-bodyLarge">${s.changePw}</div>${ic('chevron_right', 'lead')}</div>
+  <div class="row">${ic('phonelink_lock', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.twoStep}</div><div class="t-bodyMedium var">${s.off}</div></div>${ic('chevron_right', 'lead')}</div>
+  <div class="row">${ic('home', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.household}</div><div class="t-bodyMedium var">${HH}</div></div>${ic('chevron_right', 'lead')}</div>
+  <div class="row">${ic('bug_report', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.crash}</div><div class="t-bodyMedium var">${s.crashNote}</div></div><span class="switch"></span></div>
+  <div class="divider"></div>
+  <div class="row">${ic('logout', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.signOut}</div><div class="t-bodyMedium var">${s.signOutNote}</div></div></div>
+  <div class="row" style="color:var(--error)">${ic('delete_forever')}<div class="txt t-bodyLarge">${s.deleteAccount}</div></div>
+  <div class="t-bodySmall var" style="margin-top:auto;padding:var(--sp-l);text-align:center">Tally 1.0</div>`;
+
 /* ---------- Screens: id, title, story and decision refs, content(strings) ---------- */
 const SCREENS = [
-  { id: '01', t: 'Sign-in', refs: 'AUTH-01, AUTH-02, SYNC-03, OQ-22, OQ-23. Google is the main button; "Use email and password" leads to sign in, create account and reset (24 to 28). Shown only when signed out. No connection: snackbar, nothing else happens. Cancelling the account picker shows nothing.',
-    f: s => `<div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-l)">Tally</div>
-      <div class="t-bodyLarge var">${s.appTag}</div>
-      <div class="stack"><span class="btn filled wide t-labelLarge">${ic('login')}${s.signIn}</span><span class="btn outlined wide t-labelLarge">${ic('mail')}${s.signInEmail}</span></div>
-      <div class="t-bodySmall var" style="margin-top:var(--sp-s)">${s.signInNote}</div></div>${snack(s.needsConnection)}` },
+  { id: '01', t: 'Sign-in', refs: 'AUTH-01, AUTH-02, SYNC-03, OQ-22, OQ-23. Google is the main button ("Continue with Google"); "Use email and password" leads to sign in, create account and reset (24 to 28). Shown only when signed out. No connection: snackbar, nothing else happens. Cancelling the account picker shows nothing.',
+    f: s => signInScreen(s, '') + snack(s.needsConnection) },
   { id: '02', t: 'Lists, empty', refs: 'LIST-01, VIS-01, OQ-1. First start of a new account.',
     f: s => `${listsBar(s)}<div class="center"><div class="bubble">${ic('checklist')}</div><div class="t-titleLarge">${s.noListsTitle}</div>
       <div class="t-bodyMedium var">${s.noListsBody}</div></div>${fab(s.createList)}` },
@@ -445,15 +512,7 @@ const SCREENS = [
       <div class="divider" style="width:100%;margin:var(--sp-l) 0 var(--sp-s)"></div>
       <div class="t-titleMedium">${s.haveLink}</div><div class="t-bodyMedium var">${s.haveLinkBody}</div></div>` },
   { id: '15', t: 'Household members (household owner)', refs: 'HH-02, HH-04, HH-06. Member menu open. A plain member sees Leave household instead of Delete and no member menu. All of these need a connection (OQ-22).',
-    f: s => `${topbar(s.household, { back: true })}<div class="head"><div class="t-headlineSmall">${HH}</div><div class="t-bodyMedium var">${s.members(3)}</div></div>
-      <div class="row"><span class="avatar lg">S</span><div class="txt"><div class="t-bodyLarge">Sam Jensen (${s.you})</div><div class="t-bodyMedium var">${s.owner}</div></div></div>
-      <div class="row"><span class="avatar lg sec">A</span><div class="txt"><div class="t-bodyLarge">Anna Jensen</div><div class="t-bodyMedium var">${s.member}</div></div>${iconBtn('more_vert')}</div>
-      <div class="row"><span class="avatar lg ter">M</span><div class="txt"><div class="t-bodyLarge">Mikkel</div><div class="t-bodyMedium var">${s.member}</div></div>${iconBtn('more_vert')}</div>
-      <div class="menu t-bodyLarge" style="top:262px;right:16px"><div class="mi">${ic('shield_person')}<span>${s.makeOwner}</span></div><div class="mi danger">${ic('person_remove')}<span>${s.removeMember}</span></div></div>
-      <div class="section t-titleMedium">${s.openInvites}</div>
-      <div class="row">${ic('link', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.inviteLink}</div><div class="t-bodyMedium var">${s.expiresIn(6)}</div></div><span class="btn text t-labelLarge">${s.revoke}</span></div>
-      <div style="padding:var(--sp-s) var(--sp-l)"><span class="btn filled wide t-labelLarge">${ic('share')}${s.invite}</span></div>
-      <div style="padding:0 var(--sp-l)"><span class="btn text danger wide t-labelLarge">${s.deleteHh}</span></div>` },
+    f: s => hhMembers(s, true) },
   { id: '16', t: 'Join household', refs: 'HH-03, OQ-16. Opened from an invite link, after sign-in if needed. Joining needs a connection (OQ-22).',
     f: s => `${topbar('', { close: true })}<div class="center"><div class="bubble">${ic('home')}</div><div class="t-bodyLarge var">${s.invited}</div>
       <div class="t-headlineSmall">${HH}</div><div class="t-bodyMedium var">${s.joinBody}</div>
@@ -461,16 +520,8 @@ const SCREENS = [
   { id: '17', t: 'Invite link does not work', refs: 'HH-03, SYNC-03. The same layout says "leave your household first" and "this needs a connection", each with its own text.',
     f: s => `${topbar('', { close: true })}<div class="center"><div class="bubble">${ic('link_off')}</div><div class="t-titleLarge">${s.linkDead}</div>
       <div class="t-bodyMedium var">${s.linkDeadBody}</div><div class="stack"><span class="btn tonal wide t-labelLarge">${s.toLists}</span></div></div>` },
-  { id: '18', t: 'Account', refs: 'AUTH-03, AUTH-04, AUTH-09, OQ-31. Password account shown; a Google account has no password rows. No language row: v1 uses only Android per-app language (OQ-12). Sign out removes the local copy (OQ-13).',
-    f: s => `${topbar(s.account, { back: true })}<div class="row" style="padding:var(--sp-l)"><span class="avatar lg">S</span><div class="txt"><div class="t-titleMedium">Sam Jensen</div><div class="t-bodyMedium var">sam@example.com</div></div></div>
-      <div class="divider"></div>
-      <div class="row">${ic('password', 'lead')}<div class="txt t-bodyLarge">${s.changePw}</div>${ic('chevron_right', 'lead')}</div>
-      <div class="row">${ic('phonelink_lock', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.twoStep}</div><div class="t-bodyMedium var">${s.off}</div></div>${ic('chevron_right', 'lead')}</div>
-      <div class="row">${ic('home', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.household}</div><div class="t-bodyMedium var">${HH}</div></div>${ic('chevron_right', 'lead')}</div>
-      <div class="divider"></div>
-      <div class="row">${ic('logout', 'lead')}<div class="txt"><div class="t-bodyLarge">${s.signOut}</div><div class="t-bodyMedium var">${s.signOutNote}</div></div></div>
-      <div class="row" style="color:var(--error)">${ic('delete_forever')}<div class="txt t-bodyLarge">${s.deleteAccount}</div></div>
-      <div class="t-bodySmall var" style="margin-top:auto;padding:var(--sp-l);text-align:center">Tally 1.0</div>` },
+  { id: '18', t: 'Account', refs: 'AUTH-03, AUTH-04, AUTH-09, AUTH-12, OQ-31. Password account shown; a Google account has no password rows. "Your name" is editable (43, AUTH-12). "Send crash reports" is off until switched on (M1-25). No language row: v1 uses only Android per-app language (OQ-12). Sign out removes the local copy (OQ-13).',
+    f: s => accountScreen(s) },
   { id: '19', t: 'Delete account', refs: 'AUTH-04, OQ-5. A household owner with other members is first told to transfer ownership; nothing is deleted. Needs a connection.',
     f: s => `${topbar(s.account, { back: true })}${dialog({ icon: 'delete_forever', title: s.deleteAccountQ, body: s.deleteAccountBody,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.deleteAccount}</span>` })}` },
@@ -485,19 +536,19 @@ const SCREENS = [
     f: s => openList(s, { l: LISTS[1], items: PLAIN }) },
   { id: '23', t: 'Add item, plain list', refs: 'ITEM-01 for a plain list: the name only; the sheet stays open for the next item. Edit (08) is the same without years.',
     f: s => openList(s, { l: LISTS[1], items: PLAIN, fabOn: false, overlay: sheetItem(s, { title: s.addItem, name: 'Kaffeb', focus: 'n', plain: true }) }) },
-  { id: '24', t: 'Sign in with email, wrong email or password', refs: 'AUTH-07. One message that never says which part was wrong or whether the account exists. No connection: "This needs a connection".',
+  { id: '24', t: 'Sign in with email, wrong email or password', refs: 'AUTH-07, OQ-34(c), decided. One message that never says which part was wrong or whether the account exists, with the hint for Google users. No connection: "This needs a connection".',
     f: s => auth(s.signInBtn, '', `${field({ label: s.email, value: 'sam@example.com' })}${pw(s.password, 14, { state: 'err', trail: 'error' })}${support(s.wrongCreds, true)}
       <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-l)">${s.signInBtn}</span>${linkRow(`<span class="btn text t-labelLarge">${s.forgot}</span>`, `<span class="var">${s.noAccount}</span> <span class="btn text t-labelLarge">${s.createAccount}</span>`)}`) },
   { id: '25', t: 'Sign in with email, too many attempts', refs: 'AUTH-07, AUTH-09. After many failed attempts (also wrong codes): the message replaces the error until the server allows tries again.',
     f: s => auth(s.signInBtn, '', `${field({ label: s.email, value: 'sam@example.com' })}${pw(s.password, 14)}
       <div class="row card" style="margin:var(--sp-s) 0;background:var(--errorContainer);color:var(--onErrorContainer)">${ic('timer')}<div class="txt t-bodyMedium">${s.tooMany}</div></div>
       <span class="btn filled wide t-labelLarge" style="opacity:.38">${s.signInBtn}</span>${linkRow(`<span class="btn text t-labelLarge">${s.forgot}</span>`)}`) },
-  { id: '26', t: 'Create account, password too short', refs: 'AUTH-05, OQ-26: at least 12 characters and no other rules. Invalid email: field error. An existing email never makes a second account (AUTH-10).',
-    f: s => auth(s.createAccount, '', `${field({ label: s.email, value: 'kim@example.com' })}${pw(s.password, 8, { state: 'err', trail: 'error', caret: true })}${support(s.pwShort, true)}
+  { id: '26', t: 'Create account, password too short', refs: 'AUTH-05, AUTH-12, OQ-26: "Your name" is required (empty: field error, nothing created); at least 12 characters and no other rules. Invalid email: field error. An existing email never makes a second account (AUTH-10).',
+    f: s => auth(s.createAccount, '', `${field({ label: s.yourName, value: 'Kim Larsen' })}${support(s.nameHelp)}${field({ label: s.email, value: 'kim@example.com' })}${pw(s.password, 8, { state: 'err', trail: 'error', caret: true })}${support(s.pwShort, true)}
       <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-l)">${s.createAccount}</span>`) + '<div style="flex:1"></div>' },
-  { id: '27', t: 'Verify email', refs: 'AUTH-06. Continue before the link is opened: snackbar. Send again many times: "Try again later". Unverified users see this screen again at sign-in.',
+  { id: '27', t: 'Verify email', refs: 'AUTH-06, AUTH-10. The line about an existing account is shown to everyone, so new and existing emails see the same text. Continue before the link is opened: snackbar. Send again many times: "Try again later". Unverified users see this screen again at sign-in.',
     f: s => `${topbar('', {})}<div class="center"><div class="bubble">${ic('mark_email_unread')}</div><div class="t-titleLarge">${s.checkEmail}</div>
-      <div class="t-bodyMedium var">${s.checkEmailBody('kim@example.com')}</div><div class="stack"><span class="btn filled wide t-labelLarge">${s.cont}</span>
+      <div class="t-bodyMedium var">${s.checkEmailBody('kim@example.com')}</div><div class="t-bodySmall var">${s.checkEmailNote}</div><div class="stack"><span class="btn filled wide t-labelLarge">${s.cont}</span>
       <span class="btn outlined wide t-labelLarge">${s.sendAgain}</span><span class="btn text wide t-labelLarge">${s.signOut}</span></div></div>${snack(s.notVerified)}` },
   { id: '28', t: 'Reset password, link sent', refs: 'AUTH-08. The same message whether or not an account exists. The new password follows the 12-character rule on the Firebase default page (OQ-29).',
     f: s => auth(s.resetTitle, s.resetBody, `${field({ label: s.email, value: 'sam@example.com' })}
@@ -519,6 +570,41 @@ const SCREENS = [
   { id: '33', t: 'Share while offline', refs: 'VIS-02, VIS-04, OQ-22 (owner, 2026-11-16): sharing and stopping sharing need a connection; nothing changes. List and item changes still work offline.',
     f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}${offline(s, 1)}<div class="center"><div class="bubble">${ic('playlist_add')}</div>
       <div class="t-titleLarge">${s.emptyListTitle}</div></div>${snack(s.needsConnection)}` },
+  { id: '34', t: 'Leave household', refs: 'HH-05, OQ-5, OQ-22. A plain member. Same dialog pattern as 11, 12, 19 and 20. The text says the lists go with me and the others lose the lists I shared. Needs a connection.',
+    f: s => hhMembers(s, false, true) + dialog({ icon: 'logout', title: s.leaveQ, body: s.leaveBody(HH),
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.leave}</span>` }) },
+  { id: '35', t: 'Remove member', refs: 'HH-06, OQ-5, OQ-22. Household owner, from the member menu on 15. The text says the lists the member created go with them.',
+    f: s => hhMembers(s, false) + dialog({ icon: 'person_remove', title: s.removeQ('Anna Jensen'), body: s.removeBody('Anna'),
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.remove}</span>` }) },
+  { id: '36', t: 'Transfer ownership', refs: 'HH-06, OQ-22. Household owner, from the member menu on 15. Not dangerous, so the action button is not red.',
+    f: s => hhMembers(s, false) + dialog({ icon: 'shield_person', title: s.ownerQ('Anna Jensen'), body: s.ownerBody('Anna'),
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.makeOwnerBtn}</span>` }) },
+  { id: '37', t: 'Delete household', refs: 'HH-06, OQ-17, OQ-22. The text says shared lists go back to their creators and that the household cannot be restored.',
+    f: s => hhMembers(s, false) + dialog({ icon: 'home', title: s.deleteHhQ, body: s.deleteHhBody(HH),
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.delete}</span>` }) },
+  { id: '38', t: 'Delete account, transfer ownership first', refs: 'AUTH-04, HH-06. A household owner with other members: nothing is deleted. "Go to household" opens 15.',
+    f: s => accountScreen(s) + dialog({ icon: 'shield_person', title: s.transferFirst, body: s.transferFirstBody,
+      acts: `<span class="btn text">${s.ok}</span><span class="btn text">${s.toHousehold}</span>` }) },
+  { id: '39', t: 'Sign out with unsent changes', refs: 'AUTH-03, M1-14, OQ-13. Shown whenever the wait for pending changes does not finish (offline or timeout), with this text when an unsent change is known (45 is the text when none is known). When the wait finishes, sign out needs no dialog.',
+    f: s => accountScreen(s) + dialog({ icon: 'logout', title: s.signOutQ, body: s.signOutBody,
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.signOutAnyway}</span>` }) },
+  { id: '45', t: 'Sign out, wait not finished, no unsent change known', refs: 'AUTH-03, M1-14. The wait did not finish and no open screen knows of an unsent change (a write can wait without a listener): the same dialog, with wording that does not claim a change is unsent.',
+    f: s => accountScreen(s) + dialog({ icon: 'logout', title: s.signOutQ, body: s.signOutBody2,
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.signOutAnyway}</span>` }) },
+  { id: '40', t: 'Removed from household notice', refs: 'HH-06, M1-21. Shown once at the next app start to a member the household owner removed. The member keeps their own lists, now private.',
+    f: s => `${listsBar(s)}<div class="scroll" style="padding-top:var(--sp-s)">${LISTS.filter(l => !l.by).map(l => listRow(s, { ...l, shared: false })).join('')}</div>${dialog({
+      icon: 'info', title: s.removedQ, body: s.removedBody(HH), acts: `<span class="btn text">${s.ok}</span>` })}` },
+  { id: '41', t: 'Update the app', refs: 'START-01, M1-27. Full screen at app start, before sign-in, when this version is below the minimum. No back, no skip. Offline it uses the last minimum read; not shown when none was ever read (first offline start).',
+    f: s => `<div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-l)">${s.updateTitle}</div><div class="t-bodyLarge var">${s.updateBody}</div>
+      <div class="stack"><span class="btn filled wide t-labelLarge">${ic('system_update')}${s.updateBtn}</span></div><div class="t-bodySmall var">${s.updateNote}</div></div>` },
+  { id: '42', t: 'Your name, first Google sign-in', refs: 'AUTH-01, AUTH-12 (owner decision on #191). Asked once after the first Google sign-in, filled in from the Google account; it can be changed. Empty: field error "Enter your name". No back arrow: the step is required, and the next app start shows it again until a name is saved. System Back leaves the app and saves nothing. Members never see emails.',
+    f: s => `${topbar(s.nameTitle, {})}<div style="padding:0 var(--sp-l);display:flex;flex-direction:column;gap:var(--sp-s)"><div class="t-bodyMedium var" style="margin-bottom:var(--sp-s)">${s.nameGoogleBody}</div>${field({ label: s.yourName, value: 'Sam Jensen', state: 'focus', caret: true })}
+      <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-s)">${s.cont}</span></div>` },
+  { id: '43', t: 'Edit your name', refs: 'AUTH-12. From Account (18). Same name rules as 42 and 26; the household sees the new name at once. Needs a connection.',
+    f: s => accountScreen(s) + dialog({ title: s.editName, extra: `<div style="margin-top:var(--sp-s)">${field({ label: s.yourName, value: 'Sam Jensen', state: 'focus', caret: true })}</div>`,
+      acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.save}</span>` }) },
+  { id: '44', t: 'Google sign-in, email already has a password account', refs: 'AUTH-10, OQ-34(a), non-Gmail (decided 2026-11-17, M1.md). A non-Gmail Google account whose email has a password account: no second account, nothing lost. Shown on the sign-in screen.',
+    f: s => signInScreen(s, msgCard('error', s.collision)) },
 ];
 
 /* ---------- Token plumbing ---------- */
