@@ -24,6 +24,21 @@ def case(body, header="import unittest\n"):
     return header + "\nclass T(unittest.TestCase):\n    " + body
 
 
+def run_tree(files, jobs=None):
+    """Like run_runner, but `files` maps relative paths (sub/test_c.py ...) to sources; sub-directories get an __init__.py."""
+    with tempfile.TemporaryDirectory(prefix="hook-runner-tree-") as d:
+        for rel, src in files.items():
+            full = os.path.join(d, rel)
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            if os.path.dirname(rel):
+                open(os.path.join(os.path.dirname(full), "__init__.py"), "a", encoding="utf-8").close()
+            with open(full, "w", encoding="utf-8") as f:
+                f.write(src)
+        extra = ["--jobs", str(jobs)] if jobs else []
+        r = subprocess.run([sys.executable, "-I", RUNNER, *extra, d], capture_output=True, text=True, cwd=d)
+        return r.returncode, r.stdout + r.stderr
+
+
 def run_runner(*sources, jobs=None):
     """Writes each source as scripts/hooks-style test_n.py in a temp dir, runs the runner on it, returns (rc, output)."""
     with tempfile.TemporaryDirectory(prefix="hook-runner-test-") as d:
@@ -144,6 +159,57 @@ class ParallelRunnerKeepsEveryGate(unittest.TestCase):
         for bad in ("0", "-1", "x"):
             r = subprocess.run([sys.executable, "-I", RUNNER, "--jobs", bad], capture_output=True, text=True)
             self.assertNotEqual(r.returncode, 0, bad)
+
+
+FAILING = case("def test_a(self):\n        self.fail('x')\n")
+
+
+class ParallelDiscoveryMatchesSerial(unittest.TestCase):
+    """R1-01 (PR 232 round 1): --jobs must collect exactly what the serial run collects (test*.py, sub-packages),
+    or CI would pass a test that the pre-push hook fails."""
+
+    TREES = {
+        "file named testb.py (no underscore)": {"test_a.py": case(PASSING), "testb.py": FAILING},
+        "test in a sub-package": {"test_a.py": case(PASSING), "sub/test_c.py": FAILING},
+        "test*.py in a sub-package": {"test_a.py": case(PASSING), "sub/testd.py": FAILING},
+    }
+
+    def test_serial_and_parallel_agree_on_every_tree(self):
+        for name, files in self.TREES.items():
+            serial, _ = run_tree(files)
+            parallel, out = run_tree(files, jobs=2)
+            self.assertNotEqual(serial, 0, name)
+            self.assertNotEqual(parallel, 0, f"{name}: {out}")
+
+    def test_passing_trees_run_every_test_in_both_modes(self):
+        files = {"test_a.py": case(PASSING), "testb.py": case(PASSING), "sub/test_c.py": case(PASSING), "sub/testd.py": case(PASSING)}
+        for jobs in (None, 2, 4):
+            rc, out = run_tree(files, jobs=jobs)
+            self.assertEqual(rc, 0, out)
+        self.assertIn("hook tests: ran 4 tests in", run_tree(files, jobs=2)[1])
+
+    def test_a_skip_in_a_sub_package_fails_in_parallel_mode(self):
+        rc, out = run_tree({"test_a.py": case(PASSING), "sub/test_c.py": case(f"@unittest.{SK}('x')\n    " + PASSING)}, jobs=2)
+        self.assertNotEqual(rc, 0, out)
+
+    def test_a_count_mismatch_between_shards_and_discovery_is_a_failure(self):
+        import run_hook_tests
+
+        with tempfile.TemporaryDirectory(prefix="hook-runner-count-") as d:
+            with open(os.path.join(d, "test_a.py"), "w", encoding="utf-8") as f:
+                f.write(case(PASSING))
+            self.assertIsNone(run_hook_tests.count_problem(d, 1))
+            self.assertIn("1 test", run_hook_tests.count_problem(d, 0))
+            self.assertIn("1 test", run_hook_tests.count_problem(d, 2))
+
+    def test_units_list_top_level_test_files_and_packages(self):
+        import run_hook_tests
+
+        with tempfile.TemporaryDirectory(prefix="hook-runner-units-") as d:
+            for rel in ("test_a.py", "testb.py", "helper.py", "sub/__init__.py", "sub/test_c.py", "nopkg/test_d.py"):
+                os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
+                open(os.path.join(d, rel), "w", encoding="utf-8").close()
+            self.assertEqual(run_hook_tests.units(d), ["sub", "test_a.py", "testb.py"])
 
 
 class Partition(unittest.TestCase):

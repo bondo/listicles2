@@ -2,8 +2,9 @@
 
 ci_scope.py decides whether the slow Gradle gate self-tests (warnings gate, JDK release gate, licensee gate) can be
 affected by a pull request. It only ever answers `skip` when every changed path is known to be unrelated, and answers `run`
-for anything else: unknown paths, an empty list, a push, a diff that cannot be computed. The CI jobs keep reporting either
-way (the decision is a step-level `if:`, never a job-level one, so a required check is never skipped or missing)."""
+for anything else: unknown paths, an empty list, a push, a diff that cannot be computed. The decision is made inside
+ci_scope.py (`selftests`, `gradle-exclude`); the CI jobs have no condition at all (no `if:`, `needs:` or `paths:`), so every
+required check always runs and reports."""
 
 import os
 import re
@@ -176,42 +177,96 @@ def ci_text():
     return (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
 
-def job(name):
-    m = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z][\w-]*:\n|\Z)", ci_text(), re.S | re.M)
-    if not m:
-        raise AssertionError(f"job {name} not found in ci.yml")
-    return m.group(1)
+def job_in(text, name):
+    m = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z][\w-]*:\n|\Z)", text, re.S | re.M)
+    return m.group(1) if m else None
+
+
+def wiring_problems(text):
+    """What is wrong with a ci.yml text, as a list of messages (empty when the wiring is right)."""
+    problems = []
+    if re.search(r"^\s+paths(-ignore)?:", text, re.M):
+        problems.append("workflow-level paths filter")
+    for name in REQUIRED_JOBS:
+        body = job_in(text, name)
+        if body is None:
+            problems.append(f"{name}: job missing")
+            continue
+        if not re.search(rf"^    name: {re.escape(name)}$", body, re.M):
+            problems.append(f"{name}: check name changed")
+        if re.search(r"^    if:", body, re.M):
+            problems.append(f"{name}: job-level if")
+        if re.search(r"^    needs:", body, re.M):
+            problems.append(f"{name}: needs")
+    static = job_in(text, "static") or ""
+    if re.search(r"(?m)^\s*(?:-\s+)?if:", static) or "continue-on-error" in static:
+        problems.append("static: if or continue-on-error")
+    if "fetch-depth: 2" not in static:
+        problems.append("static: no two-commit checkout")
+    if not re.search(r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$", static):
+        problems.append("static: does not run ci_scope.py selftests")
+    if not re.search(r"read -ra exclude <<< \"\$\(python3 -I scripts/ci_scope\.py gradle-exclude\)\"", static) or not re.search(
+        r"\./gradlew [^\n]*:app:lintDebug \"\$\{exclude\[@\]\}\"\n", static
+    ):
+        problems.append("static: gradle step does not use gradle-exclude")
+    for script in ci_scope.SELFTESTS:
+        if script in static:
+            problems.append(f"static: calls {script} directly")
+    if "scripts/hooks/run_hook_tests.py --jobs 4" not in (job_in(text, "guards") or ""):
+        problems.append("guards: hook tests not run with --jobs 4")
+    if "python3 -I scripts/test_ci_scope.py" not in text:
+        problems.append("ci.yml does not run test_ci_scope.py")
+    return problems
 
 
 class CiWiring(unittest.TestCase):
-    def test_every_required_check_is_still_a_job_without_a_job_level_condition(self):
-        """A job that is skipped by a job-level `if:` still reports success, but a renamed or removed one is missing."""
+    def test_real_ci_yml_has_no_problems(self):
+        self.assertEqual(wiring_problems(ci_text()), [])
+
+    def mutated(self, old, new):
+        text = ci_text()
+        self.assertIn(old, text)
+        return wiring_problems(text.replace(old, new, 1))
+
+    def test_job_level_if_is_flagged_on_every_required_job(self):
         for name in REQUIRED_JOBS:
-            body = job(name)
-            self.assertIsNotNone(re.search(rf"^    name: {re.escape(name)}$", body, re.M), f"{name}: the check name must stay {name}")
-            self.assertIsNone(re.search(r"^    if:", body, re.M), f"{name}: no job-level if:, only step-level ones")
-            self.assertIsNone(re.search(r"^    needs:", body, re.M), f"{name}: no needs:, so the jobs stay parallel")
+            got = self.mutated(f"  {name}:\n    name: {name}\n", f"  {name}:\n    name: {name}\n    if: github.event_name == 'push'\n")
+            self.assertIn(f"{name}: job-level if", got)
 
-    def test_no_paths_filter_on_the_workflow(self):
-        self.assertIsNone(re.search(r"^\s+paths(-ignore)?:", ci_text(), re.M), "a workflow-level paths filter leaves required checks missing")
+    def test_needs_is_flagged_on_every_required_job(self):
+        for name in REQUIRED_JOBS:
+            got = self.mutated(f"  {name}:\n    name: {name}\n", f"  {name}:\n    name: {name}\n    needs: [wrapper]\n")
+            self.assertIn(f"{name}: needs", got)
 
-    def test_static_job_has_no_condition_at_all(self):
-        """scripts/check_gradle_repos.py forbids if: and continue-on-error in the static job; the decision lives in ci_scope.py."""
-        body = job("static")
-        self.assertIsNone(re.search(r"(?m)^\s*(?:-\s+)?if:", body))
-        self.assertNotIn("continue-on-error", body)
+    def test_renamed_check_is_flagged(self):
+        self.assertIn("workflow-lint: check name changed", self.mutated("    name: workflow-lint\n", "    name: workflow-linting\n"))
 
-    def test_static_job_uses_a_two_commit_checkout_and_the_script_for_both_decisions(self):
-        body = job("static")
-        self.assertIn("fetch-depth: 2", body)
-        self.assertRegex(body, r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$")
-        self.assertRegex(body, r"read -ra exclude <<< \"\$\(python3 -I scripts/ci_scope\.py gradle-exclude\)\"")
-        self.assertRegex(body, r"\./gradlew [^\n]*:app:lintDebug \"\$\{exclude\[@\]\}\"\n")
+    def test_removed_job_is_flagged(self):
+        self.assertIn("secrets: job missing", self.mutated("  secrets:\n    name: secrets\n", "  secrets-moved:\n    name: secrets-moved\n"))
 
-    def test_the_self_tests_are_no_longer_called_directly_from_the_static_job(self):
-        body = job("static")
-        for script in ci_scope.SELFTESTS:
-            self.assertNotIn(script, body)
+    def test_paths_filters_are_flagged(self):
+        for key in ("paths", "paths-ignore"):
+            got = self.mutated("on:\n  pull_request:\n", f"on:\n  pull_request:\n    {key}: ['docs/**']\n")
+            self.assertIn("workflow-level paths filter", got)
+
+    def test_condition_in_static_is_flagged(self):
+        got = self.mutated("      - name: gradle repos check tests", "      - if: false\n        name: gradle repos check tests")
+        self.assertIn("static: if or continue-on-error", got)
+
+    def test_static_without_the_scope_script_is_flagged(self):
+        self.assertIn("static: does not run ci_scope.py selftests", self.mutated("ci_scope.py selftests", "ci_scope.py nothing"))
+        self.assertIn("static: gradle step does not use gradle-exclude", self.mutated(':app:lintDebug "${exclude[@]}"', ":app:lintDebug"))
+        self.assertIn("static: no two-commit checkout", self.mutated("fetch-depth: 2", "fetch-depth: 1"))
+
+    def test_direct_call_of_a_self_test_in_static_is_flagged(self):
+        got = self.mutated("      - name: gradle repos check tests", "      - run: python3 -I scripts/test_warnings_gate.py\n      - name: gradle repos check tests")
+        self.assertIn("static: calls scripts/test_warnings_gate.py directly", got)
+
+    def test_hook_tests_without_jobs_are_flagged(self):
+        self.assertIn("guards: hook tests not run with --jobs 4", self.mutated("run_hook_tests.py --jobs 4", "run_hook_tests.py"))
+
+    def test_job_lookup_of_a_missing_job_is_none(self):
+        self.assertIsNone(job_in(ci_text(), "no-such-job"))
 
     def test_jdk_release_gate_tests_are_in_the_ci_selftest_list(self):
         """225 R2-01: ci.yml reaches test_jdk_release_gate.py through `ci_scope.py selftests`."""
@@ -221,13 +276,8 @@ class CiWiring(unittest.TestCase):
         self.assertIn("python3 -I scripts/test_ci_scope.py", ci_text())
         self.assertIn("python3 -I scripts/test_ci_scope.py", (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8"))
 
-    def test_hook_tests_run_in_parallel_in_ci_and_verify(self):
-        self.assertIn("scripts/hooks/run_hook_tests.py --jobs 4", job("guards"))
+    def test_hook_tests_run_in_parallel_in_verify(self):
         self.assertIn("scripts/hooks/run_hook_tests.py --jobs 4", (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8"))
-
-    def test_job_lookup_fails_loudly(self):
-        with self.assertRaises(AssertionError):
-            job("no-such-job")
 
 
 if __name__ == "__main__":
