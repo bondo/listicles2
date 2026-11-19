@@ -11,7 +11,9 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * no closing keyword (close/fix/resolve and their -s/-d forms) sits directly before an issue number or URL in the title, body or commits;
   * the base is `main` and the API's file and commit lists are complete (it caps them at 3000 and 250);
   * every changed file (a rename's old name too) is inside the kind's allowed paths. For dependabot, a workflow may only
-    re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version.
+    re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
+  * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
+    in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
 Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the head moved) and the checked title and body as commit text.
 Exit status: 0 merged, 1 refused or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
@@ -46,10 +48,84 @@ CLOSING_RE = re.compile(
     re.I,
 )
 SHA_RE = re.compile(r"[0-9a-f]{40}")
+NEW_PIN_RE = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<repo>[\w.-]+/[\w.-]+)(?:/[\w./-]+)?@(?P<sha>[0-9a-f]{40})\s*(?:#(?P<comment>.*))?$")
+REPO_RE = re.compile(r"[A-Za-z0-9][\w.-]*/[\w.-]+")  # owner/repo, no leading dash or further path
+TAG_RE = re.compile(r"[\w][\w.+-]*")
+LS_REMOTE_TIMEOUT = 30
 
 
 class ApiError(Exception):
     pass
+
+
+class PinError(Exception):
+    """A re-pinned action could not be tied to its tag (lookup failed, tag unknown or sha mismatch)."""
+
+
+def ls_remote_resolver(run=subprocess.run):
+    """A resolver (owner/repo, tag) -> the commit sha that tag points to, via `git ls-remote` (an annotated tag is dereferenced).
+    Raises PinError on any failure, so a network problem refuses the merge. `run` is injectable for tests."""
+
+    def resolve(repo, tag):
+        if not REPO_RE.fullmatch(repo) or ".." in repo or not TAG_RE.fullmatch(tag):
+            raise PinError(f"refusing to look up {repo!r} tag {tag!r}")
+        ref = f"refs/tags/{tag}"
+        try:
+            res = run(["git", "ls-remote", f"https://github.com/{repo}", ref, f"{ref}^{{}}"], capture_output=True, text=True,
+                      timeout=LS_REMOTE_TIMEOUT, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+        except (OSError, subprocess.SubprocessError) as e:
+            raise PinError(f"git ls-remote {repo} failed: {type(e).__name__}") from e
+        if res.returncode != 0:
+            raise PinError(f"git ls-remote {repo} failed: {(res.stderr or '').strip()[:120] or res.returncode}")
+        found = {}
+        for line in res.stdout.splitlines():
+            sha, _, name = line.partition("\t")
+            if name in (ref, f"{ref}^{{}}"):
+                if not SHA_RE.fullmatch(sha):
+                    raise PinError(f"git ls-remote {repo}: unreadable line for tag {tag}")
+                found[name] = sha
+        commit = found.get(f"{ref}^{{}}") or found.get(ref)  # the peeled line is the commit of an annotated tag
+        if not commit:
+            raise PinError(f"tag {tag} not found in {repo}")
+        return commit
+
+    return resolve
+
+
+def new_pins(patch):
+    """(owner/repo, sha, tag or None) for each `uses:` line a diff adds; the tag is the first word of the trailing comment."""
+    pins = []
+    for _, added in _changed_lines(patch):
+        for ln in added:
+            m = NEW_PIN_RE.match(ln)
+            if m:
+                words = (m.group("comment") or "").split()
+                pins.append((m.group("repo"), m.group("sha"), words[0] if words else None))
+    return pins
+
+
+def pin_tag_problems(name, patch, resolve):
+    """Reasons a re-pinned action is not tied to its tag: no tag comment, a failed lookup, or a sha other than the tag's commit."""
+    problems = []
+    added = [ln for _, block in _changed_lines(patch) for ln in block]
+    for ln in added:  # pin_only accepted this line, so the tag check must be able to read it too (one gate, no seam between two regexes)
+        if PIN_LINE_RE.match(ln) and not NEW_PIN_RE.match(ln):
+            problems.append(f"{name}: unparsed pin {ln.strip()[:80]!r}, cannot tie it to a tag")
+    for repo, sha, tag in new_pins(patch):
+        if not tag:
+            problems.append(f"{name}: {repo}@{sha[:7]} has no tag comment (# <tag>), cannot tie the sha to a release")
+            continue
+        try:
+            want = resolve(repo, tag)
+        except PinError as e:
+            problems.append(f"{name}: {repo} tag {tag}: {e}")
+            continue
+        except Exception as e:  # noqa: BLE001  # justified: any lookup crash must refuse the merge, never allow it
+            problems.append(f"{name}: {repo} tag {tag}: lookup crashed ({type(e).__name__})")
+            continue
+        if want != sha:
+            problems.append(f"{name}: {repo} tag {tag} is commit {want[:7]}, but the pin is {sha[:7]} (not the tagged release)")
+    return problems
 
 
 class GhApi:
@@ -131,7 +207,7 @@ def drops_draft_status(patch):
     return count(0) > count(1)
 
 
-def file_problems(kind, files):
+def file_problems(kind, files, resolve):
     if not files:
         return ["no changed files"]
     problems = []
@@ -150,6 +226,8 @@ def file_problems(kind, files):
                 problems.append(f"{name}: no patch from the API, cannot verify a version bump only")
             elif not check(patch):
                 problems.append(f"{name}: changes beyond a version bump (re-pinned `uses:` lines, services.gradle.org distribution)")
+            elif check is pin_only:
+                problems += pin_tag_problems(name, patch, resolve)
     return problems
 
 
@@ -180,7 +258,7 @@ def check_problems(api, repo, base, sha):
     return problems
 
 
-def evaluate(api, repo, n, sha, kind):
+def evaluate(api, repo, n, sha, kind, resolve):
     """(the PR, all reasons it must not be merged); no reasons means ready."""
     pr = api.get(f"repos/{repo}/pulls/{n}")
     problems = []
@@ -201,7 +279,7 @@ def evaluate(api, repo, n, sha, kind):
         m = CLOSING_RE.search(text)
         if m:
             problems.append(f"closing keyword in {where}: {m.group(0)!r} (rephrase, e.g. 'see issue N')")
-    problems += file_problems(kind, files)
+    problems += file_problems(kind, files, resolve)
     problems += check_problems(api, repo, pr["base"]["ref"], sha)
     return pr, problems
 
@@ -209,7 +287,7 @@ def evaluate(api, repo, n, sha, kind):
 KINDS = {"working-draft-docs", "tasks-sync", "dependabot"}
 
 
-def main(argv, api=None, out=sys.stdout, err=sys.stderr):
+def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None):
     if len(argv) != 3 or not argv[0].isdigit() or not SHA_RE.fullmatch(argv[1]):
         print("usage: merge_ready.py <N> <40-hex head sha> <kind>", file=err)
         return 2
@@ -219,7 +297,7 @@ def main(argv, api=None, out=sys.stdout, err=sys.stderr):
         return 2
     api = api or GhApi()
     try:
-        pr, problems = evaluate(api, REPO, n, sha, kind)
+        pr, problems = evaluate(api, REPO, n, sha, kind, resolver or ls_remote_resolver())
         if problems:
             for p in problems:
                 print(f"merge_ready: refused PR {n}: {p}", file=err)

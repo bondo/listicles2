@@ -97,8 +97,7 @@ One issue per milestone, assigned to the owner and mentioning the collaborator, 
 
 ## 4. Visual-quality rubric
 
-Draft owned by `docs/product/rubric.md` (drafted by the M0.5-15 design reviewer in the M0.5-03 PR, D-3.3; agreed by the owner at D5; the owner and the collaborator see the
-draft together; later changes go through R6). Used by R5, R9, R10 and R12. Score each criterion **1-5 with a one-line reason**,
+Owned by `docs/product/rubric.md` (owner-approved; later changes go through R6). Used by R5, R9, R10 and R12. Score each criterion **1-5 with a one-line reason**,
 per screen or per flow.
 
 | Criterion | A 5 looks like |
@@ -111,7 +110,7 @@ per screen or per flow.
 | Consistency | same patterns for the same things across screens |
 | Polish and delight | empty states, transitions and small details feel cared for |
 
-Optional: 2-3 **reference apps** the owner names at D5 ("feels like X"), used for comparison, never copied.
+**Reference apps** (owner decision 2026-11-18, rubric question R1, #15 comment 6991349569): Todoist and Google Keep, used for comparison, never copied.
 
 **Pass bar (D-3.4):** no criterion below 3 in the **owner's** scores (R10, D5). An **agent** score below 3 is a **minor
 finding**, never a blocker.
