@@ -180,7 +180,8 @@ class WrapperResidualRisksAreDocumented(unittest.TestCase):
 
     def test_both_wrapper_bullets_name_the_planted_gh_and_the_injected_environment(self):
         marking, updating = self.bullet("Marking a PR ready:"), self.bullet("Updating a branch")
-        for needle in ("fixed directories", "root session", "LD_PRELOAD", "shell snapshot"):
+        for needle in ("fixed directories", "root session", "LD_PRELOAD", "shell snapshot",
+                       "function named `scripts/mark-ready.sh` or `scripts/update-branch.sh`"):
             self.assertIn(needle, marking, needle)
         self.assertRegex(updating, r"residual risks are those of `mark-ready\.sh`")
         self.assertIn("GH_HOST/GH_REPO cannot redirect the call", updating)

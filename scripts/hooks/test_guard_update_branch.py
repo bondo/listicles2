@@ -34,6 +34,14 @@ def fresh(content=None):
     return d
 
 
+def joined_name_forms(name, args):
+    """R2-01 of #237: a quote or `$''` before the backslash-newline, or inside the name, still makes bash run `scripts/<name>12`, a file nobody protects."""
+    stem, rest = name[:-4], name[-4:]
+    return [f'scripts/{name}""\\\n{args}', f"scripts/{name}''\\\n{args}", f"scripts/{name}$''\\\n{args}", f"scripts/{name}\"\"\\\r\n{args}",
+            f'scripts/{stem}""{rest}\\\n{args}', f'"scripts/{name}"\\\n{args}', f"'scripts/{name}'\\\n{args}", f'scripts/{name}""\\\n {args}',
+            f"scripts/{name}{args.split()[0]} {' '.join(args.split()[1:])}".rstrip()]  # the joined name itself, run directly
+
+
 class UpdateBranchGuard(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -62,7 +70,7 @@ class UpdateBranchGuard(unittest.TestCase):
             "scripts/update-branch.sh\\ 12 " + SHA, '"' + CALL + '"', "cd app && " + CALL,
             # R5-02 (as for mark-ready.sh): a backslash-newline right after the name joins to `update-branch.sh12`, a file name nobody protects
             f"scripts/update-branch.sh\\\n12 {SHA}", f"scripts/update-branch.sh\\\r\n12 {SHA}", f"scripts/update-branch.sh\\\n 12 {SHA}",
-        ]
+        ] + joined_name_forms("update-branch.sh", f"12 {SHA}")
         for c in forms:
             self.assertEqual(self.bash(c), 2, c)
             self.assertEqual(self.bash(c, env=TOOLING), 2, c + " (tooling)")
