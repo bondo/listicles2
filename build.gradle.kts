@@ -1,4 +1,21 @@
 import io.gitlab.arturbosch.detekt.Detekt
+import java.util.Properties
+
+// Dependabot alerts (issue 187, docs/SECURITY.md): transitive build and lint tool dependencies that have an advisory are
+// raised to the first fixed version, from gradle/patched-dependencies.properties. Constraints only raise: a newer version
+// that a plugin asks for still wins. scripts/dependency_floors.py checks gradle/verification-metadata.xml against the advisories.
+// This block runs before the script body, so it cannot share a value with the project configurations below; both read the file.
+buildscript {
+    val patched =
+        java.util.Properties().apply {
+            file("gradle/patched-dependencies.properties").inputStream().use { load(it) }
+        }
+    dependencies {
+        constraints {
+            patched.forEach { (coordinate, version) -> add("classpath", "$coordinate:$version") }
+        }
+    }
+}
 
 plugins {
     alias(libs.plugins.android.application) apply false
@@ -127,6 +144,41 @@ val checkWarningsAsErrors =
     }
 
 tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
+
+// The same floor for every project configuration (the Android lint tool, test and build tool classpaths). Constraints cannot be
+// declared on resolvable-only configurations such as compileClasspath, so the selection is raised while dependencies resolve.
+val patchedDependencies =
+    Properties().apply {
+        file("gradle/patched-dependencies.properties").inputStream().use { load(it) }
+    }
+
+fun versionParts(version: String): List<Int> = version.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+
+fun isOlder(
+    version: String,
+    fixed: String,
+): Boolean {
+    val a = versionParts(version)
+    val b = versionParts(fixed)
+    for (i in 0 until maxOf(a.size, b.size)) {
+        val diff = a.getOrElse(i) { 0 } - b.getOrElse(i) { 0 }
+        if (diff != 0) return diff < 0
+    }
+    return false
+}
+
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            val fixed = patchedDependencies.getProperty("${requested.group}:${requested.name}")
+            val wanted = requested.version
+            if (fixed != null && wanted != null && isOlder(wanted, fixed)) {
+                useVersion(fixed)
+                because("Dependabot alert: first fixed version is $fixed (docs/SECURITY.md)")
+            }
+        }
+    }
+}
 
 // Test-support JVM modules run only on the host JDK (21), never on Android, and use its newer API on purpose
 // (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18). checkJdkRelease fails if any
