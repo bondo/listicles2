@@ -69,8 +69,16 @@ val gateResults =
         .dir("test-results/testDebugUnitTest")
         .get()
         .asFile.path
+// A filtered run (--tests, or one class from the IDE) runs a subset on purpose, so the gate does not apply.
+val filteredTestRun =
+    gradle.startParameter.taskRequests.any { request ->
+        request.args.any { it == "--tests" || it.startsWith("--tests=") }
+    }
 val checkUnitTestResults by tasks.registering(Exec::class) {
-    commandLine("python3", "-I", gateScript, gateSources, gateResults)
+    commandLine(
+        listOf("python3", "-I", gateScript, gateSources, gateResults) +
+            listOfNotNull("--filtered".takeIf { filteredTestRun }),
+    )
 }
 
 tasks.withType<Test>().configureEach {

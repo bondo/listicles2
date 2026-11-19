@@ -91,6 +91,10 @@ class Cli(Fixture):
         self.assertEqual(r.returncode, 1)
         self.assertIn("a.b.OldTest", r.stderr)
 
+    def test_filtered_run_skips_the_check(self):
+        self.write("OldTest.kt", JUNIT4)
+        self.assertEqual(self.run_cli(str(self.src), str(self.results), "--filtered").returncode, 0)
+
     def test_missing_results_dir_fails(self):
         self.write("OldTest.kt", JUNIT4)
         self.assertEqual(self.run_cli(str(self.src), str(self.results / "nope")).returncode, 1)
