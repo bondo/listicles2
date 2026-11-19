@@ -1675,8 +1675,11 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         doc = self.norm(self.ORCH_DOC).split("### 7.5 pull requests and the merge request", 1)[1].split("### 7.6", 1)[0]
         self.assertRegex(doc, self.AUTH)
         self.assertEqual(len(re.findall(r"owner authorizes it there", self.norm(self.ORCH_DOC))), 1)
-        self.assertRegex(self.norm(self.ORCH_MD), self.AUTH)
-        self.assertEqual(len(re.findall(r"owner authorizes it there", self.norm(self.ORCH_MD))), 1)
+        # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
+        prompt = self.norm(self.ORCH_MD)
+        self.assertRegex(prompt, r"the owner authorizes it there before its first merge, and you never pass an approval on to it\.")
+        self.assertRegex(prompt, r"the owner also records a new authorization for it on #15 \(per merge agent, §7\.5\)")
+        self.assertEqual(len(re.findall(r"owner authorizes it there", prompt)), 1)
 
     def missing_recipes(self, section):
         return [label for label, pattern in self.RECIPES if not re.search(pattern, section)]
