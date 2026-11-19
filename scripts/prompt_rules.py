@@ -334,15 +334,18 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"handover \(§5, two-phase\), at about 50% of a 1m window \(40% of a 200k one, `agents/roles\.yaml` context\)",
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
             r"a successor does §5\.2",
+            r"from lineage depth 6 or more \(§9, f3\) do not spawn the successor: ask the owner to start the next orchestrator from a top-level session "
+            r"with the same prompt \(§5\.1 step 5\)",
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 80% of a 1M window (60% of 200k), first batch boundary: comment, successor, ack, release (§5)",
-        forbidden=(r"at about 50% context", r"at about 80% context"),
+        "two-phase handover at about 50% of a 1M window (40% of 200k, owner decision #15 comment 7001335975), first batch boundary: "
+        "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window"),
     ),
     Rule(
         "lock-takeover", ("orchestrator",),
@@ -736,6 +739,9 @@ RULES = (
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and you never pass an approval on to it",
+            r"the merge agent merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
+            r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one "
+            r"\(§7\.5, #15 comment 7002904192\)\.",
         ),
         "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
     ),
@@ -932,13 +938,15 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"trigger: about 50% of a 1m window \(40% of a 200k one; `agents/roles\.yaml` context, #15 comment 7001335975\)",
+            r"until the hard stage, the orchestrator follows this section, not the soft reminder",
             r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
-        "ORCHESTRATION 5: hand over at about 80% at a batch boundary (40 wakes or 20 sessions when unknown); the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"the owner archives you"),
+        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
+        "the successor archives the predecessor",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"the owner archives you"),
     ),
     DocRule(
         "orch-parallel", ORCH,
@@ -1032,7 +1040,10 @@ DOC_RULES = (
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
-            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge",
+            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, "
+            r"and it merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
+            r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one "
+            r"\(owner decision, #15 comment 7002904192\)",
         ),
         "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
     ),
