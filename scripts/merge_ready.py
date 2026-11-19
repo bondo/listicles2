@@ -107,6 +107,10 @@ def new_pins(patch):
 def pin_tag_problems(name, patch, resolve):
     """Reasons a re-pinned action is not tied to its tag: no tag comment, a failed lookup, or a sha other than the tag's commit."""
     problems = []
+    added = [ln for _, block in _changed_lines(patch) for ln in block]
+    for ln in added:  # pin_only accepted this line, so the tag check must be able to read it too (one gate, no seam between two regexes)
+        if PIN_LINE_RE.match(ln) and not NEW_PIN_RE.match(ln):
+            problems.append(f"{name}: unparsed pin {ln.strip()[:80]!r}, cannot tie it to a tag")
     for repo, sha, tag in new_pins(patch):
         if not tag:
             problems.append(f"{name}: {repo}@{sha[:7]} has no tag comment (# <tag>), cannot tie the sha to a release")
