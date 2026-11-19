@@ -420,7 +420,7 @@ These are constraints for the data model and screens; v1 builds none of them (M2
 
 ## 10. Decided questions
 
-Answered by the owner on 2026-11-15 to 2026-11-18 (state issue #15); the stories above follow them.
+Answered by the owner on 2026-11-15 to 2026-11-19 (state issue #15); the stories above follow them.
 
 **Labels for the M1 strings** (decided): the re-release year is "re-release year" in English and "Genudgivelsesår" in Danish
 (OQ-19); an item is "ting" in Danish; the checkbox is "I have it", Danish "Jeg har den" (OQ-7).
@@ -443,7 +443,7 @@ Answered by the owner on 2026-11-15 to 2026-11-18 (state issue #15); the stories
 | OQ-14 | **Decided (2026-11-16):** a small banner shows the offline state and that changes wait to be sent. | SYNC-01 |
 | OQ-16 | **Confirmed (2026-11-18, issue #15 comment 6991888410):** a member who joins later sees all lists already shared with the household (sharing is per household, not per person). | VIS-02 |
 | OQ-17 | **Decided (2026-11-16):** when a household is deleted, its shared lists go back to being private to their creators; nothing is lost, creators are notified and may share again later. This is the one exception to the OQ-5 rule: a member who leaves, is removed or deletes their account still takes the lists they created with them. | AUTH-04, HH-05, HH-06 |
-| OQ-18 | **Decided (2026-11-18, issue #15 comment 6992089109):** an item belongs to the list it is in. (a) Items a person added to other people's lists stay there (shown as added by a former member); (b) items others added to that person's shared lists go with those lists. On account deletion the person's name on remaining items is removed (anonymised). **Added (2026-11-19, #15 comment 7000527780):** an Undo of a deleted item by another member restores the original adder, not the member who pressed Undo. Open, deferred to M2 planning (#15 comment 7000513565): anonymising after leave, removal, unsharing or household deletion. | AUTH-04, HH-05, HH-06 |
+| OQ-18 | **Decided (2026-11-18, issue #15 comment 6992089109):** an item belongs to the list it is in. (a) Items a person added to other people's lists stay there (shown as added by a former member); (b) items others added to that person's shared lists go with those lists. On account deletion the person's name on remaining items is removed (anonymised). **Added (2026-11-19, #15 comment 7000527780):** when another member removes an item and taps Undo, the item keeps its original adder, not the member who pressed Undo. Open, deferred to M2 planning (#15 comment 7000513565): anonymising at leave, removal, stop sharing or household deletion. | AUTH-04, HH-05, HH-06 |
 | OQ-19 | **Decided (2026-11-16):** no rule between the two years: each is optional, either may be set alone and in any order; each only has to be from 1900 to the current year plus 50. Labels: English "re-release year", Danish "Genudgivelsesår". | ITEM-01, ITEM-02, ITEM-05 |
 | OQ-20..22 | **Decided (2026-11-16):** see [flow section 10](flow.md#10-new-open-questions): sharing without a household is disabled; an invite page "install, then tap the link again"; household, invite and sharing actions need a connection. | VIS-02, HH-03, SYNC-03 |
 | OQ-23 | **Decided (2026-11-16):** email and password sign-in is built together with Google in v1 (M1), not later. Google stays the main button. | AUTH-01, AUTH-05..08, AUTH-10 |

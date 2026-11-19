@@ -1,6 +1,6 @@
 # Tally (repo: listicles2) – Implementation Plan
 
-Status: working draft, matched to the owner-approved stories and flow and to the decisions of 2026-11-15 to 2026-11-18
+Status: working draft, matched to the owner-approved stories and flow and to the decisions of 2026-11-15 to 2026-11-19
 (task OQ-15; OQ-15 decided 2026-11-18, issue #15 comment 6991933333); the plan itself is not owner-approved (see issue #15).
 
 Android app for shared household lists. In v1 every list is private to its creator until the creator shares it
@@ -137,7 +137,7 @@ A list is readable by its creator (`createdBy == uid`) always, and by others onl
 | Transfer ownership (one batch) | Updates `household.ownerUid` and the `role` of both member docs. Household update: `O(uid)`, only `ownerUid` changes, and the new owner is a member both before and after the batch (`M(new)` and `existsAfter(members/new)`). Each member-doc update: only `role` changes, `O(uid)` before the batch, and the new role equals `getAfter(household).ownerUid == thisDoc ? owner : member`. `ownerUid` is the single source of truth, so there is always exactly one owner. `role` is a cached copy for display, and rules use `O(x)`. |
 | Create list | `createdBy == uid`, `sharedWith == null`, `kind` in `PLAIN`, `COLLECTION`, plus field validation (below). |
 | Update list | The creator, or a member of `sharedWith` while `LIVE` (OQ-3). `kind`, `createdBy` and `createdAt` never change. `sharedWith` changes only: by the creator, `null` → their own household (`M(uid)`, `LIVE`) or back to `null` (VIS-02, VIS-04, and the self-heal after leaving, removal or deletion); by the owner in Remove member (above), to `null` only. |
-| Items: create, update | Same people as Update list. On create `createdBy == uid` and `createdAt <= request.time` (OQ-37, decided: Undo keeps the original value; an Undo by another member restores the original adder, OQ-18, see section 3.2: how the create rule allows that is settled in M2 planning); on update `createdBy` and `createdAt` never change, with one exception: **anonymise**, the planner's proposal for OQ-18 (the owner decided only that the person's name is removed; the shape is confirmed in M2 planning, `risk:high`, `area:security-rules`; the alternative of no rules exception is weighed there, because items store a uid, display names live in `members/{uid}`, and `households/{hid}.createdBy` keeps a uid anyway). An update by the person named in `createdBy` and/or `updatedBy` may set exactly those fields to `null` and change nothing else (`updatedAt` untouched); it is allowed only while that person can still read the list. Years only in `COLLECTION` lists. Deny tests: changing `createdBy` or `createdAt` on update, a future `createdAt`, years in a `PLAIN` list; anonymise: allow the person's own uid → `null`, deny setting another user's uid to `null`, deny changing any other field in the same write, deny `null` → a uid. |
+| Items: create, update | Same people as Update list. On create `createdBy == uid` and `createdAt <= request.time` (OQ-37, decided: Undo keeps the original value). An Undo by another member restores the original adder (OQ-18, section 3.2); how the create rule allows that is settled in M2 planning. On update `createdBy` and `createdAt` never change, with one exception: **anonymise**, the planner's proposal for OQ-18 (the owner decided only that the person's name is removed; the shape is confirmed in M2 planning, `risk:high`, `area:security-rules`; the alternative of no rules exception is weighed there, because items store a uid, display names live in `members/{uid}`, and `households/{hid}.createdBy` keeps a uid anyway). An update by the person named in `createdBy` and/or `updatedBy` may set exactly those fields to `null` and change nothing else (`updatedAt` untouched); it is allowed only while that person can still read the list. Years only in `COLLECTION` lists. Deny tests: changing `createdBy` or `createdAt` on update, a future `createdAt`, years in a `PLAIN` list; anonymise: allow the person's own uid → `null`, deny setting another user's uid to `null`, deny changing any other field in the same write, deny `null` → a uid. |
 | Delete list, items | Same people as Update list; the client deletes the items first, in pages, then the list. |
 | Delete household | `O(uid)`. **Soft delete**: first one update sets `deleted: true`. This update may change only `deleted` (false → true) and `name` (→ empty); `ownerUid`, `createdBy` and `createdAt` stay as they are. From that moment `LIVE` is false, so every read and write under the household is denied to everyone except the owner's cleanup. Then the client deletes invites → `removed` markers → members in pages. Lists shared with the household go back to their creators (OQ-17) without any owner write: from the moment `LIVE` is false only creators pass the list read rule. Each creator's app sees the tombstone at its next start (the tombstone read above), shows the HH-06 dialog, clears `sharedWith` on its own lists and its `householdId`. This follows the stories planner note (`docs/product/stories.md` section 11): creators, not the owner, make their lists private again. **Cleanup rule**: while `deleted == true`, the owner (`O(uid)`) may read, list (including the invites query on `householdId`) and delete everything under the household; nobody else may do anything. The household doc itself stays as a tombstone (`{ createdBy, createdAt, ownerUid, deleted: true, name: "" }`; field validation accepts the empty name only on tombstones), so its id can never be reused. A crash mid-cleanup leaves data no one can access, and the next app start resumes the cleanup. |
 
@@ -170,14 +170,15 @@ leaves; an owner with other members must transfer ownership first, and the UI
 guides them; a last member deletes the household. Before the member leaves, while they can still write to those
 lists, the app anonymises the items the user added to or last changed on other people's shared lists. The owner
 decided (OQ-18, 2026-11-18) that those items stay and the person's name is removed; how is the planner's proposal,
-confirmed in M2 planning (owner, #15 comment 7000527780: the rule shape, own uid → `null` and nothing else, stays the
-working design, confirmed at M2 planning together with the gap below): per list a query on `createdBy == uid` and one on `updatedBy == uid`, in pages, using the
-anonymise rule (section 3.1; M2, together with the unsharing steps). Then the
+kept by the owner as the working design (#15 comment 7000527780: own uid → `null`, nothing else) and confirmed in M2
+planning together with the gap below: per list a query on `createdBy == uid` and one on `updatedBy == uid`, in pages,
+using the anonymise rule (section 3.1; M2, together with the unsharing steps). Then the
 member leaves, and the app deletes the lists the user created (items first, which also removes what others added to
 them), `users/{uid}` and the Auth user. Deletion needs a recent sign-in[^reauth]
 (`FirebaseAuthRecentLoginRequiredException`): the app asks for Google, or the password plus a TOTP code when
 two-step verification is on, before it starts, so nothing is left half-done.
-**Still open, deferred to M2 planning by the owner (#15 comment 7000513565, on questions 6992973369 and 6994571090; decided together with the rule shape):** the proposal works only while the person can still write
+**Still open, deferred to M2 planning by the owner (#15 comment 7000513565, on questions 6992973369 and
+6994571090; decided together with the rule shape):** the proposal works only while the person can still write
 to the list. If they already left or were removed, or the list's creator stopped sharing it (VIS-04), or the
 household was deleted, and they delete their account later, their uid stays in `createdBy`/`updatedBy` on those items
 (no name or profile remains, and the UI shows "former member"). Accept this, or anonymise in those cases too (at leave,
@@ -218,11 +219,14 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]; the owner
 * **OQ-37 (decided 2026-11-17, C5 of the investigation):** Undo keeps the original `createdAt`, so the item
   keeps its place in the "oldest added first" tie-break (ITEM-05). Rules cannot tell an Undo from any other
   create, so every item create accepts any `createdAt` not later than `request.time` (a forged older value
-  only changes a tie-break order). `createdBy` is the caller, so a plain create by another member records them as the
-  adder. **OQ-18 addition (owner, #15 comment 7000527780, question 2 of 6992973369):** an Undo by another member
+  only changes a tie-break order). `createdBy` is the caller, so a normal create records the caller as the adder; an Undo is the
+  exception (below). **OQ-18 addition (owner, #15 comment 7000527780, question 2 of 6992973369):** an Undo by another member
   restores the ORIGINAL adder, not the member who pressed Undo. The client re-creates the item with its original
   `createdBy` (and `createdAt`); the create rule must therefore accept the original adder's uid on an Undo, and how
-  rules tell this from a forged `createdBy` is settled in M2 planning (`risk:high`, `area:security-rules`).
+  rules tell this from a forged `createdBy` is settled in M2 planning (`risk:high`, `area:security-rules`). That
+  rule must also allow a `null` `createdBy`/`updatedBy` on an Undo (the original adder may already be anonymised), and
+  M2 planning decides whether an Undo may restore the uid of an account deleted in the meantime (for example the client
+  writes `null` when the adder is no longer a member), so an Undo does not undo the anonymisation.
 * **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
   an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 keeps no history and
   stays last write wins per field, as above; the only constraint on the sync-merge design is that it must not rule
