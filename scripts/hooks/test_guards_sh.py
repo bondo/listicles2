@@ -685,6 +685,56 @@ class Baselines(GuardsCase):
         self.repo.commit("delete it")
         self.assertPasses()
 
+    # R1-01: `--staged` lists added and modified files; a staged rename or type change into a baseline name has to be seen too.
+    def test_staged_rename_into_the_eslint_suppressions_name_fails(self):
+        self.repo.write("web/notes.json", '{"a.ts": {"no-console": {"count": 1}}}\n')
+        self.repo.commit("base file")
+        self.repo.git("mv", "web/notes.json", "web/eslint-suppressions.json")
+        self.assertFails("guard: baseline file: web/eslint-suppressions.json", "--staged")
+
+    def test_staged_rename_into_a_baseline_name_fails(self):
+        self.repo.write("config/detekt/rules.xml", "<x/>\n")
+        self.repo.commit("base file")
+        self.repo.git("mv", "config/detekt/rules.xml", "config/detekt/detekt-baseline.xml")
+        self.assertFails("guard: baseline file: config/detekt/detekt-baseline.xml", "--staged")
+
+    def test_staged_type_change_to_a_symlink_named_eslint_suppressions_fails(self):
+        self.repo.write("web/eslint-suppressions.json", "{}\n")
+        self.repo.write("web/other.json", "{}\n")
+        self.repo.commit("base files")
+        os.remove(os.path.join(self.repo.dir, "web", "eslint-suppressions.json"))
+        os.symlink("other.json", os.path.join(self.repo.dir, "web", "eslint-suppressions.json"))
+        self.repo.git("add", "web/eslint-suppressions.json")
+        self.assertFails("guard: baseline file: web/eslint-suppressions.json", "--staged")
+
+    def test_staged_rename_away_from_the_eslint_suppressions_name_passes(self):
+        self.repo.write("web/eslint-suppressions.json", "{}\n")
+        self.repo.commit("base file")
+        self.repo.git("mv", "web/eslint-suppressions.json", "web/notes.json")
+        self.assertPasses("--staged")
+
+    # R1-02: the ESLint Node API loads a suppressions file of any name (applySuppressions, suppressionsLocation).
+    def test_eslint_node_api_apply_suppressions_fails(self):
+        self.repo.write("firebase/lint.mjs", "const eslint = new ESLint({ applySuppressions: true });\n")
+        self.repo.commit()
+        self.assertFails("guard: baseline wiring: firebase/lint.mjs:1:")
+
+    def test_eslint_node_api_suppressions_location_fails(self):
+        self.repo.write("firebase/lint.ts", "const o = { suppressionsLocation: 'lint-state.json' };\n")
+        self.repo.commit()
+        self.assertFails("guard: baseline wiring: firebase/lint.ts:1:")
+
+    def test_staged_eslint_node_api_suppressions_fails(self):
+        self.repo.write("firebase/lint.mjs", "new ESLint({ applySuppressions: true, suppressionsLocation: 'x.json' });\n")
+        self.repo.git("add", "firebase/lint.mjs")
+        self.assertFails("guard: baseline wiring: firebase/lint.mjs:1:", "--staged")
+
+    def test_a_longer_identifier_that_only_contains_the_node_api_option_names_passes(self):
+        self.repo.write("firebase/report.ts",
+                        "const applySuppressionsCount = 3;\nconst suppressionsLocationNote = 1;\nconst xapplySuppressions = 2;\n")
+        self.repo.commit()
+        self.assertPasses()
+
     def test_staged_deletion_of_the_eslint_suppressions_file_passes(self):
         self.repo.write("web/eslint-suppressions.json", "{}\n")
         self.repo.commit("base file")
