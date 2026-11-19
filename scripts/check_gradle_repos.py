@@ -26,6 +26,7 @@ BACKOFF = "systemProp.org.gradle.internal.repository.initial.backoff"
 
 CHAR_LITERAL = re.compile(r"'(?:[^\\'\n]|\\(?:u[0-9a-fA-F]{4}|[^\n]))'")
 INCLUDE = re.compile(r"\binclude\w*\s*\(")
+ONLY_GOOGLE = re.compile(r"\s*google\s*\(\s*\)\s*;?\s*")
 
 
 def _strip(text, blank_strings=False):
@@ -115,12 +116,14 @@ def _filtered(repos, call):
 
 
 def _exclusive(repos):
-    """Spans of forRepository { } bodies in exclusiveContent blocks whose own filter { } has an include...() rule."""
+    """Spans of forRepository { } bodies that are exactly google() in exclusiveContent blocks whose own filter { } has an
+    include...() rule. Gradle applies the filter only to the repository the lambda returns, so any other repository or
+    statement in the body (google(); maven(...), maven { google() }) is not covered."""
     spans = []
     for start, end in _spans(repos, "exclusiveContent"):
         body = repos[start:end]
         if any(INCLUDE.search(body[a:b]) for a, b in _top_spans(body, "filter")):
-            spans += [(start + a, start + b) for a, b in _top_spans(body, "forRepository")]
+            spans += [(start + a, start + b) for a, b in _top_spans(body, "forRepository") if ONLY_GOOGLE.fullmatch(body[a:b])]
     return spans
 
 
