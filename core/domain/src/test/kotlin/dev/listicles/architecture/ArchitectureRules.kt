@@ -20,7 +20,10 @@ object ArchitectureRules {
     private val floatingPatterns =
         listOf(
             Regex("""\b(Float|Double)\b"""),
-            Regex("""\.to(Float|Double)(OrNull)?\b"""),
+            Regex("""\bto(Float|Double)(OrNull)?\b"""),
+            // Floating-point arrays, streams and helpers whose names only contain Float or Double.
+            Regex("""\b(?:to)?(?:Float|Double)Array\b|\b(?:float|double)ArrayOf\b|\bDoubleStream\b"""),
+            Regex("""\b(?:mapToDouble|asDoubleStream|nextGaussian|OptionalDouble)\b"""),
             // BigDecimal is exact but not whole-number; BigInteger stays allowed.
             Regex("""\b(?:BigDecimal|toBigDecimal(?:OrNull)?)\b"""),
             Regex("""\bnext(Float|Double)\b"""),
