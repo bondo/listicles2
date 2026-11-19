@@ -24,16 +24,33 @@ TENTATIVES = "systemProp.org.gradle.internal.repository.max.tentatives"
 BACKOFF = "systemProp.org.gradle.internal.repository.initial.backoff"
 
 
+CHAR_LITERAL = re.compile(r"'(?:[^\\'\n]|\\(?:u[0-9a-fA-F]{4}|[^\n]))'")
+INCLUDE = re.compile(r"\binclude\w*\s*\(")
+ONLY_GOOGLE = re.compile(r"\s*google\s*\(\s*\)\s*;?\s*")
+
+
 def _strip(text, blank_strings=False):
-    """Kotlin source without // and /* */ comments; string contents become spaces if blank_strings."""
+    """Kotlin source without // and (nested) /* */ comments, each block comment replaced by one space so tokens never glue.
+
+    String and char literal contents become spaces if blank_strings. Block comments nest in Kotlin."""
     out, i, n = [], 0, len(text)
     while i < n:
         if text.startswith("//", i):
             while i < n and text[i] != "\n":
                 i += 1
         elif text.startswith("/*", i):
-            end = text.find("*/", i + 2)
-            i = n if end < 0 else end + 2
+            depth, i = 1, i + 2
+            while i < n and depth:
+                if text.startswith("/*", i):
+                    depth, i = depth + 1, i + 2
+                elif text.startswith("*/", i):
+                    depth, i = depth - 1, i + 2
+                else:
+                    i += 1
+            out.append(" ")
+        elif text[i] == "'" and (char := CHAR_LITERAL.match(text, i)) is not None:
+            out.append("'" + " " * (char.end() - i - 2) + "'" if blank_strings else char.group())
+            i = char.end()
         elif text[i] == '"':
             out.append('"')
             i += 1
@@ -72,6 +89,18 @@ def _spans(text, name):
     return spans
 
 
+def _top_spans(text, name):
+    """Like _spans, but only the `name { ... }` blocks that are not nested inside another block of text."""
+    spans = []
+    for m in re.finditer(r"\b" + re.escape(name) + r"(\(\))?\s*\{", text):
+        if text.count("{", 0, m.start()) != text.count("}", 0, m.start()):
+            continue
+        body = _body(text, m.end() - 1)
+        if body is not None:
+            spans.append((m.end(), m.end() + len(body)))
+    return spans
+
+
 def _block(text, name):
     """Body of the first `name { ... }` block, or None."""
     spans = _spans(text, name)
@@ -83,7 +112,19 @@ def _filtered(repos, call):
     brace = re.compile(r"\s*\{").match(repos, call.end())
     body = _body(repos, brace.end() - 1) if brace else None
     content = _block(body, "content") if body is not None else None
-    return content is not None and re.search(r"\binclude\w*\s*\(", content) is not None
+    return content is not None and INCLUDE.search(content) is not None
+
+
+def _exclusive(repos):
+    """Spans of forRepository { } bodies that are exactly google() in exclusiveContent blocks whose own filter { } has an
+    include...() rule. Gradle applies the filter only to the repository the lambda returns, so any other repository or
+    statement in the body (google(); maven(...), maven { google() }) is not covered."""
+    spans = []
+    for start, end in _spans(repos, "exclusiveContent"):
+        body = repos[start:end]
+        if any(INCLUDE.search(body[a:b]) for a, b in _top_spans(body, "filter")):
+            spans += [(start + a, start + b) for a, b in _top_spans(body, "forRepository") if ONLY_GOOGLE.fullmatch(body[a:b])]
+    return spans
 
 
 def _repositories(text, name):
@@ -108,7 +149,7 @@ def check_settings(text):
             problems.append(f"{name}: no repositories block")
             continue
         mirror = repos_text.find(f'"{MIRROR}"')
-        central = re.search(r"\bmavenCentral\s*\(\s*\)", repos)
+        central = re.search(r"\bmavenCentral\s*(?:\(\s*\)|\{\s*\})", repos)  # mavenCentral() or an empty mavenCentral { }
         if mirror < 0:
             problems.append(f"{name}: Maven Central mirror {MIRROR} missing")
         elif central is None:
@@ -117,7 +158,8 @@ def check_settings(text):
             problems.append(f"{name}: Maven Central mirror must come before mavenCentral()")
         # A qualified call (this.google(), foo.google()) counts too; strings are blanked, so URLs never match.
         calls = re.finditer(r"(?<!\w)google\b\s*(\(\s*\))?", repos)
-        if not all(_filtered(repos, call) for call in calls):
+        exclusive = _exclusive(repos)
+        if not all(_filtered(repos, c) or any(a <= c.start() < b for a, b in exclusive) for c in calls):
             problems.append(f"{name}: google() needs a content filter")
     return problems
 
