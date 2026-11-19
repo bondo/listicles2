@@ -164,7 +164,7 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # every command on the line. A backslash continuation is one logical line; it loses its unquoted trailing ` # comment` and is split at ; & | so
 # a flag only counts for the tool in its own command; only the text after the tool name is read (`grep -i shellcheck` has no flag), and a bare
 # `--` ends the flags. A tool named as the thing being installed (`pip install ruff --upgrade`, `npm i -D eslint`, `cargo install`) is not run, so datacmd skips it.
-# For npm and npx (and yarn, pnpm and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
+# For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
 # there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known, so `npm test -- -u` needs a `justified:`
 # too (issue 164 item 3). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
 # tsc names are read case-insensitively (as tsc does), mypy and shellcheck accept unique prefixes of long options so a proper prefix of a
@@ -173,14 +173,14 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # Kinds: f = plain flag; v = takes a value, any; c = takes a config path that must be a file the config scan (2b) reads, not an inline
 # `key = value`, an absolute, `~` or `..` path or one built from `$` or backticks (they may be generated at run time); nf = switch that
 # may not be set to false; z = value must be 0; e = value must be error or 2; s = shellcheck severity, not error; fi = mypy follow-imports,
-# normal or error; o = optional value attached to the flag (shellcheck colour: always, never or auto); r = ESLint --rule, no severity of off, warn, 0 or 1; n = the last part of the value must be the flag name (`-shellcheck=$d/shellcheck`); an empty value or a stub program disables the integration.
+# normal or error; fm = an ESLint built-in formatter name (stylish, json, json-with-metadata, html); o = optional value attached to the flag (shellcheck colour: always, never or auto); r = ESLint --rule, no severity of off, warn, 0 or 1; n = the last part of the value must be the flag name (`-shellcheck=$d/shellcheck`); an empty value or a stub program disables the integration.
 # Beyond the allowlist: `tsc` with a source file argument and no -p/-b ignores tsconfig.json, so it fails; every project argument of `tsc -b` is
 # checked; a mypy `@argfile` fails; an empty quoted config (`--config-file ""`) disables the config, so it fails.
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
 # Not covered: action `with: args:` lines, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (2b does not read it), flags held in
 # shell variables (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, tools run from Python (subprocess),
-# and yarn and pnpm forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
+# and yarn, pnpm and bun forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
 # is added only with a reason a reviewer can check, in scripts/hooks/test_guards_cli_flags.py too (docs/guards-known-gaps.md has the rationale).
 CLI_ALLOW='
 ruff --config c a config file that 2b reads, so its settings are reviewed there
@@ -235,13 +235,13 @@ eslint --report-unused-disable-directives f switches a check on
 eslint --report-unused-disable-directives-severity e only error or 2 keeps unused directives failing
 eslint --no-inline-config f makes inline directives inert
 eslint --prune-suppressions f only removes entries from a suppressions file (check 3 refuses the file itself)
-eslint --format v only changes how findings are printed
-eslint -f v only changes how findings are printed
+eslint --format fm only a built-in formatter: a formatter module is code and can exit 0
+eslint -f fm only a built-in formatter: a formatter module is code and can exit 0
 eslint --color f only changes the output
 eslint --no-color f only changes the output
 eslint --version f prints the version
 prettier --check f reports unformatted files and writes nothing
-prettier --write f formats in place, the stricter local form
+prettier --write f formats in place; like a bare run it never fails on formatting, which no flag check can see
 prettier --list-different f reports unformatted files
 prettier --config c a config file that 2b reads
 prettier --log-level v only changes the output
@@ -381,7 +381,7 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
     t = w[i]; sub(/^["\047]+/, "", t)
     if (t == "") continue
     if (t == "--") break
-    if (tools == "tsc" && substr(t, 1, 1) == "@") return 1
+    if (index(tools, "tsc") && substr(t, 1, 1) == "@") return 1
     if (t == "-" || substr(t, 1, 1) != "-") {
       v = t; sub(/["\047,]+$/, "", v)
       if (direct && !hp && v !~ /=/ && v ~ SRCRE) return 1
@@ -418,6 +418,7 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
     if (!eq) { i++; v = w[i] }
     v = unq(v)
     if (k == "z" && v != "0") return 1
+    if (k == "fm" && v !~ /^(stylish|json|json-with-metadata|html)$/) return 1
     if (k == "e" && v !~ /^(error|2)$/) return 1
     if (k == "s" && v !~ SEVOK) return 1
     if (k == "fi" && v !~ /^(normal|error)$/) return 1
@@ -426,15 +427,16 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
   return 0
 }
 function eslintbase(s) { return hit(s, "suppress-all|suppress-rule|suppressions-location|pass-on-unpruned-suppressions") }
-function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
+function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bun|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
 function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
 # datacmd: the command installs a tool (its name is an argument, not a command): `pip install ruff --upgrade`, `npm i -D eslint`.
-function datacmd(p,   n, w, i, j, k, a, b, c) {
+function datacmd(p,   n, w, i, j, k, a, b, c, m) {
   n = split(p, w, /[ \t]+/); i = 1
   while (i <= n && (w[i] == "" || w[i] == "-" || w[i] ~ /:$/ || w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[i] ~ /^(sudo|env|time|export|exec|command)$/)) i++
   a = w[i]; sub(/^["\047]+/, "", a); sub(/^.*\//, "", a)
+  for (m = i + 1; m <= n; m++) if (w[m] ~ /^(run|exec|dlx|run-script)$/ || (a == "npm" && w[m] == "x")) return 0  # a run verb: the tool is run, whatever else precedes
   j = i + 1; while (j <= n && w[j] ~ /^-/) j++; b = w[j]; k = j + 1; while (k <= n && w[k] ~ /^-/) k++; c = w[k]
   if (a ~ /^(pip|pip3|pipx)$/ && b ~ /^(install|uninstall|upgrade|upgrade-all|inject|reinstall|reinstall-all|download)$/) return 1
   if (a == "conda" && b ~ /^(install|create|update|remove|uninstall)$/) return 1
@@ -469,6 +471,7 @@ function flush(   n, i, parts, j) {
   if (cur == "") return
   j = just(cur)
   n = split(stripc(cur), parts, /[;&|]+/)
+  if (F ~ /(Makefile|\.mk)$/) for (i = 1; i <= n; i++) sub(/^[ \t]*[@+-]+/, "", parts[i])  # recipe prefixes: silent, always run, ignore errors
   for (i = 1; i <= n; i++) if (baseline(parts[i]) || (!j && relaxed(parts[i]))) { printf "%s:%d:%s\n", F, start, cur; break }
   cur = ""
 }

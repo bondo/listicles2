@@ -69,7 +69,7 @@ would otherwise fail: it switches a check on, says where a config or output goes
 | ruff | `--config` (a 2b-scanned file), `--no-cache`, `--output-format`, `--version`; `check`: `--extend-select`; `format`: `--check`, `--diff` |
 | mypy | `--config-file` (a 2b-scanned file), `--follow-imports` (`normal` or `error`), `--strict`, `--check-untyped-defs`, `--strict-equality`, `--strict-bytes`, `--extra-checks`, `--no-implicit-reexport`, `--no-implicit-optional`, `--warn-*`, `--disallow-*`, `--version` |
 | tsc | `--noEmit`, `-p` and `--project` (a scanned tsconfig), `-b` and `--build` (every project argument checked), `--verbose`, `--force`, `--pretty`, `--outDir`, `--outFile`, `--version`, and the strict family unless set to false (`--strict*`, `--noImplicitAny`, `--noImplicitThis`, `--noImplicitReturns`, `--noImplicitOverride`, `--noUnused*`, `--alwaysStrict`, `--useUnknownInCatchVariables`, `--noUncheckedIndexedAccess`, `--exactOptionalPropertyTypes`, `--noFallthroughCasesInSwitch`, `--noPropertyAccessFromIndexSignature`, `--checkJs`) |
-| ESLint | `--max-warnings 0`, `-c` and `--config` (a scanned file), `--rule` (severity `error` only), `--report-unused-disable-directives`, `--report-unused-disable-directives-severity` (`error` or `2`), `--no-inline-config`, `--prune-suppressions`, `--format`, `-f`, `--color`, `--no-color`, `--version` |
+| ESLint | `--max-warnings 0`, `-c` and `--config` (a scanned file), `--rule` (severity `error` only), `--report-unused-disable-directives`, `--report-unused-disable-directives-severity` (`error` or `2`), `--no-inline-config`, `--prune-suppressions`, `--format` and `-f` (a built-in formatter: `stylish`, `json`, `json-with-metadata` or `html`; a formatter module is code), `--color`, `--no-color`, `--version` |
 | Prettier | `--check`, `--write`, `--list-different`, `--config` (a scanned file), `--log-level`, `--version` |
 | shellcheck | `-S` and `--severity` (`warning`, `info` or `style`, never `error`), `-x`, `-a`, `-o`, `-C`, `-f`, `-P` and their long forms, `--norc`, `--version`; short options may be combined |
 | actionlint | `-shellcheck` and `-pyflakes` (the value must end in `shellcheck` or `pyflakes`: an empty value or a stub program such as `true` switches the integration off), `-color`, `-no-color`, `-oneline`, `-verbose`, `-format`, `-version` |
@@ -84,7 +84,7 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   (issue 174, R5-01) while `ruff format --diff .` passes.
 - actionlint: `-ignore`, an empty `-pyflakes=` or `-shellcheck=` and every unlisted flag fail; a non-empty `-shellcheck=<path>` passes
   (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`.
-- Makefiles, `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2, the part a line scan can read: only the `entry:` and run lines are read, not `args:`).
+- Makefiles, `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2, the part a line scan can read: only the `entry:` and run lines are read, not `args:`; a recipe prefix `@`, `+` or `-` is stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
 - False positives removed: `uvx mypy@1.15`, `tsc -b > build.log` (issue 164 item 5) and `tsc --outFile dist/out.js` (item 4), and tools that
   are being installed (`pip install ruff --upgrade`, `npm i -D eslint --save-exact`, `cargo install`, `go install`).
 
@@ -94,7 +94,7 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   So `npm test -- --coverage` or `npm run build -- --watch` now needs a `justified:` (issue 164 item 3 stays open, and is wider than under
   the blocklist). Resolving the script name through `package.json` would narrow it; no such passthrough exists in the repo today.
 - `with: args:` of a lint action, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (its `ignore:` entries are not read by
-  2b), flags held in shell variables, tools run from Python (subprocess), and yarn or pnpm forms without `--`.
+  2b), flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
 - A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
 - pre-commit `args:` lines (block style under `- id: ruff`, and the flow form `- {id: ruff, args: [--ignore=E501]}`), a tool name held in a
   Make or shell variable (`$(RUFF) check --ignore E501 .`), and a flag hidden by shell escapes (`eslint \--quiet .`, `eslint $'--quiet' .`).
