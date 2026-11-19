@@ -1,6 +1,6 @@
 # Tally app flow (v1)
 
-Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); open: T2 text size, screen 32a.
+Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); T2 text size decided (owner, 2026-11-18, issue #15 comment 6991847257) and screen 32a closed (comment 6992107414); recorded in docs/milestones/M1.md.
 
 Task M0.5-02. Status: **owner-approved 2026-11-18** (M0.5-O1, issue #15 comment 6991804241).
 Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19,

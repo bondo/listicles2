@@ -1,6 +1,6 @@
 # Tally user stories (v1)
 
-Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); open: T2 text size, screen 32a.
+Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); T2 text size decided (owner, 2026-11-18, issue #15 comment 6991847257) and screen 32a closed (comment 6992107414); recorded in docs/milestones/M1.md.
 
 Task M0.5-01. Status: **owner-approved 2026-11-18** (M0.5-O1, issue #15 comment 6991804241).
 Sources: the owner's design-chain decisions Q1-Q5, the answers to OQ-1 to OQ-6 of 2026-11-15 and to OQ-17, OQ-19 and
