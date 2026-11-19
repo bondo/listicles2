@@ -18,6 +18,8 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 FB = os.path.join(ROOT, "firebase")
 BIN = os.path.join(FB, "node_modules", ".bin")
 EXACT = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+COOLDOWN_ECOSYSTEMS = ("gradle", "npm", "pip", "github-actions")
+COOLDOWN_DAYS = 7
 REQUIRED_DEV = {
     "@eslint/js", "@firebase/rules-unit-testing", "@types/jest", "@types/node", "eslint", "firebase", "firebase-tools", "jest",
     "prettier", "semver", "ts-jest", "typescript", "typescript-eslint",
@@ -123,6 +125,19 @@ def dependabot_ignore_problems(cfg, policy=IGNORE_POLICY):
             problems.append(f"{name} must be ignored for {policy[name]} only, got {rule}")
     problems += [f"{name} has no ignore rule" for name in policy if seen.count(name) == 0]
     problems += [f"{name} has {seen.count(name)} ignore rules" for name in policy if seen.count(name) > 1]
+    return problems
+
+
+def dependabot_cooldown_problems(cfg, ecosystems=COOLDOWN_ECOSYSTEMS, days=COOLDOWN_DAYS):
+    """Problems with the cooldown (issue 186): every update entry, and every ecosystem in `ecosystems`, must delay a new release by at
+    least `days` days (a whole number) through cooldown.default-days. Security updates are not delayed by cooldown."""
+    updates = cfg.get("updates", [])
+    problems = [f"no update entry for {eco}" for eco in ecosystems if not any(u.get("package-ecosystem") == eco for u in updates)]
+    for u in updates:
+        where = f"{u.get('package-ecosystem')} {u.get('directory')}"
+        got = (u.get("cooldown") or {}).get("default-days")
+        if not isinstance(got, int) or isinstance(got, bool) or got < days:
+            problems.append(f"{where}: cooldown.default-days must be a whole number >= {days}, got {got!r}")
     return problems
 
 
@@ -434,6 +449,28 @@ class Config(unittest.TestCase):
 
     def test_dependabot_groups_firebase_and_rules_unit_testing_ahead_of_the_catch_all(self):
         self.assertEqual(dependabot_group_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
+
+    def test_dependabot_cooldown_check_rejects_a_missing_short_or_malformed_cooldown(self):
+        base = [{"package-ecosystem": e, "directory": "/", "cooldown": {"default-days": 7}} for e in COOLDOWN_ECOSYSTEMS]
+        self.assertEqual(dependabot_cooldown_problems({"updates": base}), [])
+        self.assertEqual(dependabot_cooldown_problems({"updates": [*base[:3], {**base[3], "cooldown": {"default-days": 10}}]}), [])
+        bad = {
+            "no cooldown on one": {"updates": [*base[:3], {"package-ecosystem": "github-actions", "directory": "/"}]},
+            "short": {"updates": [*base[:3], {**base[3], "cooldown": {"default-days": 6}}]},
+            "zero": {"updates": [*base[:3], {**base[3], "cooldown": {"default-days": 0}}]},
+            "string": {"updates": [*base[:3], {**base[3], "cooldown": {"default-days": "7"}}]},
+            "bool": {"updates": [*base[:3], {**base[3], "cooldown": {"default-days": True}}]},
+            "only semver keys": {"updates": [*base[:3], {**base[3], "cooldown": {"semver-major-days": 14}}]},
+            "empty cooldown": {"updates": [*base[:3], {**base[3], "cooldown": {}}]},
+            "ecosystem missing": {"updates": base[:3]},
+            "no updates": {},
+        }
+        for name, c in bad.items():
+            with self.subTest(name):
+                self.assertNotEqual(dependabot_cooldown_problems(c), [])
+
+    def test_every_dependabot_ecosystem_has_a_seven_day_cooldown(self):
+        self.assertEqual(dependabot_cooldown_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
 
     def test_ci_node_satisfies_every_engines_range_in_the_lockfile(self):
         node = ci_node_version(read(".github", "workflows", "ci.yml"))
