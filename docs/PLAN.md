@@ -385,6 +385,7 @@ enforce the rules rather than goodwill.
      was started for a `tooling` task (an environment flag set at spawn).
    * A context-% warning (section 9.3).
 4. **CI (GitHub Actions)**, required checks on `main`:
+   * `wrapper`: Gradle wrapper validation (the checksum of `gradle-wrapper.jar`)
    * `static`: spotless, detekt, Android Lint (warnings are errors, `MissingTranslation`
      and `ExtraTranslation` are errors, `HardcodedText` is an error). `targetSdk`
      follows `compileSdk`; if they differ, `OldTargetApi` is disabled with a
@@ -414,6 +415,8 @@ enforce the rules rather than goodwill.
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label
      * a diff over 600 changed lines outside generated files
+   * `python-lint`: ruff and mypy on `scripts/`, versions pinned, with tests that deliberate violations fail
+   * `workflow-lint`: shellcheck, actionlint and zizmor on `.github/` and `scripts/`, pinned binaries
    * `secrets`: gitleaks
    * `tasks`: `scripts/test_tasks.py` and `scripts/tasks.py validate` (the task graph in
      `docs/tasks.toml`); also run by `scripts/verify.sh`, including `--fast`

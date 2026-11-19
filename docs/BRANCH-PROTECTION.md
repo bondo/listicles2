@@ -140,4 +140,3 @@ Try these in order; stop at the first that works.
 ## 6. Keep in sync
 When a CI job is added, renamed or removed in `ci.yml`, update the required list here and in the ruleset
 in the same sitting. A renamed job silently becomes "expected, never reported" and blocks every PR.
-
