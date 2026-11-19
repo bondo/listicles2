@@ -110,7 +110,7 @@ per screen or per flow.
 | Consistency | same patterns for the same things across screens |
 | Polish and delight | empty states, transitions and small details feel cared for |
 
-**Reference apps** (decided in R1, #15 comment 6991349569): Todoist and Google Keep, used for comparison, never copied.
+**Reference apps** (owner decision 2026-11-18, rubric question R1, #15 comment 6991349569): Todoist and Google Keep, used for comparison, never copied.
 
 **Pass bar (D-3.4):** no criterion below 3 in the **owner's** scores (R10, D5). An **agent** score below 3 is a **minor
 finding**, never a blocker.
