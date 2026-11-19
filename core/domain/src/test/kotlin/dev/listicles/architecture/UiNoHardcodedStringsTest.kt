@@ -157,4 +157,79 @@ class UiNoHardcodedStringsTest {
         File(dir, "a/b/Deep.kt").writeText("package sample\n\nval x = Text(\"Deep\")\n")
         UiHardcodedStringRules.violations(dir).single().shouldContain("a/b/Deep.kt:3:")
     }
+
+    private val realText = "    Text(\"Real text\")"
+
+    private fun realFunction() = "\n\n@Composable\nfun Real() {\n$realText\n}"
+
+    @Test
+    fun previewWithAPreviewParameterDoesNotExemptTheNextFunction() {
+        violationsOf(
+            "@Preview\n@Composable\nfun P(@PreviewParameter(Prov::class) s: String) {\n    Text(\"Sample\")\n}" +
+                realFunction(),
+        ).single().shouldContain("Real text")
+    }
+
+    @Test
+    fun previewParameterAloneIsNotAPreviewExemption() {
+        violationsOf("@Composable\nfun P(@PreviewParameter(Prov::class) s: String) {\n    Text(\"Sample\")\n}")
+            .shouldNotBeEmpty()
+    }
+
+    @Test
+    fun expressionBodyPreviewDoesNotExemptTheNextFunction() {
+        violationsOf("@Preview\n@Composable\nfun P() = Sample()" + realFunction())
+            .single()
+            .shouldContain("Real text")
+    }
+
+    @Test
+    fun multiPreviewAnnotationClassDoesNotExemptTheNextFunction() {
+        violationsOf(
+            "@Preview(name = \"Light\")\n@Preview(name = \"Dark\")\nannotation class ThemePreviews" + realFunction(),
+        ).single().shouldContain("Real text")
+    }
+
+    @Test
+    fun previewWithArgumentsAndAReturnTypeBodyIsStillExempt() {
+        violationsOf(
+            "@Preview(name = \"Dark\", showBackground = true)\n@Composable\nfun P(): Unit {\n    Text(\"Sample\")\n}",
+        ).shouldBeEmpty()
+    }
+
+    @Test
+    fun rejectsPositionalSnackbarMessage() {
+        violationsOf("suspend fun f() {\n    host.showSnackbar(\"Item deleted\")\n}").shouldNotBeEmpty()
+        violationsOf("suspend fun f() {\n    host.showSnackbar(stringResource(R.string.deleted))\n}").shouldBeEmpty()
+    }
+
+    @Test
+    fun rejectsActionLabelOnClickLabelAndStateDescription() {
+        violationsOf("host.showSnackbar(m, actionLabel = \"Undo\")").shouldNotBeEmpty()
+        violationsOf("Modifier.clickable(onClickLabel = \"Open list\") {}").shouldNotBeEmpty()
+        violationsOf("Modifier.toggleable(stateDescription = \"Selected item\")").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsPositionalContentDescriptionOfIconAndImage() {
+        violationsOf("Icon(Icons.Filled.Add, \"Add item\")").shouldNotBeEmpty()
+        violationsOf("Image(painter, \"Logo\")").shouldNotBeEmpty()
+        violationsOf("Icon(Icons.Filled.Add, null)\nImage(painter, null)").shouldBeEmpty()
+        violationsOf("Icon(Icons.Filled.Add, stringResource(R.string.add))").shouldBeEmpty()
+        violationsOf("Icon(vector(\"a, b\", 1), null)").shouldBeEmpty()
+    }
+
+    @Test
+    fun rejectsContentDescriptionAssignedInASemanticsBlock() {
+        violationsOf("Box(Modifier.semantics { contentDescription = \"Add item\" })").shouldNotBeEmpty()
+        violationsOf("Box(Modifier.semantics {\n    contentDescription = \"Add item\"\n})").shouldNotBeEmpty()
+        violationsOf("Box(Modifier.semantics { stateDescription = \"Selected item\"; role = r })").shouldNotBeEmpty()
+        violationsOf("Box(Modifier.semantics { contentDescription = stringResource(R.string.add) })").shouldBeEmpty()
+    }
+
+    @Test
+    fun acceptsEscapeOnlyLiterals() {
+        violationsOf("Text(\"\\u2022\")\nText(\"\\n\")\nText(\"\\t-\\\\\")").shouldBeEmpty()
+        violationsOf("Text(\"\\nHello\")").shouldNotBeEmpty()
+    }
 }
