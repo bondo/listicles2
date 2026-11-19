@@ -59,6 +59,26 @@ class Gate(Fixture):
         self.assertEqual(c.missing(self.src, self.results), ["a.b.OldTest"])
 
 
+class HelperClasses(Fixture):
+    def test_private_helper_next_to_a_real_test_is_ignored(self):
+        self.write("FooTest.kt", JUNIT4.replace("OldTest", "FooTest") + "\nprivate class FakeRepo\n")
+        self.result("a.b.FooTest")
+        self.assertEqual(c.missing(self.src, self.results), [])
+
+    def test_plain_helper_next_to_a_real_test_is_ignored(self):
+        self.write("FooTest.kt", JUNIT4.replace("OldTest", "FooTest") + "\nclass FakeRepo {\n    fun get() = 1\n}\n")
+        self.result("a.b.FooTest")
+        self.assertEqual(c.missing(self.src, self.results), [])
+
+    def test_abstract_base_with_tests_is_ignored(self):
+        self.write("BaseTest.kt", JUNIT4.replace("class OldTest", "abstract class BaseTest"))
+        self.assertEqual(c.missing(self.src, self.results), [])
+
+    def test_helper_before_the_test_class_does_not_hide_a_skipped_test(self):
+        self.write("OldTest.kt", "package a.b\n\nimport org.junit.Test\n\nclass Helper\n\nclass OldTest {\n    @Test\n    fun x() {}\n}\n")
+        self.assertEqual(c.missing(self.src, self.results), ["a.b.OldTest"])
+
+
 class Cli(Fixture):
     def test_exit_0_when_complete(self):
         self.write("NewTest.kt", JUPITER)
@@ -87,10 +107,24 @@ class Wiring(unittest.TestCase):
         verify = (ROOT / "scripts" / "verify.sh").read_text()
         self.assertIn("python3 -I scripts/test_check_test_results.py", verify)
 
-    def test_app_unit_tests_are_gated_by_the_check(self):
-        gradle = (ROOT / "app" / "build.gradle.kts").read_text()
-        self.assertIn("check_test_results.py", gradle)
-        self.assertIn("finalizedBy", gradle)
+
+def gradle(*args):
+    return subprocess.run(
+        [str(ROOT / "gradlew"), "-q", "--console=plain", *args], cwd=ROOT, capture_output=True, text=True
+    )
+
+
+class GradleWiring(unittest.TestCase):
+    """Behaviour of the real build: the gate must follow testDebugUnitTest, but not a filtered run."""
+
+    def test_gate_is_scheduled_after_the_unit_test_task(self):
+        r = gradle("--dry-run", ":app:testDebugUnitTest")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(":app:checkUnitTestResults", r.stdout)
+
+    def test_filtered_run_does_not_fail_the_gate(self):
+        r = gradle(":app:testDebugUnitTest", "--tests", "dev.listicles.app.ThemeTest")
+        self.assertEqual(r.returncode, 0, r.stderr[-1500:])
 
 
 if __name__ == "__main__":
