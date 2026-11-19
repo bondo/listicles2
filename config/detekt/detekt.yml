@@ -6,6 +6,10 @@ naming:
   FunctionNaming:
     # Composables are PascalCase.
     ignoreAnnotated: ['Composable']
+complexity:
+  LongParameterList:
+    # Stateless composables keep explicit event lambdas (state hoisting); owner decision, see #217.
+    ignoreAnnotated: ['Composable']
 style:
   MagicNumber:
     excludes: ['**/test/**', '**/androidTest/**']  # justified: test literals are not magic numbers
