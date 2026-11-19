@@ -1651,7 +1651,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         for label, pattern in self.RECIPES:
             with self.subTest(recipe=label):
                 self.assertRegex(section, pattern)
-        self.assertRegex(section, r"docs/orchestration\.md §7\.8")  # the pointer to the detailed section
+        self.assertRegex(section, r"docs/orchestration\.md`? §7\.8")  # the pointer to the detailed section
 
     def test_orchestration_md_holds_the_detailed_section_7_8(self):
         text = self.norm(self.ORCH_DOC)

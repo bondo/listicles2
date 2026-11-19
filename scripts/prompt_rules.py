@@ -305,15 +305,16 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"handover \(§5, two-phase\), at about 50% of a 1m window \(40% of a 200k one, `agents/roles\.yaml` context\)",
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
             r"a successor does §5\.2",
+            r"from lineage depth 6 or more \(§9, f3\) do not spawn the successor: the owner starts the next orchestrator from a top-level session",
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 80% of a 1M window (60% of 200k), first batch boundary: comment, successor, ack, release (§5)",
-        forbidden=(r"at about 50% context", r"at about 80% context"),
+        "two-phase handover at about 50% of a 1M window (40% of 200k, owner decision #15 comment 7001335975), first batch boundary: comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window"),
     ),
     Rule(
         "lock-takeover", ("orchestrator",),
@@ -879,13 +880,13 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"trigger: about 50% of a 1m window \(40% of a 200k one, `agents/roles\.yaml` context;",
             r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
-        "ORCHESTRATION 5: hand over at about 80% at a batch boundary (40 wakes or 20 sessions when unknown); the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"the owner archives you"),
+        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); the successor archives the predecessor",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"the owner archives you"),
     ),
     DocRule(
         "orch-parallel", ORCH,
