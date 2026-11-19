@@ -673,5 +673,46 @@ class ReviewRound1Tests(CliFlagCase):
         self.assertPasses()
 
 
+class ReviewRound2Tests(CliFlagCase):
+    """PR 183 review round 2: R2-01 tsc @response file through npm `--`, R2-02 an option value that reads as an installer verb, R2-03 bun
+    as a passthrough runner, R2-04 Makefile recipe prefixes, R2-05 ESLint formatter modules."""
+
+    BAD = [
+        "npm run typecheck -- @relax.txt", "npm exec tsc -- @relax.txt", "npm run typecheck -- --noEmit @relax.txt",
+        "npm --prefix install exec eslint --quiet .", "npm -w install exec eslint --quiet .", "npm --loglevel install exec eslint -- --quiet",
+        "conda -n install run ruff check --ignore E501 .", "uv --directory add run ruff check --fix .",
+        "bun run lint:eslint -- --quiet", "bun run typecheck:tsc -- --noCheck",
+        "eslint -f ./fmt.cjs .", "eslint --format ./fmt.cjs .", "eslint --format=eslint-formatter-x .", "npm run lint -- -f ./fmt.cjs",
+    ]
+    GOOD = [
+        "npm run lint -- -f json", "eslint -f stylish --max-warnings 0 .", "eslint --format=html .", "eslint --format json-with-metadata .",
+        "bun run lint -- --max-warnings 0", "bun install eslint --save-exact", "npm install --save-dev eslint --save-exact",
+        "npm run typecheck -- --noEmit",
+    ]
+
+    def test_holes_the_review_found_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_neighbouring_lines_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+    def test_makefile_recipe_prefixes_do_not_hide_the_tool(self):
+        for line in ["\t-ruff check --fix .", "\t@-eslint --quiet .", "\t-mypy --ignore-missing-imports scripts", "\t+tsc --noCheck",
+                     "\t@+-shellcheck -e SC2086 a.sh"]:
+            with self.subTest(line=line):
+                self.put("Makefile", line)
+                self.assertFails(MARK + ": Makefile:1:")
+        for line in ["\t-ruff check scripts", "\t@eslint --max-warnings 0 .", "\t@-tsc --noEmit -p tsconfig.json"]:
+            with self.subTest(line=line):
+                self.put("Makefile", line)
+                self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
