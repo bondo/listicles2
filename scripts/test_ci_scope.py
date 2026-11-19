@@ -148,9 +148,26 @@ def job_in(text, name):
     return m.group(1) if m else None
 
 
+# Steps that merged PRs could not add themselves (ci.yml is protected): (job, command, source finding).
+# Each also runs in verify.sh. Issue 224 R1-02, PR 231, PR 235 R1-04. PR 239 R2-02 (check_test_results) is not here until #239 merges.
+CI_STEPS = [
+    ("static", "python3 -I scripts/test_check_gradle_wrapper.py", "PR 231"),
+    ("static", "python3 -I scripts/check_gradle_wrapper.py", "PR 231"),
+    ("static", "python3 -I scripts/test_gitignore_secrets.py", "PR 235 R1-04"),
+    ("tasks", "python3 -I scripts/test_dependency_floors.py", "PR 224 R1-02"),
+    ("tasks", "python3 -I scripts/dependency_floors.py", "PR 224 R1-02"),
+]
+
+
 def wiring_problems(text):
     """What is wrong with a ci.yml text, as a list of messages (empty when the wiring is right)."""
     problems = []
+    for job, cmd, _source in CI_STEPS:
+        body = job_in(text, job) or ""
+        if not re.search(rf"(?m)^        run: {re.escape(cmd)}$", body):
+            problems.append(f"{job}: does not run {cmd}")
+        if re.search(r"(?m)^\s*(?:-\s+)?if:", body) or "continue-on-error" in body:
+            problems.append(f"{job}: if or continue-on-error")
     if re.search(r"^\s+paths(-ignore)?:", text, re.M):
         problems.append("workflow-level paths filter")
     for name in REQUIRED_JOBS:
@@ -210,13 +227,36 @@ class CiWiring(unittest.TestCase):
             ("guards: hook tests not run with --jobs 4", "run_hook_tests.py --jobs 4", "run_hook_tests.py"),
             ("ci.yml does not run test_ci_scope.py", "python3 -I scripts/test_ci_scope.py", "python3 -I scripts/test_nothing.py"),
         ]
+        for job, cmd, _source in CI_STEPS:
+            run = f"        run: {cmd}\n"
+            problem = f"{job}: does not run {cmd}"
+            cases += [
+                (problem, cmd, "python3 -I scripts/test_nothing.py"),
+                (problem, run, f"        # run: {cmd}\n"),
+                (problem, run, run.rstrip() + " || true\n"),
+                (problem, run, ""),
+                (f"{job}: if or continue-on-error", run, run + "        continue-on-error: true\n"),
+            ]
         for problem, old, new in cases:
             self.assertIn(problem, self.mutated(old, new), problem)
+
+    def test_a_step_moved_to_another_job_is_flagged(self):
+        text = ci_text()
+        for job, cmd, _source in CI_STEPS:
+            run = f"        run: {cmd}\n"
+            moved = text.replace(run, "", 1).replace("      - name: hook tests", f"      - run: {cmd}\n      - name: hook tests", 1)
+            self.assertIn(f"{job}: does not run {cmd}", wiring_problems(moved), (job, cmd))
 
     def test_verify_runs_the_scope_tests_and_the_parallel_hook_tests(self):
         verify = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8")
         self.assertIn("python3 -I scripts/test_ci_scope.py", verify)
         self.assertIn("scripts/hooks/run_hook_tests.py --jobs 4", verify)
+
+    def test_every_ci_step_also_runs_in_verify_and_its_script_exists(self):
+        verify = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8")
+        for _job, cmd, source in CI_STEPS:
+            self.assertIn(cmd, verify, source)
+            self.assertTrue((ROOT / cmd.rsplit(" ", 1)[1]).is_file(), cmd)
 
 
 if __name__ == "__main__":
