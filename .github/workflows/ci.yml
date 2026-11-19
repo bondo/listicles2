@@ -68,6 +68,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: unit tests and coverage
         run: ./gradlew -q --console=plain testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: test-results gate tests (PR 239 R2-02)
+        run: python3 -I scripts/test_check_test_results.py
 
   firebase:
     name: firebase
