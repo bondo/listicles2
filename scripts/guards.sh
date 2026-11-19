@@ -46,7 +46,7 @@ out=$(gg '[Ee]nabled *(= *|\() *(false|!)|onlyIf *(\([^)]*\))? *\{ *false|exclud
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled tests via build config: /'; fail=1; }
 
 LS=(git ls-files)
-[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AM)
+[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AMRT) # added, modified, renamed (new path) and type-changed (file to symlink)
 
 # 2. Suppressions and weakened settings need "justified: <reason>" on the same line.
 # The justification is looked for in the whole `path:line:text` grep output, so a tracked path containing it would waive every hit
@@ -546,7 +546,8 @@ out=$("${LS[@]}" | grep -iE 'baseline|(^|/)eslint-suppressions\.json$')
 # Formatter and linter ignore files cannot carry a same-line justification, so they are refused outright (ask the owner).
 out=$("${LS[@]}" | grep -E '(^|/)\.(prettier|eslint|stylelint|dprint)ignore$')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: ignore file: /'; fail=1; }
-out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=' -- "${EXCL[@]}")
+# The ESLint Node API options applySuppressions and suppressionsLocation load a suppressions file of any name (whole identifiers only).
+out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=|(^|[^[:alnum:]_])(applySuppressions|suppressionsLocation)($|[^[:alnum:]_])' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline wiring: /'; fail=1; }
 
 # 5. File size (owner decision, #15 comment 6974778901: Git LFS is not adopted, so big binaries stay out of the repo).
