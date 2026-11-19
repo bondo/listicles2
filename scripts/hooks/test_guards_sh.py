@@ -807,6 +807,17 @@ class DiffChecks(GuardsCase):
         self.assertFails("screenshot references changed", GUARD_BASE="origin/main")
         self.assertPasses(GOLDEN_UPDATE="1")
 
+    def test_many_changed_goldens_do_not_skip_the_label_check(self):
+        """#251: under pipefail `grep -E | grep -q .` died of SIGPIPE when more than one pipe buffer of golden paths changed."""
+        for n in (1, 300):
+            with self.subTest(goldens=n):
+                for i in range(n):
+                    self.repo.write(f"app/src/test/screenshots/{i:04d}_{'x' * 50}.png", "png")
+                self.repo.commit()
+                self.assertFails("screenshot references changed", GUARD_BASE="origin/main")
+                self.repo.git("rm", "-q", "-r", "-f", "app/src/test/screenshots")
+                self.repo.commit()
+
     def test_diff_size_limit_is_enforced_only_in_ci(self):
         self.repo.write("notes.txt", "x\n" * 50)
         self.repo.commit()
@@ -2064,6 +2075,15 @@ class LineLengthPerTool(DiffCase):
             ".editorconfig to a symlink": ({".editorconfig": "[*.kt]\nmax_line_length = 100\n"}, {".editorconfig": ("link", "config/editorconfig")}),
             "ruff.toml to a symlink": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": ("link", "config/ruff-base.toml")}),
             "non-ASCII directory": ({"\u00f8velser/.prettierrc.json": '{ "printWidth": 100 }\n'}, {"\u00f8velser/.prettierrc.json": '{ "printWidth": 300 }\n'}),
+            "non-ASCII .editorconfig": (
+                {"\u00f8/.editorconfig": "[*.kt]\nmax_line_length = 100\n"},
+                {"\u00f8/.editorconfig": "[*.kt]\nmax_line_length = 300\n"},
+            ),
+            "non-ASCII ruff.toml": ({"\u00f8/ruff.toml": "line-length = 100\n"}, {"\u00f8/ruff.toml": "line-length = 300\n"}),
+            "non-ASCII detekt.yml": (
+                {"\u00f8/detekt.yml": "style:\n  MaxLineLength:\n    maxLineLength: 100\n"},
+                {"\u00f8/detekt.yml": "style:\n  MaxLineLength:\n    maxLineLength: 300\n"},
+            ),
         }, True)
         self.assertRaised({
             "non-ASCII directory, lowered": (
@@ -2072,6 +2092,60 @@ class LineLengthPerTool(DiffCase):
             ),
             "a symlink that stays": ({".editorconfig": ("link", "config/editorconfig")}, {".editorconfig": ("link", "config/other")}),
         }, False)
+
+    def test_other_spellings_of_the_ruff_and_flake8_tables_are_read(self):
+        """R2-02..R2-01: TOML and INI spell the same table in several ways, and all of them are read by ruff and flake8."""
+        pp = "[tool.black]\nline-length = 60\n"
+        base_py = {"pyproject.toml": pp + self.PP % 100}
+        base_fl = {"setup.cfg": "[isort]\nline_length = 60\n[flake8]\nmax-line-length = 100\n"}
+        self.assertRaised({
+            '[tool."ruff"]': (base_py, {"pyproject.toml": pp + '[tool."ruff"]\nline-length = 300\n'}),
+            "[ tool.ruff ]": (base_py, {"pyproject.toml": pp + "[ tool.ruff ]\nline-length = 300\n"}),
+            "[tool] ruff.line-length": (base_py, {"pyproject.toml": pp + "[tool]\nruff.line-length = 300\n"}),
+            "root tool.ruff.line-length": (base_py, {"pyproject.toml": "tool.ruff.line-length = 300\n" + pp}),
+            "[tool] ruff = {}": (base_py, {"pyproject.toml": pp + "[tool]\nruff = { line-length = 300 }\n"}),
+            "comment after the header": (base_py, {"pyproject.toml": pp + "[tool.ruff]#c\nline-length = 300\n"}),
+            "flake8 header, comment": (base_fl, {"setup.cfg": "[isort]\nline_length = 60\n[flake8];c\nmax-line-length = 300\n"}),
+            "tox.ini header, comment": (
+                {"tox.ini": "[tox]\n[flake8]\nmax-line-length = 100\n"},
+                {"tox.ini": "[tox]\n[flake8]#c\nmax-line-length = 300\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "black raised in [tool]": (base_py, {"pyproject.toml": "[tool]\nblack.line-length = 300\n" + self.PP % 100}),
+            "ruff lowered, comment": (base_py, {"pyproject.toml": pp + "[tool.ruff]#c\nline-length = 90\n"}),
+        }, False)
+
+    def test_extend_only_exempts_ruff_from_the_default(self):
+        """R2-04: flake8 has no `extend`, a `[flake8] extend = x` line is ignored and the default applies."""
+        self.assertRaised({
+            "flake8": ({".flake8": "[flake8]\nmax-line-length = 60\n"}, {".flake8": "[flake8]\nextend = x\n"}),
+        }, True)
+        self.assertRaised({
+            "ruff": ({"ruff.toml": "line-length = 60\n"}, {"ruff.toml": 'extend = "base.toml"\n'}),
+        }, False)
+
+    def test_block_comments_after_a_value_are_not_part_of_it(self):
+        """R2-05: `printWidth: 100 /* c */` was read as no limit, so a raise passed and an added comment failed."""
+        js = "export default { printWidth: %s };\n"
+        cfg = "firebase/prettier.config.js"
+        self.assertRaised({"raise": ({cfg: js % "100 /* c */"}, {cfg: js % "300 /* c */"})}, True)
+        self.assertRaised({"added comment": ({cfg: js % "100"}, {cfg: js % "100 /* note */"})}, False)
+
+    def test_style_files_under_docs_handoff_node_modules_and_build_are_not_read(self):
+        """R2-06"""
+        lowered = {"ruff.toml": "line-length = 90\n"}
+        self.assertRaised({
+            where: ({"ruff.toml": "line-length = 100\n"}, {**lowered, f"{where}/x/ruff.toml": "line-length = 300\n"})
+            for where in ("docs", "handoff", "web/node_modules", "app/build")
+        }, False)
+
+    def test_cr_only_line_ends_are_read(self):
+        """R2-07: a lone CR is a line end for flake8 and YAML, and a leading comment hid every value in such a file."""
+        self.assertRaised({
+            "flake8": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "# c\r[flake8]\rmax-line-length = 300\r"}),
+        }, True)
+        self.assertRaised({"lowered": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "# c\r[flake8]\rmax-line-length = 90\r"})}, False)
 
 
 class WeakerPresets(DiffCase):
