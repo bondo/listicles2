@@ -9,6 +9,10 @@ kotest = "6.2.7"
 konsist = "0.18.1"
 junit = "6.1.3"
 junit4 = "4.13.2"
+robolectric = "4.18.1"
+# Issue 213: the android-all jar Robolectric 4.18.1 uses for SDK 37 (robolectric.properties), the app's targetSdk. Bump together;
+# RobolectricUnderNetworkBlockTest fails (jar not found, or SDK differs from targetSdk) when they disagree.
+robolectricAndroidAll = "17-robolectric-16653203-i7"
 androidxTestJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 detekt = "1.23.8"
@@ -39,6 +43,8 @@ junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-android-all = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectricAndroidAll" }
 kotest-runner = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
