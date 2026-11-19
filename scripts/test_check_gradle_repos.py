@@ -174,6 +174,21 @@ class Hardening(unittest.TestCase):
         bad = 'exclusiveContent { forRepository { google() ; filter { includeGroup("x") } } }\n' + MIRROR_CALL + "mavenCentral()\n"
         self.assertEqual(self.dep(bad), UNFILTERED)
 
+    def test_forrepository_body_must_be_exactly_google(self):
+        # Gradle applies the exclusive filter only to the repository the lambda returns, so any other repository
+        # or statement in the body means a google() there may be asked first for every group.
+        for body in ('google(); maven("https://x.example")', 'maven { url = uri("https://x.example"); google() }',
+                     'maven("https://x.example"); google()', "google(); google()", "val g = google()", "this.google()", "google"):
+            with self.subTest(body=body):
+                bad = f'exclusiveContent {{ forRepository {{ {body} }} filter {{ includeGroup("x") }} }}\n'
+                self.assertEqual(self.dep(bad + MIRROR_CALL + "mavenCentral()\n"), UNFILTERED)
+
+    def test_forrepository_with_only_google_in_any_layout_passes(self):
+        for body in ("google()", " google() ", "\n google()\n", "google();", "google ( )", "/* c */ google() /* c */"):
+            with self.subTest(body=body):
+                ok = f'exclusiveContent {{ forRepository {{ {body} }} filter {{ includeGroup("x") }} }}\n'
+                self.assertEqual(self.dep(ok + MIRROR_CALL + "mavenCentral()\n"), [])
+
     def test_google_with_its_own_filter_inside_forrepository_passes(self):
         ok = "exclusiveContent { forRepository { " + GOOGLE + "} }\n" + MIRROR_CALL + "mavenCentral()\n"
         self.assertEqual(self.dep(ok), [])
