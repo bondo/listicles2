@@ -26,7 +26,7 @@ Origin: owner decision on issue 187 (also logged on issue 15). Version-update PR
   `gradle/patched-dependencies.properties` (`build.gradle.kts` raises every older request to it), then run the checks with
   `--write-verification-metadata sha256` to add the new checksums to `gradle/verification-metadata.xml`, and remove the
   superseded entries (the PR review checks that only the bumped coordinates changed).
-* `scripts/dependency_floors.py` (run by `scripts/verify.sh`) fails if a version that a triaged alert flagged comes
+* `scripts/dependency_floors.py` (run by `scripts/verify.sh` and the CI `tasks` job) fails if a version that a triaged alert flagged comes
   back in `firebase/package-lock.json` or `gradle/verification-metadata.xml`. A new bump adds its row there, with every
   vulnerable range of the advisory (one per release line), not only the one the alert shows.
 
