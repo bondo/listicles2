@@ -185,10 +185,6 @@ class GhApi:
         return json.loads(self._gh([*args, path]))
 
 
-def is_draft_doc(name):
-    return name in DOC_FILES or name.startswith(DOC_PREFIXES)
-
-
 @functools.cache
 def ci_scripts():
     """The scripts/ paths the CI workflow on this checkout (main, for the merge agent) runs, casefolded; None if it cannot be read (fail closed)."""
@@ -338,28 +334,29 @@ class GitMergeTree:
     """`merge_tree(p1, p2)`: the tree git makes by merging p2 (a commit of main) into p1 (a commit of the PR), or None if that has conflicts.
     Runs in this checkout (the merge agent's clean checkout of origin/main), after fetching main and refs/pull/N/head once."""
 
-    def __init__(self, n, cwd=None, run=subprocess.run):
-        self.n, self.cwd, self.run, self.fetched = n, cwd, run, False
+    def __init__(self, n, cwd=None):
+        self.n, self.cwd, self.fetched = n, cwd, False
 
     def _git(self, *args):
         try:
-            return self.run(["git", *args], cwd=self.cwd, capture_output=True, text=True, timeout=MERGE_TREE_TIMEOUT,
-                            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+            res = subprocess.run(["git", *args], cwd=self.cwd, capture_output=True, text=True, timeout=MERGE_TREE_TIMEOUT,
+                                 env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
         except (OSError, subprocess.SubprocessError) as e:
             raise MergeCheckError(f"git {args[0]} failed: {type(e).__name__}") from e
+        if res.returncode not in (0, 1 if args[0] == "merge-tree" else 0):
+            raise MergeCheckError(f"git {args[0]} failed: {(res.stderr or '').strip()[:120] or res.returncode}")
+        return res
 
     def __call__(self, p1, p2):
         if not self.fetched:
-            res = self._git("fetch", "--quiet", "origin", BASE, f"refs/pull/{self.n}/head")
-            if res.returncode != 0:
-                raise MergeCheckError(f"git fetch of {BASE} and pull/{self.n}/head failed: {(res.stderr or '').strip()[:120] or res.returncode}")
+            self._git("fetch", "--quiet", "origin", BASE, f"refs/pull/{self.n}/head")
             self.fetched = True
         res = self._git("merge-tree", "--write-tree", "--no-messages", p1, p2)
-        lines = (res.stdout or "").splitlines()
+        lines = res.stdout.splitlines()
         if res.returncode == 1:
             return None  # conflicts
-        if res.returncode != 0 or not lines or not SHA_RE.fullmatch(lines[0]):
-            raise MergeCheckError(f"git merge-tree {p1[:7]} {p2[:7]} failed: {(res.stderr or '').strip()[:120] or res.returncode}")
+        if not lines or not SHA_RE.fullmatch(lines[0]):
+            raise MergeCheckError(f"git merge-tree {p1[:7]} {p2[:7]}: unreadable output")
         return lines[0]
 
 
@@ -380,25 +377,20 @@ def update_branch_problems(api, repo, base, head, approved, commits, merge_tree)
     seen, old = reach(head), reach(approved)
     if approved not in seen:
         return [f"head {head[:7]} does not descend from the approved commit {approved[:7]} (within the PR's commits)"]
-    problems = []
     for sha in sorted(seen - old):
-        ps = parents(by[sha])
-        if len(ps) != 2 or ps[0] not in by:
-            problems.append(f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base}")
-        elif api.get(f"repos/{repo}/compare/{base}...{ps[1]}").get("status") not in ("behind", "identical"):
-            problems.append(f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base} (its second parent is not in {base})")
-    if problems:
-        return problems
-    for sha in sorted(seen - old):  # the merge of a commit of the PR with a commit of the base must be exactly what git makes without help
-        p1, p2 = parents(by[sha])
-        try:
-            auto = merge_tree(p1, p2)
+        p1, *rest = parents(by[sha])
+        if len(rest) != 1 or p1 not in by:
+            return [f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base}"]
+        if api.get(f"repos/{repo}/compare/{base}...{rest[0]}").get("status") not in ("behind", "identical"):
+            return [f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base} (its second parent is not in {base})"]
+        try:  # the merge must be exactly what git makes without help
+            auto = merge_tree(p1, rest[0])
         except MergeCheckError as e:
             return [f"cannot check the merge {sha[:7]}: {e}"]
         if auto is None:
             return [f"merge {sha[:7]} of {base} conflicts in git: a hand-resolved conflict needs a fresh owner approval"]
         if auto != by[sha]["commit"]["tree"]["sha"]:
-            return [f"the tree of merge {sha[:7]} is not git's automatic merge of its parents (an edit or an extra file in the merge commit needs a fresh owner approval)"]
+            return [f"the tree of merge {sha[:7]} is not git's automatic merge of its parents (an edit or an extra file needs a fresh owner approval)"]
     return []
 
 
