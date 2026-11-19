@@ -165,8 +165,11 @@ def wiring_problems(text):
     problems = []
     for job, cmd, _source in CI_STEPS:
         body = job_in(text, job) or ""
-        if not re.search(rf"(?m)^        run: {re.escape(cmd)}$", body):
+        # No `$` match followed by a more-indented line: YAML folds that line into the run scalar (`|| true`, `--help`).
+        if not re.search(rf"(?m)^        run: {re.escape(cmd)}$(?!\n {{9}})", body):
             problems.append(f"{job}: does not run {cmd}")
+    for job in dict.fromkeys(job for job, _cmd, _source in CI_STEPS):
+        body = job_in(text, job) or ""
         if re.search(r"(?m)^\s*(?:-\s+)?if:", body) or "continue-on-error" in body:
             problems.append(f"{job}: if or continue-on-error")
     if re.search(r"^\s+paths(-ignore)?:", text, re.M):
@@ -183,11 +186,11 @@ def wiring_problems(text):
         if re.search(r"^    needs:", body, re.M):
             problems.append(f"{name}: needs")
     static = job_in(text, "static") or ""
-    if re.search(r"(?m)^\s*(?:-\s+)?if:", static) or "continue-on-error" in static:
+    if (re.search(r"(?m)^\s*(?:-\s+)?if:", static) or "continue-on-error" in static) and "static: if or continue-on-error" not in problems:
         problems.append("static: if or continue-on-error")
     if "fetch-depth: 2" not in static:
         problems.append("static: no two-commit checkout")
-    if not re.search(r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$", static):
+    if not re.search(r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$(?!\n {9})", static):
         problems.append("static: does not run ci_scope.py selftests")
     if not re.search(r"read -ra exclude <<< \"\$\(python3 -I scripts/ci_scope\.py gradle-exclude\)\"", static) or not re.search(
         r"\./gradlew [^\n]*:app:lintDebug \"\$\{exclude\[@\]\}\"\n", static
@@ -204,7 +207,13 @@ def wiring_problems(text):
 
 
 def verify_problems(verify):
-    return []  # stub (red): the real check follows in the green commit
+    """Problems with how verify.sh runs the CI_STEPS commands: each must be an active, top-level `step <name> <cmd>` line."""
+    lines = verify.splitlines()
+    return [
+        f"verify.sh does not run `{cmd}` as a top-level step"
+        for _job, cmd, _source in CI_STEPS
+        if not any(re.fullmatch(rf"step \S+ {re.escape(cmd)}", ln) for ln in lines)
+    ]
 
 
 class CiWiring(unittest.TestCase):
