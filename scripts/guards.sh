@@ -63,8 +63,16 @@ PAT+='[Nn][Oo][Qq][Aa]|type: *ignore|eslint-disable|@ts-(ignore|expect-error)|@[
 # mypy inline flags that relax (ignore-*, allow-*, no-*, =False, follow-imports=skip); ignore-without-code and =True are strict.
 PAT+='mypy:(.*[[:space:],:])?(allow[-_]|implicit[-_](optional|reexport)|no[-_](strict|check[-_]untyped[-_]defs|(disallow|warn)[-_]))|mypy:.*(ignore[-_](errors|missing[-_]imports)|disable[-_]error[-_]code|follow[-_]imports[[:space:]]*=[[:space:]]*(skip|silent)|=[[:space:]]*([Ff]alse|0))|'
 PAT+='[Pp][Rr][Aa][Gg][Mm][Aa][:[:space:]]?[[:space:]]*[Nn][Oo][[:space:]]*([Cc][Oo][Vv][Ee][Rr]|[Bb][Rr][Aa][Nn][Cc][Hh])|(c8|v8|istanbul) ignore|prettier-ignore|biome-ignore|dprint-ignore|fmt: *(off|skip)|yapf: *disable|isort: *(skip|off)|@formatter:off'
-JUST='justified:[[:space:]]*[^[:space:]*/]'
-out=$(gg "$PAT" -- "${EXCL[@]}" | grep -vE "$JUST")
+# Owner decision (#46): the reason after `justified:` needs at least 3 words of letters (a word is a run of 2 or more ASCII letters,
+# so "-", "x", "ok" and "two words" fail); reviewers still judge the content. just() is awk, shared by the line filter and entrycheck.
+# Only the reason counts: it ends at a closing `*/` or `-->` and at a following comment opener (` # word`, ` // word`), so code or a
+# directive after it (`/* justified: x */ // eslint-disable-line no-console`) adds no words. `#46` and `http://` do not end it.
+JUSTFN='function just(l,   i, r, n) { i = index(l, "justified:"); if (!i) return 0; r = substr(l, i + 10); n = 0
+  i = index(r, "*/"); if (i) r = substr(r, 1, i - 1); i = index(r, "-->"); if (i) r = substr(r, 1, i - 1)
+  if (match(r, /[ \t](#|\/\/)[ \t]*[A-Za-z]/)) r = substr(r, 1, RSTART)
+  while (match(r, /[A-Za-z][A-Za-z]+/)) { n++; r = substr(r, RSTART + RLENGTH) } return n >= 3 }'
+unjust() { LC_ALL=C awk "$JUSTFN"' !just($0)'; } # keeps the lines that have no valid justification
+out=$(gg "$PAT" -- "${EXCL[@]}" | unjust)
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
 
 # 2b. Relaxed settings in the linter config files themselves (same justification rule). Each pattern only applies to the files
@@ -77,8 +85,8 @@ ENTRY_AWK='
 function strip(l) { sub(/[ \t]*(#|\/\/).*$/, "", l); return l }
 function blank(l) { gsub(/"[^"]*"/, "\"\"", l); gsub(/\047[^\047]*\047/, "\047\047", l); return l }
 function nest(l,   t, o) { t = l; gsub(/[^[({]/, "", t); o = length(t); t = l; gsub(/[^])}]/, "", t); return o - length(t) }
-function check() { if (line !~ JUSTRE) printf "%s:%d:%s\n", F, NR, line }
-BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
+function check() { if (!just(line)) printf "%s:%d:%s\n", F, NR, line }
+BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
 {
   line = $0; nc = strip(line); c = blank(nc); lc = tolower(nc)
   if (c ~ /^[ \t]*$/) next
@@ -96,13 +104,13 @@ BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; ini = (F ~ /(\.ini|\.cfg|\.flake8|\
 entrycheck() { # entrycheck <pathspec>...
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$ENTRY_AWK"
-    else awk -v F="$f" "$ENTRY_AWK" "$f" 2>/dev/null; fi
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$ENTRY_AWK"
+    else LC_ALL=C awk -v F="$f" "$JUSTFN$ENTRY_AWK" "$f" 2>/dev/null; fi
   done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified suppression: /'
 }
 cfgcheck() { # cfgcheck <pattern> <pathspec>...
   local pat="$1" o; shift
-  o=$(gg "$pat" -- "$@" "${EXCL[@]}" | grep -vE "$JUST")
+  o=$(gg "$pat" -- "$@" "${EXCL[@]}" | unjust)
   [ -n "$o" ] && echo "$o" | sed 's/^/guard: unjustified suppression: /'
   entrycheck "$@"
   return 0
@@ -112,7 +120,7 @@ extcheck() {
   local ok='"extends"[[:space:]]*:[[:space:]]*("[^"]*(tsconfig|jsconfig)[^"]*"[[:space:]]*(,|$|//)|'
   ok+='\[[[:space:]]*"[^"]*(tsconfig|jsconfig)[^"]*"([[:space:]]*,[[:space:]]*"[^"]*(tsconfig|jsconfig)[^"]*")*[[:space:]]*\])'
   local o
-  o=$(gg '"extends"[[:space:]]*:' -- '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}" | grep -vE "$ok" | grep -vE "$JUST")
+  o=$(gg '"extends"[[:space:]]*:' -- '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}" | grep -vE "$ok" | unjust)
   [ -n "$o" ] && echo "$o" | sed 's/^/guard: unjustified suppression: /'
   return 0
 }
@@ -130,7 +138,7 @@ PYPAT+='follow_imports[[:space:]]*[=:][[:space:]]*.?(skip|silent)|disable_error_
 TSPAT='"(strict|noImplicitAny|strictNullChecks|strictFunctionTypes|strictBindCallApply|strictPropertyInitialization|noImplicitThis|alwaysStrict|'
 TSPAT+='useUnknownInCatchVariables|noUncheckedIndexedAccess|exactOptionalPropertyTypes|noImplicitReturns|noImplicitOverride|noFallthroughCasesInSwitch|'
 TSPAT+='noUnusedLocals|noUnusedParameters|noPropertyAccessFromIndexSignature|checkJs)"[[:space:]]*:[[:space:]]*false|'
-TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors|noCheck)"[[:space:]]*:[[:space:]]*true'
+TSPAT+='"(allowUnreachableCode|allowUnusedLabels|suppressImplicitAnyIndexErrors|suppressExcessPropertyErrors|noCheck|skipLibCheck)"[[:space:]]*:[[:space:]]*true'
 # ESLint (rules off or downgraded to warn, ignored files, unused-directive reporting off) and biome
 # Numbers only count as severities after a rule key (line start or first key of `rules: {`), so option objects like { max: 1 } do not.
 ESPAT=':[[:space:]]*(\[[[:space:]]*)?.?(off|warn).?[[:space:]]*([],}]|$|//)|'
@@ -151,7 +159,7 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 
 # 2c. Relaxations passed as command-line flags on tool invocation lines (issue 45): ruff, mypy, tsc, ESLint, Prettier, shellcheck, in
 # shell scripts, git hooks, CI workflows and package.json. A backslash continuation is one logical line, and one same-line
-# `justified: <reason>` waives the whole logical line (every command on it). A logical line loses its unquoted trailing ` # comment`
+# `justified: <reason>` (3 words, just() above) waives the whole logical line (every command on it). A logical line loses its unquoted trailing ` # comment`
 # and is split at ; & | so a flag only counts for the tool in its own command; only the text after the tool name is read (so
 # `grep -i shellcheck` is not a flag). For npm and npx (and yarn, pnpm and bunx when they use `--`) the JS tools also see what follows a
 # bare `--` (`npm run lint -- --quiet`); the options of npm itself never count. That passthrough is checked against every JS tool, so
@@ -309,12 +317,12 @@ function relaxed(p,   js, dd, s, ok) {
 }
 function flush(   n, i, parts, j) {
   if (cur == "") return
-  j = (cur ~ JUSTRE)
+  j = just(cur)
   n = split(stripc(cur), parts, /[;&|]+/)
   for (i = 1; i <= n; i++) if (baseline(parts[i]) || (!j && relaxed(parts[i]))) { printf "%s:%d:%s\n", F, start, cur; break }
   cur = ""
 }
-BEGIN { JUSTRE = "justified:[ \t]*[^ \t*/]"; TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)"
+BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.json$)"
   MYPYN = "ignore-missing-imports allow-untyped-defs allow-untyped-globals allow-redefinition allow-redefinition-new no-strict-optional no-strict-equality no-strict-bytes no-check-untyped-defs no-warn-no-return no-warn-unused-ignores no-warn-redundant-casts no-warn-unused-configs no-extra-checks disable-error-code implicit-optional implicit-reexport exclude untyped-calls-exclude"
   SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0 }
 {
@@ -330,12 +338,42 @@ END { flush() }'
 cliflags() { # cliflags <pathspec>...
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$CLI_AWK"
-    else awk -v F="$f" "$CLI_AWK" "$f" 2>/dev/null; fi
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
+    else LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
   done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
 }
 out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '*package.json')
 [ -n "$out" ] && { echo "$out"; fail=1; }
+# 2d. `/* global foo, bar:writable */` (ESLint) switches off no-undef for the names. Any block comment that starts with `global` or
+# `globals` and a name, closed on the same line, in a JS or TS file: that is how ESLint reads it (names split on commas and spaces, an
+# optional `-- description`), so `/* global state is kept */` is a directive too. A multi-line comment is not matched.
+out=$(gg '/\*[[:space:]]*globals?[[:space:]]+[A-Za-z_$][^*]*\*/' \
+  -- '*.js' '*.mjs' '*.cjs' '*.jsx' '*.ts' '*.mts' '*.cts' '*.tsx' '*.vue' "${EXCL[@]}" | unjust)
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: unjustified suppression: /'; fail=1; }
+# 2e. Linter, formatter and test config embedded in package.json is not scanned by the checks above (and ESLint 9 ignores eslintConfig).
+# JSON has no comment for a justification, so there is no escape hatch: keep that config in the dedicated file. A dependency entry
+# (`"jest": "30.5.2"`) has a string value and does not match; the string form of "prettier" is not detected. Only top-level keys count
+# (brace depth 1), so `"overrides": { "jest": { ... } }` and `"peerDependenciesMeta"` are dependency data.
+PKG_AWK='
+{ s = $0; n = length(s); i = 1
+  while (i <= n) {
+    c = substr(s, i, 1)
+    if (c == "\"") {
+      k = ""; j = i + 1
+      while (j <= n && (d = substr(s, j, 1)) != "\"") { if (d == "\\") { j++; d = d substr(s, j, 1) } k = k d; j++ }
+      rest = substr(s, j + 1); i = j + 1
+      if (depth == 1 && rest ~ /^[ \t]*:/) { sub(/^[ \t]*:[ \t]*/, "", rest)
+        if (k == "eslintConfig" || k == "eslintIgnore" || (k ~ /^(prettier|jest|nyc|c8)$/ && rest ~ /^(\{|$)/)) { printf "%s:%d:%s\n", F, NR, $0; next } }
+      continue
+    }
+    if (c == "{" || c == "[") depth++; else if (c == "}" || c == "]") depth--
+    i++
+  }
+}'
+out=$(while IFS= read -r f; do
+  if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | awk -v F="$f" "$PKG_AWK"; else awk -v F="$f" "$PKG_AWK" "$f" 2>/dev/null; fi
+done < <(git ls-files -- '*package.json' "${EXCL[@]}"))
+[ -n "$out" ] && { echo "$out" | sed 's/^/guard: embedded config: package.json must not hold linter or test config (use the dedicated file): /'; fail=1; }
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
 out=$("${LS[@]}" | grep -iE 'baseline')
@@ -364,6 +402,102 @@ sizecheck() { # sizecheck <git diff args>...: `git diff --raw` lists new modes a
     esac
     [ "$size" -gt "$lim" ] && bad "file too large: $f is $size bytes (limit $lim bytes: $why). Git LFS is not adopted (docs/tasks.toml, M6-O4); shrink it, keep it out of the repo, or ask the owner"
   done < <(git diff --raw -z --no-abbrev --no-renames --diff-filter=AMT "$@")
+}
+
+# 6. Narrowed lists (owner decision in #46: diff-based, against the merge base). `listitems <key regex> <rev:path>` prints
+# key<TAB>item<TAB>line for every quoted item of an array value of that key (single or multi-line, several keys per line). Comments
+# (`#`, `//`) are cut. A removed ruff `select` item or tsconfig `include` entry fails with no escape hatch (a replacement by "ALL" is fine);
+# an added tsconfig `exclude` entry needs `justified:` on its own line (tsconfig allows comments). Files new in the PR are not compared; a deleted one is compared with every config of its kind at HEAD.
+LISTS_AWK='
+BEGIN { RE = "(^|[^A-Za-z_-])[\"\047]?(" KEYRE ")[\"\047]?[ \t]*[:=][ \t]*\\[" }
+{
+  s = $0; n = length(s); i = 1; q = ""; gsub(/\t/, " ", s)
+  while (i <= n) {
+    if (bc) { j = index(substr(s, i), "*/"); if (!j) break; i += j + 1; bc = 0; continue }
+    if (depth == 0) {
+      t = substr(s, i)
+      if (!match(t, RE)) break
+      st = RSTART; ln = RLENGTH; m = substr(t, st, ln); match(m, KEYRE); key = substr(m, RSTART, RLENGTH); i += st + ln - 1; depth = 1; continue
+    }
+    c = substr(s, i, 1); i++
+    if (q != "") { if (c == q) { q = ""; print key "\t" cur "\t" s } else cur = cur c; continue }
+    if (c == "\"" || c == "\047") { q = c; cur = ""; continue }
+    if (c == "[") depth++
+    else if (c == "]") depth--
+    else if (c == "/" && substr(s, i, 1) == "*") { bc = 1; i++ }
+    else if (c == "#" || (c == "/" && substr(s, i, 1) == "/")) break
+  }
+}'
+listitems() { git show "$2" 2>/dev/null | LC_ALL=C awk -v KEYRE="$1" "$LISTS_AWK" | sed 's/^extend-//'; }
+widened() { # widened <file> <base items> <head items>: exclude entries the head adds, without a justification on their own line
+  local k it ln
+  while IFS=$'\t' read -r k it ln; do
+    [ "$k" = exclude ] || continue
+    if printf '%s\n' "$2" | cut -f1,2 | grep -qxF -- "$k"$'\t'"$it"; then continue; fi
+    [ -n "$(printf '%s\n' "$ln" | unjust)" ] && bad "widened tsconfig exclude: $1: $it was added without a justified: reason"
+  done <<<"$3"
+}
+narrowcheck() { # narrowcheck <merge-base>
+  local mb="$1" f g re kind base head added k it hk hit kept
+  while IFS= read -r f; do
+    git cat-file -e "$mb:$f" 2>/dev/null || continue
+    case "$f" in
+      *ruff.toml|*pyproject.toml) re='(extend-)?select'; kind='ruff\.toml$|pyproject\.toml$' ;;
+      *) re='include|exclude'; kind='(ts|js)config[^/]*\.json$' ;;
+    esac
+    base=$(listitems "$re" "$mb:$f"); added=""
+    # A deleted file (a rename or a move shows as delete plus add) is compared with the items of every file of its kind at HEAD, and
+    # its base exclude entries with the exclude entries of the files of that kind added in the PR.
+    if git cat-file -e "HEAD:$f" 2>/dev/null; then head=$(listitems "$re" "HEAD:$f"); added=$head
+    else
+      head=$(while IFS= read -r g; do listitems "$re" "HEAD:$g"; done < <(git ls-tree -r --name-only HEAD | grep -E "$kind"))
+      added=$(while IFS= read -r g; do listitems "$re" "HEAD:$g"; done < <(git diff --name-only --no-renames --diff-filter=A "$mb" HEAD | grep -E "$kind"))
+    fi
+    while IFS=$'\t' read -r k it _; do
+      [ -n "$k" ] || continue
+      if printf '%s\n' "$head" | cut -f1,2 | grep -qxF -- "$k"$'\t'"$it"; then continue; fi
+      if [ "$k" = select ]; then
+        # Ruff selectors are code prefixes: a head item that is a prefix of the removed one (or ALL) still covers it.
+        kept=0
+        while IFS=$'\t' read -r hk hit _; do [ "$hk" = select ] && case "$it" in "$hit"*) kept=1 ;; esac; [ "$hit" = ALL ] && kept=1; done <<<"$head"
+        [ "$kept" = 1 ] || bad "narrowed ruff select: $f: $it was removed"
+      elif [ "$k" = include ]; then bad "narrowed tsconfig include: $f: $it was removed"; fi
+    done <<<"$base"
+    widened "$f" "$base" "$added"
+  done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- '*ruff.toml' '*pyproject.toml' '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}")
+}
+
+# 7. A raised line length (owner decision in #46). Per style config file the largest value of the setting family (line-length,
+# max-line-length, max_line_length, maxLineLength, printWidth; quotes and comments ignored, a word such as `off` counts as no limit)
+# is compared with the same file at the merge base, so an added setting counts as well as an edited one. A deleted file (rename or
+# move) is compared with the largest value in the style files of the same tool at HEAD (prettier, editorconfig, detekt, ruff, flake8
+# and their kin each form one group). Lowered or removed is stricter and passes. Not compared: a base
+# without the setting (the tool default is not known), and the same family split over two files when neither is deleted.
+STYLERE='(ruff\.toml|pyproject\.toml|\.flake8|setup\.cfg|tox\.ini|\.editorconfig|detekt\.yml|prettierrc[^/]*|prettier\.config\.[^/]*)$'
+LL_AWK='{ lo = tolower($0); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
+  while (match(lo, /(max[-_]?line[-_]?length|line[-_]?length|printwidth)["\047]?[ \t]*[:=][ \t]*["\047]?/)) {
+    lo = substr(lo, RSTART + RLENGTH); if (lo ~ /^[ \t]*$/) continue  # a YAML parent key (`MaxLineLength:`) has no value
+    v = match(lo, /^[0-9]+/) ? substr(lo, 1, RLENGTH) + 0 : 999999999; if (!f || v > m) m = v; f = 1 } }
+  END { if (f) print m }'
+stylekind() { # the style files of the same tool as <path>
+  case "$1" in
+    *prettierrc*|*prettier.config.*) echo 'prettierrc[^/]*$|prettier\.config\.[^/]*$' ;;
+    *.editorconfig) echo '\.editorconfig$' ;;
+    *detekt.yml) echo 'detekt\.yml$' ;;
+    *ruff.toml|*pyproject.toml) echo 'ruff\.toml$|pyproject\.toml$' ;;
+    *) echo '\.flake8$|setup\.cfg$|tox\.ini$' ;;
+  esac
+}
+linemax() { git show "$1" 2>/dev/null | LC_ALL=C awk "$LL_AWK"; }
+linecheck() { # linecheck <merge-base>
+  local mb="$1" f g b h kind
+  while IFS= read -r f; do
+    git cat-file -e "$mb:$f" 2>/dev/null || continue
+    b=$(linemax "$mb:$f"); [ -n "$b" ] || continue
+    if git cat-file -e "HEAD:$f" 2>/dev/null; then h=$(linemax "HEAD:$f")
+    else kind=$(stylekind "$f"); h=$(while IFS= read -r g; do linemax "HEAD:$g"; done < <(git ls-tree -r --name-only HEAD | grep -E "$kind") | sort -n | tail -1); fi
+    [ -n "$h" ] && [ "$h" -gt "$b" ] && bad "raised line length: $f: $([ "$b" -gt 99999 ] && echo "no limit" || echo "$b") -> $([ "$h" -gt 99999 ] && echo "no limit" || echo "$h")"
+  done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- . "${EXCL[@]}" | grep -E "$STYLERE")
 }
 
 if [ "$STAGED" = 1 ]; then sizecheck --cached; fi
@@ -417,7 +551,10 @@ if [ "$STAGED" = 0 ]; then
           while (match(kw, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
         }
       }
-      kw ~ /(minBound|mutationThreshold|threshold|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ {
+      # coverageThreshold (Jest) and fail_under / --cov-fail-under (coverage.py) are named like thresholds but not spelled `threshold`.
+      # In a Jest, Vitest, nyc or c8 config the per-metric values sit on their own lines (`branches: 80,`), so those lines count too.
+      kw ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ ||
+      (file ~ /(jest|vitest|vite)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n } else { add[key] = l; addn[key] = n }
       }
@@ -428,6 +565,26 @@ if [ "$STAGED" = 0 ]; then
         }
         exit bad
       }' || fail=1
+    # Weaker lint presets: per plugin, the strictest preset named on removed lines must not outrank the one on added lines.
+    # Flat config (`tseslint.configs.strictTypeChecked`) and eslintrc (`plugin:@typescript-eslint/strict-type-checked`) forms; the order is
+    # strictTypeChecked > strict > recommendedTypeChecked > recommended, other presets (stylistic, ...) are not ranked.
+    git diff -U0 "$MB" HEAD -- '*eslint.config.*' '*eslintrc*' "${EXCL[@]}" | awk '
+      BEGIN { R["stricttypechecked"] = 4; R["strict"] = 3; R["recommendedtypechecked"] = 2; R["recommended"] = 1 }
+      /^diff --git/ { file = $3; next }
+      /^(---|\+\+\+)/ { next }
+      /^[-+]/ {
+        sg = substr($0, 1, 1); t = substr($0, 2); gsub(/\/\*[^*]*\*\//, "", t); sub(/(^|[ \t])(\/\/|#).*$/, "", t)
+        while (match(t, /[-A-Za-z_@\/]+\.configs\.[A-Za-z]+|plugin:[-A-Za-z_@\/]+\/[-A-Za-z]+/)) {
+          tok = substr(t, RSTART, RLENGTH); t = substr(t, RSTART + RLENGTH)
+          if (tok ~ /^plugin:/) { g = tok; sub(/\/[^\/]*$/, "", g); p = tok; sub(/^.*\//, "", p); gsub(/-/, "", p) }
+          else { g = tok; sub(/\.configs\.[A-Za-z]+$/, "", g); p = tok; sub(/^.*\./, "", p) }
+          r = R[tolower(p)] + 0
+          if (r) { k = file "|" g; if (sg == "-") { if (r > rem[k]) rem[k] = r } else if (r > add[k]) add[k] = r }
+        }
+      }
+      END { for (k in rem) if (rem[k] > add[k] + 0) { print "guard: weaker lint preset: " k " (strictness " rem[k] " -> " add[k] + 0 ")"; bad = 1 } exit bad }' || fail=1
+    narrowcheck "$MB"
+    linecheck "$MB"
     # Screenshot references.
     if [ "${GOLDEN_UPDATE:-0}" != 1 ] && git diff --name-only "$MB" HEAD \
       | grep -E '(screenshots|golden|snapshots|roborazzi)/.*\.png$|src/[A-Za-z]*[Tt]est[A-Za-z]*/.*\.png$' | grep -q .; then
