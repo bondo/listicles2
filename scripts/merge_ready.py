@@ -13,24 +13,26 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * every check the base ruleset requires has a latest run with conclusion `success` (none configured, missing or pending: refused);
   * no closing keyword (close/fix/resolve and their -s/-d forms) sits directly before an issue number or URL in the title, body or commits;
   * the base is `main` and the API's file and commit lists are complete (it caps them at 3000 and 250);
-  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: not an owner-only path, see owner_only;
-    owner-batch: any). For dependabot, a workflow may only
-    re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
+  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: not an owner-only path, see owner_only; owner-batch: any).
+    For dependabot, a workflow may only re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
     in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
-  * for owner-batch, the comment is the owner's, on #15 and unedited, with a `batch approval: #N@sha, ...` line that lists this PR once with a sha
+  * for owner-batch, the comment is the owner's account (it cannot tell the person from an agent), on #15 and unedited, its first non-empty line is
+    `batch approval: #N@sha, ...` (only entries and (notes)) and lists this PR once with a sha
     (7+ hex) of one of its commits; earlier listed PRs are merged; the head is that commit or only adds update-branch merges of main (second parent
     in main) with the same patch against main (compare main...head vs main...approved; a truncated compare refuses).
 Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the head moved) and the checked title and body as commit text.
 Exit status: 0 merged, 1 refused (or timed out waiting) or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
 
+import functools
 import json
 import os
 import re
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
@@ -44,13 +46,19 @@ DOC_PREFIXES = ("docs/milestones/", "docs/product/wireframes/")
 DOC_FILES = ("docs/PLAN.md", "docs/product/stories.md", "docs/product/flow.md", "docs/product/rubric.md", "design/tokens.json")
 DRAFT_STATUS = "not owner-approved"
 TASKS_FILES = ("docs/tasks.toml",)
-# Kind `general` refuses these (ORCHESTRATION 7.5, owner-only PRs): protected process files, gate docs, naming, design and product sign-off, and dependency
-# manifests (a manifest carries runnable or fetchable content, R2-01). A listed working draft is not owner-only. The owner's batch approval lifts all of it.
-OWNER_ONLY_FILES = ("CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/mark-ready.sh", "scripts/merge_ready.py", "scripts/test_merge_ready.py",
-                    "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "gradle/verification-metadata.xml")
-OWNER_ONLY_PREFIXES = (".claude/", ".github/", ".githooks/", "agents/", "scripts/hooks/", "docs/reviews/", "docs/product/", "design/", "gradle/wrapper/")
-OWNER_ONLY_BASENAMES = ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml")
+# Kind `general` refuses these (ORCHESTRATION 7.5, owner-only PRs), compared casefolded: the protected process files (the list of
+# scripts/hooks/pretooluse_guard.py PROTECTED, which a test keeps in sync), the wrappers by name anywhere, gate docs and approved product and design docs,
+# dependency manifests (R2-01), and every scripts/ path a CI job runs (ci_scripts). The owner's batch approval lifts all of it.
+OWNER_ONLY_FILES = {f.casefold() for f in (
+    "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
+    "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
+    "gradle/verification-metadata.xml")}
+OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".githooks/", ".tools/", "agents/", "scripts/hooks/", "docs/reviews/",
+                                                   "docs/product/", "design/", "gradle/wrapper/"))
+OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh")}
 REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
+GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md", "design/tokens.json"), ("docs/milestones/",)  # the drafts still without an owner sign-off
+CI_YML = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
 DEPENDABOT_FILES = ("gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar")
@@ -180,12 +188,24 @@ def is_draft_doc(name):
     return name in DOC_FILES or name.startswith(DOC_PREFIXES)
 
 
+@functools.cache
+def ci_scripts():
+    """The scripts/ paths the CI workflow on this checkout (main, for the merge agent) runs, casefolded; None if it cannot be read (fail closed)."""
+    try:
+        return {m.casefold() for m in re.findall(r"scripts/[\w./-]+\.(?:py|sh)", CI_YML.read_text(encoding="utf-8"))}
+    except OSError:
+        return None
+
+
 def owner_only(name):
-    """Whether a path needs the owner's approval first (kind `general` refuses it); a listed working draft does not."""
-    if is_draft_doc(name):
+    """Whether a path needs the owner's approval first (kind `general` refuses it); only a still-unsigned draft does not."""
+    n = name.casefold()
+    if n in GENERAL_DRAFT_FILES or n.startswith(GENERAL_DRAFT_PREFIXES):
         return False
-    base = name.rsplit("/", 1)[-1]
-    return name in OWNER_ONLY_FILES or name.startswith(OWNER_ONLY_PREFIXES) or base in OWNER_ONLY_BASENAMES or bool(REQUIREMENTS_RE.match(base))
+    base = n.rsplit("/", 1)[-1]
+    if n.startswith("scripts/") and (ci_scripts() is None or n in ci_scripts()):
+        return True
+    return n in OWNER_ONLY_FILES or n.startswith(OWNER_ONLY_PREFIXES) or base in OWNER_ONLY_BASENAMES or bool(REQUIREMENTS_RE.match(base))
 
 
 def allowed(kind, name):
@@ -249,7 +269,7 @@ def file_problems(kind, files, resolve):
             if name and not allowed(kind, name):
                 problems.append(f"path outside kind {kind}: {name}")
         name, patch = f["filename"], f.get("patch")
-        draft = any(is_draft_doc(x) for x in (name, f.get("previous_filename") or name))
+        draft = any(x.casefold() in GENERAL_DRAFT_FILES or x.casefold().startswith(GENERAL_DRAFT_PREFIXES) for x in (name, f.get("previous_filename") or name))
         if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or drops_draft_status(patch or "")):
             problems.append(f"{name}: removes or renames a working draft, or removes a '{DRAFT_STATUS}' status line (a sign-off is the owner's)")
         if kind == "dependabot" and f.get("status") != "modified":
@@ -294,8 +314,19 @@ def check_problems(api, repo, base, sha):
     return problems
 
 
-APPROVAL_RE = re.compile(r"batch approval:([^\n]*)", re.I)
+APPROVAL_RE = re.compile(r"batch approval:(.*)", re.I)
 ENTRY_RE = re.compile(r"#(\d+)@([0-9a-f]{7,40})\b", re.I)
+
+
+def approval_entries(body):
+    """[(PR, sha)] from a comment whose first non-empty line is `batch approval:` and holds only `#N@sha` entries and (notes): agents post as the owner
+    too, so a request, a refusal or a quoted decision (R1-01 of #245) must not read as an approval. [] otherwise."""
+    first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+    m = APPROVAL_RE.fullmatch(first)
+    rest = re.sub(r"\([^()]*\)", " ", m.group(1)) if m else ""
+    if not m or re.sub(r"[\s,;]", "", ENTRY_RE.sub("", rest)):
+        return []
+    return [(int(num), sha.lower()) for num, sha in ENTRY_RE.findall(rest)]
 
 
 def _changes(f):
@@ -353,10 +384,9 @@ def batch_problems(api, repo, n, head, base, commits, approval_id):
         return [f"approval comment {approval_id} is not on issue #{STATE_ISSUE}"]
     if comment.get("created_at") != comment.get("updated_at"):
         return [f"approval comment {approval_id} was edited after it was posted (post a new batch approval)"]
-    line = APPROVAL_RE.search(comment.get("body") or "")
-    entries = [(int(num), sha.lower()) for num, sha in ENTRY_RE.findall(line.group(1))] if line else []
+    entries = approval_entries(comment.get("body") or "")
     if not entries:
-        return [f"approval comment {approval_id} has no `batch approval: #N@sha, ...` list"]
+        return [f"approval comment {approval_id} is not an anchored `batch approval: #N@sha, ...` first line"]
     numbers = [num for num, _ in entries]
     if len(set(numbers)) != len(numbers):
         return [f"the batch approval lists a PR twice: {sorted(x for x in set(numbers) if numbers.count(x) > 1)}"]
