@@ -714,5 +714,43 @@ class ReviewRound2Tests(CliFlagCase):
                 self.assertPasses()
 
 
+class ReviewRound3Tests(CliFlagCase):
+    """PR 183 review round 3: R3-01 blanks between Makefile recipe prefixes, R3-02 npm script verbs after an option value, R3-03 makefile
+    and GNUmakefile."""
+
+    NPM_BAD = [
+        "npm --prefix install test -- --quiet", "npm -w install t -- --quiet", "npm --prefix ci start -- --quiet", "npm --prefix install test -- @relax.txt",
+        "npm --prefix install urn typecheck -- --noCheck", "pnpm --dir add test -- --quiet", "yarn --cwd add test -- --quiet",
+        "npm --prefix install rum lint -- --quiet", "npm --prefix install restart -- --quiet", "npm --prefix install tst -- --quiet",
+    ]
+
+    def test_npm_script_verbs_after_an_option_value_do_not_hide_the_tail(self):
+        for line in self.NPM_BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+        self.put("scripts/lint.sh", "npm install --save-dev eslint --save-exact")
+        self.assertPasses()
+
+    def test_blanks_between_recipe_prefixes_do_not_hide_the_tool(self):
+        for line in ["\t@ -ruff check --fix .", "\t+ -eslint --quiet .", "\t@ -mypy --ignore-missing-imports scripts",
+                     "lint: ; @ -ruff check --fix .", "\t- @eslint --quiet ."]:
+            with self.subTest(line=line):
+                self.put("Makefile", line)
+                self.assertFails(MARK + ": Makefile:1:")
+        self.put("Makefile", "\t@ -ruff check scripts")
+        self.assertPasses()
+
+    def test_makefile_spellings_are_scanned(self):
+        for path in ["makefile", "GNUmakefile", "tools/makefile", "tools/GNUmakefile"]:
+            with self.subTest(path=path):
+                self.put(path, "\truff check --fix .")
+                self.assertFails(MARK + ": " + path + ":1:")
+                self.repo.git("rm", "-q", path)
+                self.repo.commit()
+        self.put("makefile", "\truff check scripts")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
