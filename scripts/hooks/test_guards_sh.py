@@ -691,6 +691,31 @@ class DiffChecks(GuardsCase):
         self.repo.commit()
         self.assertPasses(CI="true")
 
+    def test_verification_metadata_is_not_counted_in_the_diff_size(self):
+        # Owner decision (issue 15 / PR #158): gradle/verification-metadata.xml is generated, so it is excluded from the limit.
+        self.repo.write("gradle/verification-metadata.xml", "<c/>\n" * 5000)
+        self.repo.write("notes.txt", "x\n" * 5)
+        self.repo.commit()
+        self.assertPasses(CI="true")
+        self.repo.write("notes.txt", "x\n" * 601)
+        self.repo.commit()
+        self.assertFails("diff is 601 changed lines (limit 600)", CI="true")  # only the other file counts
+
+    def test_other_xml_files_still_count_towards_the_diff_size(self):
+        for rel in ("gradle/other.xml", "app/src/main/res/values/x.xml", "verification-metadata.xml",
+                    "app/gradle/verification-metadata.xml", "gradle/verification-metadata.xml.bak"):
+            with self.subTest(rel=rel):
+                self.repo.write(rel, "<c/>\n" * 601)
+                self.repo.commit()
+                self.assertFails("changed lines (limit 600)", CI="true")
+                self.repo.git("rm", "-q", "-f", rel)
+                self.repo.commit()
+
+    def test_verification_metadata_is_still_scanned_by_the_content_guards(self):
+        self.repo.write("gradle/verification-metadata.xml", "<!-- @Ignore -->\n")
+        self.repo.commit()
+        self.assertFails("guard: disabled test:")
+
     def test_non_numeric_diff_limit_fails(self):
         self.assertFails("GUARD_MAX_DIFF is not a number", CI="true", GUARD_MAX_DIFF="lots")
 
