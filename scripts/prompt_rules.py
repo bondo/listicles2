@@ -313,7 +313,8 @@ RULES = (
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 50% of a 1M window (40% of 200k, owner decision #15 comment 7001335975), first batch boundary: comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
+        "two-phase handover at about 50% of a 1M window (40% of 200k, owner decision #15 comment 7001335975), first batch boundary: "
+        "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
         forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window"),
     ),
     Rule(
@@ -885,7 +886,8 @@ DOC_RULES = (
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
-        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); the successor archives the predecessor",
+        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
+        "the successor archives the predecessor",
         forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"the owner archives you"),
     ),
     DocRule(
