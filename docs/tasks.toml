@@ -971,6 +971,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-11", "M1-18"]
+notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear after Delete household, with a test each (PLAN 3.1, HH-06 household name)"
 
 [[task]]
 id = "M1-19"
