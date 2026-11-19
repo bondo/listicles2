@@ -1,8 +1,10 @@
 """Tests for the command-line flag check in scripts/guards.sh (issue 45). Run: python3 -I -m unittest discover -s scripts/hooks
 
-Relaxations passed as flags on a tool invocation line (ruff, mypy, tsc, ESLint, Prettier, shellcheck) in shell scripts, git hooks,
-CI workflows and package.json need `justified: <reason>` on the same logical line (a backslash continuation is one line).
-Every tool has lines that must fail and neighbouring strict or ordinary lines that must pass.
+A flag passed to a tool (ruff, mypy, tsc, ESLint, Prettier, shellcheck, actionlint) in shell scripts, git hooks, CI workflows,
+package.json, Makefiles and pre-commit config passes only when it is on that tool's allowlist (issue 177); any other flag needs
+`justified: <reason>` on the same logical line (a backslash continuation is one line). Every tool has lines that must fail and
+neighbouring strict or ordinary lines that must pass. The first classes were written for the blocklist of PR 157 and still hold
+unchanged: every flag they call relaxing is also off the allowlist. AllowlistTests and the classes after it are the new ones.
 """
 
 import unittest
@@ -417,6 +419,214 @@ class RoundThreeTests(CliFlagCase):
             with self.subTest(line=line):
                 self.put("scripts/lint.sh", line)
                 self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+
+class AllowlistTests(CliFlagCase):
+    """Issue 177 (owner decision, #15): a flag on a tool invocation passes only when it is on that tool's allowlist; any other flag
+    needs `justified:`. UNKNOWN lines carry flags no blocklist ever named: each must fail. ALLOWED lines use only listed flags."""
+
+    UNKNOWN = [
+        ("ruff", ["ruff check --fix .", "ruff check --target-version py37 .", "ruff check --unsafe-fixes .", "ruff check --preview .",
+                  "ruff check --respect-gitignore=false .", "ruff format --line-length 120 .", "ruff format --target-version py37 ."]),
+        ("mypy", ["mypy --platform win32 scripts", "mypy --always-false FLAG scripts", "mypy --python-version 3.8 scripts",
+                  "mypy --no-site-packages scripts", "mypy --enable-incomplete-feature=NewGenericSyntax scripts"]),
+        ("tsc", ["tsc --target es5 -p .", "tsc --lib es5 -p .", "tsc --types node -p .", "tsc --typeRoots x -p .", "tsc --jsx react -p ."]),
+        ("eslint", ["eslint --fix .", "eslint --global foo .", "eslint --env browser .", "eslint --parser x .", "eslint --plugin x .",
+                    "eslint --cache ."]),
+        ("prettier", ["prettier --check --plugin x .", "prettier --check --no-config .", "prettier --check --no-editorconfig .",
+                      "prettier --check --config-precedence prefer-file .", "prettier --write --cache ."]),
+        ("shellcheck", ["shellcheck -s sh a.sh", "shellcheck --shell=sh a.sh", "shellcheck -W 0 a.sh", "shellcheck --wiki-link-count=0 a.sh",
+                        "shellcheck -f json1 -s dash a.sh"]),
+        ("actionlint", ["actionlint -ignore 'SC2086' .github/workflows/ci.yml", "actionlint -ignore=SC2086 .github/workflows/ci.yml",
+                        "actionlint --ignore x .github/workflows/ci.yml", "actionlint -config-file ci.yaml",
+                        "actionlint -stdin-filename x.yml"]),
+    ]
+    ALLOWED = [
+        "ruff check --config ruff.toml --no-cache --output-format concise --extend-select E scripts", "ruff format --check --diff scripts",
+        "ruff --config ruff.toml format --diff .", "ruff check scripts", "ruff --version",
+        "mypy --strict --warn-unused-ignores --warn-redundant-casts --disallow-untyped-defs --check-untyped-defs scripts",
+        "mypy --config-file mypy.ini --follow-imports=normal scripts", "mypy --strict-equality --no-implicit-optional --extra-checks scripts",
+        "tsc --noEmit -p tsconfig.json --pretty", "tsc -b --force --verbose", "tsc --noEmit --strict --noUnusedLocals --noImplicitAny true",
+        "tsc --outDir build --outFile dist/out.js -p .", "tsc --version",
+        "eslint --max-warnings 0 --config eslint.config.mjs --format stylish .", "eslint --rule 'no-console: error' --no-inline-config .",
+        "eslint --report-unused-disable-directives-severity error --color .", "eslint --version",
+        "prettier --check --config .prettierrc.json --log-level warn .", "prettier --write --list-different .", "prettier --version",
+        "shellcheck -S warning -x -a -o all --color=never -f gcc a.sh", "shellcheck --severity=style --external-sources --check-sourced a.sh",
+        "shellcheck -P SCRIPTDIR --source-path=SCRIPTDIR a.sh", "shellcheck --version",
+        "actionlint", "actionlint -color -verbose -oneline .github/workflows/ci.yml", "actionlint -shellcheck=.tools/bin/shellcheck x.yml",
+        "actionlint -no-color -format '{{json .}}' -pyflakes=/opt/pyflakes", "actionlint -version",
+    ]
+
+    def test_flags_off_the_allowlist_fail(self):
+        for tool, lines in self.UNKNOWN:
+            for line in lines:
+                with self.subTest(tool=tool, line=line):
+                    self.put("scripts/lint.sh", line)
+                    self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_allowlisted_flags_pass(self):
+        for line in self.ALLOWED:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+    def test_a_justified_unknown_flag_passes(self):
+        for tool, lines in self.UNKNOWN:
+            with self.subTest(tool=tool):
+                self.put("scripts/lint.sh", lines[0] + " # justified: generated code, owner approved in #15")
+                self.assertPasses()
+
+    def test_a_reason_under_three_words_does_not_waive_an_unknown_flag(self):
+        for tool, lines in self.UNKNOWN:
+            for reason in ["-", "ok", "two words"]:
+                with self.subTest(tool=tool, reason=reason):
+                    self.repo.write("scripts/lint.sh", lines[0] + " # justified: " + reason + "\n", raw=True)
+                    self.repo.commit()
+                    self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_staged_mode_reads_the_index(self):
+        """Also the R5-01 nit of issue 176: the 3-word rule on 2c lines in --staged mode."""
+        for tool, lines in self.UNKNOWN:
+            with self.subTest(tool=tool):
+                self.repo.write("scripts/lint.sh", lines[0] + "\n")
+                self.repo.git("add", "scripts/lint.sh")
+                self.assertFails(MARK + ": scripts/lint.sh:1:", "--staged")
+                self.repo.write("scripts/lint.sh", lines[0] + " # justified: ok\n", raw=True)
+                self.repo.git("add", "scripts/lint.sh")
+                self.assertFails(MARK + ": scripts/lint.sh:1:", "--staged")
+                self.repo.write("scripts/lint.sh", lines[0] + " # justified: generated code here\n", raw=True)
+                self.repo.git("add", "scripts/lint.sh")
+                self.assertPasses("--staged")
+                self.repo.git("rm", "-qf", "scripts/lint.sh")
+
+    def test_the_value_of_an_allowed_flag_is_still_checked(self):
+        for line in ["tsc --strict false -p .", "tsc --noUnusedLocals=false", "eslint --max-warnings 3 .", "eslint --max-warnings=-1 .",
+                     "eslint --report-unused-disable-directives-severity warn .", "mypy --follow-imports silent scripts",
+                     "shellcheck -S error a.sh", "shellcheck --severity=error a.sh", "ruff check --config ci.toml .",
+                     "actionlint -shellcheck= x.yml", "actionlint -pyflakes= x.yml", 'actionlint -shellcheck "" x.yml',
+                     "actionlint --pyflakes= x.yml"]:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_tsc_option_names_are_case_insensitive(self):
+        """TypeScript reads --NoCheck like --noCheck, so a blocklist of exact spellings misses it."""
+        for line in ["tsc --NoCheck", "tsc --NOCHECK -p .", "tsc --skiplibcheck -p .", "tsc --STRICT false -p ."]:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+        self.put("scripts/lint.sh", "tsc --NOEMIT --STRICT -p .")
+        self.assertPasses()
+
+    def test_unknown_flags_in_npm_passthrough_and_package_json_fail(self):
+        self.put("firebase/package.json", '    "lint": "eslint --fix ."')
+        self.assertFails(MARK + ": firebase/package.json:1:")
+        self.put("scripts/lint.sh", "npm run lint -- --fix")
+        self.assertFails(MARK + ": scripts/lint.sh:1:")
+        self.put("scripts/lint.sh", "npm run lint -- --max-warnings 0 --config eslint.config.mjs")
+        self.assertPasses()
+
+    def test_only_the_text_after_a_bare_double_dash_is_a_file_list(self):
+        self.put("scripts/lint.sh", "shellcheck -S warning -x -- a.sh -e.sh")
+        self.assertPasses()
+
+
+class RuffSubcommandTests(CliFlagCase):
+    """Issue 174 and its R5-01 comment: a ruff option before the subcommand must not hide the subcommand's options."""
+
+    def test_global_option_before_the_subcommand_does_not_hide_diff(self):
+        for line in ["ruff --quiet check --diff .", "ruff --config ruff.toml check --diff .", "ruff --config ruff.toml check --fix .",
+                     "ruff --no-cache check --target-version py37 ."]:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_the_format_subcommand_keeps_its_own_flags(self):
+        for line in ["ruff --config ruff.toml format --diff .", "ruff --config ruff.toml format --check .", "ruff format --check --diff ."]:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+        self.put("scripts/lint.sh", "ruff format --fix .")
+        self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+
+class FalsePositiveFixTests(CliFlagCase):
+    """Issue 164 items 4 and 5 (R3-06, R4-03) and installers: a tool name that is data, not a command, needs no flag review."""
+
+    GOOD = [
+        "uvx mypy@1.15 scripts", "uvx --from mypy@1.15 mypy --strict scripts", "tsc -b > build.log", "tsc -b tsconfig.json 2> build.log",
+        "tsc --build --verbose >build.log", "tsc --outFile dist/out.js -p .", "tsc --outDir dist -p .",
+        "pip install ruff --ignore-installed", "pip3 install -r r.txt ruff==0.4.0 --upgrade", "python3 -m pip install mypy --quiet --no-cache-dir",
+        "npm install --save-dev eslint --save-exact", "npm i -D prettier --legacy-peer-deps", "npm ci --ignore-scripts eslint",
+        "apt-get install -y shellcheck --no-install-recommends", "brew install shellcheck --quiet", "uv tool install ruff --force",
+        "cargo install --locked ruff", "go install github.com/rhysd/actionlint/cmd/actionlint@latest -v",
+    ]
+    BAD = [
+        "uvx mypy @args.txt scripts", "mypy @args.txt scripts", "tsc -b ci.json > build.log", "tsc -b > build.log ci.json",
+        "tsc --outFile dist/out.js --skipLibCheck -p .", "npx --yes eslint --quiet .", "python3 -m ruff check --fix .",
+    ]
+
+    def test_data_uses_of_a_tool_name_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+    def test_the_neighbouring_real_invocations_still_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+
+class ActionlintTests(CliFlagCase):
+    """Issue 164 item 1 (owner decision, #15): `-ignore` with any value and an empty `-pyflakes=` or `-shellcheck=` are relaxations;
+    a non-empty `-shellcheck=<path>` passes."""
+
+    def test_ignore_and_disabled_integrations_fail_in_each_file_kind(self):
+        files = {
+            "scripts/lint_workflows.sh": '"$bin/actionlint" -ignore "SC2086" "${files[@]}"',
+            ".githooks/pre-commit": "actionlint -pyflakes= .github/workflows/ci.yml",
+            ".github/workflows/ci.yml": "        run: actionlint -shellcheck= .github/workflows/ci.yml",
+            "scripts/install_linters.sh": "  printf 'exec \"$d/actionlint\" \"-shellcheck=$d/shellcheck\" -pyflakes= \"$@\"\\n' > wrapper",
+        }
+        for path, line in files.items():
+            with self.subTest(path=path):
+                self.put(path, line)
+                self.assertFails(MARK + ": " + path + ":1:")
+                self.repo.git("rm", "-q", path)
+                self.repo.commit()
+
+    def test_a_nonempty_shellcheck_path_passes_and_a_reason_waives_the_rest(self):
+        self.put("scripts/lint.sh", 'exec "$d/../libexec/actionlint" "-shellcheck=$d/shellcheck" "$@"')
+        self.assertPasses()
+        self.put("scripts/lint.sh", 'exec "$d/actionlint" "-shellcheck=$d/shellcheck" -pyflakes= "$@" # justified: pyflakes needs Python here')
+        self.assertPasses()
+
+
+class MoreFileKindsTests(CliFlagCase):
+    """Issue 164 item 2 (the parts a line scan can read): Makefiles, composite actions and pre-commit config are scanned too."""
+
+    def test_invocations_in_these_files_fail(self):
+        files = {
+            "Makefile": "\truff check --fix .",
+            "tools/Makefile": "\tmypy --ignore-missing-imports scripts",
+            "ci.mk": "\teslint --quiet .",
+            ".github/actions/lint/action.yml": "      run: eslint --quiet .",
+            ".pre-commit-config.yaml": "        entry: ruff check --ignore E501",
+        }
+        for path, line in files.items():
+            with self.subTest(path=path):
+                self.put(path, line)
+                self.assertFails(MARK + ": " + path + ":1:")
+                self.repo.git("rm", "-q", path)
+                self.repo.commit()
+
+    def test_strict_lines_in_these_files_pass(self):
+        for path, line in [("Makefile", "\truff check scripts"), (".pre-commit-config.yaml", "        entry: eslint --max-warnings 0")]:
+            with self.subTest(path=path):
+                self.put(path, line)
+                self.assertPasses()
 
 
 if __name__ == "__main__":
