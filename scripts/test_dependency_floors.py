@@ -72,6 +72,29 @@ class NpmRules(unittest.TestCase):
         self.assertEqual(len(self.flagged(uuid="9.0.1")), 1)
         self.assertEqual(self.flagged(uuid="11.1.1"), [])
 
+    def test_grpc_1_14_line_range_edges(self):
+        # GHSA-m9gg-hp2v-232j and GHSA-f596-whhp-79r4 also cover >=1.14.0 <1.14.5 (R1-01).
+        for bad in ("1.14.0", "1.14.3", "1.14.4"):
+            problems = self.flagged(**{"@grpc__grpc-js": bad})
+            self.assertEqual(len(problems), 1, bad)
+            self.assertIn("1.14.5", problems[0])
+        for ok in ("1.13.6", "1.13.9", "1.14.5", "1.14.7", "1.15.0"):
+            self.assertEqual(self.flagged(**{"@grpc__grpc-js": ok}), [], ok)
+
+    def test_uuid_12_and_13_ranges(self):
+        # GHSA-w5hq-g745-h8pq also covers >=12.0.0 <12.0.1 and >=13.0.0 <13.0.1 (R1-01).
+        for bad, fixed in (("12.0.0", "12.0.1"), ("13.0.0", "13.0.1")):
+            problems = self.flagged(uuid=bad)
+            self.assertEqual(len(problems), 1, bad)
+            self.assertIn(fixed, problems[0])
+        for ok in ("11.1.1", "11.2.0", "12.0.1", "12.1.0", "13.0.1", "14.0.3"):
+            self.assertEqual(self.flagged(uuid=ok), [], ok)
+        self.assertEqual(len(self.flagged(uuid="11.1.0")), 1)
+
+    def test_one_package_can_be_flagged_once_per_copy_not_once_per_range(self):
+        problems = self.flagged(uuid="12.0.0")
+        self.assertEqual(len(problems), 1)
+
     def test_nested_package_is_found(self):
         text = json.dumps({"packages": {"": {}, "node_modules/a/node_modules/uuid": {"version": "9.0.1"}}})
         self.assertEqual(len(df.check_npm_lock(text)), 1)
@@ -114,6 +137,15 @@ class GradleRules(unittest.TestCase):
         self.assertEqual(len(self.flagged(("com.google.guava", "guava", "33.7.1-jre", ["jar"]))), 1)
         self.assertEqual(len(self.flagged(("com.google.guava", "guava", "33.4.0-jre", ["jar"]))), 1)
 
+    def test_plexus_utils_4_0_range_edges(self):
+        # GHSA-6fmv-xxpf-w3cw also covers >=4.0.0 <4.0.3 (R1-01).
+        for bad in ("3.6.0", "4.0.0", "4.0.2"):
+            problems = self.flagged(("org.codehaus.plexus", "plexus-utils", bad, ["jar", "pom"]))
+            self.assertEqual(len(problems), 1, bad)
+        self.assertIn("4.0.3", self.flagged(("org.codehaus.plexus", "plexus-utils", "4.0.1", ["jar"]))[0])
+        for ok in ("3.6.1", "3.9.0", "4.0.3", "4.1.0"):
+            self.assertEqual(self.flagged(("org.codehaus.plexus", "plexus-utils", ok, ["jar", "pom"])), [], ok)
+
     def test_pom_only_entry_is_not_a_used_artifact(self):
         self.assertEqual(self.flagged(("org.jdom", "jdom2", "2.0.6", ["pom"])), [])
 
@@ -138,10 +170,27 @@ class RuleTable(unittest.TestCase):
         self.assertEqual({r.name for r in df.RULES if r.ecosystem == "npm"} >= ALERT_NPM, True)
         self.assertEqual({r.name for r in df.RULES if r.ecosystem == "gradle"} >= ALERT_GRADLE, True)
 
-    def test_every_rule_names_its_advisory_and_a_fixed_version(self):
+    def test_every_rule_names_its_advisory_and_its_ranges(self):
         for r in df.RULES:
             self.assertRegex(r.advisory, r"^GHSA-[2-9a-z]{4}-[2-9a-z]{4}-[2-9a-z]{4}$", r.name)
-            self.assertRegex(r.fixed, r"^[0-9]+(\.[0-9]+)+$", r.name)
+            self.assertTrue(r.ranges, r.name)
+            for lo, hi in r.ranges:
+                self.assertRegex(lo, r"^[0-9]+(\.[0-9]+)*$", r.name)
+                self.assertRegex(hi, r"^[0-9]+(\.[0-9]+)+$", r.name)
+
+    def test_ranges_are_ordered_and_disjoint(self):
+        for r in df.RULES:
+            keys = [(df.version_key(lo), df.version_key(hi)) for lo, hi in r.ranges]
+            for lo, hi in keys:
+                self.assertLess(lo, hi, r.name)
+            for (_, prev_hi), (next_lo, _) in zip(keys, keys[1:], strict=False):
+                self.assertLessEqual(prev_hi, next_lo, r.name)
+
+    def test_multi_range_advisories_are_modelled(self):
+        by_name = {(r.ecosystem, r.name): r for r in df.RULES}
+        self.assertEqual(len(by_name[("npm", "uuid")].ranges), 3)
+        self.assertEqual(len(by_name[("npm", "@grpc/grpc-js")].ranges), 2)
+        self.assertEqual(len(by_name[("gradle", "org.codehaus.plexus:plexus-utils")].ranges), 2)
 
     def test_version_ordering(self):
         self.assertTrue(df.version_key("1.13.10") > df.version_key("1.13.6"))
