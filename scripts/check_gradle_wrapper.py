@@ -17,8 +17,12 @@ SUM_KEY = "distributionSha256Sum"
 URL_KEY = "distributionUrl"
 SUM_RE = re.compile(r"[0-9a-f]{64}")
 URL_RE = re.compile(r"https\\://services\.gradle\.org/distributions/gradle-[\w.-]+-(?:bin|all)\.zip")
-# java.util.Properties: key ends at the first '=', ':' or whitespace; one optional '=' or ':' and blanks follow; # and ! start comments.
-LINE_RE = re.compile(r"\s*([^\s=:]+)\s*[=:]?\s*(.*)")
+# java.util.Properties: lines end only at \n, \r or \r\n and the only blanks are space, tab and form feed (not str.splitlines(),
+# str.lstrip() or \s, which also act on \v, \x1c-\x1e, U+0085, U+2028/9, NBSP and other Unicode characters Java treats as plain text).
+# The key ends at the first '=', ':' or blank; one optional '=' or ':' and blanks follow; # and ! start comments.
+BLANKS = " \t\f"
+LINE_BREAK = re.compile(r"\r\n|\r|\n")
+LINE_RE = re.compile(r"[ \t\f]*([^ \t\f=:]+)[ \t\f]*[=:]?[ \t\f]*(.*)")
 
 
 def _continues(line):
@@ -29,13 +33,13 @@ def _continues(line):
 def _logical_lines(text):
     """The logical lines of a .properties text: comment and blank lines dropped, continued lines joined (leading blanks of the
     continuation line removed, as Java does), so a key folded into the previous property is not seen as a key of its own."""
-    physical = iter(text.splitlines())
+    physical = iter(LINE_BREAK.split(text))
     for raw in physical:
-        line = raw.lstrip()
+        line = raw.lstrip(BLANKS)
         if not line or line[0] in "#!":
             continue
         while _continues(line):
-            line = line[:-1] + next(physical, "").lstrip()
+            line = line[:-1] + next(physical, "").lstrip(BLANKS)
         yield line
 
 
