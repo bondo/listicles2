@@ -818,6 +818,13 @@ class DiffChecks(GuardsCase):
                 self.repo.git("rm", "-q", "-r", "-f", "app/src/test/screenshots")
                 self.repo.commit()
 
+    def test_a_non_ascii_golden_path_needs_the_label_too(self):
+        """R3-02: git quotes such a path in `diff --name-only`, and the closing quote hid the `.png` suffix."""
+        self.repo.write("app/src/test/screenshots/s\u00f8g_light.png", "png")
+        self.repo.commit()
+        self.assertFails("screenshot references changed", GUARD_BASE="origin/main")
+        self.assertPasses(GOLDEN_UPDATE="1")
+
     def test_diff_size_limit_is_enforced_only_in_ci(self):
         self.repo.write("notes.txt", "x\n" * 50)
         self.repo.commit()
@@ -2017,7 +2024,6 @@ class LineLengthPerTool(DiffCase):
         }, True)
         self.assertRaised({
             "a nearer ruff.toml that extends": ({"ruff.toml": "line-length = 60\n"}, {"scripts/ruff.toml": "extend = \"../ruff.toml\"\n"}),
-            "black raised, not ruff": ({"pyproject.toml": self.PP % 60 + black}, {"pyproject.toml": self.PP % 60 + black.replace("60", "200")}),
         }, False)
 
     def test_a_kept_file_that_lost_its_setting_is_not_compared_with_other_files(self):
@@ -2094,7 +2100,7 @@ class LineLengthPerTool(DiffCase):
         }, False)
 
     def test_other_spellings_of_the_ruff_and_flake8_tables_are_read(self):
-        """R2-02..R2-01: TOML and INI spell the same table in several ways, and all of them are read by ruff and flake8."""
+        """R2-01, R3-01: TOML and INI spell the same table in several ways, and all of them are read by ruff and flake8."""
         pp = "[tool.black]\nline-length = 60\n"
         base_py = {"pyproject.toml": pp + self.PP % 100}
         base_fl = {"setup.cfg": "[isort]\nline_length = 60\n[flake8]\nmax-line-length = 100\n"}
@@ -2112,7 +2118,6 @@ class LineLengthPerTool(DiffCase):
             ),
         }, True)
         self.assertRaised({
-            "black raised in [tool]": (base_py, {"pyproject.toml": "[tool]\nblack.line-length = 300\n" + self.PP % 100}),
             "ruff lowered, comment": (base_py, {"pyproject.toml": pp + "[tool.ruff]#c\nline-length = 90\n"}),
         }, False)
 
@@ -2146,6 +2151,63 @@ class LineLengthPerTool(DiffCase):
             "flake8": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "# c\r[flake8]\rmax-line-length = 300\r"}),
         }, True)
         self.assertRaised({"lowered": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "# c\r[flake8]\rmax-line-length = 90\r"})}, False)
+
+    def test_a_file_that_is_not_parsed_fails_closed(self):
+        """R3-01: every line-length value in pyproject.toml, setup.cfg and tox.ini counts, whatever the spelling of the table around it
+        (ruff and flake8 read many), so a raise cannot hide; the cost is that another tool's raise there fails too."""
+        black = "[tool.black]\nline-length = 60\n"
+        base = {"pyproject.toml": black + self.PP % 100}
+        for name, head in {
+            "quoted root key": 'tool."ruff".line-length = 300\n' + black,
+            "all quoted": '"tool"."ruff"."line-length" = 300\n' + black,
+            "single quotes": "tool.'ruff'.line-length = 300\n" + black,
+            "blanks": "tool . ruff . line-length = 300\n" + black,
+            "root inline table": "tool = { ruff = { line-length = 300 } }\n" + black,
+            "multi-line inline table": black + "[tool]\nruff = {\n  line-length = 300\n}\n",
+            "BOM": "\ufeff[tool.ruff]\nline-length = 300\n" + black,
+            "black raised": black.replace("60", "300") + self.PP % 100,
+        }.items():
+            self.assertRaised({name: (base, {"pyproject.toml": head})}, True)
+        fl = "[isort]\nline_length = 60\n[flake8]%s\nmax-line-length = %d\n"
+        self.assertRaised({
+            "[flake8]x": ({"setup.cfg": fl % ("", 100)}, {"setup.cfg": fl % ("x", 300)}),
+            "[flake8] (style)": ({"setup.cfg": fl % ("", 100)}, {"setup.cfg": fl % (" (style)", 300)}),
+            "[flake8] // c": ({"tox.ini": "[flake8]\nmax-line-length = 100\n"}, {"tox.ini": "[flake8] // c\nmax-line-length = 300\n"}),
+        }, True)
+        self.assertRaised({"lowered": (base, {"pyproject.toml": black + self.PP % 90})}, False)
+
+    def test_the_default_is_counted_when_the_files_own_setting_goes(self):
+        """R3-02: the `use` marker of ruff keys outside a `[tool.ruff]` table, and the owner of a value on the next line."""
+        self.assertRaised({
+            "[tool] ruff keys": (
+                {"pyproject.toml": '[tool]\nruff.line-length = 60\nruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": '[tool]\nruff.lint.select = ["E501"]\n'},
+            ),
+            "root ruff keys": (
+                {"pyproject.toml": 'tool.ruff.line-length = 60\ntool.ruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": 'tool.ruff.lint.select = ["E501"]\n'},
+            ),
+            "isort value on the next line": (
+                {"setup.cfg": "[isort]\nline_length =\n    60\n[flake8]\nmax-line-length = 60\n"},
+                {"setup.cfg": "[isort]\nline_length =\n    60\n[flake8]\nselect = E\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "setting kept": (
+                {"pyproject.toml": '[tool]\nruff.line-length = 60\nruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": '[tool]\nruff.line-length = 60\nruff.lint.select = ["E"]\n'},
+            ),
+        }, False)
+
+    def test_a_multi_line_block_comment_is_not_part_of_a_value(self):
+        """R3-03: prose such as `printWidth: 100 matches ktlint.` inside a comment read as no limit."""
+        cfg = "firebase/prettier.config.js"
+        doc = "/**\n * Prettier settings. printWidth: 100 matches ktlint.\n */\nexport default {\n  printWidth: %d,\n  files: \"src/*\",\n};\n"
+        self.assertRaised({"raise under the comment": ({cfg: doc % 100}, {cfg: doc % 300})}, True)
+        self.assertRaised({
+            "comment added": ({cfg: "export default {\n  printWidth: 100,\n};\n"}, {cfg: doc % 100}),
+            "lowered": ({cfg: doc % 100}, {cfg: doc % 90}),
+        }, False)
 
 
 class WeakerPresets(DiffCase):
