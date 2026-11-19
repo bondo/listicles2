@@ -653,6 +653,9 @@ The orchestrator collects results in this order, from cheapest to most expensive
 * **Dependabot weekly routine:** once a week one batch triage worker reads the open Dependabot PRs and groups the bumps
   into one new branch cut from `main` (never a feature branch, F6), opens a draft PR and posts a "ready" comment on it.
   The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since its bumps then supersede them.
+  Dependabot cannot run Gradle, so a Gradle bump fails CI with "Dependency verification failed" until `gradle/verification-metadata.xml`
+  is regenerated: the grouped Gradle bump branch regenerates it from scratch before merge (command in `ANDROID-BEST-PRACTICES.md` §11),
+  and its reviewer checks that only the bumped coordinates changed. A red individual Dependabot PR with that error is expected.
 * **Linter permission (M0.5-06, owner-approved 2026-11-15, issue #15):** `.claude/settings.json` allows exactly three commands:
   `Bash(.tools/bin/shellcheck *)`, `Bash(.tools/bin/actionlint *)` and `Bash(.tools/bin/zizmor --offline *)` (zizmor offline only).
   `scripts/install_linters.sh` fills `.tools/bin/` (git-ignored) from `scripts/linters.pins` (shellcheck v0.11.0, actionlint v1.7.12,
