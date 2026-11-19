@@ -1,7 +1,10 @@
 """Tests for scripts/check_gradle_wrapper.py. Run: python3 -I scripts/test_check_gradle_wrapper.py"""
 
+import contextlib
+import io
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -100,15 +103,15 @@ class RealRepo(unittest.TestCase):
         self.assertRegex(PROPS.read_text(encoding="utf-8"), r"(?m)^distributionSha256Sum=[0-9a-f]{64}$")
 
     def test_main_fails_on_properties_without_a_sum(self):
-        import tempfile
-
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "gradle" / "wrapper").mkdir(parents=True)
             (Path(tmp) / "gradle" / "wrapper" / "gradle-wrapper.properties").write_text(
                 GOOD.replace(f"distributionSha256Sum={SUM}\n", ""), encoding="utf-8"
             )
-            self.assertEqual(c.main(tmp), 1)
-            self.assertEqual(c.main(Path(tmp) / "nowhere"), 1)
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(c.main(tmp), 1)
+                self.assertEqual(c.main(Path(tmp) / "nowhere"), 1)
+            self.assertIn("distributionSha256Sum is missing", out.getvalue())
 
     def test_merge_ready_accepts_the_sum_line_as_a_wrapper_bump_line(self):
         sum_line = next(ln for ln in PROPS.read_text(encoding="utf-8").splitlines() if ln.startswith("distributionSha256Sum="))

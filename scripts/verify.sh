@@ -55,6 +55,8 @@ step wireframes-safety-tests python3 -I scripts/test_wireframes_safety.py
 step wireframes-safety python3 -I scripts/wireframes_safety.py
 step gradle-repos-tests python3 -I scripts/test_check_gradle_repos.py
 step gradle-repos python3 -I scripts/check_gradle_repos.py
+step wrapper-checksum-tests python3 -I scripts/test_check_gradle_wrapper.py
+step wrapper-checksum python3 -I scripts/check_gradle_wrapper.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
 step python-lint ./scripts/lint_python.sh
 step workflow-lint-tests python3 -I scripts/test_lint_workflows.py
