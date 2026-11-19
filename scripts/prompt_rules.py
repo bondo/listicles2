@@ -89,8 +89,8 @@ BATCH = (
     r"the merge agent merges the listed prs in that order, one at a time, with update-branch and green ci between merges"
 )
 SAME_PATCH = (
-    r"a listed pr may be merged at a head that differs from its approved sha only by update-branch merge commits of `main` with the same patch "
-    r"against `main` \(d2\); any other change needs a new approval"
+    r"a listed pr may be merged at a head that differs from its approved sha only by update-branch merge commits of `main` whose tree equals "
+    r"git's automatic merge \(`git merge-tree` without conflicts, d2\); a hand-resolved conflict or any other change needs a new approval"
 )
 APPROVAL_FORM = (
     r"an owner approval given in a decision comment or in the owner's chat is recorded as one anchored `batch approval: #n@sha` first line "
