@@ -16,9 +16,10 @@ import java.io.File
  * `rememberInfiniteTransition`, `AnimatedVisibility`, `AnimatedContent`, `Crossfade`), which names the animation for
  * tooling and is never shown. Test tags, routes, log tags and other literals are not matched.
  *
- * **Not covered (review catches these):** a literal behind an expression (`text = if (x) "A" else "B"`, `when`),
- * text built with `buildAnnotatedString { append("...") }`, `Toast.makeText`, and any other function that takes a
- * user-visible string.
+ * Only a literal that starts the value is reported. **Not covered (review catches these):** a literal inside or after
+ * an expression (`if`, `when`, `name + " items"`, `AnnotatedString("...")`, `String.format("...")`), text built with
+ * `buildAnnotatedString { append("...") }`, positional arguments of other functions (`Toast.makeText`, the app's own
+ * composables), other semantics properties, `this.contentDescription = "..."`, and `<plurals>`.
  *
  * Allowed: code inside the block body of a `@Preview` function (also `@PreviewLightDark` and the other built-in
  * multipreviews), and a literal whose call line carries `// justified: <reason>` with at least three words of
