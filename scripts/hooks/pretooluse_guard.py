@@ -62,6 +62,9 @@ PINNED_WRAPPERS = {MARK_READY: (MARK_READY_SHA256, (PR_NUMBER,)), "update-branch
 # R5-02: a word that names a wrapper, also after unquoting (`scripts/mark-ready.sh\\ 1` is one word): a path component that is exactly
 # a wrapper name, then whitespace, a slash or the end. Names such as mark-ready.sh.md or xmark-ready.sh do not match.
 WRAPPER_WORD = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")(\s|/|$)")
+# R2-01 of #237: a program is routed to the exact-call check by the START of its name (no boundary), because quotes and a line continuation make bash
+# run `scripts/mark-ready.sh12` for `scripts/mark-ready.sh""<backslash-newline>12`, a file the boundary form above does not recognise.
+WRAPPER_PREFIX = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -911,7 +914,7 @@ def check_mark_ready(cmd, assigns, words, wrappers, state):
     $VAR, globs and braces never pass the argument checks. Runs when the command's first word is a wrapper name (mark-ready.sh or
     update-branch.sh); `bash scripts/mark-ready.sh N` is not matched by the allow rule."""
     here = os.path.realpath(state["cwd"])
-    name = WRAPPER_WORD.search(words[0]).group(2)
+    name = WRAPPER_PREFIX.search(words[0]).group(2)
     arg_patterns = PINNED_WRAPPERS[name][1]
     call = "scripts/" + name
     shape = f"`{call} " + ("<PR number> <40-hex sha>" if len(arg_patterns) == 2 else "<PR number>") + "`"
@@ -939,7 +942,7 @@ def check_simple(cmd, state, depth):
         check_assign(a)
     for s in nested:
         check_command_string(s, child(state), depth + 1)
-    if words and WRAPPER_WORD.search(words[0]):
+    if words and WRAPPER_PREFIX.search(words[0]):
         check_mark_ready(cmd, assigns, words, wrappers, state)
         return
     if not words:
