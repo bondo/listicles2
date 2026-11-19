@@ -29,7 +29,8 @@ step() {
 gradle() { ./gradlew -q --console=plain "$@"; }
 
 step guards ./scripts/guards.sh
-step hook-tests python3 -I scripts/hooks/run_hook_tests.py
+step hook-tests python3 -I scripts/hooks/run_hook_tests.py --jobs 4
+step ci-scope-tests python3 -I scripts/test_ci_scope.py
 step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
 step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py
 step tasks-tests python3 -I scripts/test_tasks.py
