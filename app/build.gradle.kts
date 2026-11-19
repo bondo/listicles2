@@ -77,14 +77,22 @@ val syncRobolectricAndroidAll by tasks.registering(Sync::class) {
 
 class RobolectricOfflineArgs(
     @get:InputDirectory @get:PathSensitive(PathSensitivity.RELATIVE) val dependencyDir: Provider<Directory>,
+    @get:Input val targetSdk: Int,
 ) : CommandLineArgumentProvider {
     override fun asArguments() =
-        listOf("-Drobolectric.offline=true", "-Drobolectric.dependency.dir=${dependencyDir.get().asFile.absolutePath}")
+        listOf(
+            "-Drobolectric.offline=true",
+            "-Drobolectric.dependency.dir=${dependencyDir.get().asFile.absolutePath}",
+            // RobolectricUnderNetworkBlockTest checks that Robolectric's SDK level (robolectric.properties) follows it.
+            "-Dlisticles.targetSdk=$targetSdk",
+        )
 }
 
 tasks.withType<Test>().configureEach {
     dependsOn(syncRobolectricAndroidAll)
-    jvmArgumentProviders.add(RobolectricOfflineArgs(robolectricAndroidAllDir))
+    jvmArgumentProviders.add(
+        RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),
+    )
 }
 
 kotlin {

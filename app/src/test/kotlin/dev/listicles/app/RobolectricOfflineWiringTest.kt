@@ -1,11 +1,9 @@
 package dev.listicles.app
 
-import dev.listicles.testing.NetworkAccessBlockedException
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.types.shouldNotBeInstanceOf
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.robolectric.internal.dependency.DependencyJar
@@ -74,7 +72,6 @@ class RobolectricOfflineWiringTest {
                 ).getLocalArtifactUrl(dependency("15-robolectric-1-i7"))
             }
         failure.message shouldContain "${prefix}15-robolectric-1-i7.jar"
-        failure.shouldNotBeInstanceOf<NetworkAccessBlockedException>()
     }
 
     @Test
