@@ -26,7 +26,6 @@ Agents cannot do it: it needs repo admin in GitHub Settings.
 ## 1. Before you start
 1. Run CI once on a PR so GitHub knows the check names (the status-check picker only lists names seen
    in the last week). Names must match `ci.yml` job `name:` exactly, lowercase, no workflow prefix.
-   The `tasks` check (added by PR #35) is only selectable after #35 has merged and the job has run once.
 2. Settings > General > Pull Requests: tick **Allow squash merging**, untick **Allow merge commits** and
    **Allow rebase merging**. Tick **Automatically delete head branches**. Optional: default commit message
    "Pull request title and description".
@@ -57,11 +56,11 @@ Tick these rules:
 | - Allowed merge methods | **Squash** only |
 | Require status checks to pass | on |
 | - Require branches to be up to date before merging | on |
-| - Status checks that are required | the 8 checks below, each with its source set to **GitHub Actions** |
+| - Status checks that are required | the 10 checks below, each with its source set to **GitHub Actions** |
 
-Required checks (8): `wrapper`, `static`, `unit`, `firebase`, `ui`, `guards`, `secrets`, `tasks`.
-`tasks` can only be added after PR #35 merges and has run once; until then require the other seven, and add
-`tasks` the same day #35 lands.
+Required checks (10): `wrapper`, `static`, `unit`, `firebase`, `ui`, `guards`, `secrets`, `tasks`,
+`python-lint`, `workflow-lint`. These are all the jobs in `ci.yml`; `scripts/test_firebase_ts.py` fails when the
+jobs, this list and the list in `docs/PLAN.md` differ.
 
 For each check, set the source (the "Integration" / app dropdown, **[unverified]** label) to **GitHub
 Actions**, not "Any source". With "Any source", anything holding a write token (agents included) can post a
@@ -141,4 +140,3 @@ Try these in order; stop at the first that works.
 ## 6. Keep in sync
 When a CI job is added, renamed or removed in `ci.yml`, update the required list here and in the ruleset
 in the same sitting. A renamed job silently becomes "expected, never reported" and blocks every PR.
-Pending change: after PR #35 merges, add `tasks` to the required list (section 2).
