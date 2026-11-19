@@ -232,4 +232,45 @@ class UiNoHardcodedStringsTest {
         violationsOf("Text(\"\\u2022\")\nText(\"\\n\")\nText(\"\\t-\\\\\")").shouldBeEmpty()
         violationsOf("Text(\"\\nHello\")").shouldNotBeEmpty()
     }
+
+    @Test
+    fun acceptsLabelsOfAnimationApis() {
+        listOf(
+            """val a = animateFloatAsState(target, label = "alpha")""",
+            """val a = animateColorAsState(c, animationSpec = spec, label = "color")""",
+            """val t = updateTransition(state, label = "card")""",
+            """val t = rememberInfiniteTransition(label = "pulse")""",
+            """val v = animateValueAsState<Float>(x, converter, label = "value")""",
+            """val f = transition.animateFloat(label = "fade") { 1 }""",
+            "val a = animateDpAsState(\n    targetValue = d,\n    label = \"padding\",\n)",
+            """AnimatedContent(state, label = "swap") { Text(stringResource(R.string.a)) }""",
+            """AnimatedVisibility(visible, label = "show") {}""",
+            """Crossfade(state, label = "fade") {}""",
+        ).forEach { code -> violationsOf(code).shouldBeEmpty() }
+    }
+
+    @Test
+    fun otherLabelsNearAnimationCallsAreStillRejected() {
+        violationsOf("""OutlinedTextField(label = "Name")""").shouldNotBeEmpty()
+        violationsOf("""Chip(onClick = animateIt(1), label = "Hello there")""").shouldNotBeEmpty()
+        violationsOf("""Chip(modifier = Modifier.animate(label = "x"), label = "Hello there")""").shouldNotBeEmpty()
+        violationsOf("""animateFloatAsState(target, contentDescription = "Add item")""").shouldNotBeEmpty()
+        violationsOf("""val a = animated(label = "Hello there")""").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun builtInMultiPreviewsAreExempt() {
+        listOf("PreviewLightDark", "PreviewScreenSizes", "PreviewFontScale", "PreviewDynamicColors").forEach { name ->
+            violationsOf("@$name\n@Composable\nfun P() {\n    Text(\"Sample\")\n}").shouldBeEmpty()
+        }
+        violationsOf("@PreviewLightDarkX\n@Composable\nfun P() {\n    Text(\"Sample\")\n}").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun aBodylessPreviewDeclarationDoesNotExemptTheNextDeclaration() {
+        violationsOf("@Preview\n@Composable\nfun P()" + realFunction()).single().shouldContain("Real text")
+        violationsOf("@Preview\nfun P()\n\nclass K {\n    fun f() {\n$realText\n    }\n}")
+            .single()
+            .shouldContain("Real text")
+    }
 }
