@@ -1669,7 +1669,11 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         self.assertRegex(text, r"until the hard stage, the orchestrator follows this section, not the soft reminder")
         self.assertNotIn("for other sessions", text)
 
-    AUTH = r"owner authorizes it there before its first merge and records a new authorization for it on #15 \(per merge agent\)"
+    # Owner decision on #15, comment 7002904192 (R2-01 of #179): one authorization covers exactly its window and the PRs it names.
+    SCOPE = (r"one authorization covers exactly the time window and the prs it names, whichever merge agent session runs under it, "
+             r"and ends with the window, and a merge outside a recorded window or list needs a new one")
+    AUTH = (r"owner authorizes it there before its first merge and records a new authorization for it on #15; " + SCOPE
+            + r" \(owner decision, #15 comment 7002904192\)")
 
     def test_merge_agent_authorization_is_stated_once_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179
         doc = self.norm(self.ORCH_DOC).split("### 7.5 pull requests and the merge request", 1)[1].split("### 7.6", 1)[0]
@@ -1678,8 +1682,14 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
         prompt = self.norm(self.ORCH_MD)
         self.assertRegex(prompt, r"the owner authorizes it there before its first merge, and you never pass an approval on to it\.")
-        self.assertRegex(prompt, r"the owner also records a new authorization for it on #15 \(per merge agent, §7\.5\)")
+        self.assertRegex(prompt, r"the owner also records a new authorization for it on #15: " + self.SCOPE + r" \(§7\.5, #15 comment 7002904192\); "
+                                 r"the merge agent does not merge before that")
         self.assertEqual(len(re.findall(r"owner authorizes it there", prompt)), 1)
+
+    def test_no_per_merge_agent_unit_of_authorization_is_left(self):  # R2-01 of #179: no owner source states it
+        for path in (self.ORCH_MD, self.ORCH_DOC, ROOT / "scripts" / "prompt_rules.py"):
+            with self.subTest(path=path.name):
+                self.assertNotIn("per merge agent", path.read_text(encoding="utf-8").lower())
 
     def missing_recipes(self, section):
         return [label for label, pattern in self.RECIPES if not re.search(pattern, section)]
