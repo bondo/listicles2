@@ -128,6 +128,11 @@ val checkWarningsAsErrors =
 
 tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
 
+// Test-support JVM modules run only on the host JDK (21), never on Android, and use its newer API on purpose
+// (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18). checkJdkRelease fails if any
+// non-test configuration depends on one of them, so such a module can never reach the app.
+val jdkTestSupportModules = setOf(":core:testing")
+
 // Issue 211: every JVM module (Kotlin JVM plugin) compiles against the JDK 17 API, not the JDK 21 one the build runs
 // on. minSdk is 26 and Android has java.util.List.removeFirst()/removeLast()/reversed() only from API 35, so a call
 // that resolves to the JDK 21 member crashes on Android 8 to 14. Kotlin (-Xjdk-release) and Java (--release) must both
@@ -147,7 +152,27 @@ val checkJdkRelease =
 
         fun javaOk(release: String) = release == wanted
 
-        val jvmProjects = provider { allprojects.filter { it.plugins.hasPlugin("org.jetbrains.kotlin.jvm") } }
+        val jvmProjects =
+            provider {
+                allprojects.filter {
+                    it.plugins.hasPlugin("org.jetbrains.kotlin.jvm") && it.path !in jdkTestSupportModules
+                }
+            }
+        // "project path -> configuration" for every non-test configuration that depends on a test-support module.
+        val leaks =
+            provider {
+                allprojects.flatMap { p ->
+                    p.configurations
+                        .filterNot { it.name.contains("test", ignoreCase = true) }
+                        .flatMap { c ->
+                            c.dependencies
+                                .withType<ProjectDependency>()
+                                .filter { it.path in jdkTestSupportModules }
+                                .map { "${p.path}:${c.name} -> ${it.path}" }
+                        }
+                }
+            }
+        inputs.property("leaks", leaks)
         val kotlinTasks =
             jvmProjects.map { ps ->
                 ps.flatMap { p ->
@@ -201,6 +226,9 @@ val checkJdkRelease =
                     javaTasks.get().filterNot { (_, release) -> javaOk(release) }.map { (path, release) ->
                         "$path (Java release: ${release.ifEmpty { "unset" }})"
                     }
+            check(leaks.get().isEmpty()) {
+                "test-support modules (use JDK 21 API) must only be test dependencies: ${leaks.get().joinToString()}"
+            }
             check(offenders.isEmpty()) {
                 "JVM modules must compile against the JDK $wanted API (-Xjdk-release=$wanted, " +
                     "options.release=$wanted) so Android API 26 to 34 has every method called; " +
@@ -209,7 +237,18 @@ val checkJdkRelease =
         }
     }
 
-// (wired into detekt in the green commit)
+tasks.named("detekt") { dependsOn(checkJdkRelease) }
+
+// The shared setting that checkJdkRelease checks: every JVM module compiles against the JDK 17 API.
+subprojects {
+    if (path in jdkTestSupportModules) return@subprojects
+    plugins.withId("org.jetbrains.kotlin.jvm") {
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
+            compilerOptions.freeCompilerArgs.add("-Xjdk-release=17")
+        }
+        tasks.withType<JavaCompile>().configureEach { options.release.set(17) }
+    }
+}
 
 // Every test JVM blocks network access (core/testing: NoNetwork). NIO sockets need the JDK's selector provider
 // replaced, which is only possible through a system property read when the JVM first needs one.
