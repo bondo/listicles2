@@ -12,7 +12,9 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
 import merge_ready  # noqa: E402  # justified: must follow the sys.path insert above
+import pretooluse_guard  # noqa: E402  # justified: its PROTECTED list is the source of the process files (R1-03)
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "merge_ready.py"
@@ -440,8 +442,8 @@ class UsageTests(unittest.TestCase):
         self.assertEqual(api.requested, [])
         self.assertEqual(api.merged, [])
 
-    def test_kinds_are_exactly_the_three_authorized_ones(self):
-        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "tasks-sync", "working-draft-docs"])
+    def test_kinds_are_exactly_the_authorized_ones(self):
+        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "general", "tasks-sync", "working-draft-docs"])
 
     def test_cli_unknown_kind(self):
         res = self.cli("12", SHA, "everything")
@@ -476,6 +478,84 @@ class UsageTests(unittest.TestCase):
         self.assertIn("405", text)
 
 
+class GeneralKindTests(unittest.TestCase):
+    """Kind `general`: a PR that is not owner-only, merged under the owner's standing authorization (#15 comment 7005366747)."""
+
+    def refused(self, api, reason, **kwargs):
+        code, text = go(api, kind="general", **kwargs)
+        self.assertNotEqual(code, 0, text)
+        self.assertEqual(api.merged, [], "a refused PR must not be merged")
+        self.assertRegex(text, reason)
+
+    def test_non_gate_scripts_docs_and_build_files_are_merged(self):
+        names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md", "docs/FOLLOW-UPS.md",
+                 "core/domain/src/Lists.kt", "docs/PLAN.md", "design/tokens.json", "docs/milestones/M1.md", "firebase/test/rules.test.ts")
+        api = make_api(files=[file_entry(n) for n in names])
+        self.assertEqual(go(api, kind="general")[0], 0)
+        self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_every_owner_only_path_is_refused(self):
+        names = ("docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/product/naming.md", "docs/reviews/README.md", "design/new-sign-off.md",
+                 "firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt",
+                 "gradle/wrapper/gradle-wrapper.properties", "gradle/verification-metadata.xml", ".github/CODEOWNERS")  # the PROTECTED ones: see below
+        for name in names:
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry("scripts/new_tool.py"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_dotdot_and_a_rename_from_an_owner_only_path_are_refused(self):
+        for entry, reason in ((file_entry("scripts/../CLAUDE.md"), r"\.\."),
+                              (file_entry("scripts/x.py", status="renamed", previous="scripts/guards.sh"), r"scripts/guards\.sh")):
+            with self.subTest(reason=reason):
+                self.refused(make_api(files=[entry]), reason)
+
+    def test_a_working_draft_sign_off_or_removal_is_still_the_owners(self):
+        flip = "@@ -3 +3 @@\n-Status: working draft; not owner-approved (see issue #15).\n+Status: approved by the owner."
+        for f in (file_entry("docs/PLAN.md", patch=flip), {"filename": "docs/PLAN.md", "status": "removed"},
+                  {"filename": "docs/milestones/M1.md", "status": "renamed", "previous_filename": "docs/milestones/old.md"}):
+            with self.subTest(f=f):
+                self.refused(make_api(files=[f]), r"(not owner-approved|sign-off|removal)")
+
+    def test_process_files_from_the_guard_list_are_owner_only(self):  # R1-03: the set comes from pretooluse_guard.PROTECTED, not a second list
+        for entry in pretooluse_guard.PROTECTED:
+            with self.subTest(entry=entry):
+                self.assertTrue(merge_ready.owner_only(entry + ("x" if entry.endswith("/") else "")))
+        for name in ("scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", ".tools/bin/shellcheck", "app/mark-ready.sh",
+                     "x/update-branch.sh", "scripts/update-branch.sh"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_approved_product_docs_and_gate_docs_are_owner_only(self):  # R1-04: only the real drafts are not
+        for name in ("docs/product/flow.md", "docs/product/stories.md", "docs/product/rubric.md", "docs/product/wireframes/01-sign-in-dark.png",
+                     "docs/ANDROID-BEST-PRACTICES.md"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_every_script_a_required_ci_job_runs_is_owner_only(self):  # R1-05: read from ci.yml, so a new CI script needs no list edit
+        ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        found = set(re.findall(r"scripts/[\w./-]+\.(?:py|sh)", ci))
+        self.assertIn("scripts/check_gradle_repos.py", found)
+        for name in sorted(found):
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+        self.assertFalse(merge_ready.owner_only("scripts/verify.sh"), "not run by a CI job, so a non-gate script")
+
+    def test_without_a_readable_ci_yml_every_scripts_path_is_owner_only(self):  # fails closed
+        merge_ready.ci_scripts.cache_clear()
+        try:
+            orig, merge_ready.CI_YML = merge_ready.CI_YML, ROOT / "no" / "such.yml"
+            self.assertTrue(merge_ready.owner_only("scripts/verify.sh"))
+        finally:
+            merge_ready.CI_YML = orig
+            merge_ready.ci_scripts.cache_clear()
+
+    def test_case_variants_of_owner_only_paths_are_refused(self):  # R1-06
+        for name in ("claude.md", ".Claude/settings.local.json", ".Githooks/post-checkout", "Scripts/Hooks/x.py", "DOCS/orchestration.md", "Agents/x.md"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+
+    def test_the_common_checks_still_apply(self):
+        self.refused(make_api(files=[file_entry("scripts/x.py")], state="behind"), r"mergeable_state.*behind")
+        self.refused(make_api(files=[file_entry("scripts/x.py")], body="Fixes #1"), r"closing keyword")
+        self.refused(make_api(files=[file_entry("scripts/x.py")], checks=[run("guards"), run("tasks")]), r"static.*missing")
+
+
 class WiringTests(unittest.TestCase):
     """The tests and the script must run in verify.sh and CI, and the process docs must tell the merge agent to run only the script."""
 
@@ -508,6 +588,12 @@ class WiringTests(unittest.TestCase):
         doc = self.read("docs/ORCHESTRATION.md")
         self.assertRegex(doc, r"(?is)merge agent.*git ls-remote.*annotated tags dereferenced")
         self.assertRegex(doc, r"(?i)7-day `cooldown`")
+
+    def test_docs_name_every_kind_of_the_script(self):
+        doc = self.read("docs/ORCHESTRATION.md")
+        for word in sorted(merge_ready.KINDS) + ["standing authorization"]:
+            with self.subTest(word=word):
+                self.assertIn(word, doc)
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
