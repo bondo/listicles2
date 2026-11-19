@@ -373,4 +373,3 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **PR to merge** [#224](https://github.com/bondo/listicles2/issues/224): Dependabot alert triage&#58; bump all 14 open alerts, add triage policy (issue 187)
