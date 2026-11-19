@@ -21,7 +21,8 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
     `batch approval: #N@sha, ...` (only entries and (notes)) and lists this PR once with a sha
     (7+ hex) of one of its commits; earlier listed PRs are merged; the head is that commit or only adds update-branch merges of main (second parent
     in main) whose tree equals git's automatic merge of their two parents (`git merge-tree --write-tree`, no conflicts, run in this checkout after
-    fetching main and pull/N/head; R1-02 of #245). A hand-resolved conflict, an edit or an extra file in the merge commit refuses (a fresh owner approval is needed).
+    fetching main and pull/N/head; R1-02 of #245). A hand-resolved conflict, an edit or an extra file in the merge commit refuses (a fresh owner
+    approval is needed).
 Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the head moved) and the checked title and body as commit text.
 Exit status: 0 merged, 1 refused (or timed out waiting) or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
