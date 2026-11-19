@@ -631,5 +631,47 @@ class MoreFileKindsTests(CliFlagCase):
                 self.assertPasses()
 
 
+class ReviewRound1Tests(CliFlagCase):
+    """PR 183 review round 1: R1-01 npm `--` tail with a tool name on the line, R1-02 pipx run and conda run, R1-03 actionlint programs,
+    R1-04 camelCase tsc flags after npm `--`, R1-05 tsc response files, R1-06 --noImplicitUseStrict."""
+
+    BAD = [
+        "npm run lint:eslint -- --quiet", "npm run eslint -- --quiet", "npm exec eslint -- --quiet .", "npm run typecheck:tsc -- --noCheck",
+        "yarn run lint:eslint -- --quiet", "npm ci && npm run eslint -- --quiet",
+        "pipx run ruff check --ignore E501 .", "pipx run mypy --ignore-missing-imports scripts", "conda run -n x ruff check --ignore E501 .",
+        "time pipx run ruff check --exit-zero .", "sudo pipx run ruff check --fix .",
+        "actionlint -pyflakes=true x.yml", "actionlint -shellcheck=/bin/true x.yml", "actionlint -shellcheck=shellcheck-stub x.yml",
+        "tsc @relax.txt", "tsc -p tsconfig.json @relax.txt", "tsc --noImplicitUseStrict -p .",
+    ]
+    GOOD = [
+        "npm run lint:eslint -- --max-warnings 0", "npm exec eslint -- --max-warnings 0 .", "npm run typecheck -- --noEmit",
+        "npm run typecheck -- --noImplicitAny", "npm run typecheck:tsc -- --noEmit --strict",
+        "pipx install ruff --force", "pipx upgrade ruff --verbose", "pipx inject ruff plugin --quiet", "conda install -n x ruff --yes",
+        "apt-get -y install shellcheck --no-install-recommends", "sudo apt install -y shellcheck --no-install-recommends", "pip install --upgrade ruff --quiet",
+        'exec "$d/actionlint" "-shellcheck=$d/shellcheck" x.yml', "actionlint -pyflakes=/opt/bin/pyflakes x.yml",
+        "tsc --noImplicitAny --noImplicitThis --noImplicitReturns --noImplicitOverride -p .",
+    ]
+
+    def test_holes_the_review_found_fail(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_neighbouring_lines_pass(self):
+        for line in self.GOOD:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertPasses()
+
+    def test_the_workflow_form_of_pipx_run_fails(self):
+        self.put(".github/workflows/ci.yml", "      - run: pipx run ruff check --ignore E501 .")
+        self.assertFails(MARK + ": .github/workflows/ci.yml:1:")
+
+    def test_a_justified_reason_waives_these_too(self):
+        self.put("scripts/lint.sh", "npm run lint:eslint -- --quiet # justified: generated code, owner approved")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
