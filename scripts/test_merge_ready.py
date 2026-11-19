@@ -412,9 +412,8 @@ class LsRemoteResolverTests(unittest.TestCase):
             "no git": FakeRun(exc=FileNotFoundError("git")),
         }
         for name, runner in cases.items():
-            with self.subTest(name):
-                with self.assertRaises(merge_ready.PinError):
-                    self.resolve(runner)
+            with self.subTest(name), self.assertRaises(merge_ready.PinError):
+                self.resolve(runner)
 
     def test_a_repo_or_tag_that_could_smuggle_an_option_or_a_url_is_refused_before_git_runs(self):
         for repo, tag in (("actions/checkout", "--upload-pack=evil"), ("actions/checkout", "v1 refs/heads/main"), ("-o/evil", "v1"),
