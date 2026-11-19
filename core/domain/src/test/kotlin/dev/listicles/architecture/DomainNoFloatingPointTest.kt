@@ -231,4 +231,37 @@ class DomainNoFloatingPointTest {
     fun wholeNumberParsingIsAccepted() {
         violationsOf("val x = \"12\".toLongOrNull() ?: \"3\".toIntOrNull() ?: 0").shouldBeEmpty()
     }
+
+    @Test
+    fun rejectsFloatingConversionsWithoutALeadingDot() {
+        violationsOf("val x = listOf(\"1\").mapNotNull(String::toDoubleOrNull)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(\"1\").mapNotNull(String::toFloatOrNull)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).map(Int::toDouble)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).map(Int::toFloat)").shouldNotBeEmpty()
+        violationsOf("val x = with(\"1\") { toDoubleOrNull() }").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsFloatingArraysStreamsAndRandomHelpers() {
+        violationsOf("val x = DoubleArray(3)").shouldNotBeEmpty()
+        violationsOf("val x = FloatArray(3)").shouldNotBeEmpty()
+        violationsOf("val x = doubleArrayOf(1)").shouldNotBeEmpty()
+        violationsOf("val x = floatArrayOf(1)").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).toDoubleArray()").shouldNotBeEmpty()
+        violationsOf("val x = listOf(1).stream().mapToDouble { it * 1 }.sum()").shouldNotBeEmpty()
+        violationsOf("val x = s.asDoubleStream()").shouldNotBeEmpty()
+        violationsOf("val x: DoubleStream? = null").shouldNotBeEmpty()
+        violationsOf("val x = java.util.Random().nextGaussian()").shouldNotBeEmpty()
+        violationsOf("val x: OptionalDouble? = null").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsWholeNumberArraysStreamsAndLookAlikes() {
+        violationsOf(
+            "val a = IntArray(3)\nval b = LongArray(3)\nval c = intArrayOf(1)\nval d = s.mapToInt { it }\n" +
+                "val e = s.mapToLong { it }\nval doubleArrayCount = 1\nclass MyDoubleArray\n" +
+                "fun mapToDoubleish() = 1\n" +
+                "fun nextGaussianish() = 1",
+        ).shouldBeEmpty()
+    }
 }
