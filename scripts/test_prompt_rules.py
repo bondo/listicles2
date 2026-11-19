@@ -1727,5 +1727,41 @@ class NoResolveThreadTests(unittest.TestCase):
         self.assertTrue({"docs/ORCHESTRATION.md", "docs/COLLABORATING.md"} <= {r.path for r in prompt_rules.DOC_RULES})
 
 
+class Issue134ReviewerEffortTests(unittest.TestCase):
+    """#134 (owner decision, comment 6989468926): a reviewer of an area:security-rules or area:sync-merge PR runs at max effort even
+    without risk:high, as docs/reviews/README.md R7 says. The reviewer prompt must say so, in step with agents/roles.yaml."""
+
+    RULE = "reviewer-effort"
+    OLD = "Opus, high effort (max for risk:high PRs)."
+
+    def test_the_rule_exists_for_the_reviewer_only_and_the_real_prompt_passes(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        self.assertEqual(by_id[self.RULE].roles, ("reviewer",))
+        self.assertNotIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer"))))
+
+    def test_the_old_risk_high_only_wording_is_rejected(self):
+        text = prompt_rules.normalize(real("reviewer"))
+        first = text.split(". Fresh session")[0]  # the opening line carrying the effort
+        self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", text.replace(first, self.OLD.rstrip("."), 1))))
+
+    def test_a_stale_old_spelling_next_to_the_new_line_is_rejected(self):  # R1-01 of #155: only `forbidden` can catch this
+        for old in ("Opus, high effort (max for risk:high PRs).", "Opus, high effort (max for `risk:high` PRs).",
+                    "Opus, high effort (MAX FOR `RISK:HIGH` PRs)."):
+            with self.subTest(old=old):
+                self.assertNotIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer"))))
+                self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer") + "\n" + old)))
+
+    def test_dropping_either_label_or_the_even_without_clause_is_rejected(self):
+        text = prompt_rules.normalize(real("reviewer"))
+        for clause in ("`area:security-rules`", "`area:sync-merge`", "even without `risk:high`"):
+            with self.subTest(clause=clause):
+                self.assertIn(clause, text)
+                self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", text.replace(clause, "", 1))))
+
+    def test_the_rule_applies_to_no_other_role(self):
+        for role in ("implementer", "second-reviewer", "escalation-reviewer"):
+            self.assertNotIn(self.RULE, ids(prompt_rules.check_text(role, "")), role)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -651,6 +651,15 @@ RULES = (
         forbidden=(r"flag plan gaps for the owner instead of deciding",),
     ),
     Rule(
+        "reviewer-effort", ("reviewer",),
+        (
+            r"opus, high effort \(max for `risk:high` prs and for prs labelled `area:security-rules` or `area:sync-merge`, even without `risk:high`, "
+            r"per `agents/roles\.yaml`",
+        ),
+        "the reviewer prompt names max effort for risk:high, area:security-rules and area:sync-merge PRs, as roles.yaml and R7 do (#134)",
+        forbidden=(r"max for `?risk:high`? prs\)",),
+    ),
+    Rule(
         "reviewer-visual-matrix", ("reviewer",),
         (
             r"visual check and rules matrix \(review\.md items 12 and 13\)", r"an agent score below 3 is a `minor` finding, never a blocker or major",

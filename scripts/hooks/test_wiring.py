@@ -212,6 +212,38 @@ class RolesYaml(unittest.TestCase):
         self.assertEqual(impl["max_effort_when"], ["the PR is tagged risk:high in the milestone doc"])
         self.assertNotIn("high_effort_when", impl)  # high is the default now; an agent may ask for more in its WORKER-RESULT
 
+    @staticmethod
+    def max_effort_roles(labels):
+        """Roles whose review/implementation effort is max for a PR with these labels: a `max_effort_when` entry names a label it fires on."""
+        found = set()
+        for name, role in roles_file()["roles"].items():
+            for entry in role.get("max_effort_when", []):
+                if any(re.search(rf"(?<![\w:-]){re.escape(label)}(?![\w:-])", entry) for label in labels):
+                    found.add(name)
+        return found
+
+    def test_a_security_rules_pr_without_risk_high_gets_a_max_effort_reviewer(self):  # owner decision, #134 comment 6989468926
+        self.assertEqual(self.max_effort_roles(["area:security-rules"]), {"reviewer"})
+        self.assertEqual(self.max_effort_roles(["area:sync-merge"]), {"reviewer"})
+
+    def test_risk_high_still_raises_the_reviewer_and_the_implementer_to_max(self):
+        self.assertEqual(self.max_effort_roles(["risk:high"]), {"implementer", "reviewer"})
+        self.assertEqual(self.max_effort_roles(["area:security-rules", "risk:high"]), {"implementer", "reviewer"})
+
+    def test_a_plain_pr_gets_no_max_effort_role(self):
+        for labels in ([], ["area:ui"], ["area:release"], ["area:process"], ["area:security-rules-docs"], ["area:sync-merge-ui"]):
+            self.assertEqual(self.max_effort_roles(labels), set(), labels)
+
+    def test_the_security_rules_label_does_not_raise_anyone_but_the_reviewer(self):
+        for role in ("implementer", "second-reviewer", "planner", "design-reviewer"):
+            self.assertNotIn(role, self.max_effort_roles(["area:security-rules", "area:sync-merge"]), role)
+
+    def test_the_process_docs_state_the_same_reviewer_rule(self):
+        for path in (("docs", "ORCHESTRATION.md"), ("docs", "PLAN.md")):
+            row = next(line for line in read(*path).splitlines() if line.startswith("| **Reviewer**"))
+            for needle in ("risk:high", "area:security-rules", "area:sync-merge"):
+                self.assertIn(needle, row, f"{'/'.join(path)}: {needle}")
+
     def test_fallback_set_keeps_the_pre_pilot_values(self):
         fallback = roles_file()["fallback"]
         self.assertEqual(set(fallback), set(FALLBACK))

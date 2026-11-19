@@ -13,7 +13,7 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
 | **Orchestrator** | Opus / medium | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, draft PRs, Dependabot PR closes, scheduled tasks, session tags | Commits, pushes (the one exception: the server-side `update_pull_request_branch` of §7.5), edits files, reviews code, reads whole transcripts, merges |
 | **Implementer** | Opus / high (max for `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
-| **Reviewer** | Opus / high (max for `risk:high`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
+| **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
 | **Collaborator** (human, trusted Write role, [`COLLABORATING.md`](COLLABORATING.md)) | n/a | n/a | Comments, issues from the forms, PR reviews; nothing else | Merge, enable auto-merge, mark ready, edit files, close, delete branches, resolve threads, labels, comment on #15; sign off design (owner only) |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
 
