@@ -39,7 +39,7 @@ RULES = [
     Rule("gradle", "org.bitbucket.b_c:jose4j", "GHSA-3677-xxcr-wjqv", (("0", "0.9.6"),)),
     Rule("gradle", "org.jdom:jdom2", "GHSA-2363-cqg2-863c", (("0", "2.0.6.1"),)),
     Rule("gradle", "org.apache.commons:commons-lang3", "GHSA-j288-q9x7-2f5v", (("3.0", "3.18.0"),)),
-    Rule("gradle", "org.apache.httpcomponents:httpclient", "GHSA-7r82-7xv7-xcpj", (("0", "4.5.13"),)),
+    Rule("gradle", "org.apache.httpcomponents:httpclient", "GHSA-7r82-7xv7-xcpj", (("0", "4.5.13"), ("5.0.0", "5.0.3"))),
 ]
 
 
