@@ -30,9 +30,13 @@ open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions)
 
 ```mermaid
 flowchart TD
-    start(["App opens"]) --> signed{"Signed in?<br>AUTH-02"}
+    start(["App opens"]) --> gate{"Version below the minimum?<br>START-01"}
+    gate -- "yes" --> upd["Update the app, full screen, no way past it<br>START-01, wireframe 41"]
+    gate -- "no, or cannot be read" --> signed{"Signed in?<br>AUTH-02"}
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
-    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
+    signed -- "yes, also offline" --> named{"Name saved?<br>AUTH-12"}
+    named -- "no" --> nm0["Your name, required; system Back leaves the app, nothing saved<br>AUTH-12, wireframe 42"] --> lists
+    named -- "yes" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
     signin -- "Google account picked" --> lists
     signin -- "Use email and password" --> email["Email sign-in<br>AUTH-05, AUTH-07, AUTH-08, AUTH-10"]
     email -- "signed in, email verified" --> lists
@@ -60,19 +64,24 @@ lists at once and needs no household (OQ-1, VIS-01).
 ```mermaid
 flowchart TD
     open(["First start on this phone"]) --> si["Sign-in screen only<br>AUTH-01"]
-    si -- "Sign in with Google" --> net{"Network?"}
+    si -- "Continue with Google" --> net{"Network?"}
     net -- "no" --> nonet["Message: first sign-in needs a connection<br>AUTH-01, SYNC-03"] --> si
     net -- "yes" --> picker["System account picker<br>AUTH-01"]
     picker -- "cancel" --> si
     picker -- "account picked" --> known{"Account already<br>has lists?"}
-    known -- "no, new account" --> home["Lists, empty state with Create list<br>LIST-01"]
+    known -- "no, new account" --> nm["Your name, filled in from Google, required<br>AUTH-12, wireframe 42"] --> home["Lists, empty state with Create list<br>LIST-01"]
     known -- "yes, for example a new phone" --> mine["Lists with my lists<br>AUTH-01, LIST-01"]
     home -. "later starts, also offline" .-> home2["Lists without signing in again<br>AUTH-02"]
-    acc["Account"] -- "Sign out" --> wipe["Local copy removed (OQ-13)<br>AUTH-03"] --> si
+    acc["Account"] -- "Sign out" --> unsent{"Wait for pending<br>changes finished?"}
+    unsent -- "yes" --> wipe["Local copy removed (OQ-13)<br>AUTH-03"] --> si
+    unsent -- "no, offline or timeout" --> unc["Always confirm: changes not yet sent will be lost<br>(wording A if an unsent change is known, B if not)<br>AUTH-03, M1-14, wireframes 39, 45"]
+    unc -- "cancel" --> acc
+    unc -- "Sign out anyway" --> wipe
+    acc -- "Your name" --> ename["Edit name<br>AUTH-12, wireframe 43"] --> acc
     acc -- "Change password" --> chpw["Sign in again, new password of at least 12<br>AUTH-11, OQ-31"]
     acc -- "Turn on two-step" --> warn["Warning: losing the app may lose access to the account;<br>QR code, then a code<br>AUTH-09, OQ-28"]
     acc -- "Delete account" --> owner{"Household owner<br>with other members?"}
-    owner -- "yes" --> transfer["Guide: transfer ownership first, nothing deleted<br>AUTH-04, HH-06"]
+    owner -- "yes" --> transfer["Guide: transfer ownership first, nothing deleted<br>AUTH-04, HH-06, wireframe 38"]
     owner -- "no" --> confirm["Confirm: my lists, private and shared, are deleted<br>AUTH-04, OQ-5"]
     confirm -- "cancel" --> acc
     confirm -- "confirm" --> reauth{"Server wants a<br>recent sign-in?"}
@@ -88,21 +97,23 @@ section 1). Password: at least 12 characters, no other rules (OQ-26). Each step 
 ```mermaid
 flowchart TD
     si["Sign-in screen<br>AUTH-01"] -- "Use email and password" --> es["Email sign-in<br>AUTH-07"]
-    es -- "Create account" --> ca["Email and password<br>AUTH-05"]
-    ca -- "invalid email or password under 12" --> caerr["Field error, nothing created<br>AUTH-05, OQ-26"] --> ca
-    ca -- "valid, with or without an existing account" --> ve["Verify email: Continue, Send again, Sign out;<br>same screen whether or not the email has an account<br>AUTH-06, AUTH-10, OQ-34"]
+    es -- "Create account" --> ca["Your name, email and password<br>AUTH-05, AUTH-12"]
+    ca -- "empty name, invalid email or password under 12" --> caerr["Field error, nothing created<br>AUTH-05, AUTH-12, OQ-26"] --> ca
+    ca -- "valid, with or without an existing account" --> ve["Verify email: Continue, Send again, Sign out;<br>same screen and same line about an existing account for everyone<br>AUTH-06, AUTH-10, wireframe 27"]
     ve -- "Continue, link not opened yet" --> vnot["Message: not verified yet<br>AUTH-06"] --> ve
     ve -- "Continue, link opened" --> home["Lists, or Join if I came from an invite<br>AUTH-06, HH-03"]
     es -- "email and password" --> ok{"Right?"}
-    ok -- "no" --> wrong["Wrong email or password;<br>after many tries: try again later<br>AUTH-07"] --> es
+    ok -- "no" --> wrong["Wrong email or password, with the hint to use Continue with Google;<br>after many tries: try again later<br>AUTH-07, OQ-34(c), wireframe 24"] --> es
     ok -- "yes, email not verified" --> ve
     ok -- "yes, two-step on" --> code["Enter 6-digit code<br>AUTH-09, OQ-25"]
     code -- "right code" --> home
     code -- "wrong code" --> codeerr["Wrong code: error;<br>after many tries: try again later<br>AUTH-09"] --> code
     ok -- "yes" --> home
-    es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email;<br>Google-only email: OQ-34<br>AUTH-08"]
+    es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email;<br>Google-only email: OQ-34(b)<br>AUTH-08"]
     rp -. "link opened" .-> newpw["New password, at least 12;<br>expired or used link: message<br>AUTH-08"] --> es
-    si -- "Google, the email may have a password account" --> gsame["Firebase handling (trusted provider)<br>checked in M1; no lists lost<br>AUTH-10, OQ-34"]
+    si -- "Google, the email has a password account" --> gsame{"Gmail address?"}
+    gsame -- "no" --> coll["Message: this email already has an account, sign in with email and password;<br>no second account<br>AUTH-10, wireframe 44"] --> si
+    gsame -- "yes" --> gmail["Firebase handling, checked in M1 (OQ-34(a)); no lists lost<br>AUTH-10"]
 ```
 
 ## 3. Household
@@ -122,15 +133,16 @@ flowchart TD
     inv -- "no" --> invnet["Message: needs a connection<br>SYNC-03"]
     inv -- "yes" --> share["Single-use link, valid 7 days; Android share sheet<br>HH-02"]
     members -- "Revoke invite (its creator or household owner)" --> revoked["Link no longer works<br>HH-02"]
-    members -- "Leave (not household owner)" --> leave["Confirm: lists I created go with me, private;<br>members lose those I shared<br>HH-05, OQ-5"]
+    members -- "Leave (not household owner)" --> leave["Confirm: lists I created go with me, private;<br>members lose those I shared<br>HH-05, OQ-5, wireframe 34"]
     leave -- "cancel" --> members
     leave -- "confirm" --> left["Not in a household; I no longer see others' shared lists;<br>my invites deleted<br>HH-05"]
-    members -- "Remove member (household owner)" --> removed["Member loses others' shared lists, their open invites stop working;<br>their lists go with them<br>HH-06, OQ-5"]
-    members -- "Transfer ownership (household owner)" --> moved["Other member is household owner; I am a plain member<br>HH-06"]
-    members -- "Delete household (household owner)" --> delc["Confirm: shared lists go back to their creators;<br>cannot be restored<br>HH-06"]
+    members -- "Remove member (household owner)" --> removed["Member loses others' shared lists, their open invites stop working;<br>their lists go with them<br>Confirm first<br>HH-06, OQ-5, wireframe 35"]
+    members -- "Transfer ownership (household owner)" --> moved["Confirm, then other member is household owner; I am a plain member<br>HH-06, wireframe 36"]
+    members -- "Delete household (household owner)" --> delc["Confirm: shared lists go back to their creators;<br>cannot be restored<br>HH-06, wireframe 37"]
     delc -- "cancel" --> members
     delc -- "confirm" --> deleted["No members; every shared list private to its creator again<br>HH-06, OQ-17"]
     deleted -. "creator's next app start" .-> notice["Dialog to acknowledge: household deleted,<br>my shared lists are private again<br>HH-06"]
+    removed -. "removed member's next app start" .-> rnotice["Dialog to acknowledge: removed from the household,<br>my lists are mine and private<br>HH-06, wireframe 40"]
 ```
 
 Leaving, removing a member, transferring ownership and deleting the household need a connection
@@ -309,8 +321,8 @@ Every v1 story appears in at least one diagram above. Each row lists every story
 
 | Section | Stories |
 |---|---|
-| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03 |
-| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, HH-03, HH-06, LIST-01, VIS-01, SYNC-03 |
+| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, AUTH-12, START-01, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03 |
+| 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, AUTH-12, HH-03, HH-06, LIST-01, VIS-01, SYNC-03 |
 | 3. Household | AUTH-01, AUTH-05, AUTH-06, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, VIS-02, SYNC-03 |
 | 4. Lists and sharing | LIST-01, LIST-02, LIST-03, LIST-04, VIS-01, VIS-02, VIS-03, VIS-04 |
 | 5. Items | ITEM-01, ITEM-02, ITEM-03, ITEM-04, ITEM-05 |
