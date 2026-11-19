@@ -92,6 +92,7 @@ Sources: [Testing fundamentals](https://developer.android.com/training/testing/f
 | At minimum: ViewModel unit tests including Flows, repository and data source tests, UI navigation tests as CI regression tests, and Macrobenchmark startup and rendering tests | tooling in part: unit tests and Kover floor 80 are in `verify.sh`; UI and benchmark tests `later` |
 | Prefer fakes to mocks (fakes live in the test source set, named `Fake*`); assert on `StateFlow.value` | review (already REVIEW.md item 3) |
 | Compose UI tests with `createComposeRule`, run against fake state (hermetic) | later (M1) |
+| JUnit 4 tests (Robolectric, Roborazzi, `createComposeRule`) really run in `:app` unit tests | tooling: `junit-vintage-engine` is on the `:app` test runtime, `failOnNoDiscoveredTests` is on, and `scripts/check_test_results.py` (run after `testDebugUnitTest`) fails when a test class has no result XML |
 | Screenshot tests and accessibility checks in UI tests | later: PLAN section 5 plans Roborazzi and `enableAccessibilityChecks`. Correction (2026-11-17, contradiction C7 of the best-practices investigation on issue #15): Google does have a tool, [Compose Preview Screenshot Testing](https://developer.android.com/studio/preview/compose-screenshot-testing), still experimental; its page says the standalone plugin is no longer maintained and recommends AGP test suites on AGP 9.5+ (this repo is on AGP 9.5.1). M1-03 compares it with Roborazzi before choosing; a switch needs a recorded decision. Correction accepted by the owner on 2026-11-17 (issue #15 comment 6947871526) |
 
 ## 7. Accessibility
@@ -126,7 +127,7 @@ Sources: [Security checklist](https://developer.android.com/privacy-and-security
 
 | Rule | Status |
 |---|---|
-| Never commit API keys; keep them out of the source repository | tooling: `secrets` (gitleaks) CI job and the guards; `google-services.json` rule in CLAUDE.md |
+| Never commit API keys; keep them out of the source repository | tooling in part: the `secrets` (gitleaks) CI job and GitHub push protection catch a key inside a committed file; `.gitignore` keeps `google-services.json` (in any directory) and key and credential files out of `git add -A`, tested by `scripts/test_gitignore_secrets.py`; no guard blocks such a file by name once it is force-added, so the `google-services.json` rule in CLAUDE.md is also a review item |
 | Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding) |
 | Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change) |
 | Deep links and intents: App Links use `android:autoVerify="true"` plus a hosted `assetlinks.json`; treat data from an incoming link or intent (invite code) as untrusted input and validate it; set `android:exported` explicitly and keep components unexported unless needed ([Verify App Links](https://developer.android.com/training/app-links/verify-applinks), [Security checklist](https://developer.android.com/privacy-and-security/security-tips)) | review (M1-20) |
