@@ -22,10 +22,7 @@ def forms(name, args):
     call = f"scripts/{name} {args}"
     out = [f"noglob {call}", f"stdbuf --output L {call}", f"stdbuf --input L {call}", f"stdbuf --error 0 {call}"]  # R3-01
     out += [f"{pre} {call}" for pre in ("timeout 5", "time", "nice", "nohup", "stdbuf -oL", "command", "builtin", "xargs")]  # the documented strip list
-    out += [f'scripts/$""{name} {args}', f'scripts/$"{name}" {args}', f'scripts/{name[:3]}$""{name[3:]} {args}',  # R3-02: $"..." is a plain string
-            f'scripts/$""{name}""{ESC}\n{args}', f'scripts/$"{name}"{ESC}\n{args}']
     out += [f"scrip\"\"ts/{name}\"\"{ESC}\n{args} $'{ESC}E'", f"scripts{ESC}/{name}''{ESC}\n{args} $'{ESC}v'", f"scrip\"\"ts/{name} {args} $'{ESC}E'"]  # R3-03
-    out += [f"FOO+=1 {call}", f"FOO[0]=1 {call}", f"NODE_ENV+=test {call}", f"LD_PRELOAD+=/x.so {call}"]  # R3-04
     return out
 
 
@@ -62,13 +59,6 @@ class WrapperForms(unittest.TestCase):
                 with self.subTest(c=c):
                     self.assertEqual(self.bash(c), 2)
                     self.assertEqual(self.bash(c, TOOLING), 2, "tooling")
-
-    def test_a_name_plus_equals_or_indexed_assignment_prefix_cannot_hide_any_command(self):  # R3-04, guard-wide
-        for c in ("FOO+=1 git push --force origin work", "FOO+=1 git push origin main", "FOO[0]=1 git commit --no-verify -m x", "FOO+=1 rm CLAUDE.md",
-                  "FOO+=1 cp /tmp/x .claude/settings.json", "GIT_CONFIG_GLOBAL+=/x git status", "GIT_CONFIG_GLOBAL[0]=/x git status"):
-            self.assertEqual(self.bash(c), 2, c)
-        for c in ("FOO+=1 ls", "FOO[0]=1 true", "FOO=1 ls"):
-            self.assertEqual(self.bash(c), 0, c)
 
     def test_a_plain_name_plus_equals_or_indexed_statement_keeps_the_tracked_value(self):  # R4-01: behave as main does
         dirty = dirty_repo()

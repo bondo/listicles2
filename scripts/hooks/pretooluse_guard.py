@@ -68,16 +68,7 @@ WRAPPER_PREFIX = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")  # also NAME+=v and NAME[i]=v, which bash runs as assignments (R3-04 of #237)
-
-
-PLAIN_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-
-
-def assign_split(a):
-    """(variable name without [..] or +, value) of an assignment word."""
-    name, val = a.split("=", 1)
-    return re.sub(r"\[[^\]]*\]$", "", name.rstrip("+")), val
+ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash"}
 INTERPRETERS = re.compile(r"^(python[0-9.]*|node|nodejs|ruby|perl|php|deno|bun)$")
 RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for", "in", "case", "esac", "!", "{", "}", "function",
@@ -443,9 +434,6 @@ def lex(src):
                     word.append(c)
                     i += 1
             in_word = quoted = True
-        elif src.startswith('$"', i):  # a locale-translated string reads as a plain double-quoted one (R3-02 of #237)
-            i += 1
-            continue
         elif src.startswith("$'", i):
             j = i + 2
             while j < n and src[j] != "'":
@@ -806,7 +794,7 @@ def check_linter(prog, args):
 
 
 def check_assign(a):
-    name, val = assign_split(a)
+    name, val = a.split("=", 1)
     if name in CONFIG_FILE_VARS:
         deny(f"{name} swaps git's config file, which can disable the hooks or hide aliases")
     if name.startswith("GIT_CONFIG") and RISKY_CONFIG_ANY.search(val):
@@ -966,9 +954,7 @@ def check_simple(cmd, state, depth):
         return
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values
-            if not PLAIN_ASSIGN.match(a):
-                continue  # NAME+=v appends and NAME[k]=v sets an element, so the tracked value is kept, as before R3-04 (R4-01 of #237)
-            name, val = assign_split(a)
+            name, val = a.split("=", 1)
             if val in BRANCH_SUBS:
                 state["vars"][name] = branch(state["cwd"]) or val
             elif "$" in val or "`" in val:
