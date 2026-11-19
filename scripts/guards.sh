@@ -46,7 +46,7 @@ out=$(gg '[Ee]nabled *(= *|\() *(false|!)|onlyIf *(\([^)]*\))? *\{ *false|exclud
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled tests via build config: /'; fail=1; }
 
 LS=(git ls-files)
-[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AM)
+[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --no-renames --diff-filter=AMT) # added, modified, type-changed; --no-renames so a rename or copy is an add whatever diff.renames says
 
 # 2. Suppressions and weakened settings need "justified: <reason>" on the same line.
 # The justification is looked for in the whole `path:line:text` grep output, so a tracked path containing it would waive every hit
@@ -540,12 +540,15 @@ done < <(git ls-files -- '*package.json' "${EXCL[@]}"))
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: embedded config: package.json must not hold linter or test config (use the dedicated file): /'; fail=1; }
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
-out=$("${LS[@]}" | grep -iE 'baseline')
+# ESLint loads a committed eslint-suppressions.json (bulk suppressions) on its own, in any directory: a baseline too (#173).
+# A directory of that name is its cache dir, which ESLint also reads suppressions from, so files under it count as well.
+out=$("${LS[@]}" | grep -iE 'baseline|(^|/)eslint-suppressions\.json(/|$)')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline file: /'; fail=1; }
 # Formatter and linter ignore files cannot carry a same-line justification, so they are refused outright (ask the owner).
 out=$("${LS[@]}" | grep -E '(^|/)\.(prettier|eslint|stylelint|dprint)ignore$')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: ignore file: /'; fail=1; }
-out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=' -- "${EXCL[@]}")
+# The ESLint Node API options applySuppressions and suppressionsLocation load a suppressions file of any name (whole identifiers only).
+out=$(gg 'baseline *(=|\(|\.set)|<SmellBaseline>|<issues format=|(^|[^[:alnum:]_])(applySuppressions|suppressionsLocation)($|[^[:alnum:]_])' -- "${EXCL[@]}")
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline wiring: /'; fail=1; }
 
 # 5. File size (owner decision, #15 comment 6974778901: Git LFS is not adopted, so big binaries stay out of the repo).

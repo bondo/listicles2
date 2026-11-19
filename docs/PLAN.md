@@ -387,7 +387,9 @@ enforce the rules rather than goodwill.
 4. **CI (GitHub Actions)**, required checks on `main`:
    * `wrapper`: Gradle wrapper validation (the checksum of `gradle-wrapper.jar`)
    * `static`: spotless, detekt, Android Lint (warnings are errors, `MissingTranslation`
-     and `ExtraTranslation` are errors, `HardcodedText` is an error). `targetSdk`
+     and `ExtraTranslation` are errors, `HardcodedText` is an error, for XML only; Compose text is checked only by the
+     JUnit rule `UiHardcodedStringRules` (`:core:domain:test`), for the call forms listed in its KDoc, and the
+     rest is review). `targetSdk`
      follows `compileSdk`; if they differ, `OldTargetApi` is disabled with a
      `// justified:` comment rather than failing the build silently. Detekt: M0
      evaluates detekt 2.x, which supports Kotlin 2.4 and type resolution
