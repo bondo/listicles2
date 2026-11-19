@@ -94,6 +94,29 @@ def job(text, name):
     return m.group(1) if m else None
 
 
+REQUIRED_CHECKS = (
+    "wrapper", "static", "unit", "firebase", "ui", "guards", "secrets", "tasks", "python-lint", "workflow-lint",
+)  # the ruleset on main requires these ten (docs/BRANCH-PROTECTION.md section 2, kept in sync per section 6; issue 184)
+
+
+def documented_checks(text):
+    """The check names in the first "Required checks (N): `a`, `b`, ..." line (or the PLAN item 6 list), sorted."""
+    m = re.search(r"(?:Required checks \(\d+\):|all \d+ checks green \()([^.;]*?)(?:;|\.|\))", text, re.S)
+    return sorted(set(re.findall(r"`([a-z][a-z-]*)`", m.group(1)))) if m else []
+
+
+def documented_count(text):
+    """The N in "Required checks (N):" or "all N checks green", or None."""
+    m = re.search(r"(?:Required checks \(|all )(\d+)(?:\)| checks green)", text)
+    return int(m.group(1)) if m else None
+
+
+def plan_item4_checks(text):
+    """Check names that open a bullet in PLAN section 5 item 4 (the CI list)."""
+    m = re.search(r"(?ms)^4\. \*\*CI \(GitHub Actions\).*?(?=^5\. )", text)
+    return sorted(set(re.findall(r"(?m)^   \* `([a-z][a-z-]*)`", m.group(0)))) if m else []
+
+
 def ordered(text, commands):
     """True if every command is an active step and they appear in the given order."""
     lines = active_lines(text)
@@ -470,9 +493,44 @@ class VerifyAndCiWiring(unittest.TestCase):
 
     def test_ci_has_no_new_job_and_keeps_the_required_check_names(self):
         text = read(".github", "workflows", "ci.yml")
-        for name in ("wrapper", "static", "unit", "firebase", "ui", "guards", "secrets", "tasks"):
+        for name in REQUIRED_CHECKS:
             self.assertIsNotNone(job(text, name), name)
             self.assertRegex(text, rf"(?m)^    name: {name}$")
+
+    def test_every_ci_job_is_a_required_check(self):
+        text = read(".github", "workflows", "ci.yml")
+        jobs = re.findall(r"(?m)^  ([A-Za-z][\w-]*):\n", text.split("\njobs:\n", 1)[1])
+        self.assertEqual(sorted(jobs), sorted(REQUIRED_CHECKS))
+
+    def test_docs_list_exactly_the_required_checks(self):
+        for parts in (("docs", "BRANCH-PROTECTION.md"), ("docs", "PLAN.md")):
+            with self.subTest(doc=parts[-1]):
+                text = read(*parts)
+                self.assertEqual(documented_checks(text), sorted(REQUIRED_CHECKS))
+                self.assertIn(f"{len(REQUIRED_CHECKS)} checks", text)
+                self.assertEqual(documented_count(text), len(REQUIRED_CHECKS))
+                self.assertNotRegex(text, r"\b8 checks")
+
+    def test_plan_ci_list_has_a_bullet_for_every_required_check(self):
+        self.assertEqual(plan_item4_checks(read("docs", "PLAN.md")), sorted(REQUIRED_CHECKS))
+
+    def test_count_and_item4_parsers_have_negative_cases(self):
+        names = ", ".join(f"`{n}`" for n in REQUIRED_CHECKS)
+        self.assertEqual(documented_count(f"Required checks (10): {names}."), 10)
+        self.assertNotEqual(documented_count(f"Required checks (9): {names}."), len(REQUIRED_CHECKS))
+        self.assertNotEqual(documented_count(f"all 8 checks green ({names})"), len(REQUIRED_CHECKS))
+        self.assertIsNone(documented_count("no count here"))
+        item = "4. **CI (GitHub Actions)**, required:\n   * `static`: x\n   * `unit`: y\n5. next\n   * `ui`: z\n"
+        self.assertEqual(plan_item4_checks(item), ["static", "unit"])
+        self.assertEqual(plan_item4_checks("nothing"), [])
+
+    def test_documented_checks_parser_rejects_a_missing_or_extra_name(self):
+        base = "x\nRequired checks (10): " + ", ".join(f"`{n}`" for n in REQUIRED_CHECKS) + ".\n"
+        self.assertEqual(documented_checks(base), sorted(REQUIRED_CHECKS))
+        short = base.replace("`workflow-lint`", "`unit`")
+        self.assertNotEqual(documented_checks(short), sorted(REQUIRED_CHECKS))
+        self.assertNotEqual(documented_checks(base.replace("`tasks`", "`tasks`, `extra`")), sorted(REQUIRED_CHECKS))
+        self.assertEqual(documented_checks("no list here"), [])
 
 
 class Behaviour(unittest.TestCase):
