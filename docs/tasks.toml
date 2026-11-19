@@ -567,11 +567,11 @@ notes = "Tooling env, test-first (renderer, fetch, publisher and workflow wiring
 id = "M0.5-O1"
 title = "Approve stories, flow and design"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03"]
-notes = "Sign-off is owner only (D5): the collaborator comments or reviews but does not formally approve. Done when the owner approves the M0.5-03 PR, which includes agreeing the visual-quality rubric (docs/product/rubric.md, D5)."
+notes = "Owner approved the stories, flow, rubric and wireframes on 2026-11-18 (#15 comments 6991799032 and 6991804241). Sign-off is owner only (D5): the collaborator comments or reviews but does not formally approve. Was: done when the owner approves the M0.5-03 PR, which includes agreeing the visual-quality rubric (docs/product/rubric.md, D5)."
 
 [[task]]
 id = "M0.5-O2"
