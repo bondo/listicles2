@@ -173,7 +173,7 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # Kinds: f = plain flag; v = takes a value, any; c = takes a config path that must be a file the config scan (2b) reads, not an inline
 # `key = value`, an absolute, `~` or `..` path or one built from `$` or backticks (they may be generated at run time); nf = switch that
 # may not be set to false; z = value must be 0; e = value must be error or 2; s = shellcheck severity, not error; fi = mypy follow-imports,
-# normal or error; o = optional value attached to the flag (shellcheck colour: always, never or auto); r = ESLint --rule, no severity of off, warn, 0 or 1; n = value must not be empty (an empty one disables the integration).
+# normal or error; o = optional value attached to the flag (shellcheck colour: always, never or auto); r = ESLint --rule, no severity of off, warn, 0 or 1; n = the last part of the value must be the flag name (`-shellcheck=$d/shellcheck`); an empty value or a stub program disables the integration.
 # Beyond the allowlist: `tsc` with a source file argument and no -p/-b ignores tsconfig.json, so it fails; every project argument of `tsc -b` is
 # checked; a mypy `@argfile` fails; an empty quoted config (`--config-file ""`) disables the config, so it fails.
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
@@ -215,7 +215,10 @@ tsc --outFile v where build output goes
 tsc --version f prints the version
 tsc -v f prints the version
 tsc --strict* nf every --strict option switches a check on, unless it is set to false
-tsc --noImplicit* nf switches a check on, unless it is set to false
+tsc --noImplicitAny nf switches a check on, unless it is set to false
+tsc --noImplicitThis nf switches a check on, unless it is set to false
+tsc --noImplicitReturns nf switches a check on, unless it is set to false
+tsc --noImplicitOverride nf switches a check on, unless it is set to false
 tsc --noUnused* nf switches a check on, unless it is set to false
 tsc --alwaysStrict nf switches a check on, unless it is set to false
 tsc --useUnknownInCatchVariables nf switches a check on, unless it is set to false
@@ -257,10 +260,10 @@ shellcheck -f v only changes how findings are printed
 shellcheck --format v only changes how findings are printed
 shellcheck -P v where sourced files are looked up
 shellcheck --source-path v where sourced files are looked up
-shellcheck --norc f ignores a .shellcheckrc, which only the repo root has
+shellcheck --norc f ignores any .shellcheckrc, and none may exist (scripts/test_lint_workflows.py)
 shellcheck --version f prints the version
-actionlint -shellcheck n a non-empty path of the shellcheck to run; an empty value switches shellcheck off
-actionlint -pyflakes n a non-empty path of the pyflakes to run; an empty value switches pyflakes off
+actionlint -shellcheck n a path whose last part is shellcheck; an empty value or another program can switch shellcheck off
+actionlint -pyflakes n a path whose last part is pyflakes; an empty value or another program can switch pyflakes off
 actionlint -color f only changes the output
 actionlint -no-color f only changes the output
 actionlint -oneline f only changes the output
@@ -378,6 +381,7 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
     t = w[i]; sub(/^["\047]+/, "", t)
     if (t == "") continue
     if (t == "--") break
+    if (tools == "tsc" && substr(t, 1, 1) == "@") return 1
     if (t == "-" || substr(t, 1, 1) != "-") {
       v = t; sub(/["\047,]+$/, "", v)
       if (direct && !hp && v !~ /=/ && v ~ SRCRE) return 1
@@ -399,7 +403,7 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
     }
     nm = t; eq = 0; v = ""
     if (index(nm, "=")) { eq = 1; v = substr(nm, index(nm, "=") + 1); nm = substr(nm, 1, index(nm, "=") - 1) } else sub(/["\047,;]+$/, "", nm)
-    if (tools == "tsc") nm = tolower(nm)
+    if (index(tools, "tsc")) nm = tolower(nm)
     if (tools == "actionlint") sub(/^--/, "-", nm)
     k = look(tools, sb, nm)
     if (k == "" && one) k = abbr(tools, nm)
@@ -417,7 +421,7 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
     if (k == "e" && v !~ /^(error|2)$/) return 1
     if (k == "s" && v !~ SEVOK) return 1
     if (k == "fi" && v !~ /^(normal|error)$/) return 1
-    if (k == "n" && v == "") return 1
+    if (k == "n" && v !~ ("(^|/)" substr(nm, 2) "$")) return 1
   }
   return 0
 }
@@ -427,14 +431,17 @@ function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
 function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
 # datacmd: the command installs a tool (its name is an argument, not a command): `pip install ruff --upgrade`, `npm i -D eslint`.
-function datacmd(p,   n, w, i, a, b, c) {
+function datacmd(p,   n, w, i, j, k, a, b, c) {
   n = split(p, w, /[ \t]+/); i = 1
   while (i <= n && (w[i] == "" || w[i] == "-" || w[i] ~ /:$/ || w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[i] ~ /^(sudo|env|time|export|exec|command)$/)) i++
-  a = w[i]; sub(/^["\047]+/, "", a); sub(/^.*\//, "", a); b = w[i + 1]; c = w[i + 2]
-  if (a ~ /^(pip|pip3|pipx|apt|apt-get|apk|brew|dnf|yum|conda|gem)$/) return 1
+  a = w[i]; sub(/^["\047]+/, "", a); sub(/^.*\//, "", a)
+  j = i + 1; while (j <= n && w[j] ~ /^-/) j++; b = w[j]; k = j + 1; while (k <= n && w[k] ~ /^-/) k++; c = w[k]
+  if (a ~ /^(pip|pip3|pipx)$/ && b ~ /^(install|uninstall|upgrade|upgrade-all|inject|reinstall|reinstall-all|download)$/) return 1
+  if (a == "conda" && b ~ /^(install|create|update|remove|uninstall)$/) return 1
+  if (a ~ /^(apt|apt-get|apk|brew|dnf|yum|gem)$/ && b ~ /^(install|add|reinstall|upgrade|update|remove|uninstall)$/) return 1
   if (a ~ /^(npm|pnpm|yarn|bun)$/ && b ~ /^(install|i|ci|add|update|upgrade|uninstall|remove|rm|link)$/) return 1
   if (a == "uv" && (b ~ /^(pip|add|sync|lock|remove)$/ || (b == "tool" && c ~ /^(install|upgrade|uninstall)$/))) return 1
-  if (a ~ /^python[0-9.]*$/ && b == "-m" && c ~ /^(pip|ensurepip|venv)$/) return 1
+  if (a ~ /^python[0-9.]*$/ && w[i + 1] == "-m" && w[i + 2] ~ /^(pip|ensurepip|venv)$/) return 1
   return (a ~ /^(cargo|go)$/ && b == "install")
 }
 function relaxed(p,   dd, e, pr, t, ok, s) {
@@ -449,7 +456,7 @@ function relaxed(p,   dd, e, pr, t, ok, s) {
   if (has(p, "shellcheck") && scan(after(p, "shellcheck"), "shellcheck", 0)) return 1
   if (has(p, "actionlint") && scan(after(p, "actionlint"), "actionlint", 0)) return 1
   e = has(p, "eslint"); pr = has(p, "prettier"); t = has(p, "tsc")
-  if (dd != "" && !e && !pr && !t && scan(dd, "eslint prettier tsc", 0)) return 1
+  if (dd != "" && scan(dd, "eslint prettier tsc", 0)) return 1
   if (e) ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*)$)"
   else if (pr) ok = "((^|/)[^= \t]*(prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
   else ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*|prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
