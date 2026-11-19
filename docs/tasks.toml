@@ -877,7 +877,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-12"]
-notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user (#199, #205)"
+notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user; deny soft delete by a plain member or non-member; allow transfer, soft delete and cleanup with createdBy seeded null (#199, #205)"
 
 [[task]]
 id = "M1-12"
