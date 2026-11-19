@@ -61,7 +61,7 @@ done
 # bin/actionlint is a wrapper that pins the installed shellcheck and disables pyflakes (real binary in libexec): PATH is irrelevant.
 if [ -f "$tmp/stage/actionlint" ]; then
   mv "$tmp/stage/actionlint" "$tmp/stage/actionlint.real"
-  printf '#!/bin/sh\nd=$(CDPATH= cd -- "${0%%/*}" && pwd)\nexec "$d/../libexec/actionlint" "-shellcheck=$d/shellcheck" -pyflakes= "$@"\n' > "$tmp/stage/actionlint"
+  printf '#!/bin/sh\nd=$(CDPATH= cd -- "${0%%/*}" && pwd)\nexec "$d/../libexec/actionlint" "-shellcheck=$d/shellcheck" -pyflakes= "$@"\n' > "$tmp/stage/actionlint" # justified: pyflakes stays off so no program is run from PATH
   chmod 0755 "$tmp/stage/actionlint"
   mkdir -p "$root/.tools/libexec"
   mv -f "$tmp/stage/actionlint.real" "$root/.tools/libexec/actionlint"
