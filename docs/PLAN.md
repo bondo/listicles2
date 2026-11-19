@@ -397,6 +397,8 @@ enforce the rules rather than goodwill.
      * a raised line length, a lowered `coverageThreshold` / `fail_under`, a weaker ESLint preset, a dropped ruff `select` item or tsconfig
        `include` entry, a new tsconfig `exclude` entry, by comparing against `main`; linter or test config embedded
        in `package.json`. What is still not caught: `docs/guards-known-gaps.md`
+     * a command-line flag that is not on the per-tool allowlist (ruff, mypy, tsc, ESLint, Prettier, shellcheck, actionlint; check 2c), unless the
+       line carries a valid `justified:` reason; the lists and their reasons are in `scripts/guards.sh`, the rationale in `docs/guards-known-gaps.md`
      * any detekt or lint baseline file
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label

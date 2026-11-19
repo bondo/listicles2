@@ -521,6 +521,8 @@ class AllowlistTests(CliFlagCase):
     def test_unknown_flags_in_npm_passthrough_and_package_json_fail(self):
         self.put("firebase/package.json", '    "lint": "eslint --fix ."')
         self.assertFails(MARK + ": firebase/package.json:1:")
+        self.repo.git("rm", "-q", "firebase/package.json")
+        self.repo.commit()
         self.put("scripts/lint.sh", "npm run lint -- --fix")
         self.assertFails(MARK + ": scripts/lint.sh:1:")
         self.put("scripts/lint.sh", "npm run lint -- --max-warnings 0 --config eslint.config.mjs")

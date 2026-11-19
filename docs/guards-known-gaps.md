@@ -52,3 +52,46 @@ reason is true and specific (`REVIEW.md`, item 8).
 - **Values split from their key** (`"strict":` then `false` on the next line), the YAML eslintrc form, a multi-line block directive, rarer
   mypy and ruff options, and the INI key case (comments on issue 46 from PR 43 review rounds 1 to 4): not done in this batch. They are
   small and independent, so a later batch can take them one at a time with tests.
+
+## Check 2c: command-line flags are an allowlist (issues 177, 174, 164)
+
+Owner decision (issue 15, comments 7000552252 and 7002040979): the blocklist of PR 157 never converged (5, 2, 5 and 2 new gaps per review
+round, and `ruff check --fix`, `--target-version` and a global option before the subcommand were still open). Check 2c now keeps one
+allowlist per tool. A flag on an invocation of ruff, mypy, tsc, ESLint, Prettier, shellcheck or actionlint passes only when
+`CLI_ALLOW` in `scripts/guards.sh` lists it for that tool, and its value passes the check of its kind. Any other flag fails unless the
+logical line has a valid `justified:` reason (3 words, the policy above). New options of those tools therefore fail closed.
+
+**The allowlists (one table, one reason per flag, in `scripts/guards.sh`).** A flag is listed only when it cannot make a run pass that
+would otherwise fail: it switches a check on, says where a config or output goes, or only changes how findings print.
+
+| Tool | Listed flags |
+|---|---|
+| ruff | `--config` (a 2b-scanned file), `--no-cache`, `--output-format`, `--version`; `check`: `--extend-select`; `format`: `--check`, `--diff` |
+| mypy | `--config-file` (a 2b-scanned file), `--follow-imports` (`normal` or `error`), `--strict`, `--check-untyped-defs`, `--strict-equality`, `--strict-bytes`, `--extra-checks`, `--no-implicit-reexport`, `--no-implicit-optional`, `--warn-*`, `--disallow-*`, `--version` |
+| tsc | `--noEmit`, `-p` and `--project` (a scanned tsconfig), `-b` and `--build` (every project argument checked), `--verbose`, `--force`, `--pretty`, `--outDir`, `--outFile`, `--version`, and the strict family unless set to false (`--strict*`, `--noImplicit*`, `--noUnused*`, `--alwaysStrict`, `--useUnknownInCatchVariables`, `--noUncheckedIndexedAccess`, `--exactOptionalPropertyTypes`, `--noFallthroughCasesInSwitch`, `--noPropertyAccessFromIndexSignature`, `--checkJs`) |
+| ESLint | `--max-warnings 0`, `-c` and `--config` (a scanned file), `--rule` (severity `error` only), `--report-unused-disable-directives`, `--report-unused-disable-directives-severity` (`error` or `2`), `--no-inline-config`, `--prune-suppressions`, `--format`, `-f`, `--color`, `--no-color`, `--version` |
+| Prettier | `--check`, `--write`, `--list-different`, `--config` (a scanned file), `--log-level`, `--version` |
+| shellcheck | `-S` and `--severity` (`warning`, `info` or `style`, never `error`), `-x`, `-a`, `-o`, `-C`, `-f`, `-P` and their long forms, `--norc`, `--version`; short options may be combined |
+| actionlint | `-shellcheck` and `-pyflakes` (a non-empty value only: an empty one switches the integration off), `-color`, `-no-color`, `-oneline`, `-verbose`, `-format`, `-version` |
+
+To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and one disallowed-value case in
+`scripts/hooks/test_guards_cli_flags.py`, and this table. The owner reviews it, like any process file.
+
+**What the redesign changed.**
+- Abbreviated long options (mypy, shellcheck) are read as the listed option they abbreviate; an unlisted abbreviation fails.
+- tsc option names are read case-insensitively, as tsc does (`--NoCheck` used to pass).
+- A bare `--` ends the flags of a tool. The ruff subcommand is found among the arguments, so `ruff --config ruff.toml check --diff .` fails
+  (issue 174, R5-01) while `ruff format --diff .` passes.
+- actionlint: `-ignore`, an empty `-pyflakes=` or `-shellcheck=` and every unlisted flag fail; a non-empty `-shellcheck=<path>` passes
+  (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`.
+- Makefiles, `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2, the part a line scan can read).
+- False positives removed: `uvx mypy@1.15`, `tsc -b > build.log` (issue 164 item 5) and `tsc --outFile dist/out.js` (item 4), and tools that
+  are being installed (`pip install ruff --upgrade`, `npm i -D eslint --save-exact`, `cargo install`, `go install`).
+
+**Still not covered, or a new cost.**
+- A flag after `--` of `npm`, `npx` and kin passes when any of eslint, prettier and tsc lists it, because the script that runs is not known.
+  So `npm test -- --coverage` or `npm run build -- --watch` now needs a `justified:` (issue 164 item 3 stays open, and is wider than under
+  the blocklist). Resolving the script name through `package.json` would narrow it; no such passthrough exists in the repo today.
+- `with: args:` of a lint action, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (its `ignore:` entries are not read by
+  2b), flags held in shell variables, tools run from Python (subprocess), and yarn or pnpm forms without `--`.
+- A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
