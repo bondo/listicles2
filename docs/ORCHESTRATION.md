@@ -647,7 +647,8 @@ The orchestrator collects results in this order, from cheapest to most expensive
 * **Merge agent (issue 136):** for the owner-authorized kinds only (`working-draft-docs`, `tasks-sync` = only `docs/tasks.toml`, `dependabot`) the
   merge agent runs only `scripts/merge_ready.py <N> <sha> <kind>` (`<sha>` = the head the owner or orchestrator named), from a clean checkout of `origin/main` (`git status --porcelain` empty),
   never from a branch or a modified tree. No other merge call, no hand-repeated checks. The script refuses (exit 1, reasons on stderr, nothing merged) unless head == `<sha>`, `mergeable_state` is `clean`, the ruleset-required checks succeeded,
-  no closing keyword precedes an issue number, and every changed file is in the kind's paths (see its header); else it squash-merges via REST with
+  no closing keyword precedes an issue number, and every changed file is in the kind's paths (see its header); for `dependabot`, a workflow change may only re-pin actions, and each new
+  `uses: owner/repo@<sha> # <tag>` pin must carry its tag comment and its `<sha>` must equal the commit that tag points to in `owner/repo` (`git ls-remote`, annotated tags dereferenced; a failed lookup refuses, R2-06); else it squash-merges via REST with
   `<sha>` pinned. On a refusal the agent stops and reports. The script and its test are protected process files (PreToolUse guard); changing them is
   an owner-only tooling change (`scripts/test_merge_ready.py` runs in `verify.sh` and CI).
 * **Dependabot weekly routine:** once a week one batch triage worker reads the open Dependabot PRs and groups the bumps
@@ -656,6 +657,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
   Dependabot cannot run Gradle, so a Gradle bump fails CI with "Dependency verification failed" until `gradle/verification-metadata.xml`
   is regenerated: the grouped Gradle bump branch regenerates it from scratch before merge (command in `ANDROID-BEST-PRACTICES.md` §11),
   and its reviewer checks that only the bumped coordinates changed. A red individual Dependabot PR with that error is expected.
+  `.github/dependabot.yml` gives every ecosystem a 7-day `cooldown` (issue 186; security updates are not delayed), so a compromised release is usually pulled before it is proposed.
 * **Linter permission (M0.5-06, owner-approved 2026-11-15, issue #15):** `.claude/settings.json` allows exactly three commands:
   `Bash(.tools/bin/shellcheck *)`, `Bash(.tools/bin/actionlint *)` and `Bash(.tools/bin/zizmor --offline *)` (zizmor offline only).
   `scripts/install_linters.sh` fills `.tools/bin/` (git-ignored) from `scripts/linters.pins` (shellcheck v0.11.0, actionlint v1.7.12,

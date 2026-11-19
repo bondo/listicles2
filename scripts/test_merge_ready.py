@@ -316,7 +316,7 @@ class PinTagTests(unittest.TestCase):
 
     def test_sha_of_a_different_commit_is_refused(self):
         table = {("actions/checkout", "v7.1.0"): "9" * 40}
-        self.refused(pin_files(), r"ci\.yml.*actions/checkout.*v7\.1\.0.*" + "c" * 7 + ".*" + "9" * 7, fake_resolver(table))
+        self.refused(pin_files(), r"ci\.yml.*actions/checkout.*v7\.1\.0.*" + "9" * 7 + ".*" + "c" * 7, fake_resolver(table))
 
     def test_missing_or_empty_tag_comment_is_refused(self):
         for new in ("      - uses: actions/checkout@" + "c" * 40, "      - uses: actions/checkout@" + "c" * 40 + " #",
@@ -501,6 +501,11 @@ class WiringTests(unittest.TestCase):
         doc = self.read("docs/ORCHESTRATION.md")
         self.assertIn("scripts/merge_ready.py <N> <sha> <kind>", doc)
         self.assertRegex(doc, r"(?i)merge agent[^\n]*runs? only")
+
+    def test_docs_describe_the_pin_tag_check_and_the_cooldown(self):
+        doc = self.read("docs/ORCHESTRATION.md")
+        self.assertRegex(doc, r"(?is)merge agent.*git ls-remote.*annotated tags dereferenced")
+        self.assertRegex(doc, r"(?i)7-day `cooldown`")
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
