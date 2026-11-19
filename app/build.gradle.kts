@@ -35,7 +35,11 @@ android {
     }
 
     testOptions {
-        unitTests.all { it.useJUnitPlatform() }
+        unitTests.all {
+            it.useJUnitPlatform()
+            // A test task that discovers zero tests is a failure, not a pass.
+            it.failOnNoDiscoveredTests = true
+        }
     }
 
     buildFeatures {
@@ -106,6 +110,7 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
     testImplementation(project(":core:testing"))
+    testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
 
     androidTestImplementation(platform(libs.compose.bom))

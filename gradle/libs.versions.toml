@@ -36,6 +36,7 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 junit4 = { module = "junit:junit", version = "4.13.2" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 kotest-runner = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
