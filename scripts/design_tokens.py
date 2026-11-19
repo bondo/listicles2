@@ -82,6 +82,9 @@ REQUIRED_PAIRS = (
     ("onPrimaryFixed", "primaryFixedDim"),
     ("onSecondaryFixed", "secondaryFixedDim"),
     ("onTertiaryFixed", "tertiaryFixedDim"),
+    ("onPrimaryFixedVariant", "primaryFixedDim"),
+    ("onSecondaryFixedVariant", "secondaryFixedDim"),
+    ("onTertiaryFixedVariant", "tertiaryFixedDim"),
 )
 
 
