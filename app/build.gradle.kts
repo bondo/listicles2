@@ -58,6 +58,30 @@ android {
     }
 }
 
+// A JUnit 4 test with no result XML was silently skipped: fail the build (issue #212).
+val checkUnitTestResults by tasks.registering(Exec::class) {
+    val results = layout.buildDirectory.dir("test-results/testDebugUnitTest")
+    commandLine(
+        "python3",
+        "-I",
+        rootProject.file("scripts/check_test_results.py").path,
+        layout.projectDirectory
+            .dir("src/test")
+            .asFile.path,
+        results.get().asFile.path,
+    )
+    onlyIf {
+        tasks
+            .named("testDebugUnitTest")
+            .get()
+            .state.failure == null
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -79,6 +103,7 @@ dependencies {
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
     testImplementation(project(":core:testing"))
     testRuntimeOnly(libs.junit.platform.launcher)
