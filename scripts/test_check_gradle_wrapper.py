@@ -95,6 +95,60 @@ class Properties(unittest.TestCase):
         self.assertEqual(len(c.check_properties(GOOD.replace(URL, http))), 1)
 
 
+class LineContinuation(unittest.TestCase):
+    """java.util.Properties joins a line ending in an odd number of backslashes with the next line (R1-01)."""
+
+    SUM_LINE = f"distributionSha256Sum={SUM}"
+
+    def props(self, *lines):
+        return "\n".join(lines) + "\n"
+
+    def test_continued_line_before_the_sum_folds_it_away(self):
+        for name, folded in {
+            "one backslash": "networkTimeout=10000\\",
+            "three backslashes": "networkTimeout=10000\\\\\\",
+            "empty value then backslash": "zipStorePath=\\",
+        }.items():
+            with self.subTest(name=name):
+                text = self.props(URL, folded, self.SUM_LINE, "validateDistributionUrl=true")
+                self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_continued_line_before_the_url_folds_it_away(self):
+        text = self.props("distributionPath=wrapper/dists\\", URL, self.SUM_LINE)
+        self.assertEqual(c.check_properties(text), ["distributionUrl is missing"])
+
+    def test_continuation_line_leading_blanks_do_not_unfold_it(self):
+        text = self.props(URL, "networkTimeout=10000\\", "    " + self.SUM_LINE)
+        self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_the_sum_line_itself_continued_into_the_next_line_is_malformed(self):
+        text = self.props(URL, self.SUM_LINE + "\\", "validateDistributionUrl=true")
+        got = sum_problems(text)
+        self.assertEqual(len(got), 1, got)
+        self.assertIn("64 lowercase hex characters", got[0])
+
+    def test_continued_line_swallows_a_following_comment_marker_line(self):
+        text = self.props(URL, "networkTimeout=10000\\", "#" + self.SUM_LINE)
+        self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_escaped_backslash_does_not_continue(self):
+        for slashes in ("\\\\", "\\\\\\\\"):
+            with self.subTest(slashes=slashes):
+                text = self.props(URL, "networkTimeout=10000" + slashes, self.SUM_LINE)
+                self.assertEqual(c.check_properties(text), [])
+
+    def test_comment_line_ending_in_a_backslash_does_not_continue(self):
+        for mark in ("#", "!"):
+            with self.subTest(mark=mark):
+                text = self.props(URL, f"{mark} note\\", self.SUM_LINE)
+                self.assertEqual(c.check_properties(text), [])
+
+    def test_the_real_file_has_no_continued_line(self):
+        for number, line in enumerate(PROPS.read_text(encoding="utf-8").splitlines(), 1):
+            slashes = len(line) - len(line.rstrip("\\"))
+            self.assertEqual(slashes % 2, 0, f"gradle-wrapper.properties line {number} ends in a line continuation")
+
+
 class RealRepo(unittest.TestCase):
     def test_repo_wrapper_properties_pass(self):
         self.assertEqual(c.main(ROOT), 0)
