@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
+import ci_scope  # noqa: E402  # justified: its SELFTESTS are the gate self-tests CI runs without naming them
 import merge_ready  # noqa: E402  # justified: must follow the sys.path insert above
 import pretooluse_guard  # noqa: E402  # justified: its PROTECTED list is the source of the process files (R1-03)
 
@@ -488,8 +489,9 @@ class GeneralKindTests(unittest.TestCase):
         self.assertRegex(text, reason)
 
     def test_non_gate_scripts_docs_and_build_files_are_merged(self):
-        names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md", "docs/FOLLOW-UPS.md",
-                 "core/domain/src/Lists.kt", "docs/PLAN.md", "design/tokens.json", "docs/milestones/M1.md", "firebase/test/rules.test.ts")
+        names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md",
+                 "core/domain/src/Lists.kt", "docs/PLAN.md", "design/tokens.json", "docs/milestones/M1.md", "firebase/test/rules.test.ts",
+                 "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "scripts/status_publish.py")  # detekt config and scripts only other workflows run: owner ruling R2
         api = make_api(files=[file_entry(n) for n in names])
         self.assertEqual(go(api, kind="general")[0], 0)
         self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
@@ -497,7 +499,10 @@ class GeneralKindTests(unittest.TestCase):
     def test_every_owner_only_path_is_refused(self):
         names = ("docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/product/naming.md", "docs/reviews/README.md", "design/new-sign-off.md",
                  "firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt",
-                 "gradle/wrapper/gradle-wrapper.properties", "gradle/verification-metadata.xml", ".github/CODEOWNERS")  # the PROTECTED ones: see below
+                 "gradle/wrapper/gradle-wrapper.properties", "gradle/verification-metadata.xml", ".github/CODEOWNERS",  # the PROTECTED ones: see below
+                 "gradlew", "gradlew.bat", "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py",  # R2-01: what CI runs through ci_scope.py
+                 "config/licensee/google-sdk-terms.txt", "config/licensee/policy.gradle",  # R2-02: licence acceptances
+                 "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md")  # R2-07: canonical process and policy docs
         for name in names:
             with self.subTest(name=name):
                 self.refused(make_api(files=[file_entry("scripts/new_tool.py"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
@@ -514,6 +519,18 @@ class GeneralKindTests(unittest.TestCase):
                   {"filename": "docs/milestones/M1.md", "status": "renamed", "previous_filename": "docs/milestones/old.md"}):
             with self.subTest(f=f):
                 self.refused(make_api(files=[f]), r"(not owner-approved|sign-off|removal)")
+
+    def test_a_working_draft_without_a_patch_is_refused(self):  # R2-05: the API omits the patch of a large diff, so the status line cannot be checked
+        self.refused(make_api(files=[file_entry("docs/PLAN.md", patch=None)]), r"no patch")
+
+    def test_every_draft_still_carries_its_status_line(self):  # R2-06: a sign-off PR must also take the file off the draft list
+        files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+        drafts = [f for f in files if f.casefold() in merge_ready.GENERAL_DRAFT_FILES or f.casefold().startswith(merge_ready.GENERAL_DRAFT_PREFIXES)]
+        self.assertGreaterEqual(len(drafts), 3)
+        for name in drafts:
+            if name.endswith((".md", ".json")):
+                with self.subTest(name=name):
+                    self.assertIn(merge_ready.DRAFT_STATUS, (ROOT / name).read_text(encoding="utf-8"))
 
     def test_process_files_from_the_guard_list_are_owner_only(self):  # R1-03: the set comes from pretooluse_guard.PROTECTED, not a second list
         for entry in pretooluse_guard.PROTECTED:
@@ -535,6 +552,8 @@ class GeneralKindTests(unittest.TestCase):
         for name in sorted(found):
             with self.subTest(name=name):
                 self.assertTrue(merge_ready.owner_only(name))
+        for name in ci_scope.SELFTESTS:  # run through `ci_scope.py selftests`, so no literal path in ci.yml (R2-01)
+            self.assertTrue(merge_ready.owner_only(name), name)
         self.assertFalse(merge_ready.owner_only("scripts/verify.sh"), "not run by a CI job, so a non-gate script")
 
     def test_without_a_readable_ci_yml_every_scripts_path_is_owner_only(self):  # fails closed
@@ -594,6 +613,15 @@ class WiringTests(unittest.TestCase):
         for word in sorted(merge_ready.KINDS) + ["standing authorization"]:
             with self.subTest(word=word):
                 self.assertIn(word, doc)
+
+    def test_docs_record_the_r2_rulings_and_the_interim_route(self):  # owner rulings #15 7019683156 and R2-04
+        doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
+        for pattern in (r"for the kinds `working-draft-docs`, `tasks-sync`, `dependabot` and `general` the merge agent runs only",
+                        r"until kind `owner-batch` exists, an owner-approved owner-only pr is merged by hand under d1 and d2 \(#15 comment 7007421567\)",
+                        r"`config/licensee/`.*owner-only", r"guard thresholds do not include `config/detekt/detekt\.yml`",
+                        r"scripts that only other workflows or `\.claude/settings\.json` run stay `general` \(owner ruling, #15 comment 7019683156\)"):
+            with self.subTest(pattern=pattern):
+                self.assertRegex(doc, pattern)
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
