@@ -172,15 +172,15 @@ leaves; an owner with other members must transfer ownership first, and the UI
 guides them; a last member deletes the household. Before the member leaves, while they can still write to those
 lists, the app anonymises the items the user added to or last changed on other people's shared lists. The owner
 decided (OQ-18, 2026-11-18) that those items stay and the person's name is removed; how is the planner's proposal,
-kept by the owner as the working design (#15 comment 7000527780: own uid → `null`, nothing else) and confirmed in M2
-planning together with the gap below: per list a query on `createdBy == uid` and one on `updatedBy == uid`, in pages,
+kept by the owner as the working design (#15 comment 7000527780: own uid → `null`, nothing else) and to be confirmed
+in M2 planning together with the gap below: per list a query on `createdBy == uid` and one on `updatedBy == uid`, in pages,
 using the anonymise rule (section 3.1; M2, together with the unsharing steps). Then the
 member leaves, and the app deletes the lists the user created (items first, which also removes what others added to
 them), `users/{uid}` and the Auth user. Deletion needs a recent sign-in[^reauth]
 (`FirebaseAuthRecentLoginRequiredException`): the app asks for Google, or the password plus a TOTP code when
 two-step verification is on, before it starts, so nothing is left half-done.
 **Still open, deferred to M2 planning by the owner (#15 comment 7000513565, on questions 6992973369 and
-6994571090; decided together with the rule shape):** the proposal works only while the person can still write
+6994571090; to be decided together with the rule shape):** the proposal works only while the person can still write
 to the list. If they already left or were removed, or the list's creator stopped sharing it (VIS-04), or the
 household was deleted, and they delete their account later, their uid stays in `createdBy`/`updatedBy` on those items
 (no name or profile remains, and the UI shows "former member"). Accept this, or anonymise in those cases too (at leave,
@@ -224,13 +224,13 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]; the owner
   only changes a tie-break order). `createdBy` is the caller, so a normal create records the caller as the
   adder; an Undo is the exception (below). **OQ-18 addition (owner, #15 comment 7000527780, question 2 of
   6992973369):** an Undo by another member restores the ORIGINAL adder, not the member who pressed Undo. The client
-  re-creates the item with its original `createdBy` (and `createdAt`); the create rule must therefore accept the
-  original adder's uid on an Undo, and how rules tell this from a forged `createdBy` is settled in M2 planning
-  (`risk:high`, `area:security-rules`). That rule must also allow a `null` `createdBy` on an Undo (the original adder
-  may already be anonymised). The owner's decision covers the adder only: `updatedBy` stays the caller (section 3.3).
+  re-creates the item with its original `createdBy` (and `createdAt`); so the create rule has to accept the
+  original adder's uid on an Undo. Whether rules can tell this from a forged `createdBy`, or which values the create
+  rule accepts instead (as for `createdAt` above), is settled in M2 planning (`risk:high`, `area:security-rules`). That rule must also allow a `null` `createdBy` on an Undo (the original adder
+  may already be anonymised). The owner's decision covers the adder only: `updatedBy` stays the caller (section 3.1, field validation).
   M2 planning decides whether an Undo may restore the uid of an account deleted in the meantime (for example the
   client writes `null` when the adder is no longer a member; that also covers a member who only left, which ties in
-  with the open gap in section 3.2). The aim is that an Undo does not undo the anonymisation.
+  with the open gap in section 3.1, account deletion). The aim is that an Undo does not undo the anonymisation.
 * **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
   an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 keeps no history and
   stays last write wins per field, as above; the only constraint on the sync-merge design is that it must not rule
