@@ -224,13 +224,14 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]; the owner
   only changes a tie-break order). `createdBy` is the caller, so a normal create records the caller as the
   adder; an Undo is the exception (below). **OQ-18 addition (owner, #15 comment 7000527780, question 2 of
   6992973369):** an Undo by another member restores the ORIGINAL adder, not the member who pressed Undo. The client
-  re-creates the item with its original `createdBy` (and `createdAt`); so the create rule has to accept the
-  original adder's uid on an Undo. Whether rules can tell this from a forged `createdBy`, or which values the create
-  rule accepts instead (as for `createdAt` above), is settled in M2 planning (`risk:high`, `area:security-rules`). That rule must also allow a `null` `createdBy` on an Undo (the original adder
-  may already be anonymised). The owner's decision covers the adder only: `updatedBy` stays the caller (section 3.1, field validation).
-  M2 planning decides whether an Undo may restore the uid of an account deleted in the meantime (for example the
-  client writes `null` when the adder is no longer a member; that also covers a member who only left, which ties in
-  with the open gap in section 3.1, account deletion). The aim is that an Undo does not undo the anonymisation.
+  re-creates the item with its original `createdBy` (and `createdAt`); so the create rule has to accept the original
+  adder's uid on an Undo. Whether rules can tell this from a forged `createdBy`, or which values the create rule
+  accepts instead (as for `createdAt` above), is settled in M2 planning (`risk:high`, `area:security-rules`). That
+  rule must also allow a `null` `createdBy` on an Undo (the original adder may already be anonymised). The owner's
+  decision covers the adder only: `updatedBy` stays the caller (section 3.1, field validation). M2 planning decides
+  whether an Undo may restore the uid of an account deleted in the meantime (for example the client writes `null` when
+  the adder is no longer a member; that also covers a member who only left, which ties in with the open gap in section
+  3.1, account deletion). The aim is that an Undo does not undo the anonymisation.
 * **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
   an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 keeps no history and
   stays last write wins per field, as above; the only constraint on the sync-merge design is that it must not rule
