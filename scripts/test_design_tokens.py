@@ -44,6 +44,63 @@ PETROL = {
 TEAL = ["#1F6A5F", "#B4EFE2", "#CCE8E1", "#F6FAF8", "#F0F4F2", "#8ED4C6", "#005046", "#334B46", "#0F1513", "#171D1B", "#6F7975"]
 
 
+# Every Material 3 ColorScheme color role (issue #190). Written out here on purpose: the gate's own list must match it.
+M3_ROLES = (
+    "primary", "onPrimary", "primaryContainer", "onPrimaryContainer",
+    "inversePrimary",
+    "secondary", "onSecondary", "secondaryContainer", "onSecondaryContainer",
+    "tertiary", "onTertiary", "tertiaryContainer", "onTertiaryContainer",
+    "background", "onBackground",
+    "surface", "onSurface", "surfaceVariant", "onSurfaceVariant", "surfaceTint",
+    "inverseSurface", "inverseOnSurface",
+    "error", "onError", "errorContainer", "onErrorContainer",
+    "outline", "outlineVariant", "scrim",
+    "surfaceBright", "surfaceDim",
+    "surfaceContainer", "surfaceContainerHigh", "surfaceContainerHighest", "surfaceContainerLow", "surfaceContainerLowest",
+    "primaryFixed", "primaryFixedDim", "onPrimaryFixed", "onPrimaryFixedVariant",
+    "secondaryFixed", "secondaryFixedDim", "onSecondaryFixed", "onSecondaryFixedVariant",
+    "tertiaryFixed", "tertiaryFixedDim", "onTertiaryFixed", "onTertiaryFixedVariant",
+)
+
+
+class M3Roles(unittest.TestCase):
+    def test_the_gate_requires_every_m3_role(self):
+        self.assertEqual(set(dt.REQUIRED_ROLES), set(M3_ROLES))
+
+    def test_the_real_tokens_define_every_m3_role_in_both_themes(self):
+        for theme in ("light", "dark"):
+            self.assertEqual(sorted(set(M3_ROLES) - set(REAL["color"][theme])), [], theme)
+
+    def test_a_missing_m3_role_is_reported_in_the_theme_that_lacks_it(self):
+        for role in M3_ROLES:
+            for theme in ("light", "dark"):
+                bad = copy.deepcopy(REAL)
+                bad["color"][theme].pop(role, None)
+                with self.subTest(role=role, theme=theme):
+                    found = dt.check(bad)
+                    self.assertTrue(any(theme in f and role in f and "M3" in f for f in found), found)
+
+    def test_a_role_missing_from_both_themes_is_still_reported(self):
+        bad = copy.deepcopy(REAL)
+        for theme in ("light", "dark"):
+            bad["color"][theme].pop("surfaceTint", None)
+        self.assertTrue(any("surfaceTint" in f and "M3" in f for f in dt.check(bad)))
+
+    def test_each_fixed_variant_role_is_gated_on_both_fixed_backgrounds(self):
+        for palette in ("Primary", "Secondary", "Tertiary"):
+            fg, low = f"on{palette}FixedVariant", palette.lower()
+            for bg in (f"{low}Fixed", f"{low}FixedDim"):
+                with self.subTest(pair=(fg, bg)):
+                    self.assertIn((fg, bg), dt.REQUIRED_PAIRS)
+                    self.assertTrue(any(p["fg"] == fg and p["bg"] == bg for p in REAL["contrastPairs"]))
+
+    def test_an_extra_non_m3_role_is_not_a_finding(self):
+        ok = copy.deepcopy(REAL)
+        for theme in ("light", "dark"):
+            ok["color"][theme]["customAccent"] = "#123456"
+        self.assertEqual(dt.check(ok), [])
+
+
 class Contrast(unittest.TestCase):
     def test_known_ratios(self):
         self.assertAlmostEqual(dt.contrast("#000000", "#FFFFFF"), 21.0, places=2)
@@ -65,10 +122,10 @@ class Check(unittest.TestCase):
 
     def test_a_pair_just_under_its_minimum_fails_and_at_the_minimum_passes(self):
         toks = {"color": {th: {"a": "#777777", "b": "#FFFFFF"} for th in ("light", "dark")}, "contrastPairs": [{"fg": "a", "bg": "b", "min": 4.5}]}
-        self.assertEqual(len(dt.check(toks, required=())), 2)  # 4.48 < 4.5, once per theme
+        self.assertEqual(len(dt.check(toks, required=(), roles_required=())), 2)  # 4.48 < 4.5, once per theme
         for th in toks["color"]:
             toks["color"][th]["a"] = "#767676"  # 4.54
-        self.assertEqual(dt.check(toks, required=()), [])
+        self.assertEqual(dt.check(toks, required=(), roles_required=()), [])
 
     def test_a_role_in_one_theme_only_is_reported(self):
         bad = copy.deepcopy(REAL)

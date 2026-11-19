@@ -50,13 +50,15 @@ DRAFT_STATUS = "not owner-approved"
 TASKS_FILES = ("docs/tasks.toml",)
 # Kind `general` refuses these (ORCHESTRATION 7.5, owner-only PRs), compared casefolded: the protected process files (the list of
 # scripts/hooks/pretooluse_guard.py PROTECTED, which a test keeps in sync), the wrappers by name anywhere, gate docs and approved product and design docs,
-# dependency manifests (R2-01), and every scripts/ path a CI job runs (ci_scripts). The owner's batch approval lifts all of it.
+# dependency manifests (R2-01), licence acceptances, canonical process docs, gradlew, and every scripts/ path a CI job runs (ci_scripts).
+# The owner's batch approval lifts all of it.
 OWNER_ONLY_FILES = {f.casefold() for f in (
     "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
     "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
-    "gradle/verification-metadata.xml")}
+    "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md", "gradle/verification-metadata.xml", "gradlew", "gradlew.bat",
+    "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")}  # the last two run through `ci_scope.py selftests` (a test keeps them in sync)
 OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".githooks/", ".tools/", "agents/", "scripts/hooks/", "docs/reviews/",
-                                                   "docs/product/", "design/", "gradle/wrapper/"))
+                                                   "docs/product/", "design/", "gradle/wrapper/", "config/licensee/"))
 OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh")}
 REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
 GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md", "design/tokens.json"), ("docs/milestones/",)  # the drafts still without an owner sign-off
@@ -268,8 +270,9 @@ def file_problems(kind, files, resolve):
                 problems.append(f"path outside kind {kind}: {name}")
         name, patch = f["filename"], f.get("patch")
         draft = any(x.casefold() in GENERAL_DRAFT_FILES or x.casefold().startswith(GENERAL_DRAFT_PREFIXES) for x in (name, f.get("previous_filename") or name))
-        if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or drops_draft_status(patch or "")):
-            problems.append(f"{name}: removes or renames a working draft, or removes a '{DRAFT_STATUS}' status line (a sign-off is the owner's)")
+        if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or patch is None or drops_draft_status(patch)):
+            problems.append(f"{name}: removes or renames a working draft, has no patch to check, or removes a '{DRAFT_STATUS}' status line "
+                            "(a sign-off is the owner's)")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
         if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
