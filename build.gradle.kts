@@ -522,6 +522,7 @@ val detektFixtureCases =
                 "ComposableParamOrder",
                 "GlobalCoroutineUsage",
                 "Material2",
+                "LongParameterList",
             ),
         "violating-typed" to listOf("InjectDispatcher"),
         "clean" to emptyList(),

@@ -10,7 +10,7 @@ security review, comment 6927207374), and [the plan](../PLAN.md). Decided questi
 
 ## How to read this
 
-* **Story ids** are stable and never reused: `AUTH` sign-in and account, `HH` household, `LIST` lists, `ITEM` items,
+* **Story ids** are stable and never reused: `START` app start, `AUTH` sign-in and account, `HH` household, `LIST` lists, `ITEM` items,
   `VIS` private and shared, `SYNC` offline and sync, `LANG` language, `THEME` app theme (parked after v1).
 * Each story has a "so that" value and acceptance criteria written as **Given / When / Then**, so a test can check them.
 * **Words used:** *user* = a signed-in person. *Household* = a group of users (PLAN section 1). *Household owner* = the
@@ -26,7 +26,7 @@ security review, comment 6927207374), and [the plan](../PLAN.md). Decided questi
   own. They make a collection list, type in the items themselves (name, years) and tick the ones they have. A shopping list is just a shared
   list (Q4).
 
-## 1. Sign-in and account
+## 1. App start, sign-in and account
 
 Two sign-in methods in v1: Google (the main one) and email with password (OQ-23). No email-link ("magic link") sign-in
 (OQ-27). **Server access:** every Firestore read and write needs a signed-in user whose email is verified
@@ -35,15 +35,27 @@ security rule may rely on a two-step (MFA) claim: two-step verification (AUTH-09
 Rules allow and deny tests cover both. Before anyone but the owner installs the app, a privacy text in English and
 Danish names Google as processor of email addresses and passwords (OQ-30).
 
+**START-01 Update gate at app start.** As the owner, I want a version that is too old to be told to update, so that
+nobody uses a version the data no longer fits (M1-27).
+* Given the app starts and its version is below the minimum in the app config document, then it shows a full-screen
+  "Update the app" / "Opdater appen" with a button to the releases page on GitHub, before sign-in, with no way past it
+  (wireframe 41).
+* Given the version equals or is above the minimum, then the app starts as before (AUTH-02).
+* Given I am offline and a minimum was read before, then the app uses that last value.
+* Given the minimum cannot be read (offline with no cached value), then the app starts normally: the gate never blocks
+  a first offline start.
+
 **AUTH-01 Sign in.** As a new user, I want to sign in with my Google account, or with an email and password if I
 prefer, so that my lists follow me to a new phone.
 * Given the app is opened for the first time, when it starts, then it shows the sign-in screen and nothing else.
-* Given the sign-in screen, then "Sign in with Google" is the first and main button and "Use email and password" is
+* Given the sign-in screen, then "Continue with Google" ("Fortsæt med Google") is the first and main button and "Use email and password" is
   the second (OQ-23).
 * Given the sign-in screen, when I pick a Google account in the system account picker, then I am signed in and see my
   lists (LIST-01).
 * Given I tap "Use email and password", then I can sign in (AUTH-07), create an account (AUTH-05) or reset my password
   (AUTH-08).
+* Given I sign in with Google for the first time (no account yet), then I am asked for my name, filled in from my
+  Google account, before I see my lists (AUTH-12).
 * Given the account picker is open, when I cancel it, then I stay on the sign-in screen and no error is shown.
 * Given there is no network, when I try to sign in, then I see a message that the first sign-in needs a connection.
 
@@ -52,7 +64,16 @@ once.
 * Given I am signed in, when I restart the app (also with no network), then I see my lists without signing in again.
 
 **AUTH-03 Sign out.** As a user, I want to sign out, so that someone else can use this phone without seeing my lists.
-* Given I am signed in, when I sign out, then I see the sign-in screen.
+* Given I am signed in and the wait for my pending changes finishes (online, everything sent), when I sign out, then I
+  see the sign-in screen with no question asked.
+* Given the wait for my pending changes does not finish (the app is offline, or it times out), when I choose "Sign
+  out", then I am always asked to confirm that changes not yet sent will be lost; "Cancel" keeps me signed in and "Sign
+  out anyway" signs me out (M1-14).
+* Given that confirmation and an unsent change is known, then it says "Some changes have not been sent yet. If you sign
+  out now, they will be lost." / "Nogle ændringer er ikke sendt endnu. Hvis du logger ud nu, går de tabt." (wireframe 39).
+* Given that confirmation and no unsent change is known (a write can wait with no screen listening), then it says
+  "Changes you made may not have been sent yet. If you sign out now, they may be lost." / "Ændringer, du har lavet, er
+  måske ikke sendt endnu. Hvis du logger ud nu, kan de gå tabt." (wireframe 45).
 * Given I signed out, when another person signs in on the same phone, then none of my private lists or the lists
   shared with me are shown to them, online or offline (the local copy is removed at sign-out, OQ-13).
 
@@ -61,7 +82,8 @@ once.
 * Given I ask to delete my account, when I confirm, then every list I created (private and shared) with its items and my
   account are deleted, and I see the sign-in screen (OQ-5); members lose the shared lists I created.
 * Given I am the household owner and other members remain, when I ask to delete my account, then the app first guides me
-  to transfer ownership (HH-06) and deletes nothing until that is done.
+  to transfer ownership (HH-06) and deletes nothing until that is done (wireframe 38: "Transfer ownership first",
+  with "OK" and "Go to household").
 * Given I am the last member, when I delete my account, then the household is deleted too (my lists are deleted with
   my account, so nothing returns to anyone, OQ-17).
 * Given the server demands a recent sign-in, when I confirm, then the app asks me to sign in again with the method I
@@ -70,7 +92,10 @@ once.
 
 **AUTH-05 Create an account with email and password.** As a new user without (or not wanting to use) a Google account,
 I want to create an account with my email and a password, so that I can use Tally too.
-* Given I enter a valid email that has no account and a password of at least 12 characters, when I confirm, then the
+* Given the create-account screen, then it asks for "Your name", my email and a password, and a note says that the
+  household sees the name and never the email (AUTH-12).
+* Given I leave "Your name" empty or only spaces, when I confirm, then nothing is created and the field shows an error.
+* Given I enter a name, a valid email that has no account and a password of at least 12 characters, when I confirm, then the
   account is created, a verification email is sent, and I see the "check your email" screen (AUTH-06).
 * Given a password shorter than 12 characters, when I confirm, then nothing is created and the field shows an error;
   there are no other password rules (no required digits, symbols or capitals, OQ-26).
@@ -83,7 +108,8 @@ I want to create an account with my email and a password, so that I can use Tall
 owner of the address can use the account.
 * Given I created an account (AUTH-05), then I see a screen saying a link was sent to my email, with the line "If you
   already have an account with this email, no new email is sent: sign in the way you created it", and the buttons
-  "Continue", "Send again" and "Sign out".
+  "Continue", "Send again" and "Sign out" (wireframe 27). The line is shown to everyone, whether or not the email
+  already has an account (AUTH-10).
 * Given I opened the link in the email, when I tap "Continue", then I see my lists (or the join screen, HH-03).
 * Given the email and the page its link opens, then they are Firebase's defaults, with the email text in English and
   Danish (OQ-29; the same for AUTH-08).
@@ -97,8 +123,10 @@ owner of the address can use the account.
 password, so that I reach my lists on any phone.
 * Given the right email and password, when I confirm, then I see my lists (or the code step if AUTH-09 is on, or the
   verify screen if AUTH-06 is not done).
-* Given a wrong email or a wrong password, when I confirm, then I see one message, "Wrong email or password", that does
-  not say which one was wrong or whether the account exists.
+* Given a wrong email or a wrong password, when I confirm, then I see one message that does not say which one was
+  wrong or whether the account exists (OQ-34(c)): "Wrong email or password. If you signed up with Google, use Continue
+  with Google." / "Forkert e-mail eller adgangskode. Hvis du oprettede dig med Google, så brug Fortsæt med Google."
+  It is the same for every failed sign-in, also for an email that only has a Google account.
 * Given many failed attempts, when I try again, then I see "Too many attempts, try again later".
 * Given there is no network, when I confirm, then I see a message that the first sign-in needs a connection.
 
@@ -135,10 +163,12 @@ way, so that I never get two accounts or lose my lists.
   "Continue" (link not opened: "not verified yet") or "Send again" shows the same messages for both; only the email
   without an account gets an account and an email.
 * Given I sign in with a password (AUTH-07) or ask for a reset (AUTH-08) for an email, then the messages are the same
-  whether or not an account exists and whichever method it uses (what a Google-only email gets: OQ-34).
-* Given I sign in with Google and the email may already have a password account, then what Firebase does (Google is a
-  trusted provider under one account per email) is checked in M1 (OQ-34); in every case no lists are lost and no
-  second account is created.
+  whether or not an account exists and whichever method it uses (what a Google-only email gets: OQ-34(b)).
+* Given I sign in with Google and the email already has a password account, then Firebase trusts Google only for
+  `@gmail.com` addresses (M1.md, docs-check note 3). For another address the sign-in fails and the sign-in screen shows
+  "This email already has an account. Sign in with your email and password." / "Der findes allerede en konto med
+  denne e-mail. Log ind med din e-mail og adgangskode." (wireframe 44). What Firebase does for a Gmail address is
+  checked in M1 (OQ-34(a)). In every case no lists are lost and no second account is created.
 * Given I signed in the way I created the account, then I see my lists as before; adding a second method or changing
   the email comes after v1 (OQ-31).
 
@@ -147,6 +177,18 @@ leaked one (OQ-31).
 * Given a password account, when I choose "Change password" in Account, then I first sign in again (with a code if
   AUTH-09 is on), then enter a new password of at least 12 characters (OQ-26); after that the old one no longer works.
 * Given there is no network, then I see "This needs a connection".
+
+**AUTH-12 My name.** As a user, I want the household to see my name and not my email, so that I stay private
+(owner decision on #191, 2026-11-19).
+* Given I create a password account, then "Your name" is required (AUTH-05).
+* Given I sign in with Google for the first time, then I am asked for my name, filled in from my Google account, and I
+  must confirm a non-empty name before I see my lists (wireframe 42); an empty name shows the error "Enter your name".
+* Given I am signed in with no name saved, when the app starts, then it shows the name step (wireframe 42) before my
+  lists; it has no back arrow, and the system Back button leaves the app and saves nothing.
+* Given I am signed in, when I choose "Your name" in Account, then I can change it (wireframe 43); the household sees
+  the new name. This needs a connection (SYNC-03).
+* Given I am in a household, then members see my name and never my email (HH-04); the app never falls back to the
+  email.
 
 ## 2. Household
 
@@ -177,12 +219,13 @@ lists.
 * Given there is no network, when I confirm, then I see a message that joining needs a connection.
 
 **HH-04 See who is in my household.** As a member, I want to see the members, so that I know who can see my shared lists.
-* Given I am a member, when I open the household screen, then I see each member's display name and who is the household owner.
+* Given I am a member, when I open the household screen, then I see each member's display name and who is the household owner, and never an email address (AUTH-12).
 
 **HH-05 Leave a household.** As a member who is not the household owner, I want to leave, so that I stop sharing.
 * Given I confirm leaving, then I no longer see lists other members shared, and my open invites are deleted.
 * Given I confirm leaving, then every list I created goes with me: it stays mine and is private to me, and the other
-  members lose the lists I had shared (OQ-5). The confirmation says so. (Household deletion works differently: HH-06.)
+  members lose the lists I had shared (OQ-5). The confirmation says so and offers "Cancel" and "Leave" (wireframe 34).
+  (Household deletion works differently: HH-06.)
 * Given I added items to lists other members created, then those items stay in those lists, shown as added by a former
   member (OQ-18).
 
@@ -191,9 +234,12 @@ ownership or delete the household, so that the household stays under control.
 * Given I remove a member, then they lose access to the lists others shared, their open invites stop working, and the
   lists they created go with them as in HH-05, so the other members lose the lists they had shared (OQ-5); items they
   added to other members' lists stay, as in HH-05 (OQ-18).
-* Given I transfer ownership to another member, then that member is the household owner and I am a plain member.
+* Given I choose "Remove from household" for a member, then I am asked to confirm, and the confirmation says that
+  the lists they created go with them (wireframe 35).
+* Given I transfer ownership to another member, then I am asked to confirm (wireframe 36), and then that member is the
+  household owner and I am a plain member.
 * Given I choose to delete the household, then I am asked to confirm, and the confirmation says that shared lists go
-  back to their creators and that the household cannot be restored.
+  back to their creators and that the household cannot be restored (wireframe 37).
 * Given I confirm, then no one is a member any more and the household cannot be restored (PLAN section 3.1, soft delete
   then cleanup).
 * Given the household is deleted, then every list that was shared with it goes back to being private to its creator,
@@ -201,6 +247,9 @@ ownership or delete the household, so that the household stays under control.
 * Given a list I created went back to private because the household was deleted, when I next open the app, then I see
   a dialog I must acknowledge saying that the household was deleted and my shared lists are private again; I can share them again once I am in a
   household (VIS-02).
+* Given the household owner removed me, when I next open the app, then I see a dialog I must acknowledge: "You were
+  removed from the household" / "Du er fjernet fra husstanden", saying that the lists I created will stay with me and
+  stay private, and that I will no longer see lists others shared (wireframe 40, M1-21).
 * Given the household is deleted, then a former member cannot read or change a list that someone else created and had
   shared with it, and the creator still can (rules allow and deny tests).
 
@@ -457,6 +506,10 @@ Answered by the owner on 2026-11-15 to 2026-11-19 (state issue #15); the stories
 | OQ-31 | **Decided (2026-11-16):** changing the password is in v1 (AUTH-11); changing the email and linking a second method come after v1. | AUTH-10, AUTH-11 |
 | OQ-32 | **Decided (2026-11-16):** a list's type cannot be changed in v1. Turning a plain list into a collection list may come later (section 9). | LIST-02 |
 | OQ-33 | **Decided (2026-11-16):** collection lists put items without a release year last; plain lists sort by name ignoring case, with æ, ø, å after z. | ITEM-05 |
+| OQ-34(b) | **Decided (2026-11-17, M1.md):** a password reset may add a password to a Google-only account (same account, no lists lost); M1-15 records what Firebase does. | AUTH-08, AUTH-10 |
+| OQ-34(c) | **Decided (2026-11-17, texts 2026-11-19, issue #192):** every failed password sign-in shows "Wrong email or password. If you signed up with Google, use Continue with Google." / "Forkert e-mail eller adgangskode. Hvis du oprettede dig med Google, så brug Fortsæt med Google." The Google button is "Continue with Google" / "Fortsæt med Google". | AUTH-01, AUTH-07 |
+| OQ-34(a), non-Gmail | **Decided (2026-11-17, texts 2026-11-19):** Google is trusted only for `@gmail.com`. A non-Gmail Google account whose email has a password account fails with "This email already has an account. Sign in with your email and password." / "Der findes allerede en konto med denne e-mail. Log ind med din e-mail og adgangskode." | AUTH-10 |
+| Name | **Decided (2026-11-19, issue #191):** a required "Your name" at create account, and on the first Google sign-in (filled in from Google); editable in Account; members never see emails. | AUTH-05, AUTH-12, HH-04 |
 | OQ-34(d) | **Decided (2026-11-18, issue #15 comment 6991970000):** accept for v1 that Firebase sign-up reveals an existing email to direct API callers; the app shows the same screen either way (AUTH-10); App Check (M1-26) makes scripted calls harder. Parts (a) to (c) are in M1. | AUTH-10 |
 | OQ-35 | **Decided (2026-11-18, issue #15 comment 6991995012):** "most recently used" (LIST-01) = last opened by me, kept on the device only (no Firestore writes or reads); lists never opened on this device follow `updatedAt`. | LIST-01 |
 | OQ-38 | **Decided (2026-11-18, issue #15 comment 6992014550):** no Blaze backups; an in-app export of every list I can see (my own lists and lists shared with me; scope decided 2026-11-19, #15 comment 7000534815) to a JSON or CSV file through the system file picker, in M2, before the first external tester (also covers data portability). | none yet (M2) |
@@ -473,9 +526,12 @@ diagram (M0.5-02) any more.
 | Id | Question | Stories | Blocks |
 |---|---|---|---|
 | OQ-15 | **Decided 2026-11-18 (issue #15 comment 6991933333), PLAN update in progress** (packing, trips and barcodes come after v1, M3 or later; a planner agent updates `docs/PLAN.md`). Earlier question: the plan (sections 1, 3, 3.1 and 7) still describes inventory items with notes, tags and barcodes, packing lists, trips, and lists that every member can read. Who updates the plan to match Q1-Q4 and private lists, and in which milestone do the packing and barcode features now belong? | all | waiting for the PLAN update PR |
-| OQ-34 | Google is a trusted provider, and the project uses one account per email. Check in M1 with a test project: (a) When someone signs in with Google and the email already has a password account (verified or not), does Firebase link Google to it, replace the password sign-in, or refuse? (b) Reverse: a Google-only email asks for a password reset (AUTH-08). Is a reset email sent, and does opening it add a password to the account (a second method, which OQ-31 puts after v1)? (c) Password sign-in (AUTH-07) for a Google-only email shows "Wrong email or password" with no hint to use Google: should that message, shown to everyone, add "If you created your account with Google, use Google"? (d) is decided: see section 10. In every case the app must not lose lists or create a second account, and its screens must not reveal whether an account exists (AUTH-10). | AUTH-01, AUTH-05, AUTH-07, AUTH-08, AUTH-10 | M1 planning |
+| OQ-34 | Still open from the M1 test-project check: (a) for a `@gmail.com` address that already has a password account, does Firebase link Google to it, replace the password sign-in, or refuse? (b), (c), the non-Gmail case of (a) and (d) are decided: see section 10. In every case the app must not lose lists or create a second account, and its screens must not reveal whether an account exists (AUTH-10). | AUTH-01, AUTH-10 | M1 planning |
 
-**Plan gaps for the next planner** (not decisions): lists can exist without a household (OQ-1) and move with their
+**Plan gaps for the next planner** (not decisions): the user's name (AUTH-12) is asked before a household exists, but
+PLAN section 3 stores `displayName` only on the member document; the planner must say where the name lives without a
+household, that the create and join batches copy it to the member document, and that an edit (wireframe 43) updates
+both. Lists can exist without a household (OQ-1) and move with their
 creator (OQ-5), but PLAN section 3 stores every list under a household. Lists need a creator and a sharing state, and new
 security rules: the creator can do everything; members of the household a list is shared with can do everything except
 stop the share or change the list's creator or household (OQ-2, OQ-3, OQ-4); today members can read everything under the household (PLAN section 3.1). These need
