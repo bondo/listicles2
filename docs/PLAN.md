@@ -1,6 +1,6 @@
 # Tally (repo: listicles2) – Implementation Plan
 
-Status: working draft, matched to the owner-approved stories and flow and to the decisions of 2026-11-15 to 2026-11-18
+Status: working draft, matched to the owner-approved stories and flow and to the decisions of 2026-11-15 to 2026-11-19
 (task OQ-15; OQ-15 decided 2026-11-18, issue #15 comment 6991933333); the plan itself is not owner-approved (see issue #15).
 
 Android app for shared household lists. In v1 every list is private to its creator until the creator shares it
@@ -18,7 +18,7 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 | Sync | Firestore snapshot listeners; offline cache on; one document per item; updates write only the changed fields; same-field conflicts resolve last write wins |
 | Lists | Private to their creator by default (Q3, VIS-01); the creator may share a list with their household (VIS-02) and stop sharing it (VIS-04). A household is needed only to share (OQ-1). Type `kind` is `PLAIN` or `COLLECTION`, chosen at creation and fixed (OQ-32). Access: the creator does everything; household members of a list shared with their household do everything except stop the share or change its creator or household (OQ-2, OQ-3, OQ-4). A member who joins later sees every list already shared (OQ-16, confirmed 2026-11-18) |
 | Items (v1) | Name + "I have it"; collection lists add an optional release year and re-release year (1900 to the current year + 50, OQ-6, OQ-19). Sorted per type (OQ-8, OQ-33), "show only missing" filter, progress "12 of 30" (OQ-9). Equal names are allowed, with a quiet "Already in this list" hint while typing (OQ-11). An item belongs to its list (OQ-18). No notes, tags, quantity, barcode or search in v1 (stories section 8) |
-| Backup | No Firestore backups (they need Blaze). An in-app export of my lists to a JSON or CSV file through the system file picker, in M2, before the first external tester; it also covers data portability (OQ-38). Whether "my lists" means the lists I created or every list I can see is open for M2 planning (section 3.3) |
+| Backup | No Firestore backups (they need Blaze). An in-app export of every list I can see (my own lists and lists shared with me) to a JSON or CSV file through the system file picker, in M2, before the first external tester; it also covers data portability (OQ-38, scope decided) |
 | Sharing | Households: one per user; members join through a **single-use invite link** (random code of 16+ characters, expires after 7 days, can be revoked). Household, invite and sharing actions need a connection (OQ-22) |
 | After v1 (M3 to M5 and later) | Packing templates, scaling, merging and trips (section 4); barcode scanning (ML Kit + CameraX) and title lookup (UPCitemdb); infinite global undo/redo internally for each list, with conflict handling (owner requirement, 2026-11-18, quoted in section 7; the leave-room constraint on v1 is in section 3.2). Not in M1 or M2 (OQ-36 2026-11-17, OQ-15 2026-11-18, section 7) |
 | i18n | English + Danish; all strings in resources; CI fails on missing translations. Android 13+: the system per-app language setting, made visible by an auto-generated `LocaleConfig`[^lang]; Android 8-12 follow the phone language; no in-app picker, `minSdk` stays 26 (OQ-12, decided 2026-11-17) |
@@ -137,7 +137,7 @@ A list is readable by its creator (`createdBy == uid`) always, and by others onl
 | Transfer ownership (one batch) | Updates `household.ownerUid` and the `role` of both member docs. Household update: `O(uid)`, only `ownerUid` changes, and the new owner is a member both before and after the batch (`M(new)` and `existsAfter(members/new)`). Each member-doc update: only `role` changes, `O(uid)` before the batch, and the new role equals `getAfter(household).ownerUid == thisDoc ? owner : member`. `ownerUid` is the single source of truth, so there is always exactly one owner. `role` is a cached copy for display, and rules use `O(x)`. |
 | Create list | `createdBy == uid`, `sharedWith == null`, `kind` in `PLAIN`, `COLLECTION`, plus field validation (below). |
 | Update list | The creator, or a member of `sharedWith` while `LIVE` (OQ-3). `kind`, `createdBy` and `createdAt` never change. `sharedWith` changes only: by the creator, `null` → their own household (`M(uid)`, `LIVE`) or back to `null` (VIS-02, VIS-04, and the self-heal after leaving, removal or deletion); by the owner in Remove member (above), to `null` only. |
-| Items: create, update | Same people as Update list. On create `createdBy == uid` and `createdAt <= request.time` (OQ-37, decided: Undo keeps the original value); on update `createdBy` and `createdAt` never change, with one exception: **anonymise**, the planner's proposal for OQ-18 (the owner decided only that the person's name is removed; the shape is confirmed in M2 planning, `risk:high`, `area:security-rules`; the alternative of no rules exception is weighed there, because items store a uid, display names live in `members/{uid}`, and `households/{hid}.createdBy` keeps a uid anyway). An update by the person named in `createdBy` and/or `updatedBy` may set exactly those fields to `null` and change nothing else (`updatedAt` untouched); it is allowed only while that person can still read the list. Years only in `COLLECTION` lists. Deny tests: changing `createdBy` or `createdAt` on update, a future `createdAt`, years in a `PLAIN` list; anonymise: allow the person's own uid → `null`, deny setting another user's uid to `null`, deny changing any other field in the same write, deny `null` → a uid. |
+| Items: create, update | Same people as Update list. On create `createdBy == uid` and `createdAt <= request.time` (OQ-37, decided: Undo keeps the original value). An Undo by another member restores the original adder (OQ-18, section 3.2); how the create rule allows that is settled in M2 planning. On update `createdBy` and `createdAt` never change, with one exception: **anonymise**, the planner's proposal for OQ-18 (the owner decided only that the person's name is removed; the shape is confirmed in M2 planning, `risk:high`, `area:security-rules`; the alternative of no rules exception is weighed there, because items store a uid, display names live in `members/{uid}`, and `households/{hid}.createdBy` keeps a uid anyway). An update by the person named in `createdBy` and/or `updatedBy` may set exactly those fields to `null` and change nothing else (`updatedAt` untouched); it is allowed only while that person can still read the list. Years only in `COLLECTION` lists. Deny tests: changing `createdBy` or `createdAt` on update, a future `createdAt`, years in a `PLAIN` list; anonymise: allow the person's own uid → `null`, deny setting another user's uid to `null`, deny changing any other field in the same write, deny `null` → a uid. |
 | Delete list, items | Same people as Update list; the client deletes the items first, in pages, then the list. |
 | Delete household | `O(uid)`. **Soft delete**: first one update sets `deleted: true`. This update may change only `deleted` (false → true) and `name` (→ empty); `ownerUid`, `createdBy` and `createdAt` stay as they are. From that moment `LIVE` is false, so every read and write under the household is denied to everyone except the owner's cleanup. Then the client deletes invites → `removed` markers → members in pages. Lists shared with the household go back to their creators (OQ-17) without any owner write: from the moment `LIVE` is false only creators pass the list read rule. Each creator's app sees the tombstone at its next start (the tombstone read above), shows the HH-06 dialog, clears `sharedWith` on its own lists and its `householdId`. This follows the stories planner note (`docs/product/stories.md` section 11): creators, not the owner, make their lists private again. **Cleanup rule**: while `deleted == true`, the owner (`O(uid)`) may read, list (including the invites query on `householdId`) and delete everything under the household; nobody else may do anything. The household doc itself stays as a tombstone (`{ createdBy, createdAt, ownerUid, deleted: true, name: "" }`; field validation accepts the empty name only on tombstones), so its id can never be reused. A crash mid-cleanup leaves data no one can access, and the next app start resumes the cleanup. |
 
@@ -162,27 +162,31 @@ fails, the fallback is to nest invites under the household, with a top-level
 * `updatedBy == request.auth.uid` and `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`;
 * `createdAt` and `createdBy` can't change on update; on create `createdBy == request.auth.uid` and
   `createdAt == request.time`, except items, where `createdAt <= request.time` (OQ-37, decided 2026-11-17);
-* one exception to the two bullets above: the item anonymise write of section 3.1 (the planner's proposal for
-  OQ-18) only sets `createdBy` and/or `updatedBy` to `null`, changes nothing else, and leaves `updatedAt` as it is.
+* two exceptions to the bullets above: (1) the item anonymise write of section 3.1 (the planner's proposal for
+  OQ-18) only sets `createdBy` and/or `updatedBy` to `null`, changes nothing else, and leaves `updatedAt` as it is;
+  (2) the Undo create that restores the original `createdBy` (section 3.2; how rules allow it is settled in M2
+  planning).
 
 **Account deletion** (required by Google Play): in-app "Delete my account" (AUTH-04). A member
 leaves; an owner with other members must transfer ownership first, and the UI
 guides them; a last member deletes the household. Before the member leaves, while they can still write to those
 lists, the app anonymises the items the user added to or last changed on other people's shared lists. The owner
 decided (OQ-18, 2026-11-18) that those items stay and the person's name is removed; how is the planner's proposal,
-confirmed in M2 planning: per list a query on `createdBy == uid` and one on `updatedBy == uid`, in pages, using the
-anonymise rule (section 3.1; M2, together with the unsharing steps). Then the
+kept by the owner as the working design (#15 comment 7000527780: own uid → `null`, nothing else) and to be confirmed
+in M2 planning together with the gap below: per list a query on `createdBy == uid` and one on `updatedBy == uid`, in pages,
+using the anonymise rule (section 3.1; M2, together with the unsharing steps). Then the
 member leaves, and the app deletes the lists the user created (items first, which also removes what others added to
 them), `users/{uid}` and the Auth user. Deletion needs a recent sign-in[^reauth]
 (`FirebaseAuthRecentLoginRequiredException`): the app asks for Google, or the password plus a TOTP code when
 two-step verification is on, before it starts, so nothing is left half-done.
-**Open for the owner (#15 comments 6992973369 and 6994571090, PR #171):** the proposal works only while the person can still write
+**Still open, deferred to M2 planning by the owner (#15 comment 7000513565, on questions 6992973369 and
+6994571090; to be decided together with the rule shape):** the proposal works only while the person can still write
 to the list. If they already left or were removed, or the list's creator stopped sharing it (VIS-04), or the
 household was deleted, and they delete their account later, their uid stays in `createdBy`/`updatedBy` on those items
 (no name or profile remains, and the UI shows "former member"). Accept this, or anonymise in those cases too (at leave,
 removal, stop sharing and household deletion)? The last two need a different mechanism than the proposal above,
 because the person loses write access at that moment.
-Until the owner answers, M2 planning must not treat the proposal as complete.
+Until it is decided in M2 planning, the proposal must not be treated as complete.
 Play also requires a **web** way to request deletion, besides the in-app path[^playdel]. The owner deferred
 this decision (2026-11-17): it must be settled before the first external tester and must exist before a Play
 release. Options on file: a static page with a mailto link on the owner's domain next to the invite page
@@ -217,8 +221,17 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]; the owner
 * **OQ-37 (decided 2026-11-17, C5 of the investigation):** Undo keeps the original `createdAt`, so the item
   keeps its place in the "oldest added first" tie-break (ITEM-05). Rules cannot tell an Undo from any other
   create, so every item create accepts any `createdAt` not later than `request.time` (a forged older value
-  only changes a tie-break order). `createdBy` is the caller, so an Undo by another member records them as the
-  adder (the planner's default until the owner answers, #15 comment 6992973369 question 2: OQ-18 does not cover an Undo by another member).
+  only changes a tie-break order). `createdBy` is the caller, so a normal create records the caller as the
+  adder; an Undo is the exception (below). **OQ-18 addition (owner, #15 comment 7000527780, question 2 of
+  6992973369):** an Undo by another member restores the ORIGINAL adder, not the member who pressed Undo. The client
+  re-creates the item with its original `createdBy` (and `createdAt`); so the create rule has to accept the original
+  adder's uid on an Undo. Whether rules can tell this from a forged `createdBy`, or which values the create rule
+  accepts instead (as for `createdAt` above), is settled in M2 planning (`risk:high`, `area:security-rules`). That
+  rule must also allow a `null` `createdBy` on an Undo (the original adder may already be anonymised). The owner's
+  decision covers the adder only: `updatedBy` stays the caller (section 3.1, field validation). M2 planning decides
+  whether an Undo may restore the uid of an account deleted in the meantime (for example the client writes `null` when
+  the adder is no longer a member; that also covers a member who only left, which ties in with the open gap in section
+  3.1, account deletion). The aim is that an Undo does not undo the anonymisation.
 * **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
   an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 keeps no history and
   stays last write wins per field, as above; the only constraint on the sync-merge design is that it must not rule
@@ -259,9 +272,9 @@ Rules of thumb:
   reads where the emulator can.
 * GitHub Actions: the repo is public, so minutes are unlimited.
 * No backups on Spark (scheduled backups and point-in-time recovery need Blaze[^backup]), and any member can
-  delete a shared list. OQ-38 (decided 2026-11-18): no Blaze; M2 builds an in-app export of my lists to a JSON or CSV file through the
-  system file picker, before the first external tester (the owner's words). Whether that means the lists I created
-  or every list I can see is settled in M2 planning (planner's proposal: every list I can see, because any member
+  delete a shared list. OQ-38 (decided 2026-11-18): no Blaze; M2 builds an in-app export to a JSON or CSV file through the
+  system file picker, before the first external tester (the owner's words). Scope decided (#15 comment 7000534815):
+  every list the user can see, their own lists plus the lists shared with them, replacing "my lists" (any member
   can delete a shared list). The export reads every item once, so it is counted in the M2 read-cost estimate.
 
 [^quota]: https://firebase.google.com/docs/firestore/quotas
@@ -454,7 +467,7 @@ enforce the rules rather than goodwill.
 | M0 | **Foundation**: agent setup (section 9: role prompts, `.claude/` settings, status line, handoff template, metrics script) + Gradle multi-module skeleton, version catalog, spotless/detekt/lint/Kover, `verify.sh`, hooks, CI workflows, Firebase emulator config + an empty rules test, REVIEW.md, CLAUDE.md, PR template, branch-protection guide | All CI jobs run green on a hello-world app plus a trivial test, and a test that's deliberately broken makes CI fail |
 | M0.5 | **Product design** (no code): user stories with acceptance criteria (`docs/product/stories.md`), app-flow diagram (`docs/product/flow.md`, Mermaid), screen wireframes and design tokens (colors, type, spacing, dark mode) published as an artifact for review | You approve stories, flow and design (owner-only sign-off; the collaborator comments and reviews, `docs/COLLABORATING.md`). Each later milestone's acceptance tests are traced to story IDs |
 | M1 | Accounts + households: Google and email + password sign-in (verification, reset, change password, optional TOTP), the non-Gmail collision message, create household, single-use invite link, join, leave, remove member, transfer ownership, delete account; rules requiring a verified email (`email_verified`, also to read an invite) + allow and deny tests; `LocaleConfig`; Crashlytics opt-in; App Check (monitoring); privacy text draft (OQ-30). The rules and sign-in PRs are `risk:high` (`area:security-rules` for rules). The list parts of leaving, removal, household deletion and account deletion wait for M2. Plan: the M1 milestone doc (task M1-01) | Two verified emulator users (one Google, one password) join one household; an unverified user and an outsider are denied (rules allow and deny tests) |
-| M2 | Lists and items (v1): lists without a household, private by default, plain and collection types (`kind`), items with "I have it" and years, sorting per type, "show only missing", progress, "most recently used" kept on the device (OQ-35), duplicate-name hint (OQ-11), Undo snackbar (OQ-39), share and stop sharing, the creator and household-member access rules, real-time sync, offline banner, export of my lists to JSON or CSV (OQ-38), en/da; plus the list parts of HH-05, HH-06 and AUTH-04 (unsharing on leave, the `removed` marker unsharing, the creators' self-heal after deletion, anonymising the user's items on other people's lists and deleting the deleted account's lists, OQ-18) with their rules tests. The list rules, sharing and sync PRs are `risk:high` with `area:security-rules` or `area:sync-merge` | A UI test shows an edit on client A appearing on client B through the emulator; rules tests deny reading another user's private list and allow and deny each list part of HH-05, HH-06 and AUTH-04 |
+| M2 | Lists and items (v1): lists without a household, private by default, plain and collection types (`kind`), items with "I have it" and years, sorting per type, "show only missing", progress, "most recently used" kept on the device (OQ-35), duplicate-name hint (OQ-11), Undo snackbar (OQ-39), share and stop sharing, the creator and household-member access rules, real-time sync, offline banner, export of every list I can see to JSON or CSV (OQ-38), en/da; plus the list parts of HH-05, HH-06 and AUTH-04 (unsharing on leave, the `removed` marker unsharing, the creators' self-heal after deletion, anonymising the user's items on other people's lists and deleting the deleted account's lists, OQ-18) with their rules tests. The list rules, sharing and sync PRs are `risk:high` with `area:security-rules` or `area:sync-merge` | A UI test shows an edit on client A appearing on client B through the emulator; rules tests deny reading another user's private list and allow and deny each list part of HH-05, HH-06 and AUTH-04 |
 | M3 | *After v1 (OQ-36, OQ-15, decided).* Packing domain: scaling, per-person templates and merging in `core/domain`, with property tests and PIT | Coverage and mutation floors met, and all invariants are property-tested |
 | M4 | *After v1 (OQ-36, OQ-15, decided).* Packing UI + trips | End-to-end UI test from templates to a trip with the expected amounts |
 | M5 | *After v1 (OQ-36, OQ-15, decided).* Barcode: CameraX + ML Kit scanning, UPCitemdb lookup | Scanner logic tested with an injected fake decoder, and lookup failure falls back to manual entry |
