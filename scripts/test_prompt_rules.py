@@ -1560,6 +1560,115 @@ class Issue69UsageEdgeTests(unittest.TestCase):
         self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("implementer", "")))
         self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("escalation-reviewer", "")))
 
+class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
+    """Owner decisions on #15, comments 7000637274 and 7001335975: handover at about 50% of a 1M window, lineage depth 6 means
+    the owner starts the next orchestrator, orchestrator effort medium, and the handover-only recipes written into the repo."""
+
+    ORCH_MD = PROMPTS / "orchestrator.md"
+    ORCH_DOC = ROOT / "docs" / "ORCHESTRATION.md"
+    ROLES_YAML = ROOT / "agents" / "roles.yaml"
+
+    @classmethod
+    def norm(cls, path):
+        return prompt_rules.normalize(path.read_text(encoding="utf-8")).lower()
+
+    def context_value(self, key):
+        m = re.search(rf"^  {key}: (\d+)\s*$", self.ROLES_YAML.read_text(encoding="utf-8"), re.M)
+        self.assertIsNotNone(m, f"roles.yaml context needs {key}")
+        return int(m.group(1))
+
+    def test_roles_yaml_has_the_orchestrator_handover_values_and_keeps_the_hook_values(self):
+        big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
+        self.assertEqual(big, 50)
+        self.assertLess(small, big)  # a 200k window hands over earlier, as the hook stages do
+        # the context-guard hook stages are for every session and are not part of this decision
+        self.assertEqual((self.context_value("step_boundary_after_percent_1m"), self.context_value("handoff_at_percent_1m")), (60, 80))
+        self.assertEqual((self.context_value("step_boundary_after_percent_200k"), self.context_value("handoff_at_percent_200k")), (40, 60))
+
+    def test_roles_yaml_orchestrator_session_line_names_the_same_threshold_and_medium_effort(self):
+        block = self.ROLES_YAML.read_text(encoding="utf-8").split("  orchestrator:\n", 1)[1].split("\n  planner:", 1)[0]
+        self.assertIn("effort: medium", block)
+        self.assertIn(f"near {self.context_value('orchestrator_handover_at_percent_1m')}% context", block)
+        self.assertNotIn("80%", block)
+
+    def test_orchestrator_prompt_and_orchestration_section_5_carry_the_roles_yaml_threshold(self):
+        phrase = (f"at about {self.context_value('orchestrator_handover_at_percent_1m')}% of a 1m window "
+                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k one")
+        for path in (self.ORCH_MD, self.ORCH_DOC):
+            with self.subTest(path=path.name):
+                text = self.norm(path)
+                self.assertIn(phrase.replace("at about", "about") if path == self.ORCH_DOC else phrase, text)
+                self.assertNotRegex(text, r"about 80% of a 1m window \(60% of a 200k one")
+
+    def test_the_bootstrap_prompt_states_threshold_and_depth_rule(self):
+        boot = self.norm(self.ORCH_DOC).split("### 8.1 orchestrator bootstrap", 1)[1].split("### 8.2", 1)[0]
+        self.assertRegex(boot, r"hand over at about 50% of a 1m window")
+        self.assertRegex(boot, r"lineage depth (?:is )?6 or more.{0,80}the owner starts the next orchestrator")
+
+    def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):
+        text = self.norm(self.ORCH_MD)
+        self.assertRegex(text, r"lineage depth 6 or more.{0,120}the owner starts the next orchestrator from a top-level session")
+        self.assertRegex(text, r"§9, f3")
+        self.assertNotRegex(text, r"depth (?:of )?7|lineage depth \u2265 ?7|depth 7")
+
+    def test_orchestration_f3_and_5_1_keep_depth_6(self):
+        text = self.norm(self.ORCH_DOC)
+        self.assertRegex(text, r"unless lineage depth is ≥ 6 \(§9, f3\)")
+        self.assertRegex(text, r"at depth ≥ 6, the owner starts the next orchestrator")
+        self.assertNotRegex(text, r"depth (?:is )?(?:≥|>=) ?7")
+
+    def test_effort_is_medium_everywhere_the_orchestrator_is_described(self):
+        self.assertRegex(self.norm(self.ORCH_MD), r"^you are the orchestrator for listicles \(repo bondo/listicles2\)\. opus, medium effort")
+        self.assertRegex(self.norm(self.ORCH_DOC), r"\| \*\*orchestrator\*\* \| opus / medium \|")
+
+    RECIPE_HEADING = "repo access and worker-prompt recipes"
+    # Every recipe of #15 comment 7001335975, item 4: (label, regex over the normalized lower-case text).
+    RECIPES = (
+        ("rest only", r"rest only \(graphql is blocked"),
+        ("pagination", r"&page=n or `since="),
+        ("ready for review", r"post `pulls/n/ccr/ready_for_review`"),
+        ("update branch", r"put `pulls/n/update-branch` with `expected_head_sha`"),
+        ("no clone", r"no clone in the orchestrator"),
+        ("body from a file", r"-f body=@file"),
+        ("scripts from a file", r"run a script that mentions a protected path from a file"),
+        ("source_revision", r"`source_revision` is the pr branch name"),
+        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while waiting"),
+        ("red green one push", r"a red/green pair may go up in one push \(say so in the pr body\)"),
+        ("pr bodies by mcp", r"pr bodies only through the github mcp tools"),
+        ("close after merge", r"comment on the completed issue, then close it with `state=closed`, `state_reason=completed`"),
+        ("merge agent authorization", r"merges only after a new owner-recorded authorization on #15"),
+        ("archive policy", r"keep implementers until their pr merges; archive the others when they are done"),
+        ("owner-only list", r"owner-only merge list"),
+    )
+
+    def recipe_text(self, path):
+        text = self.norm(path)
+        self.assertIn(self.RECIPE_HEADING, text, path.name)
+        return text.split(self.RECIPE_HEADING, 1)[1]
+
+    def test_orchestrator_prompt_has_every_recipe_in_a_short_section(self):
+        section = self.recipe_text(self.ORCH_MD)
+        for label, pattern in self.RECIPES:
+            with self.subTest(recipe=label):
+                self.assertRegex(section, pattern)
+        self.assertRegex(section, r"docs/orchestration\.md §7\.8")  # the pointer to the detailed section
+
+    def test_orchestration_md_holds_the_detailed_section_7_8(self):
+        text = self.norm(self.ORCH_DOC)
+        self.assertIn("### 7.8 repo access and worker-prompt recipes", text)
+        section = text.split("### 7.8 repo access and worker-prompt recipes", 1)[1].split("## 8. spawn messages", 1)[0]
+        for label, pattern in self.RECIPES[:5]:
+            with self.subTest(recipe=label):
+                self.assertRegex(section, pattern)
+
+    def test_a_missing_recipe_is_detected(self):
+        section = self.recipe_text(self.ORCH_MD)
+        for label, pattern in self.RECIPES:
+            with self.subTest(recipe=label):
+                cut = re.sub(pattern, "", section)
+                self.assertNotEqual(cut, section)
+                self.assertIsNone(re.search(pattern, cut))
+
 
 if __name__ == "__main__":
     unittest.main()
