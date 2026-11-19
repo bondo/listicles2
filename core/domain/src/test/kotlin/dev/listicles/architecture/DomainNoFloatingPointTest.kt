@@ -196,4 +196,39 @@ class DomainNoFloatingPointTest {
         File(nested, "Sample.kt").writeText("package sample\n\nval x: Double = 0\n")
         ArchitectureRules.floatingPointViolations(nested).shouldNotBeEmpty()
     }
+
+    @Test
+    fun rejectsNullSafeConversionToFloatingPoint() {
+        violationsOf("val x = \"1.5\".toDoubleOrNull()").shouldNotBeEmpty()
+        violationsOf("val y = s.toFloatOrNull() ?: 0").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun rejectsBigDecimalInAnyForm() {
+        violationsOf("val x = \"1\".toBigDecimal()").shouldNotBeEmpty()
+        violationsOf("val x = s.toBigDecimalOrNull()").shouldNotBeEmpty()
+        violationsOf("val x = BigDecimal(\"1.5\")").shouldNotBeEmpty()
+        violationsOf("val x: BigDecimal? = null").shouldNotBeEmpty()
+        violationsOf("import java.math.BigDecimal").shouldNotBeEmpty()
+        violationsOf("val x = java.math.BigDecimal.ONE").shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsBigIntegerBecauseItIsWholeNumber() {
+        violationsOf("import java.math.BigInteger\nval x = BigInteger.ONE + \"2\".toBigInteger()").shouldBeEmpty()
+    }
+
+    @Test
+    fun acceptsIdentifiersThatMerelyContainTheForbiddenWords() {
+        violationsOf(
+            "val bigDecimalCount = 1\nfun toBigDecimalish() = 1\nclass MyBigDecimal\n" +
+                "val toDoubleOrNullable = 2\nfun a(s: String) = s.toDoubleOrNullish()\n" +
+                "val doubleOrNull = 3\nfun toFloatOrNullCount() = 4",
+        ).shouldBeEmpty()
+    }
+
+    @Test
+    fun wholeNumberParsingIsAccepted() {
+        violationsOf("val x = \"12\".toLongOrNull() ?: \"3\".toIntOrNull() ?: 0").shouldBeEmpty()
+    }
 }
