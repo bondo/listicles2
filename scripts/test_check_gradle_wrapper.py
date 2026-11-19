@@ -149,6 +149,72 @@ class LineContinuation(unittest.TestCase):
             self.assertEqual(slashes % 2, 0, f"gradle-wrapper.properties line {number} ends in a line continuation")
 
 
+class JavaCharacterSets(unittest.TestCase):
+    """java.util.Properties ends a line only at \\n, \\r or \\r\\n and treats only space, \\t and \\f as blanks (R2-01)."""
+
+    SUM_LINE = f"distributionSha256Sum={SUM}"
+    # Python str methods split lines or strip blanks on these; Java does neither, so they are plain characters there.
+    PYTHON_ONLY_BREAKS = ("\x0b", "\x1c", "\x1d", "\x1e", "\x85", " ", " ")
+    PYTHON_ONLY_BLANKS = ("\x0b", "\xa0", " ", "　")
+
+    def props(self, *lines, end="\n"):
+        return end.join(lines) + end
+
+    def test_a_sum_after_a_character_java_does_not_break_on_stays_in_the_previous_value(self):
+        for char in (*self.PYTHON_ONLY_BREAKS, "\x0c"):
+            with self.subTest(char=repr(char)):
+                text = self.props(URL, f"networkTimeout=10000{char}{self.SUM_LINE}")
+                self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_a_comment_runs_to_the_end_of_the_java_line(self):
+        for char in (*self.PYTHON_ONLY_BREAKS, "\x0c"):
+            for mark in ("#", "!"):
+                with self.subTest(char=repr(char), mark=mark):
+                    text = self.props(URL, f"{mark} note{char}{self.SUM_LINE}")
+                    self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_a_leading_character_java_does_not_count_as_blank_changes_the_key(self):
+        for char in (*self.PYTHON_ONLY_BREAKS, *self.PYTHON_ONLY_BLANKS):
+            with self.subTest(char=repr(char)):
+                text = self.props(URL, f"{char}{self.SUM_LINE}")
+                self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_a_separator_character_java_does_not_count_as_blank_joins_key_and_value(self):
+        for char in (*self.PYTHON_ONLY_BREAKS, *self.PYTHON_ONLY_BLANKS):
+            with self.subTest(char=repr(char)):
+                text = self.props(URL, f"distributionSha256Sum{char}{SUM}")
+                self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_a_url_after_such_a_character_is_not_a_url_line(self):
+        for char in (*self.PYTHON_ONLY_BREAKS, *self.PYTHON_ONLY_BLANKS):
+            with self.subTest(char=repr(char)):
+                text = self.props(f"networkTimeout=10000{char}{URL}", self.SUM_LINE)
+                self.assertEqual(c.check_properties(text), ["distributionUrl is missing"])
+
+    def test_space_tab_and_form_feed_are_blanks(self):
+        for blank in (" ", "\t", "\x0c", " \t\x0c"):
+            with self.subTest(blank=repr(blank)):
+                for line in (
+                    f"{blank}distributionSha256Sum={SUM}",
+                    f"distributionSha256Sum{blank}={blank}{SUM}",
+                    f"distributionSha256Sum{blank}{SUM}",
+                    f"distributionSha256Sum:{blank}{SUM}",
+                ):
+                    self.assertEqual(c.check_properties(self.props(URL, line)), [], line)
+
+    def test_form_feed_before_a_continuation_line_is_a_blank(self):
+        text = self.props(URL, "networkTimeout=10000\\", "\x0c" + self.SUM_LINE)
+        self.assertEqual(c.check_properties(text), ["distributionSha256Sum is missing"])
+
+    def test_line_ends_are_newline_carriage_return_and_both(self):
+        for end in ("\n", "\r", "\r\n"):
+            with self.subTest(end=repr(end)):
+                self.assertEqual(c.check_properties(self.props(URL, self.SUM_LINE, "validateDistributionUrl=true", end=end)), [])
+                folded = self.props(URL, "networkTimeout=10000\\", self.SUM_LINE, end=end)
+                self.assertEqual(c.check_properties(folded), ["distributionSha256Sum is missing"])
+                self.assertEqual(c.check_properties(self.props(URL, "# " + self.SUM_LINE, end=end)), ["distributionSha256Sum is missing"])
+
+
 class RealRepo(unittest.TestCase):
     def test_repo_wrapper_properties_pass(self):
         self.assertEqual(c.main(ROOT), 0)
