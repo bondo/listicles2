@@ -165,6 +165,56 @@ class GradleRules(unittest.TestCase):
         self.assertTrue(df.check_gradle_metadata(meta()))  # no components: would pass vacuously
 
 
+# (ecosystem, package, the version the alert showed, the version just below the fix, the first fixed version). Every alert of the PR table.
+ALERT_VERSIONS = [
+    ("npm", "@grpc/grpc-js", "1.9.16", "1.13.5", "1.13.6"),
+    ("npm", "minimatch", "9.0.9", "11.0.0", "11.0.1"),
+    ("npm", "minimatch", "10.2.6", "11.0.0", "11.0.1"),
+    ("npm", "uuid", "9.0.1", "11.1.0", "11.1.1"),
+    ("gradle", "org.freemarker:freemarker", "2.3.32", "2.3.34", "2.3.35"),
+    ("gradle", "org.bouncycastle:bcprov-jdk18on", "1.80.2", "1.84", "1.85"),
+    ("gradle", "org.bouncycastle:bcpkix-jdk18on", "1.80.2", "1.83", "1.84"),
+    ("gradle", "com.google.guava:guava", "33.4.0-jre", "33.7.1-jre", "33.7.2-jre"),
+    ("gradle", "org.codehaus.plexus:plexus-utils", "3.6.0", "3.6.0", "3.6.1"),
+    ("gradle", "org.bitbucket.b_c:jose4j", "0.9.5", "0.9.5", "0.9.6"),
+    ("gradle", "org.jdom:jdom2", "2.0.6", "2.0.6", "2.0.6.1"),
+    ("gradle", "org.apache.commons:commons-lang3", "3.16.0", "3.17.0", "3.18.0"),
+    ("gradle", "org.apache.httpcomponents:httpclient", "4.5.6", "4.5.12", "4.5.13"),
+]
+
+
+class EveryAlert(unittest.TestCase):
+    """Per alert: the shown version and the one just below the fix are flagged, the first fixed version passes (R2-01)."""
+
+    def problems(self, ecosystem, name, version):
+        if ecosystem == "npm":
+            return df.check_npm_lock(lock(**{name.replace("/", "__"): version}))
+        group, artifact = name.split(":")
+        return df.check_gradle_metadata(meta((group, artifact, version, ["jar", "pom"])))
+
+    def test_vulnerable_versions_are_flagged_and_the_fixed_one_passes(self):
+        for ecosystem, name, shown, below, fixed in ALERT_VERSIONS:
+            with self.subTest(package=name, shown=shown):
+                for bad in (shown, below):
+                    found = self.problems(ecosystem, name, bad)
+                    self.assertEqual(len(found), 1, f"{name} {bad}")
+                    self.assertIn(fixed.split("-")[0], found[0])
+                self.assertEqual(self.problems(ecosystem, name, fixed), [])
+
+    def test_the_table_covers_every_rule(self):
+        self.assertEqual({(e, n) for e, n, *_ in ALERT_VERSIONS}, {(r.ecosystem, r.name) for r in df.RULES})
+
+    def test_httpclient_5_0_range(self):
+        # GHSA-7r82-7xv7-xcpj also covers >=5.0.0 <5.0.3 (R2-02).
+        name = ("org.apache.httpcomponents", "httpclient")
+        for bad in ("5.0.0", "5.0.2"):
+            found = df.check_gradle_metadata(meta((*name, bad, ["jar"])))
+            self.assertEqual(len(found), 1, bad)
+            self.assertIn("5.0.3", found[0])
+        for ok in ("4.5.13", "4.5.14", "5.0.3", "5.1.0"):
+            self.assertEqual(df.check_gradle_metadata(meta((*name, ok, ["jar"]))), [], ok)
+
+
 class RuleTable(unittest.TestCase):
     def test_every_alert_package_has_a_rule(self):
         self.assertEqual({r.name for r in df.RULES if r.ecosystem == "npm"} >= ALERT_NPM, True)
