@@ -127,7 +127,7 @@ Sources: [Security checklist](https://developer.android.com/privacy-and-security
 
 | Rule | Status |
 |---|---|
-| Never commit API keys; keep them out of the source repository | tooling: `secrets` (gitleaks) CI job and the guards; `google-services.json` rule in CLAUDE.md |
+| Never commit API keys; keep them out of the source repository | tooling in part: the `secrets` (gitleaks) CI job and GitHub push protection catch a key inside a committed file; `.gitignore` keeps `google-services.json` (in any directory) and key and credential files out of `git add -A`, tested by `scripts/test_gitignore_secrets.py`; no guard blocks such a file by name once it is force-added, so the `google-services.json` rule in CLAUDE.md is also a review item |
 | Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding) |
 | Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change) |
 | Deep links and intents: App Links use `android:autoVerify="true"` plus a hosted `assetlinks.json`; treat data from an incoming link or intent (invite code) as untrusted input and validate it; set `android:exported` explicitly and keep components unexported unless needed ([Verify App Links](https://developer.android.com/training/app-links/verify-applinks), [Security checklist](https://developer.android.com/privacy-and-security/security-tips)) | review (M1-20) |
