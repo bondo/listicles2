@@ -29,6 +29,18 @@ def forms(name, args):
     return out
 
 
+def dirty_repo():
+    d = repo()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    with open(os.path.join(d, "f"), "w") as fh:
+        fh.write("a")
+    subprocess.run(["git", "add", "f"], cwd=d, check=True, capture_output=True)
+    subprocess.run(git + ["commit", "-q", "-m", "f"], cwd=d, check=True, capture_output=True)
+    with open(os.path.join(d, "f"), "w") as fh:
+        fh.write("b")
+    return d
+
+
 class WrapperForms(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -59,13 +71,7 @@ class WrapperForms(unittest.TestCase):
             self.assertEqual(self.bash(c), 0, c)
 
     def test_a_plain_name_plus_equals_or_indexed_statement_keeps_the_tracked_value(self):  # R4-01: behave as main does
-        dirty = repo()
-        with open(os.path.join(dirty, "f"), "w") as fh:
-            fh.write("a")
-        subprocess.run(["git", "add", "f"], cwd=dirty, check=True, capture_output=True)
-        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "f"], cwd=dirty, check=True, capture_output=True)
-        with open(os.path.join(dirty, "f"), "w") as fh:
-            fh.write("b")
+        dirty = dirty_repo()
         cases = (
             (self.d, "FOO=--force; FOO+=; git push $FOO origin work"), (self.d, "FOO=--force; FOO+=''; git push $FOO origin work"),
             (self.d, "FOO=--force; FOO[1]=x; git push $FOO origin work"), (self.d, "X=--no-veri; X+=fy; git commit $X -m x"),
@@ -90,6 +96,31 @@ class WrapperForms(unittest.TestCase):
         with self.assertRaises(ValueError):
             pretooluse_guard.lex("echo 'unterminated")
         self.assertEqual(self.bash("echo 'unterminated"), 0)
+
+    def test_a_translated_string_word_is_still_an_expansion_the_guard_cannot_read(self):  # R5-01: main's behaviour, the $" branch is reverted
+        dirty = dirty_repo()
+        cases = [(dirty, c) for c in ('git reset $"x"', 'X=$"x"; git reset $X', 'git checkout $"x"', 'git clean $"x"', 'git restore --staged $"x"')]
+        cases += [(self.d, c) for c in ('git $"y" --force origin work', 'git -C . $"y" --force origin work', '$"g" push --force origin work',
+                                        'git push origin $"z"', 'git push origin HEAD:$"z"', 'git push origin $"w"')]
+        for d, c in cases:
+            for env in (None, TOOLING):
+                with self.subTest(c=c, env=env):
+                    self.assertEqual(run("Bash", {"command": c}, d, env), 2)
+
+    def test_a_quoted_or_escaped_name_plus_equals_word_is_a_command_not_an_assignment(self):  # R5-02: main's behaviour, bash runs it as a path
+        git = "/usr/bin/git"
+        cases = [(self.d, c) for c in (f'"FOO+={git}" push --force origin work', f"'FOO+={git}' push --force origin work",
+                                       f"FOO{ESC}+={git} push --force origin work", f'"FOO[1]={git}" push --force origin work',
+                                       f'"FOO+={git}" commit --no-verify -m x', f'"FOO+={git}" -c core.hooksPath=/x commit -m x',
+                                       """"A+=/bin/bash" -c 'git push --force origin work'""")]
+        cases.append((dirty_repo(), f'"FOO+={git}" reset --hard'))
+        for d, c in cases:
+            for env in (None, TOOLING):
+                with self.subTest(c=c, env=env):
+                    self.assertEqual(run("Bash", {"command": c}, d, env), 2)
+        for c in ('"FOO+=/bin/rm" CLAUDE.md', '"A+=/bin/cp" /tmp/x .claude/settings.json'):
+            self.assertEqual(self.bash(c), 2, c)
+        self.assertEqual(self.bash('echo "FOO+=1"'), 0)
 
     def test_ansi_c_follows_bash_for_every_escape(self):  # R3-03: the lexer must fail only where bash fails
         for src, want in ((r"\E", "\x1b"), (r"\v", "\v"), (r"\f", "\f"), (r"\?", "?"), (r"\cA", "\x01"), (r"\8", "\\8"), (r"\q", "\\q"), (r"\n", "\n")):
