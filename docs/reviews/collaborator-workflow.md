@@ -24,7 +24,7 @@ anyone with Write counts as trusted, there is no id allowlist; their input produ
 ## 2. Accident surface: what Write gives them
 
 Personal-account repos have **one collaborator level, effectively Write** **[unverified]**. `main`'s ruleset
-(docs/BRANCH-PROTECTION.md: PR required, the 8 required checks, squash only, no force-push, no deletion, **empty
+(docs/BRANCH-PROTECTION.md: PR required, the 10 required checks, squash only, no force-push, no deletion, **empty
 bypass list**) stops a direct push to `main` and a merge with red checks, but not *who* merges (0 approvals).
 
 | Capability | Accident it allows | Guard |
@@ -141,7 +141,7 @@ Dropped now (round-2 review reasoning); revisit if their merge power surprises y
 * **C1 `main-merge` ruleset** (Restrict updates, bypass Repository admin only): stops them merging; needed only if the
   live test shows they can and the agreement is not enough. Reverses BRANCH-PROTECTION.md §2.
 * **C1b `claude/**` branch ruleset:** blocks non-owner pushes to agent branches; the agreement covers accidents.
-* **C4 `pull_request_target` check:** detects a workflow swapped under the 8 required names; malicious accounts only.
+* **C4 `pull_request_target` check:** detects a workflow swapped under the 10 required names; malicious accounts only.
 * **C7 audit script (M0.5-20):** replaces the manual check; if built, use the run's **head SHA/actor** (R2-05).
 * **Machine account / App (D6):** the only clean way to make approvals gate merges (Code Owners + 1 approval); costs its
   own claude.ai/GitHub connection and changes to every environment, ruleset and CODEOWNERS.

@@ -335,7 +335,7 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
 
 ## 5. Orchestrator handover
 
-Trigger: about 80% of a 1M window (60% of a 200k one, `agents/roles.yaml` context) (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
+Trigger: about 50% of a 1M window (40% of a 200k one; `agents/roles.yaml` context, #15 comment 7001335975). This is earlier than the hook stages every session gets (60% / 80%); until the hard stage, the orchestrator follows this section, not the soft reminder. (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
 or the status line), at the first **batch boundary** (if none comes before the hard stage, at the next step boundary) rather than mid-batch.
 `used_tokens` can read 0 while a turn is running, so read it at the start of a wake and treat 0 as
 **unknown**, not as "plenty left". When it is unknown, hand over at the first batch boundary after about
@@ -618,7 +618,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
   "mark #N done" instead. Scan the PR body for them before asking the owner to merge.
 * **Merge agent:** the merge agent merges every READY PR except the owner-only ones, one at a time. Owner-only: permissions and `.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, licence acceptances, design and product sign-off, docs that are themselves a gate (a decision to approve before work relies on it), naming and protected process files.
   A `risk:high` PR is marked READY only after the independent second-reviewer pass is clean (owner decision B, 2026-11-17). Docs PRs whose owner approval can wait go to it too and carry the status line `working draft ...; not owner-approved (see issue #15)` until the owner approves them in a later PR.
-  A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge; the orchestrator never passes an approval on to it.
+  A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, and it merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the PRs it names, whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one (owner decision, #15 comment 7002904192); the orchestrator never passes an approval on to it.
 * **Marking a PR ready:** the orchestrator (or the implementer session when the orchestrator says so) marks a draft PR ready after
   clean review rounds with `scripts/mark-ready.sh <N>`. Reviewers never mark PRs ready. The script accepts exactly one argument,
   the PR number as digits only, and makes one fixed POST to the `ready_for_review` route of this repo; it refuses anything else
@@ -786,6 +786,21 @@ but say so in the `Usage:` line.
 Throughput goes first, quality last; the stages are cumulative: (1) no optional extras (recurring reviews R3 and R4, transcript sampling, explorer runs the task does not need); (2) halve the concurrency limit, once per check-in while stage 2 applies, at most twice; (3) pause new work and finish the open PRs. A stage lifts, and the limit returns to the §7.1 default, at the first check-in where its trigger no longer applies.
 Never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the R2 usage read of §7.7.1.
 
+### 7.8 Repo access and worker-prompt recipes
+
+Working recipes of the orchestrator (owner decisions, #15 comment 7001335975); `agents/prompts/orchestrator.md` carries the one-line versions.
+
+* **Repo access:** REST only (GraphQL is blocked; paginate with &page=N or `since=`). Mark a PR ready with POST `pulls/N/ccr/ready_for_review`,
+  which `scripts/mark-ready.sh N` does (§7.5). Update a branch with PUT `pulls/N/update-branch` with `expected_head_sha` (the head you last saw; a moved head is refused).
+  No clone in the orchestrator: it reads through the API, and it never edits files.
+* **Comment bodies and protected paths:** write a multi-line comment body to a file and post it with `-F body=@file`, so quoting never changes it.
+  Run a script that mentions a protected path from a file: the PreToolUse hook reads the command line, so an inline script that names such a path is blocked.
+* **Worker prompts:** `source_revision` is the PR branch name, never a SHA. Wait for CI and verify.sh with a Monitor/until-loop and do not end the turn while waiting.
+  A red/green pair may go up in one push (say so in the PR body), because pre-push runs the hook tests. PR bodies only through the GitHub MCP tools.
+* **After a merge:** comment on the completed issue, then close it with `state=closed`, `state_reason=completed`.
+* **Merge agent, archive, owner-only:** the merge agent merges only after a new owner-recorded authorization on #15 (§7.5).
+  Archive policy: keep implementers until their PR merges; archive the others when they are done (§7.4). The owner-only merge list is in §7.5.
+
 ## 8. Spawn messages
 
 The role rules live in `agents/prompts/<role>.md` (models and effort in `agents/roles.yaml`).
@@ -802,6 +817,8 @@ commit or push. Read docs/ORCHESTRATION.md, then state issue #{state_issue} (bod
 since the last "handover"). Do §5.2 (incoming checklist) first, including the ready query (§4.3),
 then continue from "Next:". If the lock was not released to you or there is no handover comment, follow §5.3.
 Follow §1.1 (autonomy: what you may do unasked, what you must ask the owner). Predecessor: {session_id}.
+Hand over at about 50% of a 1M window (40% of a 200k one), §5. At lineage depth 6 or more the owner starts the next orchestrator (§5.1 step 5, §9 F3).
+Repo access and worker-prompt recipes: §7.8.
 ```
 
 ### 8.2 Implementer
