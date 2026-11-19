@@ -25,7 +25,7 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 5. **i18n**: no hardcoded strings; English and Danish both present; plurals use `<plurals>`.
 6. **Accessibility**: touch targets, contrast, content descriptions, dark theme.
 7. **Free-tier cost**: Firestore reads and writes per user action; no listeners on large collections without need.
-8. **Process files and suppressions**: every `// justified:` reason is true and specific; no disabled tests,
+8. **Process files and suppressions**: every `// justified:` reason is true and specific (the guard only requires 3 words); no disabled tests,
    baselines or lowered thresholds (`scripts/guards.sh` catches the mechanical cases; check intent).
 9. **Scope**: one concern per PR; flag unrelated changes.
 10. **Test-first**: every code change, tooling included (hooks, scripts, guards, CI checks, metrics, status line), needs
