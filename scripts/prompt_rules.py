@@ -699,9 +699,9 @@ RULES = (
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
-            r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge "
-            r"and records a new authorization for it on #15 \(per merge agent\), "
+            r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and you never pass an approval on to it",
+            r"the owner also records a new authorization for it on #15 \(per merge agent, §7\.5\); the merge agent does not merge before that",
         ),
         "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
     ),
