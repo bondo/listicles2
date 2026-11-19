@@ -540,7 +540,8 @@ done < <(git ls-files -- '*package.json' "${EXCL[@]}"))
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: embedded config: package.json must not hold linter or test config (use the dedicated file): /'; fail=1; }
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
-out=$("${LS[@]}" | grep -iE 'baseline')
+# ESLint loads a committed eslint-suppressions.json (bulk suppressions) on its own, in any directory: a baseline too (#173).
+out=$("${LS[@]}" | grep -iE 'baseline|(^|/)eslint-suppressions\.json$')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline file: /'; fail=1; }
 # Formatter and linter ignore files cannot carry a same-line justification, so they are refused outright (ask the owner).
 out=$("${LS[@]}" | grep -E '(^|/)\.(prettier|eslint|stylelint|dprint)ignore$')
