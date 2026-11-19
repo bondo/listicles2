@@ -373,3 +373,4 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
+- **PR to merge** [#220](https://github.com/bondo/listicles2/issues/220): docs&#58; M1 UI wording and wireframes 34-45 (name at sign-up, Continue with Google, dialogs)
