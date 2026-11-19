@@ -5,7 +5,8 @@ Exit status: 0 clean, 1 findings (one line per finding). A file that is missing,
 (a wrong type, a missing key) is reported as a finding too, never as a traceback.
 
 Rules: every color is #RRGGBB in upper case; the light and dark themes have exactly the same roles (so a theme can be swapped
-whole, post-v1); every role in REQUIRED_ROLES (all Material 3 ColorScheme roles) is defined in both themes; every pair in REQUIRED_PAIRS is listed in contrastPairs (an empty or shortened list fails); every
+whole, post-v1); every role in REQUIRED_ROLES (all Material 3 ColorScheme roles) is defined in both themes;
+every pair in REQUIRED_PAIRS is listed in contrastPairs (an empty or shortened list fails); every
 contrastPairs entry names roles that exist, keeps the WCAG AA minimum (4.5 for text, 3.0 for the outline pair) and meets
 that minimum in both themes. Thresholds are never read from anywhere that could weaken them: a pair may ask for
 more than AA, never less.
