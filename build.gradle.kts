@@ -134,9 +134,11 @@ tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
 val jdkTestSupportModules = setOf(":core:testing")
 
 // Issue 211: every JVM module (Kotlin JVM plugin) compiles against the JDK 17 API, not the JDK 21 one the build runs
-// on. minSdk is 26 and Android has java.util.List.removeFirst()/removeLast()/reversed() only from API 35, so a call
-// that resolves to the JDK 21 member crashes on Android 8 to 14. Kotlin (-Xjdk-release) and Java (--release) must both
-// say 17. The task first runs its own negative cases on the predicate, then checks every real compile task.
+// on. minSdk is 26 and Android has java.util.List.removeFirst()/removeLast() only from API 35, so a call that
+// resolves to the JDK 21 member crashes on Android 8 to 14. Kotlin (-Xjdk-release) and Java (--release) must both
+// say 17. This closes the JDK 18 to 21 gap only: Java 9 to 17 APIs that are newer than API 26 (for example
+// Stream.toList) still compile and are not checked here. The task first runs its own negative cases on the
+// predicate, then checks every real compile task.
 // Run: ./gradlew checkJdkRelease (wired into detekt, so verify.sh and CI run it).
 val checkJdkRelease =
     tasks.register("checkJdkRelease") {
@@ -231,8 +233,9 @@ val checkJdkRelease =
             }
             check(offenders.isEmpty()) {
                 "JVM modules must compile against the JDK $wanted API (-Xjdk-release=$wanted, " +
-                    "options.release=$wanted) so Android API 26 to 34 has every method called; " +
-                    "offenders: ${offenders.joinToString()}"
+                    "options.release=$wanted), not the JDK 21 one the build runs on: Android has the JDK 18 to 21 " +
+                    "API (for example List.removeFirst) only from API 35 and minSdk is 26. " +
+                    "Offenders: ${offenders.joinToString()}"
             }
         }
     }

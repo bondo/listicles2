@@ -13,7 +13,8 @@ import java.util.spi.ToolProvider
  * `java.util.List.removeFirst()` and friends only from API 35, while minSdk is 26, so a call that compiles to the
  * JDK 21 member crashes with NoSuchMethodError on Android 8 to 14. This test compiles (as part of the test source
  * set, so with the same compiler options as the module) a probe that makes those calls, then reads the bytecode:
- * with `-Xjdk-release=17` Kotlin resolves them to its own stdlib extensions.
+ * with `-Xjdk-release=17` Kotlin resolves `removeFirst()` and `removeLast()` to its own stdlib extensions. The
+ * `reversed()` probe is a positive control only: Kotlin resolves it to the stdlib with or without the setting.
  */
 class JdkApiLevelTest {
     private fun bytecodeOf(type: Class<*>): String {
