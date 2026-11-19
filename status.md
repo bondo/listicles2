@@ -373,3 +373,4 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
+- **PR to merge** [#239](https://github.com/bondo/listicles2/issues/239): build(app)&#58; run JUnit 4 tests in &#58;app and fail the build when one is skipped
