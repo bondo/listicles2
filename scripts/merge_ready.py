@@ -3,6 +3,7 @@
 
 Usage: python3 -I scripts/merge_ready.py <N> <sha> <kind>
   kind: working-draft-docs | tasks-sync | dependabot   (the owner-authorized merge-agent kinds)
+        general      a PR that is not owner-only, under the owner's standing authorization (#15 comment 7005366747)
 
 Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * the PR head is exactly <sha>;
@@ -10,7 +11,8 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * every check the base ruleset requires has a latest run with conclusion `success` (none configured, missing or pending: refused);
   * no closing keyword (close/fix/resolve and their -s/-d forms) sits directly before an issue number or URL in the title, body or commits;
   * the base is `main` and the API's file and commit lists are complete (it caps them at 3000 and 250);
-  * every changed file (a rename's old name too) is inside the kind's allowed paths. For dependabot, a workflow may only
+  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: not an owner-only path, see owner_only).
+    For dependabot, a workflow may only
     re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
     in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
@@ -18,12 +20,14 @@ Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the hea
 Exit status: 0 merged, 1 refused or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
 
+import functools
 import json
 import os
 import re
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
@@ -34,6 +38,19 @@ DOC_PREFIXES = ("docs/milestones/", "docs/product/wireframes/")
 DOC_FILES = ("docs/PLAN.md", "docs/product/stories.md", "docs/product/flow.md", "docs/product/rubric.md", "design/tokens.json")
 DRAFT_STATUS = "not owner-approved"
 TASKS_FILES = ("docs/tasks.toml",)
+# Kind `general` refuses these (ORCHESTRATION 7.5, owner-only PRs), compared casefolded: the protected process files (the list of
+# scripts/hooks/pretooluse_guard.py PROTECTED, which a test keeps in sync), the wrappers by name anywhere, gate docs and approved product and design docs,
+# dependency manifests (R2-01), and every scripts/ path a CI job runs (ci_scripts).
+OWNER_ONLY_FILES = {f.casefold() for f in (
+    "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
+    "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
+    "gradle/verification-metadata.xml")}
+OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".githooks/", ".tools/", "agents/", "scripts/hooks/", "docs/reviews/",
+                                                   "docs/product/", "design/", "gradle/wrapper/"))
+OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh")}
+REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
+GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md", "design/tokens.json"), ("docs/milestones/",)  # the drafts still without an owner sign-off
+CI_YML = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
 DEPENDABOT_FILES = ("gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar")
@@ -159,10 +176,32 @@ class GhApi:
         return json.loads(self._gh([*args, path]))
 
 
+@functools.cache
+def ci_scripts():
+    """The scripts/ paths the CI workflow on this checkout (main, for the merge agent) runs, casefolded; None if it cannot be read (fail closed)."""
+    try:
+        return {m.casefold() for m in re.findall(r"scripts/[\w./-]+\.(?:py|sh)", CI_YML.read_text(encoding="utf-8"))}
+    except OSError:
+        return None
+
+
+def owner_only(name):
+    """Whether a path needs the owner's approval first (kind `general` refuses it); only a still-unsigned draft does not."""
+    n = name.casefold()
+    if n in GENERAL_DRAFT_FILES or n.startswith(GENERAL_DRAFT_PREFIXES):
+        return False
+    base = n.rsplit("/", 1)[-1]
+    if n.startswith("scripts/") and (ci_scripts() is None or n in ci_scripts()):
+        return True
+    return n in OWNER_ONLY_FILES or n.startswith(OWNER_ONLY_PREFIXES) or base in OWNER_ONLY_BASENAMES or bool(REQUIREMENTS_RE.match(base))
+
+
 def allowed(kind, name):
     """Whether a changed path belongs to the kind (workflow pins are judged on their patch, see pin_only)."""
     if ".." in name.split("/"):
         return False
+    if kind == "general":
+        return not owner_only(name)
     if kind == "working-draft-docs":
         return name in DOC_FILES or name.startswith(DOC_PREFIXES)
     if kind == "tasks-sync":
@@ -216,6 +255,9 @@ def file_problems(kind, files, resolve):
             if name and not allowed(kind, name):
                 problems.append(f"path outside kind {kind}: {name}")
         name, patch = f["filename"], f.get("patch")
+        draft = any(x.casefold() in GENERAL_DRAFT_FILES or x.casefold().startswith(GENERAL_DRAFT_PREFIXES) for x in (name, f.get("previous_filename") or name))
+        if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or drops_draft_status(patch or "")):
+            problems.append(f"{name}: removes or renames a working draft, or removes a '{DRAFT_STATUS}' status line (a sign-off is the owner's)")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
         if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
@@ -284,7 +326,7 @@ def evaluate(api, repo, n, sha, kind, resolve):
     return pr, problems
 
 
-KINDS = {"working-draft-docs", "tasks-sync", "dependabot"}
+KINDS = {"working-draft-docs", "tasks-sync", "dependabot", "general"}
 
 
 def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None):
