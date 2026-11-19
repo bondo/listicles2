@@ -4,6 +4,7 @@ Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os
 import shutil
+import subprocess
 import unittest
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
@@ -56,6 +57,39 @@ class WrapperForms(unittest.TestCase):
             self.assertEqual(self.bash(c), 2, c)
         for c in ("FOO+=1 ls", "FOO[0]=1 true", "FOO=1 ls"):
             self.assertEqual(self.bash(c), 0, c)
+
+    def test_a_plain_name_plus_equals_or_indexed_statement_keeps_the_tracked_value(self):  # R4-01: behave as main does
+        dirty = repo()
+        with open(os.path.join(dirty, "f"), "w") as fh:
+            fh.write("a")
+        subprocess.run(["git", "add", "f"], cwd=dirty, check=True, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "f"], cwd=dirty, check=True, capture_output=True)
+        with open(os.path.join(dirty, "f"), "w") as fh:
+            fh.write("b")
+        cases = (
+            (self.d, "FOO=--force; FOO+=; git push $FOO origin work"), (self.d, "FOO=--force; FOO+=''; git push $FOO origin work"),
+            (self.d, "FOO=--force; FOO[1]=x; git push $FOO origin work"), (self.d, "X=--no-veri; X+=fy; git commit $X -m x"),
+            (self.d, "B=--mirr; B+=or; git push $B origin"), (dirty, "OPTS=--hard; OPTS+=' HEAD'; git reset $OPTS"),
+            (dirty, "OPTS=--hard; OPTS[1]=HEAD; git reset $OPTS"),
+        )
+        for d, c in cases:
+            for env in (None, TOOLING):
+                with self.subTest(c=c, env=env):
+                    self.assertEqual(run("Bash", {"command": c}, d, env), 2)
+        self.assertEqual(self.bash("FOO=ok; FOO+=1; git push $FOO origin work"), 0)  # a harmless value stays allowed
+
+    def test_the_lexer_failure_fallback_sees_a_wrapper_name_hidden_by_quotes_or_written_without_scripts_slash(self):  # R4-02
+        for name, args in WRAPPERS:
+            hidden = (f"scrip\"\"ts/{name[:3]}\"\"{name[3:]} {args} 'x", f"cd scripts && ./{name} {args} 'x")
+            for c in hidden:
+                with self.subTest(c=c):
+                    with self.assertRaises(ValueError, msg="the test must reach the fallback"):
+                        pretooluse_guard.lex(c)
+                    self.assertEqual(self.bash(c), 2)
+                    self.assertEqual(self.bash(c, TOOLING), 2, "tooling")
+        with self.assertRaises(ValueError):
+            pretooluse_guard.lex("echo 'unterminated")
+        self.assertEqual(self.bash("echo 'unterminated"), 0)
 
     def test_ansi_c_follows_bash_for_every_escape(self):  # R3-03: the lexer must fail only where bash fails
         for src, want in ((r"\E", "\x1b"), (r"\v", "\v"), (r"\f", "\f"), (r"\?", "?"), (r"\cA", "\x01"), (r"\8", "\\8"), (r"\q", "\\q"), (r"\n", "\n")):
