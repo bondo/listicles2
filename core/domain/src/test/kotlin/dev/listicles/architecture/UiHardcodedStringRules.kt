@@ -12,9 +12,13 @@ import java.io.File
  *   `supportingText`, `actionLabel`, `onClickLabel` or `stateDescription`, or
  * - assigned to `contentDescription` or `stateDescription` in a `semantics { }` block.
  *
- * Test tags, routes, log tags and other literals are not matched. **Not covered (review catches these):** a literal
- * behind an expression (`text = if (x) "A" else "B"`, `when`), text built with
- * `buildAnnotatedString { append("...") }`, `Toast.makeText`, and any other function that takes a user-visible string.
+ * Exempt: `label` of an animation API (`animate*AsState`, `animateFloat` and its siblings, `updateTransition`,
+ * `rememberInfiniteTransition`, `AnimatedVisibility`, `AnimatedContent`, `Crossfade`), which names the animation for
+ * tooling and is never shown. Test tags, routes, log tags and other literals are not matched.
+ *
+ * **Not covered (review catches these):** a literal behind an expression (`text = if (x) "A" else "B"`, `when`),
+ * text built with `buildAnnotatedString { append("...") }`, `Toast.makeText`, and any other function that takes a
+ * user-visible string.
  *
  * Allowed: code inside the block body of a `@Preview` function (also `@PreviewLightDark` and the other built-in
  * multipreviews), and a literal whose call line carries `// justified: <reason>` with at least three words of
@@ -30,6 +34,11 @@ object UiHardcodedStringRules {
                 """actionLabel|onClickLabel|stateDescription)\s*=(?!=)""",
         )
     private val semantics = Regex("""(?m)(?:^|[{;])\s*(?<name>contentDescription|stateDescription)\s*=(?!=)""")
+    private val animationCall =
+        Regex(
+            """animate\w*AsState|animate(?:Float|Color|Dp|Int|Value|Size|Offset|IntSize|IntOffset|Rect)|""" +
+                """updateTransition|rememberInfiniteTransition|AnimatedVisibility|AnimatedContent|Crossfade""",
+        )
     private val previewAnnotation = Regex("""@Preview(?:LightDark|ScreenSizes|FontScale|DynamicColors)?(?!\w)""")
     private val modifiers =
         setOf(
@@ -135,12 +144,40 @@ object UiHardcodedStringRules {
         text: String,
         masked: String,
     ): List<Pair<Int, Int>> {
-        val direct = positional.findAll(masked) + named.findAll(masked) + semantics.findAll(masked)
+        val direct =
+            positional.findAll(masked) +
+                named.findAll(masked).filterNot { isAnimationLabel(masked, it) } +
+                semantics.findAll(masked)
         val second =
             iconOrImage.findAll(masked).mapNotNull { match ->
                 secondArgument(masked, match.range.last)?.let { callStart(match) to skipBlanks(text, it) }
             }
         return (direct.map { callStart(it) to skipBlanks(text, it.range.last + 1) } + second).toList()
+    }
+
+    // `label` of an animation API names the animation for tooling and is never shown to the user.
+    private fun isAnimationLabel(
+        masked: String,
+        match: MatchResult,
+    ): Boolean =
+        match.groups["name"]?.value == "label" && animationCall.matches(enclosingCallName(masked, match.range.first))
+
+    // Name of the call whose argument list contains [at] (a `(` or `,` of that list), or "" when there is none.
+    private fun enclosingCallName(
+        masked: String,
+        at: Int,
+    ): String {
+        var depth = 0
+        var i = at
+        while (i >= 0 && !(masked[i] == '(' && depth == 0)) {
+            if (masked[i] == ')') depth++
+            if (masked[i] == '(') depth--
+            i--
+        }
+        var end = i
+        while (end > 0 && masked[end - 1].isWhitespace()) end--
+        if (end > 0 && masked[end - 1] == '>') end = masked.lastIndexOf('<', end - 1).coerceAtLeast(0)
+        return masked.substring(0, end).takeLastWhile { it.isLetterOrDigit() || it == '_' }
     }
 
     // Offset just after the first top-level comma of the call whose `(` is at [open]; null when there is none.
@@ -172,18 +209,20 @@ object UiHardcodedStringRules {
         from: Int,
     ): IntRange? {
         val params = funKeywordEnd(masked, from)?.let { masked.indexOf('(', it) } ?: -1
-        val body =
-            if (params <
-                0
-            ) {
-                null
-            } else {
-                (closing(masked, params) + 1 until masked.length).firstOrNull {
-                    masked[it] == '{' ||
-                        masked[it] == '='
-                }
-            }
+        val body = if (params < 0) null else bodyStart(masked, closing(masked, params) + 1)
         return if (body != null && masked[body] == '{') body..closing(masked, body) else null
+    }
+
+    // Offset of the `{` or `=` that ends the signature after the parameter list; null when anything but an optional
+    // return type comes first (a bodyless declaration), so the search never reaches the next declaration.
+    private fun bodyStart(
+        masked: String,
+        from: Int,
+    ): Int? {
+        val end = (from until masked.length).firstOrNull { masked[it] in "{=};" }
+        val gap = end?.let { masked.substring(from, it).trim() }
+        val signatureOnly = gap != null && (gap.isEmpty() || (gap.startsWith(":") && '\n' !in gap))
+        return if (signatureOnly) end else null
     }
 
     // Offset after the `fun` keyword that follows only annotations and modifiers from [from]; null otherwise.
