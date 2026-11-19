@@ -70,7 +70,7 @@ once.
   out", then I am always asked to confirm that changes not yet sent will be lost; "Cancel" keeps me signed in and "Sign
   out anyway" signs me out (M1-14).
 * Given that confirmation and an unsent change is known, then it says "Some changes have not been sent yet. If you sign
-  out now, they are lost." / "Nogle ændringer er ikke sendt endnu. Hvis du logger ud nu, går de tabt." (wireframe 39).
+  out now, they will be lost." / "Nogle ændringer er ikke sendt endnu. Hvis du logger ud nu, går de tabt." (wireframe 39).
 * Given that confirmation and no unsent change is known (a write can wait with no screen listening), then it says
   "Changes you made may not have been sent yet. If you sign out now, they may be lost." / "Ændringer, du har lavet, er
   måske ikke sendt endnu. Hvis du logger ud nu, kan de gå tabt." (wireframe 45).

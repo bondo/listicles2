@@ -251,7 +251,7 @@ const S = {
     editName: 'Edit your name',
     crash: 'Send crash reports', crashNote: 'Off until you turn it on. Helps fix crashes.',
     leaveQ: 'Leave household?', leave: 'Leave',
-    leaveBody: h => `You leave ${h}. The lists you created go with you and stay private. The other members lose the lists you shared.`,
+    leaveBody: h => `You will leave ${h}. The lists you created will go with you and stay private. The other members will lose the lists you shared.`,
     removeQ: n => `Remove ${n}?`,
     removeBody: n => `${n} loses access to the lists others shared. The lists ${n} created go with ${n}, so the other members lose the lists ${n} shared.`,
     ownerQ: n => `Make ${n} household owner?`, makeOwnerBtn: 'Make owner',
@@ -260,7 +260,7 @@ const S = {
     deleteHhBody: h => `${h} is deleted for all members and cannot be restored. Shared lists go back to the people who created them, private, with all their items.`,
     transferFirst: 'Transfer ownership first', toHousehold: 'Go to household',
     transferFirstBody: 'You are the household owner and other members remain. Make another member the household owner, then delete your account. Nothing has been deleted.',
-    leaveHh: 'Leave household', signOutQ: 'Sign out?', signOutBody2: 'Changes you made may not have been sent yet. If you sign out now, they may be lost.', signOutBody: 'Some changes have not been sent yet. If you sign out now, they are lost.', signOutAnyway: 'Sign out anyway',
+    leaveHh: 'Leave household', signOutQ: 'Sign out?', signOutBody2: 'Changes you made may not have been sent yet. If you sign out now, they may be lost.', signOutBody: 'Some changes have not been sent yet. If you sign out now, they will be lost.', signOutAnyway: 'Sign out anyway',
     removedQ: 'You were removed from the household',
     removedBody: h => `You were removed from ${h}. The lists you created stay with you and are private. You no longer see lists others shared.`,
     updateTitle: 'Update the app', updateBody: 'This version of Tally is too old to work. Get the new version, then open it.',
@@ -603,7 +603,7 @@ const SCREENS = [
   { id: '43', t: 'Edit your name', refs: 'AUTH-12. From Account (18). Same name rules as 42 and 26; the household sees the new name at once. Needs a connection.',
     f: s => accountScreen(s) + dialog({ title: s.editName, extra: `<div style="margin-top:var(--sp-s)">${field({ label: s.yourName, value: 'Sam Jensen', state: 'focus', caret: true })}</div>`,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.save}</span>` }) },
-  { id: '44', t: 'Google sign-in, email already has a password account', refs: 'AUTH-10, OQ-34(a) (decided 2026-11-17, M1.md). A non-Gmail Google account whose email has a password account: no second account, nothing lost. Shown on the sign-in screen.',
+  { id: '44', t: 'Google sign-in, email already has a password account', refs: 'AUTH-10, OQ-34(a), non-Gmail (decided 2026-11-17, M1.md). A non-Gmail Google account whose email has a password account: no second account, nothing lost. Shown on the sign-in screen.',
     f: s => signInScreen(s, msgCard('error', s.collision)) },
 ];
 
