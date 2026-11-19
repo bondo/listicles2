@@ -70,44 +70,103 @@ def merge_repo(path_to_change):
     return d
 
 
-def run_cli(cwd, event="pull_request"):
+def run_cli(cwd, *args, event="pull_request"):
     env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GITHUB_EVENT_NAME")}
     if event is not None:
         env["GITHUB_EVENT_NAME"] = event
-    r = subprocess.run([sys.executable, "-I", str(SCRIPT)], cwd=cwd, env=env, capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-I", str(SCRIPT), *args], cwd=cwd, env=env, capture_output=True, text=True)
     return r.returncode, r.stdout.strip()
 
 
-class Cli(unittest.TestCase):
-    def test_docs_only_pull_request_skips(self):
-        self.assertEqual(run_cli(merge_repo("docs/x.md")), (0, "gradle_selftests=skip"))
+class GradleExclude(unittest.TestCase):
+    """`gradle-exclude` prints the Gradle arguments that drop the licensee self-test, or nothing."""
 
-    def test_build_file_pull_request_runs(self):
-        self.assertEqual(run_cli(merge_repo("gradle/libs.versions.toml")), (0, "gradle_selftests=run"))
+    SKIP = (0, "-x testLicenseeGate")
+    RUN = (0, "")
 
-    def test_changes_that_main_made_are_not_counted(self):
-        d = merge_repo("docs/x.md")
-        # the first parent is main as it was at merge time: a build change that main made earlier is not this PR's change
-        self.assertEqual(run_cli(d), (0, "gradle_selftests=skip"))
+    def test_docs_only_pull_request_excludes_it(self):
+        self.assertEqual(run_cli(merge_repo("docs/x.md"), "gradle-exclude"), self.SKIP)
 
-    def test_push_runs_everything(self):
-        self.assertEqual(run_cli(merge_repo("docs/x.md"), event="push"), (0, "gradle_selftests=run"))
+    def test_build_file_pull_request_keeps_it(self):
+        self.assertEqual(run_cli(merge_repo("gradle/libs.versions.toml"), "gradle-exclude"), self.RUN)
 
-    def test_missing_event_runs_everything(self):
-        self.assertEqual(run_cli(merge_repo("docs/x.md"), event=None), (0, "gradle_selftests=run"))
+    def test_licensee_config_keeps_it(self):
+        self.assertEqual(run_cli(merge_repo("config/licensee/allowed.txt"), "gradle-exclude"), self.RUN)
 
-    def test_head_without_two_parents_runs_everything(self):
+    def test_push_keeps_it(self):
+        self.assertEqual(run_cli(merge_repo("docs/x.md"), "gradle-exclude", event="push"), self.RUN)
+
+    def test_missing_event_keeps_it(self):
+        self.assertEqual(run_cli(merge_repo("docs/x.md"), "gradle-exclude", event=None), self.RUN)
+
+    def test_head_without_two_parents_keeps_it(self):
         d = tempfile.mkdtemp(prefix="ci-scope-")
         git(d, "init", "-q", "-b", "main")
         git(d, "commit", "-q", "--allow-empty", "-m", "only")
-        self.assertEqual(run_cli(d), (0, "gradle_selftests=run"))
+        self.assertEqual(run_cli(d, "gradle-exclude"), self.RUN)
 
-    def test_not_a_repository_runs_everything(self):
-        self.assertEqual(run_cli(tempfile.mkdtemp(prefix="ci-scope-nogit-")), (0, "gradle_selftests=run"))
+    def test_not_a_repository_keeps_it(self):
+        self.assertEqual(run_cli(tempfile.mkdtemp(prefix="ci-scope-nogit-"), "gradle-exclude"), self.RUN)
 
     def test_odd_file_names_are_read_literally(self):
-        self.assertEqual(run_cli(merge_repo("docs/a b\"c.md")), (0, "gradle_selftests=skip"))
-        self.assertEqual(run_cli(merge_repo("weird dir/x.md")), (0, "gradle_selftests=run"))
+        self.assertEqual(run_cli(merge_repo("docs/a b\"c.md"), "gradle-exclude"), self.SKIP)
+        self.assertEqual(run_cli(merge_repo("weird dir/x.md"), "gradle-exclude"), self.RUN)
+
+    def test_unknown_command_fails(self):
+        self.assertNotEqual(run_cli(merge_repo("docs/x.md"), "nope")[0], 0)
+        self.assertNotEqual(run_cli(merge_repo("docs/x.md"))[0], 0)
+
+
+# A fake self-test script appends its word to a `marker` file next to it.
+MARK = "import os\nopen(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marker'), 'a').write('%s\\n')\n"
+
+
+class Selftests(unittest.TestCase):
+    """`selftests [--scripts a b]` runs the gate self-test scripts when the PR can affect them, else none of them."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="ci-scope-fakes-")
+        self.marker = os.path.join(self.tmp, "marker")
+        self.ok = os.path.join(self.tmp, "ok.py")
+        self.bad = os.path.join(self.tmp, "bad.py")
+        with open(self.ok, "w", encoding="utf-8") as f:
+            f.write(MARK % "ok")
+        with open(self.bad, "w", encoding="utf-8") as f:
+            f.write(MARK % "bad" + "raise SystemExit(1)\n")
+
+    def ran(self):
+        return open(self.marker, encoding="utf-8").read().split() if os.path.exists(self.marker) else []
+
+    def selftests(self, repo, *scripts, event="pull_request"):
+        return run_cli(repo, "selftests", "--scripts", *scripts, event=event)
+
+    def test_docs_only_pull_request_runs_none(self):
+        rc, out = self.selftests(merge_repo("docs/x.md"), self.ok, self.bad)
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.ran(), [])
+        self.assertIn("skipped", out)
+
+    def test_build_file_pull_request_runs_all(self):
+        rc, out = self.selftests(merge_repo("build.gradle.kts"), self.ok, self.ok)
+        self.assertEqual((rc, self.ran()), (0, ["ok", "ok"]), out)
+
+    def test_push_runs_all(self):
+        rc, out = self.selftests(merge_repo("docs/x.md"), self.ok, event="push")
+        self.assertEqual((rc, self.ran()), (0, ["ok"]), out)
+
+    def test_a_failing_script_fails_the_step_and_the_others_still_run(self):
+        rc, out = self.selftests(merge_repo("build.gradle.kts"), self.bad, self.ok)
+        self.assertNotEqual(rc, 0, out)
+        self.assertEqual(sorted(self.ran()), ["bad", "ok"])
+
+    def test_a_missing_script_fails_the_step(self):
+        rc, out = self.selftests(merge_repo("build.gradle.kts"), os.path.join(self.tmp, "nope.py"))
+        self.assertNotEqual(rc, 0, out)
+
+    def test_the_default_scripts_are_the_warnings_and_jdk_gate_tests(self):
+        self.assertEqual(ci_scope.SELFTESTS, ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py"))
+        for p in ci_scope.SELFTESTS:
+            self.assertTrue((ROOT / p).is_file(), p)
 
 
 def ci_text():
@@ -133,26 +192,27 @@ class CiWiring(unittest.TestCase):
     def test_no_paths_filter_on_the_workflow(self):
         self.assertIsNone(re.search(r"^\s+paths(-ignore)?:", ci_text(), re.M), "a workflow-level paths filter leaves required checks missing")
 
-    def test_static_job_decides_the_scope_with_the_script_on_a_two_commit_checkout(self):
+    def test_static_job_has_no_condition_at_all(self):
+        """scripts/check_gradle_repos.py forbids if: and continue-on-error in the static job; the decision lives in ci_scope.py."""
+        body = job("static")
+        self.assertIsNone(re.search(r"(?m)^\s*(?:-\s+)?if:", body))
+        self.assertNotIn("continue-on-error", body)
+
+    def test_static_job_uses_a_two_commit_checkout_and_the_script_for_both_decisions(self):
         body = job("static")
         self.assertIn("fetch-depth: 2", body)
-        self.assertRegex(body, r"run: python3 -I scripts/ci_scope\.py >> \"\$GITHUB_OUTPUT\"")
+        self.assertRegex(body, r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$")
+        self.assertRegex(body, r"exclude=\$\(python3 -I scripts/ci_scope\.py gradle-exclude\)")
+        self.assertRegex(body, r"\./gradlew [^\n]*:app:lintDebug \$exclude\n")
 
-    def test_the_slow_self_tests_are_step_level_conditions_on_the_scope(self):
+    def test_the_self_tests_are_no_longer_called_directly_from_the_static_job(self):
         body = job("static")
-        for command in ("python3 -I scripts/test_warnings_gate.py", "python3 -I scripts/test_jdk_release_gate.py"):
-            m = re.search(rf"^      - name: [^\n]*\n((?:        [^\n]*\n)*?)        run: {re.escape(command)}$", body, re.M)
-            self.assertIsNotNone(m, f"{command} must be a step of the static job")
-            self.assertIn("if: steps.scope.outputs.gradle_selftests == 'run'", m.group(1), command)
+        for script in ci_scope.SELFTESTS:
+            self.assertNotIn(script, body)
 
-    def test_licensee_self_test_is_excluded_only_when_the_scope_says_skip(self):
-        body = job("static")
-        self.assertRegex(body, r"-x testLicenseeGate")
-        self.assertIn("steps.scope.outputs.gradle_selftests == 'skip'", body)
-
-    def test_jdk_release_gate_tests_are_a_ci_step(self):
-        """225 R2-01."""
-        self.assertIn("python3 -I scripts/test_jdk_release_gate.py", ci_text())
+    def test_jdk_release_gate_tests_are_in_the_ci_selftest_list(self):
+        """225 R2-01: ci.yml reaches test_jdk_release_gate.py through `ci_scope.py selftests`."""
+        self.assertIn("scripts/test_jdk_release_gate.py", ci_scope.SELFTESTS)
 
     def test_scope_tests_run_in_ci_and_verify(self):
         self.assertIn("python3 -I scripts/test_ci_scope.py", ci_text())
