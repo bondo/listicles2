@@ -84,7 +84,7 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   (issue 174, R5-01) while `ruff format --diff .` passes.
 - actionlint: `-ignore`, an empty `-pyflakes=` or `-shellcheck=` and every unlisted flag fail; a non-empty `-shellcheck=<path>` passes
   (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`.
-- Makefiles, `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2, the part a line scan can read: only the `entry:` and run lines are read, not `args:`; a recipe prefix `@`, `+` or `-` is stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
+- Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2, the part a line scan can read: only the `entry:` and run lines are read, not `args:`; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
 - False positives removed: `uvx mypy@1.15`, `tsc -b > build.log` (issue 164 item 5) and `tsc --outFile dist/out.js` (item 4), and tools that
   are being installed (`pip install ruff --upgrade`, `npm i -D eslint --save-exact`, `cargo install`, `go install`).
 
@@ -99,4 +99,7 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
 - pre-commit `args:` lines (block style under `- id: ruff`, and the flow form `- {id: ruff, args: [--ignore=E501]}`), a tool name held in a
   Make or shell variable (`$(RUFF) check --ignore E501 .`), and a flag hidden by shell escapes (`eslint \--quiet .`, `eslint $'--quiet' .`).
 - Installer commands are matched by their subcommand (`pipx install`, `conda install`, `apt-get install`); `pipx run` and `conda run`
-  run the tool, so they are scanned. A tsc `@response-file` fails, because the options inside it cannot be read.
+  run the tool, so they are scanned. A tsc `@response-file` fails, because the options inside it cannot be read. Because the rule covers the
+  whole eslint, prettier and tsc union, any `@` word after an npm `--` fails too (`npm run build -- @scope/pkg`, `npm exec -- @commitlint/cli --edit`),
+  and needs a `justified:`; `npx @scope/tool` without `--` passes. A segment with a `--` tail after npm, yarn, pnpm or bun is never an installer, and the
+  npm script verbs (`test`, `t`, `tst`, `start`, `stop`, `restart`, `run`, `rum`, `urn`, `run-script`, `exec`, `x`) are read as runs.

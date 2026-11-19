@@ -433,10 +433,11 @@ function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(
 function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
 # datacmd: the command installs a tool (its name is an argument, not a command): `pip install ruff --upgrade`, `npm i -D eslint`.
 function datacmd(p,   n, w, i, j, k, a, b, c, m) {
+  if (ddseg(p) != "") return 0  # a `--` tail after npm, yarn, pnpm or bun is passed to a script, so the segment runs something
   n = split(p, w, /[ \t]+/); i = 1
   while (i <= n && (w[i] == "" || w[i] == "-" || w[i] ~ /:$/ || w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[i] ~ /^(sudo|env|time|export|exec|command)$/)) i++
   a = w[i]; sub(/^["\047]+/, "", a); sub(/^.*\//, "", a)
-  for (m = i + 1; m <= n; m++) if (w[m] ~ /^(run|exec|dlx|run-script)$/ || (a == "npm" && w[m] == "x")) return 0  # a run verb: the tool is run, whatever else precedes
+  for (m = i + 1; m <= n; m++) if (w[m] ~ /^(run|exec|dlx|run-script|test|start|stop|restart)$/ || (a == "npm" && w[m] ~ /^(x|rum|urn|t|tst)$/)) return 0  # a run verb: the tool is run, whatever else precedes
   j = i + 1; while (j <= n && w[j] ~ /^-/) j++; b = w[j]; k = j + 1; while (k <= n && w[k] ~ /^-/) k++; c = w[k]
   if (a ~ /^(pip|pip3|pipx)$/ && b ~ /^(install|uninstall|upgrade|upgrade-all|inject|reinstall|reinstall-all|download)$/) return 1
   if (a == "conda" && b ~ /^(install|create|update|remove|uninstall)$/) return 1
@@ -471,7 +472,7 @@ function flush(   n, i, parts, j) {
   if (cur == "") return
   j = just(cur)
   n = split(stripc(cur), parts, /[;&|]+/)
-  if (F ~ /(Makefile|\.mk)$/) for (i = 1; i <= n; i++) sub(/^[ \t]*[@+-]+/, "", parts[i])  # recipe prefixes: silent, always run, ignore errors
+  if (F ~ /([Mm]akefile|\.mk)$/) for (i = 1; i <= n; i++) sub(/^[ \t@+-]+/, "", parts[i])  # recipe prefixes: silent, always run, ignore errors
   for (i = 1; i <= n; i++) if (baseline(parts[i]) || (!j && relaxed(parts[i]))) { printf "%s:%d:%s\n", F, start, cur; break }
   cur = ""
 }
@@ -505,7 +506,7 @@ cliflags() { # cliflags <pathspec>...
     else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
   done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
 }
-out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*.mk' '*pre-commit-config.yaml')
+out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*makefile' '*.mk' '*pre-commit-config.yaml')
 [ -n "$out" ] && { echo "$out"; fail=1; }
 # 2d. `/* global foo, bar:writable */` (ESLint) switches off no-undef for the names. Any block comment that starts with `global` or
 # `globals` and a name, closed on the same line, in a JS or TS file: that is how ESLint reads it (names split on commas and spaces, an
