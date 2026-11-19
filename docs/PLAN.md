@@ -387,7 +387,9 @@ enforce the rules rather than goodwill.
 4. **CI (GitHub Actions)**, required checks on `main`:
    * `wrapper`: Gradle wrapper validation (the checksum of `gradle-wrapper.jar`)
    * `static`: spotless, detekt, Android Lint (warnings are errors, `MissingTranslation`
-     and `ExtraTranslation` are errors, `HardcodedText` is an error). `targetSdk`
+     and `ExtraTranslation` are errors, `HardcodedText` is an error, for XML only; Compose text is checked only by the
+     JUnit rule `UiHardcodedStringRules` (`:core:domain:test`), for the call forms listed in its KDoc, and the
+     rest is review). `targetSdk`
      follows `compileSdk`; if they differ, `OldTargetApi` is disabled with a
      `// justified:` comment rather than failing the build silently. Detekt: M0
      evaluates detekt 2.x, which supports Kotlin 2.4 and type resolution
@@ -411,6 +413,8 @@ enforce the rules rather than goodwill.
      * a raised line length, a lowered `coverageThreshold` / `fail_under`, a weaker ESLint preset, a dropped ruff `select` item or tsconfig
        `include` entry, a new tsconfig `exclude` entry, by comparing against `main`; linter or test config embedded
        in `package.json`. What is still not caught: `docs/guards-known-gaps.md`
+     * a command-line flag that is not on the per-tool allowlist (ruff, mypy, tsc, ESLint, Prettier, shellcheck, actionlint; check 2c), unless the
+       line carries a valid `justified:` reason; the lists and their reasons are in `scripts/guards.sh`, the rationale in `docs/guards-known-gaps.md`
      * any detekt or lint baseline file
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label

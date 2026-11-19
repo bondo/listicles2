@@ -22,5 +22,12 @@
     "ts-jest": "29.4.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.7"
+    },
+    "minimatch@>=7 <11": "11.0.8",
+    "uuid": "11.1.1"
   }
 }
