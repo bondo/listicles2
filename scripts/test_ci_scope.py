@@ -205,8 +205,8 @@ class CiWiring(unittest.TestCase):
         body = job("static")
         self.assertIn("fetch-depth: 2", body)
         self.assertRegex(body, r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$")
-        self.assertRegex(body, r"exclude=\$\(python3 -I scripts/ci_scope\.py gradle-exclude\)")
-        self.assertRegex(body, r"\./gradlew [^\n]*:app:lintDebug \$exclude\n")
+        self.assertRegex(body, r"read -ra exclude <<< \"\$\(python3 -I scripts/ci_scope\.py gradle-exclude\)\"")
+        self.assertRegex(body, r"\./gradlew [^\n]*:app:lintDebug \"\$\{exclude\[@\]\}\"\n")
 
     def test_the_self_tests_are_no_longer_called_directly_from_the_static_job(self):
         body = job("static")
