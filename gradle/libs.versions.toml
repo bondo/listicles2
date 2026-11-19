@@ -10,9 +10,9 @@ konsist = "0.18.1"
 junit = "6.1.3"
 junit4 = "4.13.2"
 robolectric = "4.18.1"
-# Issue 213: the android-all jar Robolectric 4.18.1 uses for SDK 35 (robolectric.properties). Bump both together;
-# RobolectricUnderNetworkBlockTest fails (jar not found in the offline directory) when they disagree.
-robolectricAndroidAll = "15-robolectric-14663667-2-i7"
+# Issue 213: the android-all jar Robolectric 4.18.1 uses for SDK 37 (robolectric.properties), the app's targetSdk. Bump together;
+# RobolectricUnderNetworkBlockTest fails (jar not found, or SDK differs from targetSdk) when they disagree.
+robolectricAndroidAll = "17-robolectric-16653203-i7"
 androidxTestJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 detekt = "1.23.8"
