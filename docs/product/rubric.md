@@ -1,9 +1,9 @@
-# Tally visual-quality rubric (draft)
+# Tally visual-quality rubric
 
-Status: working draft, merged as the baseline for M1; not owner-approved (open owner questions T2 text size, R1 reference apps; see issue #15). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225).
+Status: owner-approved 2026-11-18 (issue #15 comments 6991799032 and 6991804241); T2 text size decided (owner, 2026-11-18, issue #15 comment 6991847257; recorded in docs/milestones/M1.md section 6). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225). R1 decided: reference apps are Todoist and Google Keep (owner, 2026-11-18, issue #15 comment 6991349569).
 
-Task M0.5-03. Status: **draft for the owner** (D-3.3): the owner edits and agrees it at D5 (M0.5-O1); the collaborator
-comments, the owner decides. After that, changes go through R6. This file is the detailed form of
+Task M0.5-03. Agreed by the owner at D5 (M0.5-O1, 2026-11-18); from now on changes go through R6. The collaborator
+comments, the owner decides. This file is the detailed form of
 [docs/reviews/README.md section 4](../reviews/README.md#4-visual-quality-rubric), which stays the short summary and
 keeps the pass bar.
 
@@ -16,8 +16,7 @@ keeps the pass bar.
 * **Pass bar (D-3.4):** no criterion below 3 in the **owner's** scores. An agent score below 3 is a **minor** finding,
   never a blocker. Agent scores are advisory; taste stays with the owner. When an agent score disagrees with the owner's,
   record it as a calibration note for this rubric, not as a finding.
-* Reference apps: the owner may name 2 or 3 at D5 ("feels like X"); they are compared with, never copied.
-  *Not named yet.*
+* Reference apps: Todoist and Google Keep (owner decision R1, 2026-11-18, issue #15 comment 6991349569); they are compared with, never copied.
 
 ## Criteria
 

@@ -2,7 +2,7 @@
 Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
-docs/PLAN.md, docs/ORCHESTRATION.md, docs/reviews/README.md and handoff/TEMPLATE.md).
+docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/reviews/README.md and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -50,6 +50,7 @@ class Rule:
     patterns: tuple  # regexes, all must match (case-insensitive) in the normalized text
     message: str
     forbidden: tuple = ()  # regexes, none may match (case-insensitive): stale instructions the prompt must not carry
+    forbidden_lines: tuple = ()  # like forbidden, but matched on normalize_sentences(text): headings, blank lines and bullets end a sentence
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ class DocRule:
     patterns: tuple
     message: str
     forbidden: tuple = ()
+    forbidden_lines: tuple = ()
 
 
 # The merge agent's owner-only list (#15 comments 6941366090 and 6943342158); the same wording in the prompt and ORCHESTRATION 7.5.
@@ -77,6 +79,27 @@ SCORE_BLOCKS_MERGE = r"below 3 (?:blocks|must block) the merge"
 MATRIX_WRONG_SEVERITY = (
     r"(?:(?:a |the |such a )?(?:matrix )?gaps? (?:in the matrix )?|without both )(?:is|are) (?:always |only |just )?(?:a |an )?`?(?:minor|nit|blocker)"
 )
+# Wording that would allow an agent to resolve a thread (follow-up #44; R1-01, R1-02 of #150, R2-01 to R2-03). The ban itself is pinned by
+# the patterns of the rules; this keeps a later edit from adding permission next to it. Subject patterns need an agent or "you" and no
+# negating word in front ("no agent may", "neither ... nor ... may"); imperatives are matched per sentence (normalize_sentences), so
+# "never/do not/must not resolve ..." and "only the owner may resolve ..." do not match. Wording pins are not exhaustive.
+_NOT_NEGATED = r"(?<!\bno )(?<!\bnor )(?<!\bnor the )(?<!\bneither )(?<!\bneither the )"
+_AGENT = _NOT_NEGATED + r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
+_NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
+_THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
+_ADVERB = r"(?:(?:also|then|now|still|just)\s+)?"
+RESOLVE_PERMISSION = (
+    rf"{_AGENT}\s+(?:may|can|could|should|must|will)\s+{_ADVERB}resolve\s+{_THREAD}",
+    rf"\b(?:feel free|(?:is|are) (?:allowed|permitted|free)) to resolve\s+{_THREAD}",
+    rf"{_AGENT}\s+{_ADVERB}resolves?\s+{_THREAD}",
+    rf"(?<!\bnot )(?<!\bnever )(?<!n't )\breply\s+(?:and|then)\s+resolve\s+{_THREAD}",
+)
+# Imperatives, per sentence: "Resolve the thread ...", "Then resolve ...", "Once answered, resolve the thread". The article stays required after
+# a comma, so the never-cell "delete branches, resolve threads, labels" does not match; article-free plurals only start a sentence or bullet.
+RESOLVE_IMPERATIVE = (
+    rf"(?:^|[.:;,]\s+|[-*]\s+|\bthen\s+)resolve\s+(?:the|a|an|any|their|all)\s+{_NOUN}",
+    rf"(?:^|[.:;]\s+|[-*]\s+)resolve\s+{_NOUN}",
+)
 RULES = (
     Rule(
         "data-fenced", ALL,
@@ -87,6 +110,12 @@ RULES = (
         "no-resolve-thread", ALL,
         (r"never resolve a collaborator's review thread", r"resolve_review_thread", r"#44"),
         "agents never resolve a collaborator's review thread (follow-up #44)",
+        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
+    ),
+    Rule(
+        "no-resolve-thread-reply", ("implementer", "orchestrator"),
+        (r"never resolve a collaborator's review thread[^.]*: reply and leave it for the collaborator or the owner",),
+        "agents that answer on threads reply and leave a collaborator's review thread for the collaborator or the owner (follow-up #44)",
     ),
     Rule(
         "trust-by-role", ("orchestrator",),
@@ -305,15 +334,18 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"handover \(§5, two-phase\), at about 50% of a 1m window \(40% of a 200k one, `agents/roles\.yaml` context\)",
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
             r"a successor does §5\.2",
+            r"from lineage depth 6 or more \(§9, f3\) do not spawn the successor: ask the owner to start the next orchestrator from a top-level session "
+            r"with the same prompt \(§5\.1 step 5\)",
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 80% of a 1M window (60% of 200k), first batch boundary: comment, successor, ack, release (§5)",
-        forbidden=(r"at about 50% context", r"at about 80% context"),
+        "two-phase handover at about 50% of a 1M window (40% of 200k, owner decision #15 comment 7001335975), first batch boundary: "
+        "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window"),
     ),
     Rule(
         "lock-takeover", ("orchestrator",),
@@ -622,6 +654,15 @@ RULES = (
         forbidden=(r"flag plan gaps for the owner instead of deciding",),
     ),
     Rule(
+        "reviewer-effort", ("reviewer",),
+        (
+            r"opus, high effort \(max for `risk:high` prs and for prs labelled `area:security-rules` or `area:sync-merge`, even without `risk:high`, "
+            r"per `agents/roles\.yaml`",
+        ),
+        "the reviewer prompt names max effort for risk:high, area:security-rules and area:sync-merge PRs, as roles.yaml and R7 do (#134)",
+        forbidden=(r"max for `?risk:high`? prs\)",),
+    ),
+    Rule(
         "reviewer-visual-matrix", ("reviewer",),
         (
             r"visual check and rules matrix \(review\.md items 12 and 13\)", r"an agent score below 3 is a `minor` finding, never a blocker or major",
@@ -698,6 +739,9 @@ RULES = (
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and you never pass an approval on to it",
+            r"the merge agent merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
+            r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one "
+            r"\(§7\.5, #15 comment 7002904192\)\.",
         ),
         "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
     ),
@@ -718,6 +762,21 @@ RULES = (
 
 ORCH = "docs/ORCHESTRATION.md"
 DOC_RULES = (
+    DocRule(
+        "orch-no-resolve-thread", ORCH,
+        (
+            r"delete branches, resolve threads, labels, comment on #15",
+            r"never resolve a collaborator's review thread \(follow-up #44\): reply and leave it for the collaborator or the owner",
+        ),
+        "ORCHESTRATION: the collaborator row lists resolving threads as never, and 7.6 says agents reply and leave the thread (follow-up #44)",
+        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
+    ),
+    DocRule(
+        "collab-no-resolve", "docs/COLLABORATING.md",
+        (r"## please do not press", r"\*\*resolve conversation\*\*"),
+        "COLLABORATING: Resolve conversation is on the collaborator's do-not-press list (follow-up #44)",
+        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
+    ),
     DocRule(
         "claude-reading", "CLAUDE.md",
         (r"read what you need to understand the change", r"read whole files you edit", r"`explorer` subagent"),
@@ -879,13 +938,15 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 80% of a 1m window \(60% of a 200k one, `agents/roles\.yaml` context\)",
+            r"trigger: about 50% of a 1m window \(40% of a 200k one; `agents/roles\.yaml` context, #15 comment 7001335975\)",
+            r"until the hard stage, the orchestrator follows this section, not the soft reminder",
             r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
-        "ORCHESTRATION 5: hand over at about 80% at a batch boundary (40 wakes or 20 sessions when unknown); the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"the owner archives you"),
+        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
+        "the successor archives the predecessor",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"the owner archives you"),
     ),
     DocRule(
         "orch-parallel", ORCH,
@@ -979,7 +1040,10 @@ DOC_RULES = (
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
-            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge",
+            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, "
+            r"and it merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
+            r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one "
+            r"\(owner decision, #15 comment 7002904192\)",
         ),
         "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
     ),
@@ -1040,6 +1104,23 @@ def normalize(text):
     return " ".join(_HTML_COMMENT.sub(" ", text).split())
 
 
+_BLOCK_START = re.compile(r"\s*(?:[-*]\s|\d+\.\s|\|)")
+
+
+def normalize_sentences(text):
+    """normalize(), but a blank line, a heading line, a bullet, a numbered item or a table row also ends the sentence before it (and a
+    heading after it), written as " . ". A hard-wrapped continuation line stays part of its sentence."""
+    out = []
+    for line in _HTML_COMMENT.sub(" ", text).splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or _BLOCK_START.match(line):
+            out.append(" . ")
+        out.append(stripped)
+        if stripped.startswith("#"):
+            out.append(" . ")
+    return " ".join(" ".join(out).split())
+
+
 def parse_label_lists(text, line_pattern):
     """Every `<line_pattern> a, b, c.` marker in normalized text, as a list of label lists."""
     found = re.finditer(line_pattern + r"\s*([^.]*)\.", text, re.I)
@@ -1090,6 +1171,9 @@ def check_text(role, text):
             for pattern in rule.forbidden:
                 if re.search(pattern, norm, re.I):
                     problems.append(f"{rule.id}: {rule.message} (found /{pattern}/)")
+            if rule.forbidden_lines:
+                sentences = normalize_sentences(text)
+                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_lines if re.search(p, sentences, re.I))
             if rule.id in ("tier0-labels", "never-labels"):
                 line, want = (TIER0_LINE, TIER0_LABELS) if rule.id == "tier0-labels" else (NEVER_LINE, NEVER_LABELS)
                 got = parse_label_lists(norm, line)
@@ -1115,6 +1199,9 @@ def check_doc_text(path, text):
                 break
         else:
             problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden if re.search(p, norm, re.I))
+            if rule.forbidden_lines:
+                sentences = normalize_sentences(text)
+                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_lines if re.search(p, sentences, re.I))
     return problems
 
 

@@ -196,6 +196,8 @@ class M011AlignmentTests(unittest.TestCase):
         for role, rule_id, old in (
             ("orchestrator", "autonomy", "merges of owner-only PRs; "),
             ("orchestrator", "autonomy", "and a relayed approval is refused"),
+            ("orchestrator", "handover", "From lineage depth 6 or more"),  # R1-01 of #179: the depth-6 clause is pinned
+            ("orchestrator", "handover", "ask the owner to start the next orchestrator from a top-level session"),  # R1-04 of #179
             ("orchestrator", "lock-takeover", "and if nothing follows, ask the owner"),
             ("orchestrator", "lock-takeover", "and `get_session` shows it is not working"),
             ("orchestrator", "lock-takeover", "A holder that is working but has a stale `Updated:` is stalled, not dead:"),
@@ -1367,6 +1369,7 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-autonomy", "* merges (of any PR);"),
         ("docs/ORCHESTRATION.md", "orch-autonomy", "* the 4-round cap being hit"),
         ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 50% context."),
+        ("docs/ORCHESTRATION.md", "orch-handover", "Trigger: about 80% of a 1M window (60% of a 200k one, `agents/roles.yaml` context)"),  # R1-01 of #179
         ("docs/ORCHESTRATION.md", "orch-handover", "8. Stop. The owner archives you."),
         ("docs/ORCHESTRATION.md", "orch-parallel", "Keep to the parallelism cap."),
         ("docs/ORCHESTRATION.md", "orch-parallel", "No batched extras."),
@@ -1409,6 +1412,7 @@ class Pr4RuleTests(unittest.TestCase):
             ("orchestrator", "autonomy", " The `big-pr` label is set only with the owner's say-so."),
             ("orchestrator", "autonomy", " The 4-round cap being hit."),
             ("orchestrator", "handover", " Hand over at about 80% context."), ("orchestrator", "handover", " Hand over at about 50% context."),
+            ("orchestrator", "handover", " Hand over at about 80% of a 1M window (60% of a 200k one)."),  # R1-01 of #179
             ("orchestrator", "orch-deferral", " more than about 15 changed lines"),
             ("orchestrator", "orch-deferral", " Stop deferring and ask the owner to do M0-O10."),
             ("orchestrator", "orch-delta-review", " Owner acceptance is the only alternative."),
@@ -1559,6 +1563,350 @@ class Issue69UsageEdgeTests(unittest.TestCase):
     def test_the_rule_applies_to_no_other_role(self):
         self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("implementer", "")))
         self.assertNotIn(self.FINDINGS_RULE, ids(prompt_rules.check_text("escalation-reviewer", "")))
+
+class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
+    """Owner decisions on #15, comments 7000637274 and 7001335975: handover at about 50% of a 1M window, lineage depth 6 means
+    the owner starts the next orchestrator, orchestrator effort medium, and the handover-only recipes written into the repo."""
+
+    ORCH_MD = PROMPTS / "orchestrator.md"
+    ORCH_DOC = ROOT / "docs" / "ORCHESTRATION.md"
+    ROLES_YAML = ROOT / "agents" / "roles.yaml"
+
+    @classmethod
+    def norm(cls, path):
+        return prompt_rules.normalize(path.read_text(encoding="utf-8")).lower()
+
+    def context_value(self, key):
+        m = re.search(rf"^  {key}: (\d+)\s*$", self.ROLES_YAML.read_text(encoding="utf-8"), re.M)
+        self.assertIsNotNone(m, f"roles.yaml context needs {key}")
+        return int(m.group(1))
+
+    def test_roles_yaml_has_the_orchestrator_handover_values_and_keeps_the_hook_values(self):
+        big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
+        self.assertEqual(big, 50)
+        self.assertLess(small, big)  # a 200k window hands over earlier, as the hook stages do
+        # the context-guard hook stages are for every session and are not part of this decision
+        self.assertEqual((self.context_value("step_boundary_after_percent_1m"), self.context_value("handoff_at_percent_1m")), (60, 80))
+        self.assertEqual((self.context_value("step_boundary_after_percent_200k"), self.context_value("handoff_at_percent_200k")), (40, 60))
+
+    def test_roles_yaml_orchestrator_session_line_names_the_same_threshold_and_medium_effort(self):
+        block = self.ROLES_YAML.read_text(encoding="utf-8").split("  orchestrator:\n", 1)[1].split("\n  planner:", 1)[0]
+        self.assertIn("effort: medium", block)
+        self.assertIn(f"near {self.context_value('orchestrator_handover_at_percent_1m')}% context", block)
+        self.assertNotIn("80%", block)
+
+    def test_orchestrator_prompt_and_orchestration_section_5_carry_the_roles_yaml_threshold(self):
+        phrase = (f"at about {self.context_value('orchestrator_handover_at_percent_1m')}% of a 1m window "
+                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k one")
+        for path in (self.ORCH_MD, self.ORCH_DOC):
+            with self.subTest(path=path.name):
+                text = self.norm(path)
+                self.assertIn(phrase.replace("at about", "about") if path == self.ORCH_DOC else phrase, text)
+                self.assertNotRegex(text, r"about 80% of a 1m window \(60% of a 200k one")
+
+    def test_the_bootstrap_prompt_states_threshold_and_depth_rule(self):
+        boot = self.norm(self.ORCH_DOC).split("### 8.1 orchestrator bootstrap", 1)[1].split("### 8.2", 1)[0]
+        big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
+        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k one)", boot)
+        self.assertRegex(boot, r"lineage depth (?:is )?6 or more.{0,80}the owner starts the next orchestrator")
+
+    def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):
+        text = self.norm(self.ORCH_MD)
+        self.assertRegex(text, r"lineage depth 6 or more.{0,120}ask the owner to start the next orchestrator from a top-level session "
+                               r"with the same prompt \(§5\.1 step 5\)")
+        self.assertRegex(text, r"§9, f3")
+        self.assertNotRegex(text, r"depth (?:of )?7|lineage depth \u2265 ?7|depth 7")
+
+    def test_orchestration_f3_and_5_1_keep_depth_6(self):
+        text = self.norm(self.ORCH_DOC)
+        self.assertRegex(text, r"unless lineage depth is ≥ 6 \(§9, f3\)")
+        self.assertRegex(text, r"at depth ≥ 6, the owner starts the next orchestrator")
+        self.assertNotRegex(text, r"depth (?:is )?(?:≥|>=) ?7")
+
+    def test_effort_is_medium_everywhere_the_orchestrator_is_described(self):
+        self.assertRegex(self.norm(self.ORCH_MD), r"^you are the orchestrator for listicles \(repo bondo/listicles2\)\. opus, medium effort")
+        self.assertRegex(self.norm(self.ORCH_DOC), r"\| \*\*orchestrator\*\* \| opus / medium \|")
+
+    RECIPE_HEADING = "repo access and worker-prompt recipes"
+    # Every recipe of #15 comment 7001335975, item 4: (label, regex over the normalized lower-case text).
+    RECIPES = (
+        ("rest only", r"rest only \(graphql is blocked"),
+        ("pagination", r"&page=n or `since="),
+        ("ready for review", r"post `pulls/n/ccr/ready_for_review`"),
+        ("update branch", r"put `pulls/n/update-branch` with `expected_head_sha`"),
+        ("no clone", r"no clone in the orchestrator"),
+        ("body from a file", r"-f body=@file"),
+        ("scripts from a file", r"run a script that mentions a protected path from a file"),
+        ("source_revision", r"`source_revision` is the pr branch name"),
+        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while waiting"),
+        ("red green one push", r"a red/green pair may go up in one push \(say so in the pr body\)"),
+        ("pr bodies by mcp", r"pr bodies only through the github mcp tools"),
+        ("close after merge", r"comment on the completed issue, then close it with `state=closed`, `state_reason=completed`"),
+        ("merge agent authorization", r"merges only after a new owner-recorded authorization on #15"),
+        ("archive policy", r"keep implementers until their pr merges; archive the others when they are done"),
+        ("owner-only list", r"owner-only merge list"),
+    )
+
+    def recipe_text(self, path):
+        text = self.norm(path)
+        self.assertIn(self.RECIPE_HEADING, text, path.name)
+        return text.split(self.RECIPE_HEADING, 1)[1]
+
+    def test_orchestrator_prompt_has_every_recipe_in_a_short_section(self):
+        section = self.recipe_text(self.ORCH_MD)
+        self.assertEqual(self.missing_recipes(section), [])
+        self.assertRegex(section, r"docs/orchestration\.md`? §7\.8")  # the pointer to the detailed section
+
+    def test_orchestration_md_holds_the_detailed_section_7_8(self):
+        text = self.norm(self.ORCH_DOC)
+        self.assertIn("### 7.8 repo access and worker-prompt recipes", text)
+        section = text.split("### 7.8 repo access and worker-prompt recipes", 1)[1].split("## 8. spawn messages", 1)[0]
+        self.assertEqual(self.missing_recipes(section), [])  # all 15, not only the repo-access ones (R1-05 of #179)
+
+    def test_section_5_says_the_orchestrator_follows_it_not_the_soft_hook_reminder(self):  # R1-03 of #179
+        text = self.norm(self.ORCH_DOC).split("## 5. orchestrator handover", 1)[1].split("### 5.1", 1)[0]
+        self.assertRegex(text, r"earlier than the hook stages every session gets \(60% / 80%\)")
+        self.assertRegex(text, r"until the hard stage, the orchestrator follows this section, not the soft reminder")
+        self.assertNotIn("for other sessions", text)
+
+    # Owner decision on #15, comment 7002904192 (R2-01 of #179): one authorization covers exactly its window and the PRs it names.
+    # R3-01 of #179: the record is a condition on merging, not a per-agent action.
+    SCOPE = (r"an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
+             r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one")
+    AUTH = (r"owner authorizes it there before its first merge, and it merges only under " + SCOPE
+            + r" \(owner decision, #15 comment 7002904192\)")
+
+    def test_merge_agent_authorization_is_stated_once_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179
+        doc = self.norm(self.ORCH_DOC).split("### 7.5 pull requests and the merge request", 1)[1].split("### 7.6", 1)[0]
+        self.assertRegex(doc, self.AUTH)
+        self.assertEqual(len(re.findall(r"owner authorizes it there", self.norm(self.ORCH_DOC))), 1)
+        # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
+        prompt = self.norm(self.ORCH_MD)
+        self.assertRegex(prompt, r"the owner authorizes it there before its first merge, and you never pass an approval on to it\.")
+        self.assertRegex(prompt, r"the merge agent merges only under " + self.SCOPE + r" \(§7\.5, #15 comment 7002904192\)\.")
+        self.assertNotIn("records a new authorization", prompt)
+        self.assertNotIn("records a new authorization", self.norm(self.ORCH_DOC))
+        self.assertEqual(len(re.findall(r"owner authorizes it there", prompt)), 1)
+
+    def test_no_per_merge_agent_unit_of_authorization_is_left(self):  # R2-01 of #179: no owner source states it
+        for path in (self.ORCH_MD, self.ORCH_DOC, ROOT / "scripts" / "prompt_rules.py"):
+            with self.subTest(path=path.name):
+                self.assertNotIn("per merge agent", path.read_text(encoding="utf-8").lower())
+
+    def missing_recipes(self, section):
+        return [label for label, pattern in self.RECIPES if not re.search(pattern, section)]
+
+    def test_a_section_missing_one_recipe_is_reported_for_both_files(self):  # R1-01 of #179: the check itself can fail
+        for path in (self.ORCH_MD, self.ORCH_DOC):
+            heading = self.RECIPE_HEADING if path == self.ORCH_MD else "### 7.8 repo access and worker-prompt recipes"
+            section = self.norm(path).split(heading, 1)[1].split("## 8. spawn messages", 1)[0]
+            for label, pattern in self.RECIPES:
+                with self.subTest(path=path.name, recipe=label):
+                    cut = re.sub(pattern, "", section)
+                    self.assertNotEqual(cut, section)
+                    self.assertEqual(self.missing_recipes(cut), [label])
+
+
+class NoResolveThreadTests(unittest.TestCase):
+    """Follow-up #44 (R1-07): agents never resolve a collaborator's review thread; they reply and leave it for the collaborator or the owner.
+    The prompts already carry the ban (rule no-resolve-thread); these pin the reply-and-leave half and the process docs."""
+
+    REPLY_ROLES = ("implementer", "orchestrator")  # the roles that answer on threads; read-only roles only carry the ban
+    DOCS = {
+        "docs/ORCHESTRATION.md": (
+            "orch-no-resolve-thread",
+            "never resolve a collaborator's review thread (follow-up #44): reply and leave it for the collaborator or the owner",
+        ),
+        "docs/COLLABORATING.md": ("collab-no-resolve", "**Resolve conversation**"),
+    }
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def test_the_real_prompts_and_docs_pass(self):
+        for role in self.REPLY_ROLES:
+            self.assertNotIn("no-resolve-thread-reply", ids(prompt_rules.check_text(role, real(role))))
+        for path in self.DOCS:
+            self.assertEqual(prompt_rules.check_doc_text(path, self.doc(path)), [], path)
+
+    def test_the_reply_rule_exists_for_exactly_the_reply_roles(self):
+        rule = next((r for r in prompt_rules.RULES if r.id == "no-resolve-thread-reply"), None)
+        self.assertIsNotNone(rule)
+        self.assertEqual(set(rule.roles), set(self.REPLY_ROLES))
+
+    def test_dropping_the_reply_and_leave_it_half_is_rejected(self):
+        for role in self.REPLY_ROLES:
+            text = real(role)
+            self.assertRegex(prompt_rules.normalize(text), r"reply and leave it for the collaborator or the owner")
+            cut = re.sub(r"reply\s+and\s+leave\s+it\s+for\s+the\s+collaborator\s+or\s+the\s+owner", "", text, count=1)
+            with self.subTest(role=role):
+                self.assertIn("no-resolve-thread-reply", ids(prompt_rules.check_text(role, cut)))
+
+    def test_reply_then_leave_it_to_the_owner_alone_is_rejected(self):
+        for role in self.REPLY_ROLES:
+            cut = re.sub(r"for\s+the\s+collaborator\s+or\s+the\s+owner", "for nobody", real(role), count=1)
+            with self.subTest(role=role):
+                self.assertIn("no-resolve-thread-reply", ids(prompt_rules.check_text(role, cut)))
+
+    def test_permission_to_resolve_is_rejected(self):
+        for role in ROLES:
+            for stale in (" You may resolve the thread once you have replied.", " Resolve the collaborator's review thread after answering.",
+                          " Agents can resolve a review thread when the question is answered."):
+                with self.subTest(role=role, stale=stale):
+                    self.assertIn("no-resolve-thread", ids(prompt_rules.check_text(role, real(role) + stale)))
+
+    # R1-02 of #150: the natural permission phrasings (plural, no article, imperative, "feel free").
+    MISSED_PERMISSION = (
+        "You may resolve threads once answered.",
+        "The orchestrator may resolve review threads.",
+        "Resolve the thread after answering.",
+        "Then resolve the conversation.",
+        "Feel free to resolve the thread after replying.",
+        "Agents are allowed to resolve a collaborator's thread.",
+        "Reply and resolve the thread.",
+        "- Resolve the collaborator's review thread.",
+        # R2-02 of #150
+        "Once answered, resolve the thread.",
+        "After replying, resolve the thread.",
+        "When done, resolve the collaborator's thread.",
+        "Resolve threads once answered.",
+        "Resolve review threads after replying.",
+        "Reviewers may resolve the thread.",
+        "Workers may resolve threads.",
+        "Implementers can resolve threads.",
+        "You may now resolve the thread.",
+    )
+    # R1-01 of #150: correct ban or owner-only wording must not be flagged.
+    BAN_WORDING = (
+        "Do not resolve a collaborator's review thread.",
+        "Agents must not resolve a collaborator's thread.",
+        "The owner resolves a collaborator's thread when done.",
+        "Only the owner may resolve the thread.",
+        "Agents are not allowed to resolve a collaborator's thread.",
+        "Never resolve a collaborator's review thread.",
+        "The collaborator may resolve their own thread.",
+        # R2-01 of #150
+        "No agent may resolve a collaborator's review thread.",
+        "No agent can resolve the thread.",
+        "Neither the orchestrator nor the reviewer may resolve the thread.",
+        "Do not reply and resolve the thread.",
+        "Never approve and resolve the thread yourself.",
+        # a hard-wrapped ban must not read as a new sentence
+        "Agents must not\nresolve the collaborator's review thread.",
+    )
+    # R2-03 of #150: a line-start imperative under a heading (normalize joins lines, so the sentence break has to come from the layout).
+    HEADING_LAYOUTS = (
+        "\n## Threads\n\nResolve the thread after answering.\n",
+        "\n## Threads\nResolve the conversation once answered.\n",
+        "\n\n* Resolve the collaborator's review thread once answered.\n",
+    )
+    PERMISSION_IDS = {"no-resolve-thread", "orch-no-resolve-thread", "collab-no-resolve"}
+
+    def flagged(self, where, text):
+        if where in ROLES:
+            return ids(prompt_rules.check_text(where, text))
+        return ids(prompt_rules.check_doc_text(where, text))
+
+    def test_the_missed_permission_phrasings_are_rejected_everywhere(self):
+        for stale in self.MISSED_PERMISSION:
+            for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
+                base = real(where) if where in ROLES else self.doc(where)
+                with self.subTest(where=where, stale=stale):
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base + "\n\n" + stale + "\n"))
+
+    def test_correct_ban_and_owner_only_wording_is_not_rejected(self):
+        for good in self.BAN_WORDING:
+            for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
+                base = real(where) if where in ROLES else self.doc(where)
+                with self.subTest(where=where, good=good):
+                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, base + "\n\n" + good + "\n"))
+
+    def test_an_imperative_under_a_heading_or_bullet_is_rejected(self):
+        for layout in self.HEADING_LAYOUTS:
+            for where in (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md"):
+                base = real(where) if where in ROLES else self.doc(where)
+                with self.subTest(where=where, layout=layout):
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, base + layout))
+
+    def test_a_hard_wrapped_continuation_line_is_not_a_new_sentence(self):
+        for where in ROLES:
+            with self.subTest(where=where):
+                self.assertFalse(self.PERMISSION_IDS & self.flagged(where, real(where) + "\nAgents must not\nresolve the thread.\n"))
+
+    def test_every_prompt_still_needs_the_ban_itself(self):
+        for role in ROLES:
+            for index in range(3):
+                with self.subTest(role=role, pattern=index):
+                    self.assertIn("no-resolve-thread", ids(prompt_rules.check_text(role, delete_match(role, "no-resolve-thread", index))))
+
+    def test_the_process_docs_carry_the_ban(self):
+        for path, (rid, needle) in self.DOCS.items():
+            with self.subTest(path=path):
+                self.assertIn(needle.lower(), prompt_rules.normalize(self.doc(path)).lower())
+                self.assertTrue(any(r.id == rid and r.path == path for r in prompt_rules.DOC_RULES), rid)
+
+    def test_deleting_the_doc_wording_is_rejected(self):
+        for path, (rid, needle) in self.DOCS.items():
+            text = prompt_rules.normalize(self.doc(path))
+            cut = re.sub(re.escape(needle), "", text, count=1, flags=re.I)
+            with self.subTest(path=path):
+                self.assertNotEqual(cut, text)
+                self.assertIn(rid, ids(prompt_rules.check_doc_text(path, cut)))
+
+    def test_the_orchestration_role_table_keeps_resolve_threads_in_the_collaborator_never_cell(self):
+        text = prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))
+        cut = text.replace("delete branches, resolve threads, labels", "delete branches, labels", 1)
+        self.assertNotEqual(cut, text)
+        self.assertIn("orch-no-resolve-thread", ids(prompt_rules.check_doc_text("docs/ORCHESTRATION.md", cut)))
+
+    def test_stale_doc_wording_is_rejected(self):
+        for path, stale in (
+            ("docs/ORCHESTRATION.md", "Agents may resolve a collaborator's review thread once answered."),
+            ("docs/ORCHESTRATION.md", "The orchestrator resolves the collaborator's thread after replying."),
+            ("docs/COLLABORATING.md", "Agents resolve the conversation when your question is answered."),
+        ):
+            with self.subTest(path=path, stale=stale):
+                self.assertTrue({"orch-no-resolve-thread", "collab-no-resolve"} & ids(prompt_rules.check_doc_text(path, self.doc(path) + "\n" + stale + "\n")))
+
+    def test_check_docs_on_the_repo_passes_and_names_both_files(self):
+        self.assertEqual(prompt_rules.check_docs(ROOT), [])
+        self.assertTrue({"docs/ORCHESTRATION.md", "docs/COLLABORATING.md"} <= {r.path for r in prompt_rules.DOC_RULES})
+
+
+class Issue134ReviewerEffortTests(unittest.TestCase):
+    """#134 (owner decision, comment 6989468926): a reviewer of an area:security-rules or area:sync-merge PR runs at max effort even
+    without risk:high, as docs/reviews/README.md R7 says. The reviewer prompt must say so, in step with agents/roles.yaml."""
+
+    RULE = "reviewer-effort"
+    OLD = "Opus, high effort (max for risk:high PRs)."
+
+    def test_the_rule_exists_for_the_reviewer_only_and_the_real_prompt_passes(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        self.assertEqual(by_id[self.RULE].roles, ("reviewer",))
+        self.assertNotIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer"))))
+
+    def test_the_old_risk_high_only_wording_is_rejected(self):
+        text = prompt_rules.normalize(real("reviewer"))
+        first = text.split(". Fresh session")[0]  # the opening line carrying the effort
+        self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", text.replace(first, self.OLD.rstrip("."), 1))))
+
+    def test_a_stale_old_spelling_next_to_the_new_line_is_rejected(self):  # R1-01 of #155: only `forbidden` can catch this
+        for old in ("Opus, high effort (max for risk:high PRs).", "Opus, high effort (max for `risk:high` PRs).",
+                    "Opus, high effort (MAX FOR `RISK:HIGH` PRs)."):
+            with self.subTest(old=old):
+                self.assertNotIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer"))))
+                self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", real("reviewer") + "\n" + old)))
+
+    def test_dropping_either_label_or_the_even_without_clause_is_rejected(self):
+        text = prompt_rules.normalize(real("reviewer"))
+        for clause in ("`area:security-rules`", "`area:sync-merge`", "even without `risk:high`"):
+            with self.subTest(clause=clause):
+                self.assertIn(clause, text)
+                self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", text.replace(clause, "", 1))))
+
+    def test_the_rule_applies_to_no_other_role(self):
+        for role in ("implementer", "second-reviewer", "escalation-reviewer"):
+            self.assertNotIn(self.RULE, ids(prompt_rules.check_text(role, "")), role)
 
 
 if __name__ == "__main__":

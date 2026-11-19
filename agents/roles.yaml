@@ -8,7 +8,7 @@ roles:
   orchestrator:
     model: opus
     effort: medium
-    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 80% context
+    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 50% context (1M window; 40% of a 200k one), see `context`
     prompt: agents/prompts/orchestrator.md
   planner:
     model: opus
@@ -29,6 +29,8 @@ roles:
     prompt: agents/prompts/reviewer.md
     max_effort_when:
       - the PR is tagged risk:high in the milestone doc
+      - the PR is labelled area:security-rules, even without the risk:high tag (owner decision, #134; R7 in docs/reviews/README.md)
+      - the PR is labelled area:sync-merge, even without the risk:high tag (same decision)
   second-reviewer:
     model: opus
     effort: high
@@ -64,6 +66,11 @@ roles:
     effort: high
     session: fresh, one per retro run
 context:
+  # Orchestrator handover (ORCHESTRATION 5; owner decision on #15, comment 7001335975): earlier than the hook stages below.
+  # The 200k value scales 80 -> 60 the same way (50 -> 37.5, rounded to 40).
+  orchestrator_handover_at_percent_1m: 50
+  orchestrator_handover_at_percent_200k: 40
+  # Hook stages for every session (scripts/hooks/context_guard.py, scripts/statusline.sh):
   handoff_at_percent_1m: 80
   step_boundary_after_percent_1m: 60
   handoff_at_percent_200k: 60

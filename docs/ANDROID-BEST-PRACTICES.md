@@ -47,7 +47,7 @@ Sources: [State hoisting](https://developer.android.com/develop/ui/compose/state
 | A screen has two composables: a stateful one that gets the ViewModel and a stateless one that takes state and events, so the stateless one can be previewed and tested | review |
 | Stability: with Kotlin 2.0.20+ strong skipping is on by default, so do not add `@Stable` or `@Immutable` or immutable-collection wrappers without a measured problem; do not allocate new instances of unstable parameters on every recomposition | review; compiler reports proposed |
 | Previews for every stateless screen and component, using multipreview (`@PreviewLightDark`, `@PreviewFontScales`) and a `locale` preview for Danish; previews cannot build ViewModels | review |
-| Follow the Compose API guidelines (naming, `modifier` parameter, Kotlin style) | tooling in part: spotless and ktlint, detekt `FunctionNaming` with `Composable` exempted; the rest `review` |
+| Follow the Compose API guidelines (naming, `modifier` parameter, Kotlin style) | tooling in part: spotless and ktlint, detekt `FunctionNaming` with `Composable` exempted, plus the Compose detekt rules (compose-rules 0.4.28: modifier parameter, naming, parameter order, no `MutableState` parameters, no Material 2 imports; `UnstableCollections` stays off on purpose, see the stability row above), gated by `testDetektRules` on fixtures in `config/detekt/fixtures`; the rest `review` |
 
 ## 3. Navigation
 Sources: [Navigation in Compose](https://developer.android.com/develop/ui/compose/navigation) and the "single-activity"
@@ -74,10 +74,10 @@ Source: [Coroutines best practices](https://developer.android.com/kotlin/corouti
 
 | Rule | Status |
 |---|---|
-| Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | review; detekt rule evaluation proposed |
+| Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | review; detekt `InjectDispatcher` enabled but active only where detekt is type-resolved (core modules today, not `:app`) |
 | Suspend functions are main-safe: the class doing blocking work moves it with `withContext` | review |
 | The ViewModel creates the coroutines; the data layer exposes `suspend` for one-shot calls and `Flow` for streams | review |
-| No `GlobalScope`; work that must outlive a screen uses an injected external scope | review; detekt rule evaluation proposed |
+| No `GlobalScope`; work that must outlive a screen uses an injected external scope | review; detekt `GlobalCoroutineUsage` enabled and fixture-gated (`testDetektRules`) |
 | Structured concurrency (`coroutineScope` or `supervisorScope`); never swallow `CancellationException`; catch specific exceptions | review |
 
 ## 6. Testing
@@ -163,11 +163,44 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
 | Dependency freshness | Dependabot (lint freshness checks are disabled on purpose with a `// justified:`) |
+| Dependency verification | tooling: `gradle/verification-metadata.xml` holds a sha256 for every resolved artifact (plugins, build tools, lint, test and Android configurations), enforced by Gradle in every build; `scripts/check_gradle_repos.py` fails when the file is missing, verification is switched off, or an artifact has no sha256 |
+
+### Regenerating dependency verification metadata
+After any dependency, plugin or Gradle wrapper bump (including a Dependabot PR), a build fails with "Dependency verification failed" until the file is updated. Regenerate it from scratch with the tasks CI runs (Gradle never removes stale entries, so delete the file first), then review the diff (old versions of the bumped artifacts removed, new ones added, nothing else):
+
+```
+rm gradle/verification-metadata.xml
+./gradlew --no-configuration-cache --refresh-dependencies --write-verification-metadata sha256 \
+  spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest \
+  :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
+```
+
+The file must be generated on Linux (CI's platform), and then given the other two operating systems' `aapt2` jars. AGP resolves `com.android.tools.build:aapt2:<version>:<os>` for the build host's OS only, so a Linux run records only the `linux` jar and a macOS or Windows build fails verification. Regenerating on macOS or Windows instead would drop the `linux` jar and break CI. After the command above, add the other two from a throwaway project (`<version>` is the `aapt2` version in the file; the write mode only adds entries):
+
+```
+mkdir -p /tmp/aapt2-os/gradle && cp gradle/verification-metadata.xml /tmp/aapt2-os/gradle/ && cd /tmp/aapt2-os
+echo 'dependencyResolutionManagement { repositories { google() } }' > settings.gradle.kts
+cat > build.gradle.kts <<'EOT'
+val cfgs = listOf("linux", "osx", "windows").map { os ->
+    configurations.create("aapt2$os") { isTransitive = false }
+        .also { dependencies.add(it.name, "com.android.tools.build:aapt2:<version>:$os@jar") }
+}
+tasks.register("resolveAll") { doLast { cfgs.forEach { println(it.files) } } }
+EOT
+<repo>/gradlew --no-configuration-cache --write-verification-metadata sha256 resolveAll
+cp gradle/verification-metadata.xml <repo>/gradle/   # the diff against the repo file is only the osx and windows jars
+```
+
+`scripts/check_gradle_repos.py` fails when the `aapt2` component lacks any of the three jars.
+
+`--refresh-dependencies` is required: Gradle does not record BOM and parent POM files it already has in its metadata cache, so without it a warm `~/.gradle` writes an incomplete file that only fails on a fresh CI runner. With it, the result is the same as from an empty cache.
+
+Checksums only, no PGP signatures: most Android and Kotlin artifacts are not signed with keys Gradle can verify, and a checksum is enough to stop a mirror or CDN from silently changing an artifact. Never add `trusted-artifacts` or set `org.gradle.dependency.verification` to `off` or `lenient`; the check rejects both. The `ui` job's `:app:connectedDebugAndroidTest` needs no extra entries beyond the assemble tasks above (it needs a device, so it is not in the command); if an AGP bump adds artifacts only that task resolves, `ui` fails and the file is regenerated again. Add a new CI task to the command above when CI starts running one.
 
 ## Proposed follow-ups (not implemented here)
 Each would be its own PR, test-first, per CLAUDE.md.
 1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types; ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `GlobalScope`; no `Dispatchers.` outside the DI module.
-2. **detekt coroutines rules** (`GlobalCoroutineUsage`, `InjectDispatcher`): evaluate whether they exist and are usable in detekt 1.23.8 before enabling.
+2. **detekt coroutines rules**: partly done (issue 38). `GlobalCoroutineUsage` is enabled and fixture-tested. `InjectDispatcher` is enabled and fixture-tested with a type-resolved fixture, but it only fires in type-resolved tasks (`detektMain`/`detektTest`), which today exist only for `:core:domain` and `:core:testing`. Still open: a type-resolved detekt run for `:app` and the planned `:core:data`, so the rule reaches code that will write `Dispatchers.IO`.
 3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog).
 4. **Guard that `targetSdk` is at least the Play minimum** (36 until the date changes).
 5. **Manifest guard**: fail on `usesCleartextTraffic="true"`, `cleartextTrafficPermitted="true"`, or `allowBackup="true"` without backup rules.
