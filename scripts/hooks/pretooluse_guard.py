@@ -68,7 +68,13 @@ WRAPPER_PREFIX = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")  # also NAME+=v and NAME[i]=v, which bash runs as assignments (R3-04 of #237)
+
+
+def assign_split(a):
+    """(variable name without [..] or +, value) of an assignment word."""
+    name, val = a.split("=", 1)
+    return re.sub(r"\[[^\]]*\]$", "", name.rstrip("+")), val
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash"}
 INTERPRETERS = re.compile(r"^(python[0-9.]*|node|nodejs|ruby|perl|php|deno|bun)$")
 RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for", "in", "case", "esac", "!", "{", "}", "function",
@@ -87,7 +93,8 @@ WRAPPERS = {
     "exec": ({"-a"}, 0),
     "builtin": (set(), 0),
     "setsid": (set(), 0),
-    "stdbuf": ({"-i", "-o", "-e"}, 0),
+    "stdbuf": ({"-i", "-o", "-e", "--input", "--output", "--error"}, 0),
+    "noglob": (set(), 0),  # zsh's precommand modifier, which Claude Code strips before matching Bash rules (R3-01 of #237)
     "unbuffer": (set(), 0),
     "busybox": (set(), 0),
     "watch": ({"-n", "-d"}, 0),
@@ -332,15 +339,20 @@ def extract_subs(text):
 def ansi_c(s):
     def rep(m):
         t = m.group(1)
-        simple = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", "'": "'", '"': '"', "e": "\x1b", "a": "\a", "b": "\b"}
+        simple = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", "'": "'", '"': '"', "e": "\x1b", "E": "\x1b", "a": "\a", "b": "\b", "f": "\f", "v": "\v",
+                  "?": "?"}
         if t in simple:
             return simple[t]
+        if t[0] == "c" and len(t) == 2:
+            return chr(ord(t[1]) & 0x1F)
+        if len(t) == 1 and t not in "01234567":
+            return "\\" + t  # an unknown escape keeps its backslash, as in bash
         if t[0] == "x":
             return chr(int(t[1:], 16))
         if t[0] in "uU":
             return chr(int(t[1:], 16))
         return chr(int(t, 8) & 0xFF)
-    return re.sub(r"\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|.)", rep, s)
+    return re.sub(r"\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|c.|.)", rep, s)
 
 
 class Word(str):
@@ -428,6 +440,9 @@ def lex(src):
                     word.append(c)
                     i += 1
             in_word = quoted = True
+        elif src.startswith('$"', i):  # a locale-translated string reads as a plain double-quoted one (R3-02 of #237)
+            i += 1
+            continue
         elif src.startswith("$'", i):
             j = i + 2
             while j < n and src[j] != "'":
@@ -788,7 +803,7 @@ def check_linter(prog, args):
 
 
 def check_assign(a):
-    name, val = a.split("=", 1)
+    name, val = assign_split(a)
     if name in CONFIG_FILE_VARS:
         deny(f"{name} swaps git's config file, which can disable the hooks or hide aliases")
     if name.startswith("GIT_CONFIG") and RISKY_CONFIG_ANY.search(val):
@@ -850,7 +865,8 @@ def check_command_string(command, state, depth=0):
     try:
         cmds = lex(command)
     except ValueError:
-        if re.search(r"\bgit\b|CLAUDE\.md|REVIEW\.md|\.claude|\.github|\.githooks|agents/|scripts/|\.git/", command):
+        flat = re.sub(r"\\\r?\n|['\"\\$]", "", command)  # quotes and continuations hide a name from the raw text (R3-03 of #237)
+        if re.search(r"\bgit\b|CLAUDE\.md|REVIEW\.md|\.claude|\.github|\.githooks|agents/|scripts/|\.git/|mark-ready|update-branch", command + " " + flat):
             deny("could not parse this command (unbalanced quote or substitution); simplify it")
         return
     stack = []
@@ -947,7 +963,7 @@ def check_simple(cmd, state, depth):
         return
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values
-            name, val = a.split("=", 1)
+            name, val = assign_split(a)
             if val in BRANCH_SUBS:
                 state["vars"][name] = branch(state["cwd"]) or val
             elif "$" in val or "`" in val:
