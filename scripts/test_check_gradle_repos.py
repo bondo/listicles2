@@ -107,6 +107,125 @@ class Settings(unittest.TestCase):
         self.assertIn("pluginManagement: no repositories block", c.check_settings("rootProject.name = \"x\"\n"))
 
 
+GOOGLE = 'google { content { includeGroup("androidx") } }\n'
+MIRROR_CALL = f'maven("{c.MIRROR}")\n'
+MISSING = [f"dependencyResolutionManagement: Maven Central mirror {c.MIRROR} missing"]
+BEFORE = ["dependencyResolutionManagement: Maven Central mirror must come before mavenCentral()"]
+UNFILTERED = ["dependencyResolutionManagement: google() needs a content filter"]
+NO_CENTRAL = ["dependencyResolutionManagement: mavenCentral() fallback missing"]
+
+
+class Hardening(unittest.TestCase):
+    """Follow-up for issue 54: nested comments and valid forms that were rejected; every bypass must stay an error."""
+
+    def dep(self, repos):
+        return c.check_settings(settings(dep_repos=repos))
+
+    # Item 1: Kotlin block comments nest.
+    def test_mirror_inside_nested_block_comment_does_not_count(self):
+        self.assertEqual(self.dep(GOOGLE + f"/* a /* b */ {MIRROR_CALL} */\nmavenCentral()\n"), MISSING)
+
+    def test_central_inside_nested_block_comment_does_not_count(self):
+        self.assertEqual(self.dep(GOOGLE + MIRROR_CALL + "/* a /* b */ mavenCentral() */\n"), NO_CENTRAL)
+
+    def test_nested_comment_then_real_code_passes(self):
+        self.assertEqual(self.dep(GOOGLE + "/* a /* b */ c */\n" + MIRROR_CALL + "mavenCentral()\n"), [])
+
+    def test_unterminated_nested_comment_hides_the_rest(self):
+        self.assertEqual(self.dep(GOOGLE + f"/* a /* b */ {MIRROR_CALL}mavenCentral()\n"), MISSING)
+
+    def test_comment_markers_inside_strings_do_not_open_a_comment(self):
+        self.assertEqual(self.dep(GOOGLE + 'val s = "/*"\n' + MIRROR_CALL + "mavenCentral()\n"), [])
+
+    def test_block_comment_does_not_glue_tokens_into_a_call(self):
+        self.assertEqual(self.dep(GOOGLE + MIRROR_CALL + "maven/**/Central()\n"), NO_CENTRAL)
+
+    # Item 2a: exclusiveContent { forRepository { google() } filter { include...() } } is a valid filter.
+    def exclusive(self, filter_body='includeGroupAndSubgroups("androidx")'):
+        return f"exclusiveContent {{ forRepository {{ google() }} filter {{ {filter_body} }} }}\n" + MIRROR_CALL + "mavenCentral()\n"
+
+    def test_exclusive_content_with_include_filter_passes(self):
+        self.assertEqual(self.dep(self.exclusive()), [])
+        self.assertEqual(self.dep(self.exclusive('includeGroup("androidx")')), [])
+
+    def test_exclusive_content_without_filter_still_fails(self):
+        bad = "exclusiveContent { forRepository { google() } }\n" + MIRROR_CALL + "mavenCentral()\n"
+        self.assertEqual(self.dep(bad), UNFILTERED)
+
+    def test_exclusive_content_with_empty_or_exclude_only_filter_still_fails(self):
+        self.assertEqual(self.dep(self.exclusive("")), UNFILTERED)
+        self.assertEqual(self.dep(self.exclusive('excludeGroup("androidx")')), UNFILTERED)
+
+    def test_exclusive_content_filter_commented_out_still_fails(self):
+        bad = 'exclusiveContent { forRepository { google() } filter { /* includeGroup("x") */ } }\n' + MIRROR_CALL + "mavenCentral()\n"
+        self.assertEqual(self.dep(bad), UNFILTERED)
+
+    def test_exclusive_content_filter_does_not_cover_google_outside_it(self):
+        self.assertEqual(self.dep(self.exclusive() + "google()\n"), UNFILTERED)
+        other = 'exclusiveContent { forRepository { maven("https://x.example") } filter { includeGroup("x") } }\ngoogle()\n'
+        self.assertEqual(self.dep(other + MIRROR_CALL + "mavenCentral()\n"), UNFILTERED)
+
+    def test_filter_of_one_exclusive_content_does_not_cover_a_second_one(self):
+        self.assertEqual(self.dep(self.exclusive() + "exclusiveContent { forRepository { google() } }\n"), UNFILTERED)
+
+    def test_filter_nested_inside_forrepository_does_not_count(self):
+        bad = 'exclusiveContent { forRepository { google() ; filter { includeGroup("x") } } }\n' + MIRROR_CALL + "mavenCentral()\n"
+        self.assertEqual(self.dep(bad), UNFILTERED)
+
+    def test_google_with_its_own_filter_inside_forrepository_passes(self):
+        ok = "exclusiveContent { forRepository { " + GOOGLE + "} }\n" + MIRROR_CALL + "mavenCentral()\n"
+        self.assertEqual(self.dep(ok), [])
+
+    # Item 2b: mavenCentral { } is the same repository as mavenCentral().
+    def test_central_with_empty_block_passes(self):
+        for call in ("mavenCentral { }", "mavenCentral {}", "mavenCentral() { }", "mavenCentral()"):
+            with self.subTest(call=call):
+                self.assertEqual(self.dep(GOOGLE + MIRROR_CALL + call + "\n"), [])
+
+    def test_central_with_block_still_must_come_after_the_mirror(self):
+        self.assertEqual(self.dep(GOOGLE + "mavenCentral { }\n" + MIRROR_CALL), BEFORE)
+
+    def test_central_mentioned_without_call_does_not_count(self):
+        for text in ("val mavenCentral = 1", "mavenCentral", "mavenCentral.foo"):
+            with self.subTest(text=text):
+                self.assertEqual(self.dep(GOOGLE + MIRROR_CALL + text + "\n"), NO_CENTRAL)
+
+    # Item 2c: braces inside strings must not move block bounds (already handled by taking bounds from the blanked text).
+    def test_closing_brace_in_string_before_the_mirror_passes(self):
+        for before in ('maven("a}b")\n', 'val s = "}"\n', 'val s = "\\"}"\n', 'val s = "{"\n'):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + before + MIRROR_CALL + "mavenCentral()\n"), [])
+
+    def test_brace_in_string_does_not_end_the_repositories_block(self):
+        bad = settings(dep_repos=GOOGLE + 'val s = "}"\n' + MIRROR_CALL + "mavenCentral()\n    }\n    repositories {\n        google()\n")
+        self.assertEqual(c.check_settings(bad), UNFILTERED)
+
+    def test_brace_in_string_does_not_hide_an_unfiltered_google(self):
+        self.assertEqual(self.dep(GOOGLE + 'val s = "{"\ngoogle()\n' + MIRROR_CALL + "mavenCentral()\n"), UNFILTERED)
+
+    # Item 2d: a char literal of a double quote is not the start of a string.
+    def test_double_quote_char_literal_passes(self):
+        self.assertEqual(self.dep(GOOGLE + "val q = '\"'\n" + MIRROR_CALL + "mavenCentral()\n"), [])
+
+    def test_escaped_char_literals_pass(self):
+        ok = GOOGLE + "val a = '\\''\nval b = '\\u0022'\nval c = '\\\\'\n" + MIRROR_CALL + "mavenCentral()\n"
+        self.assertEqual(self.dep(ok), [])
+
+    def test_double_quote_char_literal_does_not_hide_a_commented_mirror(self):
+        bad = GOOGLE + "val q = '\"'\n// " + MIRROR_CALL + "mavenCentral()\n"
+        self.assertEqual(self.dep(bad), MISSING)
+
+    def test_double_quote_char_literal_keeps_the_mirror_order_check(self):
+        self.assertEqual(self.dep(GOOGLE + "val q = '\"'\nmavenCentral()\n" + MIRROR_CALL), BEFORE)
+
+    def test_double_quote_char_literal_does_not_hide_an_unfiltered_google(self):
+        self.assertEqual(self.dep("val q = '\"'\ngoogle()\n" + MIRROR_CALL + "mavenCentral()\n"), UNFILTERED)
+
+    def test_apostrophe_in_comment_or_string_is_not_a_char_literal(self):
+        ok = GOOGLE + "// it's\n/* don't */\nval s = \"it's\"\n" + MIRROR_CALL + "mavenCentral()\n"
+        self.assertEqual(self.dep(ok), [])
+
+
 class Properties(unittest.TestCase):
     def test_good_properties_pass(self):
         self.assertEqual(c.check_properties(GOOD_PROPS), [])
