@@ -413,8 +413,8 @@ enforce the rules rather than goodwill.
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
    trusted on their own; the owner's merge is the review.
-6. **Branch protection** on `main`: PR required, all 8 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
-   `guards`, `secrets`, `tasks`; source: GitHub Actions),
+6. **Branch protection** on `main`: PR required, all 10 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
+   `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never
