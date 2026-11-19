@@ -739,7 +739,9 @@ RULES = (
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and you never pass an approval on to it",
-            r"the owner also records a new authorization for it on #15 \(per merge agent, §7\.5\); the merge agent does not merge before that",
+            r"the owner also records a new authorization for it on #15: one authorization covers exactly the time window and the prs it names, "
+            r"whichever merge agent session runs under it, and ends with the window, and a merge outside a recorded window or list needs a new one "
+            r"\(§7\.5, #15 comment 7002904192\); the merge agent does not merge before that",
         ),
         "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
     ),
@@ -1039,7 +1041,9 @@ DOC_RULES = (
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge "
-            r"and records a new authorization for it on #15 \(per merge agent\)",
+            r"and records a new authorization for it on #15; one authorization covers exactly the time window and the prs it names, "
+            r"whichever merge agent session runs under it, and ends with the window, and a merge outside a recorded window or list needs a new one "
+            r"\(owner decision, #15 comment 7002904192\)",
         ),
         "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
     ),
