@@ -149,13 +149,14 @@ def job_in(text, name):
 
 
 # Steps that merged PRs could not add themselves (ci.yml is protected): (job, command, source finding).
-# Each also runs in verify.sh. Issue 224 R1-02, PR 231, PR 235 R1-04. PR 239 R2-02 (check_test_results) is not here until #239 merges.
+# Each also runs in verify.sh. Issue 224 R1-02, PR 231, PR 235 R1-04.
 CI_STEPS = [
     ("static", "python3 -I scripts/test_check_gradle_wrapper.py", "PR 231"),
     ("static", "python3 -I scripts/check_gradle_wrapper.py", "PR 231"),
     ("static", "python3 -I scripts/test_gitignore_secrets.py", "PR 235 R1-04"),
     ("tasks", "python3 -I scripts/test_dependency_floors.py", "PR 224 R1-02"),
     ("tasks", "python3 -I scripts/dependency_floors.py", "PR 224 R1-02"),
+    ("unit", "python3 -I scripts/test_check_test_results.py", "PR 239 R2-02"),
 ]
 
 
