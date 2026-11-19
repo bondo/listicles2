@@ -536,7 +536,7 @@ const SCREENS = [
     f: s => openList(s, { l: LISTS[1], items: PLAIN }) },
   { id: '23', t: 'Add item, plain list', refs: 'ITEM-01 for a plain list: the name only; the sheet stays open for the next item. Edit (08) is the same without years.',
     f: s => openList(s, { l: LISTS[1], items: PLAIN, fabOn: false, overlay: sheetItem(s, { title: s.addItem, name: 'Kaffeb', focus: 'n', plain: true }) }) },
-  { id: '24', t: 'Sign in with email, wrong email or password', refs: 'AUTH-07, OQ-34 (c, decided). One message that never says which part was wrong or whether the account exists, with the hint for Google users. No connection: "This needs a connection".',
+  { id: '24', t: 'Sign in with email, wrong email or password', refs: 'AUTH-07, OQ-34(c), decided. One message that never says which part was wrong or whether the account exists, with the hint for Google users. No connection: "This needs a connection".',
     f: s => auth(s.signInBtn, '', `${field({ label: s.email, value: 'sam@example.com' })}${pw(s.password, 14, { state: 'err', trail: 'error' })}${support(s.wrongCreds, true)}
       <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-l)">${s.signInBtn}</span>${linkRow(`<span class="btn text t-labelLarge">${s.forgot}</span>`, `<span class="var">${s.noAccount}</span> <span class="btn text t-labelLarge">${s.createAccount}</span>`)}`) },
   { id: '25', t: 'Sign in with email, too many attempts', refs: 'AUTH-07, AUTH-09. After many failed attempts (also wrong codes): the message replaces the error until the server allows tries again.',
@@ -588,7 +588,7 @@ const SCREENS = [
   { id: '39', t: 'Sign out with unsent changes', refs: 'AUTH-03, M1-14, OQ-13. Shown whenever the wait for pending changes does not finish (offline or timeout), with this text when an unsent change is known (45 is the text when none is known). When the wait finishes, sign out needs no dialog.',
     f: s => accountScreen(s) + dialog({ icon: 'logout', title: s.signOutQ, body: s.signOutBody,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.signOutAnyway}</span>` }) },
-  { id: '45', t: 'Sign out, offline, no unsent change known', refs: 'AUTH-03, M1-14. The wait did not finish and no open screen knows of an unsent change (a write can wait without a listener): the same dialog, with wording that does not claim a change is unsent.',
+  { id: '45', t: 'Sign out, wait not finished, no unsent change known', refs: 'AUTH-03, M1-14. The wait did not finish and no open screen knows of an unsent change (a write can wait without a listener): the same dialog, with wording that does not claim a change is unsent.',
     f: s => accountScreen(s) + dialog({ icon: 'logout', title: s.signOutQ, body: s.signOutBody2,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.signOutAnyway}</span>` }) },
   { id: '40', t: 'Removed from household notice', refs: 'HH-06, M1-21. Shown once at the next app start to a member the household owner removed. The member keeps their own lists, now private.',
@@ -597,13 +597,13 @@ const SCREENS = [
   { id: '41', t: 'Update the app', refs: 'START-01, M1-27. Full screen at app start, before sign-in, when this version is below the minimum. No back, no skip. Offline it uses the last minimum read; not shown when none was ever read (first offline start).',
     f: s => `<div class="center">${logo()}<div class="t-headlineSmall" style="margin-top:var(--sp-l)">${s.updateTitle}</div><div class="t-bodyLarge var">${s.updateBody}</div>
       <div class="stack"><span class="btn filled wide t-labelLarge">${ic('system_update')}${s.updateBtn}</span></div><div class="t-bodySmall var">${s.updateNote}</div></div>` },
-  { id: '42', t: 'Your name, first Google sign-in', refs: 'AUTH-01, AUTH-12 (owner decision on #191). Asked once after the first Google sign-in, filled in from the Google account; it can be changed. Empty: field error "Enter your name". No back arrow: the step is required, and the next app start shows it again until a name is saved. Members never see emails.',
+  { id: '42', t: 'Your name, first Google sign-in', refs: 'AUTH-01, AUTH-12 (owner decision on #191). Asked once after the first Google sign-in, filled in from the Google account; it can be changed. Empty: field error "Enter your name". No back arrow: the step is required, and the next app start shows it again until a name is saved. System Back leaves the app and saves nothing. Members never see emails.',
     f: s => `${topbar(s.nameTitle, {})}<div style="padding:0 var(--sp-l);display:flex;flex-direction:column;gap:var(--sp-s)"><div class="t-bodyMedium var" style="margin-bottom:var(--sp-s)">${s.nameGoogleBody}</div>${field({ label: s.yourName, value: 'Sam Jensen', state: 'focus', caret: true })}
       <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-s)">${s.cont}</span></div>` },
   { id: '43', t: 'Edit your name', refs: 'AUTH-12. From Account (18). Same name rules as 42 and 26; the household sees the new name at once. Needs a connection.',
     f: s => accountScreen(s) + dialog({ title: s.editName, extra: `<div style="margin-top:var(--sp-s)">${field({ label: s.yourName, value: 'Sam Jensen', state: 'focus', caret: true })}</div>`,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text">${s.save}</span>` }) },
-  { id: '44', t: 'Google sign-in, email already has a password account', refs: 'AUTH-10, OQ-34 (decided 2026-11-17, M1.md). A non-Gmail Google account whose email has a password account: no second account, nothing lost. Shown on the sign-in screen.',
+  { id: '44', t: 'Google sign-in, email already has a password account', refs: 'AUTH-10, OQ-34(a) (decided 2026-11-17, M1.md). A non-Gmail Google account whose email has a password account: no second account, nothing lost. Shown on the sign-in screen.',
     f: s => signInScreen(s, msgCard('error', s.collision)) },
 ];
 

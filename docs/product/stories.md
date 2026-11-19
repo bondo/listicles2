@@ -124,7 +124,7 @@ password, so that I reach my lists on any phone.
 * Given the right email and password, when I confirm, then I see my lists (or the code step if AUTH-09 is on, or the
   verify screen if AUTH-06 is not done).
 * Given a wrong email or a wrong password, when I confirm, then I see one message that does not say which one was
-  wrong or whether the account exists (OQ-34 c): "Wrong email or password. If you signed up with Google, use Continue
+  wrong or whether the account exists (OQ-34(c)): "Wrong email or password. If you signed up with Google, use Continue
   with Google." / "Forkert e-mail eller adgangskode. Hvis du oprettede dig med Google, så brug Fortsæt med Google."
   It is the same for every failed sign-in, also for an email that only has a Google account.
 * Given many failed attempts, when I try again, then I see "Too many attempts, try again later".
@@ -163,12 +163,12 @@ way, so that I never get two accounts or lose my lists.
   "Continue" (link not opened: "not verified yet") or "Send again" shows the same messages for both; only the email
   without an account gets an account and an email.
 * Given I sign in with a password (AUTH-07) or ask for a reset (AUTH-08) for an email, then the messages are the same
-  whether or not an account exists and whichever method it uses (what a Google-only email gets: OQ-34).
+  whether or not an account exists and whichever method it uses (what a Google-only email gets: OQ-34(b)).
 * Given I sign in with Google and the email already has a password account, then Firebase trusts Google only for
   `@gmail.com` addresses (M1.md, docs-check note 3). For another address the sign-in fails and the sign-in screen shows
   "This email already has an account. Sign in with your email and password." / "Der findes allerede en konto med
   denne e-mail. Log ind med din e-mail og adgangskode." (wireframe 44). What Firebase does for a Gmail address is
-  checked in M1 (OQ-34 a). In every case no lists are lost and no second account is created.
+  checked in M1 (OQ-34(a)). In every case no lists are lost and no second account is created.
 * Given I signed in the way I created the account, then I see my lists as before; adding a second method or changing
   the email comes after v1 (OQ-31).
 
@@ -184,7 +184,7 @@ leaked one (OQ-31).
 * Given I sign in with Google for the first time, then I am asked for my name, filled in from my Google account, and I
   must confirm a non-empty name before I see my lists (wireframe 42); an empty name shows the error "Enter your name".
 * Given I am signed in with no name saved, when the app starts, then it shows the name step (wireframe 42) before my
-  lists; it has no back arrow.
+  lists; it has no back arrow, and the system Back button leaves the app and saves nothing.
 * Given I am signed in, when I choose "Your name" in Account, then I can change it (wireframe 43); the household sees
   the new name. This needs a connection (SYNC-03).
 * Given I am in a household, then members see my name and never my email (HH-04); the app never falls back to the

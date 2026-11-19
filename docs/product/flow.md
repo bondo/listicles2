@@ -34,7 +34,9 @@ flowchart TD
     gate -- "yes" --> upd["Update the app, full screen, no way past it<br>START-01, wireframe 41"]
     gate -- "no, or cannot be read" --> signed{"Signed in?<br>AUTH-02"}
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
-    signed -- "yes, also offline" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
+    signed -- "yes, also offline" --> named{"Name saved?<br>AUTH-12"}
+    named -- "no" --> nm0["Your name, required; system Back leaves the app, nothing saved<br>AUTH-12, wireframe 42"] --> lists
+    named -- "yes" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
     signin -- "Google account picked" --> lists
     signin -- "Use email and password" --> email["Email sign-in<br>AUTH-05, AUTH-07, AUTH-08, AUTH-10"]
     email -- "signed in, email verified" --> lists
@@ -101,17 +103,17 @@ flowchart TD
     ve -- "Continue, link not opened yet" --> vnot["Message: not verified yet<br>AUTH-06"] --> ve
     ve -- "Continue, link opened" --> home["Lists, or Join if I came from an invite<br>AUTH-06, HH-03"]
     es -- "email and password" --> ok{"Right?"}
-    ok -- "no" --> wrong["Wrong email or password, with the hint to use Continue with Google;<br>after many tries: try again later<br>AUTH-07, OQ-34 c, wireframe 24"] --> es
+    ok -- "no" --> wrong["Wrong email or password, with the hint to use Continue with Google;<br>after many tries: try again later<br>AUTH-07, OQ-34(c), wireframe 24"] --> es
     ok -- "yes, email not verified" --> ve
     ok -- "yes, two-step on" --> code["Enter 6-digit code<br>AUTH-09, OQ-25"]
     code -- "right code" --> home
     code -- "wrong code" --> codeerr["Wrong code: error;<br>after many tries: try again later<br>AUTH-09"] --> code
     ok -- "yes" --> home
-    es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email;<br>Google-only email: OQ-34<br>AUTH-08"]
+    es -- "Forgot password" --> rp["Always: if an account exists,<br>we sent an email;<br>Google-only email: OQ-34(b)<br>AUTH-08"]
     rp -. "link opened" .-> newpw["New password, at least 12;<br>expired or used link: message<br>AUTH-08"] --> es
     si -- "Google, the email has a password account" --> gsame{"Gmail address?"}
     gsame -- "no" --> coll["Message: this email already has an account, sign in with email and password;<br>no second account<br>AUTH-10, wireframe 44"] --> si
-    gsame -- "yes" --> gmail["Firebase handling, checked in M1 (OQ-34 a); no lists lost<br>AUTH-10"]
+    gsame -- "yes" --> gmail["Firebase handling, checked in M1 (OQ-34(a)); no lists lost<br>AUTH-10"]
 ```
 
 ## 3. Household
@@ -319,7 +321,7 @@ Every v1 story appears in at least one diagram above. Each row lists every story
 
 | Section | Stories |
 |---|---|
-| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, START-01, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03 |
+| 1. Screen map | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, AUTH-12, START-01, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, LIST-01, ITEM-05, VIS-03 |
 | 2. Sign-in and account | AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06, AUTH-07, AUTH-08, AUTH-09, AUTH-10, AUTH-11, AUTH-12, HH-03, HH-06, LIST-01, VIS-01, SYNC-03 |
 | 3. Household | AUTH-01, AUTH-05, AUTH-06, HH-01, HH-02, HH-03, HH-04, HH-05, HH-06, VIS-02, SYNC-03 |
 | 4. Lists and sharing | LIST-01, LIST-02, LIST-03, LIST-04, VIS-01, VIS-02, VIS-03, VIS-04 |
