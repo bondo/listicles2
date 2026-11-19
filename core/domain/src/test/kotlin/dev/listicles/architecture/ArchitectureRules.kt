@@ -20,7 +20,9 @@ object ArchitectureRules {
     private val floatingPatterns =
         listOf(
             Regex("""\b(Float|Double)\b"""),
-            Regex("""\.to(Float|Double)\b"""),
+            Regex("""\.to(Float|Double)(OrNull)?\b"""),
+            // BigDecimal is exact but not whole-number; BigInteger stays allowed.
+            Regex("""\b(?:BigDecimal|toBigDecimal(?:OrNull)?)\b"""),
             Regex("""\bnext(Float|Double)\b"""),
             Regex("""(?<![\w.])\d[\d_]*\.\d[\d_]*(?:[eE][+-]?\d+)?[fF]?\b"""),
             Regex("""(?<![\w.])\.\d"""),
