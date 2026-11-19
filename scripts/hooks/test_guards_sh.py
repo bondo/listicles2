@@ -713,6 +713,45 @@ class Baselines(GuardsCase):
         self.repo.git("mv", "web/eslint-suppressions.json", "web/notes.json")
         self.assertPasses("--staged")
 
+    # R2-01: ESLint treats a directory named eslint-suppressions.json as a cache dir and loads suppressions_<hash> from it.
+    def test_file_under_an_eslint_suppressions_json_directory_fails(self):
+        self.repo.write("firebase/eslint-suppressions.json/suppressions_1uw1oel", "{}\n")
+        self.repo.commit()
+        self.assertFails("guard: baseline file: firebase/eslint-suppressions.json/suppressions_1uw1oel")
+
+    def test_file_under_a_case_variant_eslint_suppressions_json_directory_fails(self):
+        self.repo.write("FIREBASE/ESLINT-Suppressions.JSON/suppressions_1uw1oel", "{}\n")
+        self.repo.commit()
+        self.assertFails("guard: baseline file: FIREBASE/ESLINT-Suppressions.JSON/suppressions_1uw1oel")
+
+    def test_staged_file_under_an_eslint_suppressions_json_directory_fails(self):
+        self.repo.write("eslint-suppressions.json/suppressions_1uw1oel", "{}\n")
+        self.repo.git("add", "eslint-suppressions.json/suppressions_1uw1oel")
+        self.assertFails("guard: baseline file: eslint-suppressions.json/suppressions_1uw1oel", "--staged")
+
+    def test_directories_that_only_start_with_the_name_pass(self):
+        self.repo.write("web/eslint-suppressions.json.d/notes.txt", "x\n")
+        self.repo.write("web/eslint-suppressions.jsonl/notes.txt", "x\n")
+        self.repo.commit()
+        self.assertPasses()
+
+    # R2-02: the staged list must not depend on the diff.renames setting; a copy shows as status C with diff.renames=copies.
+    def test_staged_copy_into_the_eslint_suppressions_name_fails_with_copy_detection(self):
+        self.repo.write("web/notes.json", '{"a.ts": {"no-console": {"count": 1}}}\n')
+        self.repo.commit("base file")
+        self.repo.git("config", "diff.renames", "copies")
+        self.repo.write("web/eslint-suppressions.json", '{"a.ts": {"no-console": {"count": 1}}}\n')
+        self.repo.write("web/notes.json", '{"a.ts": {"no-console": {"count": 1}}, "b": 1}\n')
+        self.repo.git("add", "-A")
+        self.assertFails("guard: baseline file: web/eslint-suppressions.json", "--staged")
+
+    def test_staged_rename_away_passes_with_copy_detection(self):
+        self.repo.write("web/eslint-suppressions.json", "{}\n")
+        self.repo.commit("base file")
+        self.repo.git("config", "diff.renames", "copies")
+        self.repo.git("mv", "web/eslint-suppressions.json", "web/notes.json")
+        self.assertPasses("--staged")
+
     # R1-02: the ESLint Node API loads a suppressions file of any name (applySuppressions, suppressionsLocation).
     def test_eslint_node_api_apply_suppressions_fails(self):
         self.repo.write("firebase/lint.mjs", "const eslint = new ESLint({ applySuppressions: true });\n")
