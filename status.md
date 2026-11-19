@@ -374,3 +374,4 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
+- **PR to merge** [#159](https://github.com/bondo/listicles2/issues/159): Tooling&#58; guards.sh known gaps batch 1 (justified needs 3 words, coverage thresholds, package.json…
