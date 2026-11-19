@@ -71,6 +71,9 @@ SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__fi
 ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")  # also NAME+=v and NAME[i]=v, which bash runs as assignments (R3-04 of #237)
 
 
+PLAIN_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
 def assign_split(a):
     """(variable name without [..] or +, value) of an assignment word."""
     name, val = a.split("=", 1)
@@ -963,6 +966,8 @@ def check_simple(cmd, state, depth):
         return
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values
+            if not PLAIN_ASSIGN.match(a):
+                continue  # NAME+=v appends and NAME[k]=v sets an element, so the tracked value is kept, as before R3-04 (R4-01 of #237)
             name, val = assign_split(a)
             if val in BRANCH_SUBS:
                 state["vars"][name] = branch(state["cwd"]) or val
