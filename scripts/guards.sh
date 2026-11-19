@@ -46,7 +46,7 @@ out=$(gg '[Ee]nabled *(= *|\() *(false|!)|onlyIf *(\([^)]*\))? *\{ *false|exclud
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: disabled tests via build config: /'; fail=1; }
 
 LS=(git ls-files)
-[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --diff-filter=AMRT) # added, modified, renamed (new path) and type-changed (file to symlink)
+[ "$STAGED" = 1 ] && LS=(git diff --cached --name-only --no-renames --diff-filter=AMT) # added, modified, type-changed; --no-renames so a rename or copy is an add whatever diff.renames says
 
 # 2. Suppressions and weakened settings need "justified: <reason>" on the same line.
 # The justification is looked for in the whole `path:line:text` grep output, so a tracked path containing it would waive every hit
@@ -541,7 +541,8 @@ done < <(git ls-files -- '*package.json' "${EXCL[@]}"))
 
 # 3. Baselines (no escape hatch): by name, by wiring and by content, any file type.
 # ESLint loads a committed eslint-suppressions.json (bulk suppressions) on its own, in any directory: a baseline too (#173).
-out=$("${LS[@]}" | grep -iE 'baseline|(^|/)eslint-suppressions\.json$')
+# A directory of that name is its cache dir, which ESLint also reads suppressions from, so files under it count as well.
+out=$("${LS[@]}" | grep -iE 'baseline|(^|/)eslint-suppressions\.json(/|$)')
 [ -n "$out" ] && { echo "$out" | sed 's/^/guard: baseline file: /'; fail=1; }
 # Formatter and linter ignore files cannot carry a same-line justification, so they are refused outright (ask the owner).
 out=$("${LS[@]}" | grep -E '(^|/)\.(prettier|eslint|stylelint|dprint)ignore$')
