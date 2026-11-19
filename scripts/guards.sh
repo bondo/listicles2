@@ -634,37 +634,65 @@ narrowcheck() { # narrowcheck <merge-base>
   done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- '*ruff.toml' '*pyproject.toml' '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}")
 }
 
-# 7. A raised line length (owner decision in #46). Per style config file the largest value of the setting family (line-length,
-# max-line-length, max_line_length, maxLineLength, printWidth; quotes and comments ignored, a word such as `off` counts as no limit)
-# is compared with the same file at the merge base, so an added setting counts as well as an edited one. A deleted file (rename or
-# move) is compared with the largest value in the style files of the same tool at HEAD (prettier, editorconfig, detekt, ruff, flake8
-# and their kin each form one group). Lowered or removed is stricter and passes. Not compared: a base
-# without the setting (the tool default is not known), and the same family split over two files when neither is deleted.
+# 7. A raised line length (owner decisions in #46 and #176). Every setting of the family (line-length, max-line-length, max_line_length,
+# maxLineLength, printWidth; quotes and comments ignored, a word such as `off` counts as no limit) is read from every style file of
+# a tool, at the merge base and at HEAD, and the largest value is compared per group: per file, per tool (all its style files), per
+# tool and setting name, and per tool, setting name and section (an `.editorconfig` section or a TOML table). A group that is larger at
+# HEAD fails, so an added setting counts like an edited one, a family split over two kept files is one group, and a raise is not masked
+# by a lowering of another setting or of another section. ruff (88) and flake8 (79) have their default as the value of a tool that is
+# in use but has no setting, at either side (ruff.toml or `[tool.ruff` in pyproject.toml; .flake8 or `[flake8]`), so a base without
+# the setting and a removal below the default are compared too. A deleted file is compared with the same tool at HEAD. Lowered is
+# stricter and passes. Prettier, `.editorconfig` and detekt have no default mapped, and a setting removed from a group is not compared.
 STYLERE='(ruff\.toml|pyproject\.toml|\.flake8|setup\.cfg|tox\.ini|\.editorconfig|detekt\.yml|prettierrc[^/]*|prettier\.config\.[^/]*)$'
-LL_AWK='{ lo = tolower($0); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
-  while (match(lo, /(max[-_]?line[-_]?length|line[-_]?length|printwidth)["\047]?[ \t]*[:=][ \t]*["\047]?/)) {
-    lo = substr(lo, RSTART + RLENGTH); if (lo ~ /^[ \t]*$/) continue  # a YAML parent key (`MaxLineLength:`) has no value
-    v = match(lo, /^[0-9]+/) ? substr(lo, 1, RLENGTH) + 0 : 999999999; if (!f || v > m) m = v; f = 1 } }
-  END { if (f) print m }'
-stylekind() { # the style files of the same tool as <path>
+STYLEX='^(docs|handoff)/|(^|/)(node_modules|build)/'
+# Per file: `file TAB tool TAB section TAB setting TAB value` lines, and a `use` line when ruff or flake8 is configured there.
+LL_AWK='BEGIN { OFS = "\t"; use = (f ~ /(^|\/)\.?(ruff\.toml|flake8)$/) }
+  { lo = tolower($0); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
+    if (lo ~ /^[ \t]*\[[^]]*\][ \t]*$/) { sec = lo; gsub(/^[ \t]+|[ \t]+$/, "", sec); if (sec ~ /^\[(tool\.ruff|flake8)/) use = 1 }
+    gsub(/ktlint_[a-z0-9_]*max[-_]?line[-_]?length/, "ktlint_rule", lo)  # a rule switch, not a limit
+    while (match(lo, /(max[-_]?line[-_]?length|line[-_]?length|printwidth)["\047]?[ \t]*[:=][ \t]*["\047]?/)) {
+      k = substr(lo, RSTART, RLENGTH); sub(/[^a-z_-].*$/, "", k); gsub(/[-_]/, "", k)
+      lo = substr(lo, RSTART + RLENGTH); if (lo ~ /^[ \t]*$/) continue  # a YAML parent key (`MaxLineLength:`) has no value
+      v = match(lo, /^[0-9]+/) ? substr(lo, 1, RLENGTH) + 0 : 999999999
+      print f, t, sec, k, v } }
+  END { if (use) print f, t, "", "use", 1 }'
+# Input: the lines of both sides, `B` or `H` first. Output: one `raised line length: ...` line per group that is larger at HEAD.
+LL_CMP='BEGIN { FS = "\t"; DEF["ruff"] = 88; DEF["flake8"] = 79 }
+  function put(k, v) { if (!(k in M) || v > M[k]) M[k] = v }
+  function fmt(v) { return v > 99999 ? "no limit" : v }
+  $5 == "use" { U[$1, $3] = 1; next }
+  { put($1 SUBSEP "F|" $3 "|" $2, $6); put($1 SUBSEP "T|" $3, $6); put($1 SUBSEP "K|" $3 "|" $5, $6); put($1 SUBSEP "S|" $3 "|" $5 "|" $4, $6) }
+  END {
+    for (t in DEF) for (s = 0; s < 2; s++) { d = s ? "H" : "B"; if (U[d, t] && !((d, "T|" t) in M)) M[d, "T|" t] = DEF[t] }
+    for (k in M) {
+      split(k, p, SUBSEP); if (p[1] != "B") continue
+      g = p[2]; b = M[k]
+      if (("H", g) in M) h = M["H", g]
+      else if (g ~ /^F\|/) { t = g; sub(/^F\|/, "", t); sub(/\|.*$/, "", t); if (!(("H", "T|" t) in M)) continue; h = M["H", "T|" t] }
+      else continue
+      if (h <= b) continue
+      lbl = g; if (g ~ /^F\|/) sub(/^F\|[^|]*\|/, "", lbl); else { sub(/^[A-Z]\|/, "", lbl); gsub(/\|/, " ", lbl) }
+      print "raised line length: " lbl ": " fmt(b) " -> " fmt(h) } }'
+styletool() { # the tool a style file belongs to
   case "$1" in
-    *prettierrc*|*prettier.config.*) echo 'prettierrc[^/]*$|prettier\.config\.[^/]*$' ;;
-    *.editorconfig) echo '\.editorconfig$' ;;
-    *detekt.yml) echo 'detekt\.yml$' ;;
-    *ruff.toml|*pyproject.toml) echo 'ruff\.toml$|pyproject\.toml$' ;;
-    *) echo '\.flake8$|setup\.cfg$|tox\.ini$' ;;
+    *prettierrc*|*prettier.config.*) echo prettier ;;
+    *.editorconfig) echo editorconfig ;;
+    *detekt.yml) echo detekt ;;
+    *ruff.toml|*pyproject.toml) echo ruff ;;
+    *) echo flake8 ;;
   esac
 }
-linemax() { git show "$1" 2>/dev/null | LC_ALL=C awk "$LL_AWK"; }
+styledump() { # styledump <rev> <side>: the settings of every style file at <rev>, each line starting with <side>
+  local f
+  git ls-tree -r --name-only "$1" | grep -E "$STYLERE" | grep -vE "$STYLEX" | while IFS= read -r f; do
+    git show "$1:$f" 2>/dev/null | LC_ALL=C awk -v f="$f" -v t="$(styletool "$f")" "$LL_AWK"
+  done | sed "s/^/$2\t/"
+}
 linecheck() { # linecheck <merge-base>
-  local mb="$1" f g b h kind
-  while IFS= read -r f; do
-    git cat-file -e "$mb:$f" 2>/dev/null || continue
-    b=$(linemax "$mb:$f"); [ -n "$b" ] || continue
-    if git cat-file -e "HEAD:$f" 2>/dev/null; then h=$(linemax "HEAD:$f")
-    else kind=$(stylekind "$f"); h=$(while IFS= read -r g; do linemax "HEAD:$g"; done < <(git ls-tree -r --name-only HEAD | grep -E "$kind") | sort -n | tail -1); fi
-    [ -n "$h" ] && [ "$h" -gt "$b" ] && bad "raised line length: $f: $([ "$b" -gt 99999 ] && echo "no limit" || echo "$b") -> $([ "$h" -gt 99999 ] && echo "no limit" || echo "$h")"
-  done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- . "${EXCL[@]}" | grep -E "$STYLERE")
+  local out l
+  git diff --name-only --no-renames --diff-filter=ADMT "$1" HEAD -- . "${EXCL[@]}" | grep -qE "$STYLERE" || return 0
+  out=$({ styledump "$1" B; styledump HEAD H; } | LC_ALL=C awk "$LL_CMP" | sort)
+  while IFS= read -r l; do [ -n "$l" ] && bad "$l"; done <<<"$out"
 }
 
 if [ "$STAGED" = 1 ]; then sizecheck --cached; fi

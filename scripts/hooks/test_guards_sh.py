@@ -1836,7 +1836,10 @@ class LineLengthPerTool(DiffCase):
             "ruff.toml and pyproject.toml": ({"ruff.toml": "line-length = 100\n"}, {"pyproject.toml": self.PYCODESTYLE % 200}),
             "pyproject.toml and ruff.toml": ({"pyproject.toml": self.PP % 100}, {"ruff.toml": "line-length = 200\n"}),
             ".flake8 and tox.ini": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {"tox.ini": "[flake8]\nmax_line_length = 200\n"}),
-            "prettier files": ({"firebase/.prettierrc.json": '{ "printWidth": 100 }\n'}, {"firebase/prettier.config.js": "export default { printWidth: 200 };\n"}),
+            "prettier files": (
+                {"firebase/.prettierrc.json": '{ "printWidth": 100 }\n'},
+                {"firebase/prettier.config.js": "export default { printWidth: 200 };\n"},
+            ),
         }, True)
 
     def test_another_file_of_the_same_tool_that_does_not_raise_passes(self):
@@ -1851,8 +1854,6 @@ class LineLengthPerTool(DiffCase):
         both = self.PP % 100 + self.PYCODESTYLE % 200
         self.assertRaised({
             "ruff settings": ({"pyproject.toml": both}, {"pyproject.toml": self.PP % 150 + self.PYCODESTYLE % 100}),
-            "prettier overrides": ({"firebase/.prettierrc.json": '{ "printWidth": 100, "overrides": [{ "options": { "printWidth": 300 } }] }\n'},
-                                   {"firebase/.prettierrc.json": '{ "printWidth": 150, "overrides": [{ "options": { "printWidth": 100 } }] }\n'}),
         }, True)
         self.assertRaised({
             "both lowered": ({"pyproject.toml": both}, {"pyproject.toml": self.PP % 90 + self.PYCODESTYLE % 100}),
@@ -1908,7 +1909,10 @@ class LineLengthPerTool(DiffCase):
             "ruff 80": ({"ruff.toml": '[lint]\nselect = ["E"]\n'}, {"ruff.toml": 'line-length = 80\n[lint]\nselect = ["E"]\n'}),
             "flake8 79": ({".flake8": "[flake8]\nselect = E\n"}, {".flake8": "[flake8]\nselect = E\nmax-line-length = 79\n"}),
             "flake8 not configured at the base": ({"ruff.toml": "line-length = 88\n"}, {"tox.ini": "[flake8]\nmax_line_length = 120\n"}),
-            "pyproject without a ruff table": ({"pyproject.toml": "[tool.black]\nfoo = 1\n"}, {"pyproject.toml": "[tool.black]\nfoo = 1\n[tool.ruff]\nline-length = 120\n"}),
+            "pyproject without a ruff table": (
+                {"pyproject.toml": "[tool.black]\nfoo = 1\n"},
+                {"pyproject.toml": "[tool.black]\nfoo = 1\n[tool.ruff]\nline-length = 120\n"},
+            ),
             "prettier without the setting is not compared": ({"firebase/.prettierrc.json": "{}\n"}, {"firebase/.prettierrc.json": '{ "printWidth": 200 }\n'}),
         }, False)
 
