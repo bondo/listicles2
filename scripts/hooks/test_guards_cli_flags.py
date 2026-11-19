@@ -203,6 +203,45 @@ class ConfigIndirectionTests(CliFlagCase):
         self.assertPasses()
 
 
+class ReasonWordsTests(CliFlagCase):
+    """Owner decision (#46): a `justified:` reason needs 3 words of letters, on command-line flag lines too (check 2c uses just())."""
+
+    RUFF = "ruff check --ignore E501 scripts # justified: %s"
+
+    def raw(self, rel, line):
+        self.repo.write(rel, line + "\n", raw=True)
+        self.repo.commit()
+
+    def test_a_reason_under_three_words_does_not_waive_a_flag(self):
+        for reason in ["-", "x", "ok", "two words", "123 456 789"]:
+            with self.subTest(reason=reason):
+                self.raw("scripts/lint.sh", self.RUFF % reason)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def test_three_words_waive_a_flag(self):
+        for reason in ["generated code here", "the legacy long URLs", "well-known stub gap"]:
+            with self.subTest(reason=reason):
+                self.raw("scripts/lint.sh", self.RUFF % reason)
+                self.assertPasses()
+
+    def test_the_other_forms_follow_the_same_rule(self):
+        for rel, short, good in [
+            (".github/workflows/ci.yml", '        SHELLCHECK_OPTS: "-e SC2086" # justified: ok',
+             '        SHELLCHECK_OPTS: "-e SC2086" # justified: generated file here'),
+            ("scripts/lint.sh", "ruff check \\\n  --ignore E501 # justified: ok", "ruff check \\\n  --ignore E501 # justified: generated code here"),
+            ("firebase/package.json", '    "lint": "eslint --quiet ." // justified: x', '    "lint": "eslint --quiet ." // justified: noisy generated code'),
+        ]:
+            with self.subTest(file=rel, line=short):
+                self.raw(rel, short)
+                self.assertFails(MARK)
+                self.raw(rel, good)
+                self.assertPasses()
+
+    def test_words_after_the_reason_are_not_counted(self):
+        self.raw("scripts/lint.sh", "ruff check --ignore E501 scripts # justified: x # more words follow here")
+        self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+
 class QuotingAndEnvironmentTests(CliFlagCase):
     """R1-02: a quote before the flag or before false, combined short options and SHELLCHECK_OPTS hide a relaxation."""
 
