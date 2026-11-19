@@ -21,12 +21,28 @@ URL_RE = re.compile(r"https\\://services\.gradle\.org/distributions/gradle-[\w.-
 LINE_RE = re.compile(r"\s*([^\s=:]+)\s*[=:]?\s*(.*)")
 
 
-def _values(text):
-    """key -> list of raw values of the active lines of a .properties text."""
-    found = {}
-    for line in text.splitlines():
-        if line.lstrip()[:1] in ("#", "!"):
+def _continues(line):
+    """True if the line ends in an odd number of backslashes: java.util.Properties joins it with the next line."""
+    return (len(line) - len(line.rstrip("\\"))) % 2 == 1
+
+
+def _logical_lines(text):
+    """The logical lines of a .properties text: comment and blank lines dropped, continued lines joined (leading blanks of the
+    continuation line removed, as Java does), so a key folded into the previous property is not seen as a key of its own."""
+    physical = iter(text.splitlines())
+    for raw in physical:
+        line = raw.lstrip()
+        if not line or line[0] in "#!":
             continue
+        while _continues(line):
+            line = line[:-1] + next(physical, "").lstrip()
+        yield line
+
+
+def _values(text):
+    """key -> list of raw values of the active logical lines of a .properties text."""
+    found = {}
+    for line in _logical_lines(text):
         match = LINE_RE.fullmatch(line)
         if match:
             found.setdefault(match.group(1), []).append(match.group(2))
