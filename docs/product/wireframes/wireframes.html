@@ -418,7 +418,7 @@ const SCREENS = [
     f: s => openList(s, { fabOn: false, overlay: sheetItem(s, { title: s.addItem, name: 'Candle', y: '1992', r: '1890', rErr: true, focus: 'r', kbd: true }) }) },
   { id: '08', t: 'Edit item', refs: 'ITEM-02, ITEM-03. Clearing a year removes it; clearing the name keeps the old one with an error. Remove is here, and the "I have it" box with its label.',
     f: s => openList(s, { fabOn: false, overlay: sheetItem(s, { title: s.editItem, name: 'Star', y: '1985', r: '2015', edit: true }) }) },
-  { id: '09', t: 'Item removed, undo', refs: 'ITEM-03, OQ-10: no confirmation, undo in the snackbar. The same snackbar style carries the SYNC-02 messages.',
+  { id: '09', t: 'Item removed, undo', refs: 'ITEM-03, OQ-10: no confirmation, undo in the snackbar, which stays until the user acts, dismisses it or leaves the list (OQ-39). The same snackbar style carries the SYNC-02 messages.',
     f: s => openList(s, { items: ITEMS.filter(i => i.n !== 'Heart'), fabOn: false, overlay: snack(s.removed('Heart'), s.undo) }) },
   { id: '10', t: 'List menu, no household', refs: 'LIST-03, LIST-04, VIS-02, OQ-20: Share is disabled with the reason. A list creator in a household sees Share (or Stop sharing); others never see Stop sharing.',
     f: s => `${topbar('Board games', { back: true, actions: iconBtn('more_vert') })}<div class="center"><div class="bubble">${ic('playlist_add')}</div>
@@ -461,7 +461,7 @@ const SCREENS = [
   { id: '17', t: 'Invite link does not work', refs: 'HH-03, SYNC-03. The same layout says "leave your household first" and "this needs a connection", each with its own text.',
     f: s => `${topbar('', { close: true })}<div class="center"><div class="bubble">${ic('link_off')}</div><div class="t-titleLarge">${s.linkDead}</div>
       <div class="t-bodyMedium var">${s.linkDeadBody}</div><div class="stack"><span class="btn tonal wide t-labelLarge">${s.toLists}</span></div></div>` },
-  { id: '18', t: 'Account', refs: 'AUTH-03, AUTH-04, AUTH-09, OQ-31. Password account shown; a Google account has no password rows. No language row: v1 uses only Android per-app language (OQ-12). Sign out removes the local copy (OQ-13, assumed).',
+  { id: '18', t: 'Account', refs: 'AUTH-03, AUTH-04, AUTH-09, OQ-31. Password account shown; a Google account has no password rows. No language row: v1 uses only Android per-app language (OQ-12). Sign out removes the local copy (OQ-13).',
     f: s => `${topbar(s.account, { back: true })}<div class="row" style="padding:var(--sp-l)"><span class="avatar lg">S</span><div class="txt"><div class="t-titleMedium">Sam Jensen</div><div class="t-bodyMedium var">sam@example.com</div></div></div>
       <div class="divider"></div>
       <div class="row">${ic('password', 'lead')}<div class="txt t-bodyLarge">${s.changePw}</div>${ic('chevron_right', 'lead')}</div>
@@ -591,7 +591,7 @@ function render(T) {
   let theme = 'light';
   try { theme = storedTheme(localStorage.getItem('tally-wf-theme')); } catch (e) { /* storage may be blocked */ }
   const draw = () => {
-    app.innerHTML = `<div class="gallery"><h1>Tally v1 wireframes</h1><p class="intro">Status: working draft, not owner-approved (open: T2, R1, screen 32a; see issue #15). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225).</p><p class="intro">Draft for the owner's sign-off (task M0.5-03). Each screen is shown in English and Danish.
+    app.innerHTML = `<div class="gallery"><h1>Tally v1 wireframes</h1><p class="intro">Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); T2 text size decided (owner, 2026-11-18, issue #15 comment 6991847257) and screen 32a closed (comment 6992107414); recorded in docs/milestones/M1.md section 6. T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225).</p><p class="intro">Owner-approved (task M0.5-03, M0.5-O1). Each screen is shown in English and Danish.
       Numbers match the review sheet in the pull request. Story ids refer to docs/product/stories.md, OQ ids to its open and decided questions.</p>
       <div class="toolbar"><button data-t="light" aria-pressed="${theme === 'light'}">Light</button><button data-t="dark" aria-pressed="${theme === 'dark'}">Dark</button>
       <button data-t="tokens" aria-pressed="${theme === 'tokens'}">Tokens</button></div>

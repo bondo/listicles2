@@ -6,11 +6,14 @@ request run out, so a single unlucky burst fails the whole build. The setup this
   * Google's Maven Central mirror is listed before mavenCentral() (mavenCentral() stays as fallback),
   * google() only gets the groups it hosts, so other artifacts are not looked up there first,
   * Gradle retries repository requests often enough, with backoff, to ride out a 429 burst.
+It also checks Gradle dependency verification (gradle/verification-metadata.xml, sha256 for every artifact), so a
+mirror or CDN problem cannot silently change an artifact; Gradle itself enforces it in every build.
 Run: python3 -I scripts/check_gradle_repos.py  (exit 1 and one line per problem when the setup is off).
 """
 
 import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 MIRROR = "https://maven-central.storage-download.googleapis.com/maven2"
@@ -136,10 +139,74 @@ def check_properties(text):
     return problems
 
 
+VERIFICATION_PROP = "org.gradle.dependency.verification"
+META = "verification-metadata.xml"
+
+
+def check_verification(meta, props_text, verify_text=""):
+    """Problems with the dependency verification metadata (text, or None if the file is missing) and gradle.properties."""
+    problems = []
+    # Gradle reads gradle.properties with java.util.Properties (key ends at =, : or whitespace) and the mode case-insensitively.
+    prop = re.compile(r"\s*" + re.escape(VERIFICATION_PROP) + r"(?:\s*[=:]\s*|\s+)(\S+)")
+    lines, joined = [], ""
+    for raw in props_text.splitlines():  # a non-comment line ending in an odd number of backslashes continues on the next line
+        line = joined + (raw.lstrip() if joined else raw)
+        cont = not line.lstrip().startswith(("#", "!")) and (len(line) - len(line.rstrip("\\"))) % 2 == 1
+        joined = line[:-1] if cont else ""
+        if not cont:
+            lines.append(line)
+    for line in lines:
+        m = None if line.lstrip().startswith(("#", "!")) else prop.fullmatch(line.rstrip()) or prop.match(line)
+        if m and m.group(1).lower() in ("off", "lenient"):
+            problems.append(f"gradle.properties: {VERIFICATION_PROP}={m.group(1).lower()} disables verification")
+    flags = re.compile(
+        r"(?:--dependency-verification|\s-F|-D" + re.escape(VERIFICATION_PROP) + r")(?:\s*=\s*|\s+|(?<=-F))[\"']?(?:off|lenient)\b", re.I
+    )
+    if any(flags.search(ln) for ln in verify_text.splitlines() if not ln.lstrip().startswith("#")):
+        problems.append("scripts/verify.sh: switches Gradle dependency verification off")
+    if meta is None:
+        return [f"{META} missing"] + problems
+    try:
+        root = ET.fromstring(meta)
+    except ET.ParseError:
+        return [f"{META} is not well-formed XML"] + problems
+
+    def tag(el):
+        return el.tag.rsplit("}", 1)[-1]
+
+    elements = list(root.iter())
+    flag = [e for e in elements if tag(e) == "verify-metadata"]
+    if not flag or any((e.text or "").strip() != "true" for e in flag):
+        problems.append(f"{META}: verify-metadata must be true")
+    if any(tag(e) == "trusted-artifacts" for e in elements):
+        problems.append(f"{META}: trusted-artifacts bypass verification")
+    components = [e for e in elements if tag(e) == "component"]
+    if not components:
+        problems.append(f"{META}: no components")
+    for comp in components:
+        if comp.get("group") == "com.android.tools.build" and comp.get("name") == "aapt2":
+            names = [a.get("name", "") for a in comp if tag(a) == "artifact"]
+            gone = [o for o in ("linux", "osx", "windows") if not any(n.endswith(f"-{o}.jar") for n in names)]
+            if gone:
+                what = ", ".join(gone) + (" jars" if len(gone) > 1 else " jar")
+                problems.append(f"{META}: aapt2 {comp.get('version')} lacks {what} (see docs/ANDROID-BEST-PRACTICES.md section 11)")
+        for art in (e for e in comp if tag(e) == "artifact"):
+            hashes = [e.get("value", "") for e in art if tag(e) == "sha256"]
+            if not any(re.fullmatch(r"[0-9a-f]{64}", h) for h in hashes):
+                gav = f"{comp.get('group')}:{comp.get('name')}:{comp.get('version')}"
+                problems.append(f"{META}: artifact {art.get('name')} of {gav} has no sha256")
+    return problems
+
+
 def main(root):
     root = Path(root)
     problems = check_settings((root / "settings.gradle.kts").read_text(encoding="utf-8"))
     problems += check_properties((root / "gradle.properties").read_text(encoding="utf-8"))
+    meta = root / "gradle" / META
+    problems += check_verification(
+        meta.read_text(encoding="utf-8") if meta.is_file() else None, (root / "gradle.properties").read_text(encoding="utf-8"),
+        (root / "scripts" / "verify.sh").read_text(encoding="utf-8"),
+    )
     for p in problems:
         print(f"gradle-repos: {p}")
     return 1 if problems else 0

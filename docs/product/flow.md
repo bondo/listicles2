@@ -1,8 +1,8 @@
 # Tally app flow (v1)
 
-Status: working draft, merged as the baseline for M1 planning; not owner-approved (see issue #15).
+Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); T2 text size decided (owner, 2026-11-18, issue #15 comment 6991847257) and screen 32a closed (comment 6992107414); recorded in docs/milestones/M1.md section 6.
 
-Task M0.5-02. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
+Task M0.5-02. Status: **owner-approved 2026-11-18** (M0.5-O1, issue #15 comment 6991804241).
 Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19,
 OQ-23 to OQ-33, the two list types; state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
 open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions). New questions this flow raised are in
@@ -68,7 +68,7 @@ flowchart TD
     known -- "no, new account" --> home["Lists, empty state with Create list<br>LIST-01"]
     known -- "yes, for example a new phone" --> mine["Lists with my lists<br>AUTH-01, LIST-01"]
     home -. "later starts, also offline" .-> home2["Lists without signing in again<br>AUTH-02"]
-    acc["Account"] -- "Sign out" --> wipe["Local copy removed (assumed, OQ-13)<br>AUTH-03"] --> si
+    acc["Account"] -- "Sign out" --> wipe["Local copy removed (OQ-13)<br>AUTH-03"] --> si
     acc -- "Change password" --> chpw["Sign in again, new password of at least 12<br>AUTH-11, OQ-31"]
     acc -- "Turn on two-step" --> warn["Warning: losing the app may lose access to the account;<br>QR code, then a code<br>AUTH-09, OQ-28"]
     acc -- "Delete account" --> owner{"Household owner<br>with other members?"}
@@ -204,13 +204,13 @@ flowchart TD
     edit -- "name cleared" --> keep["Old name kept, error<br>ITEM-02"]
     edit -- "year cleared" --> noyear["Item has no such year<br>ITEM-02"]
     edit -- "valid" --> saved["Saved, shown to members too<br>ITEM-02"]
-    open -- "Remove item" --> rgone["Item gone at once; Undo for 10 seconds<br>ITEM-03, OQ-10"]
+    open -- "Remove item" --> rgone["Item gone at once; Undo stays until I act, dismiss it or leave the list<br>ITEM-03, OQ-10, OQ-39"]
     rgone -- "Undo" --> open
     open -- "Tap checkbox" --> toggle["I have it: checked or unchecked, stays in place, kept offline too<br>ITEM-04, OQ-7"]
     open -- "Show only missing" --> missing["Only unchecked items<br>ITEM-05, OQ-8"]
 ```
 
-Item order is set by the list type (ITEM-05; items without a release year last, OQ-33). Duplicate item names (OQ-11)
+Item order is set by the list type (ITEM-05; items without a release year last, OQ-33). Duplicate item names (OQ-11: allowed, with a quiet hint)
 are not in this flow; there is no search or manual order in v1 (OQ-8).
 
 ## 6. Offline and sync
