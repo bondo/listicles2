@@ -155,6 +155,39 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
 | Dependency freshness | Dependabot (lint freshness checks are disabled on purpose with a `// justified:`) |
+| Dependency verification | tooling: `gradle/verification-metadata.xml` holds a sha256 for every resolved artifact (plugins, build tools, lint, test and Android configurations), enforced by Gradle in every build; `scripts/check_gradle_repos.py` fails when the file is missing, verification is switched off, or an artifact has no sha256 |
+
+### Regenerating dependency verification metadata
+After any dependency, plugin or Gradle wrapper bump (including a Dependabot PR), a build fails with "Dependency verification failed" until the file is updated. Regenerate it from scratch with the tasks CI runs (Gradle never removes stale entries, so delete the file first), then review the diff (old versions of the bumped artifacts removed, new ones added, nothing else):
+
+```
+rm gradle/verification-metadata.xml
+./gradlew --no-configuration-cache --refresh-dependencies --write-verification-metadata sha256 \
+  spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest \
+  :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
+```
+
+The file must be generated on Linux (CI's platform), and then given the other two operating systems' `aapt2` jars. AGP resolves `com.android.tools.build:aapt2:<version>:<os>` for the build host's OS only, so a Linux run records only the `linux` jar and a macOS or Windows build fails verification. Regenerating on macOS or Windows instead would drop the `linux` jar and break CI. After the command above, add the other two from a throwaway project (`<version>` is the `aapt2` version in the file; the write mode only adds entries):
+
+```
+mkdir -p /tmp/aapt2-os/gradle && cp gradle/verification-metadata.xml /tmp/aapt2-os/gradle/ && cd /tmp/aapt2-os
+echo 'dependencyResolutionManagement { repositories { google() } }' > settings.gradle.kts
+cat > build.gradle.kts <<'EOT'
+val cfgs = listOf("linux", "osx", "windows").map { os ->
+    configurations.create("aapt2$os") { isTransitive = false }
+        .also { dependencies.add(it.name, "com.android.tools.build:aapt2:<version>:$os@jar") }
+}
+tasks.register("resolveAll") { doLast { cfgs.forEach { println(it.files) } } }
+EOT
+<repo>/gradlew --no-configuration-cache --write-verification-metadata sha256 resolveAll
+cp gradle/verification-metadata.xml <repo>/gradle/   # the diff against the repo file is only the osx and windows jars
+```
+
+`scripts/check_gradle_repos.py` fails when the `aapt2` component lacks any of the three jars.
+
+`--refresh-dependencies` is required: Gradle does not record BOM and parent POM files it already has in its metadata cache, so without it a warm `~/.gradle` writes an incomplete file that only fails on a fresh CI runner. With it, the result is the same as from an empty cache.
+
+Checksums only, no PGP signatures: most Android and Kotlin artifacts are not signed with keys Gradle can verify, and a checksum is enough to stop a mirror or CDN from silently changing an artifact. Never add `trusted-artifacts` or set `org.gradle.dependency.verification` to `off` or `lenient`; the check rejects both. The `ui` job's `:app:connectedDebugAndroidTest` needs no extra entries beyond the assemble tasks above (it needs a device, so it is not in the command); if an AGP bump adds artifacts only that task resolves, `ui` fails and the file is regenerated again. Add a new CI task to the command above when CI starts running one.
 
 ## Proposed follow-ups (not implemented here)
 Each would be its own PR, test-first, per CLAUDE.md.
