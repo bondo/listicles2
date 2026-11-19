@@ -1612,7 +1612,8 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):
         text = self.norm(self.ORCH_MD)
-        self.assertRegex(text, r"lineage depth 6 or more.{0,120}ask the owner to start the next orchestrator from a top-level session with the same prompt \(§5\.1 step 5\)")
+        self.assertRegex(text, r"lineage depth 6 or more.{0,120}ask the owner to start the next orchestrator from a top-level session "
+                               r"with the same prompt \(§5\.1 step 5\)")
         self.assertRegex(text, r"§9, f3")
         self.assertNotRegex(text, r"depth (?:of )?7|lineage depth \u2265 ?7|depth 7")
 

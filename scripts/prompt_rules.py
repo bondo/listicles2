@@ -309,7 +309,8 @@ RULES = (
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
             r"a successor does §5\.2",
-            r"from lineage depth 6 or more \(§9, f3\) do not spawn the successor: the owner starts the next orchestrator from a top-level session",
+            r"from lineage depth 6 or more \(§9, f3\) do not spawn the successor: ask the owner to start the next orchestrator from a top-level session "
+            r"with the same prompt \(§5\.1 step 5\)",
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
@@ -698,7 +699,8 @@ RULES = (
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
-            r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
+            r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge "
+            r"and records a new authorization for it on #15 \(per merge agent\), "
             r"and you never pass an approval on to it",
         ),
         "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
@@ -881,7 +883,8 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 50% of a 1m window \(40% of a 200k one, `agents/roles\.yaml` context;",
+            r"trigger: about 50% of a 1m window \(40% of a 200k one; `agents/roles\.yaml` context, #15 comment 7001335975\)",
+            r"until the hard stage, the orchestrator follows this section, not the soft reminder",
             r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
@@ -982,7 +985,8 @@ DOC_RULES = (
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
-            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge",
+            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge "
+            r"and records a new authorization for it on #15 \(per merge agent\)",
         ),
         "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
     ),
