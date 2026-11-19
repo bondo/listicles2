@@ -746,6 +746,12 @@ RULES = (
         "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
     ),
     Rule(
+        "orch-update-branch", ("orchestrator",),
+        (r"the merge agent updates a pr's branch itself with `scripts/update-branch\.sh <n> <expected head sha>` "
+         r"\(owner decision, #15 comment 7008033864\)",),
+        "the merge agent updates PR branches itself through scripts/update-branch.sh (owner decision, #15 7008033864)",
+    ),
+    Rule(
         "orch-archive", ("orchestrator",),
         (
             r"archive \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it",
@@ -1046,6 +1052,12 @@ DOC_RULES = (
             r"\(owner decision, #15 comment 7002904192\)",
         ),
         "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
+    ),
+    DocRule(
+        "orch-update-branch", ORCH,
+        (r"the merge agent updates a pr's branch itself with `scripts/update-branch\.sh <n> <expected head sha>` "
+         r"\(owner decision, #15 comment 7008033864\)",),
+        "ORCHESTRATION 7.5: the merge agent updates PR branches itself through scripts/update-branch.sh (owner decision, #15 7008033864)",
     ),
     DocRule(
         "orch-throttle", ORCH,
