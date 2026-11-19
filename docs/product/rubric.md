@@ -1,6 +1,6 @@
 # Tally visual-quality rubric
 
-Status: owner-approved 2026-11-18 (issue #15 comments 6991799032 and 6991804241); open owner question T2 text size (see issue #15). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225). R1 decided: reference apps are Todoist and Google Keep (owner, 2026-11-18, issue #15 comment 6991349569).
+Status: owner-approved 2026-11-18 (issue #15 comments 6991799032 and 6991804241); T2 text size decided (owner, 2026-11-18, issue #15 comment 6991847257; recorded in docs/milestones/M1.md section 6). T1 decided: Petrol palette (owner, 2026-11-17, issue #15 comment 6956773225). R1 decided: reference apps are Todoist and Google Keep (owner, 2026-11-18, issue #15 comment 6991349569).
 
 Task M0.5-03. Agreed by the owner at D5 (M0.5-O1, 2026-11-18); from now on changes go through R6. The collaborator
 comments, the owner decides. This file is the detailed form of
