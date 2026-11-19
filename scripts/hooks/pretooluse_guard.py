@@ -39,25 +39,30 @@ PROTECTED = (
     "scripts/install-hooks.sh",
     "scripts/merge_ready.py",  # the merge agent runs it
     "scripts/test_merge_ready.py",
-    "scripts/mark-ready.sh",  # the project allow rule approves this path; see MARK_READY below
+    "scripts/mark-ready.sh",  # the project allow rules approve these paths; see PINNED_WRAPPERS below
+    "scripts/update-branch.sh",
     "scripts/hooks/",
     ".tools/",  # linter binaries that the allow rules in .claude/settings.json run
     "scripts/install_linters.sh",
     "scripts/linters.pins",
 )
-# The allow rule `Bash(scripts/mark-ready.sh *)` approves any command that starts with that text. So: a file with this name is a process
-# file in every directory, and a command that runs one is allowed only as exactly `scripts/mark-ready.sh <PR number>` from the project root.
+# The allow rules `Bash(scripts/mark-ready.sh *)` and `Bash(scripts/update-branch.sh *)` approve any command that starts with that text. So: a
+# file with such a name is a process file in every directory, and a command that runs one is allowed only as exactly `scripts/<name> <arguments>`
+# from the project root (the arguments are fixed per wrapper, see PINNED_WRAPPERS).
 # Writes to the file cannot all be caught by name (sed -i scripts/*.sh, cp -t scripts, tar, git apply), so its content is checked when it runs:
-# the wrapper must be a regular file, not a symlink, with exactly this SHA-256. A legitimate edit of the wrapper updates this pin in the same
-# reviewed tooling PR (test_guard_mark_ready.py fails until it does).
+# the wrapper must be a regular file, not a symlink, with exactly its SHA-256. A legitimate edit of a wrapper updates its pin in the same
+# reviewed tooling PR (test_guard_mark_ready.py and test_guard_update_branch.py fail until it does).
 MARK_READY_SHA256 = "31dadb519381aa1754aad85588e06bd23bd4086f11889ceda3b5549d3958879a"
+UPDATE_BRANCH_SHA256 = "c8619a43021dc864fb2fb085037d4f73781cbdb2cbceccdcef059e48386b132c"
 MARK_READY = "mark-ready.sh"
 MARK_READY_CALL = "scripts/mark-ready.sh"
 PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")
-# R5-02: a word that names the wrapper, also after unquoting (`scripts/mark-ready.sh\\ 1` is one word): a path component that is exactly
-# mark-ready.sh, then whitespace, a slash or the end. Names such as mark-ready.sh.md or xmark-ready.sh do not match.
-WRAPPER_WORD = re.compile(r"(^|/)" + re.escape(MARK_READY) + r"(\s|/|$)")
-WHOLE_CALL = re.compile(re.escape(MARK_READY_CALL) + r" [1-9][0-9]{0,5}")
+HEX40 = re.compile(r"[0-9a-f]{40}")
+# wrapper file name -> (the pinned SHA-256, the argument patterns); the exact call is `scripts/<name> <arg> <arg>...`
+PINNED_WRAPPERS = {MARK_READY: (MARK_READY_SHA256, (PR_NUMBER,)), "update-branch.sh": (UPDATE_BRANCH_SHA256, (PR_NUMBER, HEX40))}
+# R5-02: a word that names a wrapper, also after unquoting (`scripts/mark-ready.sh\\ 1` is one word): a path component that is exactly
+# a wrapper name, then whitespace, a slash or the end. Names such as mark-ready.sh.md or xmark-ready.sh do not match.
+WRAPPER_WORD = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")(\s|/|$)")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -889,36 +894,41 @@ def check_literals(code, state, depth):
         check_command_string(c, child(state), depth + 1)
 
 
-def wrapper_is_pinned(root):
+def wrapper_is_pinned(root, name=MARK_READY):
     """R3-01: scripts/ is not a symlink, the wrapper is a regular file (not a symlink), and its SHA-256 is the pinned one."""
     scripts = os.path.join(root, "scripts")
-    path = os.path.join(scripts, MARK_READY)
+    path = os.path.join(scripts, name)
     try:
         if os.path.islink(scripts) or not stat.S_ISREG(os.lstat(path).st_mode):
             return False
         with open(path, "rb") as f:
-            return hashlib.sha256(f.read()).hexdigest() == MARK_READY_SHA256
+            return hashlib.sha256(f.read()).hexdigest() == PINNED_WRAPPERS[name][0]
     except OSError:
         return False
 
 
 def check_mark_ready(cmd, assigns, words, wrappers, state):
     """R2-01/R2-02/R3-01/R4-01: the exact call only, as the whole command, of the pinned wrapper. Raw words are judged, so $(...), backticks,
-    $VAR, globs and braces never pass the digit check. Runs when the command's first word is a mark-ready.sh; `bash scripts/mark-ready.sh N`
-    is not matched by the allow rule."""
+    $VAR, globs and braces never pass the argument checks. Runs when the command's first word is a wrapper name (mark-ready.sh or
+    update-branch.sh); `bash scripts/mark-ready.sh N` is not matched by the allow rule."""
     here = os.path.realpath(state["cwd"])
+    name = WRAPPER_WORD.search(words[0]).group(2)
+    arg_patterns = PINNED_WRAPPERS[name][1]
+    call = "scripts/" + name
+    shape = f"`{call} " + ("<PR number> <40-hex sha>" if len(arg_patterns) == 2 else "<PR number>") + "`"
     # R4-01: the hash below is taken before anything else in the line runs
-    if WHOLE_CALL.fullmatch(state.get("whole", "").strip(" \t\n")) is None:
-        deny("run the PR marker only as the whole command, exactly `scripts/mark-ready.sh <PR number>`: nothing before, after or beside it "
+    whole = re.compile(re.escape(call) + "".join(" " + p.pattern for p in arg_patterns))
+    if whole.fullmatch(state.get("whole", "").strip(" \t\n")) is None:
+        deny(f"run the wrapper only as the whole command, exactly {shape}: nothing before, after or beside it "
              "(no ; && || | & newline, group, subshell, wrapper or nesting), because the guard checks the script before the rest of the line runs")
-    exact = (words[0] == MARK_READY_CALL and len(words) == 2 and PR_NUMBER.fullmatch(words[1]) is not None
+    exact = (words[0] == call and len(words) == len(arg_patterns) + 1 and all(p.fullmatch(w) for p, w in zip(arg_patterns, words[1:], strict=True))
              and not assigns and not wrappers and not (cmd.writes or cmd.heredocs or cmd.subs)
              and state["known"] and here in project_roots(state["cwd"]))
     if not exact:
-        deny("run the PR marker only as exactly `scripts/mark-ready.sh <PR number>` from the project root: no other path, no cd or env prefix, "
+        deny(f"run the wrapper only as exactly {shape} from the project root: no other path, no cd or env prefix, "
              "no wrapper, redirect or substitution (the project allow rule approves that text, so the guard narrows it)")
-    if not wrapper_is_pinned(here):
-        deny("scripts/mark-ready.sh is missing, a symlink, or not the pinned version (SHA-256 in pretooluse_guard.py MARK_READY_SHA256); "
+    if not wrapper_is_pinned(here, name):
+        deny(f"{call} is missing, a symlink, or not the pinned version (SHA-256 in pretooluse_guard.py); "
              "only a tooling session may change the wrapper, together with the pin")
 
 
@@ -1029,8 +1039,8 @@ def guard_target(path, state, what="write to"):
 
 
 def check_bash(command, cwd):
-    if re.search(re.escape(MARK_READY) + r"\\\r?\n", command):  # R5-02: `mark-ready.sh\<newline>1` joins to a different word; never judge it
-        deny("a line continuation right after mark-ready.sh is not allowed; write exactly `scripts/mark-ready.sh <PR number>`")
+    if re.search("(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")\\\r?\n", command):  # R5-02: `mark-ready.sh\<newline>1` joins to a different word
+        deny("a line continuation right after a wrapper name is not allowed; write the exact call, e.g. `scripts/mark-ready.sh <PR number>`")
     check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command})
 
 
