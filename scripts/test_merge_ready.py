@@ -491,7 +491,7 @@ class GeneralKindTests(unittest.TestCase):
     def test_non_gate_scripts_docs_and_build_files_are_merged(self):
         names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md",
                  "core/domain/src/Lists.kt", "docs/PLAN.md", "design/tokens.json", "docs/milestones/M1.md", "firebase/test/rules.test.ts",
-                 "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "scripts/status_publish.py")  # detekt config and scripts only other workflows run: owner ruling R2
+                 "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "scripts/status_publish.py")  # R2 ruling: detekt, other workflows' scripts
         api = make_api(files=[file_entry(n) for n in names])
         self.assertEqual(go(api, kind="general")[0], 0)
         self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
