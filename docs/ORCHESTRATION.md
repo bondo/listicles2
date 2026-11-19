@@ -13,7 +13,7 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
 | **Orchestrator** | Opus / medium | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, draft PRs, Dependabot PR closes, scheduled tasks, session tags | Commits, pushes (the one exception: the server-side `update_pull_request_branch` of §7.5), edits files, reviews code, reads whole transcripts, merges |
 | **Implementer** | Opus / high (max for `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
-| **Reviewer** | Opus / high (max for `risk:high`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
+| **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
 | **Collaborator** (human, trusted Write role, [`COLLABORATING.md`](COLLABORATING.md)) | n/a | n/a | Comments, issues from the forms, PR reviews; nothing else | Merge, enable auto-merge, mark ready, edit files, close, delete branches, resolve threads, labels, comment on #15; sign off design (owner only) |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
 
@@ -653,6 +653,9 @@ The orchestrator collects results in this order, from cheapest to most expensive
 * **Dependabot weekly routine:** once a week one batch triage worker reads the open Dependabot PRs and groups the bumps
   into one new branch cut from `main` (never a feature branch, F6), opens a draft PR and posts a "ready" comment on it.
   The individual Dependabot PRs are closed (§1.1) only after that grouped PR has merged, since its bumps then supersede them.
+  Dependabot cannot run Gradle, so a Gradle bump fails CI with "Dependency verification failed" until `gradle/verification-metadata.xml`
+  is regenerated: the grouped Gradle bump branch regenerates it from scratch before merge (command in `ANDROID-BEST-PRACTICES.md` §11),
+  and its reviewer checks that only the bumped coordinates changed. A red individual Dependabot PR with that error is expected.
 * **Linter permission (M0.5-06, owner-approved 2026-11-15, issue #15):** `.claude/settings.json` allows exactly three commands:
   `Bash(.tools/bin/shellcheck *)`, `Bash(.tools/bin/actionlint *)` and `Bash(.tools/bin/zizmor --offline *)` (zizmor offline only).
   `scripts/install_linters.sh` fills `.tools/bin/` (git-ignored) from `scripts/linters.pins` (shellcheck v0.11.0, actionlint v1.7.12,

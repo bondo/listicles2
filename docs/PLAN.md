@@ -406,7 +406,10 @@ enforce the rules rather than goodwill.
      * `@Ignore`, `@Disabled`, `xit`, `.only`
      * `@Suppress`, `tools:ignore`, `ktlint-disable`, `detekt:` suppressions, or
        `lint.disable` / `.editorconfig` rule-offs, unless the line carries
-       `// justified: <reason>` (the reviewer checks these)
+       `// justified: <reason>` of at least 3 words of letters (the reviewer checks the content)
+     * a raised line length, a lowered `coverageThreshold` / `fail_under`, a weaker ESLint preset, a dropped ruff `select` item or tsconfig
+       `include` entry, a new tsconfig `exclude` entry, by comparing against `main`; linter or test config embedded
+       in `package.json`. What is still not caught: `docs/guards-known-gaps.md`
      * any detekt or lint baseline file
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label
@@ -521,7 +524,7 @@ members' changes; a conflict keeps the losing side; so v1 sync design should lea
 | **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR; the PR-sized tasks with dependencies in `docs/tasks.toml` |
 | **Implementer** | Opus / high (max for `risk:high`) | Fresh session per PR, kept across its review rounds | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green |
-| **Reviewer** | Opus / high | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
+| **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
 | **Second reviewer** | Opus / high | Fresh session in the same round, for `risk:high` and the protected areas | Diff, PR description, `REVIEW.md`; not the first reviewer's findings | Findings (`S<round>-<nn>`), merged with the reviewer's |
 | **Escalation reviewer** | Opus / max | Fresh session, once per PR after round 4 or on a dispute | The whole review thread | `fix`, `split` or `owner` (`REVIEW.md`, Loop and cap) |
 | **Design reviewer** | Opus / high | Fresh session per design-PR round, max 3 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |

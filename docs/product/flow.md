@@ -1,8 +1,8 @@
 # Tally app flow (v1)
 
-Status: working draft, merged as the baseline for M1 planning; not owner-approved (see issue #15).
+Status: owner-approved 2026-11-18 (issue #15 comment 6991804241); T2 text size decided (owner, 2026-11-18, issue #15 comment 6991847257) and screen 32a closed (comment 6992107414); recorded in docs/milestones/M1.md section 6.
 
-Task M0.5-02. Status: **draft for the owner's sign-off** (M0.5-O1; the collaborator comments, the owner decides).
+Task M0.5-02. Status: **owner-approved 2026-11-18** (M0.5-O1, issue #15 comment 6991804241).
 Source: the [v1 user stories](stories.md) and the owner decisions they record (Q1-Q5, OQ-1 to OQ-6, OQ-17, OQ-19,
 OQ-23 to OQ-33, the two list types; state issue #15). This document adds no product decision: every step names the story it comes from, and anything still
 open is marked **OQ-n** as in [stories section 11](stories.md#11-open-questions). New questions this flow raised are in
