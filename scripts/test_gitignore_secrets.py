@@ -3,14 +3,14 @@
 Uses `git check-ignore --no-index`, so the answer is about the patterns alone, not about what is tracked.
 """
 
+import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
-
-# Tracked although ignored: predates this check. Anything else tracked must never match an ignore pattern.
-TRACKED_BUT_IGNORED = {"firebase/.firebaserc"}
 
 MUST_IGNORE = [
     "app/google-services.json",
@@ -35,6 +35,8 @@ MUST_IGNORE = [
     "service-account.json",
     "service-account-key.json",
     "firebase/service-account-prod.json",
+    "firebase/listicles-firebase-adminsdk-x1y2z-0123456789.json",
+    "listicles-firebase-adminsdk-x1y2z-0123456789.json",
     "app/src/debug/service-account.json",
     "firebase/.firebase/hosting.abc.cache",
     "firebase/.firebase/",
@@ -47,6 +49,8 @@ MUST_NOT_IGNORE = [
     "app/build.gradle.kts",
     "firebase/firebase.json",
     "firebase/.gitignore",
+    "firebase/.firebaserc",
+    "docs/firebase-admin.md",
     "firebase/firestore.rules",
     "docs/service-accounts.md",
     "scripts/service_account.py",
@@ -67,6 +71,13 @@ def check_ignore(path: str) -> bool:
     return r.returncode == 0
 
 
+def tracked_ignored() -> set[str]:
+    out = subprocess.run(
+        ["git", "ls-files", "-ci", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout
+    return set(out.split("\n")) - {""}
+
+
 class Ignored(unittest.TestCase):
     def test_secret_paths_are_ignored(self):
         for path in MUST_IGNORE:
@@ -81,11 +92,28 @@ class NotIgnored(unittest.TestCase):
                 self.assertFalse(check_ignore(path), f"{path} must not be git-ignored")
 
     def test_no_tracked_file_is_ignored(self):
-        out = subprocess.run(
-            ["git", "ls-files", "-ci", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True, check=True
-        ).stdout
-        tracked_ignored = set(out.split("\n")) - {""}
-        self.assertEqual(tracked_ignored - TRACKED_BUT_IGNORED, set())
+        self.assertEqual(tracked_ignored(), set())
+
+
+class IndependentOfDeveloperMachine(unittest.TestCase):
+    """A global excludes file (core.excludesFile) must not change the answers."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        excludes = Path(tmp.name) / "excludes"
+        excludes.write_text("poison-*.txt\nREADME.md\n")
+        config = Path(tmp.name) / "gitconfig"
+        config.write_text(f"[core]\n\texcludesFile = {excludes}\n")
+        patcher = mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_global_excludes_do_not_hide_a_missing_pattern(self):
+        self.assertFalse(check_ignore("poison-1.txt"))
+
+    def test_global_excludes_do_not_hide_a_tracked_ignored_file(self):
+        self.assertEqual(tracked_ignored(), set())
 
 
 if __name__ == "__main__":
