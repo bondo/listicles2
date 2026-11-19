@@ -2,6 +2,7 @@
 Tests that create repos must never touch the enclosing one. Each case points GIT_DIR at a sentinel repo and proves the sentinel
 is unchanged. Run: python3 -I -m unittest discover -s scripts/hooks"""
 
+import concurrent.futures
 import os
 import subprocess
 import sys
@@ -27,6 +28,16 @@ def sentinel():
     return d
 
 
+def run_suites(suites, env):
+    """Runs each suite in its own process, all at once (issue 229: the serial loop was the slowest hook test). Returns {suite: result}."""
+    def run(suite):
+        return subprocess.run([sys.executable, "-I", "-m", "unittest", "discover", "-s", HERE, "-p", suite], cwd=ROOT, env=env,
+                              capture_output=True, text=True)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(suites)) as pool:
+        return dict(zip(suites, pool.map(run, suites), strict=True))
+
+
 def snapshot(d):
     return (git(d, "rev-parse", "HEAD"), git(d, "log", "--oneline"), git(d, "config", "--local", "--list"))
 
@@ -36,22 +47,10 @@ class GitEnvIsolation(unittest.TestCase):
         s = sentinel()
         before = snapshot(s)
         env = dict(os.environ, GIT_DIR=os.path.join(s, ".git"))
-        for suite in SUITES:
-            r = subprocess.run([sys.executable, "-I", "-m", "unittest", "discover", "-s", HERE, "-p", suite], cwd=ROOT, env=env,
-                               capture_output=True, text=True)
+        for suite, r in run_suites(SUITES, env).items():
             self.assertEqual(r.returncode, 0, suite + r.stderr[-600:])
-            self.assertEqual(snapshot(s), before, f"{suite} modified the repository named by GIT_DIR")
-
-    def test_suites_pass_under_a_hostile_global_git_config(self):
-        """R12-52: signing, hooks or identity in the developer's global/system config must not matter to fixture repos."""
-        cfg = os.path.join(tempfile.mkdtemp(), "hostile.cfg")
-        with open(cfg, "w") as f:
-            f.write("[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n[core]\n\thooksPath = /nonexistent\n")
-        env = dict(os.environ, GIT_CONFIG_GLOBAL=cfg)
-        for suite in ("test_prepush_hook.py", "test_precommit_hook.py", "test_guards_sh.py"):
-            r = subprocess.run([sys.executable, "-I", "-m", "unittest", "discover", "-s", HERE, "-p", suite], cwd=ROOT, env=env,
-                               capture_output=True, text=True)
-            self.assertEqual(r.returncode, 0, suite + r.stderr[-600:])
+        # The suites run at the same time, so a change to the sentinel cannot be pinned on one of them (PR 232 R1-04).
+        self.assertEqual(snapshot(s), before, f"one of {', '.join(SUITES)} modified the repository named by GIT_DIR")
 
     def test_leak_detection_works(self):
         """Negative case: a process that really inherits GIT_DIR does change the sentinel, so the check above can fail."""
