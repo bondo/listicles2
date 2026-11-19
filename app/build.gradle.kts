@@ -95,6 +95,35 @@ tasks.withType<Test>().configureEach {
     )
 }
 
+// A JUnit 4 test with no result XML was silently skipped: fail the build (issue #212).
+val gateScript = rootProject.file("scripts/check_test_results.py").path
+val gateSources =
+    layout.projectDirectory
+        .dir("src/test")
+        .asFile.path
+val gateResults =
+    layout.buildDirectory
+        .dir("test-results/testDebugUnitTest")
+        .get()
+        .asFile.path
+// A filtered run (--tests, or one class from the IDE) runs a subset on purpose, so the gate does not apply.
+val filteredTestRun =
+    gradle.startParameter.taskRequests.any { request ->
+        request.args.any { it == "--tests" || it.startsWith("--tests=") }
+    }
+val checkUnitTestResults by tasks.registering(Exec::class) {
+    commandLine(
+        listOf("python3", "-I", gateScript, gateSources, gateResults) +
+            listOfNotNull("--filtered".takeIf { filteredTestRun }),
+    )
+}
+
+tasks.withType<Test>().configureEach {
+    // A test task that discovers zero tests is a failure, not a pass.
+    failOnNoDiscoveredTests = true
+    if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -116,12 +145,12 @@ dependencies {
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
     testImplementation(project(":core:testing"))
-    testRuntimeOnly(libs.junit.platform.launcher)
-    testImplementation(libs.junit4)
-    testImplementation(libs.robolectric)
     testRuntimeOnly(libs.junit.vintage.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.robolectric)
     robolectricAndroidAll(libs.robolectric.android.all)
 
     androidTestImplementation(platform(libs.compose.bom))

@@ -24,13 +24,29 @@ def case(body, header="import unittest\n"):
     return header + "\nclass T(unittest.TestCase):\n    " + body
 
 
-def run_runner(*sources):
+def run_tree(files, jobs=None):
+    """Like run_runner, but `files` maps relative paths (sub/test_c.py ...) to sources; sub-directories get an __init__.py."""
+    with tempfile.TemporaryDirectory(prefix="hook-runner-tree-") as d:
+        for rel, src in files.items():
+            full = os.path.join(d, rel)
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            if os.path.dirname(rel):
+                open(os.path.join(os.path.dirname(full), "__init__.py"), "a", encoding="utf-8").close()
+            with open(full, "w", encoding="utf-8") as f:
+                f.write(src)
+        extra = ["--jobs", str(jobs)] if jobs else []
+        r = subprocess.run([sys.executable, "-I", RUNNER, *extra, d], capture_output=True, text=True, cwd=d)
+        return r.returncode, r.stdout + r.stderr
+
+
+def run_runner(*sources, jobs=None):
     """Writes each source as scripts/hooks-style test_n.py in a temp dir, runs the runner on it, returns (rc, output)."""
     with tempfile.TemporaryDirectory(prefix="hook-runner-test-") as d:
         for i, src in enumerate(sources):
             with open(os.path.join(d, f"test_n{i}.py"), "w", encoding="utf-8") as f:
                 f.write(src)
-        r = subprocess.run([sys.executable, "-I", RUNNER, d], capture_output=True, text=True, cwd=d)
+        extra = ["--jobs", str(jobs)] if jobs else []
+        r = subprocess.run([sys.executable, "-I", RUNNER, *extra, d], capture_output=True, text=True, cwd=d)
         return r.returncode, r.stdout + r.stderr
 
 
@@ -98,6 +114,98 @@ class RunnerStaysPlainOtherwise(unittest.TestCase):
 
     def test_the_real_hook_suite_discovery_defaults_to_the_script_directory(self):
         self.assertTrue(os.path.isfile(RUNNER))
+
+
+FAILING = case("def test_a(self):\n        self.fail('x')\n")
+SKIPPING = case(f"@unittest.{SK}('x')\n    " + PASSING)
+XFAIL = case("@unittest.expected" + "Failure\n    def test_a(self):\n        self.fail('x')\n")
+
+
+class ParallelRunnerKeepsEveryGate(unittest.TestCase):
+    """--jobs N runs the test files in child processes (issue 229). It fails for everything the serial run fails for, and
+    (R1-01, PR 232 round 1) collects what serial discovery collects: test*.py files and sub-packages."""
+
+    def test_passing_trees_run_every_test_once_in_every_mode(self):
+        files = {"test_a.py": case(PASSING), "testb.py": case(PASSING), "sub/test_c.py": case(PASSING), "sub/testd.py": case(PASSING)}
+        for jobs in (None, 2, 4, 8):
+            rc, out = run_tree(files, jobs=jobs)
+            self.assertEqual(rc, 0, out)
+        self.assertIn("hook tests: ran 4 tests in 2 shards", run_tree(files, jobs=2)[1])
+        self.assertIn("ran 5 tests in 3 shards", run_runner(*[case(PASSING)] * 5, jobs=3)[1])
+
+    def test_every_failure_form_fails_serial_and_parallel(self):
+        ok = {"test_a.py": case(PASSING)}
+        bad = {
+            "skip": {"test_b.py": SKIPPING},
+            "expected failure": {"test_b.py": XFAIL},
+            "failing test": {"test_b.py": FAILING},
+            "import error": {"test_b.py": "import no_such_module_for_runner_test\n"},
+            "crash": {"test_b.py": "import os\nos._exit(3)\n"},
+            "file named testb.py (no underscore)": {"testb.py": FAILING},
+            "test in a sub-package": {"sub/test_c.py": FAILING},
+            "test*.py in a sub-package": {"sub/testd.py": FAILING},
+            "skip in a sub-package": {"sub/test_c.py": SKIPPING},
+        }
+        for what, extra in bad.items():
+            files = {**ok, **extra}
+            if what != "crash":  # a crash of the whole process is not a serial-mode form
+                self.assertNotEqual(run_tree(files)[0], 0, f"serial: {what}")
+            rc, out = run_tree(files, jobs=2)
+            self.assertNotEqual(rc, 0, f"parallel: {what}: {out}")
+
+    def test_a_test_hidden_from_name_loading_is_caught_by_the_count_check(self):
+        """R2-01: load_tests hides a failing test from loadTestsFromName but not from discovery; only the count check sees it."""
+        hidden = FAILING + "\n\ndef load_tests(loader, tests, pattern):\n    return tests if pattern else unittest.TestSuite()\n"
+        files = {"test_a.py": case(PASSING), "test_b.py": case(PASSING), "test_lt.py": hidden}
+        self.assertNotEqual(run_tree(files)[0], 0)
+        rc, out = run_tree(files, jobs=2)
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("serial discovery collects", out)
+
+    def test_skip_is_reported_by_name(self):
+        self.assertIn("skipped", run_runner(case(PASSING), SKIPPING, case(PASSING), jobs=3)[1])
+
+    def test_zero_tests_found_fails(self):
+        rc, out = run_runner(jobs=2)
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("no tests", out)
+
+    def test_bad_job_counts_fail(self):
+        for bad in ("0", "-1", "x"):
+            r = subprocess.run([sys.executable, "-I", RUNNER, "--jobs", bad], capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0, bad)
+
+    def test_count_check_and_units(self):
+        import run_hook_tests
+
+        with tempfile.TemporaryDirectory(prefix="hook-runner-units-") as d:
+            for rel in ("test_a.py", "testb.py", "helper.py", "sub/__init__.py", "sub/test_c.py", "nopkg/test_d.py"):
+                os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
+                with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                    f.write(case(PASSING) if rel.startswith("test") else "")
+            self.assertEqual(run_hook_tests.units(d), ["sub", "test_a.py", "testb.py"])
+            self.assertIsNone(run_hook_tests.count_problem(d, 2))  # test_a.py and testb.py; sub has no tests
+            self.assertIn("2 test", run_hook_tests.count_problem(d, 3))
+
+
+class Partition(unittest.TestCase):
+    def test_every_file_lands_in_exactly_one_shard(self):
+        import run_hook_tests
+
+        files = [f"test_{i}.py" for i in range(10)] + ["test_gitenv_isolation.py", "test_guards_sh.py"]
+        for n in (1, 2, 3, 4, 7, 20):
+            shards = run_hook_tests.partition(files, n)
+            flat = [f for shard in shards for f in shard]
+            self.assertEqual(sorted(flat), sorted(files), n)
+            self.assertTrue(all(shards), f"no empty shard for {n}")
+            self.assertLessEqual(len(shards), n)
+
+    def test_the_known_slow_files_do_not_share_a_shard(self):
+        import run_hook_tests
+
+        shards = run_hook_tests.partition(["test_a.py", "test_gitenv_isolation.py", "test_gitenv_hostile_config.py", "test_guards_sh.py"], 3)
+        for shard in shards:
+            self.assertLessEqual(sum(f in run_hook_tests.WEIGHTS for f in shard), 1, shards)
 
 
 if __name__ == "__main__":
