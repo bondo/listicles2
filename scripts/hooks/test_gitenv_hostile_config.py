@@ -1,6 +1,5 @@
-"""R12-52: signing, hooks or identity in the developer's global/system config must not matter to fixture repos.
-Split from test_gitenv_isolation.py (issue 229) so the parallel hook runner can run the two slow halves side by side.
-Run: python3 -I -m unittest discover -s scripts/hooks"""
+"""R12-52: signing, hooks or identity in the global git config must not matter to fixture repos. Split from
+test_gitenv_isolation.py (issue 229) so the parallel runner can run the two slow halves side by side."""
 
 import os
 import tempfile

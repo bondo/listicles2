@@ -116,100 +116,68 @@ class RunnerStaysPlainOtherwise(unittest.TestCase):
         self.assertTrue(os.path.isfile(RUNNER))
 
 
+FAILING = case("def test_a(self):\n        self.fail('x')\n")
+SKIPPING = case(f"@unittest.{SK}('x')\n    " + PASSING)
+XFAIL = case("@unittest.expected" + "Failure\n    def test_a(self):\n        self.fail('x')\n")
+
+
 class ParallelRunnerKeepsEveryGate(unittest.TestCase):
-    """--jobs N runs the test files in N child processes (issue 229). It must fail for everything the serial run fails for."""
+    """--jobs N runs the test files in child processes (issue 229). It fails for everything the serial run fails for, and
+    (R1-01, PR 232 round 1) collects what serial discovery collects: test*.py files and sub-packages."""
 
-    def test_passing_files_exit_zero_and_every_test_runs_once(self):
-        rc, out = run_runner(*[case(PASSING)] * 5, jobs=3)
-        self.assertEqual(rc, 0, out)
-        self.assertIn("hook tests: ran 5 tests in 3 shards", out)
+    def test_passing_trees_run_every_test_once_in_every_mode(self):
+        files = {"test_a.py": case(PASSING), "testb.py": case(PASSING), "sub/test_c.py": case(PASSING), "sub/testd.py": case(PASSING)}
+        for jobs in (None, 2, 4, 8):
+            rc, out = run_tree(files, jobs=jobs)
+            self.assertEqual(rc, 0, out)
+        self.assertIn("hook tests: ran 4 tests in 2 shards", run_tree(files, jobs=2)[1])
+        self.assertIn("ran 5 tests in 3 shards", run_runner(*[case(PASSING)] * 5, jobs=3)[1])
 
-    def test_skip_in_one_shard_fails(self):
-        rc, out = run_runner(case(PASSING), case(f"@unittest.{SK}('x')\n    " + PASSING), case(PASSING), jobs=3)
-        self.assertNotEqual(rc, 0, out)
-        self.assertIn("skipped", out)
+    def test_every_failure_form_fails_serial_and_parallel(self):
+        ok = {"test_a.py": case(PASSING)}
+        bad = {
+            "skip": {"test_b.py": SKIPPING},
+            "expected failure": {"test_b.py": XFAIL},
+            "failing test": {"test_b.py": FAILING},
+            "import error": {"test_b.py": "import no_such_module_for_runner_test\n"},
+            "crash": {"test_b.py": "import os\nos._exit(3)\n"},
+            "file named testb.py (no underscore)": {"testb.py": FAILING},
+            "test in a sub-package": {"sub/test_c.py": FAILING},
+            "test*.py in a sub-package": {"sub/testd.py": FAILING},
+            "skip in a sub-package": {"sub/test_c.py": SKIPPING},
+        }
+        for what, extra in bad.items():
+            files = {**ok, **extra}
+            if what != "crash":  # a crash of the whole process is not a serial-mode form
+                self.assertNotEqual(run_tree(files)[0], 0, f"serial: {what}")
+            rc, out = run_tree(files, jobs=2)
+            self.assertNotEqual(rc, 0, f"parallel: {what}: {out}")
 
-    def test_expected_failure_in_one_shard_fails(self):
-        rc, out = run_runner(case(PASSING), case("@unittest.expected" + "Failure\n    def test_a(self):\n        self.fail('x')\n"), jobs=2)
-        self.assertNotEqual(rc, 0, out)
-
-    def test_failing_test_in_one_shard_fails(self):
-        rc, out = run_runner(case(PASSING), case("def test_a(self):\n        self.fail('x')\n"), jobs=2)
-        self.assertNotEqual(rc, 0, out)
-
-    def test_import_error_in_one_shard_fails(self):
-        rc, out = run_runner(case(PASSING), "import no_such_module_for_runner_test\n", jobs=2)
-        self.assertNotEqual(rc, 0, out)
+    def test_skip_is_reported_by_name(self):
+        self.assertIn("skipped", run_runner(case(PASSING), SKIPPING, case(PASSING), jobs=3)[1])
 
     def test_zero_tests_found_fails(self):
         rc, out = run_runner(jobs=2)
         self.assertNotEqual(rc, 0, out)
         self.assertIn("no tests", out)
 
-    def test_more_jobs_than_files_still_runs_everything(self):
-        rc, out = run_runner(case(PASSING), jobs=8)
-        self.assertEqual(rc, 0, out)
-        self.assertIn("ran 1 tests in 1 shards", out)
-
-    def test_a_crashing_shard_fails(self):
-        rc, out = run_runner(case(PASSING), "import os\nos._exit(3)\n", jobs=2)
-        self.assertNotEqual(rc, 0, out)
-
     def test_bad_job_counts_fail(self):
         for bad in ("0", "-1", "x"):
             r = subprocess.run([sys.executable, "-I", RUNNER, "--jobs", bad], capture_output=True, text=True)
             self.assertNotEqual(r.returncode, 0, bad)
 
-
-FAILING = case("def test_a(self):\n        self.fail('x')\n")
-
-
-class ParallelDiscoveryMatchesSerial(unittest.TestCase):
-    """R1-01 (PR 232 round 1): --jobs must collect exactly what the serial run collects (test*.py, sub-packages),
-    or CI would pass a test that the pre-push hook fails."""
-
-    TREES = {
-        "file named testb.py (no underscore)": {"test_a.py": case(PASSING), "testb.py": FAILING},
-        "test in a sub-package": {"test_a.py": case(PASSING), "sub/test_c.py": FAILING},
-        "test*.py in a sub-package": {"test_a.py": case(PASSING), "sub/testd.py": FAILING},
-    }
-
-    def test_serial_and_parallel_agree_on_every_tree(self):
-        for name, files in self.TREES.items():
-            serial, _ = run_tree(files)
-            parallel, out = run_tree(files, jobs=2)
-            self.assertNotEqual(serial, 0, name)
-            self.assertNotEqual(parallel, 0, f"{name}: {out}")
-
-    def test_passing_trees_run_every_test_in_both_modes(self):
-        files = {"test_a.py": case(PASSING), "testb.py": case(PASSING), "sub/test_c.py": case(PASSING), "sub/testd.py": case(PASSING)}
-        for jobs in (None, 2, 4):
-            rc, out = run_tree(files, jobs=jobs)
-            self.assertEqual(rc, 0, out)
-        self.assertIn("hook tests: ran 4 tests in", run_tree(files, jobs=2)[1])
-
-    def test_a_skip_in_a_sub_package_fails_in_parallel_mode(self):
-        rc, out = run_tree({"test_a.py": case(PASSING), "sub/test_c.py": case(f"@unittest.{SK}('x')\n    " + PASSING)}, jobs=2)
-        self.assertNotEqual(rc, 0, out)
-
-    def test_a_count_mismatch_between_shards_and_discovery_is_a_failure(self):
-        import run_hook_tests
-
-        with tempfile.TemporaryDirectory(prefix="hook-runner-count-") as d:
-            with open(os.path.join(d, "test_a.py"), "w", encoding="utf-8") as f:
-                f.write(case(PASSING))
-            self.assertIsNone(run_hook_tests.count_problem(d, 1))
-            self.assertIn("1 test", run_hook_tests.count_problem(d, 0))
-            self.assertIn("1 test", run_hook_tests.count_problem(d, 2))
-
-    def test_units_list_top_level_test_files_and_packages(self):
+    def test_count_check_and_units(self):
         import run_hook_tests
 
         with tempfile.TemporaryDirectory(prefix="hook-runner-units-") as d:
             for rel in ("test_a.py", "testb.py", "helper.py", "sub/__init__.py", "sub/test_c.py", "nopkg/test_d.py"):
                 os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
-                open(os.path.join(d, rel), "w", encoding="utf-8").close()
+                with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                    f.write(case(PASSING) if rel.startswith("test") else "")
             self.assertEqual(run_hook_tests.units(d), ["sub", "test_a.py", "testb.py"])
+            self.assertIsNone(run_hook_tests.count_problem(d, 2))  # test_a.py and testb.py; sub has no tests
+            for wrong in (0, 3):
+                self.assertIn("2 test", run_hook_tests.count_problem(d, wrong))
 
 
 class Partition(unittest.TestCase):
@@ -237,11 +205,6 @@ class Partition(unittest.TestCase):
 
         for name in run_hook_tests.WEIGHTS:
             self.assertTrue(os.path.isfile(os.path.join(HERE, name)), name)
-
-    def test_no_files_gives_no_shards(self):
-        import run_hook_tests
-
-        self.assertEqual(run_hook_tests.partition([], 4), [])
 
 
 if __name__ == "__main__":

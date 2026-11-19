@@ -37,9 +37,8 @@ jobs:
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-      # Issue 229 / 216: the Gradle gate self-tests (about 20 cold builds each) run only when the PR touches something
-      # they inspect, and always on pushes to main. This job has no if: (check_gradle_repos.py forbids one), so
-      # scripts/ci_scope.py decides; it fails closed to "run".
+      # Issue 229 / 216: the Gradle gate self-tests run only when the PR can affect them (always on main).
+      # No if: here (check_gradle_repos.py forbids one), so scripts/ci_scope.py decides and fails closed.
       - name: Gradle gate self-tests (warnings-as-errors, JDK release; scripts/ci_scope.py)
         run: python3 -I scripts/ci_scope.py selftests
       - name: gradle repos check tests (config and CI wiring)

@@ -2,14 +2,15 @@
 
 Usage: python3 -I scripts/hooks/run_hook_tests.py [--jobs N] [start_dir]   (default: the directory of this script, serial)
 
-With --jobs N the test files are spread over N child processes (issue 229); every child applies the same gates and the
-parent fails if any child fails, crashes or finds nothing. The slow files are listed in WEIGHTS so they do not share a shard.
+With --jobs N the test files and packages are spread over N child processes (issue 229); every child applies the same gates
+and the parent fails if a child fails, or if the shards ran a different number of tests than serial discovery collects.
 
 The suite is a CI gate, so a skipped test is a failure however the skip was written (`import unittest as ut` + `@ut.skip`,
 a call form, `self.skipTest`). The check reads the run's result, not the source text. Expected failures and unexpected
 successes count too, and so does a run that finds no tests.
 """
 
+import argparse
 import concurrent.futures
 import fnmatch
 import os
@@ -72,10 +73,8 @@ def run_parallel(start, jobs):
     total, rc = 0, 0
     for names, code, out in results:
         print(f"--- shard: {' '.join(names)} (exit {code})")
-        print(out if code != 0 else "\n".join(ln for ln in out.splitlines() if ln.startswith(("Ran ", "OK", "FAILED"))))
-        for ln in out.splitlines():
-            if ln.startswith("Ran "):
-                total += int(ln.split()[1])
+        print(out if code != 0 else "\n".join(ln for ln in out.splitlines() if ln.startswith(("Ran ", "OK"))))
+        total += sum(int(ln.split()[1]) for ln in out.splitlines() if ln.startswith("Ran "))
         rc = rc or code
     print(f"hook tests: ran {total} tests in {len(shards)} shards")
     problem = count_problem(start, total)
@@ -85,30 +84,23 @@ def run_parallel(start, jobs):
 
 
 def main(argv):
-    args = argv[1:]
-    jobs, only = 1, None
-    while args and args[0] in ("--jobs", "--only"):
-        flag = args[0]
-        if len(args) < 2:
-            print(f"hook tests: {flag} needs a value", file=sys.stderr)
-            return 2
-        if flag == "--jobs":
-            if not args[1].isdigit() or int(args[1]) < 1:
-                print("hook tests: --jobs needs a whole number of at least 1", file=sys.stderr)
-                return 2
-            jobs = int(args[1])
-        else:
-            only = args[1].split(",")
-        args = args[2:]
-    start = os.path.abspath(args[0]) if args else os.path.dirname(os.path.abspath(__file__))
-    if jobs > 1 and only is None:
-        return run_parallel(start, jobs)
+    ap = argparse.ArgumentParser(prog="run_hook_tests.py")
+    ap.add_argument("--jobs", type=int, default=1)
+    ap.add_argument("--only", help="comma-separated units for one shard (used by the parent)")
+    ap.add_argument("start", nargs="?", default=os.path.dirname(os.path.abspath(__file__)))
+    args = ap.parse_args(argv[1:])
+    if args.jobs < 1:
+        print("hook tests: --jobs needs a whole number of at least 1", file=sys.stderr)
+        return 2
+    start = os.path.abspath(args.start)
+    if args.jobs > 1 and args.only is None:
+        return run_parallel(start, args.jobs)
     loader = unittest.TestLoader()
-    if only is None:
+    if args.only is None:
         suite = loader.discover(start)
     else:
         sys.path.insert(0, start)  # a module is loaded by name, so its directory must be importable (discover adds it itself)
-        suite = unittest.TestSuite(load_unit(loader, start, n) for n in only)
+        suite = unittest.TestSuite(load_unit(loader, start, n) for n in args.only.split(","))
     result = unittest.TextTestRunner(stream=sys.stdout, verbosity=1).run(suite)
     problems = []
     if result.testsRun == 0:

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """CI scope (issue 229, see 216): can this pull request affect the slow Gradle gate self-tests?
 
-Usage (in the static job, which checks out the PR merge commit with fetch-depth 2; the job has no `if:`, because
-scripts/check_gradle_repos.py forbids one, so the decision is made here):
+Used by the static job (checkout of the PR merge commit, fetch-depth 2; the job may have no `if:`, see check_gradle_repos.py):
     python3 -I scripts/ci_scope.py selftests [--scripts a.py b.py]   runs the Gradle gate self-tests, or none of them
     python3 -I scripts/ci_scope.py gradle-exclude                    prints `-x testLicenseeGate` or nothing
 
-The answer is `skip` only when the event is a pull request, HEAD is a merge commit and every path changed against its first parent (the
-base branch tip) is known to be unrelated. Everything else is `run`: a push (main always runs everything), an unknown or
-odd path, an empty list, a git failure. The answer only gates steps, never a job, so every required check still reports.
+`skip` only for a pull request whose merge commit changes, against its first parent, nothing but known-unrelated paths.
+Everything else is `run`: a push (main always runs everything), an unknown or odd path, no paths, a git failure.
 """
 
 import os

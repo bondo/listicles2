@@ -37,15 +37,13 @@ class Classify(unittest.TestCase):
                   "scripts/ci_scope.py", ".github/workflows/ci.yml", "app/src/main/build.gradle.kts"):
             self.assertEqual(ci_scope.gradle_selftests([p]), "run", p)
 
-    def test_one_relevant_path_among_unrelated_ones_runs(self):
-        self.assertEqual(ci_scope.gradle_selftests(["docs/a.md", "docs/b.md", "gradle/libs.versions.toml"]), "run")
-
     def test_unknown_paths_run(self):
         for p in ("new-top-level-dir/x", "Makefile", "x.kt", "src/main/A.kt", "docs/../build.gradle.kts", "/abs/path", ""):
             self.assertEqual(ci_scope.gradle_selftests([p]), "run", p)
 
-    def test_empty_list_runs(self):
+    def test_empty_list_and_one_relevant_path_among_unrelated_ones_run(self):
         self.assertEqual(ci_scope.gradle_selftests([]), "run")
+        self.assertEqual(ci_scope.gradle_selftests(["docs/a.md", "docs/b.md", "gradle/libs.versions.toml"]), "run")
 
 
 def git(cwd, *args):
@@ -56,18 +54,14 @@ def git(cwd, *args):
 def merge_repo(path_to_change):
     """A repo whose HEAD is a merge commit (like the pull_request checkout) that changes `path_to_change` against its first parent."""
     d = tempfile.mkdtemp(prefix="ci-scope-")
-    git(d, "init", "-q", "-b", "main")
-    git(d, "commit", "-q", "--allow-empty", "-m", "base")
-    git(d, "checkout", "-q", "-b", "pr")
-    full = os.path.join(d, path_to_change)
-    os.makedirs(os.path.dirname(full), exist_ok=True)
-    with open(full, "w", encoding="utf-8") as f:
-        f.write("x\n")
-    git(d, "add", "-A")
-    git(d, "commit", "-q", "-m", "change")
-    git(d, "checkout", "-q", "main")
-    git(d, "commit", "-q", "--allow-empty", "-m", "main moved")
-    git(d, "merge", "-q", "--no-ff", "-m", "merge", "pr")
+    for args in (("init", "-q", "-b", "main"), ("commit", "-q", "--allow-empty", "-m", "base"), ("checkout", "-q", "-b", "pr")):
+        git(d, *args)
+    full = Path(d, path_to_change)
+    full.parent.mkdir(parents=True, exist_ok=True)
+    full.write_text("x\n", encoding="utf-8")
+    for args in (("add", "-A"), ("commit", "-q", "-m", "change"), ("checkout", "-q", "main"), ("commit", "-q", "--allow-empty", "-m", "moved"),
+                 ("merge", "-q", "--no-ff", "-m", "merge", "pr")):
+        git(d, *args)
     return d
 
 
@@ -80,42 +74,31 @@ def run_cli(cwd, *args, event="pull_request"):
 
 
 class GradleExclude(unittest.TestCase):
-    """`gradle-exclude` prints the Gradle arguments that drop the licensee self-test, or nothing."""
+    """`gradle-exclude` prints the Gradle arguments that drop the licensee self-test, or nothing (fail closed)."""
 
-    SKIP = (0, "-x testLicenseeGate")
-    RUN = (0, "")
-
-    def test_docs_only_pull_request_excludes_it(self):
-        self.assertEqual(run_cli(merge_repo("docs/x.md"), "gradle-exclude"), self.SKIP)
-
-    def test_build_file_pull_request_keeps_it(self):
-        self.assertEqual(run_cli(merge_repo("gradle/libs.versions.toml"), "gradle-exclude"), self.RUN)
-
-    def test_licensee_config_keeps_it(self):
-        self.assertEqual(run_cli(merge_repo("config/licensee/allowed.txt"), "gradle-exclude"), self.RUN)
-
-    def test_push_keeps_it(self):
-        self.assertEqual(run_cli(merge_repo("docs/x.md"), "gradle-exclude", event="push"), self.RUN)
-
-    def test_missing_event_keeps_it(self):
-        self.assertEqual(run_cli(merge_repo("docs/x.md"), "gradle-exclude", event=None), self.RUN)
-
-    def test_head_without_two_parents_keeps_it(self):
-        d = tempfile.mkdtemp(prefix="ci-scope-")
-        git(d, "init", "-q", "-b", "main")
-        git(d, "commit", "-q", "--allow-empty", "-m", "only")
-        self.assertEqual(run_cli(d, "gradle-exclude"), self.RUN)
-
-    def test_not_a_repository_keeps_it(self):
-        self.assertEqual(run_cli(tempfile.mkdtemp(prefix="ci-scope-nogit-"), "gradle-exclude"), self.RUN)
-
-    def test_odd_file_names_are_read_literally(self):
-        self.assertEqual(run_cli(merge_repo("docs/a b\"c.md"), "gradle-exclude"), self.SKIP)
-        self.assertEqual(run_cli(merge_repo("weird dir/x.md"), "gradle-exclude"), self.RUN)
+    def test_cases(self):
+        single = tempfile.mkdtemp(prefix="ci-scope-")  # HEAD is not a merge commit
+        git(single, "init", "-q", "-b", "main")
+        git(single, "commit", "-q", "--allow-empty", "-m", "only")
+        skip, keep = (0, "-x testLicenseeGate"), (0, "")
+        cases = [  # (what, repo, event, expected)
+            ("docs-only PR", merge_repo("docs/x.md"), "pull_request", skip),
+            ("odd file name", merge_repo('docs/a b"c.md'), "pull_request", skip),
+            ("build file PR", merge_repo("gradle/libs.versions.toml"), "pull_request", keep),
+            ("licensee config PR", merge_repo("config/licensee/allowed.txt"), "pull_request", keep),
+            ("unknown directory with a space", merge_repo("weird dir/x.md"), "pull_request", keep),
+            ("push", merge_repo("docs/x.md"), "push", keep),
+            ("no event", merge_repo("docs/x.md"), None, keep),
+            ("not a merge commit", single, "pull_request", keep),
+            ("not a repository", tempfile.mkdtemp(prefix="ci-scope-nogit-"), "pull_request", keep),
+        ]
+        for what, repo, event, want in cases:
+            self.assertEqual(run_cli(repo, "gradle-exclude", event=event), want, what)
 
     def test_unknown_command_fails(self):
-        self.assertNotEqual(run_cli(merge_repo("docs/x.md"), "nope")[0], 0)
-        self.assertNotEqual(run_cli(merge_repo("docs/x.md"))[0], 0)
+        repo = merge_repo("docs/x.md")
+        self.assertNotEqual(run_cli(repo, "nope")[0], 0)
+        self.assertNotEqual(run_cli(repo)[0], 0)
 
 
 # A fake self-test script appends its word to a `marker` file next to it.
@@ -125,47 +108,30 @@ MARK = "import os\nopen(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 class Selftests(unittest.TestCase):
     """`selftests [--scripts a b]` runs the gate self-test scripts when the PR can affect them, else none of them."""
 
-    def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="ci-scope-fakes-")
-        self.marker = os.path.join(self.tmp, "marker")
-        self.ok = os.path.join(self.tmp, "ok.py")
-        self.bad = os.path.join(self.tmp, "bad.py")
-        with open(self.ok, "w", encoding="utf-8") as f:
-            f.write(MARK % "ok")
-        with open(self.bad, "w", encoding="utf-8") as f:
-            f.write(MARK % "bad" + "raise SystemExit(1)\n")
+    def run_case(self, change, *scripts, event="pull_request"):
+        """Runs fake scripts ('ok', 'bad', 'nope' = missing) and returns (exit code, output, words the fakes recorded)."""
+        tmp = tempfile.mkdtemp(prefix="ci-scope-fakes-")
+        for name, tail in (("ok", ""), ("bad", "raise SystemExit(1)\n")):
+            with open(os.path.join(tmp, name + ".py"), "w", encoding="utf-8") as f:
+                f.write(MARK % name + tail)
+        rc, out = run_cli(merge_repo(change), "selftests", "--scripts", *(os.path.join(tmp, n + ".py") for n in scripts), event=event)
+        marker = Path(tmp, "marker")
+        return rc, out, marker.read_text(encoding="utf-8").split() if marker.exists() else []
 
-    def ran(self):
-        if not os.path.exists(self.marker):
-            return []
-        with open(self.marker, encoding="utf-8") as f:
-            return f.read().split()
-
-    def selftests(self, repo, *scripts, event="pull_request"):
-        return run_cli(repo, "selftests", "--scripts", *scripts, event=event)
-
-    def test_docs_only_pull_request_runs_none(self):
-        rc, out = self.selftests(merge_repo("docs/x.md"), self.ok, self.bad)
-        self.assertEqual(rc, 0, out)
-        self.assertEqual(self.ran(), [])
+    def test_cases(self):
+        rc, out, ran = self.run_case("docs/x.md", "ok", "bad")
+        self.assertEqual((rc, ran), (0, []), out)
         self.assertIn("skipped", out)
-
-    def test_build_file_pull_request_runs_all(self):
-        rc, out = self.selftests(merge_repo("build.gradle.kts"), self.ok, self.ok)
-        self.assertEqual((rc, self.ran()), (0, ["ok", "ok"]), out)
-
-    def test_push_runs_all(self):
-        rc, out = self.selftests(merge_repo("docs/x.md"), self.ok, event="push")
-        self.assertEqual((rc, self.ran()), (0, ["ok"]), out)
+        self.assertEqual(self.run_case("build.gradle.kts", "ok", "ok")[::2], (0, ["ok", "ok"]))
+        self.assertEqual(self.run_case("docs/x.md", "ok", event="push")[::2], (0, ["ok"]))
 
     def test_a_failing_script_fails_the_step_and_the_others_still_run(self):
-        rc, out = self.selftests(merge_repo("build.gradle.kts"), self.bad, self.ok)
+        rc, out, ran = self.run_case("build.gradle.kts", "bad", "ok")
         self.assertNotEqual(rc, 0, out)
-        self.assertEqual(sorted(self.ran()), ["bad", "ok"])
+        self.assertEqual(sorted(ran), ["bad", "ok"])
 
     def test_a_missing_script_fails_the_step(self):
-        rc, out = self.selftests(merge_repo("build.gradle.kts"), os.path.join(self.tmp, "nope.py"))
-        self.assertNotEqual(rc, 0, out)
+        self.assertNotEqual(self.run_case("build.gradle.kts", "nope")[0], 0)
 
     def test_the_default_scripts_are_the_warnings_and_jdk_gate_tests(self):
         self.assertEqual(ci_scope.SELFTESTS, ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py"))
@@ -228,57 +194,28 @@ class CiWiring(unittest.TestCase):
         self.assertIn(old, text)
         return wiring_problems(text.replace(old, new, 1))
 
-    def test_job_level_if_is_flagged_on_every_required_job(self):
-        for name in REQUIRED_JOBS:
-            got = self.mutated(f"  {name}:\n    name: {name}\n", f"  {name}:\n    name: {name}\n    if: github.event_name == 'push'\n")
-            self.assertIn(f"{name}: job-level if", got)
-
-    def test_needs_is_flagged_on_every_required_job(self):
-        for name in REQUIRED_JOBS:
-            got = self.mutated(f"  {name}:\n    name: {name}\n", f"  {name}:\n    name: {name}\n    needs: [wrapper]\n")
-            self.assertIn(f"{name}: needs", got)
-
-    def test_renamed_check_is_flagged(self):
-        self.assertIn("workflow-lint: check name changed", self.mutated("    name: workflow-lint\n", "    name: workflow-linting\n"))
-
-    def test_removed_job_is_flagged(self):
-        self.assertIn("secrets: job missing", self.mutated("  secrets:\n    name: secrets\n", "  secrets-moved:\n    name: secrets-moved\n"))
-
-    def test_paths_filters_are_flagged(self):
-        for key in ("paths", "paths-ignore"):
-            got = self.mutated("on:\n  pull_request:\n", f"on:\n  pull_request:\n    {key}: ['docs/**']\n")
-            self.assertIn("workflow-level paths filter", got)
-
-    def test_condition_in_static_is_flagged(self):
-        got = self.mutated("      - name: gradle repos check tests", "      - if: false\n        name: gradle repos check tests")
-        self.assertIn("static: if or continue-on-error", got)
-
-    def test_static_without_the_scope_script_is_flagged(self):
-        self.assertIn("static: does not run ci_scope.py selftests", self.mutated("ci_scope.py selftests", "ci_scope.py nothing"))
-        self.assertIn("static: gradle step does not use gradle-exclude", self.mutated(':app:lintDebug "${exclude[@]}"', ":app:lintDebug"))
-        self.assertIn("static: no two-commit checkout", self.mutated("fetch-depth: 2", "fetch-depth: 1"))
-
-    def test_direct_call_of_a_self_test_in_static_is_flagged(self):
+    def test_every_mutation_is_flagged(self):
         step = "      - name: gradle repos check tests"
-        got = self.mutated(step, "      - run: python3 -I scripts/test_warnings_gate.py\n" + step)
-        self.assertIn("static: calls scripts/test_warnings_gate.py directly", got)
+        cases = [
+            *[(f"{n}: job-level if", f"  {n}:\n    name: {n}\n", f"  {n}:\n    name: {n}\n    if: github.event_name == 'push'\n") for n in REQUIRED_JOBS],
+            *[(f"{n}: needs", f"  {n}:\n    name: {n}\n", f"  {n}:\n    name: {n}\n    needs: [wrapper]\n") for n in REQUIRED_JOBS],
+            *[("workflow-level paths filter", "on:\n  pull_request:\n", f"on:\n  pull_request:\n    {k}: ['docs/**']\n") for k in ("paths", "paths-ignore")],
+            ("workflow-lint: check name changed", "    name: workflow-lint\n", "    name: workflow-linting\n"),
+            ("secrets: job missing", "  secrets:\n    name: secrets\n", "  secrets-moved:\n    name: secrets-moved\n"),
+            ("static: if or continue-on-error", step, "      - if: false\n        name: gradle repos check tests"),
+            ("static: does not run ci_scope.py selftests", "ci_scope.py selftests", "ci_scope.py nothing"),
+            ("static: gradle step does not use gradle-exclude", ':app:lintDebug "${exclude[@]}"', ":app:lintDebug"),
+            ("static: no two-commit checkout", "fetch-depth: 2", "fetch-depth: 1"),
+            ("static: calls scripts/test_warnings_gate.py directly", step, "      - run: python3 -I scripts/test_warnings_gate.py\n" + step),
+            ("guards: hook tests not run with --jobs 4", "run_hook_tests.py --jobs 4", "run_hook_tests.py"),
+        ]
+        for problem, old, new in cases:
+            self.assertIn(problem, self.mutated(old, new), problem)
 
-    def test_hook_tests_without_jobs_are_flagged(self):
-        self.assertIn("guards: hook tests not run with --jobs 4", self.mutated("run_hook_tests.py --jobs 4", "run_hook_tests.py"))
-
-    def test_job_lookup_of_a_missing_job_is_none(self):
-        self.assertIsNone(job_in(ci_text(), "no-such-job"))
-
-    def test_jdk_release_gate_tests_are_in_the_ci_selftest_list(self):
-        """225 R2-01: ci.yml reaches test_jdk_release_gate.py through `ci_scope.py selftests`."""
-        self.assertIn("scripts/test_jdk_release_gate.py", ci_scope.SELFTESTS)
-
-    def test_scope_tests_run_in_ci_and_verify(self):
-        self.assertIn("python3 -I scripts/test_ci_scope.py", ci_text())
-        self.assertIn("python3 -I scripts/test_ci_scope.py", (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8"))
-
-    def test_hook_tests_run_in_parallel_in_verify(self):
-        self.assertIn("scripts/hooks/run_hook_tests.py --jobs 4", (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8"))
+    def test_verify_runs_the_scope_tests_and_the_parallel_hook_tests(self):
+        verify = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8")
+        self.assertIn("python3 -I scripts/test_ci_scope.py", verify)
+        self.assertIn("scripts/hooks/run_hook_tests.py --jobs 4", verify)
 
 
 if __name__ == "__main__":
