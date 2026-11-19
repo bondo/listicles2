@@ -162,8 +162,10 @@ fails, the fallback is to nest invites under the household, with a top-level
 * `updatedBy == request.auth.uid` and `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`;
 * `createdAt` and `createdBy` can't change on update; on create `createdBy == request.auth.uid` and
   `createdAt == request.time`, except items, where `createdAt <= request.time` (OQ-37, decided 2026-11-17);
-* one exception to the two bullets above: the item anonymise write of section 3.1 (the planner's proposal for
-  OQ-18) only sets `createdBy` and/or `updatedBy` to `null`, changes nothing else, and leaves `updatedAt` as it is.
+* two exceptions to the bullets above: (1) the item anonymise write of section 3.1 (the planner's proposal for
+  OQ-18) only sets `createdBy` and/or `updatedBy` to `null`, changes nothing else, and leaves `updatedAt` as it is;
+  (2) the Undo create that restores the original `createdBy` (section 3.2; how rules allow it is settled in M2
+  planning).
 
 **Account deletion** (required by Google Play): in-app "Delete my account" (AUTH-04). A member
 leaves; an owner with other members must transfer ownership first, and the UI
@@ -219,14 +221,16 @@ enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]; the owner
 * **OQ-37 (decided 2026-11-17, C5 of the investigation):** Undo keeps the original `createdAt`, so the item
   keeps its place in the "oldest added first" tie-break (ITEM-05). Rules cannot tell an Undo from any other
   create, so every item create accepts any `createdAt` not later than `request.time` (a forged older value
-  only changes a tie-break order). `createdBy` is the caller, so a normal create records the caller as the adder; an Undo is the
-  exception (below). **OQ-18 addition (owner, #15 comment 7000527780, question 2 of 6992973369):** an Undo by another member
-  restores the ORIGINAL adder, not the member who pressed Undo. The client re-creates the item with its original
-  `createdBy` (and `createdAt`); the create rule must therefore accept the original adder's uid on an Undo, and how
-  rules tell this from a forged `createdBy` is settled in M2 planning (`risk:high`, `area:security-rules`). That
-  rule must also allow a `null` `createdBy`/`updatedBy` on an Undo (the original adder may already be anonymised), and
-  M2 planning decides whether an Undo may restore the uid of an account deleted in the meantime (for example the client
-  writes `null` when the adder is no longer a member), so an Undo does not undo the anonymisation.
+  only changes a tie-break order). `createdBy` is the caller, so a normal create records the caller as the
+  adder; an Undo is the exception (below). **OQ-18 addition (owner, #15 comment 7000527780, question 2 of
+  6992973369):** an Undo by another member restores the ORIGINAL adder, not the member who pressed Undo. The client
+  re-creates the item with its original `createdBy` (and `createdAt`); the create rule must therefore accept the
+  original adder's uid on an Undo, and how rules tell this from a forged `createdBy` is settled in M2 planning
+  (`risk:high`, `area:security-rules`). That rule must also allow a `null` `createdBy` on an Undo (the original adder
+  may already be anonymised). The owner's decision covers the adder only: `updatedBy` stays the caller (section 3.3).
+  M2 planning decides whether an Undo may restore the uid of an account deleted in the meantime (for example the
+  client writes `null` when the adder is no longer a member; that also covers a member who only left, which ties in
+  with the open gap in section 3.2). The aim is that an Undo does not undo the anonymisation.
 * **Leave room (area:sync-merge):** the owner wants infinite undo/redo per list after v1, with conflict handling that lets
   an undo after a conflict show the other side (stories section 9, #15 comment 6991020343). v1 keeps no history and
   stays last write wins per field, as above; the only constraint on the sync-merge design is that it must not rule
