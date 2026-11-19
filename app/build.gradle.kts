@@ -35,11 +35,7 @@ android {
     }
 
     testOptions {
-        unitTests.all {
-            it.useJUnitPlatform()
-            // A test task that discovers zero tests is a failure, not a pass.
-            it.failOnNoDiscoveredTests = true
-        }
+        unitTests.all { it.useJUnitPlatform() }
     }
 
     buildFeatures {
@@ -78,6 +74,8 @@ val checkUnitTestResults by tasks.registering(Exec::class) {
 }
 
 tasks.withType<Test>().configureEach {
+    // A test task that discovers zero tests is a failure, not a pass.
+    failOnNoDiscoveredTests = true
     if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
 }
 
