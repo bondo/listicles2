@@ -61,7 +61,7 @@ OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".git
                                                    "docs/product/", "design/", "gradle/wrapper/", "config/licensee/"))
 OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh")}
 REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
-GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md", "design/tokens.json"), ("docs/milestones/",)  # the drafts still without an owner sign-off
+GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md",), ("docs/milestones/",)  # drafts without a sign-off (not design/tokens.json, R3-01)
 CI_YML = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
@@ -200,12 +200,14 @@ def ci_scripts():
 def owner_only(name):
     """Whether a path needs the owner's approval first (kind `general` refuses it); only a still-unsigned draft does not."""
     n = name.casefold()
+    base = n.rsplit("/", 1)[-1]
+    if base in OWNER_ONLY_BASENAMES or REQUIREMENTS_RE.match(base):  # wrappers and manifests count even inside a draft folder (R3-03)
+        return True
     if n in GENERAL_DRAFT_FILES or n.startswith(GENERAL_DRAFT_PREFIXES):
         return False
-    base = n.rsplit("/", 1)[-1]
     if n.startswith("scripts/") and (ci_scripts() is None or n in ci_scripts()):
         return True
-    return n in OWNER_ONLY_FILES or n.startswith(OWNER_ONLY_PREFIXES) or base in OWNER_ONLY_BASENAMES or bool(REQUIREMENTS_RE.match(base))
+    return n in OWNER_ONLY_FILES or n.startswith(OWNER_ONLY_PREFIXES)
 
 
 def allowed(kind, name):

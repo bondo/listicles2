@@ -495,7 +495,7 @@ class GeneralKindTests(unittest.TestCase):
 
     def test_non_gate_scripts_docs_and_build_files_are_merged(self):
         names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md",
-                 "core/domain/src/Lists.kt", "docs/PLAN.md", "design/tokens.json", "docs/milestones/M1.md", "firebase/test/rules.test.ts",
+                 "core/domain/src/Lists.kt", "docs/PLAN.md", "docs/milestones/M1.md", "firebase/test/rules.test.ts",
                  "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "scripts/status_publish.py")  # R2 ruling: detekt, other workflows' scripts
         api = make_api(files=[file_entry(n) for n in names])
         self.assertEqual(go(api, kind="general")[0], 0)
@@ -503,6 +503,7 @@ class GeneralKindTests(unittest.TestCase):
 
     def test_every_owner_only_path_is_refused(self):
         names = ("docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/product/naming.md", "docs/reviews/README.md", "design/new-sign-off.md",
+                 "design/tokens.json",  # R3-01: signed off by the owner, so not a draft
                  "firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt",
                  "gradle/wrapper/gradle-wrapper.properties", "gradle/verification-metadata.xml", ".github/CODEOWNERS",  # the PROTECTED ones: see below
                  "gradlew", "gradlew.bat", "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py",  # R2-01: what CI runs through ci_scope.py
@@ -511,6 +512,11 @@ class GeneralKindTests(unittest.TestCase):
         for name in names:
             with self.subTest(name=name):
                 self.refused(make_api(files=[file_entry("scripts/new_tool.py"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_a_recolour_of_the_signed_off_design_tokens_is_refused(self):  # R3-01: the owner signed design/tokens.json off (#15 7011560493, 7019570467)
+        recolour = '@@ -9 +9 @@\n-    "primary": "#006878",\n+    "primary": "#7A1FA2",'
+        self.refused(make_api(files=[file_entry("design/tokens.json", patch=recolour), file_entry("app/ui/theme/Theme.kt")]),
+                     r"outside kind general.*design/tokens\.json")
 
     def test_dotdot_and_a_rename_from_an_owner_only_path_are_refused(self):
         for entry, reason in ((file_entry("scripts/../CLAUDE.md"), r"\.\."),
@@ -531,7 +537,7 @@ class GeneralKindTests(unittest.TestCase):
     def test_every_draft_still_carries_its_status_line(self):  # R2-06: a sign-off PR must also take the file off the draft list
         files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
         drafts = [f for f in files if f.casefold() in merge_ready.GENERAL_DRAFT_FILES or f.casefold().startswith(merge_ready.GENERAL_DRAFT_PREFIXES)]
-        self.assertGreaterEqual(len(drafts), 3)
+        self.assertGreaterEqual(len(drafts), 2)  # docs/PLAN.md and a milestone doc
         for name in drafts:
             if name.endswith((".md", ".json")):
                 with self.subTest(name=name):
@@ -542,7 +548,8 @@ class GeneralKindTests(unittest.TestCase):
             with self.subTest(entry=entry):
                 self.assertTrue(merge_ready.owner_only(entry + ("x" if entry.endswith("/") else "")))
         for name in ("scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", ".tools/bin/shellcheck", "app/mark-ready.sh",
-                     "x/update-branch.sh", "scripts/update-branch.sh"):
+                     "x/update-branch.sh", "scripts/update-branch.sh", "docs/milestones/x/mark-ready.sh", "docs/milestones/scripts/update-branch.sh",
+                     "docs/milestones/package.json", "docs/milestones/requirements-x.txt"):  # R3-03: the draft exception does not cover wrappers or manifests
             self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
 
     def test_approved_product_docs_and_gate_docs_are_owner_only(self):  # R1-04: only the real drafts are not
@@ -935,12 +942,23 @@ class WiringTests(unittest.TestCase):
         self.assertRegex(doc, r"hand-resolved conflict")
         self.assertNotRegex(doc, r"same patch")
 
+    R2_OWNER_ONLY = (r"`config/licensee/` \(licence acceptances\), `docs/follow-ups\.md`, `docs/security\.md` and `docs/orchestrator-state\.md` "
+                     r"are owner-only for `general`; so are the `ci_scope\.py` self-tests, `gradlew` and `gradlew\.bat`")
+
     def test_docs_record_the_r2_rulings(self):  # owner rulings #15 7019683156
         doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
-        for pattern in (r"`config/licensee/`.*owner-only", r"guard thresholds do not include `config/detekt/detekt\.yml`",
-                        r"scripts that only other workflows or `\.claude/settings\.json` run stay `general` \(owner ruling, #15 comment 7019683156\)"):
+        for pattern in (
+                self.R2_OWNER_ONLY,
+                r"guard thresholds do not include `config/detekt/detekt\.yml`",
+                r"scripts that only other workflows or `\.claude/settings\.json` run stay `general` \(owner ruling, #15 comment 7019683156\)"):
             with self.subTest(pattern=pattern):
                 self.assertRegex(doc, pattern)
+
+    def test_the_licensee_pin_fails_when_the_sentence_is_reversed(self):  # R3-02: a later 'owner-only' elsewhere must not satisfy it
+        reversed_text = ("`config/licensee/` (licence acceptances), `docs/follow-ups.md`, `docs/security.md` and `docs/orchestrator-state.md` stay `general`; "
+                         "so are the `ci_scope.py` self-tests, `gradlew` and `gradlew.bat`. An owner-only tooling change follows.")
+        self.assertNotRegex(reversed_text, self.R2_OWNER_ONLY)
+        self.assertNotRegex(reversed_text.replace("stay `general`", "are owner-only for `general`").replace("gradlew.bat", "gradlew"), self.R2_OWNER_ONLY)
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
