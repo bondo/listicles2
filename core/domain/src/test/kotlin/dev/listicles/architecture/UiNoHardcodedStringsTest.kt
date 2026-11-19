@@ -130,7 +130,7 @@ class UiNoHardcodedStringsTest {
             "@Preview\n@Composable\nfun P() {\n    Text(\"Sample\")\n}\n\n" +
                 "@Composable\nfun Q() {\n    Text(\"Real\")\n}",
         ).single()
-            .shouldContain(":9:")
+            .shouldContain(":11:")
     }
 
     @Test
