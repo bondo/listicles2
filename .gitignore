@@ -14,6 +14,8 @@ firestore-debug.log
 # app/, app/src/<variant>/ and app/src/<flavor>/, so it is ignored in every directory.
 **/google-services.json
 **/service-account*.json
+# default name of the key the Firebase console downloads: <project-id>-firebase-adminsdk-<id>-<hash>.json
+**/*-firebase-adminsdk-*.json
 *.p12
 *.pem
 .env

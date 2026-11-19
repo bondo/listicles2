@@ -1,6 +1,7 @@
 """Tests that .gitignore covers google-services.json and key files. Run: python3 -I scripts/test_gitignore_secrets.py
 
-Uses `git check-ignore --no-index`, so the answer is about the patterns alone, not about what is tracked.
+Uses `git check-ignore --no-index`, so the answer is about the patterns alone, not about what is tracked. Git runs
+without global or system config and without .git/info/exclude (see check_ignore), so the result is the same on every machine.
 """
 
 import os
@@ -62,18 +63,44 @@ MUST_NOT_IGNORE = [
 ]
 
 
+def clean_env() -> dict[str, str]:
+    """The environment for git with no global or system config, so a developer's own settings cannot change an answer."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    return {**env, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+
+
 def check_ignore(path: str) -> bool:
-    r = subprocess.run(
-        ["git", "check-ignore", "--no-index", "-q", "--", path], cwd=ROOT, capture_output=True, text=True, check=False
-    )
+    """True when the patterns of the repo's root .gitignore ignore `path`.
+
+    Runs in a throwaway repo that holds only a copy of the root .gitignore: no global excludes file (core.excludesFile),
+    no .git/info/exclude and no other .gitignore can add a pattern the repo lacks.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / ".gitignore").write_bytes((ROOT / ".gitignore").read_bytes())
+        env = clean_env()
+        subprocess.run(["git", "init", "-q", "--template=", tmp], env=env, capture_output=True, check=True)
+        r = subprocess.run(
+            ["git", "-c", "core.excludesFile=" + os.devnull, "check-ignore", "--no-index", "-q", "--", path],
+            cwd=tmp,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     if r.returncode not in (0, 1):
         raise RuntimeError(f"git check-ignore failed for {path}: {r.stderr}")
     return r.returncode == 0
 
 
 def tracked_ignored() -> set[str]:
+    """Tracked files that the repo's own .gitignore files (root and nested) would ignore; global excludes are not read."""
     out = subprocess.run(
-        ["git", "ls-files", "-ci", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True, check=True
+        ["git", "-c", "core.excludesFile=" + os.devnull, "ls-files", "-ci", "-X", ".gitignore", "--exclude-per-directory=.gitignore"],
+        cwd=ROOT,
+        env=clean_env(),
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     return set(out.split("\n")) - {""}
 
