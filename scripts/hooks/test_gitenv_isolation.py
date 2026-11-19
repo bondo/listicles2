@@ -49,7 +49,8 @@ class GitEnvIsolation(unittest.TestCase):
         env = dict(os.environ, GIT_DIR=os.path.join(s, ".git"))
         for suite, r in run_suites(SUITES, env).items():
             self.assertEqual(r.returncode, 0, suite + r.stderr[-600:])
-            self.assertEqual(snapshot(s), before, f"{suite} modified the repository named by GIT_DIR")
+        # The suites run at the same time, so a change to the sentinel cannot be pinned on one of them (PR 232 R1-04).
+        self.assertEqual(snapshot(s), before, f"one of {', '.join(SUITES)} modified the repository named by GIT_DIR")
 
     def test_leak_detection_works(self):
         """Negative case: a process that really inherits GIT_DIR does change the sentinel, so the check above can fail."""

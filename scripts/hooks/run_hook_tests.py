@@ -11,7 +11,7 @@ successes count too, and so does a run that finds no tests.
 """
 
 import concurrent.futures
-import glob
+import fnmatch
 import os
 import subprocess
 import sys
@@ -32,6 +32,28 @@ def partition(files, n):
     return [sorted(s) for s in shards if s]
 
 
+def units(start):
+    """What the serial run collects, as shardable units: every top-level test*.py file and every top-level package."""
+    found = [n for n in os.listdir(start) if fnmatch.fnmatch(n, "test*.py") and os.path.isfile(os.path.join(start, n))]
+    found += [n for n in os.listdir(start) if os.path.isfile(os.path.join(start, n, "__init__.py"))]
+    return sorted(found)
+
+
+def count_problem(start, total):
+    """None when the shards ran exactly as many tests as serial discovery collects, else a message (R1-01: nothing dropped)."""
+    expected = unittest.TestLoader().discover(start).countTestCases()
+    if total == expected:
+        return None
+    return f"the shards ran {total} test(s) but serial discovery collects {expected} test(s)"
+
+
+def load_unit(loader, start, name):
+    """One unit of work in a child: a module by name (no recursion), or a package by directory."""
+    if name.endswith(".py"):
+        return loader.loadTestsFromName(name[:-3])
+    return loader.discover(os.path.join(start, name), pattern="test*.py", top_level_dir=start)
+
+
 def run_shard(start, names):
     """One child process: the runner itself on a subset of the files. Returns (name list, return code, output)."""
     cmd = [sys.executable, "-I", os.path.abspath(__file__), "--only", ",".join(names), start]
@@ -40,7 +62,7 @@ def run_shard(start, names):
 
 
 def run_parallel(start, jobs):
-    files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(start, "test_*.py")))
+    files = units(start)
     if not files:
         print("hook tests: no tests were found", file=sys.stderr)
         return 1
@@ -56,7 +78,10 @@ def run_parallel(start, jobs):
                 total += int(ln.split()[1])
         rc = rc or code
     print(f"hook tests: ran {total} tests in {len(shards)} shards")
-    return rc
+    problem = count_problem(start, total)
+    if problem:
+        print(f"hook tests: {problem}", file=sys.stderr)
+    return rc or (1 if problem else 0)
 
 
 def main(argv):
@@ -79,7 +104,11 @@ def main(argv):
     if jobs > 1 and only is None:
         return run_parallel(start, jobs)
     loader = unittest.TestLoader()
-    suite = loader.discover(start) if only is None else unittest.TestSuite(loader.discover(start, pattern=n) for n in only)
+    if only is None:
+        suite = loader.discover(start)
+    else:
+        sys.path.insert(0, start)  # a module is loaded by name, so its directory must be importable (discover adds it itself)
+        suite = unittest.TestSuite(load_unit(loader, start, n) for n in only)
     result = unittest.TextTestRunner(stream=sys.stdout, verbosity=1).run(suite)
     problems = []
     if result.testsRun == 0:

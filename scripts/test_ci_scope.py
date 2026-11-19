@@ -259,7 +259,8 @@ class CiWiring(unittest.TestCase):
         self.assertIn("static: no two-commit checkout", self.mutated("fetch-depth: 2", "fetch-depth: 1"))
 
     def test_direct_call_of_a_self_test_in_static_is_flagged(self):
-        got = self.mutated("      - name: gradle repos check tests", "      - run: python3 -I scripts/test_warnings_gate.py\n      - name: gradle repos check tests")
+        step = "      - name: gradle repos check tests"
+        got = self.mutated(step, "      - run: python3 -I scripts/test_warnings_gate.py\n" + step)
         self.assertIn("static: calls scripts/test_warnings_gate.py directly", got)
 
     def test_hook_tests_without_jobs_are_flagged(self):
