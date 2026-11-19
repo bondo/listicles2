@@ -5,7 +5,8 @@ Exit status: 0 clean, 1 findings (one line per finding). A file that is missing,
 (a wrong type, a missing key) is reported as a finding too, never as a traceback.
 
 Rules: every color is #RRGGBB in upper case; the light and dark themes have exactly the same roles (so a theme can be swapped
-whole, post-v1); every pair in REQUIRED_PAIRS is listed in contrastPairs (an empty or shortened list fails); every
+whole, post-v1); every role in REQUIRED_ROLES (all Material 3 ColorScheme roles) is defined in both themes;
+every pair in REQUIRED_PAIRS is listed in contrastPairs (an empty or shortened list fails); every
 contrastPairs entry names roles that exist, keeps the WCAG AA minimum (4.5 for text, 3.0 for the outline pair) and meets
 that minimum in both themes. Thresholds are never read from anywhere that could weaken them: a pair may ask for
 more than AA, never less.
@@ -22,6 +23,22 @@ HEX = re.compile(r"#[0-9A-F]{6}")
 AA_TEXT = 4.5
 AA_NON_TEXT = 3.0
 NON_TEXT_PAIRS = {("outline", "surface")}
+# Every Material 3 ColorScheme color role (issue #190): a theme that lacks one makes Theme.kt fall back to the purple Material baseline.
+REQUIRED_ROLES = (
+    "primary", "onPrimary", "primaryContainer", "onPrimaryContainer", "inversePrimary",
+    "secondary", "onSecondary", "secondaryContainer", "onSecondaryContainer",
+    "tertiary", "onTertiary", "tertiaryContainer", "onTertiaryContainer",
+    "background", "onBackground",
+    "surface", "onSurface", "surfaceVariant", "onSurfaceVariant", "surfaceTint",
+    "inverseSurface", "inverseOnSurface",
+    "error", "onError", "errorContainer", "onErrorContainer",
+    "outline", "outlineVariant", "scrim",
+    "surfaceBright", "surfaceDim",
+    "surfaceContainer", "surfaceContainerHigh", "surfaceContainerHighest", "surfaceContainerLow", "surfaceContainerLowest",
+    "primaryFixed", "primaryFixedDim", "onPrimaryFixed", "onPrimaryFixedVariant",
+    "secondaryFixed", "secondaryFixedDim", "onSecondaryFixed", "onSecondaryFixedVariant",
+    "tertiaryFixed", "tertiaryFixedDim", "onTertiaryFixed", "onTertiaryFixedVariant",
+)
 # The pairs the gate always checks: deleting one from tokens.json (or emptying the list) fails, so the gate cannot be weakened there.
 REQUIRED_PAIRS = (
     ("onPrimary", "primary"),
@@ -50,6 +67,24 @@ REQUIRED_PAIRS = (
     ("inverseOnSurface", "inverseSurface"),
     ("inversePrimary", "inverseSurface"),
     ("outline", "surface"),
+    ("onBackground", "background"),
+    ("onSurface", "surfaceDim"),
+    ("onSurface", "surfaceBright"),
+    ("onSurfaceVariant", "surfaceVariant"),
+    ("onSurfaceVariant", "surfaceDim"),
+    ("onSurfaceVariant", "surfaceBright"),
+    ("onPrimaryFixed", "primaryFixed"),
+    ("onPrimaryFixedVariant", "primaryFixed"),
+    ("onSecondaryFixed", "secondaryFixed"),
+    ("onSecondaryFixedVariant", "secondaryFixed"),
+    ("onTertiaryFixed", "tertiaryFixed"),
+    ("onTertiaryFixedVariant", "tertiaryFixed"),
+    ("onPrimaryFixed", "primaryFixedDim"),
+    ("onSecondaryFixed", "secondaryFixedDim"),
+    ("onTertiaryFixed", "tertiaryFixedDim"),
+    ("onPrimaryFixedVariant", "primaryFixedDim"),
+    ("onSecondaryFixedVariant", "secondaryFixedDim"),
+    ("onTertiaryFixedVariant", "tertiaryFixedDim"),
 )
 
 
@@ -97,7 +132,7 @@ def check_structure(tokens: object) -> list[str]:
     return found
 
 
-def check(tokens: object, required: tuple[tuple[str, str], ...] = REQUIRED_PAIRS) -> list[str]:
+def check(tokens: object, required: tuple[tuple[str, str], ...] = REQUIRED_PAIRS, roles_required: tuple[str, ...] = REQUIRED_ROLES) -> list[str]:
     malformed = check_structure(tokens)
     if malformed:
         return malformed
@@ -112,6 +147,9 @@ def check(tokens: object, required: tuple[tuple[str, str], ...] = REQUIRED_PAIRS
     roles = {t: set(colors[t]) for t in themes}
     every = set().union(*roles.values())
     for theme in themes:
+        for role in roles_required:
+            if role not in roles[theme]:
+                found.append(f"{theme}: M3 role {role} is missing (Theme.kt needs every Material 3 ColorScheme role)")
         for role in sorted(every - roles[theme]):
             found.append(f"{theme}: role {role} is missing (every theme needs the same roles)")
         for role, value in colors[theme].items():

@@ -1,3 +1,5 @@
+import org.gradle.process.CommandLineArgumentProvider
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -58,6 +60,70 @@ android {
     }
 }
 
+// Issue 213: Robolectric downloads its android-all jar at test runtime unless it is told where the jar is, and the
+// test JVM blocks the network (core/testing). So Gradle resolves the jar (verified by gradle/verification-metadata.xml)
+// and copies it to a directory, and every test JVM runs Robolectric offline from there. A missing jar fails the test.
+val robolectricAndroidAll by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+val robolectricAndroidAllDir = layout.buildDirectory.dir("robolectric-android-all")
+
+val syncRobolectricAndroidAll by tasks.registering(Sync::class) {
+    from(robolectricAndroidAll)
+    into(robolectricAndroidAllDir)
+}
+
+class RobolectricOfflineArgs(
+    @get:InputDirectory @get:PathSensitive(PathSensitivity.RELATIVE) val dependencyDir: Provider<Directory>,
+    @get:Input val targetSdk: Int,
+) : CommandLineArgumentProvider {
+    override fun asArguments() =
+        listOf(
+            "-Drobolectric.offline=true",
+            "-Drobolectric.dependency.dir=${dependencyDir.get().asFile.absolutePath}",
+            // RobolectricUnderNetworkBlockTest checks that Robolectric's SDK level (robolectric.properties) follows it.
+            "-Dlisticles.targetSdk=$targetSdk",
+        )
+}
+
+tasks.withType<Test>().configureEach {
+    dependsOn(syncRobolectricAndroidAll)
+    jvmArgumentProviders.add(
+        RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),
+    )
+}
+
+// A JUnit 4 test with no result XML was silently skipped: fail the build (issue #212).
+val gateScript = rootProject.file("scripts/check_test_results.py").path
+val gateSources =
+    layout.projectDirectory
+        .dir("src/test")
+        .asFile.path
+val gateResults =
+    layout.buildDirectory
+        .dir("test-results/testDebugUnitTest")
+        .get()
+        .asFile.path
+// A filtered run (--tests, or one class from the IDE) runs a subset on purpose, so the gate does not apply.
+val filteredTestRun =
+    gradle.startParameter.taskRequests.any { request ->
+        request.args.any { it == "--tests" || it.startsWith("--tests=") }
+    }
+val checkUnitTestResults by tasks.registering(Exec::class) {
+    commandLine(
+        listOf("python3", "-I", gateScript, gateSources, gateResults) +
+            listOfNotNull("--filtered".takeIf { filteredTestRun }),
+    )
+}
+
+tasks.withType<Test>().configureEach {
+    // A test task that discovers zero tests is a failure, not a pass.
+    failOnNoDiscoveredTests = true
+    if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -79,9 +145,13 @@ dependencies {
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
     testImplementation(project(":core:testing"))
+    testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.robolectric)
+    robolectricAndroidAll(libs.robolectric.android.all)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
