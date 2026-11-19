@@ -121,7 +121,8 @@ class GradleRules(unittest.TestCase):
         self.assertEqual(self.flagged(("org.jdom", "jdom2", "2.0.6", ["module", "pom"])), [])
 
     def test_similar_names_pass(self):
-        self.assertEqual(self.flagged(("com.google.guava", "guava-parent", "26.0-android", ["pom"]), ("com.google.guava", "failureaccess", "1.0.2", ["jar"])), [])
+        parent = ("com.google.guava", "guava-parent", "26.0-android", ["pom"])
+        self.assertEqual(self.flagged(parent, ("com.google.guava", "failureaccess", "1.0.2", ["jar"])), [])
         self.assertEqual(self.flagged(("org.bouncycastle", "bcutil-jdk18on", "1.80.2", ["jar"])), [])
 
     def test_other_group_same_name_passes(self):
