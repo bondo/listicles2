@@ -63,23 +63,18 @@ android {
 }
 
 // A JUnit 4 test with no result XML was silently skipped: fail the build (issue #212).
+val gateScript = rootProject.file("scripts/check_test_results.py").path
+val gateSources =
+    layout.projectDirectory
+        .dir("src/test")
+        .asFile.path
+val gateResults =
+    layout.buildDirectory
+        .dir("test-results/testDebugUnitTest")
+        .get()
+        .asFile.path
 val checkUnitTestResults by tasks.registering(Exec::class) {
-    val results = layout.buildDirectory.dir("test-results/testDebugUnitTest")
-    commandLine(
-        "python3",
-        "-I",
-        rootProject.file("scripts/check_test_results.py").path,
-        layout.projectDirectory
-            .dir("src/test")
-            .asFile.path,
-        results.get().asFile.path,
-    )
-    onlyIf {
-        tasks
-            .named("testDebugUnitTest")
-            .get()
-            .state.failure == null
-    }
+    commandLine("python3", "-I", gateScript, gateSources, gateResults)
 }
 
 tasks.withType<Test>().configureEach {
