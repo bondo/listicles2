@@ -45,10 +45,19 @@ class Hardening(unittest.TestCase):
             self.deny([f"{p} scripts/{name} {args}" for p in prefixes])
         self.deny([f"env --s '{PUSH}'", f"env --split '{PUSH}'", f"stdbuf --out L {PUSH}", f"timeout --sig KILL 5 {PUSH}",
                    "nice --adj 5 git commit --no-verify -m x", f"xargs --max-args 1 {PUSH}", f"xargs --delimiter x {PUSH}", f"xargs --max-p 2 {PUSH}"])
+        self.deny([f"timeout --sig=KILL 5 {PUSH}", f"stdbuf --out=L {PUSH}"])
         self.allow(["stdbuf --out L git status", "timeout --sig KILL 5 git status", "nice --adj 5 git status", "xargs --max-args 1 git status",
                     "timeout --foreground 5 git status", "xargs --no-run-if-empty git status", "timeout --signal KILL 5 git status"])
         for name, args in WRAPPERS:
             self.assertEqual(self.bash(f"scripts/{name} {args}"), 0, name)
+
+    # self-review: env, sudo and the like read any NAME=v argument as an assignment, however the shell quoted it (main denies these)
+    def test_a_quoted_assignment_word_after_a_wrapper_is_still_an_assignment(self):
+        self.deny([f'env "FOO=1" {PUSH}', f"env 'FOO=1' {PUSH}", f"env FOO{ESC}=1 {PUSH}", 'env -i "FOO=1" git commit --no-verify -m x',
+                   f'sudo "FOO=1" {PUSH}', f'nice env "A=1" {PUSH}', f'xargs env "A=1" {PUSH}', f'env FOO=1 "BAR=2" {PUSH}',
+                   'env "GIT_CONFIG_GLOBAL=/tmp/x" git commit -m x', f'command "FOO=1" {PUSH}', f"env $'FOO=1' {PUSH}"])
+        self.deny(["$'FOO=/usr/bin/git' push --force origin work", f'FOO=1 env "BAR+=2" {PUSH}'])
+        self.allow(['env "FOO=1" git status', "env 'FOO=1 2' git status"])
 
     # R4-04
     def test_an_indexed_assignment_word_before_a_command_is_denied(self):
@@ -101,7 +110,8 @@ class Hardening(unittest.TestCase):
     # R4-01, exact
     def test_plus_equals_appends_to_the_tracked_value_and_an_unquoted_expansion_splits(self):
         self.deny(["R=ma; R+=in; git push origin $R", "A=-; A+=-force; git push $A origin work", "F=--no-; F+=verify; git commit $F -m x",
-                   'P="--force origin"; git push $P work', "P=--force; P+=' origin'; git push $P work", "MSG='x --no-verify'; git commit -m $MSG"])
+                   'P="--force origin"; git push $P work', "P=--force; P+=' origin'; git push $P work", "MSG='x --no-verify'; git commit -m $MSG",
+                   "P='--force origin'; git push ${P} work"])
         self.deny(["H=--; H+=hard; git reset $H HEAD", 'O="--hard HEAD"; git reset $O', "OPTS=--hard; OPTS+=' HEAD'; git reset $OPTS"], d=self.dirty)
         self.allow(["FOO=ok; FOO+=1; git push $FOO origin work", "A=--force-; A+=with-lease; git push $A origin work", 'P="--force origin"; git push "$P" work',
                     "MSG='x --no-verify'; git commit -m \"$MSG\"", "FOO+=x; git push $FOO origin work"])
