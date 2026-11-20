@@ -971,7 +971,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-11", "M1-18"]
-notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup (PLAN 3.1, Delete household and HH-06 household name)"
+notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name)"
 
 [[task]]
 id = "M1-19"

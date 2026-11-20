@@ -105,7 +105,7 @@ the field. Deleting the doc counts as a clear (below), so it is allowed only whe
   and join batches); a direct change from one household to another is denied;
 * cleared (`hid` → `null`) only when `!existsAfter(/households/hid/members/uid)` (in the Leave batch, or after
   a removal) or the household is deleted. The owner never writes another user's doc: a removed member's or a
-  deleted household's former member's app sees the stale value at start and clears it itself (self-heal).
+  deleted household's former member's app sees the stale value at start and clears it itself (self-heal; the tombstone's own owner clears it after the cleanup instead, see Delete household).
   Self-heal order: first set `sharedWith = null` on the user's own lists shared with the stale `hid` (all
   pages; M2), then clear `householdId`. Join needs a cleared value, so the person cannot rejoin, and so
   re-share their lists, before the unsharing has finished (OQ-5).
@@ -114,7 +114,7 @@ the field. Deleting the doc counts as a clear (below), so it is allowed only whe
   membership, `hid1` → `hid2`, clear while still a member of a live household, delete the doc or drop the field
   while it holds a live household that still has the user as a member, any write to another user's doc. A user may also `get` their own `members/{uid}` path in any household (it may not
   exist) and the household doc while it is a tombstone and their `householdId` points at it: that is the
-  signal for the HH-06 "household deleted" dialog and for the self-heal.
+  signal for the HH-06 "household deleted" dialog and for the self-heal, except for the tombstone's own owner (`ownerUid` is the user), whose start resumes the cleanup and the owner's clear (Delete household row) with no HH-06 dialog and no self-heal clear.
 A list is readable by its creator (`createdBy == uid`) always, and by others only when
 `sharedWith != null && M(sharedWith) && LIVE(sharedWith)`. Items follow their list (`get` of the parent list). Item rules match `/lists/{lid}/items/{iid}`, never a bare `/lists/{lid}/{document=**}`: with `rules_version = '2'` that also matches the list doc, so the item rule would apply to list writes too (the #199 trap). M2 deny test: a write to the list doc (`createdBy`, `sharedWith`, `kind`) that only the item rule would allow.
 
