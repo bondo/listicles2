@@ -2008,7 +2008,8 @@ class LineLengthPerTool(DiffCase):
         }, False)
 
     def test_the_default_counts_per_file_and_only_values_of_the_tool_count(self):
-        """R1-02: another tool's value in the same file, or another file of the tool, must not hide a removal below the default."""
+        """R1-02: another tool's value of the same width in the file, or another file of the tool, must not hide a removal below the default
+        (a wider one of another tool is R4-02)."""
         black = "[tool.black]\nline-length = 60\n"
         self.assertRaised({
             "black value beside a removed ruff one": ({"pyproject.toml": self.PP % 60 + black}, {"pyproject.toml": "[tool.ruff]\n" + black}),
@@ -2211,10 +2212,39 @@ class LineLengthPerTool(DiffCase):
         """R3-03: prose such as `printWidth: 100 matches ktlint.` inside a comment read as no limit."""
         cfg = "firebase/prettier.config.js"
         doc = "/**\n * Prettier settings. printWidth: 100 matches ktlint.\n */\nexport default {\n  printWidth: %d,\n  files: \"src/*\",\n};\n"
-        self.assertRaised({"raise under the comment": ({cfg: doc % 100}, {cfg: doc % 300})}, True)
+        glob = '{\n  "overrides": [{ "files": "docs/*.md", "options": { "proseWrap": "always" } }],\n  "printWidth": %d\n}\n'
+        after = "module.exports = {\n  /* keep in step\n     with ktlint */ printWidth: %d,\n};\n"
+        rc, cjs = "firebase/.prettierrc.json", "web/prettier.config.cjs"
+        self.assertRaised({
+            "raise under the comment": ({cfg: doc % 100}, {cfg: doc % 300}),
+            "a glob before printWidth opens no comment": ({rc: glob % 100}, {rc: glob % 300}),
+            "a value after the closing */": ({cjs: after % 100}, {cjs: after % 300}),
+        }, True)
         self.assertRaised({
             "comment added": ({cfg: "export default {\n  printWidth: 100,\n};\n"}, {cfg: doc % 100}),
             "lowered": ({cfg: doc % 100}, {cfg: doc % 90}),
+            "lowered after a glob": ({rc: glob % 100}, {rc: glob % 90}),
+            "lowered after the closing */": ({cjs: after % 100}, {cjs: after % 90}),
+        }, False)
+
+    def test_another_tools_wider_value_does_not_hide_a_raise_of_the_tools_own_limit(self):
+        """R4-02: black and isort values count as ruff's and flake8's (fail closed), so ruff's and flake8's own values and the default
+        are compared in groups of their own as well."""
+        bl = "[tool.black]\nline-length = %d\n"
+        sel = '[tool.ruff]\nselect = ["E"]\n'
+        fl = "[isort]\nline_length = 100\n[flake8]\n%s\n"
+        self.assertRaised({
+            "first ruff setting": ({"pyproject.toml": bl % 120 + sel}, {"pyproject.toml": bl % 120 + sel + "line-length = 110\n"}),
+            "first flake8 setting": ({"setup.cfg": fl % "select = E"}, {"setup.cfg": fl % "max-line-length = 100"}),
+            "removal below the default": ({"pyproject.toml": bl % 100 + self.PP % 60}, {"pyproject.toml": bl % 100 + sel}),
+            "a new key": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120 + self.PP % 100 + self.PYCODESTYLE % 110}),
+            "moved to ruff.toml": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120, "ruff.toml": "line-length = 110\n"}),
+            "moved, pyproject.toml deleted": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": None, "ruff.toml": "line-length = 110\n"}),
+        }, True)
+        self.assertRaised({
+            "black lowered": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 90 + self.PP % 100}),
+            "moved at the same width": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120, "ruff.toml": "line-length = 100\n"}),
+            "the default written out": ({"pyproject.toml": bl % 120 + sel}, {"pyproject.toml": bl % 120 + sel + "line-length = 88\n"}),
         }, False)
 
 
