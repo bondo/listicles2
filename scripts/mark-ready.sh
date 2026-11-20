@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/bin/bash -p
 # Marks one draft PR of this repo ready for review. The only command the project permission rule allows (see docs/ORCHESTRATION.md 7.5).
 # Usage: scripts/mark-ready.sh <PR number>
 # Exactly one argument, digits only (1 to 6 digits, no leading zero). Everything else is refused before gh runs.
 set -eu
 
-# Neither bash nor gh is found through PATH (a planted shim would run under the allow rule): /bin/bash, gh only from these directories, fixed PATH.
+# Neither bash nor gh is found through PATH (a planted shim would run under the allow rule): /bin/bash -p (no BASH_ENV, no imported functions), gh only from these directories, fixed PATH.
 gh_dirs="/usr/local/bin /opt/homebrew/bin /usr/bin /bin"
 PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
 export PATH

@@ -59,7 +59,8 @@ OWNER_ONLY_FILES = {f.casefold() for f in (
     "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")}  # the last two run through `ci_scope.py selftests` (a test keeps them in sync)
 OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".githooks/", ".tools/", "agents/", "scripts/hooks/", "docs/reviews/",
                                                    "docs/product/", "design/", "gradle/wrapper/", "config/licensee/"))
-OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh")}
+OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh",
+                                                          "CLAUDE.md", "CLAUDE.local.md")}  # Claude Code loads these as agent instructions in any directory
 REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
 GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md",), ("docs/milestones/",)  # drafts without a sign-off (not design/tokens.json, R3-01)
 CI_YML = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
@@ -201,7 +202,7 @@ def owner_only(name):
     """Whether a path needs the owner's approval first (kind `general` refuses it); only a still-unsigned draft does not."""
     n = name.casefold()
     base = n.rsplit("/", 1)[-1]
-    if base in OWNER_ONLY_BASENAMES or REQUIREMENTS_RE.match(base):  # wrappers and manifests count even inside a draft folder (R3-03)
+    if base in OWNER_ONLY_BASENAMES or REQUIREMENTS_RE.match(base) or ".claude" in n.split("/")[:-1]:  # also inside a draft folder (R3-03, R4-01)
         return True
     if n in GENERAL_DRAFT_FILES or n.startswith(GENERAL_DRAFT_PREFIXES):
         return False

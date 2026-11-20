@@ -776,6 +776,12 @@ RULES = (
         "the merge agent merges general PRs under the standing authorization and owner-only PRs from the owner's batch approval (D1-D3 of #229)",
     ),
     Rule(
+        "orch-update-branch", ("orchestrator",),
+        (r"the merge agent updates a pr's branch itself with `scripts/update-branch\.sh <n> <expected head sha>` "
+         r"\(owner decision, #15 comment 7008033864\)",),
+        "the merge agent updates PR branches itself through scripts/update-branch.sh (owner decision, #15 7008033864)",
+    ),
+    Rule(
         "orch-archive", ("orchestrator",),
         (
             r"archive \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it",
@@ -1077,6 +1083,12 @@ DOC_RULES = (
             r"merge order \(#15 comment 7005414860\): the orchestrator sends " + ORDER_TAIL,
         ),
         "ORCHESTRATION 7.5: the merge agent merges general PRs under the standing authorization and owner-only PRs from the batch approval (D1-D3 of #229)",
+    ),
+    DocRule(
+        "orch-update-branch", ORCH,
+        (r"the merge agent updates a pr's branch itself with `scripts/update-branch\.sh <n> <expected head sha>` "
+         r"\(owner decision, #15 comment 7008033864\)",),
+        "ORCHESTRATION 7.5: the merge agent updates PR branches itself through scripts/update-branch.sh (owner decision, #15 7008033864)",
     ),
     DocRule(
         "orch-throttle", ORCH,
