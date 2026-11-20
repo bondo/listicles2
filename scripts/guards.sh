@@ -640,7 +640,7 @@ narrowcheck() { # narrowcheck <merge-base>
 # A larger group at HEAD fails, so an added setting counts like an edited one, a family split over two kept files is one group, and a raise
 # is not masked by a lowering of another setting or section. A value is a number only when its digits end at a delimiter (`off`, `1_60`,
 # `100 * 2` are no limit); a value on the next line is read. Files are not parsed, so it fails closed: every value in a pyproject.toml,
-# setup.cfg or tox.ini counts as the tool's, whatever holds it (another tool's raise there fails too). Only the default needs to know what
+# setup.cfg or tox.ini counts as the tool's, whatever holds it (another tool's raise there fails too). The default and the own groups need to know what
 # is the tool's own: a ruff or flake8 file in use (ruff.toml, a `[tool.ruff` table or ruff key, .flake8, `[flake8]`) with no setting of its
 # own counts the tool default (ruff 88, flake8 79) for that file, unless a ruff file has `extend =`. The tool's own values and the default
 # also get groups of their own, so another tool's wider value hides nothing. A section new at HEAD, while the setting is already no limit at
@@ -656,7 +656,7 @@ LL_AWK='function num(x) { if (!match(x, /^[0-9]+/)) return 999999999
     if (f ~ /(^|\/)pyproject\.toml$/) return (sec ~ /^\[tool\.ruff/ || (sec == "[tool]" && l ~ /ruff/) || (sec == "" && l ~ /tool\.ruff/))
     if (f ~ /(^|\/)(setup\.cfg|tox\.ini)$/) return (sec ~ /^\[flake8\]/)
     return 1 }
-  function emit(k, v, o) { if (o) any = 1; print sd, f, t, sec, k, v, o + 0 }  # every value counts (fail closed); o: it is the tool'"'"'s own, so no default
+  function emit(k, v, o) { if (o) any = 1; print sd, f, t, sec, k, v, o + 0 }  # every value counts (fail closed); o: the tool'"'"'s own (own groups, no default)
   BEGIN { OFS = "\t"; use = (f ~ /(^|\/)\.?(ruff\.toml|flake8)$/) }
   { lo = tolower($0); if (NR == 1) sub(/^\357\273\277/, "", lo)  # a BOM
     if (t == "prettier") {  # block comments, also over several lines (only one that opens at the start of a line, `src/*` is a glob)
@@ -717,8 +717,8 @@ styletool() { # the tool a style file belongs to
 styledump() { # styledump <rev> <side>: the settings of every style file at <rev>, each line starting with <side>
   local e m f t  # -z keeps a non-ASCII path readable; the mode tells a symlink (120000), which is no limit; a lone CR is a line end too
   git ls-tree -r -z "$1" | while IFS= read -r -d '' e; do
-    f=${e#*$'\t'}; m=${e%% *}; t=$(styletool "$f")
-    [[ $f =~ $STYLERE ]] && ! [[ $f =~ $STYLEX ]] || continue
+    f=${e#*$'\t'}; m=${e%% *}
+    [[ $f =~ $STYLERE ]] && ! [[ $f =~ $STYLEX ]] || continue; t=$(styletool "$f")
     if [ "$m" = 120000 ]; then printf '%s\t%s\t%s\t\tsymlink\t999999999\n%s\t%s\t%s\t\tpresent\t1\n' "$2" "$f" "$t" "$2" "$f" "$t"
     else git show "$1:$f" 2>/dev/null | tr '\r' '\n' | LC_ALL=C awk -v sd="$2" -v f="$f" -v t="$t" "$LL_AWK"; fi
   done
@@ -727,7 +727,7 @@ linecheck() { # linecheck <merge-base>
   local names out l
   names=$(git -c core.quotePath=false diff --name-only --no-renames --diff-filter=ADMT "$1" HEAD -- . "${EXCL[@]}")
   grep -qE "$STYLERE" <<<"$names" || return 0  # not `git diff | grep -q`: under pipefail a long list kills git with SIGPIPE
-  out=$({ styledump "$1" B; styledump HEAD H; } | LC_ALL=C awk "$LL_CMP" | sort)
+  out=$({ styledump "$1" B; styledump HEAD H; } | LC_ALL=C awk "$LL_CMP" | sort -u)
   while IFS= read -r l; do [ -n "$l" ] && bad "$l"; done <<<"$out"
 }
 
