@@ -755,9 +755,10 @@ def check_git(words, state, assigns_dirty=False):
 
 # ---------------------------------------------------------------- command checks
 
-def is_assign(w):
-    """bash takes a word as an assignment only when its name and the = are unquoted ("FOO=x" and FOO\\=x are command names)."""
-    return bool(ASSIGN.match(w)) and getattr(w, "asg", None) is not False
+def is_assign(w, shell_level=True):
+    """The shell takes a word as an assignment only when its name and the = are unquoted ("FOO=x" and FOO\\=x are command names).
+    After env or sudo the program itself reads the word, so quotes do not matter there."""
+    return bool(ASSIGN.match(w)) and (not shell_level or getattr(w, "asg", None) is not False)
 
 
 def long_value_option(o, opts):
@@ -771,7 +772,7 @@ def unwrap(words):
     assigns, nested, i, seen = [], [], 0, set()
     while i < len(words):
         w = words[i]
-        if is_assign(w):
+        if is_assign(w, not seen):
             assigns.append(w)
             i += 1
             continue
