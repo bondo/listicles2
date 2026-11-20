@@ -636,28 +636,27 @@ narrowcheck() { # narrowcheck <merge-base>
 
 # 7. A raised line length (owner decisions in #46 and #176). Every setting of the family (line-length, max-line-length, max_line_length,
 # maxLineLength, printWidth) is read from every style file of a tool, at the merge base and at HEAD, and the largest value is compared per
-# group: per file, per tool (all its style files), per tool and setting name, and per tool, setting name and section (an `.editorconfig`
-# section or a TOML table). A group that is larger at HEAD fails, so an added setting counts like an edited one, a family split over two
-# kept files is one group, and a raise is not masked by a lowering of another setting or section (a section new at HEAD is bounded only as
-# said below). A value is a number only when its digits end at a delimiter; anything else (`off`, `1_60`, `100 * 2`) is no limit, and a
-# value on the next line is read. Files are not parsed, so it fails closed: every value in a pyproject.toml, setup.cfg or tox.ini counts as
-# the tool's, whatever table or spelling holds it (another tool's raise there fails too). Only the default needs to know what is the
-# tool's own: a ruff or flake8 file that is in use (ruff.toml, a `[tool.ruff` table or ruff key, .flake8, `[flake8]`) with no setting of its
-# own counts the tool default (ruff 88, flake8 79) for that file, unless a ruff file has `extend =`.
-# A section that is new at HEAD, while the setting is already no limit at the base, is compared with the largest finite base value. A file
-# that is gone at HEAD is compared with the same tool at HEAD; a symlink is no limit. Lowered is stricter and passes. Not compared: a
-# setting removed from a kept file (prettier, `.editorconfig` and detekt map no default), the same setting twice in one file.
+# group: per file, per tool, per tool and setting name, and per tool, setting name and section (an `.editorconfig` section or a TOML table).
+# A larger group at HEAD fails, so an added setting counts like an edited one, a family split over two kept files is one group, and a raise
+# is not masked by a lowering of another setting or section. A value is a number only when its digits end at a delimiter (`off`, `1_60`,
+# `100 * 2` are no limit); a value on the next line is read. Files are not parsed, so it fails closed: every value in a pyproject.toml,
+# setup.cfg or tox.ini counts as the tool's, whatever holds it (another tool's raise there fails too). Only the default needs to know what
+# is the tool's own: a ruff or flake8 file in use (ruff.toml, a `[tool.ruff` table or ruff key, .flake8, `[flake8]`) with no setting of its
+# own counts the tool default (ruff 88, flake8 79) for that file, unless a ruff file has `extend =`. The tool's own values and the default
+# also get groups of their own, so another tool's wider value hides nothing. A section new at HEAD, while the setting is already no limit at
+# the base, is compared with the largest finite base value. A file gone at HEAD is compared with the same tool at HEAD; a symlink is no
+# limit. Not compared: a setting removed from a kept file (prettier, `.editorconfig`, detekt: no default), the same setting twice in a file.
 STYLERE='(ruff\.toml|pyproject\.toml|\.flake8|setup\.cfg|tox\.ini|\.editorconfig|detekt\.yml|prettierrc[^/]*|prettier\.config\.[^/]*)$'
 STYLEX='^(docs|handoff)/|(^|/)(node_modules|build)/'
 # Per file: `side TAB file TAB tool TAB section TAB setting TAB value` lines, plus a `present` line and, for a ruff or flake8 file in use
-# with no setting, a `dflt` line. Block comments are cut first; a header may be spelled with blanks, quotes and a trailing comment.
+# with no setting, a `dflt` line. A 7th field says the value is the tool's own (ruff's table, flake8's section). Block comments are cut first.
 LL_AWK='function num(x) { if (!match(x, /^[0-9]+/)) return 999999999
     d = substr(x, 1, RLENGTH); return (substr(x, RLENGTH + 1) ~ /^[ \t]*([,;}"\047]|\]|$)/) ? d + 0 : 999999999 }
   function ownline(l) {  # is this setting ruff'"'"'s or flake8'"'"'s, in a file that also holds other tools?
     if (f ~ /(^|\/)pyproject\.toml$/) return (sec ~ /^\[tool\.ruff/ || (sec == "[tool]" && l ~ /ruff/) || (sec == "" && l ~ /tool\.ruff/))
     if (f ~ /(^|\/)(setup\.cfg|tox\.ini)$/) return (sec ~ /^\[flake8\]/)
     return 1 }
-  function emit(k, v, o) { if (o) any = 1; print sd, f, t, sec, k, v }  # every value counts (fail closed); o: it is the tool'"'"'s own, so no default
+  function emit(k, v, o) { if (o) any = 1; print sd, f, t, sec, k, v, o + 0 }  # every value counts (fail closed); o: it is the tool'"'"'s own, so no default
   BEGIN { OFS = "\t"; use = (f ~ /(^|\/)\.?(ruff\.toml|flake8)$/) }
   { lo = tolower($0); if (NR == 1) sub(/^\357\273\277/, "", lo)  # a BOM
     if (t == "prettier") {  # block comments, also over several lines (only one that opens at the start of a line, `src/*` is a glob)
@@ -690,8 +689,8 @@ LL_CMP='BEGIN { FS = "\t"; DEF["ruff"] = 88; DEF["flake8"] = 79 }
     put(side SUBSEP "K|" tool "|" key, v); put(side SUBSEP "S|" tool "|" key "|" sec, v)
     if (v <= 99999 && (!((side, tool "|" key) in KF) || v > KF[side, tool "|" key])) KF[side, tool "|" key] = v }
   $5 == "present" { P[$1, $2] = 1; next }
-  $5 == "dflt" { group($1, $3, $2, "", "", DEF[$3]); next }
-  { group($1, $3, $2, $5, $4, $6) }
+  $5 == "dflt" { group($1, $3, $2, "", "", DEF[$3]); group($1, $3 " own", $2, "", "", DEF[$3]); next }
+  { group($1, $3, $2, $5, $4, $6); if ($7 && $3 in DEF) group($1, $3 " own", $2, $5, $4, $6) }  # the tool'"'"'s own values and default, too
   END {
     for (k in M) {
       split(k, p, SUBSEP); if (p[1] != "B") continue
@@ -716,12 +715,10 @@ styletool() { # the tool a style file belongs to
   esac
 }
 styledump() { # styledump <rev> <side>: the settings of every style file at <rev>, each line starting with <side>
-  local e m f t
-  # -z keeps a non-ASCII path readable; the mode tells a symlink (120000), which is no limit. A lone CR is a line end too (flake8, YAML).
+  local e m f t  # -z keeps a non-ASCII path readable; the mode tells a symlink (120000), which is no limit; a lone CR is a line end too
   git ls-tree -r -z "$1" | while IFS= read -r -d '' e; do
-    f=${e#*$'\t'}; m=${e%% *}
+    f=${e#*$'\t'}; m=${e%% *}; t=$(styletool "$f")
     [[ $f =~ $STYLERE ]] && ! [[ $f =~ $STYLEX ]] || continue
-    t=$(styletool "$f")
     if [ "$m" = 120000 ]; then printf '%s\t%s\t%s\t\tsymlink\t999999999\n%s\t%s\t%s\t\tpresent\t1\n' "$2" "$f" "$t" "$2" "$f" "$t"
     else git show "$1:$f" 2>/dev/null | tr '\r' '\n' | LC_ALL=C awk -v sd="$2" -v f="$f" -v t="$t" "$LL_AWK"; fi
   done

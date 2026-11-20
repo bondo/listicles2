@@ -1815,8 +1815,7 @@ class LineLengthDiffs(DiffCase):
 
 
 class LineLengthPerTool(DiffCase):
-    """#176: the largest line length is compared per tool across all its style files, per setting and per section, and a missing
-    setting counts as the tool default (ruff 88, flake8 79). The tests below are the gaps that #159 left open."""
+    """#176: the largest line length is compared per tool across all its style files, per setting and per section, with tool defaults."""
 
     PP = "[tool.ruff]\nline-length = %d\n"
     PYCODESTYLE = "[tool.ruff.lint.pycodestyle]\nmax-line-length = %d\n"
@@ -1921,8 +1920,7 @@ class LineLengthPerTool(DiffCase):
         }, False)
 
     def test_known_gaps_dropping_every_ruff_config_and_a_prettier_removal_pass(self):
-        """Both loosen the limit and pass on purpose (docs/guards-known-gaps.md: no default is mapped for prettier, and a tool that is no
-        longer configured has no default). A later fix flips these cases."""
+        """Both loosen the limit and pass on purpose (docs/guards-known-gaps.md); a later fix flips these cases."""
         self.assertRaised({
             "ruff dropped altogether": ({"ruff.toml": "line-length = 60\n"}, {"ruff.toml": None}),
             "prettier removed": ({"firebase/.prettierrc.json": '{ "printWidth": 60 }\n'}, {"firebase/.prettierrc.json": "{}\n"}),
@@ -1948,8 +1946,7 @@ class LineLengthPerTool(DiffCase):
         }, False)
 
     def test_a_setting_group_alone_catches_a_raise(self):
-        """R1-09: the per-setting group (K). Per file, per tool and per section nothing is raised here: ruff's `line-length` moves from
-        pyproject.toml (100) to a new ruff.toml (200) while the pyproject keeps a larger `max-line-length`."""
+        """R1-09: only the per-setting group (K) sees this: ruff's `line-length` moves from pyproject.toml (100) to a new ruff.toml (200)."""
         py = self.PP % 100 + self.PYCODESTYLE % 300
         self.assertRaised({
             "line-length moved to ruff.toml": (
@@ -1959,8 +1956,7 @@ class LineLengthPerTool(DiffCase):
         }, True)
 
     def test_a_deleted_file_is_compared_with_the_tool_at_head(self):
-        """R1-09: only the deleted-file fallback sees this: scripts/ruff.toml keeps 200, the root ruff.toml (100) goes, and the
-        pyproject.toml that replaces it has 150."""
+        """R1-09: only the deleted-file fallback sees this: scripts/ruff.toml keeps 200, the root ruff.toml (100) goes, pyproject.toml has 150."""
         self.assertRaised({
             "deleted ruff.toml": (
                 {"ruff.toml": "line-length = 100\n", "scripts/ruff.toml": "line-length = 200\n"},
@@ -2008,8 +2004,7 @@ class LineLengthPerTool(DiffCase):
         }, False)
 
     def test_the_default_counts_per_file_and_only_values_of_the_tool_count(self):
-        """R1-02: another tool's value of the same width in the file, or another file of the tool, must not hide a removal below the default
-        (a wider one of another tool is R4-02)."""
+        """R1-02: another tool's value of the same width, or another file of the tool, must not hide a removal below the default (R4-02: wider)."""
         black = "[tool.black]\nline-length = 60\n"
         self.assertRaised({
             "black value beside a removed ruff one": ({"pyproject.toml": self.PP % 60 + black}, {"pyproject.toml": "[tool.ruff]\n" + black}),
@@ -2154,8 +2149,7 @@ class LineLengthPerTool(DiffCase):
         self.assertRaised({"lowered": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "# c\r[flake8]\rmax-line-length = 90\r"})}, False)
 
     def test_a_file_that_is_not_parsed_fails_closed(self):
-        """R3-01: every line-length value in pyproject.toml, setup.cfg and tox.ini counts, whatever the spelling of the table around it
-        (ruff and flake8 read many), so a raise cannot hide; the cost is that another tool's raise there fails too."""
+        """R3-01: every value in pyproject.toml, setup.cfg and tox.ini counts, whatever the spelling; another tool's raise there fails too."""
         black = "[tool.black]\nline-length = 60\n"
         base = {"pyproject.toml": black + self.PP % 100}
         for name, head in {
@@ -2228,8 +2222,7 @@ class LineLengthPerTool(DiffCase):
         }, False)
 
     def test_another_tools_wider_value_does_not_hide_a_raise_of_the_tools_own_limit(self):
-        """R4-02: black and isort values count as ruff's and flake8's (fail closed), so ruff's and flake8's own values and the default
-        are compared in groups of their own as well."""
+        """R4-02: black and isort values count as ruff's and flake8's, so the tools' own values and the default get groups of their own."""
         bl = "[tool.black]\nline-length = %d\n"
         sel = '[tool.ruff]\nselect = ["E"]\n'
         fl = "[isort]\nline_length = 100\n[flake8]\n%s\n"
