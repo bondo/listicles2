@@ -68,7 +68,9 @@ WRAPPER_PREFIX = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\+?=")  # NAME=value and NAME+=value (bash appends)
+ASSIGN_PARTS = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(\+?)=(.*)$", re.S)
+INDEXED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\[")  # bash never applies NAME[k]=v in front of a command, but still runs the command
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash"}
 INTERPRETERS = re.compile(r"^(python[0-9.]*|node|nodejs|ruby|perl|php|deno|bun)$")
 RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for", "in", "case", "esac", "!", "{", "}", "function",
@@ -93,7 +95,8 @@ WRAPPERS = {
     "busybox": (set(), 0),
     "watch": ({"-n", "-d"}, 0),
     "flock": ({"-w", "-E", "--timeout", "--conflict-exit-code"}, 1),
-    "xargs": ({"-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "-R", "-S", "--arg-file"}, 0),
+    "xargs": ({"-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "-R", "-S", "--arg-file", "--max-args", "--max-procs", "--max-chars", "--delimiter",
+              "--process-slot-var"}, 0),
     "time": ({"-f", "-o", "--format", "--output"}, 0),
     "strace": ({"-o", "-e", "-p", "-s", "-u", "-E", "-a", "-b", "-I", "-P", "-X", "-O", "-S"}, 0),
     "ltrace": ({"-o", "-e", "-p", "-s", "-u", "-a", "-n", "-l"}, 0),
@@ -223,6 +226,7 @@ class Cmd:
         self.words, self.writes, self.subs, self.heredocs = [], [], [], []  # heredocs also holds here-strings
         self.group = None  # "open"/"close" marker for ( ) groups: a subshell's cd must not leak
         self.piped = None  # the command whose output feeds this one through a pipe
+        self.gettext = False  # a word starts with $"...", which bash translates when it parses the line
 
     def empty(self):
         return not (self.words or self.writes or self.subs or self.heredocs or self.group)
@@ -344,19 +348,25 @@ def ansi_c(s):
         if t[0] == "x":
             return chr(int(t[1:], 16))
         if t[0] in "uU":
-            return chr(int(t[1:], 16))
+            try:
+                return chr(int(t[1:], 16))
+            except ValueError:
+                return m.group(0)  # out of range: bash keeps the text, and the lexer must not fail where bash does not
         return chr(int(t, 8) & 0xFF)
     return re.sub(r"\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|c.|.)", rep, s)
 
 
 class Word(str):
     glob = False  # the word has an unquoted { } * ? [ ~ @ + ! that the shell expands after the guard has read it
+    asg = None  # the text up to its first = is unquoted, so bash takes the word as an assignment (None: not from lex)
+    ud = False  # the word has an unquoted $, so bash splits what it expands to on blanks
 
 
 def lex(src):
     """Split a shell command string into simple commands. Raises ValueError when it cannot be parsed."""
     cmds, cur = [], Cmd()
     word, in_word, quoted, pending, ug = [], False, False, None, False
+    qs, ud = None, False  # where the first quoted character sits in the word; an unquoted $ was seen
     heredocs = []
     i, n = 0, len(src)
 
@@ -367,12 +377,18 @@ def lex(src):
             cmds.append(cur)
         cur = Cmd()
 
+    def qmark():
+        nonlocal qs
+        if qs is None:
+            qs = sum(map(len, word))
+
     def flush():
-        nonlocal word, in_word, quoted, pending, ug
+        nonlocal word, in_word, quoted, pending, ug, qs, ud
         if not in_word:
             return
-        text, q, g = "".join(word), quoted, ug
-        word, in_word, quoted, ug = [], False, False, False
+        text, q, g, u = "".join(word), quoted, ug, ud
+        asg = "=" in text and (qs is None or text.index("=") < qs)
+        word, in_word, quoted, ug, qs, ud = [], False, False, False, None, False
         if pending:
             kind, pending = pending, None
             if kind == "write":
@@ -384,13 +400,14 @@ def lex(src):
                 heredocs.append((text, q, kind[1], cur))
             return
         cur.words.append(Word(text))
-        cur.words[-1].glob = g
+        cur.words[-1].glob, cur.words[-1].asg, cur.words[-1].ud = g, asg, u
 
     while i < n:
         c = src[i]
         if c == "\\":
             if i + 1 < n:
                 if src[i + 1] != "\n":
+                    qmark()
                     word.append(src[i + 1])
                     in_word = quoted = True
                 i += 2
@@ -400,10 +417,12 @@ def lex(src):
             j = src.find("'", i + 1)
             if j < 0:
                 raise ValueError("unterminated quote")
+            qmark()
             word.append(src[i + 1:j])
             in_word = quoted = True
             i = j + 1
         elif c == '"':
+            qmark()
             i += 1
             while True:
                 if i >= n:
@@ -440,6 +459,7 @@ def lex(src):
                 j += 2 if src[j] == "\\" else 1
             if j >= n:
                 raise ValueError("unterminated quote")
+            qmark()
             word.append(ansi_c(src[i + 2:j]))
             in_word = quoted = True
             i = j + 1
@@ -461,7 +481,7 @@ def lex(src):
                 raise ValueError("unterminated ${")
             word.append(src[i:j + 1])
             cur.subs.extend(extract_subs(src[i:j + 1]))
-            in_word = True
+            in_word = ud = True
             i = j + 1
         elif c in " \t\r":
             flush()
@@ -522,9 +542,12 @@ def lex(src):
             else:
                 pending = "write"
         else:
+            if src.startswith('$"', i):
+                cur.gettext = True
             word.append(c)
             in_word = True
             ug = ug or c in "{}*?[~@+!"
+            ud = ud or c == "$"
             i += 1
     flush()
     end_cmd()
@@ -732,13 +755,23 @@ def check_git(words, state, assigns_dirty=False):
 
 # ---------------------------------------------------------------- command checks
 
+def is_assign(w):
+    """bash takes a word as an assignment only when its name and the = are unquoted ("FOO=x" and FOO\\=x are command names)."""
+    return bool(ASSIGN.match(w)) and getattr(w, "asg", None) is not False
+
+
+def long_value_option(o, opts):
+    """R4-03: an option that takes a value, also written as an unambiguous prefix of its long name (getopt_long: --out for --output)."""
+    return o in opts or (o.startswith("--") and "=" not in o and any(k.startswith(o) for k in opts if k.startswith("--")))
+
+
 def unwrap(words):
     """Strip env assignments, reserved words and wrapper commands.
     Returns (assignments, rest, nested command strings, wrapper names)."""
     assigns, nested, i, seen = [], [], 0, set()
     while i < len(words):
         w = words[i]
-        if ASSIGN.match(w):
+        if is_assign(w):
             assigns.append(w)
             i += 1
             continue
@@ -763,8 +796,8 @@ def unwrap(words):
             while i < len(words) and words[i].startswith("-") and words[i] != "--":
                 o = words[i]
                 i += 1
-                if o in opts and i < len(words):
-                    if base == "env" and o in ("-S", "--split-string"):
+                if long_value_option(o, opts) and i < len(words):
+                    if base == "env" and (o == "-S" or (o.startswith("--") and "--split-string".startswith(o))):
                         nested.append(words[i])
                     if base == "taskset":
                         npos = 0
@@ -794,9 +827,11 @@ def check_linter(prog, args):
 
 
 def check_assign(a):
-    name, val = a.split("=", 1)
+    name, plus, val = ASSIGN_PARTS.match(a).groups()
     if name in CONFIG_FILE_VARS:
         deny(f"{name} swaps git's config file, which can disable the hooks or hide aliases")
+    if name.startswith("GIT_CONFIG") and plus:  # R4-06: bash joins X=a X+=b, and += may append to a value the guard cannot see
+        deny("GIT_CONFIG_* built with += cannot be checked; assign the whole value with =")
     if name.startswith("GIT_CONFIG") and RISKY_CONFIG_ANY.search(val):
         deny("GIT_CONFIG_* must not override core.hooksPath, include.path, push targets or define aliases")
 
@@ -846,7 +881,7 @@ def expand(w, state):
         if q in w:
             w = w.replace(q, branch(state["cwd"]) or q)
     out = Word(re.sub(r"\$\{(\w+)\}|\$(\w+)", rep, w))
-    out.glob = getattr(w, "glob", False)
+    out.glob, out.asg, out.ud = getattr(w, "glob", False), getattr(w, "asg", None), getattr(w, "ud", False)
     return out
 
 
@@ -857,7 +892,8 @@ def check_command_string(command, state, depth=0):
         cmds = lex(command)
     except ValueError:
         flat = re.sub(r"\\\r?\n|['\"\\$]", "", command)  # quotes and continuations hide a name from the raw text (R3-03 of #237)
-        if re.search(r"\bgit\b|CLAUDE\.md|REVIEW\.md|\.claude|\.github|\.githooks|agents/|scripts/|\.git/|mark-ready|update-branch", command + " " + flat):
+        if "$" in command or "`" in command or re.search(  # R4-05: an expansion or $'\xHH' can spell any name
+                r"\bgit\b|CLAUDE\.md|REVIEW\.md|\.claude|\.github|\.githooks|agents/|scripts/|\.git/|mark-ready|update-branch", command + " " + flat):
             deny("could not parse this command (unbalanced quote or substitution); simplify it")
         return
     stack = []
@@ -942,6 +978,8 @@ def check_mark_ready(cmd, assigns, words, wrappers, state):
 
 
 def check_simple(cmd, state, depth):
+    if cmd.gettext:  # R5-01: bash looks $"..." up in a message catalog when it parses the line, so its value cannot be known here
+        deny('a $"..." word is translated by bash when it parses the line, so the guard cannot read it; write "..." without the $')
     for t in cmd.writes:
         guard_target(expand(t, state), state, "redirect to")
     assigns, words, nested, wrappers = unwrap(cmd.words)
@@ -952,17 +990,34 @@ def check_simple(cmd, state, depth):
     if words and WRAPPER_PREFIX.search(words[0]):
         check_mark_ready(cmd, assigns, words, wrappers, state)
         return
+    if len(words) > 1 and INDEXED.match(words[0]):  # R4-04: FOO[a[1]]=1 git push ... runs git; the subscript cannot be parsed reliably
+        deny("an indexed assignment such as NAME[k]=v in front of a command is not an assignment in bash, but the command still runs; remove it")
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values
-            name, val = a.split("=", 1)
-            if val in BRANCH_SUBS:
+            name, plus, val = ASSIGN_PARTS.match(a).groups()
+            if plus:  # NAME+=v appends to a value we know; an unknown or computed one is forgotten
+                old = state["vars"].get(name)
+                if old is None or "$" in val or "`" in val:
+                    state["vars"].pop(name, None)
+                else:
+                    state["vars"][name] = old + val
+            elif val in BRANCH_SUBS:
                 state["vars"][name] = branch(state["cwd"]) or val
             elif "$" in val or "`" in val:
                 state["vars"].pop(name, None)
             else:
                 state["vars"][name] = val
         return
-    words = [words[0]] + [expand(w, state) for w in words[1:]]
+    rest = []
+    for w in words[1:]:
+        e = expand(w, state)
+        if getattr(w, "ud", False) and e != w:  # an unquoted expansion is split on blanks (P="--force origin"; git push $P) and may vanish
+            for part in e.split():
+                rest.append(Word(part))
+                rest[-1].glob = e.glob
+        else:
+            rest.append(e)
+    words = [words[0]] + rest
     prog, args = os.path.basename(words[0]), words[1:]
     if "$" in words[0] or "`" in words[0]:
         if any(a in SENSITIVE_SUBS for a in args[:3]):
