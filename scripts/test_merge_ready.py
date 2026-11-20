@@ -513,6 +513,16 @@ class GeneralKindTests(unittest.TestCase):
         self.refused(make_api(files=[file_entry("design/tokens.json", patch=recolour), file_entry("app/ui/theme/Theme.kt")]),
                      r"outside kind general.*design/tokens\.json")
 
+    def test_claude_code_instruction_files_outside_the_root_are_owner_only(self):  # R4-01: Claude Code loads these as agent instructions
+        names = ("CLAUDE.local.md", "app/CLAUDE.md", "docs/milestones/CLAUDE.md", "core/domain/CLAUDE.local.md", "app/claude.md", "App/CLAUDE.LOCAL.md",
+                 "app/.claude/skills/x/SKILL.md", "firebase/.claude/commands/x.md", "x/.Claude/rules/y.md")
+        for name in names:
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+        for name in ("docs/claude-notes.md", "app/claude.md.txt", "docs/dot.claude-notes/a.md"):  # similar names stay general
+            with self.subTest(name=name):
+                self.assertFalse(merge_ready.owner_only(name))
+
     def test_dotdot_and_a_rename_from_an_owner_only_path_are_refused(self):
         for entry, reason in ((file_entry("scripts/../CLAUDE.md"), r"\.\."),
                               (file_entry("scripts/x.py", status="renamed", previous="scripts/guards.sh"), r"scripts/guards\.sh")):
