@@ -1955,6 +1955,15 @@ class LineLengthPerTool(DiffCase):
             ),
         }, True)
 
+    def test_the_own_setting_group_alone_catches_a_raise(self):
+        """R5-01 (o): E501 stays at 300 and only ruff's `line-length` rises, and a wider black value hides it from every other group."""
+        base = "[tool.black]\nline-length = 400\n"
+        pc = "[tool.ruff.lint.pycodestyle]\nmax-line-length = 300\n"
+        cases = {"line-length moved, black wider": ({"pyproject.toml": base + self.PP % 100 + pc}, {"pyproject.toml": base + pc})}
+        for width, expect in ((200, True), (100, False)):
+            for name, (b, h) in cases.items():
+                self.assertRaised({name: (b, {**h, "ruff.toml": f"line-length = {width}\n[lint.pycodestyle]\nmax-line-length = 300\n"})}, expect)
+
     def test_a_deleted_file_is_compared_with_the_tool_at_head(self):
         """R1-09: only the deleted-file fallback sees this: scripts/ruff.toml keeps 200, the root ruff.toml (100) goes, pyproject.toml has 150."""
         self.assertRaised({
@@ -2233,11 +2242,23 @@ class LineLengthPerTool(DiffCase):
             "a new key": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120 + self.PP % 100 + self.PYCODESTYLE % 110}),
             "moved to ruff.toml": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120, "ruff.toml": "line-length = 110\n"}),
             "moved, pyproject.toml deleted": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": None, "ruff.toml": "line-length = 110\n"}),
+            "flake8 value on a continuation line": (
+                {"setup.cfg": fl % "select = E"},
+                {"setup.cfg": fl % "max-line-length =\n    100"},
+            ),
+            "flake8 continuation value removed": (
+                {".flake8": "[flake8]\nmax-line-length =\n    60\n"},
+                {".flake8": "[flake8]\nselect = E\n"},
+            ),
         }, True)
         self.assertRaised({
             "black lowered": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 90 + self.PP % 100}),
             "moved at the same width": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120, "ruff.toml": "line-length = 100\n"}),
             "the default written out": ({"pyproject.toml": bl % 120 + sel}, {"pyproject.toml": bl % 120 + sel + "line-length = 88\n"}),
+            "flake8 continuation value lowered": (
+                {".flake8": "[flake8]\nmax-line-length =\n    100\n"},
+                {".flake8": "[flake8]\nmax-line-length =\n    90\n"},
+            ),
         }, False)
 
 
