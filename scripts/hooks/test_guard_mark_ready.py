@@ -86,6 +86,11 @@ class MarkReadyGuard(unittest.TestCase):
             "scripts/mark-ready.sh\\\n1", "./scripts/mark-ready.sh\\ 1", "app/scripts/mark-ready.sh\\ 1", "nohup scripts/mark-ready.sh\\ 1",
             "cp -t scripts /tmp/x/mark-ready.sh && scripts/mark-ready.sh\\ 1"])
 
+    def test_a_quote_before_a_continuation_or_inside_the_name_cannot_join_to_a_different_file(self):
+        """R2-01 of #237: bash runs `scripts/mark-ready.sh12` for these; the guard must route by the start of the name, not only the exact word."""
+        from test_guard_update_branch import joined_name_forms
+        self.denied_everywhere(joined_name_forms("mark-ready.sh", "12"))
+
     def test_any_other_form_is_denied(self):
         for c in ["scripts/mark-ready.sh", "scripts/mark-ready.sh 0", "scripts/mark-ready.sh 012", "scripts/mark-ready.sh 1234567",
                   "scripts/mark-ready.sh -1", "scripts/mark-ready.sh 1 2", "scripts/mark-ready.sh 1 --input x", "scripts/mark-ready.sh ''",

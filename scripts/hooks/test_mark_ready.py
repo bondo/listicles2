@@ -130,7 +130,7 @@ class MarkReady(unittest.TestCase):
 
     def test_source_fixes_the_interpreter_and_the_gh_directories(self):
         src = read_wrapper()
-        self.assertEqual(src.splitlines()[0], "#!/bin/bash", "no `env` lookup of bash through PATH")
+        self.assertEqual(src.splitlines()[0], "#!/bin/bash -p", "no `env` lookup of bash through PATH")
         self.assertEqual(len(GH_DIRS_LINE.findall(src)), 1)
         listed = GH_DIRS_LINE.findall(src)[0].split('"')[1].split()
         self.assertTrue(listed and all(os.path.isabs(d) and not d.startswith(("/home", "/root", "/tmp")) for d in listed), listed)

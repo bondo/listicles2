@@ -4,7 +4,8 @@
       "Bash(.tools/bin/shellcheck *)",
       "Bash(.tools/bin/actionlint *)",
       "Bash(.tools/bin/zizmor --offline *)",
-      "Bash(scripts/mark-ready.sh *)"
+      "Bash(scripts/mark-ready.sh *)",
+      "Bash(scripts/update-branch.sh *)"
     ]
   },
   "statusLine": {
