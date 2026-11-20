@@ -148,9 +148,30 @@ def job_in(text, name):
     return m.group(1) if m else None
 
 
+# Steps that merged PRs could not add themselves (ci.yml is protected): (job, command, source finding).
+# Each also runs in verify.sh. Sources: PR 224 R1-02, PR 231, PR 235 R1-04, PR 239 R2-02.
+CI_STEPS = [
+    ("static", "python3 -I scripts/test_check_gradle_wrapper.py", "PR 231"),
+    ("static", "python3 -I scripts/check_gradle_wrapper.py", "PR 231"),
+    ("static", "python3 -I scripts/test_gitignore_secrets.py", "PR 235 R1-04"),
+    ("tasks", "python3 -I scripts/test_dependency_floors.py", "PR 224 R1-02"),
+    ("tasks", "python3 -I scripts/dependency_floors.py", "PR 224 R1-02"),
+    ("unit", "python3 -I scripts/test_check_test_results.py", "PR 239 R2-02"),
+]
+
+
 def wiring_problems(text):
     """What is wrong with a ci.yml text, as a list of messages (empty when the wiring is right)."""
     problems = []
+    for job, cmd, _source in CI_STEPS:
+        body = job_in(text, job) or ""
+        # No `$` match followed by a more-indented line: YAML folds that line into the run scalar (`|| true`, `--help`).
+        if not re.search(rf"(?m)^        run: {re.escape(cmd)}$(?!\n {{9}})", body):
+            problems.append(f"{job}: does not run {cmd}")
+    for job in dict.fromkeys(job for job, _cmd, _source in CI_STEPS):
+        body = job_in(text, job) or ""
+        if re.search(r"(?m)^\s*(?:-\s+)?if:", body) or "continue-on-error" in body:
+            problems.append(f"{job}: if or continue-on-error")
     if re.search(r"^\s+paths(-ignore)?:", text, re.M):
         problems.append("workflow-level paths filter")
     for name in REQUIRED_JOBS:
@@ -165,11 +186,11 @@ def wiring_problems(text):
         if re.search(r"^    needs:", body, re.M):
             problems.append(f"{name}: needs")
     static = job_in(text, "static") or ""
-    if re.search(r"(?m)^\s*(?:-\s+)?if:", static) or "continue-on-error" in static:
+    if (re.search(r"(?m)^\s*(?:-\s+)?if:", static) or "continue-on-error" in static) and "static: if or continue-on-error" not in problems:
         problems.append("static: if or continue-on-error")
     if "fetch-depth: 2" not in static:
         problems.append("static: no two-commit checkout")
-    if not re.search(r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$", static):
+    if not re.search(r"(?m)^        run: python3 -I scripts/ci_scope\.py selftests$(?!\n {9})", static):
         problems.append("static: does not run ci_scope.py selftests")
     if not re.search(r"read -ra exclude <<< \"\$\(python3 -I scripts/ci_scope\.py gradle-exclude\)\"", static) or not re.search(
         r"\./gradlew [^\n]*:app:lintDebug \"\$\{exclude\[@\]\}\"\n", static
@@ -183,6 +204,16 @@ def wiring_problems(text):
     if "python3 -I scripts/test_ci_scope.py" not in text:
         problems.append("ci.yml does not run test_ci_scope.py")
     return problems
+
+
+def verify_problems(verify):
+    """Problems with how verify.sh runs the CI_STEPS commands: each must be an active, top-level `step <name> <cmd>` line."""
+    lines = verify.splitlines()
+    return [
+        f"verify.sh does not run `{cmd}` as a top-level step"
+        for _job, cmd, _source in CI_STEPS
+        if not any(re.fullmatch(rf"step \S+ {re.escape(cmd)}", ln) for ln in lines)
+    ]
 
 
 class CiWiring(unittest.TestCase):
@@ -209,14 +240,61 @@ class CiWiring(unittest.TestCase):
             ("static: calls scripts/test_warnings_gate.py directly", step, "      - run: python3 -I scripts/test_warnings_gate.py\n" + step),
             ("guards: hook tests not run with --jobs 4", "run_hook_tests.py --jobs 4", "run_hook_tests.py"),
             ("ci.yml does not run test_ci_scope.py", "python3 -I scripts/test_ci_scope.py", "python3 -I scripts/test_nothing.py"),
+            ("static: does not run ci_scope.py selftests", "ci_scope.py selftests\n", "ci_scope.py selftests\n          || true\n"),
         ]
+        for job, cmd, _source in CI_STEPS:
+            run = f"        run: {cmd}\n"
+            problem = f"{job}: does not run {cmd}"
+            cases += [
+                (problem, cmd, "python3 -I scripts/test_nothing.py"),
+                (problem, run, f"        # run: {cmd}\n"),
+                (problem, run, run.rstrip() + " || true\n"),
+                (problem, run, run + "          || true\n"),
+                (problem, run, run + "          --help\n"),
+                (problem, run, ""),
+                (f"{job}: if or continue-on-error", run, run + "        continue-on-error: true\n"),
+                (f"{job}: if or continue-on-error", run, run + "        if: false\n"),
+                (f"{job}: if or continue-on-error", run, run + "        if: github.event_name == 'push'\n"),
+            ]
         for problem, old, new in cases:
             self.assertIn(problem, self.mutated(old, new), problem)
+
+    def test_an_if_in_a_job_is_reported_once(self):
+        text = ci_text().replace("      - name: gradle wrapper checksum check tests", "      - if: false\n        name: gradle wrapper checksum check tests", 1)
+        self.assertEqual(wiring_problems(text).count("static: if or continue-on-error"), 1)
+
+    def test_a_step_moved_to_another_job_is_flagged(self):
+        text = ci_text()
+        for job, cmd, _source in CI_STEPS:
+            run = f"        run: {cmd}\n"
+            moved = text.replace(run, "", 1).replace("      - name: hook tests", f"      - name: moved\n{run}      - name: hook tests", 1)
+            self.assertIn(run, moved)
+            self.assertIn(f"{job}: does not run {cmd}", wiring_problems(moved), (job, cmd))
 
     def test_verify_runs_the_scope_tests_and_the_parallel_hook_tests(self):
         verify = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8")
         self.assertIn("python3 -I scripts/test_ci_scope.py", verify)
         self.assertIn("scripts/hooks/run_hook_tests.py --jobs 4", verify)
+
+    def test_every_ci_step_exists_and_the_real_verify_sh_runs_it(self):
+        verify = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8")
+        self.assertEqual(verify_problems(verify), [])
+        for _job, cmd, source in CI_STEPS:
+            self.assertTrue((ROOT / cmd.rsplit(" ", 1)[1]).is_file(), (cmd, source))
+
+    def test_verify_sh_mutations_are_flagged(self):
+        verify = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8")
+        for _job, cmd, source in CI_STEPS:
+            line = next(ln for ln in verify.splitlines() if ln.endswith(f" {cmd}") and ln.startswith("step "))
+            problem = f"verify.sh does not run `{cmd}` as a top-level step"
+            for label, new in (
+                ("removed", ""),
+                ("commented out", f"# {line}"),
+                ("indented (inside an if)", f"  {line}"),
+                ("|| true", f"{line} || true"),
+                ("other command", line.replace(cmd, "python3 -I scripts/test_nothing.py")),
+            ):
+                self.assertIn(problem, verify_problems(verify.replace(line, new, 1)), (source, label))
 
 
 if __name__ == "__main__":
