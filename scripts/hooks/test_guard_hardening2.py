@@ -63,7 +63,7 @@ class Round2(Base):
     def test_r2_09_a_variable_the_shell_never_sets_is_not_tracked(self):
         self.deny(["F=--force; env F=ok; git push $F origin work", "F=--force; (F=ok); git push $F origin work",
                    "(IFS=); P='--force origin'; git push $P work"])
-        self.allow(["env A.B=1", "sudo A.B=1", "F=--force-with-lease; (F=--force); git push $F origin work"])
+        self.allow(["env A.B=1", "sudo A.B=1"])  # the subshell form main denies stays denied: main's verdict is the floor (test_guard_hardening4)
 
     def test_the_nesting_cap_denies(self):
         with self.assertRaises(SystemExit):
