@@ -8,6 +8,7 @@ required check always runs and reports."""
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -318,6 +319,17 @@ class OwnerInputClasses(unittest.TestCase):
                 self.assertEqual(ci_scope.gradle_selftests(["docs/a.md", p, "app/src/main/kotlin/A.kt"]), "run", (what, p))
 
 
+def setUpModule():  # every temporary repository of this file goes into one directory, removed at the end
+    global TMP_ROOT
+    TMP_ROOT = tempfile.mkdtemp(prefix="ci-scope-tests-")
+    tempfile.tempdir = TMP_ROOT
+
+
+def tearDownModule():
+    tempfile.tempdir = None
+    shutil.rmtree(TMP_ROOT, ignore_errors=True)
+
+
 def local_repo(shallow_depth=None):
     """A clone (like an agent container) with origin/main and a branch `pr` at main's tip; with `shallow_depth`, a shallow one."""
     src = tempfile.mkdtemp(prefix="ci-scope-origin-")
@@ -396,6 +408,15 @@ class LocalScope(unittest.TestCase):
         write(repo, "gradle/libs.versions.toml")
         self.assertEqual(local_scope(repo), "run")
 
+    def test_a_linked_worktree_of_a_shallow_clone_is_scoped(self):
+        _src, repo = local_repo(shallow_depth=2)
+        tree = os.path.join(tempfile.mkdtemp(prefix="ci-scope-tree-"), "wt")
+        git(repo, "worktree", "add", "-q", "-b", "pr2", tree, "HEAD")
+        write(tree, "docs/x.md")
+        self.assertEqual(local_scope(tree), "skip")
+        write(tree, "gradlew")
+        self.assertEqual(local_scope(tree), "run")
+
     def test_failure_modes_run(self):
         cases = []
         _src, repo = local_repo()
@@ -424,6 +445,10 @@ class LocalScope(unittest.TestCase):
         git(repo, "fetch", "-q", "--depth", "1", "origin", "main")  # origin/main is cut off above HEAD: no merge base
         write(repo, "docs/x.md")
         cases.append(("shallow, merge base not fetched", repo))
+        _src, repo = local_repo()
+        fd = os.open(os.path.join(os.fsencode(repo), b"docs-\xff.md"), os.O_CREAT | os.O_WRONLY)
+        os.close(fd)
+        cases.append(("a path that is not UTF-8", repo))
         for what, repo in cases:
             self.assertEqual(local_scope(repo), "run", what)
 
@@ -482,7 +507,8 @@ def verify_gate_problems(verify):
         if verify.count(line) != 1 or not re.search(rf"(?m)^  {re.escape(line)}$", block):
             problems.append(f"`{line}` is not run exactly once, inside the block")
     detekt = [ln for ln in verify.splitlines() if ln.startswith("step detekt ")]
-    if len(detekt) != 1 or not detekt[0].endswith(' "${gate_exclude[@]}"') or verify.index(block) > verify.index(detekt[0]):
+    # ${a[@]+"${a[@]}"}: a bare "${a[@]}" of an empty array is an unbound variable under set -u in bash before 4.4 (macOS).
+    if len(detekt) != 1 or not detekt[0].endswith(' ${gate_exclude[@]+"${gate_exclude[@]}"}') or verify.index(block) > verify.index(detekt[0]):
         problems.append("the detekt step does not end with the gate exclusion after the block")
     if verify.count("gate_exclude=") != 2:
         problems.append("gate_exclude is set outside the block")
@@ -506,7 +532,8 @@ class VerifyGateWiring(unittest.TestCase):
             (f"  {GATE_STEPS[0]}\n", ""),
             (f"  {GATE_STEPS[1]}\n", f"  # {GATE_STEPS[1]}\n"),
             (f"  {GATE_STEPS[0]}\n", f"  {GATE_STEPS[0]} || true\n"),
-            (' "${gate_exclude[@]}"\n', "\n"),
+            (' ${gate_exclude[@]+"${gate_exclude[@]}"}\n', "\n"),
+            (' ${gate_exclude[@]+"${gate_exclude[@]}"}\n', ' "${gate_exclude[@]}"\n'),
             ("gate_exclude=()\nif", "gate_exclude=(-x testLicenseeGate)\nif"),
             ("step lint gradle", "gate_exclude=(-x testLicenseeGate)\nstep lint gradle"),
         ]
