@@ -2032,6 +2032,39 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "- **Resolve the thread** after answering.",
         "Agents may [resolve the thread](https://example.com) once answered.",
         "| Orchestrator | Resolve threads after replying |",
+        # R4-01 of #267: an all-bold bullet is not a button name; it keeps its permission
+        "- **Agents may resolve the thread once answered.**",
+        "* **You may resolve the thread after replying**",
+        "- **Reply and resolve the thread.**",
+        "- **Agents are allowed to resolve the thread.**",
+        "- **The orchestrator resolves the conversation after replying.**",
+        "- **Once answered, resolve the thread.**",
+        "  - **Agents may resolve the thread once answered.**",
+        # R1-01 of #267, round 4 and the escalation ruling: a focus adverb, a question, an answer before a comma, a negation inside a
+        # relative clause of the subject and "Not all" are not a ban on the act
+        "Not just reply and resolve the thread, but also thank the collaborator.",
+        "Not merely reply and resolve the thread, but also thank the collaborator.",
+        "Not simply reply and resolve the thread, but also thank the collaborator.",
+        "Don't just reply and resolve the thread; also add a test.",
+        "Why don't you reply and resolve the thread?",
+        "Why not just reply and resolve the thread?",
+        "Can't you just reply and resolve the thread?",
+        "Couldn't you just reply and resolve the thread yourself?",
+        "Won't you reply and resolve the thread?",
+        "Shouldn't you reply and resolve the thread?",
+        "Why shouldn't agents reply and resolve the thread?",
+        "Need the owner? Of course not, resolve the thread yourself.",
+        "Need approval? Certainly not, resolve the thread yourself.",
+        "Need approval? Definitely not, resolve the thread yourself.",
+        "Ask the owner first? Absolutely not, resolve the thread yourself.",
+        "Need the owner? Surely not, resolve the thread yourself.",
+        "Need the owner? I think not, resolve the thread yourself.",
+        "Need the owner? Usually not, resolve the thread yourself.",
+        "Need the owner? Probably not, resolve the thread yourself.",
+        "Do agents need approval? They don't, resolve the thread after replying.",
+        "Reviewers that do not find issues reply and resolve the thread.",
+        "Agents who don't hear back reply and resolve the thread.",
+        "Not all agents reply and resolve the thread.",
     )
     BAN = (
         # R3-03: a comma clause between the negation and the verb
@@ -2107,6 +2140,12 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Do not [resolve the thread](https://example.com).",
         "- **Resolve conversation**",
         "mcp__github__resolve_review_thread is the tool name.",
+        # R4-02 of #267: a button label in the docs' own list and table formats; R1-01: a negator after an agent subject or "please"
+        "* **Resolve conversation** (on a review thread)",
+        "| **Resolve conversation** | the owner |",
+        "An agent must not reply and resolve the thread.",
+        "Please do not reply and resolve the thread.",
+        "Agents shouldn't answer and resolve it on the thread.",
     )
 
     def flagged(self, where, text):
@@ -2143,7 +2182,11 @@ class ResolveThreadSentenceTests(unittest.TestCase):
     OTHER_VERB_NEGATORS = ("Don't hesitate to", "Do not forget to", "Never fail to", "It is not hard to", "Agents should never wait to",
                            "Do not wait to", "Agents needn't wait to")
     THEN_STEPS = ("Don't wait long", "Never wait a day", "Don't forget to reply", "Do not hesitate")
-    COMMA_PHRASES = ("In no particular order,", "In no time,", "No,", "Need the owner? No,", "In no way whatsoever,")
+    COMMA_PHRASES = ("In no particular order,", "In no time,", "No,", "Need the owner? No,", "In no way whatsoever,", "Of course not,",
+                     "Certainly not,")
+    # escalation ruling of #267: a negation that does not start the clause as an imperative or after the agent subject is no ban
+    CONJ_NON_NEGATORS = ("Not just", "Don't just", "Not all agents", "Reviewers that do not find issues", "Agents who don't hear back")
+    QUESTIONS = ("Why don't you", "Can't you")
     ABBREVIATIONS = ("e.g.", "i.e.", "(e.g.")
     SEPARATORS = ("", "- ", "* ", "Note: ", "1. ", "| ")
 
@@ -2152,9 +2195,12 @@ class ResolveThreadSentenceTests(unittest.TestCase):
             for lead in self.LEAD_CLAUSES:
                 for core in self.SUBJECT_CORES:
                     yield f"{sep}{lead} {core}."
-            for neg in self.OTHER_VERB_NEGATORS:
+            for neg in self.OTHER_VERB_NEGATORS + self.CONJ_NON_NEGATORS:
                 yield f"{sep}{neg} reply and resolve the thread."
                 yield f"{sep}{neg} reply and resolve it on the thread."
+            for question in self.QUESTIONS:
+                yield f"{sep}{question} reply and resolve the thread?"
+                yield f"{sep}{question} reply and resolve it on the thread?"
             for step in self.THEN_STEPS:
                 yield f"{sep}{step} then resolve the thread."
             for phrase in self.COMMA_PHRASES:
