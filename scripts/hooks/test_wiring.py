@@ -152,6 +152,8 @@ NEW_ROLES = {
     "orchestrator": ("opus", "medium"),
     "planner": ("opus", "high"),
     "implementer": ("opus", "high"),
+    "implementer-sonnet": ("sonnet", "medium"),  # owner decision 7032210967 on #15: the Opus / Sonnet implementer split
+    "merge-agent": ("sonnet", "medium"),  # #15 comment 7011276600
     "reviewer": ("opus", "high"),
     "second-reviewer": ("opus", "high"),
     "escalation-reviewer": ("opus", "max"),
@@ -258,6 +260,37 @@ class RolesYaml(unittest.TestCase):
 
     def test_fallback_is_not_read_as_active_roles(self):
         self.assertEqual(roles()["implementer"], "high")  # the fallback implementer is medium
+
+    def test_the_implementer_split_names_every_opus_case(self):  # owner decision 7032210967 on #15
+        opus = " ".join(roles_file()["roles"]["implementer"]["use_when"]).lower()
+        for needle in ("spike", "design", "risk:high", "security rules", "sync", "guard", "3 or more review rounds"):
+            self.assertIn(needle, opus, needle)
+        sonnet = roles_file()["roles"]["implementer-sonnet"]
+        self.assertTrue(any("tooling" in e for e in sonnet["high_effort_when"]))
+        self.assertNotIn("max_effort_when", sonnet)  # a risk:high PR goes to the Opus implementer
+
+    def test_the_process_docs_state_the_implementer_split_and_the_merge_agent(self):
+        for path in (("docs", "ORCHESTRATION.md"), ("docs", "PLAN.md")):
+            rows = [line for line in read(*path).splitlines() if line.startswith("| **")]
+            impl = " ".join(r for r in rows if r.startswith("| **Implementer"))
+            for needle in ("Opus", "Sonnet"):
+                self.assertIn(needle, impl, f"{'/'.join(path)}: {needle}")
+            self.assertTrue(any(r.startswith("| **Merge agent**") for r in rows), f"{'/'.join(path)}: no merge agent row")
+
+    def test_the_merge_agent_rows_follow_7007421567(self):  # R1-03: D2 update-branch heads, D1 and D3 owner-approved owner-only PRs
+        orch = next(line for line in read("docs", "ORCHESTRATION.md").splitlines() if line.startswith("| **Merge agent**"))
+        plan = next(line for line in read("docs", "PLAN.md").splitlines() if line.startswith("| **Merge agent**"))
+        self.assertIn("except for update-branch merge commits of main", orch)
+        self.assertIn("once the owner's approval is recorded on #15", plan)
+
+    def test_deescalation_allows_an_owner_decision_and_the_roles_header_names_the_exception(self):  # R1-06
+        self.assertIn("only through the metrics retro (section 9.4) or an owner decision", " ".join(read("docs", "PLAN.md").split()))
+        self.assertIn("7032210967", "\n".join(read("agents", "roles.yaml").splitlines()[:6]))
+
+    def test_plan_no_longer_says_the_owner_merges_every_pr(self):
+        plan = read("docs", "PLAN.md")
+        for old in ("the owner squash-merges", "you squash-merge"):
+            self.assertNotIn(old, plan)
 
     def test_design_reviewer_gets_three_rounds(self):
         self.assertIn("max 3 rounds", roles_file()["roles"]["design-reviewer"]["session"])

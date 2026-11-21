@@ -76,9 +76,9 @@ kover {
                 // Same exclusions as app/build.gradle.kts (the aggregate report does not inherit them).
                 annotatedBy("androidx.compose.runtime.Composable", "androidx.compose.ui.tooling.preview.Preview")
                 classes(
-                    "dev.listicles.app.MainActivity",
-                    "dev.listicles.app.R",
-                    "dev.listicles.app.R$*",
+                    "dk.bjarkebjarke.tally.MainActivity",
+                    "dk.bjarkebjarke.tally.R",
+                    "dk.bjarkebjarke.tally.R$*",
                     "*ComposableSingletons*",
                 )
             }
@@ -311,8 +311,8 @@ subprojects {
     tasks.withType<Test>().configureEach {
         jvmArgs(
             "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-            "-Djava.nio.channels.spi.SelectorProvider=dev.listicles.testing.BlockingSelectorProvider",
-            "-Djava.nio.channels.spi.AsynchronousChannelProvider=dev.listicles.testing.BlockingAsynchronousChannelProvider",
+            "-Djava.nio.channels.spi.SelectorProvider=dk.bjarkebjarke.tally.testing.BlockingSelectorProvider",
+            "-Djava.nio.channels.spi.AsynchronousChannelProvider=dk.bjarkebjarke.tally.testing.BlockingAsynchronousChannelProvider",
         )
     }
 }
@@ -338,6 +338,8 @@ val testLicenseeGate =
         val wrapper = layout.projectDirectory.file("gradlew").asFile
         val pluginVersion = libs.versions.licensee.get()
         inputs.dir(layout.projectDirectory.dir("config/licensee"))
+        // A licensee bump must make the gate out of date (issue 216), not leave it UP-TO-DATE on the old version.
+        inputs.property("licenseeVersion", pluginVersion)
         val marker = layout.buildDirectory.file("licensee-gate.ok")
         outputs.file(marker)
         val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
