@@ -237,7 +237,11 @@ class M011AlignmentTests(unittest.TestCase):
          "or on a `risk:high` task, without owner OK",
          "never a blocker, a major, or any finding in the security-rules, sync-merge or release areas or on a `risk:high` task without owner OK"),
         ("implementer", "impl-deferral", "a minor or nit only once no blocker or major is open and the fix is not small; ", ""),
-        ("implementer", "impl-deferral", ", and with more than 8 open follow-ups for the milestone ask the owner", ""),
+        ("implementer", "impl-deferral", ", and with more than 8 open deferral follow-ups for the milestone (repo-wide review issues do not count) "
+         "ask the owner", ", and with more than 8 open follow-ups for the milestone ask the owner"),
+        ("orchestrator", "orch-deferral", "(findings of repo-wide reviews do not count, owner decision 7003661679)", ""),
+        ("orchestrator", "orch-deferral", "stop deferring and fix follow-ups as their own small PRs before new feature work",
+         "stop deferring and start the milestone's burn-down task `Mx-FU` next"),  # #256: Mx-FU depends on every task of its milestone
         ("implementer", "impl-deferral", "post the `decision` comment and any `accepted:` comment (with its `metrics:round` block, "
          "verdict `ready_deferred`) on the PR (§4, §6)", ""),
     )
@@ -262,7 +266,7 @@ class M011AlignmentTests(unittest.TestCase):
         for role, blocker in (("orchestrator", "never defer a blocker; never defer a major"), ("implementer", "never a blocker; never a major")):
             norm = prompt_rules.normalize(real(role))
             for needle in (blocker, "security-rules, sync-merge or release", "`risk:high`", "owner OK",
-                           "more than 8 open follow-ups", "`decision` comment", "`ready_deferred`", "not small", "no blocker or major is open"):
+                           "more than 8 open deferral follow-ups", "`decision` comment", "`ready_deferred`", "not small", "no blocker or major is open"):
                 self.assertIn(needle.lower(), norm.lower(), f"{role}: {needle}")
 
     def test_deferral_with_owner_ok_for_a_blocker_is_rejected(self):
@@ -1056,6 +1060,9 @@ class Pr3RuleTests(unittest.TestCase):
         "plan-working-rules": "docs/PLAN.md",
         "plan-handoff": "docs/PLAN.md",
         "plan-roles": "docs/PLAN.md",
+        "plan-implementer-split": "docs/PLAN.md",  # #255: owner decision 7032210967 and the merge agent
+        "followups-cap-exemption": "docs/FOLLOW-UPS.md",  # #256: owner decision 7003661679
+        "orch-implementer-split": "docs/ORCHESTRATION.md",
         "template-handoff": "handoff/TEMPLATE.md",
         "reviews-retro": "docs/reviews/README.md",  # #129 R2-02: the R6 retro is Opus/high as in PLAN 9.4 and roles.yaml
     }
@@ -1076,6 +1083,10 @@ class Pr3RuleTests(unittest.TestCase):
         ("docs/PLAN.md", "plan-handoff", "At **about 50%** context, the session finishes its current step."),
         ("docs/PLAN.md", "plan-handoff", "**One PR per implementer session. One review round per reviewer session.**"),
         ("docs/PLAN.md", "plan-roles", "| **Orchestrator** | Sonnet / low | One long-lived session |"),
+        ("docs/PLAN.md", "plan-implementer-split", "the owner squash-merges"),
+        ("docs/PLAN.md", "plan-implementer-split", "you squash-merge."),
+        ("docs/FOLLOW-UPS.md", "followups-cap-exemption", "the orchestrator stops deferring and starts the milestone's burn-down task"),
+        ("docs/ORCHESTRATION.md", "orch-implementer-split", "| **Implementer** | Opus / high (max for `risk:high`) | One batch or PR |"),
         ("docs/PLAN.md", "plan-roles", "The single source of truth for each role's model, effort and token budget."),
         ("docs/PLAN.md", "plan-roles", "A retro session (Sonnet / medium) reads only the CSV. Escaped defects get the label `escaped`."),
         ("docs/PLAN.md", "plan-roles", "Starting budgets (calibrated after M0): implementer about 300k tokens/PR."),  # R2-01
@@ -1139,6 +1150,16 @@ class Pr3RuleTests(unittest.TestCase):
         ):
             with self.subTest(role=role, old=old):
                 self.assertIn(rid, ids(prompt_rules.check_text(role, real(role) + old)))
+
+    def test_the_implementer_prompt_names_the_model_split_and_rejects_the_all_opus_line(self):  # owner decision 7032210967
+        norm = prompt_rules.normalize(real("implementer")).lower()
+        for needle in ("model and effort come from `agents/roles.yaml`", "opus, high effort for", "sonnet, medium effort otherwise, high for tooling"):
+            self.assertIn(needle, norm)
+        old = ("You are an IMPLEMENTER for Listicles. Opus, high effort (max for risk:high PRs per `agents/roles.yaml`; "
+               "you do not raise your own effort), fresh session, one PR, kept across its review rounds.")
+        text = prompt_rules.normalize(real("implementer"))
+        first, _, rest = text.partition(" Read:")
+        self.assertIn("impl-model-and-handoff", ids(prompt_rules.check_text("implementer", old + " Read:" + rest)))
 
     def test_the_escalation_reviewer_prompt_exists_and_roles_yaml_names_it(self):
         self.assertTrue((PROMPTS / "escalation-reviewer.md").is_file())
@@ -1381,6 +1402,7 @@ class Pr4RuleTests(unittest.TestCase):
         ("docs/ORCHESTRATION.md", "orch-archive", "Archive finished worker sessions once their metrics row is logged and the owner has seen the batch report."),
         ("docs/ORCHESTRATION.md", "orch-spawn-templates", "Role: agents/prompts/reviewer.md. PR #{pr}, round {round}, range {base_sha}..{head_sha}."),
         ("docs/ORCHESTRATION.md", "orch-design-rounds", "Max 2 rounds per design PR."),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "Stop deferring and start the milestone's burn-down task `Mx-FU` next (re-deferral and majors still need the owner)."),
         ("docs/FOLLOW-UPS.md", "followups-labels", "It stops deferring and asks the owner to do M0-O10."),
         ("docs/FOLLOW-UPS.md", "followups-small-fix", "The orchestrator stops deferring and reports to the owner."),
         ("docs/PLAN.md", "plan-working-rules", "* The orchestrator never reads child transcripts. It reads only the final summary"),
@@ -1415,6 +1437,7 @@ class Pr4RuleTests(unittest.TestCase):
             ("orchestrator", "handover", " Hand over at about 80% of a 1M window (60% of a 200k one)."),  # R1-01 of #179
             ("orchestrator", "orch-deferral", " more than about 15 changed lines"),
             ("orchestrator", "orch-deferral", " Stop deferring and ask the owner to do M0-O10."),
+            ("orchestrator", "orch-deferral", " Stop deferring and start the milestone's burn-down task `Mx-FU` next."),  # #256
             ("orchestrator", "orch-delta-review", " Owner acceptance is the only alternative."),
             ("orchestrator", "orch-delta-review", " A fresh reviewer on the range `reviewed_through..head_sha` only."),
             ("design-reviewer", "dr-rounds", " Max 2 Opus rounds per design PR."),
