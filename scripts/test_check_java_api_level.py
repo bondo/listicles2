@@ -228,7 +228,9 @@ class CheckerTest(unittest.TestCase):
         self.assertEqual(rc, 2, out)
 
     def test_corrupt_class_file_fails_closed(self):
-        for label, data in (("bad-magic", b"NOTACLASS" * 8), ("truncated", open(os.path.join(self.out, "Api26.class"), "rb").read()[:60])):
+        with open(os.path.join(self.out, "Api26.class"), "rb") as f:
+            good = f.read()
+        for label, data in (("bad-magic", b"NOTACLASS" * 8), ("truncated", good[:60])):
             with self.subTest(label=label):
                 bad = os.path.join(self.tmp.name, f"{label}.class")
                 with open(bad, "wb") as f:
