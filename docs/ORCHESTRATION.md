@@ -552,7 +552,7 @@ or `release`, or on a `risk:high` task, never without owner OK. For each deferra
 and the "only nits remain" test count only unresolved, non-deferred findings. If everything above nit was deferred and no
 commit followed the reviewed range, the PR needs no further round: the orchestrator posts a `decision` comment
 `accepted: all findings above nit deferred (#a, #b)` and sets the round's verdict to `ready_deferred` (taking precedence
-over `cap_reached`); that is the owner's signal to merge. An implementer deciding without an orchestrator posts the
+over `cap_reached`); that is the signal to mark the PR READY (§7.5). An implementer deciding without an orchestrator posts the
 `accepted:` comment on the PR with the round row inside it, and writes nothing to the state issue; the next orchestrator copies the row into the log. More than 8 open deferral follow-ups for one milestone (findings of repo-wide reviews do not count, owner decision 7003661679): stop deferring and ask the owner which follow-ups to fix as their own small PRs (as on #15 comment 6989510779); deferring resumes at 8 or fewer open (re-deferral and majors still need the owner; `Mx-FU` depends on every task of its milestone, so it cannot start early) (count targets
 with `tasks.py --followups … --json followups`, minus the repo-wide review issues, which it does not tell apart yet). The deferral is in the decision comment at once; the PR review table
 is refreshed at batch close and no later than when the PR is declared ready.

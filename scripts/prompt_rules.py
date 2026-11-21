@@ -918,6 +918,17 @@ DOC_RULES = (
         forbidden=(r"the owner squash-merges", r"you squash-merge", r"the owner's merge is the review"),
     ),
     DocRule(
+        "followups-accepted-signal", "docs/FOLLOW-UPS.md",
+        (
+            r"that is the signal to mark the pr ready \(the merge agent merges it; an owner-only pr waits for the owner's approval, "
+            r"`orchestration\.md` §7\.5\)",
+            r"deferrals are re-checked when the owner approves an owner-only pr",
+        ),
+        "FOLLOW-UPS 4: `accepted:` is the signal to mark the PR READY for the merge agent, "
+        "and the owner re-checks deferrals when approving an owner-only PR (R2-01 of #262)",
+        forbidden=(r"owner's signal to merge", r"re-checked by the owner at merge time"),
+    ),
+    DocRule(
         "followups-cap-exemption", "docs/FOLLOW-UPS.md",
         (
             r"repo-wide reviews \(owner decision, #15 comment 7003661679\):\*\* the cap of 8 per milestone counts every follow-up deferred "
@@ -1023,7 +1034,7 @@ DOC_RULES = (
         "over 8 deferral follow-ups they are fixed as small PRs",
         forbidden=(
             r"round 4 with findings above `nit`: stop and ask the owner", r"defers the remaining minors and nits \(follow-up issues\) instead of running",
-            r"stop deferring and report to the owner", r"start the milestone's burn-down task",
+            r"stop deferring and report to the owner", r"start the milestone's burn-down task", r"owner's signal to merge",
             r"fix follow-ups as their own small prs before new feature work",
         ),
     ),

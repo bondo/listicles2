@@ -74,11 +74,11 @@ Round flow with deferral:
 3. If every finding above `nit` was deferred and no commit followed the reviewed range, the PR is accepted
    **without another review round**: nothing unreviewed exists. The orchestrator sets the round's verdict to
    `ready_deferred` (round row, PR table) and posts `accepted: all findings above nit deferred (#a, #b)`; that is the
-   owner's signal to merge. An implementer deciding without an orchestrator posts the same `accepted:` comment on the PR, with the
+   signal to mark the PR READY (the merge agent merges it; an owner-only PR waits for the owner's approval, `ORCHESTRATION.md` §7.5). An implementer deciding without an orchestrator posts the same `accepted:` comment on the PR, with the
    round row (verdict `ready_deferred`) as a `metrics:round` block inside it; it writes nothing to the state issue, and the
    next orchestrator copies the row into the log. If this happens in round 4, `ready_deferred` takes precedence over `cap_reached`. If any fix was committed, `reviewed_through`
-   rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked by the
-   owner at merge time (PR review table, `Deferred` column; in a manual loop, from the decision and `accepted:` PR comments, since nobody refreshes the table) and by the next round if one happens.
+   rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked when the
+   owner approves an owner-only PR (PR review table, `Deferred` column; in a manual loop, from the decision and `accepted:` PR comments, since nobody refreshes the table) and by the next round if one happens.
 4. The **4-round cap** and the **"only nits remain"** test count only unresolved, non-deferred findings.
    Deferred findings are listed in the report to the owner but do not hold a round open.
 5. A deferral that violates section 2, or lacks the issue or decision record, is a finding itself
