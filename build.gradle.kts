@@ -338,6 +338,8 @@ val testLicenseeGate =
         val wrapper = layout.projectDirectory.file("gradlew").asFile
         val pluginVersion = libs.versions.licensee.get()
         inputs.dir(layout.projectDirectory.dir("config/licensee"))
+        // A licensee bump must make the gate out of date (issue 216), not leave it UP-TO-DATE on the old version.
+        inputs.property("licenseeVersion", pluginVersion)
         val marker = layout.buildDirectory.file("licensee-gate.ok")
         outputs.file(marker)
         val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
