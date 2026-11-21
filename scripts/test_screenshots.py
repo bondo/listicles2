@@ -196,10 +196,8 @@ class Goldens(unittest.TestCase):
         self.assertEqual(c.golden_problems(ROOT), [])
 
     def test_the_expected_set_is_light_and_dark_in_both_languages_plus_one_font_scale_golden(self):
-        self.assertEqual(
-            sorted(c.GOLDENS),
-            sorted(f"TallyApp_{lang}_{mode}.png" for lang in ("en", "da") for mode in ("light", "dark")) + ["TallyApp_da_light_font200.png"],
-        )
+        want = [f"TallyApp_{lang}_{mode}.png" for lang in ("en", "da") for mode in ("light", "dark")] + ["TallyApp_da_light_font200.png"]
+        self.assertEqual(sorted(c.GOLDENS), sorted(want))
 
     def test_a_complete_synthetic_set_has_no_problems(self):
         self.assertEqual(c.golden_problems(self.root), [])
@@ -260,14 +258,30 @@ class Build(unittest.TestCase):
         got = self.mutated("gradle/libs.versions.toml", "roborazzi = { id =", "roborazziX = { id =")
         self.assertIn("libs.versions.toml has no roborazzi plugin", got)
 
+    def test_the_goldens_must_be_an_input_of_the_test_task(self):
+        # Without it Gradle reports testDebugUnitTest UP-TO-DATE (or takes it from the build cache) after a golden changed,
+        # and the verify gate passes without comparing anything.
+        got = self.mutated("app/build.gradle.kts", 'inputs.dir("src/test/screenshots")', 'inputs.dir("src/test/other")')
+        self.assertEqual(got, ["app/build.gradle.kts must declare src/test/screenshots as an input of the test tasks (else verify is skipped when only goldens changed)"])
+
     def test_the_comparison_must_be_exact(self):
-        got = self.mutated("app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt", "changeThreshold = 0f", "changeThreshold = 0.01f")
-        self.assertEqual(got, ["ScreenshotOptions.kt must set changeThreshold = 0f, the only value allowed"])
+        want = ["ScreenshotOptions.kt must compare exactly: ThresholdValidator(0f), maxDistance = 0f, hShift = 0, vShift = 0"]
+        for old, new in (
+            ("ThresholdValidator(0f)", "ThresholdValidator(0.01f)"),
+            ("maxDistance = 0f", "maxDistance = 0.007f"),
+            ("hShift = 0", "hShift = 2"),
+            ("vShift = 0", "vShift = 2"),
+        ):
+            with self.subTest(old=old):
+                self.setUp()
+                self.assertEqual(self.mutated("app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt", old, new), want)
 
     def test_a_tolerance_in_any_other_test_source_is_reported(self):
-        other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt"
-        other.write_text("val o = CompareOptions(changeThreshold = 0.5f)\n")
-        self.assertEqual(c.build_problems(self.root), ["app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt sets a changeThreshold"])
+        for tolerance in ("CompareOptions(changeThreshold = 0.5f)", "ThresholdValidator(0.5f)", "SimpleImageComparator()", "resultValidator = { true }", "imageComparator = null"):
+            with self.subTest(tolerance=tolerance):
+                other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt"
+                other.write_text(f"val o = {tolerance}\n")
+                self.assertEqual(c.build_problems(self.root), ["app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt sets a comparison tolerance"])
 
 
 if __name__ == "__main__":
