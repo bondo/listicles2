@@ -45,6 +45,9 @@ Tally har ingen reklamer og **ingen analyseværktøjer**: appen måler ikke, hvo
 - **Den, der hoster `tally.bjarkebjarke.dk`** (`[udbyder, når den er valgt]`): invitationslinks og siden til
   sletning (afsnit 7) er websider der. Når du åbner en af dem i en browser, ser udbyderen sidens adresse (for en
   invitation også invitationskoden) og din IP-adresse.
+- **Den ansvarlige** (afsnit 1): hvis du skriver til kontakten (afsnit 9) eller beder om sletning uden appen
+  (afsnit 7), får den ansvarlige din e-mailadresse og det, du skriver. `[Skal bekræftes, når siden til sletning er
+  besluttet.]`
 
 ## 4. Hvor dine data ligger
 
@@ -66,9 +69,9 @@ navn, e-mailadresse eller indhold fra lister.]` Google gemmer nedbrudsrapporter 
 ## 6. Tjek af enheden (App Check)
 
 For at beskytte dine data mod scripts og manipulerede enheder tjekker appen med Googles **Play Integrity**, at den
-kører på en ægte Android-enhed. Selve appen bliver ikke tjekket. Ved hvert tjek sender appen oplysninger om enhedens integritet til Google, og
-Google svarer med et token, der gælder i en begrænset periode, og som appen viser til Firebase. Tally bruger kun
-resultatet til dette tjek.
+kører på en ægte Android-enhed. Selve appen bliver ikke tjekket. Ved hvert tjek sender appen oplysninger om
+enhedens integritet til Google, og Google svarer med et token, der gælder i en begrænset periode, og som appen viser
+til Firebase. Tally bruger kun resultatet til dette tjek.
 
 ## 7. Slet din konto
 
@@ -82,10 +85,11 @@ resultatet til dette tjek.
 - Ting, du har tilføjet til andres lister, bliver på listerne, men dit navn fjernes fra dem.
   `[Skal bekræftes (M2, OQ-18): hvad der sker med sådanne ting, hvis du allerede havde forladt husstanden, før
   du slettede din konto.]`
-- `[Skal bekræftes (M2, #205, #281): en slettet husstand gemmes som en tom post, der stadig indeholder de tilfældige
-  konto-id'er for den, der oprettede den, og ejeren; et tilfældigt konto-id kan også blive stående på andres lister,
-  som du sidst ændrede, og på invitationer, der er blevet tilbage under en slettet husstand (sådan en invitation
-  indeholder også husstandens navn). Dit eget navn og din e-mailadresse gemmes ikke sammen med disse id'er.]`
+- `[Skal bekræftes (M2, #205): en slettet husstand gemmes som en tom post, der stadig indeholder de tilfældige
+  konto-id'er for den, der oprettede den, og ejeren, og et tilfældigt konto-id kan også blive stående på andres
+  lister, som du sidst ændrede. Dit eget navn og din e-mailadresse gemmes ikke sammen med disse id'er.]`
+- `[Skal bekræftes (M1, #281): invitationer, der er blevet tilbage under en slettet husstand, kan stadig indeholde
+  dit tilfældige konto-id og husstandens navn.]`
 
 **Uden appen:** du kan også bede om at få din konto slettet på en webside på `tally.bjarkebjarke.dk`
 `[sidens adresse, når den er besluttet]`.

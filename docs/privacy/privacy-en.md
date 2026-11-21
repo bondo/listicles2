@@ -44,6 +44,9 @@ Tally has no ads and **no analytics**: the app does not measure how you use it.
 - **The web host of `tally.bjarkebjarke.dk`** (`[host, once decided]`): invite links and the deletion page (section
   7) are web pages there. When you open one in a browser, the host sees the page address (for an invite, that
   includes the invite code) and your IP address.
+- **The person responsible** (section 1): if you write to the contact (section 9) or ask for deletion without the
+  app (section 7), they receive your email address and what you write. `[To confirm when the deletion page is
+  decided.]`
 
 ## 4. Where your data is
 
@@ -65,9 +68,9 @@ email address or list contents.]` Google keeps crash reports for 90 days.
 ## 6. Checking the device (App Check)
 
 To protect your data against scripts and tampered devices, the app checks with Google's **Play Integrity** that it
-runs on a genuine Android device. It does not check the app itself. On each check, the app sends signals about the device's integrity to Google,
-and Google answers with a token, valid for a limited time, that the app shows to Firebase. Tally uses the result
-only for this check.
+runs on a genuine Android device. It does not check the app itself. On each check, the app sends signals about the
+device's integrity to Google, and Google answers with a token, valid for a limited time, that the app shows to
+Firebase. Tally uses the result only for this check.
 
 ## 7. Deleting your account
 
@@ -81,10 +84,11 @@ only for this check.
 - Items you added to other people's lists stay in those lists, and your name is removed from them.
   `[To confirm (M2, OQ-18): what happens to such items if you had already left the household before deleting
   your account.]`
-- `[To confirm (M2, #205, #281): a deleted household is kept as an empty record that still holds the random account
-  ids of its creator and owner; a random account id may also remain on other people's lists you last changed, and on
-  invites left under a deleted household (such an invite also keeps the household's name). Your own name and email
-  address are not kept with these ids.]`
+- `[To confirm (M2, #205): a deleted household is kept as an empty record that still holds the random account ids of
+  its creator and owner, and a random account id may also remain on other people's lists you last changed. Your own
+  name and email address are not kept with these ids.]`
+- `[To confirm (M1, #281): invites left under a deleted household may keep your random account id and the
+  household's name.]`
 
 **Without the app:** you can also ask for your account to be deleted on a web page at
 `tally.bjarkebjarke.dk` `[address of the page, once decided]`.
