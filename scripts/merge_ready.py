@@ -293,11 +293,19 @@ def tasks_problems(api, repo, base, sha):
         a, b = ({task["id"]: task for task in tomllib.loads(text).get("task", [])} for text in (old_t, new_t))
     except (KeyError, ValueError, TypeError) as e:
         return [f"docs/tasks.toml cannot be compared with the base ({type(e).__name__}): owner-only"]
-    if strip(old_t) != strip(new_t) or a.keys() != b.keys():
+    rest = lambda task: {k: v for k, v in task.items() if k not in ("status", "pr")}  # noqa: E731  # justified: one-use local helper
+    if strip(old_t) != strip(new_t) or a.keys() != b.keys() or any(rest(a[i]) != rest(b[i]) for i in a):
         return ["docs/tasks.toml: more than the `status` and `pr` lines changed (a comment, the order, another field, a task added or removed)"]
     bad = lambda x, y: x != y and (x, y) != ("todo", "done")  # noqa: E731  # justified: one-use local helper
     return [f"docs/tasks.toml: task {i} is an owner task, or its status changes other than todo to done" for i in a
             if a[i] != b[i] and ("owner" in (a[i].get("assignee"), b[i].get("assignee")) or bad(a[i].get("status"), b[i].get("status")))]
+
+
+class _NoDoctype(ET.TreeBuilder):
+    """A tree builder that refuses any DOCTYPE: expat skips declarations after a parameter-entity reference, and AGP applies them (R7-06, round 10)."""
+
+    def doctype(self, name, pubid, system):
+        raise ValueError("DOCTYPE")
 
 
 def res_xml_problems(api, repo, sha, files):
@@ -309,7 +317,7 @@ def res_xml_problems(api, repo, sha, files):
         if f.get("status") == "removed" or not (name.startswith("app/src/main/res/") and name.endswith(".xml")):
             continue
         try:
-            root = ET.fromstring(base64.b64decode(api.get(f"repos/{repo}/contents/{name}?ref={sha}")["content"]))
+            root = ET.fromstring(base64.b64decode(api.get(f"repos/{repo}/contents/{name}?ref={sha}")["content"]), parser=ET.XMLParser(target=_NoDoctype()))
         except (KeyError, ValueError, TypeError, ET.ParseError) as e:
             problems.append(f"{name}: cannot be parsed at the head ({type(e).__name__}): owner-only")
             continue
