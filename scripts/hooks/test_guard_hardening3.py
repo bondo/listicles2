@@ -32,7 +32,9 @@ class Round3(Base):
 
     def test_r3_01_a_cd_with_a_mixed_word_is_applied_once(self):
         self.deny(['A=; cd "docs"$A; rm ../CLAUDE.md', 'A=; cd "scripts"$A; rm guards.sh'], both=False)
-        self.deny(['A=; cd ".git"$A; echo x >> config', 'A=; cd ".git"$A; touch hooks/pre-commit'])
+        for c in ('A=; cd ".git"$A; echo x >> config', 'A=; cd ".git"$A; touch hooks/pre-commit'):  # CLAUDE_PROJECT_DIR is set in a real session
+            for env in ({"CLAUDE_PROJECT_DIR": self.d}, {"CLAUDE_PROJECT_DIR": self.d, "LISTICLES_TASK": "tooling"}):
+                self.assertEqual(self.bash(c, env), 2, (c, env))
         self.allow(['A=; cd "docs"$A; rm notes.md'])
 
     def test_r3_02_a_case_pattern_does_not_end_the_subshell(self):
@@ -85,7 +87,7 @@ class Round3(Base):
                 "IFS=$(printf _); X=git_push; $X --force origin work",
             ]
         )
-        self.allow(['while IFS= read -r line; do echo "$line"; done < f', "IFS=_; P=a_b; echo $P"])
+        self.allow(['while IFS= read -r line; do echo "$line"; done < f', "IFS=_; P=a_b; echo $P", 'git commit -m "handle IFS in the guard"', "git log --grep=IFS"])
 
     def test_r3_04_env_split_string_with_expansions_comments_and_blanks_env_knows(self):
         self.deny(
