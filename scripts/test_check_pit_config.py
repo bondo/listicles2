@@ -19,27 +19,41 @@ def read(*parts):
         return f.read()
 
 
+MUTATORS = (
+    "CONDITIONALS_BOUNDARY", "INCREMENTS", "INVERT_NEGS", "MATH", "NEGATE_CONDITIONALS",
+    "EMPTY_RETURNS", "FALSE_RETURNS", "TRUE_RETURNS", "NULL_RETURNS", "PRIMITIVE_RETURNS",
+)  # PIT defaults minus VOID_METHOD_CALLS
+GOOD_MUTATORS = "    mutators.set(listOf(" + ", ".join(f'"{m}"' for m in MUTATORS) + "))\n"
+
 GOOD_DOMAIN = (
     "plugins {\n    alias(libs.plugins.pitest)\n}\n"
     "pitest {\n    pitestVersion.set(libs.versions.pitest.get())\n    junit5PluginVersion.set(\"1.2.3\")\n"
-    "    mutators.set(listOf(\"CONDITIONALS_BOUNDARY\", \"NEGATE_CONDITIONALS\", \"EMPTY_RETURNS\"))\n"
+    + GOOD_MUTATORS +
     '    targetClasses.set(listOf("dk.bjarkebjarke.tally.domain.*"))\n    mutationThreshold.set(80)\n}\n'
 )
 GOOD_ROOT = "tasks.named(\"koverVerify\") { dependsOn(\":core:domain:pitest\") }\n"
 GOOD_VERIFY = "if [ x ]; then\n  step mutation gradle :core:domain:pitest\nfi\n"
+GOOD_CI = (
+    "  tasks:\n    steps:\n"
+    "      - name: pit config tests\n        run: python3 -I scripts/test_check_pit_config.py\n"
+    "      - name: pit config\n        run: python3 -I scripts/check_pit_config.py\n"
+)
 
 
 class RealFiles(unittest.TestCase):
     def test_repository_is_wired(self):
         problems = c.problems(
-            read("core", "domain", "build.gradle.kts"), read("build.gradle.kts"), read("scripts", "verify.sh")
+            read("core", "domain", "build.gradle.kts"),
+            read("build.gradle.kts"),
+            read("scripts", "verify.sh"),
+            read(".github", "workflows", "ci.yml"),
         )
         self.assertEqual(problems, [])
 
 
 class Negative(unittest.TestCase):
-    def check(self, domain=None, root=None, verify=None):
-        return c.problems(domain or GOOD_DOMAIN, root or GOOD_ROOT, verify or GOOD_VERIFY)
+    def check(self, domain=None, root=None, verify=None, ci=None):
+        return c.problems(domain or GOOD_DOMAIN, root or GOOD_ROOT, verify or GOOD_VERIFY, GOOD_CI if ci is None else ci)
 
     def test_good_fixture_passes(self):
         self.assertEqual(self.check(), [])
@@ -87,6 +101,30 @@ class Negative(unittest.TestCase):
         self.assertTrue(self.check(domain=no_mutators))
         self.assertTrue(self.check(domain=GOOD_DOMAIN.replace('"CONDITIONALS_BOUNDARY", ', "")))
         self.assertTrue(self.check(domain=GOOD_DOMAIN.replace('"NEGATE_CONDITIONALS"', '"NEGATE_CONDITIONALS", "VOID_METHOD_CALLS"')))
+
+    def test_every_pinned_mutator_is_required(self):
+        # R2-01: a shrunk list would silently drop arithmetic and return-value mutants.
+        for name in MUTATORS:
+            with self.subTest(name=name):
+                shrunk = GOOD_DOMAIN.replace(f'"{name}", ', "").replace(f', "{name}"', "")
+                self.assertNotEqual(shrunk, GOOD_DOMAIN)
+                self.assertTrue(self.check(domain=shrunk))
+
+    def test_only_two_conditionals_fails(self):
+        two = GOOD_DOMAIN.replace(GOOD_MUTATORS, '    mutators.set(listOf("CONDITIONALS_BOUNDARY", "NEGATE_CONDITIONALS"))\n')
+        self.assertTrue(self.check(domain=two))
+
+    def test_extra_stronger_mutators_are_allowed(self):
+        extra = GOOD_DOMAIN.replace('"MATH", ', '"MATH", "REMOVE_CONDITIONALS_ORDER_ELSE", ')
+        self.assertEqual(self.check(domain=extra), [])
+
+    def test_ci_must_run_checker_and_its_tests(self):
+        # R1-03: CI ran neither script, so only verify.sh (not run by pre-push) noticed a removed koverVerify wiring.
+        self.assertTrue(self.check(ci=""))
+        self.assertTrue(self.check(ci=GOOD_CI.replace("scripts/check_pit_config.py", "scripts/other.py")))
+        self.assertTrue(self.check(ci=GOOD_CI.replace("scripts/test_check_pit_config.py", "scripts/other.py")))
+        self.assertTrue(self.check(ci=GOOD_CI.replace("run: ", "run: # ")))
+        self.assertTrue(self.check(ci=GOOD_CI.replace("run: python3", "run: python3 -c 1; true #")))
 
     def test_ci_wiring_via_koverVerify_required(self):
         self.assertTrue(self.check(root="// no wiring\n"))
