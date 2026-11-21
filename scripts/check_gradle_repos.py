@@ -5,9 +5,11 @@ egress IPs with 429. Gradle disables a repository for the rest of the build once
 request run out, so a single unlucky burst fails the whole build. The setup this checks:
   * Google's Maven Central mirror is listed before mavenCentral() (mavenCentral() stays as fallback),
   * google() only gets the groups it hosts, so other artifacts are not looked up there first,
+    wherever it is written (a repositories { } block, repositories.google(), inside a string template),
   * Gradle retries repository requests often enough, with backoff, to ride out a 429 burst.
 It also checks Gradle dependency verification (gradle/verification-metadata.xml, sha256 for every artifact), so a
 mirror or CDN problem cannot silently change an artifact; Gradle itself enforces it in every build.
+Settings it cannot read with confidence (an unterminated string or template) are reported, never passed.
 Run: python3 -I scripts/check_gradle_repos.py  (exit 1 and one line per problem when the setup is off).
 """
 
@@ -29,41 +31,101 @@ INCLUDE = re.compile(r"\binclude\w*\s*\(")
 ONLY_GOOGLE = re.compile(r"\s*google\s*\(\s*\)\s*;?\s*")
 
 
+class Unparsable(Exception):
+    """Kotlin source the scanner cannot read with confidence; the check reports it instead of guessing."""
+
+
 def _strip(text, blank_strings=False):
     """Kotlin source without // and (nested) /* */ comments, each block comment replaced by one space so tokens never glue.
 
-    String and char literal contents become spaces if blank_strings. Block comments nest in Kotlin."""
-    out, i, n = [], 0, len(text)
-    while i < n:
-        if text.startswith("//", i):
-            while i < n and text[i] != "\n":
-                i += 1
-        elif text.startswith("/*", i):
-            depth, i = 1, i + 2
-            while i < n and depth:
-                if text.startswith("/*", i):
-                    depth, i = depth + 1, i + 2
-                elif text.startswith("*/", i):
-                    depth, i = depth - 1, i + 2
-                else:
-                    i += 1
-            out.append(" ")
-        elif text[i] == "'" and (char := CHAR_LITERAL.match(text, i)) is not None:
-            out.append("'" + " " * (char.end() - i - 2) + "'" if blank_strings else char.group())
-            i = char.end()
-        elif text[i] == '"':
-            out.append('"')
-            i += 1
-            while i < n and text[i] != '"':
-                step = 2 if text[i] == "\\" else 1
-                out.append(" " * step if blank_strings else text[i : i + step])
-                i += step
-            if i < n:
+    String and char literal contents become spaces if blank_strings, one space per character; the code inside a `${ }`
+    template stays (it runs). Strings are modelled in full: escapes, raw strings (a run of quotes ends one with its last
+    three), and templates, whose code can hold strings, comments and braces of its own, so the scanner recurses.
+    Raises Unparsable on an unterminated string, raw string or template, or a newline in a plain string. Block comments nest."""
+    out, n = [], len(text)
+
+    def literal(chunk):
+        out.append(" " * len(chunk) if blank_strings else chunk)
+
+    def template(i):
+        """text[i:i+2] is `${`; returns the index after the matching `}`."""
+        out.append("${")
+        i = code(i + 2, in_template=True)
+        out.append("}")
+        return i + 1
+
+    def string(i):
+        out.append('"')
+        i += 1
+        while i < n:
+            if text[i] == '"':
                 out.append('"')
+                return i + 1
+            if text.startswith("${", i):
+                i = template(i)
+            elif text[i] == "\\":
+                literal(text[i : i + 2])
+                i += 2
+            elif text[i] == "\n":
+                break
+            else:
+                literal(text[i])
                 i += 1
-        else:
-            out.append(text[i])
-            i += 1
+        raise Unparsable("unterminated string")
+
+    def raw_string(i):
+        out.append('"""')
+        i += 3
+        while i < n:
+            if text.startswith('"""', i):
+                quotes = len(text[i:]) - len(text[i:].lstrip('"'))  # the last three of a run close the string
+                literal('"' * (quotes - 3))
+                out.append('"""')
+                return i + quotes
+            if text.startswith("${", i):
+                i = template(i)
+            else:
+                literal(text[i])
+                i += 1
+        raise Unparsable("unterminated raw string")
+
+    def code(i, in_template=False):
+        """Scans code; inside a template it stops at the `}` that closes it and returns that index, else returns n."""
+        depth = 0
+        while i < n:
+            if text.startswith("//", i):
+                while i < n and text[i] != "\n":
+                    i += 1
+            elif text.startswith("/*", i):
+                nesting, i = 1, i + 2
+                while i < n and nesting:
+                    if text.startswith("/*", i):
+                        nesting, i = nesting + 1, i + 2
+                    elif text.startswith("*/", i):
+                        nesting, i = nesting - 1, i + 2
+                    else:
+                        i += 1
+                out.append(" ")
+            elif text[i] == "'" and (char := CHAR_LITERAL.match(text, i)) is not None:
+                out.append("'")
+                literal(char.group()[1:-1])
+                out.append("'")
+                i = char.end()
+            elif text.startswith('"""', i):
+                i = raw_string(i)
+            elif text[i] == '"':
+                i = string(i)
+            elif in_template and text[i] == "}" and depth == 0:
+                return i
+            else:
+                depth += {"{": 1, "}": -1}.get(text[i], 0)
+                out.append(text[i])
+                i += 1
+        if in_template:
+            raise Unparsable("unterminated string template")
+        return i
+
+    code(0)
     return "".join(out)
 
 
@@ -127,11 +189,10 @@ def _exclusive(repos):
     return spans
 
 
-def _repositories(text, name):
+def _repositories(blanked, kept, name):
     """Every repositories { } body inside every `name { }` block, joined in order (Gradle adds them all up).
 
-    Returns (code with string contents blanked, code with strings kept); both have the same length."""
-    blanked, kept = _strip(text, blank_strings=True), _strip(text)
+    blanked and kept are the same code with string contents blanked or kept (same length); returns both joined texts."""
     parts = []
     for o_start, o_end in _spans(blanked, name):
         for r_start, r_end in _spans(blanked[o_start:o_end], "repositories"):
@@ -141,26 +202,46 @@ def _repositories(text, name):
     return "\n".join(blanked[a:b] for a, b in parts), "\n".join(kept[a:b] for a, b in parts)
 
 
+def _unfiltered_google(blanked):
+    """Names of the BLOCKS whose text holds a google() without a content filter, plus None if one sits outside all of them.
+
+    The whole file is searched, not only braced repositories { } bodies, so repositories.google(), with(repositories) { google() }
+    and pluginManagement.repositories.google() need the same filter. Strings are blanked, so URLs never match."""
+    exclusive = _exclusive(blanked)
+    owners = [(name, a, b) for name in BLOCKS for a, b in _spans(blanked, name)]
+    bad = set()
+    # A qualified call (this.google(), foo.google()) counts too, and so does any other use of the name (google as a value).
+    for call in re.finditer(r"(?<!\w)google\b\s*(\(\s*\))?", blanked):
+        if _filtered(blanked, call) or any(a <= call.start() < b for a, b in exclusive):
+            continue
+        bad.add(next((name for name, a, b in owners if a <= call.start() < b), None))
+    return bad
+
+
 def check_settings(text):
+    try:
+        blanked, kept = _strip(text, blank_strings=True), _strip(text)
+    except Unparsable as e:
+        return [f"settings.gradle.kts: cannot parse ({e}), so the repositories cannot be checked"]
+    unfiltered = _unfiltered_google(blanked)
     problems = []
     for name in BLOCKS:
-        repos, repos_text = _repositories(text, name)
+        repos, repos_text = _repositories(blanked, kept, name)
         if repos is None:
             problems.append(f"{name}: no repositories block")
-            continue
-        mirror = repos_text.find(f'"{MIRROR}"')
-        central = re.search(r"\bmavenCentral\s*(?:\(\s*\)|\{\s*\})", repos)  # mavenCentral() or an empty mavenCentral { }
-        if mirror < 0:
-            problems.append(f"{name}: Maven Central mirror {MIRROR} missing")
-        elif central is None:
-            problems.append(f"{name}: mavenCentral() fallback missing")
-        elif mirror > central.start():
-            problems.append(f"{name}: Maven Central mirror must come before mavenCentral()")
-        # A qualified call (this.google(), foo.google()) counts too; strings are blanked, so URLs never match.
-        calls = re.finditer(r"(?<!\w)google\b\s*(\(\s*\))?", repos)
-        exclusive = _exclusive(repos)
-        if not all(_filtered(repos, c) or any(a <= c.start() < b for a, b in exclusive) for c in calls):
+        else:
+            mirror = repos_text.find(f'"{MIRROR}"')
+            central = re.search(r"\bmavenCentral\s*(?:\(\s*\)|\{\s*\})", repos)  # mavenCentral() or an empty mavenCentral { }
+            if mirror < 0:
+                problems.append(f"{name}: Maven Central mirror {MIRROR} missing")
+            elif central is None:
+                problems.append(f"{name}: mavenCentral() fallback missing")
+            elif mirror > central.start():
+                problems.append(f"{name}: Maven Central mirror must come before mavenCentral()")
+        if name in unfiltered:
             problems.append(f"{name}: google() needs a content filter")
+    if None in unfiltered:
+        problems.append(f"settings.gradle.kts: google() outside {' and '.join(BLOCKS)} needs a content filter")
     return problems
 
 

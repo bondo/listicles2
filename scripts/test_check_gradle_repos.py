@@ -342,7 +342,7 @@ class Strings(unittest.TestCase):
             'val s = "${ "${ "}" }" }"\n',
             "val s = \"${ '}' }\"\n",
             'val s = "${ /* } */ 1 }"\n',
-            'val s = "${ 1 // }\\n }"\n',
+            'val s = "${ 1 // }\n }"\n',
             'val s = "${ mapOf("a" to "}").size }"\n',
         ):
             with self.subTest(before=before):
