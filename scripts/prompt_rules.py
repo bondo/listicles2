@@ -70,6 +70,20 @@ OWNER_ONLY = (
     r"licence acceptances, design and product sign-off, docs that are themselves a gate \(a decision to approve before work relies on it\), "
     r"naming and protected process files"
 )
+# The merge agent's classes (#15 7005366747, 7005414860, 7007421567); the owner-only list above stays the list of PRs that need the owner's approval first.
+OWNER_HANDS = (
+    r"owner's own hands: settings outside git \(repository settings, branch protection and rulesets, network allowlists, environments, "
+    r"licence acceptances, collaborator access\)"
+)
+STANDING = (
+    r"the merge agent merges under the owner's standing authorization \(#15 comment 7005366747, replacing the per-window rule of comment 7002904192\) "
+    r"until the owner revokes it there"
+)
+CLASSES = r"a ready pr that is not owner-only is merged by the merge agent as kind `general` \(d3, #15 comment 7007421567\)"
+ORDER_TAIL = (
+    r"every ready `general` pr to the merge agent first, and brings? owner-only prs to the owner only once no `general` pr is ready to go; "
+    r"an exception needs a stated reason in the merge request \(e\.g\. a dependency between prs or a blocker fix\)"
+)
 ALL = ROLES
 
 # Wrong severities that REVIEW.md items 12 and 13 and the reviewer prompt must not carry (M0.5-26, R3-01 and R3-02 of #133). One
@@ -743,11 +757,11 @@ RULES = (
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and you never pass an approval on to it",
-            r"the merge agent merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
-            r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one "
-            r"\(§7\.5, #15 comment 7002904192\)\.",
+            r"the owner-only exception above means not under the standing authorization",
+            STANDING, CLASSES, OWNER_HANDS,
+            r"merge order \(#15 comment 7005414860\): send " + ORDER_TAIL,
         ),
-        "the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs; its own session needs the owner's authorization",
+        "the merge agent merges general PRs under the standing authorization; owner-only PRs stay with the owner (D3 of #229)",
     ),
     Rule(
         "orch-update-branch", ("orchestrator",),
@@ -1092,17 +1106,17 @@ DOC_RULES = (
     DocRule(
         "orch-merge-agent", ORCH,
         (
-            r"\* \*\*merge agent:\*\* the merge agent merges every ready pr except the owner-only ones, one at a time",
+            r"\* \*\*merge agent:\*\* the merge agent merges every ready pr that is not owner-only under the owner's standing authorization, one at a time",
             OWNER_ONLY,
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, "
-            r"and it merges only under an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
-            r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one "
-            r"\(owner decision, #15 comment 7002904192\)",
+            r"and then " + STANDING + r"; the orchestrator never passes an approval on to it",
+            CLASSES, OWNER_HANDS,
+            r"merge order \(#15 comment 7005414860\): the orchestrator sends " + ORDER_TAIL,
         ),
-        "ORCHESTRATION 7.5: the merge agent also merges risk:high PRs after a second-reviewer pass and working-draft docs PRs (owner decision B)",
+        "ORCHESTRATION 7.5: the merge agent merges general PRs under the standing authorization; owner-only PRs stay with the owner (D3 of #229)",
     ),
     DocRule(
         "orch-update-branch", ORCH,
