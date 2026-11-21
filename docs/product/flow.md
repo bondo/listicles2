@@ -41,11 +41,11 @@ flowchart TD
     named -- "yes" --> heal{"Removed from the household, or household deleted?<br>HH-06, M1-18"}
     heal -- "yes" --> notice["Notice dialog once, then continue<br>HH-06"] --> lists
     heal -- "no" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
-    signin -- "Google account picked" --> lists
+    signin -- "Google account picked" --> named
     signin -- "Use email and password" --> email["Email sign-in<br>AUTH-05, AUTH-07, AUTH-08, AUTH-10"]
-    email -- "signed in, email verified" --> lists
+    email -- "signed in, email verified" --> named
     email -- "email not verified" --> verify["Verify email<br>AUTH-06"]
-    verify -- "verified" --> lists
+    verify -- "verified" --> named
     verify -- "Sign out" --> signin
     link(["Invite link opened<br>HH-03"]) --> signed2{"Signed in?"}
     signed2 -- "no" --> signin2["Sign-in or create account and verify, then Join<br>AUTH-01, AUTH-05, AUTH-06, HH-03"]
@@ -104,7 +104,7 @@ flowchart TD
 
 ### 2.1 Email and password
 
-Every Firestore read and write needs a verified email (`email_verified`); no rule relies on a two-step claim (stories
+Every Firestore read and write except my own account record needs a verified email (`email_verified`); no rule relies on a two-step claim (stories
 section 1). Password: at least 12 characters, no other rules (OQ-26). Each step needs a connection (SYNC-03).
 
 ```mermaid

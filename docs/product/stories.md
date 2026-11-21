@@ -33,7 +33,7 @@ security review, comment 6927207374), and [the plan](../PLAN.md). Decided questi
 ## 1. App start, sign-in and account
 
 Two sign-in methods in v1: Google (the main one) and email with password (OQ-23). No email-link ("magic link") sign-in
-(OQ-27). **Server access:** every Firestore read and write needs a signed-in user whose email is verified
+(OQ-27). **Server access:** every Firestore read and write, except a user's own account record, needs a signed-in user whose email is verified
 (`email_verified`; Google accounts are verified by Google, password accounts after AUTH-06), invites included. No
 security rule may rely on a two-step (MFA) claim: two-step verification (AUTH-09) protects the sign-in, not the rules.
 Rules allow and deny tests cover both. Before anyone but the owner installs the app, a privacy text in English and

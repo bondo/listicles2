@@ -546,7 +546,7 @@ const SCREENS = [
   { id: '26', t: 'Create account, password too short', refs: 'AUTH-05, AUTH-12, OQ-26: "Your name" is required (empty: field error, nothing created); at least 12 characters and no other rules. Invalid email: field error. An existing email never makes a second account (AUTH-10).',
     f: s => auth(s.createAccount, '', `${field({ label: s.yourName, value: 'Kim Larsen' })}${support(s.nameHelp)}${field({ label: s.email, value: 'kim@example.com' })}${pw(s.password, 8, { state: 'err', trail: 'error', caret: true })}${support(s.pwShort, true)}
       <span class="btn filled wide t-labelLarge" style="margin-top:var(--sp-l)">${s.createAccount}</span>`) + '<div style="flex:1"></div>' },
-  { id: '27', t: 'Verify email', refs: 'AUTH-06, AUTH-10. The line about an existing account is shown to everyone, so new and existing emails see the same text. Continue before the link is opened: snackbar. Send again many times: "Try again later". Unverified users see this screen again at sign-in.',
+  { id: '27', t: 'Verify email', refs: 'AUTH-06, AUTH-10. The line about an existing account is shown to everyone, so new and existing emails see the same text. Continue before the link is opened: snackbar. Send again many times: "Try again later". Unverified users see this screen at every start until verified; Sign out leaves (Q2 A).',
     f: s => `${topbar('', {})}<div class="center"><div class="bubble">${ic('mark_email_unread')}</div><div class="t-titleLarge">${s.checkEmail}</div>
       <div class="t-bodyMedium var">${s.checkEmailBody('kim@example.com')}</div><div class="t-bodySmall var">${s.checkEmailNote}</div><div class="stack"><span class="btn filled wide t-labelLarge">${s.cont}</span>
       <span class="btn outlined wide t-labelLarge">${s.sendAgain}</span><span class="btn text wide t-labelLarge">${s.signOut}</span></div></div>${snack(s.notVerified)}` },
@@ -621,7 +621,7 @@ const phone = (T, theme, lang, sc) => `<div class="phone ${theme}" lang="${lang}
   <div class="status"><span>9:41</span><span>${ic('signal_cellular_alt')} ${ic('wifi')} ${ic('battery_full')}</span></div>
   <div class="body">${sc.f(S[lang])}</div><div class="gesture"></div></div>`;
 const shot = (T, sc, theme) => `<section class="shot" id="s${sc.id}-${theme}"><div class="cap"><span class="num">${sc.id}</span><span class="ttl">${sc.t}</span>
-  <span class="th">${theme === 'dark' ? 'Dark theme' : 'Light theme'} · owner-approved 2026-11-18</span></div><p class="refs">${sc.refs}</p>
+  <span class="th">${theme === 'dark' ? 'Dark theme' : 'Light theme'} · owner-approved</span></div><p class="refs">${sc.refs}</p>
   <div class="pair"><figure>${phone(T, theme, 'en', sc)}<figcaption>English</figcaption></figure><figure>${phone(T, theme, 'da', sc)}<figcaption>Dansk</figcaption></figure></div></section>`;
 
 function lum(h) {
