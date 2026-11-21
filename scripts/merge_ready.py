@@ -3,7 +3,8 @@
 
 Usage: python3 -I scripts/merge_ready.py <N> <sha> <kind>
   kind: working-draft-docs | tasks-sync | dependabot   (the owner-authorized merge-agent kinds)
-        general      a PR that is not owner-only, under the owner's standing authorization (#15 comment 7005366747)
+        general      a PR whose every path is on the allowlist (GENERAL_ALLOW), under the owner's standing authorization (#15 comment 7005366747);
+                     fail-closed since #15 comment 7058755858: any other path is owner-only
 
 Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * the PR head is exactly <sha>;
@@ -11,7 +12,7 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * every check the base ruleset requires has a latest run with conclusion `success` (none configured, missing or pending: refused);
   * no closing keyword (close/fix/resolve and their -s/-d forms) sits directly before an issue number or URL in the title, body or commits;
   * the base is `main` and the API's file and commit lists are complete (it caps them at 3000 and 250);
-  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: not an owner-only path, see owner_only).
+  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: only the allowlist, see owner_only).
     For dependabot, a workflow may only
     re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
@@ -20,14 +21,12 @@ Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the hea
 Exit status: 0 merged, 1 refused or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
 
-import functools
 import json
 import os
 import re
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
@@ -38,9 +37,10 @@ DOC_PREFIXES = ("docs/milestones/", "docs/product/wireframes/")
 DOC_FILES = ("docs/PLAN.md", "docs/product/stories.md", "docs/product/flow.md", "docs/product/rubric.md", "design/tokens.json")
 DRAFT_STATUS = "not owner-approved"
 TASKS_FILES = ("docs/tasks.toml",)
-# Kind `general` refuses these (ORCHESTRATION 7.5, owner-only PRs), compared casefolded: the protected process files (the list of
+# Kind `general` is fail-closed (owner decision #15 7058755858, replacing ruling 1 of 7019683156): only GENERAL_ALLOW paths may merge as general, and
+# these explicit lists, compared casefolded, stay as a second layer inside it: the protected process files (the list of
 # scripts/hooks/pretooluse_guard.py PROTECTED, which a test keeps in sync), the wrappers by name anywhere, gate docs and approved product and design docs,
-# dependency manifests (R2-01), licence acceptances, canonical process docs, gradlew, and every scripts/ path a CI job runs (ci_scripts).
+# dependency manifests, licence acceptances, canonical process docs and gradlew.
 OWNER_ONLY_FILES = {f.casefold() for f in (
     "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
     "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
@@ -53,7 +53,12 @@ OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "pa
                                                           ".gitattributes", ".mcp.json", ".gitleaks.toml", ".gitleaksignore")}  # R5
 REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
 GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md",), ("docs/milestones/",)  # drafts without a sign-off (not design/tokens.json, R3-01)
-CI_YML = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
+_SEG = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"  # one path component: no dot-prefix, no "..", no space, no odd characters; matched case-sensitively
+GENERAL_ALLOW = tuple(re.compile(p) for p in (
+    rf"app/src/(?:main|test|androidTest)/kotlin(?:/{_SEG})+\.kt", rf"app/src/main/res(?:/{_SEG})+\.(?:xml|png|webp)",  # app sources, tests, resources
+    rf"core/(?!testing/)[a-z][a-z0-9_-]*/src/(?:main|test)/kotlin(?:/{_SEG})+\.kt",  # core module sources and tests (core/testing is gate infrastructure)
+    rf"docs(?:/{_SEG})+\.(?:md|csv|png|txt)", r"README\.md"))  # docs (the owner-only ones are refused by the lists above)
+GENERAL_GATE_RE = re.compile(r"/architecture/|nonetwork|robolectric|junit4engine|jdkapilevel")  # tests that are gates, wherever they sit (casefolded)
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
 DEPENDABOT_FILES = ("gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar")
@@ -179,26 +184,13 @@ class GhApi:
         return json.loads(self._gh([*args, path]))
 
 
-@functools.cache
-def ci_scripts():
-    """The scripts/ paths the CI workflow on this checkout (main, for the merge agent) runs, casefolded; None if it cannot be read (fail closed)."""
-    try:
-        return {m.casefold() for m in re.findall(r"scripts/[\w./-]+\.(?:py|sh)", CI_YML.read_text(encoding="utf-8"))}
-    except OSError:
-        return None
-
-
 def owner_only(name):
-    """Whether a path needs the owner's approval first (kind `general` refuses it); only a still-unsigned draft does not."""
+    """Whether a path needs the owner's approval first (kind `general` refuses it): fail-closed, so everything but a GENERAL_ALLOW path is."""
     n = name.casefold()
     base = n.rsplit("/", 1)[-1]
-    if base in OWNER_ONLY_BASENAMES or REQUIREMENTS_RE.match(base) or ".claude" in n.split("/"):  # also inside a draft folder (R3-03, R4-01)
+    if base in OWNER_ONLY_BASENAMES or REQUIREMENTS_RE.match(base) or n in OWNER_ONLY_FILES or n.startswith(OWNER_ONLY_PREFIXES) or GENERAL_GATE_RE.search(n):
         return True
-    if n in GENERAL_DRAFT_FILES or n.startswith(GENERAL_DRAFT_PREFIXES):
-        return False
-    if n.startswith("scripts/") and (ci_scripts() is None or n in ci_scripts()):
-        return True
-    return n in OWNER_ONLY_FILES or n.startswith(OWNER_ONLY_PREFIXES)
+    return not any(p.fullmatch(name) for p in GENERAL_ALLOW)
 
 
 def allowed(kind, name):

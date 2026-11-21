@@ -602,7 +602,7 @@ class GeneralKindTests(unittest.TestCase):
                      "docs/ANDROID-BEST-PRACTICES.md"):
             self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
 
-    def test_every_script_a_required_ci_job_runs_is_owner_only(self):  # R1-05: read from ci.yml, so a new CI script needs no list edit
+    def test_every_script_a_required_ci_job_runs_is_owner_only(self):  # R1-05: still true, now because every scripts/ path is
         ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         found = set(re.findall(r"scripts/[\w./-]+\.(?:py|sh)", ci))
         self.assertIn("scripts/check_gradle_repos.py", found)
@@ -611,16 +611,7 @@ class GeneralKindTests(unittest.TestCase):
                 self.assertTrue(merge_ready.owner_only(name))
         for name in ci_scope.SELFTESTS:  # run through `ci_scope.py selftests`, so no literal path in ci.yml (R2-01)
             self.assertTrue(merge_ready.owner_only(name), name)
-        self.assertFalse(merge_ready.owner_only("scripts/verify.sh"), "not run by a CI job, so a non-gate script")
-
-    def test_without_a_readable_ci_yml_every_scripts_path_is_owner_only(self):  # fails closed
-        merge_ready.ci_scripts.cache_clear()
-        try:
-            orig, merge_ready.CI_YML = merge_ready.CI_YML, ROOT / "no" / "such.yml"
-            self.assertTrue(merge_ready.owner_only("scripts/verify.sh"))
-        finally:
-            merge_ready.CI_YML = orig
-            merge_ready.ci_scripts.cache_clear()
+        self.assertTrue(merge_ready.owner_only("scripts/verify.sh"), "fail-closed: every scripts/ path is owner-only, not only the ones CI runs")
 
     def test_case_variants_of_owner_only_paths_are_refused(self):  # R1-06
         for name in ("claude.md", ".Claude/settings.local.json", ".Githooks/post-checkout", "Scripts/Hooks/x.py", "DOCS/orchestration.md", "Agents/x.md"):
