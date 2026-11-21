@@ -31,6 +31,10 @@ SOURCES = {
     "NotInApi": "class NotInApi { static Object f() { return java.net.http.HttpClient.newHttpClient(); } }",
     "NoSuchMember": "class NoSuchMember { static Object f() { return \"x\".describeConstable(); } }",
     "NewInterface": "class NewInterface implements java.util.random.RandomGenerator { public long nextLong() { return 0; } }",
+    "InheritedProject": (
+        "class InheritedProject { static Object[] f(MyList l) { return l.toArray(String[]::new); } static Object g(MyList l) { return l.stream(); } }"
+        " class MyList extends java.util.ArrayList<String> { }"
+    ),
     "ArrayClone": "class ArrayClone { static Object f(String[] a) { return a.clone(); } }",
 }
 
@@ -44,6 +48,7 @@ API = """<?xml version="1.0" encoding="utf-8"?>
 	<class name="java/lang/String" since="1">
 		<extends name="java/lang/Object"/>
 		<method name="&lt;init>()V"/>
+		<method name="valueOf(Ljava/lang/Object;)Ljava/lang/String;"/>
 	</class>
 	<class name="java/lang/System" since="1">
 		<extends name="java/lang/Object"/>
@@ -130,7 +135,7 @@ class CheckerTest(unittest.TestCase):
     def test_member_inherited_from_an_older_interface_passes(self):
         self.assertEqual(self.check("InheritedOld")[0], 0)
 
-    def test_member_inherited_from_a_newer_member_fails_naming_the_owner_in_the_class_file(self):
+    def test_member_inherited_from_a_newer_interface_member_fails(self):
         rc, out = self.check("InheritedNew")
         self.assertEqual(rc, 1, out)
         self.assertIn("toArray", out)
@@ -158,6 +163,13 @@ class CheckerTest(unittest.TestCase):
         rc, out = self.check("NewInterface")
         self.assertEqual(rc, 1, out)
         self.assertIn("java/util/random/RandomGenerator", out)
+
+    def test_member_inherited_through_a_project_class_is_resolved(self):
+        rc, out = run("--api-versions", self.api, "--min-sdk", "26",
+                      os.path.join(self.out, "InheritedProject.class"), os.path.join(self.out, "MyList.class"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("toArray", out)
+        self.assertNotIn("stream", out)  # Collection.stream is API 24
 
     def test_array_clone_is_not_an_unknown_class(self):
         self.assertEqual(self.check("ArrayClone")[0], 0)

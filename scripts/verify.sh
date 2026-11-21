@@ -35,13 +35,15 @@ step ci-scope-tests python3 -I scripts/test_ci_scope.py
 # merge base with origin/main; anything but a clean `skip` from scripts/ci_scope.py runs them. CI on main always runs them.
 gate_exclude=()
 if gate_scope=$(python3 -I scripts/ci_scope.py local-scope 2>/dev/null) && [ "$gate_scope" = skip ]; then
-  echo "skip  warnings-gate-tests, jdk-release-gate-tests, testLicenseeGate (no gate input changed since the merge base with origin/main; scripts/ci_scope.py)"
+  echo "skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, testLicenseeGate (no gate input changed since the merge base with origin/main; scripts/ci_scope.py)"
   SKIPPED=1
   gate_exclude=(-x testLicenseeGate)
 else
   step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
   step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py
+  step java-api-level-gate-tests python3 -I scripts/test_java_api_level_gate.py
 fi
+step java-api-level-tests python3 -I scripts/test_check_java_api_level.py
 step pit-config-tests python3 -I scripts/test_check_pit_config.py
 step pit-config python3 -I scripts/check_pit_config.py
 step tasks-tests python3 -I scripts/test_tasks.py
@@ -80,6 +82,7 @@ step workflow-lint ./scripts/lint_workflows.sh
 step spotless gradle spotlessCheck
 step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest ${gate_exclude[@]+"${gate_exclude[@]}"}
 step lint gradle :app:lintDebug
+step java-api-level gradle checkJavaApiLevel
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test
   step coverage gradle koverVerify -x :core:domain:pitest

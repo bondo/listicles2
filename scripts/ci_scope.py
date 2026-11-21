@@ -19,11 +19,19 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The slow self-tests, about 20 cold Gradle builds each; the licensee gate's are excluded from detekt by gradle-exclude.
-SELFTESTS = ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")
+SELFTESTS = ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/test_java_api_level_gate.py")
 # Anything that can change what the gate self-tests inspect or how the build is configured.
 RUN_SUFFIXES = (".gradle.kts", ".gradle", ".properties")
 RUN_PREFIXES = ("gradle/", "config/", "buildSrc/", "build-logic/", ".github/")
-RUN_FILES = {"gradlew", "gradlew.bat", "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/ci_scope.py"}
+RUN_FILES = {
+    "gradlew",
+    "gradlew.bat",
+    "scripts/test_warnings_gate.py",
+    "scripts/test_jdk_release_gate.py",
+    "scripts/test_java_api_level_gate.py",
+    "scripts/check_java_api_level.py",
+    "scripts/ci_scope.py",
+}
 # Locations that cannot (docs, tooling, firebase) or only via sources the gates never read (module `src` trees).
 SKIP_PREFIXES = ("docs/", "handoff/", "agents/", "firebase/", "scripts/", ".githooks/", ".claude/", "metrics/", "design/")
 SKIP_FILES = {"README.md", "CLAUDE.md", "REVIEW.md"}
