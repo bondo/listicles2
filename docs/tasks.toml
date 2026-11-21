@@ -551,7 +551,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26", "M0.5-27", "M0.5-28", "M0.5-29"]
-notes = "Closed with no work: 0 open target:M0.5 follow-ups (see #259); set done by the M1 planning refresh, PR #261"
+notes = "Closed with no work: 0 open target:M0.5 follow-ups (see #259); set done by the M1 planning refresh, PR #261. Issue #65 still carries target:M0.5 but is the review programme issue, not a follow-up; the orchestrator re-targets it with owner OK"
 
 [[task]]
 id = "M0.5-27"
@@ -881,7 +881,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-54", "M1-53"]
-notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user; deny soft delete by a plain member or non-member; allow soft delete, tombstone read and cleanup with createdBy seeded null; deny every write under a tombstone except the cleanup deletes (#199, #205)"
+notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user; deny soft delete by a plain member or non-member; allow soft delete, tombstone read and cleanup with createdBy seeded null; deny every write under a tombstone except the cleanup deletes (#199, #205). Estimated ~450 with P6: accepted conditional split (R2-08), if the first commit's tests pass 450 lines, soft delete and cleanup go first as their own PR and the orchestrator adds that task"
 
 [[task]]
 id = "M1-12"
@@ -1123,7 +1123,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Owner decision 7003911995; owner merge. Test first: a 7-parameter composable passes, a 7-parameter plain function fails. Before M1-16"
+notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owner merge. Test first: a 7-parameter composable passes, a 7-parameter plain function fails. Before M1-16"
 
 [[task]]
 id = "M1-50"
@@ -1183,7 +1183,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env; owner approval (it narrows when gate self-tests run). Owner decision 7003898899: verify.sh and PR CI run them only when their inputs changed against the merge base, CI on main every time. Negative case per input. Schedule before the M1 product PRs"
+notes = "Tooling env; owner approval (it narrows when gate self-tests run). Owner decision 7003898899: verify.sh and PR CI run them only when their inputs changed against the merge base, CI on main every time. Inputs (owner list): licensee config and version, gate scripts and code, their fixtures, build-logic, Gradle wrapper, versions catalog; a negative case each. Schedule before the M1 product PRs"
 
 [[task]]
 id = "M1-39"
@@ -1203,7 +1203,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env (process docs and prompts), rule test first, owner merge; after the #255/#256 process-docs PR. Also #260 items 1, 9-11. Then the detekt 2.0 tracking of issue 218 moves to M6 (Q4)"
+notes = "Tooling env (process docs and prompts), rule test first, owner merge; after the #255/#256 process-docs PR. Also #260 items 1, 9-11. Then the detekt 2.0 tracking of issue 218 moves to M6 (Q7)"
 
 [[task]]
 id = "M1-41"
@@ -1243,7 +1243,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line. Q6 A (7058176190): an advanced CodeQL workflow for java-kotlin with a Gradle build, weekly and on pushes to main; it also covers the languages default setup scans, because GitHub rejects advanced uploads while default setup is on (M1-O9)"
+notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line. Q6 A (7058176190): an advanced CodeQL workflow for java-kotlin with a Gradle build, weekly and on pushes to main; it also takes over actions, javascript-typescript and python with their pull_request trigger kept, because GitHub rejects advanced uploads while default setup is on; only java-kotlin is weekly and push to main (M1-O9 at merge)"
 
 [[task]]
 id = "M1-45"
@@ -1386,17 +1386,17 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-44"]
-notes = "Owner decisions 7003645427 and 7058176190 (Q6 A); issue 258 item 2"
+notes = "Owner decisions 7003645427 and 7058176190 (Q6 A); issue 258 item 2. Done as part of the M1-44 merge, so the new workflow's first upload is accepted"
 
 [[task]]
 id = "M1-O10"
-title = "Decide the repo rename to Tally (asked again right before M1-O1)"
+title = "Ask the owner about the repo rename to Tally (right before M1-O1)"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-29"]
-notes = "Owner decision 7057951193 (#258 item 3): deferred; follow-on edits are listed in docs/product/naming.md"
+notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task, a further deferral included (record it on #15); a rename becomes a new owner task. Follow-on edits: docs/product/naming.md"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 

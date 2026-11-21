@@ -15,7 +15,7 @@ security review, comment 6927207374), and [the plan](../PLAN.md). Decided questi
 * Each story has a "so that" value and acceptance criteria written as **Given / When / Then**, so a test can check them.
 * **Accessibility lines for every START, AUTH and HH screen** (owner decision on #15, comment 7058176190): every
   icon-only button has its own English and Danish label; screen titles are headings; at 200 % font scale in Danish
-  nothing is cut off and every action stays reachable (one light golden per screen). The item-row checkbox label is
+  nothing is cut off (one light golden per screen). The item-row checkbox label is
   decided with ITEM-04 in M2 planning.
 * **Words used:** *user* = a signed-in person. *Household* = a group of users (PLAN section 1). *Household owner* = the
   one member who manages the household. *List creator* = the user who created a list (not the same as household owner).
