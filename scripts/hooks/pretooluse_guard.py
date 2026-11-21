@@ -107,6 +107,12 @@ WRAPPERS = {
     "taskset": ({"-c", "--cpu-list"}, 1),  # the mask is a positional unless -c/--cpu-list is used
     "caffeinate": ({"-t", "-w"}, 0),
 }
+MAIN_OPTS = {  # R5-03: main's option tables where this PR changed them; the floor pass parses wrapper options as main did
+    "sudo": {"-u", "-g", "-h", "-p", "-C", "-U", "-r", "-t", "-D", "-R", "--user", "--group", "--host"},
+    "ionice": {"-c", "-n", "-p", "-t"},
+    "watch": {"-n", "-d"},
+    "xargs": {"-I", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "-R", "-S", "--arg-file"},
+}
 GIT_COMMON = {"status", "log", "diff", "add", "commit", "push", "fetch", "pull", "branch", "checkout", "switch", "restore", "reset", "show",
               "merge", "rebase", "stash", "clean", "rm", "mv", "config", "remote", "tag", "cherry-pick", "am", "apply", "blame", "grep",
               "ls-files", "rev-parse", "init", "clone", "describe", "worktree", "update-ref", "read-tree", "symbolic-ref", "ls-remote",
@@ -345,7 +351,7 @@ def extract_subs(text):
     return subs
 
 
-def ansi_c(s):
+def ansi_c(s, strict=False):
     def rep(m):
         t = m.group(1)
         simple = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", "'": "'", '"': '"', "e": "\x1b", "E": "\x1b", "a": "\a", "b": "\b", "f": "\f", "v": "\v",
@@ -362,6 +368,8 @@ def ansi_c(s):
             try:
                 return chr(int(t[1:], 16))
             except ValueError:
+                if strict:  # R5-03: main could not parse such a line, and its fallback denied it; the floor pass keeps that
+                    raise
                 return m.group(0)  # out of range: bash keeps the text, and the lexer must not fail where bash does not
         return chr(int(t, 8) & 0xFF)
     return re.sub(r"\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|[0-7]{1,3}|c.|.)", rep, s)
@@ -374,8 +382,8 @@ class Word(str):
     qd: frozenset[int] = frozenset()  # offsets of the $ that sit in quoted or escaped text
 
 
-def lex(src):
-    """Split a shell command string into simple commands. Raises ValueError when it cannot be parsed."""
+def lex(src, floor=False):
+    """Split a shell command string into simple commands. Raises ValueError when it cannot be parsed. floor: main's reading (R5-03)."""
     cmds, cur = [], Cmd()
     word, in_word, quoted, pending, ug = [], False, False, None, False
     qs, ud = None, False  # where the first quoted character sits in the word; an unquoted $ was seen
@@ -397,7 +405,7 @@ def lex(src):
     def bound():
         tail = "".join(word)
         m = re.search(r"\$([A-Za-z_][A-Za-z0-9_]*)$", tail)
-        if m:  # R1-08, R2-04: $A"ce" and "$A"ce are $A followed by ce, not a variable named Ace
+        if m and not floor:  # R1-08, R2-04: $A"ce" and "$A"ce are $A followed by ce, not a variable named Ace (main read $Ace)
             word[:] = [tail[:m.start()] + "${" + m.group(1) + "}"]
 
     def qmark():
@@ -486,7 +494,7 @@ def lex(src):
             if j >= n:
                 raise ValueError("unterminated quote")
             qmark()
-            put(ansi_c(src[i + 2:j]))
+            put(ansi_c(src[i + 2:j], floor))
             in_word = quoted = True
             i = j + 1
         elif src.startswith("$(", i):
@@ -847,7 +855,16 @@ def unwrap(words, mode="shell"):
             mode = mode if mode == "floor" else "shell" if base == "time" else "env" if base in ("env", "sudo", "doas") else "prog"
             i += 1
             first_opt = i
-            while i < len(words) and words[i].startswith("-") and words[i] != "--":
+            while mode == "floor" and i < len(words) and words[i].startswith("-") and words[i] != "--":  # R5-03: main's option loop
+                o = words[i]
+                i += 1
+                if o in MAIN_OPTS.get(base, opts) and i < len(words):
+                    if base == "env" and o in ("-S", "--split-string"):
+                        nested.append(words[i])
+                    if base == "taskset":
+                        npos = 0
+                    i += 1
+            while mode != "floor" and i < len(words) and words[i].startswith("-") and words[i] != "--":
                 o = words[i]
                 i += 1
                 val, split = None, False  # R1-06: the value of this option, from the word itself or the next word
@@ -875,7 +892,7 @@ def unwrap(words, mode="shell"):
                             deny("env -S with an unbalanced quote cannot be checked; write the words out")
                     if base == "taskset":
                         npos = 0
-            if base == "watch" and not watch_exec(words[first_opt:i]):  # R2-03: without -x watch runs its words, joined, with sh -c
+            if base == "watch" and mode != "floor" and not watch_exec(words[first_opt:i]):  # R2-03: without -x watch runs its words, joined, with sh -c
                 i += 1 if i < len(words) and words[i] == "--" else 0
                 if any(re.search(r"[$`]", w) for w in words[i:]):
                     deny("watch runs its words with sh -c after expanding them, so an expansion in them cannot be checked; write them out")
@@ -970,7 +987,7 @@ def check_command_string(command, state, depth=0):
     if depth > 8:
         deny("command nesting is too deep to check")
     try:
-        cmds = lex(command)
+        cmds = lex(command, bool(state.get("floor")))
     except ValueError:
         flat = re.sub(r"\\\r?\n|['\"\\$]", "", command)  # quotes and continuations hide a name from the raw text (R3-03 of #237)
         if "$" in command or "`" in command or re.search(  # R4-05: an expansion or $'\xHH' can spell any name
@@ -981,16 +998,18 @@ def check_command_string(command, state, depth=0):
     for k, cmd in enumerate(cmds):
         if cmd.group == "open":  # (( is arithmetic, not two subshells: what it assigns stays (R4-14)
             twin = any(0 <= j < len(cmds) and cmds[j].group == "open" for j in (k - 1, k + 1))
-            stack.append((state["cwd"], state["known"], dict(state["vars"]), state.get("ifs"), state.get("ifs_unknown"), case or twin))
+            stack.append((state["cwd"], state["known"], dict(state["vars"]), state.get("ifs"), state.get("ifs_unknown"), case or twin, twin))
             continue
         if cmd.group == "close":
             if stack:
-                cwd, known, saved, ifs, unknown, loose = stack.pop()
+                cwd, known, saved, ifs, unknown, loose, _ = stack.pop()
                 if not floor:  # the floor keeps main's scope: a ) restores only the directory, the model also restores variables and IFS
                     moved = (state.get("ifs"), state.get("ifs_unknown")) != (ifs, unknown)
                     state["vars"], state["ifs"], state["ifs_unknown"] = saved, ifs, unknown or (loose and moved)
                 state["cwd"], state["known"] = cwd, known and not (loose and state["cwd"] != cwd)
             continue
+        if not floor and stack and stack[-1][6] and any(re.search(r"\bIFS\b", w) for w in cmd.words):  # (( IFS = 1 )), ((IFS++)) (R4-14)
+            state["ifs_unknown"] = state["ifs_taint"] = True
         for s in cmd.subs:
             if not floor and s.startswith("(") and re.search(r"\bIFS\b", s):  # $((IFS=1)) assigns in this shell (R4-14)
                 state["ifs_unknown"] = state["ifs_taint"] = True
@@ -1147,9 +1166,9 @@ def sets_ifs(cmd, prog, args):
     loop, eval, let, ${IFS:=v} and a name built from an expansion; None when IFS is no name argument (a message that mentions IFS) or the verb
     never changes how bash splits (export, readonly, mapfile)."""
     k = 0
-    while k < len(cmd.words) and cmd.words[k] in RESERVED - {"for"}:
-        k += 1
-    if cmd.words[k:k + 2] == ["for", "IFS"] or any(re.search(r"\$\{IFS:?=", w) for w in cmd.words):
+    while k < len(cmd.words) and (cmd.words[k] in RESERVED - {"for", "select"} or cmd.words[k] in ("time", "-p")):
+        k += 2 if cmd.words[k] == "function" else 1  # time -p and function NAME come before the loop too (R4-14)
+    if cmd.words[k:k + 2] in (["for", "IFS"], ["select", "IFS"]) or any(re.search(r"\$\{IFS:?=", w) for w in cmd.words):
         return "unknown"
     if prog in ("eval", "let"):
         return "unknown" if re.search(r"\bIFS\b", " ".join(args)) else None
@@ -1199,7 +1218,7 @@ def check_simple(cmd, state, depth):
     assigns, words, nested, wrappers = unwrap(cmd.words, "floor" if floor else "prog" if cmd.prog_first else "shell")
     for a in assigns:
         if ASSIGN.match(a):  # after env or sudo every word with an = is one (A.B=1), but only NAME=v can be read
-            check_assign(expand(a, state))
+            check_assign(a if floor else expand(a, state))  # R5-03: main checked the raw word
     for s in nested:
         check_command_string(s, child(state), depth + 1)
     if words and WRAPPER_PREFIX.search(words[0]):
