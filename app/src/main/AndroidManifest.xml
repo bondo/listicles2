@@ -9,7 +9,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Listicles">
+        android:theme="@style/Theme.Tally">
         <activity
             android:name=".MainActivity"
             android:exported="true">

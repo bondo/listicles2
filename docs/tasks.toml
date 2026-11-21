@@ -790,7 +790,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-29"]
-notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-listicles); tests live in core/data/src/androidTest. Test-first: the first commit adds a smoke test there that signs in against the Auth emulator and writes and reads a document on the Firestore emulator (10.0.2.2), failing when the emulators are not running. Adds the Firebase BoM, Auth and Firestore to the catalog and :core:data (no Google Services plugin; that is M1-30). After the rename M1-29. Adds :core:testing to the :core:data test classpath (#217 item 3)"
+notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-tally); tests live in core/data/src/androidTest. Test-first: the first commit adds a smoke test there that signs in against the Auth emulator and writes and reads a document on the Firestore emulator (10.0.2.2), failing when the emulators are not running. Adds the Firebase BoM, Auth and Firestore to the catalog and :core:data (no Google Services plugin; that is M1-30). After the rename M1-29. Adds :core:testing to the :core:data test classpath (#217 item 3)"
 
 [[task]]
 id = "M1-03"
@@ -848,10 +848,11 @@ notes = "Tooling env (CI). Effort M."
 id = "M1-29"
 title = "Rename to Tally: applicationId and namespace dk.bjarkebjarke.tally, packages, app label en/da"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
+pr = 268
 notes = "Normal env. Must merge before M1-O1 registers the Android app in Firebase (docs/product/naming.md). The repo rename is the owner's"
 
 [[task]]
@@ -1126,13 +1127,24 @@ depends_on = ["M1-12"]
 notes = "Split from M1-12 by the refresh (size); P1 deny tests; tests as in docs/milestones/M1.md section 5 (M1-12 paragraph)"
 
 [[task]]
-id = "M1-49"
-title = "detekt LongParameterList: ignoreAnnotated [Composable] for that rule only (issue 217 item 5)"
+id = "M1-55"
+title = "Tooling: move the androidTest ListiclesAppTest into the tally package as TallyAppTest and update the wiring test path"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
+depends_on = ["M1-29"]
+notes = "Tooling env (the wiring test is a process file). M1-29 left the androidTest file at its old directory (its package statement stays dev.listicles.app, since detekt requires it to match the directory) because DarkThemeUiTest in test_wiring.py reads that path. Change the path there, git mv the file under dk/bjarkebjarke/tally, rename the class to TallyAppTest and set the package to dk.bjarkebjarke.tally"
+
+[[task]]
+id = "M1-49"
+title = "detekt LongParameterList: ignoreAnnotated [Composable] for that rule only (issue 217 item 5)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
 depends_on = ["M1-01"]
+pr = 236
 notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owner merge. Test first: a 7-parameter composable passes, a 7-parameter plain function fails. Before M1-16"
 
 [[task]]
@@ -1307,7 +1319,7 @@ depends_on = [
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37",
   "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55",
 ]
 
 [[task]]

@@ -19,7 +19,7 @@ Adjustments made while evaluating the first proposal:
 | A hand-written burn-down task goes stale: a planner adds a task and forgets to add it to the burn-down's `depends_on`, so the burn-down could run before the milestone's work is finished. | `scripts/tasks.py validate` enforces it: every milestone with non-owner tasks has exactly one `Mx-FU`, assigned to `implementer`, depending on **every** other non-owner task of that milestone. Later milestones depend on `milestone:Mx`, which includes `Mx-FU`, so the ready query cannot start them early. |
 | "Security-rules / sync-merge / release findings are never deferred" needs a machine-readable tag, or it depends on the orchestrator's memory. | Reviewers tag each finding with `area` (section 5). The follow-up issue carries `area:*` and, for anything protected, a mandatory `owner-ok` label. `tasks.py drift` flags violations (blocker; major or protected area without `owner-ok`; missing severity/target). |
 | A burn-down inside the last PR of a milestone is the PR being merged, so deferring into it defers nothing. | A finding is deferred to the earliest milestone that still has a **later feature PR** (section 3). Findings from PR #16 (M0's last PR, merged after #1) target `M1`. |
-| Deferral with no limit becomes a dumping ground. | Prefer fixing when the fix is small (section 2). More than 8 open follow-ups for one milestone: the orchestrator stops deferring and starts the milestone's burn-down task; re-deferral and majors still need the owner. |
+| Deferral with no limit becomes a dumping ground. | Prefer fixing when the fix is small (section 2). More than 8 open deferral follow-ups for one milestone (repo-wide review findings do not count, section 2): the orchestrator stops deferring and asks the owner which follow-ups to fix as their own small PRs (as on #15 comment 6989510779); deferring resumes at 8 or fewer open (`Mx-FU` depends on every task of its milestone, so it cannot start early); re-deferral and majors still need the owner. |
 | The reviewer's verdict (`ready_nits_only`) was computed before the deferral decision. | `deferred` is a finding status set by the decider (not the reviewer). The verdict counts only unresolved, non-deferred findings, and the next round re-checks every deferral (section 4). |
 
 ## 2. Eligibility (the rules)
@@ -42,6 +42,12 @@ A minor may be deferred only if all of these hold:
 * The finding is not a regression introduced by this PR in code that already worked.
 
 Deferral never changes severity. A deferred finding keeps its ID and severity.
+
+**Repo-wide reviews (owner decision, #15 comment 7003661679):** the cap of 8 per milestone counts every follow-up deferred from an individual PR
+review, whatever its body looks like (older issues have no `Source:` line). Only issues that a repo-wide (programme) review filed, such as the
+`Repo review (...)` issues under #65, do not count. At M1 planning the planner sorts every
+`target:M1` issue into: before the first M1 code, during M1, move to M2 or later, or close. `tasks.py followups` counts every follow-up issue today, so
+subtract the repo-wide review issues by hand until a label tells them apart (proposed in PR #262).
 
 ## 3. Target milestone
 
@@ -68,11 +74,11 @@ Round flow with deferral:
 3. If every finding above `nit` was deferred and no commit followed the reviewed range, the PR is accepted
    **without another review round**: nothing unreviewed exists. The orchestrator sets the round's verdict to
    `ready_deferred` (round row, PR table) and posts `accepted: all findings above nit deferred (#a, #b)`; that is the
-   owner's signal to merge. An implementer deciding without an orchestrator posts the same `accepted:` comment on the PR, with the
+   signal to mark the PR READY (the merge agent merges it; an owner-only PR waits for the owner's approval, `ORCHESTRATION.md` §7.5). An implementer deciding without an orchestrator posts the same `accepted:` comment on the PR, with the
    round row (verdict `ready_deferred`) as a `metrics:round` block inside it; it writes nothing to the state issue, and the
    next orchestrator copies the row into the log. If this happens in round 4, `ready_deferred` takes precedence over `cap_reached`. If any fix was committed, `reviewed_through`
-   rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked by the
-   owner at merge time (PR review table, `Deferred` column; in a manual loop, from the decision and `accepted:` PR comments, since nobody refreshes the table) and by the next round if one happens.
+   rules apply (`ORCHESTRATION.md` §7.2) and the next round runs as usual. Deferrals are re-checked when the
+   owner approves an owner-only PR (PR review table, `Deferred` column; in a manual loop, from the decision and `accepted:` PR comments, since nobody refreshes the table) and by the next round if one happens.
 4. The **4-round cap** and the **"only nits remain"** test count only unresolved, non-deferred findings.
    Deferred findings are listed in the report to the owner but do not hold a round open.
 5. A deferral that violates section 2, or lacks the issue or decision record, is a finding itself
@@ -195,7 +201,7 @@ with its milestone's own count. `tasks.py followups` lists them by severity; `dr
 
 | Failure | Mitigation |
 |---|---|
-| Deferral used to dodge a fix | Section 2 size and acceptance-criteria tests; reviewers re-check deferrals; more than 8 open per milestone starts the burn-down; re-deferral and majors go to the owner |
+| Deferral used to dodge a fix | Section 2 size and acceptance-criteria tests; reviewers re-check deferrals; more than 8 open deferrals per milestone (repo-wide review issues excluded) stops deferring and asks the owner which follow-ups to fix as small PRs; re-deferral and majors go to the owner |
 | A follow-up is forgotten | `Mx-FU` is a dependency of everything later; `drift` flags open issues targeting a done or dropped burn-down |
 | Protected area slips through | Reviewer `area` tag, `owner-ok` label, `drift` check, PR task `risk = "high"` check by the orchestrator |
 | Labels missing, so issues are unqueryable | Owner task M0-O10; `drift` reports follow-ups lacking `severity:`/`target:` (only works for issues that carry the `follow-up` label, so the orchestrator creates them with all labels in one call) |
