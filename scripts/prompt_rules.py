@@ -1465,10 +1465,10 @@ DOC_RULES = (
         "FOLLOW-UPS section 8: the Mx-FU burn-down includes the Dependabot alert review of SECURITY.md (#260 item 9)",
     ),
     DocRule(
-        "branch-protection-ten-jobs", "docs/BRANCH-PROTECTION.md",
-        (r"only the ten jobs above",),
-        "BRANCH-PROTECTION section 4: ten required jobs, as the ruleset and section 2 (#260 item 1)",
-        forbidden=(r"only the eight jobs above",),
+        "branch-protection-job-count", "docs/BRANCH-PROTECTION.md",
+        (r"only the jobs listed above \(every job in `ci\.yml`\)",),
+        "BRANCH-PROTECTION section 4: no hard-coded job count that can go stale, as the ruleset and section 2 (#260 item 1)",
+        forbidden=(r"only the (?:eight|ten|eleven) jobs above",),
     ),
 )
 

@@ -2333,7 +2333,7 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
         "roles-recheck-reviewer": "agents/roles.yaml",
         "followups-title-forms": "docs/FOLLOW-UPS.md",
         "followups-burndown-alerts": "docs/FOLLOW-UPS.md",
-        "branch-protection-ten-jobs": "docs/BRANCH-PROTECTION.md",
+        "branch-protection-job-count": "docs/BRANCH-PROTECTION.md",
     }
 
     def doc(self, path):
@@ -2467,8 +2467,9 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
 
     # #260 items 1, 9, 10, 11.
     def test_the_nit_wording_of_issue_260_is_pinned(self):
-        self.assertIn("branch-protection-ten-jobs", self.doc_ids(
-            "docs/BRANCH-PROTECTION.md", self.doc("docs/BRANCH-PROTECTION.md") + "\n- Only the eight jobs above.\n"))
+        for stale in ("eight", "ten", "eleven"):
+            self.assertIn("branch-protection-job-count", self.doc_ids(
+                "docs/BRANCH-PROTECTION.md", self.doc("docs/BRANCH-PROTECTION.md") + f"\n- Only the {stale} jobs above.\n"))
         self.assertIn("orch-labels-exist", self.doc_ids(
             "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\nThe `owner-todo` label is not created yet.\n"))
         self.assertIn("followups-title-forms", self.doc_ids(
