@@ -2082,6 +2082,9 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Do not prematurely reply and resolve the thread.",
         "Don't merely reply and resolve the thread; also add a test.",
         "Never simply reply and resolve the thread; also thank them.",
+        # R6-02 of #267: a multi-word adverb phrase after the negator takes the negation too
+        "Agents do not by default reply and resolve the thread.",
+        "The orchestrator does not by default reply and resolve the thread.",
     )
     BAN = (
         # R3-03: a comma clause between the negation and the verb
@@ -2170,6 +2173,11 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "| **Resolve conversation** | not you: only the owner |",
         "Do not ever reply and resolve the thread.",
         "Agents must never approve the PR and resolve the thread.",
+        # R6-01 of #267: reply/apply/comply/supply are verbs, not adverbs; "never again" is a ban
+        "Do not apply the suggestion and resolve the thread.",
+        "Agents must not comply and resolve the thread.",
+        "Never supply a patch and resolve the thread.",
+        "Never again reply and resolve the thread.",
     )
 
     def flagged(self, where, text):
@@ -2213,7 +2221,9 @@ class ResolveThreadSentenceTests(unittest.TestCase):
     QUESTIONS = ("Why don't you", "Can't you")
     # round 5 of #267: a negator, then an adverb that takes the negation, before "reply and resolve"
     ADVERB_NEGATORS = ("Do not", "Don't", "Never", "Please don't", "Agents should not", "The orchestrator does not")
-    ADVERBS = ("immediately", "automatically", "always", "blindly", "unilaterally", "usually", "prematurely", "just", "merely", "simply")
+    ADVERBS = ("immediately", "automatically", "always", "blindly", "unilaterally", "usually", "prematurely", "just", "merely", "simply",
+               "first", "yet", "still", "also", "often", "by default", "in general", "right away", "straight away", "for now", "right now")
+    ROLES = ("orchestrator", "implementer", "reviewer", "planner", "worker", "verifier", "agent")
     ABBREVIATIONS = ("e.g.", "i.e.", "(e.g.")
     SEPARATORS = ("", "- ", "* ", "Note: ", "1. ", "| ")
 
@@ -2225,6 +2235,9 @@ class ResolveThreadSentenceTests(unittest.TestCase):
             for neg in self.OTHER_VERB_NEGATORS + self.CONJ_NON_NEGATORS:
                 yield f"{sep}{neg} reply and resolve the thread."
                 yield f"{sep}{neg} reply and resolve it on the thread."
+            for role in self.ROLES:  # R6-01 of #267: a button label on a line that names any agent role is no button
+                yield f"| **Resolve threads** | {role.capitalize()} |"
+                yield f"- **Resolve threads** ({role}, after replying)"
             for neg in self.ADVERB_NEGATORS:
                 for adverb in self.ADVERBS:
                     yield f"{sep}{neg} {adverb} reply and resolve the thread."
