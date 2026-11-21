@@ -2,11 +2,15 @@
 
   * verify.sh runs the gate's tests, this check and `scripts/screenshots.sh verify` as active steps,
   * ci.yml: the `tasks` job runs the tests and this check; the `screenshots` job runs the gate, then uploads the Roborazzi
-    diffs when a step failed (a pinned actions/upload-artifact step after the gate), and the gate step cannot be allowed
-    to fail. It is its own job because test_ci_scope.py forbids `if:` in the jobs that are required checks.
-  * the golden set under app/src/test/screenshots is exactly light and dark x en and da plus the 200 % font-scale Danish
-    light golden (valid, small, all different), and the Roborazzi build setup compares exactly (no colour distance, shift or changed-pixel tolerance, anywhere),
-    and every Compose UI test in androidTest turns the ATF accessibility checks on and none turns them off (P15).
+    diffs when a step failed (a pinned actions/upload-artifact step after the gate), and none of the three
+    commands' steps can be skipped (`if:`), allowed to fail (`continue-on-error`) or neutered (a folded `|| true`
+    line). It is its own job because test_ci_scope.py forbids `if:` in the jobs that are required checks.
+  * the golden set under app/src/test/screenshots is exactly, for every screen found by name, light and dark x en and da
+    plus the 200 % font-scale Danish light golden (valid, small, all different), and TallyApp is always required;
+  * the Roborazzi build setup compares exactly: no colour distance, shift or changed-pixel tolerance anywhere, and every
+    Roborazzi capture call passes ScreenshotOptions.exact;
+  * every Compose UI test in androidTest (any rule or runner) turns the ATF accessibility checks on, runs them on the
+    screen, and none turns them off (P15).
 Run: python3 -I scripts/check_screenshots.py  (exit 1 and one line per problem).
 """
 
@@ -35,6 +39,9 @@ EXACT_OPTIONS = ("ThresholdValidator(0f)", "maxDistance = 0f", "hShift = 0", "vS
 TOLERANCE = re.compile(r"changeThreshold|ThresholdValidator\(|SimpleImageComparator\(|(?:resultValidator|imageComparator)\s*=")
 INPUT_PROBLEM = "app/build.gradle.kts must declare src/test/screenshots as an input of the test tasks (else verify skips when only goldens changed)"
 OPTIONS_FILE = "app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt"
+COMPOSE_TEST = re.compile(r"create\w*ComposeRule|run\w*ComposeUiTest")
+CAPTURE_CALL = re.compile(r"\bcapture\w*Robo\w*\(|\bRoborazziRule\(")
+EXACT_ARGUMENT = re.compile(r"roborazziOptions\s*=\s*ScreenshotOptions\.exact\s*(?:,|\)|$)")
 PINNED = re.compile(r"uses:\s*actions/upload-artifact@[0-9a-f]{40}(?:\s|$)")
 
 
@@ -54,6 +61,18 @@ def _runs(step, command):
     return any(ln.removeprefix("- ") == f"run: {command}" for ln in _active_lines(step))
 
 
+def _folded(step, command):
+    """True if the line after `run: <command>` is indented further: YAML folds it into the run value (`|| true`, extra flags)."""
+    lines = step.splitlines()
+    for i, ln in enumerate(lines[:-1]):
+        if ln.strip().removeprefix("- ") == f"run: {command}":
+            indent = len(ln) - len(ln.lstrip())
+            nxt = lines[i + 1]
+            if nxt.strip() and len(nxt) - len(nxt.lstrip()) > indent:
+                return True
+    return False
+
+
 def wiring_problems(root):
     root = Path(root)
     problems = []
@@ -64,6 +83,12 @@ def wiring_problems(root):
     for job, cmds in (("tasks", (TESTS_CMD, CHECK_CMD)), ("screenshots", (GATE_CMD,))):
         steps = _job_steps(ci, job)
         problems += [f"ci.yml {job} job has no step running: {cmd}" for cmd in cmds if not any(_runs(s, cmd) for s in steps)]
+        for cmd in cmds:
+            for step in (s for s in steps if _runs(s, cmd)):
+                if any(ln == "if:" or ln.startswith("if: ") or ln.startswith("- if: ") for ln in _active_lines(step)):
+                    problems.append(f"ci.yml step running {cmd} has if:")
+                if _folded(step, cmd):
+                    problems.append(f"ci.yml step running {cmd} is followed by a more-indented line (a folded `|| true` or extra arguments)")
     steps = _job_steps(ci, "screenshots")
     gate = next((i for i, s in enumerate(steps) if _runs(s, GATE_CMD)), None)
     if gate is not None and "continue-on-error" in steps[gate]:
@@ -93,7 +118,7 @@ def golden_problems(root):
     screens = sorted({m.group("screen") for name in present if (m := GOLDEN_NAME.fullmatch(name))} | {"TallyApp"})
     wanted = [name for screen in screens for name in screen_goldens(screen)]
     problems += [f"missing golden {GOLDEN_DIR}/{name}" for name in wanted if name not in present]
-    problems += [f"unexpected file {GOLDEN_DIR}/{name}" for name in sorted(present) if not GOLDEN_NAME.fullmatch(name)]
+    problems += [f"unexpected file {GOLDEN_DIR}/{name}" for name in sorted(present) if name not in wanted]
     seen = {}
     for name in wanted:
         if name not in present:
@@ -111,15 +136,14 @@ def golden_problems(root):
 
 
 def _calls(text, opener):
-    """The argument text of each `opener ... )` call in text (balanced parentheses)."""
-    calls, start = [], text.find(opener)
-    while start != -1:
-        depth, i = 1, start + len(opener)
+    """The argument text of each call whose opening matches the regex `opener` (up to its balanced closing parenthesis)."""
+    calls = []
+    for m in opener.finditer(text):
+        depth, i = 1, m.end()
         while i < len(text) and depth:
             depth += {"(": 1, ")": -1}.get(text[i], 0)
             i += 1
-        calls.append(text[start + len(opener) : i - 1])
-        start = text.find(opener, i)
+        calls.append(text[m.end() : i - 1].strip())
     return calls
 
 
@@ -141,8 +165,9 @@ def build_problems(root):
         text, name = source.read_text(), source.relative_to(root)
         if source != options and TOLERANCE.search(text):
             problems.append(f"{name} sets a comparison tolerance")
-        # captureRoboImage defaults to Roborazzi's own options, which forgive a colour distance of 0.007 per pixel (R1-04).
-        if any("roborazziOptions = ScreenshotOptions.exact" not in call for call in _calls(text, "captureRoboImage(")):
+        # Every capture entry point defaults to Roborazzi's own options, which forgive a colour distance of 0.007 per pixel
+        # (R1-04, R2-14); `.exact.copy(..)` would undo the exactness too, so the argument must end at the comma or the call.
+        if any(not EXACT_ARGUMENT.search(call) for call in _calls(text, CAPTURE_CALL)):
             problems.append(f"{name} captures without roborazziOptions = ScreenshotOptions.exact")
     return problems
 
@@ -154,9 +179,9 @@ def accessibility_problems(root):
         problems.append("app/build.gradle.kts does not add compose.ui.test.junit4.accessibility to androidTestImplementation")
     for source in sorted(root.glob("**/src/androidTest/**/*.kt")):
         text, name = source.read_text(), source.relative_to(root)
-        if re.search(r"createComposeRule|createAndroidComposeRule", text) and "enableAccessibilityChecks()" not in text:
+        if COMPOSE_TEST.search(text) and "enableAccessibilityChecks()" not in text:
             problems.append(f"{name} uses a Compose test rule but never calls enableAccessibilityChecks()")
-        elif re.search(r"createComposeRule|createAndroidComposeRule", text) and "tryPerformAccessibilityChecks()" not in text:
+        elif COMPOSE_TEST.search(text) and "tryPerformAccessibilityChecks()" not in text:
             # The checks run only inside actions (performClick and so on); assertions and captureToImage() run none (R1-03).
             problems.append(f"{name} never calls tryPerformAccessibilityChecks(), so the checks never evaluate the screen")
         if "disableAccessibilityChecks" in text:
@@ -164,8 +189,8 @@ def accessibility_problems(root):
     return problems
 
 
-def main():
-    problems = wiring_problems(ROOT) + golden_problems(ROOT) + build_problems(ROOT) + accessibility_problems(ROOT)
+def main(root=ROOT):
+    problems = wiring_problems(root) + golden_problems(root) + build_problems(root) + accessibility_problems(root)
     for p in problems:
         print(f"check_screenshots: {p}")
     return 1 if problems else 0
