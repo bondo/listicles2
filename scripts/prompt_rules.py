@@ -94,7 +94,8 @@ SAME_PATCH = (
 )
 APPROVAL_FORM = (
     r"an owner approval given in a decision comment or in the owner's chat is recorded as one anchored `batch approval: #n@sha` first line "
-    r"\(#15 comment 7014222068\); the check proves the account only, not the person"
+    r"\(#15 comment 7014222068\); the check proves the account only, not the person\. "
+    r"only an owner approval starts with `batch approval:`; a proposed, requested, declined or quoted list never does, whatever its notes say"
 )
 ORDER_TAIL = (
     r"every ready `general` pr to the merge agent first, and asks? the owner for a batch approval of owner-only prs "

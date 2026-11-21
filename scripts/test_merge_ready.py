@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
@@ -463,7 +464,7 @@ class UsageTests(unittest.TestCase):
                      ("--wait", "--wait", "12", SHA, "general", "extra"), ("--bogus", "12", SHA, "general")):
             with self.subTest(args=args):
                 res = self.cli(*args)
-                self.assertNotEqual(res.returncode, 0)
+                self.assertEqual(res.returncode, 2, res.stderr)  # a usage error, before any API call (R2-03)
 
     def test_api_error_refuses(self):
         class Broken(FakeApi):
@@ -848,7 +849,7 @@ class OwnerBatchTests(unittest.TestCase):
         bodies = {"no line": f"I think we could merge {listed}", "decision record (7007421567)": f"{verbatim}\nbatch approval: {listed}",
                   "a request": f"asking the owner for batch approval: {listed} (not approved yet)", "a refusal": f"Owner declined the batch approval: {listed}",
                   "second line": f"Thanks!\nbatch approval: {listed}", "words after the list": f"batch approval: {listed} but only if CI is green",
-                  "a quoted line": f"> batch approval: {listed}"}
+                  "a quoted line": f"> batch approval: {listed}", "6 hex": f"batch approval: #{N}@{C1[:6]}", "1 hex": f"batch approval: #{N}@{C1[:1]}"}
         for name, body in bodies.items():
             with self.subTest(name):
                 comment = approval_comment("", line=body)
@@ -858,9 +859,20 @@ class OwnerBatchTests(unittest.TestCase):
         listed = f"#70@{'7' * 7} (docs), #{N}@{C1[:7]} (the wrapper PR)"
         self.merged(batch_api(listed=listed, earlier={70: True}, comment=approval_comment(listed, line="\n  batch approval: ")))
 
+    def test_an_approved_sha_prefix_that_two_commits_share_is_refused(self):  # R2-02: the head listed first must not count as the approved commit
+        twin = M2[:7] + "c" * 33
+        self.refused(batch_api(listed=f"#{N}@{M2[:7]}", commits=[commit(M2, [twin]), commit(twin, [BASE0])]), r"not exactly one of the commits")
+
+    def test_without_an_injected_merge_tree_git_checks_this_pr(self):  # R2-03: the production wiring
+        built, calls = [], []
+        with mock.patch.object(merge_ready, "GitMergeTree", lambda n: built.append(n) or fake_merge_tree(calls=calls)):
+            self.assertEqual(go(batch_api(), sha=M2, kind="owner-batch", flags=("--approval", str(CID)))[0], 0)
+        self.assertEqual((built, calls), ([N], [(C1, MAIN1), (M1, MAIN2)]))
+
     def test_comment_not_by_the_owner_or_not_on_the_state_issue_or_edited(self):
         cases = {"login": approval_comment(f"#{N}@{C1[:7]}", login="mallory"), "association": approval_comment(f"#{N}@{C1[:7]}", assoc="NONE"),
-                 "other issue": approval_comment(f"#{N}@{C1[:7]}", issue=16), "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True)}
+                 "other issue": approval_comment(f"#{N}@{C1[:7]}", issue=16), "#150": approval_comment(f"#{N}@{C1[:7]}", issue=150),
+                 "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True)}
         for name, comment in cases.items():
             with self.subTest(name):
                 self.refused(batch_api(comment=comment), r"approval comment.*(owner|#15|edited)")
@@ -869,6 +881,7 @@ class OwnerBatchTests(unittest.TestCase):
         merge = commit(M2, [M1, MAIN2], "Merge branch 'main' into x")
         cases = {"non-main commit in the middle": dict(commits=[commit(C1, [BASE0]), commit(M1, [C1], "Edit another file"), merge]),
                  "non-main commit as the head": dict(commits=[commit(C1, [BASE0]), commit(M2, [C1], "One more edit")]),
+                 "root commit after the approved sha": dict(commits=[commit(C1, [BASE0]), commit("0" * 40, []), commit(M2, [C1, "0" * 40])]),  # R2-04
                  "merge of another branch": dict(parent_status="ahead"), "diverged merge": dict(parent_status="diverged"),
                  "head not descending from the approved commit": dict(commits=[commit(C1, [BASE0]), commit(M2, [BASE0, MAIN2])])}
         for name, kwargs in cases.items():
@@ -949,10 +962,10 @@ class MergeTreeGitTests(unittest.TestCase):
         self.git(self.work, "merge", "-q", "--no-edit", "main")
         return self.git(self.work, "rev-parse", "HEAD")
 
-    def publish(self, head):
+    def publish(self, head, *clone_args):
         """Push main and the PR head (as refs/pull/77/head) to origin and make a fresh agent checkout of origin/main."""
         self.git(self.work, "push", "-q", "origin", "main", f"{head}:refs/pull/{N}/head")
-        self.git(self.work.parent, "clone", "-q", str(self.origin), str(self.agent))
+        self.git(self.work.parent, "clone", "-q", *clone_args, self.origin.as_uri(), str(self.agent))
         return merge_ready.GitMergeTree(N, cwd=self.agent)
 
     def tree(self, sha):
@@ -962,6 +975,10 @@ class MergeTreeGitTests(unittest.TestCase):
         merge = self.merge_main()
         merge_tree = self.publish(merge)
         self.assertEqual(merge_tree(self.c1, self.main2), self.tree(merge))
+
+    def test_a_shallow_checkout_is_deepened_first(self):  # R2-01: cloud sessions clone with depth 50, too shallow for an old approved commit
+        merge = self.merge_main()
+        self.assertEqual(self.publish(merge, "--depth", "1")(self.c1, self.main2), self.tree(merge))
 
     def test_an_edit_or_an_extra_file_in_the_merge_commit_changes_the_tree(self):
         merge = self.merge_main()
