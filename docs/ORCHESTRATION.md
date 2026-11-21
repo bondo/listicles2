@@ -12,8 +12,9 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 |---|---|---|---|---|
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
 | **Orchestrator** | Opus / medium | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, draft PRs, Dependabot PR closes, scheduled tasks, session tags | Commits, pushes (the one exception: the server-side `update_pull_request_branch` of §7.5), edits files, reviews code, reads whole transcripts, merges |
-| **Implementer** | Opus / high (max for `risk:high`) | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
+| **Implementer** | Opus / high (max for `risk:high`) or Sonnet / medium (high for tooling), by the split of PLAN §9.1 and `agents/roles.yaml` | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
 | **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
+| **Merge agent** | Sonnet / medium | Long-lived; started by the orchestrator (§7.5) | Squash merges of READY PRs, through `scripts/merge_ready.py` and `scripts/update-branch.sh` only | Edits files, reviews, merges an owner-only PR without the owner's recorded approval, merges a head other than the one approved, except for update-branch merge commits of main (§7.5; 7007421567 D2) |
 | **Collaborator** (human, trusted Write role, [`COLLABORATING.md`](COLLABORATING.md)) | n/a | n/a | Comments, issues from the forms, PR reviews; nothing else | Merge, enable auto-merge, mark ready, edit files, close, delete branches, resolve threads, labels, comment on #15; sign off design (owner only) |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
 
@@ -496,7 +497,9 @@ total cost, incidents. Then refresh the PR description's review table from the r
   tasks of one PR into one session is fine; claim them all. **One batch = one PR, no stacking** (retro R3): the next batch
   branches from `main` after the previous PR is squash-merged. `big-pr` is for generated or mechanical diffs and for one concern that cannot reasonably be split (§1.1).
 * `create_session` with the spawn message (§8), the tags from §2.1, the model and effort
-  from PLAN §9.1, and for writers `outcome_branch` = the branch they hold.
+  from `agents/roles.yaml` (PLAN §9.1), and for writers `outcome_branch` = the branch they hold.
+  **Implementer profile:** use `implementer` (Opus) for the cases in its `use_when` list, `implementer-sonnet` otherwise, and name the pick in the spawn message.
+  A fix-round or respawned implementer for a PR with 3 or more review rounds is Opus. A running implementer keeps its model (owner decision, #15 comment 7032210967).
 * **Pick the environment before `create_session`** (retro R8). Tasks that touch a process file (`CLAUDE.md`, `REVIEW.md`,
   `agents/`, `.claude/`, `.github/`, `.githooks/`, `scripts/guards.sh`, `scripts/hooks/`) need the tooling environment
   (`LISTICLES_TASK=tooling`); everything else uses the normal one. The task's `notes` names it. A wrong pick blocks the worker.
@@ -539,7 +542,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
 
 **Default:** fix a minor in the PR when its fix is small (about 30 changed lines or fewer), and always when it is in a gate (guards, hooks, thresholds, CI checks). Once a round has no blocker and no major, the orchestrator defers a minor with a larger or out-of-scope fix,
 and any nit, instead of running another round. The default is subject to the rules below and
-[`FOLLOW-UPS.md`](FOLLOW-UPS.md): the owner-OK areas (`security-rules`, `sync-merge`, `release`, `risk:high` tasks, majors) and the limit of 8 open follow-ups per milestone.
+[`FOLLOW-UPS.md`](FOLLOW-UPS.md): the owner-OK areas (`security-rules`, `sync-merge`, `release`, `risk:high` tasks, majors) and the limit of 8 open follow-ups per milestone (deferrals from PR reviews only; findings of repo-wide reviews do not count, owner decision 7003661679).
 
 Rules, labels and the issue template: [`FOLLOW-UPS.md`](FOLLOW-UPS.md). In short: after each round the orchestrator
 sorts the findings. Everything not deferred goes back to the implementer. Nits and minors may be deferred when no
@@ -549,9 +552,9 @@ or `release`, or on a `risk:high` task, never without owner OK. For each deferra
 and the "only nits remain" test count only unresolved, non-deferred findings. If everything above nit was deferred and no
 commit followed the reviewed range, the PR needs no further round: the orchestrator posts a `decision` comment
 `accepted: all findings above nit deferred (#a, #b)` and sets the round's verdict to `ready_deferred` (taking precedence
-over `cap_reached`); that is the owner's signal to merge. An implementer deciding without an orchestrator posts the
-`accepted:` comment on the PR with the round row inside it, and writes nothing to the state issue; the next orchestrator copies the row into the log. More than 8 open follow-ups for one milestone: stop deferring and start the milestone's burn-down task `Mx-FU` next (re-deferral and majors still need the owner) (count targets
-with `tasks.py --followups … --json followups`). The deferral is in the decision comment at once; the PR review table
+over `cap_reached`); that is the signal to mark the PR READY (§7.5). An implementer deciding without an orchestrator posts the
+`accepted:` comment on the PR with the round row inside it, and writes nothing to the state issue; the next orchestrator copies the row into the log. More than 8 open deferral follow-ups for one milestone (findings of repo-wide reviews do not count, owner decision 7003661679): stop deferring and ask the owner which follow-ups to fix as their own small PRs (as on #15 comment 6989510779); deferring resumes at 8 or fewer open (re-deferral and majors still need the owner; `Mx-FU` depends on every task of its milestone, so it cannot start early) (count targets
+with `tasks.py --followups … --json followups`, minus the repo-wide review issues, which it does not tell apart yet). The deferral is in the decision comment at once; the PR review table
 is refreshed at batch close and no later than when the PR is declared ready.
 
 ### 7.2.2 Plan review, second reviewer, escalation reviewer, escaped defects
