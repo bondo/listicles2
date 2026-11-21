@@ -35,6 +35,7 @@ SOURCES = {
         "class InheritedProject { static Object[] f(MyList l) { return l.toArray(String[]::new); } static Object g(MyList l) { return l.stream(); } }"
         " class MyList extends java.util.ArrayList<String> { }"
     ),
+    "Removed": "class Removed { static void f(Thread t) { t.suspend(); } }",
     "ArrayClone": "class ArrayClone { static Object f(String[] a) { return a.clone(); } }",
 }
 
@@ -53,6 +54,10 @@ API = """<?xml version="1.0" encoding="utf-8"?>
 	<class name="java/lang/System" since="1">
 		<extends name="java/lang/Object"/>
 		<field name="out" since="30"/>
+	</class>
+	<class name="java/lang/Thread" since="1">
+		<extends name="java/lang/Object"/>
+		<method name="suspend()V" removed="36"/>
 	</class>
 	<class name="java/lang/Runnable" since="1"><method name="run()V"/></class>
 	<class name="java/lang/Class" since="1"><extends name="java/lang/Object"/></class>
@@ -170,6 +175,35 @@ class CheckerTest(unittest.TestCase):
         self.assertEqual(rc, 1, out)
         self.assertIn("toArray", out)
         self.assertNotIn("stream", out)  # Collection.stream is API 24
+
+    def test_member_removed_in_a_later_api_fails(self):
+        # Android 16 removed Thread.suspend: the call compiles against JDK 17 and then throws NoSuchMethodError on API 36 and up.
+        rc, out = self.check("Removed")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("java/lang/Thread.suspend()V", out)
+        self.assertIn("removed in API 36", out)
+
+    def test_class_and_parent_edge_removed_in_a_later_api_fail(self):
+        for label, old, new, fixture in (
+            ("class", '<class name="java/time/LocalDate" since="26">', '<class name="java/time/LocalDate" since="26" removed="30">', "Api26"),
+            ("edge", '<implements name="java/util/Collection"/>', '<implements name="java/util/Collection" removed="30"/>', "InheritedOld"),
+        ):
+            with self.subTest(label=label):
+                self.assertIn(old, API)
+                api = os.path.join(self.tmp.name, f"api-removed-{label}.xml")
+                with open(api, "w", encoding="utf-8") as f:
+                    f.write(API.replace(old, new))
+                rc, out = self.check(fixture, api=api)
+                self.assertEqual(rc, 1, out)
+                self.assertIn("removed in API 30", out)
+
+    def test_an_unreadable_removed_fails_closed(self):
+        api = os.path.join(self.tmp.name, "api-bad-removed.xml")
+        with open(api, "w", encoding="utf-8") as f:
+            f.write(API.replace('removed="36"', 'removed="later"'))
+        rc, out = self.check("Api26", api=api)
+        self.assertEqual(rc, 2, out)
+        self.assertIn("removed", out)
 
     def test_array_clone_is_not_an_unknown_class(self):
         self.assertEqual(self.check("ArrayClone")[0], 0)
