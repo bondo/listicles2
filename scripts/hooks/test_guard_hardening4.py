@@ -147,6 +147,33 @@ class Round4(Base):
         self.deny(["IFS=_; unset IFS; P='--force origin'; git push $P work"])  # unset gives the default IFS, which splits on blanks
         self.deny(["IFS=_; unset -f IFS; P=--force_origin_work; git push $P", "IFS=_; declare IFS; P=--force_origin_work; git push $P"])
 
+    def test_r4_08_witnesses_of_the_twenty_three_mutants(self):
+        # each line kills one or more of round 4's 23 mutants (now judged with the floor): main's verdict alone allows the IFS forms
+        quoted = ("\\$D", "'$D'", '"\\$D"', '"$(echo $D)"', '"`echo $D`"', "$'$D'")  # bash: [commit][-m][x][$D][--no-verify]
+        self.deny([f"IFS=_; D=_--_; P=_--no-verify; git commit -m x {q}$P" for q in quoted])
+        self.deny(
+            [
+                "Q=; P=\" --no-verify\"; git commit -m 'x'$P\"$Q\"",
+                "X=x; P='--force work'; git push origin \"$X\" $P",
+                'env -S"`echo git push` --force origin work"',
+                "watch echo `printf '%s' 'x; git push --force origin work'`",
+                "X='true; git push --force origin work'; watch $X",
+                "P=$'--force\\torigin'; git push $P work",
+                "P=$'--force\\norigin'; git push $P work",
+                "P=$'\\t\\tcore.hooksPath=/x'; git -c$P commit -m x",
+                "read -r IFS <<< _; false && IFS=' '; P=--force_origin_work; git push $P",
+                "typeset -n R=IFS; R=_; P=--force_origin_work; git push $P",
+                "f() { local -n R=IFS; R=_; P=--force_origin_work; git push $P; }; f",
+                "X=echo; read X <<< git; $X -C . push --force origin work",
+                "X=echo; read X <<< git; $X --no-pager push --force origin work",
+                f'declare -gn R=GIT_CONFIG_PARAMETERS; export R="{P}"; git commit -m x',
+                f'typeset -n R=GIT_CONFIG_PARAMETERS; export R="{P}"; git commit -m x',
+                "`echo git` push --force origin work",
+                "`printf git` commit --no-verify -m x",
+            ]
+        )
+        self.deny(["rm `echo \\`echo\\``CLAUDE.md"], both=False)
+
     def test_the_floor_keeps_main_s_denials_that_the_model_alone_would_allow(self):
         # main denies these; bash would not run them as the guard fears, but main's verdict is the floor (escalation of #252)
         self.deny([f"nice FOO=1 {PUSH}", "F=--force-with-lease; (F=--force); git push $F origin work"])
