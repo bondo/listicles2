@@ -492,6 +492,9 @@ class GeneralKindTests(unittest.TestCase):
     ALLOWED = ("app/src/main/kotlin/dev/listicles/app/Lists.kt", "app/src/main/res/values/strings.xml", "app/src/main/res/values-da/strings.xml",
                "app/src/test/kotlin/dev/listicles/app/ListsTest.kt", "app/src/androidTest/kotlin/dev/listicles/app/ListsUiTest.kt",
                "core/domain/src/main/kotlin/dev/listicles/domain/Lists.kt", "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt",
+               "app/src/main/kotlin/dk/bjarkebjarke/tally/Lists.kt", "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsTest.kt",  # after M1-29 renames the packages
+               "core/domain/src/main/kotlin/dk/bjarkebjarke/tally/domain/Lists.kt",
+               "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/domain/ListsTest.kt",
                "docs/PLAN.md", "docs/milestones/M1.md", "docs/adr/0002-x.md", "docs/metrics/m0-backfill.txt", "README.md")
 
     def test_the_allowlisted_classes_are_merged(self):  # owner decision #15 7058755858: only an allowlist merges as general
@@ -515,6 +518,11 @@ class GeneralKindTests(unittest.TestCase):
                  "core/domain/src/test/kotlin/dev/listicles/domain/ProjectConfig.kt", "app/src/test/kotlin/org/junit/Assert.kt",  # only dev/listicles
                  "core/domain/src/test/kotlin/dev/listicles/testing/BlockingSelectorProvider.kt",  # R7-02: same-name classes of core/testing
                  "app/src/test/kotlin/dev/listicles/testing/BlockingAsynchronousChannelProvider.kt",
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingSelectorProvider.kt",  # the same rules under the new root
+                 "app/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingInetAddressResolverProvider.kt",
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/PackageConfig.kt", "app/src/test/kotlin/dk/bjarkebjarke/other/X.kt",
+                 "app/src/main/kotlin/dk/bjarkebjarke/X.kt", "app/src/main/kotlin/dk/bjarkebjarke/tally/../X.kt",
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/architecture/NewRule.kt",
                  "app/src/main/res/lint.xml", "app/src/main/res/xml/lint.xml", "app/src/main/res/values/lint-baseline.xml",  # R7-03: lint config
                  "app/src/main/res/xml/backup_rules.xml", "app/src/main/res/xml/data_extraction_rules.xml",  # R7-06: backup, device transfer
                  "app/src/main/res/xml/network_security_config.xml", "docs/COLLABORATING.md",  # R7-07
@@ -721,7 +729,8 @@ class WiringTests(unittest.TestCase):
                     r"sources and tests under `app/src/` and `core/<module>/src/`, app resources and docs files that are not owner-only may merge as "
                     r"`general`; every other path, including config, dotfiles, build scripts, workflows, `firebase/` and `scripts/`, is owner-only by default")
 
-    R7_RISK = (r"also owner-only for `general`: kotlin outside `dev/listicles/`, `dev/listicles/testing/` outside `core/testing`, kotest `projectconfig` and "
+    R7_RISK = (r"also owner-only for `general`: kotlin outside `dev/listicles/` and `dk/bjarkebjarke/tally/`, a `testing/` package under either root "
+               r"outside `core/testing`, kotest `projectconfig` and "
                r"`packageconfig` classes, every `lint\.xml` and `lint-baseline\.xml`, `res/xml/` and `docs/collaborating\.md`\. `docs/tasks\.toml` merges as "
                r"`general` only when the diff changes nothing but the `status` and `pr` fields of agent tasks \(owner decision, #15 comment 7059534826\)\. "
                r"residual risk: a path list cannot stop every test-weakening change inside source directories, so the pr reviewer stays the main defence")
