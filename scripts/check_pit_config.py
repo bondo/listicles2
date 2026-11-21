@@ -2,6 +2,7 @@
 
 Floor 80 (owner decision, issue 15): raise it later, never lower it. CI runs PIT through the unit job's Gradle call, because the root
 `koverVerify` task depends on `:core:domain:pitest`; verify.sh runs the same task as its own step (skipped with --fast, like unit tests).
+This checker and its tests run in verify.sh and in the CI `tasks` job, and it requires that wiring to stay in ci.yml.
 """
 
 import os
@@ -44,6 +45,9 @@ def problems(domain, root, verify, ci):
         out.append("pitest targetClasses must be dk.bjarkebjarke.tally.domain.*")
     if re.search(r"avoidCallsTo|excludedClasses|excludedMethods|excludedTestClasses", d):
         out.append("pitest must not use avoidCallsTo or exclusions: they drop real mutants and empty the gate")
+    for prop in ("mutators", "mutationThreshold"):
+        if len(re.findall(rf"\b{prop}\s*(?:\.|=)", d)) > 1:
+            out.append(f"pitest {prop} must be assigned exactly once: Gradle keeps the last assignment and would override the pin")
     ml = re.search(r"mutators\.set\(\s*listOf\(([^)]*)\)\s*,?\s*\)", d)
     names = re.findall(r'"(\w+)"', ml.group(1)) if ml else []
     if not names:
