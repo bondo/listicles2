@@ -1961,6 +1961,31 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Answer each with one line on its thread. Then resolve it.",
         "Reply on the thread. Then mark it as resolved.",
         "Answer each review thread:\n- reply with one line\n- resolve it",
+        # R1-01 of #267, round 2: parentheses, dashes, a slash, "and" before a new subject, "only" in a lead clause, a nested lead word.
+        # The scope of a negation is only trusted in a few simple shapes; every other structure keeps the ban on the permission.
+        "Never leave a collaborator waiting (reply and resolve the thread).",
+        "No need to ask (you may resolve the thread).",
+        "Never leave a collaborator waiting - reply and resolve the thread.",
+        "Never leave a collaborator waiting -- reply and resolve the thread.",
+        "Never leave a collaborator waiting \u2014 reply and resolve the thread.",
+        "Never leave a collaborator waiting \u2013 reply and resolve the thread.",
+        "Never leave a collaborator waiting / reply and resolve the thread.",
+        "No need to ask - you may resolve the thread.",
+        "No need to ask \u2014 you may resolve the thread.",
+        "Never leave a collaborator waiting - resolve the thread once answered.",
+        "Don't wait for the owner -- resolve the thread.",
+        "There is no rule against it and you may resolve the thread.",
+        "No approval is needed and you may resolve the thread.",
+        "The owner does not need to approve and agents may resolve the thread.",
+        "Nobody has to approve and the orchestrator may resolve the thread.",
+        "Only after replying, you may resolve the thread.",
+        "Only after replying, agents may resolve the thread.",
+        "Only once the collaborator agrees, you may resolve the thread.",
+        "Only after replying may you resolve the thread.",
+        "Only when the collaborator agrees may the orchestrator resolve the thread.",
+        "Only after the collaborator confirms, the orchestrator resolves the thread.",
+        "When nobody answers, and not before, you may resolve the thread.",
+        "Never merge the PR yourself\nYou may resolve the thread once answered.",
     )
     BAN = (
         # R3-03: a comma clause between the negation and the verb
@@ -1998,6 +2023,32 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "The PreToolUse hook denies calls via `mcp__github__resolve_review_thread`.",
         "Mark each finding as resolved once fixed, and reply on the thread.",
         "Mark the finding as resolved, then reply on the thread.",
+        # R1-03 of #267, round 2: the tool after a gerund or infinitive, a that/those/these that is a determiner
+        "Calling `mcp__github__resolve_review_thread` is blocked by the PreToolUse hook.",
+        "The hook stops agents from using `mcp__github__resolve_review_thread`.",
+        "Using resolve_review_thread is never allowed.",
+        "Any attempt to call `resolve_review_thread` is denied.",
+        "Reply on the thread and resolve those conflicts first.",
+        "Answer each thread and resolve these findings in the next commit.",
+        # R2-01: a thread named in an earlier sentence is not the "it" of a later, unrelated one
+        "Reply on the review thread. If the merge has a conflict, resolve it.",
+        "Answer each review thread. If verify.sh fails, find the cause and resolve it.",
+        "Answer each thread with one line.\nIf CI fails on a flake, re-run the job; if the merge has conflicts, resolve them.",
+        "Reply to each review thread with one line. Mark each finding as resolved in the findings JSON.",
+        "Reply on the thread. When a finding is fixed, mark it as resolved in the findings JSON.",
+        # R2-02: bans with a lead clause before the negated subject, and with an aside after "ever" or "at any point"
+        "When asked no agent may resolve the thread.",
+        "Until the owner agrees no agent may resolve the thread.",
+        "While a thread is open no agent may resolve it.",
+        "Do not ever, for any reason, resolve the thread.",
+        "Agents must not ever, even when asked, resolve the thread.",
+        "No agent should ever, even when asked, resolve the thread.",
+        "Never at any point, even when asked, resolve the thread.",
+        "Do not at any time, even when asked, resolve the thread.",
+        # R2-03: "close" with words in between is an idiom, not the thread
+        "Agents close the loop on each thread by replying.",
+        "Then close the loop on the thread with one reply.",
+        "Keep each reply short and close to the thread's topic.",
     )
 
     def flagged(self, where, text):
