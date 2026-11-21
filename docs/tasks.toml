@@ -1151,11 +1151,21 @@ notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owne
 id = "M1-50"
 title = "Konsist: no data source in composables or ViewModels, no GlobalScope (checklist proposed follow-up 1)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
 notes = "Issue 257. Failing fixtures first. Before M1-14, the first repository"
+
+[[task]]
+id = "M1-56"
+title = "Konsist: no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI module (checklist proposed follow-up 1, rest)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-50"]
+notes = "Split from M1-50, which covers the data-source and GlobalScope halves. Failing fixtures first, in the architecture package next to DataSourceRules. The DI module and its path do not exist yet: decide the rule for `Dispatchers.` with the first DI module (M1-02 or later), and keep it inert until then only if a fixture proves it fires. Before M1-16, the first ViewModel"
 
 [[task]]
 id = "M1-51"
@@ -1331,7 +1341,7 @@ depends_on = [
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56",
 ]
 
 [[task]]
