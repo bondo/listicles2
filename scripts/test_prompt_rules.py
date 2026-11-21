@@ -1914,6 +1914,358 @@ class NoResolveThreadTests(unittest.TestCase):
         self.assertTrue({"docs/ORCHESTRATION.md", "docs/COLLABORATING.md"} <= {r.path for r in prompt_rules.DOC_RULES})
 
 
+class ResolveThreadSentenceTests(unittest.TestCase):
+    """#153 (R3-01 to R3-04 of #150): the resolve-thread permission check works per sentence. A negating word anywhere earlier in the
+    sentence (not only one word back) makes it a ban; a verb other than "reply" before "and resolve", a pronoun object, the tool name,
+    "mark as resolved" and "close the conversation" count as permission when nothing negates them."""
+
+    PERMISSION_IDS = {"no-resolve-thread", "orch-no-resolve-thread", "collab-no-resolve"}
+    WHERE = (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md")
+
+    # R3-01: any verb before "and resolve", and "it"/"them" as the object.
+    PERMISSION = (
+        "Answer each with one line on its thread and resolve it.",
+        "Post one line on each thread, then resolve them.",
+        "Answer the question and resolve the thread.",
+        "Once the thread is answered, resolve it.",
+        # R3-02: the tool name, "mark as resolved", "close the conversation".
+        "Use `mcp__github__resolve_review_thread` once you have replied.",
+        "Call resolve_review_thread when the question is answered.",
+        "Mark the thread as resolved after replying.",
+        "Agents may mark conversations as resolved.",
+        "Close the conversation once it is answered.",
+        "You can close the thread when the collaborator is satisfied.",
+        "The orchestrator closes the conversation after replying.",
+        # a negation that belongs to another clause or sentence does not turn a permission into a ban
+        "If the question is not answered, you may resolve the thread.",
+        "Agents must not wait; you may resolve the thread.",
+        "Do not wait, but you may resolve the thread.",
+        "Never merge. Resolve the thread after answering.",
+        "Do not guess. You may resolve it when the thread is answered.",
+        # R1-01 of #267: a negation in another clause (before a colon, a bare comma, "so" or a lead clause) does not reach the permission
+        "Never resolve a collaborator's review thread (follow-up #44): reply, then resolve the thread once the collaborator agrees.",
+        "Never leave a collaborator waiting: reply and resolve the thread.",
+        "Never leave a collaborator's review thread open: reply and resolve it.",
+        "No need to ask: you may resolve the thread.",
+        "Don't wait for the owner, resolve the thread.",
+        "Only after replying, resolve the thread.",
+        "Without waiting for the owner, you may resolve the thread.",
+        "You may, without asking, resolve the thread.",
+        "If there is no reply in a day you may resolve the thread.",
+        "There is no rule against it, so you may resolve the thread.",
+        'There is no rule against "never resolve threads", so you may resolve the thread.',
+        # R1-02 of #267: the thread is named in an earlier sentence or in the lead-in line of a list
+        "Answer each with one line on its thread; then resolve it.",
+        "Answer each with one line on its thread. Then resolve it.",
+        "Reply on the thread. Then mark it as resolved.",
+        "Answer each review thread:\n- reply with one line\n- resolve it",
+        # R1-01 of #267, round 2: parentheses, dashes, a slash, "and" before a new subject, "only" in a lead clause, a nested lead word.
+        # The scope of a negation is only trusted in a few simple shapes; every other structure keeps the ban on the permission.
+        "Never leave a collaborator waiting (reply and resolve the thread).",
+        "No need to ask (you may resolve the thread).",
+        "Never leave a collaborator waiting - reply and resolve the thread.",
+        "Never leave a collaborator waiting -- reply and resolve the thread.",
+        "Never leave a collaborator waiting \u2014 reply and resolve the thread.",
+        "Never leave a collaborator waiting \u2013 reply and resolve the thread.",
+        "Never leave a collaborator waiting / reply and resolve the thread.",
+        "No need to ask - you may resolve the thread.",
+        "No need to ask \u2014 you may resolve the thread.",
+        "Never leave a collaborator waiting - resolve the thread once answered.",
+        "Don't wait for the owner -- resolve the thread.",
+        "There is no rule against it and you may resolve the thread.",
+        "No approval is needed and you may resolve the thread.",
+        "The owner does not need to approve and agents may resolve the thread.",
+        "Nobody has to approve and the orchestrator may resolve the thread.",
+        "Only after replying, you may resolve the thread.",
+        "Only after replying, agents may resolve the thread.",
+        "Only once the collaborator agrees, you may resolve the thread.",
+        "Only after replying may you resolve the thread.",
+        "Only when the collaborator agrees may the orchestrator resolve the thread.",
+        "Only after the collaborator confirms, the orchestrator resolves the thread.",
+        "When nobody answers, and not before, you may resolve the thread.",
+        "Never merge the PR yourself\nYou may resolve the thread once answered.",
+        # R1-01 of #267, round 3, shape (a): a negation inside a lead clause without its comma ("no <agent>") is not a negated subject
+        "If the PR has no reviewer you may resolve the thread.",
+        "If there is no reviewer the orchestrator may resolve the thread.",
+        "When there are no reviewers the agents may resolve the thread.",
+        "If there is no reviewer the orchestrator resolves the thread.",
+        "If a PR has no reviewer the orchestrator is allowed to resolve the thread.",
+        "If the PR has no reviewer agents are allowed to resolve the thread.",
+        "If there's no reviewer feel free to resolve the thread.",
+        "If there's nobody you may resolve the thread.",
+        "Unless there is no orchestrator you may resolve the thread.",
+        "No reviewer the orchestrator may resolve the thread.",
+        # shape (b): a negator that governs another verb ("hesitate to", "forget to"), and "then <act>" after a negated step
+        "Don't hesitate to reply and resolve the thread.",
+        "Do not hesitate to reply and resolve the thread.",
+        "Do not forget to reply and resolve the thread.",
+        "Never forget to reply and resolve the thread.",
+        "Never fail to reply and resolve the thread.",
+        "It never hurts to reply and resolve the thread.",
+        "It is not hard to reply and resolve the thread.",
+        "Agents needn't wait to reply and resolve the thread.",
+        "Agents should never wait to reply and resolve the thread.",
+        "Do not wait to reply and resolve the thread.",
+        "Don't wait long then resolve the thread.",
+        "Never wait a day then resolve the thread.",
+        "Don't forget to reply then resolve the thread.",
+        "Not only reply and resolve the thread.",
+        # shape (c): "In no ..." and a bare "No," are not a negation of the verb
+        "In no particular order, resolve the threads.",
+        "In no particular order, resolve the review threads once answered.",
+        "In no time, resolve the thread.",
+        "Need the owner? No, resolve the thread yourself.",
+        "Should you wait for the owner? No, even if unsure, resolve the thread yourself.",
+        "In no time can you resolve the thread.",
+        # shape (d): "e.g." and "i.e." lead into an imperative
+        "Handle small things yourself, e.g. resolve the thread after replying.",
+        "Close the loop, i.e. resolve the thread once answered.",
+        "Small steps need no approval (e.g. resolve the thread).",
+        # R3-01 of #267: a numbered list item gets the thread from its lead-in, like a bulleted one
+        "Answer each review thread:\n1. reply with one line\n2. resolve it",
+        "Answer each review thread:\n1. reply with one line\n2. mark it as resolved",
+        # R1-05 of #267: emphasis, links and table cells do not hide the permission
+        "Agents may **resolve the thread** once answered.",
+        "**Resolve the thread** after answering.",
+        "- **Resolve the thread** after answering.",
+        "Agents may [resolve the thread](https://example.com) once answered.",
+        "| Orchestrator | Resolve threads after replying |",
+        # R4-01 of #267: an all-bold bullet is not a button name; it keeps its permission
+        "- **Agents may resolve the thread once answered.**",
+        "* **You may resolve the thread after replying**",
+        "- **Reply and resolve the thread.**",
+        "- **Agents are allowed to resolve the thread.**",
+        "- **The orchestrator resolves the conversation after replying.**",
+        "- **Once answered, resolve the thread.**",
+        "  - **Agents may resolve the thread once answered.**",
+        # R1-01 of #267, round 4 and the escalation ruling: a focus adverb, a question, an answer before a comma, a negation inside a
+        # relative clause of the subject and "Not all" are not a ban on the act
+        "Not just reply and resolve the thread, but also thank the collaborator.",
+        "Not merely reply and resolve the thread, but also thank the collaborator.",
+        "Not simply reply and resolve the thread, but also thank the collaborator.",
+        "Don't just reply and resolve the thread; also add a test.",
+        "Why don't you reply and resolve the thread?",
+        "Why not just reply and resolve the thread?",
+        "Can't you just reply and resolve the thread?",
+        "Couldn't you just reply and resolve the thread yourself?",
+        "Won't you reply and resolve the thread?",
+        "Shouldn't you reply and resolve the thread?",
+        "Why shouldn't agents reply and resolve the thread?",
+        "Need the owner? Of course not, resolve the thread yourself.",
+        "Need approval? Certainly not, resolve the thread yourself.",
+        "Need approval? Definitely not, resolve the thread yourself.",
+        "Ask the owner first? Absolutely not, resolve the thread yourself.",
+        "Need the owner? Surely not, resolve the thread yourself.",
+        "Need the owner? I think not, resolve the thread yourself.",
+        "Need the owner? Usually not, resolve the thread yourself.",
+        "Need the owner? Probably not, resolve the thread yourself.",
+        "Do agents need approval? They don't, resolve the thread after replying.",
+        "Reviewers that do not find issues reply and resolve the thread.",
+        "Agents who don't hear back reply and resolve the thread.",
+        "Not all agents reply and resolve the thread.",
+        # a bold label is a button name only when its line names no agent (self-review of the escalation fix): the same shape with an
+        # agent in the next cell or the parenthetical is a permission (stricter than main, which passes these rows)
+        "| **Resolve threads** | Orchestrator |",
+        "| **Resolve thread** | orchestrator may do it |",
+        "- **Resolve threads** (orchestrator, after replying)",
+        "* **Resolve conversation** (agents may resolve it after replying)",
+        "- **Resolve threads** after replying",
+        "| Orchestrator | **Resolve threads** |",
+        # R1-01 of #267, round 5: an adverb after the negator takes the negation off the act; R5-02: merely and simply after a real negator
+        "Do not immediately reply and resolve the thread; give the collaborator a day to answer.",
+        "Never automatically reply and resolve the thread.",
+        "Agents should not unilaterally reply and resolve the thread.",
+        "Don't always reply and resolve the thread yourself.",
+        "The orchestrator does not immediately reply and resolve the thread; it waits a day.",
+        "Agents do not usually reply and resolve the thread themselves.",
+        "Please don't blindly reply and resolve the thread.",
+        "Do not prematurely reply and resolve the thread.",
+        "Don't merely reply and resolve the thread; also add a test.",
+        "Never simply reply and resolve the thread; also thank them.",
+    )
+    BAN = (
+        # R3-03: a comma clause between the negation and the verb
+        "Agents must never, not even with the API, resolve a thread.",
+        "Never, not even via the tool, resolve the thread yourself.",
+        "Agents must never, even when asked, resolve a conversation.",
+        # R3-04: the negation is more than one word before the subject
+        "No orchestrator or implementer may resolve the thread.",
+        "Not even the orchestrator may resolve a collaborator's thread.",
+        "Not even the orchestrator or the reviewer resolves a thread.",
+        "Neither the orchestrator nor the reviewer nor the planner may resolve the conversation.",
+        # the new wordings, negated
+        "Never call `mcp__github__resolve_review_thread`.",
+        "Never resolve a thread, not even with `mcp__github__resolve_review_thread`: reply and leave it.",
+        "Do not mark the thread as resolved.",
+        "Do not answer and resolve it on the thread.",
+        "Only the owner closes the conversation.",
+        "Agents never close a collaborator's conversation.",
+        "Leave the thread for the collaborator; do not resolve it.",
+        # not about an agent resolving a thread at all
+        "The owner marks the thread as resolved when done.",
+        "The collaborator, who resolves the thread, is told.",
+        "Close the issue when the PR has merged.",
+        "Mark the finding as resolved in the findings file.",
+        "The tool is named resolve_review_thread in the GitHub server.",
+        # R1-04 of #267
+        "None of the agents may resolve a thread.",
+        "None of you may resolve the thread.",
+        # the shapes of R3-03 and R3-04 with other negating phrases
+        "Agents must not, under any circumstances, resolve a thread.",
+        "Under no circumstances, resolve the thread yourself.",
+        "At no point may the orchestrator resolve a collaborator's thread.",
+        # R1-03 of #267: a sentence about the tool with no actor, and an "it" or "resolved" that is not the thread
+        "A thread resolved with `resolve_review_thread` cannot be reopened by an agent.",
+        "The PreToolUse hook denies calls via `mcp__github__resolve_review_thread`.",
+        "Mark each finding as resolved once fixed, and reply on the thread.",
+        "Mark the finding as resolved, then reply on the thread.",
+        # R1-03 of #267, round 2: the tool after a gerund or infinitive, a that/those/these that is a determiner
+        "Calling `mcp__github__resolve_review_thread` is blocked by the PreToolUse hook.",
+        "The hook stops agents from using `mcp__github__resolve_review_thread`.",
+        "Using resolve_review_thread is never allowed.",
+        "Any attempt to call `resolve_review_thread` is denied.",
+        "Reply on the thread and resolve those conflicts first.",
+        "Answer each thread and resolve these findings in the next commit.",
+        # R2-01: a thread named in an earlier sentence is not the "it" of a later, unrelated one
+        "Reply on the review thread. If the merge has a conflict, resolve it.",
+        "Answer each review thread. If verify.sh fails, find the cause and resolve it.",
+        "Answer each thread with one line.\nIf CI fails on a flake, re-run the job; if the merge has conflicts, resolve them.",
+        "Reply to each review thread with one line. Mark each finding as resolved in the findings JSON.",
+        "Reply on the thread. When a finding is fixed, mark it as resolved in the findings JSON.",
+        # R2-02: bans with a lead clause before the negated subject, and with an aside after "ever" or "at any point"
+        "When asked no agent may resolve the thread.",
+        "Until the owner agrees no agent may resolve the thread.",
+        "While a thread is open no agent may resolve it.",
+        "Do not ever, for any reason, resolve the thread.",
+        "Agents must not ever, even when asked, resolve the thread.",
+        "No agent should ever, even when asked, resolve the thread.",
+        "Never at any point, even when asked, resolve the thread.",
+        "Do not at any time, even when asked, resolve the thread.",
+        # R2-03: "close" with words in between is an idiom, not the thread
+        "Agents close the loop on each thread by replying.",
+        "Then close the loop on the thread with one reply.",
+        "Keep each reply short and close to the thread's topic.",
+        # round 3: a test of the hook is not the tool; a "then" that leads another step does not lend its thread to a later "it"; close idioms
+        "Run the resolve_review_thread hook test after editing the hook.",
+        "- Run the `mcp__github__resolve_review_thread` deny case in the hook tests.",
+        "Answer each review thread. Then run the tests and, if one fails, resolve it.",
+        "Close the loop on threads by replying.",
+        "Close the PR whose threads are all answered.",
+        "- Close issues from the conversation once they are fixed.",
+        # emphasis and links around a ban, and the do-not-press bullet of COLLABORATING
+        "Agents must **never** resolve the thread.",
+        "Do not [resolve the thread](https://example.com).",
+        "- **Resolve conversation**",
+        "mcp__github__resolve_review_thread is the tool name.",
+        # R4-02 of #267: a button label in the docs' own list and table formats; R1-01: a negator after an agent subject or "please"
+        "* **Resolve conversation** (on a review thread)",
+        "| **Resolve conversation** | the owner |",
+        "An agent must not reply and resolve the thread.",
+        "Please do not reply and resolve the thread.",
+        "Agents shouldn't answer and resolve it on the thread.",
+        # R5-01 of #267: "you" in a button note is COLLABORATING's reader, not an agent; adverb-free bans with "ever" or an object stay bans
+        "* **Resolve conversation** (even after you get an answer)",
+        "* **Resolve conversation** (on a review thread you started)",
+        "* **Resolve conversation** (the owner resolves threads, not you)",
+        "| **Resolve conversation** | not you: only the owner |",
+        "Do not ever reply and resolve the thread.",
+        "Agents must never approve the PR and resolve the thread.",
+    )
+
+    def flagged(self, where, text):
+        if where in ROLES:
+            return ids(prompt_rules.check_text(where, text))
+        return ids(prompt_rules.check_doc_text(where, text))
+
+    def base(self, where):
+        return real(where) if where in ROLES else (ROOT / where).read_text(encoding="utf-8")
+
+    def test_the_real_prompts_and_docs_still_pass(self):
+        for where in self.WHERE:
+            with self.subTest(where=where):
+                self.assertFalse(self.PERMISSION_IDS & self.flagged(where, self.base(where)))
+
+    def test_permission_wording_is_rejected_everywhere(self):
+        for stale in self.PERMISSION:
+            for where in self.WHERE:
+                with self.subTest(where=where, stale=stale):
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n\n" + stale + "\n"))
+
+    def test_negated_and_unrelated_wording_is_not_rejected_anywhere(self):
+        for good in self.BAN:
+            for where in self.WHERE:
+                with self.subTest(where=where, good=good):
+                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n\n" + good + "\n"))
+
+    # Round 3 of #267: the four ways a negation word can sit in a sentence without governing the permission, generated over cores and
+    # separators so that a fifth spelling of the same shape is caught here and not by the next review round. Each combination is a permission.
+    LEAD_CLAUSES = ("If the PR has no reviewer", "If there is no reviewer", "When there are no reviewers", "Unless there is no orchestrator",
+                    "If there's nobody", "No reviewer")
+    SUBJECT_CORES = ("you may resolve the thread", "the orchestrator may resolve the thread", "agents may resolve the thread",
+                     "the orchestrator resolves the thread", "agents are allowed to resolve the thread", "feel free to resolve the thread")
+    OTHER_VERB_NEGATORS = ("Don't hesitate to", "Do not forget to", "Never fail to", "It is not hard to", "Agents should never wait to",
+                           "Do not wait to", "Agents needn't wait to")
+    THEN_STEPS = ("Don't wait long", "Never wait a day", "Don't forget to reply", "Do not hesitate")
+    COMMA_PHRASES = ("In no particular order,", "In no time,", "No,", "Need the owner? No,", "In no way whatsoever,", "Of course not,",
+                     "Certainly not,")
+    # escalation ruling of #267: a negation that does not start the clause as an imperative or after the agent subject is no ban
+    CONJ_NON_NEGATORS = ("Not just", "Don't just", "Not all agents", "Reviewers that do not find issues", "Agents who don't hear back")
+    QUESTIONS = ("Why don't you", "Can't you")
+    # round 5 of #267: a negator, then an adverb that takes the negation, before "reply and resolve"
+    ADVERB_NEGATORS = ("Do not", "Don't", "Never", "Please don't", "Agents should not", "The orchestrator does not")
+    ADVERBS = ("immediately", "automatically", "always", "blindly", "unilaterally", "usually", "prematurely", "just", "merely", "simply")
+    ABBREVIATIONS = ("e.g.", "i.e.", "(e.g.")
+    SEPARATORS = ("", "- ", "* ", "Note: ", "1. ", "| ")
+
+    def generated_permissions(self):
+        for sep in self.SEPARATORS:
+            for lead in self.LEAD_CLAUSES:
+                for core in self.SUBJECT_CORES:
+                    yield f"{sep}{lead} {core}."
+            for neg in self.OTHER_VERB_NEGATORS + self.CONJ_NON_NEGATORS:
+                yield f"{sep}{neg} reply and resolve the thread."
+                yield f"{sep}{neg} reply and resolve it on the thread."
+            for neg in self.ADVERB_NEGATORS:
+                for adverb in self.ADVERBS:
+                    yield f"{sep}{neg} {adverb} reply and resolve the thread."
+            for question in self.QUESTIONS:
+                yield f"{sep}{question} reply and resolve the thread?"
+                yield f"{sep}{question} reply and resolve it on the thread?"
+            for step in self.THEN_STEPS:
+                yield f"{sep}{step} then resolve the thread."
+            for phrase in self.COMMA_PHRASES:
+                yield f"{sep}{phrase} resolve the thread yourself."
+                yield f"{sep}{phrase} resolve the threads."
+            for abbreviation in self.ABBREVIATIONS:
+                yield f"{sep}Handle small things yourself, {abbreviation} resolve the thread after replying."
+
+    def test_generated_permission_wordings_are_rejected(self):
+        missed = [t for t in self.generated_permissions() if not prompt_rules.resolve_permissions(t + "\n")]
+        self.assertGreater(len(list(self.generated_permissions())), 300)
+        self.assertEqual(missed, [])
+
+    def test_generated_bans_are_not_rejected(self):
+        bans = ("No agent may resolve the thread.", "No orchestrator or implementer may resolve the thread.",
+                "Not even the orchestrator may resolve the thread.", "Neither the orchestrator nor the reviewer may resolve the thread.",
+                "None of the agents may resolve the thread.", "Under no circumstances may you resolve the thread.",
+                "Do not reply and resolve the thread.", "Never approve and resolve the thread.",
+                "Agents must never, not even with the API, resolve the thread.",
+                "Nobody may ever, for any reason, resolve the thread.", "Do not ever, for any reason, resolve the thread.",
+                "An agent must not reply and resolve the thread.", "Please do not reply and resolve the thread.",
+                "Agents shouldn't answer and resolve it on the thread.", "An agent must never, even when asked, resolve the thread.")
+        leads = ("", "- ", "* ", "Note: ", "1. ", "If a collaborator asks, ", "| ")
+        flagged = [lead + ban for lead in leads for ban in bans if prompt_rules.resolve_permissions(lead + ban + "\n")]
+        self.assertEqual(flagged, [])
+
+    def test_a_hard_wrapped_sentence_is_one_sentence(self):
+        wrapped = "Agents must never,\nnot even with the API,\nresolve a thread.\n"
+        loose = "Agents may\nresolve a thread.\n"
+        for where in self.WHERE:
+            with self.subTest(where=where):
+                self.assertFalse(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n" + wrapped))
+                self.assertTrue(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n" + loose))
+
+
 class Issue134ReviewerEffortTests(unittest.TestCase):
     """#134 (owner decision, comment 6989468926): a reviewer of an area:security-rules or area:sync-merge PR runs at max effort even
     without risk:high, as docs/reviews/README.md R7 says. The reviewer prompt must say so, in step with agents/roles.yaml."""
