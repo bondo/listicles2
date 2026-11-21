@@ -807,6 +807,24 @@ class DiffChecks(GuardsCase):
         self.assertFails("screenshot references changed", GUARD_BASE="origin/main")
         self.assertPasses(GOLDEN_UPDATE="1")
 
+    def test_many_changed_goldens_do_not_skip_the_label_check(self):
+        """#251: under pipefail `grep -E | grep -q .` died of SIGPIPE when more than one pipe buffer (64 KiB) of golden paths changed."""
+        for n in (1, 2000):  # more than a pipe buffer, so the old `grep | grep -q` pipe fails under load too (R7-04)
+            with self.subTest(goldens=n):
+                for i in range(n):
+                    self.repo.write(f"app/src/test/screenshots/{i:04d}_{'x' * 50}.png", "png")
+                self.repo.commit()
+                self.assertFails("screenshot references changed", GUARD_BASE="origin/main")
+                self.repo.git("rm", "-q", "-r", "-f", "app/src/test/screenshots")
+                self.repo.commit()
+
+    def test_a_non_ascii_golden_path_needs_the_label_too(self):
+        """R3-02: git quotes such a path in `diff --name-only`, and the closing quote hid the `.png` suffix."""
+        self.repo.write("app/src/test/screenshots/s\u00f8g_light.png", "png")
+        self.repo.commit()
+        self.assertFails("screenshot references changed", GUARD_BASE="origin/main")
+        self.assertPasses(GOLDEN_UPDATE="1")
+
     def test_diff_size_limit_is_enforced_only_in_ci(self):
         self.repo.write("notes.txt", "x\n" * 50)
         self.repo.commit()
@@ -1794,6 +1812,561 @@ class LineLengthDiffs(DiffCase):
         self.base("scripts/tool.py", "line_length = 100\n")
         self.change("scripts/tool.py", "line_length = 160\n")
         self.assertPasses()
+
+
+class LineLengthPerTool(DiffCase):
+    """#176: the largest line length is compared per tool across all its style files, per setting and per section, with tool defaults."""
+
+    PP = "[tool.ruff]\nline-length = %d\n"
+    PYCODESTYLE = "[tool.ruff.lint.pycodestyle]\nmax-line-length = %d\n"
+
+    def put(self, rel, text):
+        """Write a file; `None` removes it, a ("link", target) tuple makes a symlink."""
+        path = os.path.join(self.repo.dir, rel)
+        if (text is None or isinstance(text, tuple)) and os.path.lexists(path):
+            self.repo.git("rm", "-q", "-f", rel)
+        if isinstance(text, tuple):
+            os.makedirs(os.path.dirname(path) or self.repo.dir, exist_ok=True)
+            os.symlink(text[1], path)
+        elif text is not None:
+            self.repo.write(rel, text, raw=True)
+
+    def base_files(self, files):
+        for rel, text in files.items():
+            self.put(rel, text)
+        self.repo.commit()
+        self.repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+
+    def assertRaised(self, files, expect):
+        """Each case: base files, then the head changes; `expect` is True (fails) or False (passes)."""
+        for name, (base, head) in files.items():
+            with self.subTest(case=name):
+                self.base_files(base)
+                try:
+                    for rel, text in head.items():
+                        self.put(rel, text)
+                    self.repo.commit()
+                    if expect:
+                        rc, out = self.repo.guards()
+                        lines = [ln for ln in out.splitlines() if ln.startswith("guard: raised line length:")]
+                        self.assertNotEqual(rc, 0, out)
+                        self.assertTrue(lines, out)
+                        self.assertEqual(len(lines), len(set(lines)), "a line is printed twice:\n" + out)  # R6-02
+                    else:
+                        self.assertPasses()
+                finally:
+                    self.repo.git("rm", "-q", "-f", "--ignore-unmatch", "--", *{**base, **head})
+                    if self.repo.git("status", "--porcelain"):
+                        self.repo.commit()
+
+    def test_the_same_family_split_over_two_kept_files_fails(self):
+        self.assertRaised({
+            "ruff.toml and pyproject.toml": ({"ruff.toml": "line-length = 100\n"}, {"pyproject.toml": self.PYCODESTYLE % 200}),
+            "pyproject.toml and ruff.toml": ({"pyproject.toml": self.PP % 100}, {"ruff.toml": "line-length = 200\n"}),
+            ".flake8 and tox.ini": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {"tox.ini": "[flake8]\nmax_line_length = 200\n"}),
+            "prettier files": (
+                {"firebase/.prettierrc.json": '{ "printWidth": 100 }\n'},
+                {"firebase/prettier.config.js": "export default { printWidth: 200 };\n"},
+            ),
+        }, True)
+
+    def test_another_file_of_the_same_tool_that_does_not_raise_passes(self):
+        self.assertRaised({
+            "lower value in a second file": ({"ruff.toml": "line-length = 100\n"}, {"pyproject.toml": self.PYCODESTYLE % 90}),
+            "equal value in a second file": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {"tox.ini": "[flake8]\nmax_line_length = 100\n"}),
+            "a larger value of another tool": ({"ruff.toml": "line-length = 100\n"}, {"tox.ini": "[flake8]\nmax_line_length = 200\n"}),
+            "a new tool": ({"firebase/.prettierrc.json": '{ "printWidth": 100 }\n'}, {"ruff.toml": "line-length = 200\n"}),
+        }, False)
+
+    def test_a_raise_masked_by_a_larger_lowering_in_the_same_file_fails(self):
+        both = self.PP % 100 + self.PYCODESTYLE % 200
+        self.assertRaised({
+            "ruff settings": ({"pyproject.toml": both}, {"pyproject.toml": self.PP % 150 + self.PYCODESTYLE % 100}),
+        }, True)
+        self.assertRaised({
+            "both lowered": ({"pyproject.toml": both}, {"pyproject.toml": self.PP % 90 + self.PYCODESTYLE % 100}),
+            "one lowered, one kept": ({"pyproject.toml": both}, {"pyproject.toml": self.PP % 100 + self.PYCODESTYLE % 100}),
+            "one removed, one lowered": ({"pyproject.toml": both}, {"pyproject.toml": self.PP % 90}),
+        }, False)
+
+    def test_a_raise_under_a_no_limit_section_fails(self):
+        """R3-02 of #159: `[*.md] max_line_length = off` must not hide a raise of `[*.kt]`."""
+        ec = "[*.md]\nmax_line_length = off\n[*.kt]\nmax_line_length = 100\n"
+        self.assertRaised({
+            "raise under off": ({".editorconfig": ec}, {".editorconfig": ec.replace("= 100", "= 300")}),
+            "kt turned off": ({".editorconfig": ec}, {".editorconfig": ec.replace("= 100", "= off")}),
+        }, True)
+        self.assertRaised({
+            "kt lowered": ({".editorconfig": ec}, {".editorconfig": ec.replace("= 100", "= 80")}),
+            "md limited": ({".editorconfig": ec}, {".editorconfig": ec.replace("= off", "= 120")}),
+        }, False)
+
+    def test_the_ktlint_rule_switch_is_not_a_line_length(self):
+        """`ktlint_standard_max-line-length = enabled` is a rule switch: it used to read as no limit and hide every raise."""
+        ec = "[*.kt]\nktlint_standard_max-line-length = enabled\nmax_line_length = 100\n"
+        self.assertRaised({"raise beside the switch": ({".editorconfig": ec}, {".editorconfig": ec.replace("= 100", "= 120")})}, True)
+        self.assertRaised({"switch only changed": ({".editorconfig": ec}, {".editorconfig": ec + "# note\n"})}, False)
+
+    def test_removing_a_setting_that_was_below_the_tool_default_fails(self):
+        self.assertRaised({
+            "ruff 60 removed": ({"ruff.toml": "line-length = 60\n"}, {"ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
+            "ruff in pyproject 60 removed": ({"pyproject.toml": self.PP % 60}, {"pyproject.toml": "[tool.ruff]\ntarget-version = \"py311\"\n"}),
+            "ruff file deleted, another ruff config stays": ({"ruff.toml": "line-length = 60\n", "pyproject.toml": "[tool.ruff]\n"}, {"ruff.toml": None}),
+            "flake8 60 removed": ({".flake8": "[flake8]\nmax-line-length = 60\n"}, {".flake8": "[flake8]\nselect = E\n"}),
+            "flake8 78 removed": ({"tox.ini": "[flake8]\nmax-line-length = 78\n"}, {"tox.ini": "[flake8]\nselect = E\n"}),
+        }, True)
+
+    def test_removing_a_setting_at_or_above_the_tool_default_passes(self):
+        self.assertRaised({
+            "ruff 88 removed": ({"ruff.toml": "line-length = 88\n"}, {"ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
+            "ruff 100 removed": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
+            "flake8 79 removed": ({".flake8": "[flake8]\nmax-line-length = 79\n"}, {".flake8": "[flake8]\nselect = E\n"}),
+        }, False)
+
+    def test_known_gaps_dropping_every_ruff_config_and_a_prettier_removal_pass(self):
+        """Both loosen the limit and pass on purpose (docs/guards-known-gaps.md); a later fix flips these cases."""
+        self.assertRaised({
+            "ruff dropped altogether": ({"ruff.toml": "line-length = 60\n"}, {"ruff.toml": None}),
+            "prettier removed": ({"firebase/.prettierrc.json": '{ "printWidth": 60 }\n'}, {"firebase/.prettierrc.json": "{}\n"}),
+        }, False)
+
+    def test_a_base_without_the_setting_is_compared_with_the_tool_default(self):
+        self.assertRaised({
+            "ruff 100 over the default": ({"ruff.toml": '[lint]\nselect = ["E"]\n'}, {"ruff.toml": 'line-length = 100\n[lint]\nselect = ["E"]\n'}),
+            "ruff pycodestyle 120": ({"pyproject.toml": "[tool.ruff]\n"}, {"pyproject.toml": "[tool.ruff]\n" + self.PYCODESTYLE % 120}),
+            "flake8 100 over the default": ({".flake8": "[flake8]\nselect = E\n"}, {".flake8": "[flake8]\nselect = E\nmax-line-length = 100\n"}),
+            "flake8 in tox.ini": ({"tox.ini": "[flake8]\nselect = E\n"}, {"tox.ini": "[flake8]\nselect = E\nmax_line_length = 99\n"}),
+        }, True)
+        self.assertRaised({
+            "ruff 88": ({"ruff.toml": '[lint]\nselect = ["E"]\n'}, {"ruff.toml": 'line-length = 88\n[lint]\nselect = ["E"]\n'}),
+            "ruff 80": ({"ruff.toml": '[lint]\nselect = ["E"]\n'}, {"ruff.toml": 'line-length = 80\n[lint]\nselect = ["E"]\n'}),
+            "flake8 79": ({".flake8": "[flake8]\nselect = E\n"}, {".flake8": "[flake8]\nselect = E\nmax-line-length = 79\n"}),
+            "flake8 not configured at the base": ({"ruff.toml": "line-length = 88\n"}, {"tox.ini": "[flake8]\nmax_line_length = 120\n"}),
+            "pyproject without a ruff table": (
+                {"pyproject.toml": "[tool.black]\nfoo = 1\n"},
+                {"pyproject.toml": "[tool.black]\nfoo = 1\n[tool.ruff]\nline-length = 120\n"},
+            ),
+            "prettier without the setting is not compared": ({"firebase/.prettierrc.json": "{}\n"}, {"firebase/.prettierrc.json": '{ "printWidth": 200 }\n'}),
+        }, False)
+
+    def test_a_setting_group_alone_catches_a_raise(self):
+        """R1-09: only the per-setting group (K) sees this: ruff's `line-length` moves from pyproject.toml (100) to a new ruff.toml (200)."""
+        py = self.PP % 100 + self.PYCODESTYLE % 300
+        self.assertRaised({
+            "line-length moved to ruff.toml": (
+                {"pyproject.toml": py},
+                {"pyproject.toml": "[tool.ruff]\n" + self.PYCODESTYLE % 300, "ruff.toml": "line-length = 200\n"},
+            ),
+        }, True)
+
+    def test_the_own_setting_group_alone_catches_a_raise(self):
+        """R5-01 (o): E501 stays at 300 and only ruff's `line-length` rises, and a wider black value hides it from every other group."""
+        base = "[tool.black]\nline-length = 400\n"
+        pc = "[tool.ruff.lint.pycodestyle]\nmax-line-length = 300\n"
+        cases = {"line-length moved, black wider": ({"pyproject.toml": base + self.PP % 100 + pc}, {"pyproject.toml": base + pc})}
+        for width, expect in ((200, True), (100, False)):
+            for name, (b, h) in cases.items():
+                self.assertRaised({name: (b, {**h, "ruff.toml": f"line-length = {width}\n[lint.pycodestyle]\nmax-line-length = 300\n"})}, expect)
+
+    def test_the_own_section_group_alone_catches_a_raise(self):
+        """R6-01: a wider black value and a lowered nearer config hide this from every other group: E501 stays at 300, only ruff's
+        `line-length` in the `[tool]` table (or at the root) rises 100 to 200, and the nearer config is lowered 300 to 100."""
+        pc = "[tool.ruff.lint.pycodestyle]\nmax-line-length = 300\n"
+        tool = "[tool]\nblack.line-length = 400\nruff.line-length = %d\n" + pc
+        root = "tool.black.line-length = 400\ntool.ruff.line-length = %d\n" + pc
+        for width, expect in ((200, True), (100, False)):
+            self.assertRaised({
+                "[tool] keys": (
+                    {"pyproject.toml": tool % 100, "scripts/ruff.toml": "line-length = 300\n"},
+                    {"pyproject.toml": tool % width, "scripts/ruff.toml": "line-length = 100\n"},
+                ),
+                "root keys": (
+                    {"pyproject.toml": root % 100, "scripts/pyproject.toml": self.PP % 300},
+                    {"pyproject.toml": root % width, "scripts/pyproject.toml": self.PP % 100},
+                ),
+            }, expect)
+
+    def test_the_own_file_tool_and_fallback_groups_each_catch_a_raise(self):
+        """R7-02: E501 for the root files is 100 at the base and 200 at the head in each case, and only one own group sees it."""
+        bl = "[tool.black]\nline-length = 400\n" + self.PP % 100
+        pc = "[tool.ruff.lint.pycodestyle]\nmax-line-length = %d\n"
+        near = {"scripts/ruff.toml": "line-length = 300\n"}
+        for width, expect in ((200, True), (100, False)):
+            self.assertRaised({
+                "own file group": (
+                    {"pyproject.toml": bl, **near},
+                    {"pyproject.toml": "[tool.black]\nline-length = 400\n" + pc % width, **near},
+                ),
+                "own tool group": (
+                    {"pyproject.toml": bl},
+                    {"pyproject.toml": "[tool.black]\nline-length = 400\n", "ruff.toml": f"[lint.pycodestyle]\nmax-line-length = {width}\n"},
+                ),
+            }, expect)
+        # the deleted-file fallback of the own groups: the 100 variant fails too, because a deleted file is compared with the widest value
+        self.assertRaised({
+            "own deleted-file fallback": ({"pyproject.toml": bl, **near}, {"pyproject.toml": None, "ruff.toml": "line-length = 200\n", **near}),
+        }, True)
+
+    def test_a_dot_ruff_toml_and_extend_select_do_not_hide_the_default(self):
+        """R7-03: `.ruff.toml` is a ruff config that is in use, and only the key `extend` (not `extend-select`) inherits a limit."""
+        ext = '[lint]\nextend-select = ["E501"]\n'
+        self.assertRaised({
+            ".ruff.toml, 60 removed": ({".ruff.toml": "line-length = 60\n"}, {".ruff.toml": '[lint]\nselect = ["E"]\n'}),
+            ".ruff.toml, 100 added": ({".ruff.toml": '[lint]\nselect = ["E"]\n'}, {".ruff.toml": 'line-length = 100\n[lint]\nselect = ["E"]\n'}),
+            "extend-select, 60 removed": ({"ruff.toml": "line-length = 60\n" + ext}, {"ruff.toml": ext}),
+            "extend-select, 100 added": ({"ruff.toml": ext}, {"ruff.toml": "line-length = 100\n" + ext}),
+        }, True)
+
+    def test_other_flake8_named_sections_are_not_flake8s_own_and_a_raise_prints_one_line_per_group(self):
+        """Mutation survivors of round 7 without a finding: `[flake8-x]` is not `[flake8]`; a section group needs no line of its own when the
+        setting group already fails; a value on the line after its key keeps the owner of the key (unparsed input)."""
+        self.assertRaised({
+            "[flake8-x] keeps 60, [flake8] loses it": (
+                {"setup.cfg": "[flake8]\nmax-line-length = 60\n[flake8-x]\nmax-line-length = 60\n"},
+                {"setup.cfg": "[flake8]\nselect = E\n[flake8-x]\nmax-line-length = 60\n"},
+            ),
+            "[tool] ruff value on the next line": (
+                {"pyproject.toml": '[tool]\nruff.line-length =\n    60\nruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": '[tool]\nruff.lint.select = ["E501"]\n'},
+            ),
+        }, True)
+        isort = "[isort]\nline_length = %d\n"
+        self.assertRaised({
+            "an emptied .flake8 is flake8's default": ({".flake8": "[flake8]\nmax-line-length = 60\n"}, {".flake8": "# nothing\n"}),
+            "tool group alone: isort 100, a new flake8 file 200": (
+                {"setup.cfg": isort % 100},
+                {"setup.cfg": isort % 100, "tox.ini": "[flake8]\nmax-line-length = 200\n"},
+            ),
+            "setting group alone: isort moves to a new section": (
+                {"setup.cfg": isort % 100 + "[flake8]\nmax-line-length = 300\n"},
+                {"setup.cfg": "[tool:isort]\nline_length = 200\n[flake8]\nmax-line-length = 300\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "a finite section beside `off` is stricter": (
+                {".editorconfig": "[*.md]\nmax_line_length = off\n"},
+                {".editorconfig": "[*.md]\nmax_line_length = off\n[*.kt]\nmax_line_length = 100\n"},
+            ),
+        }, False)
+        self.base_files({".editorconfig": "[*]\nmax_line_length = 100\n"})
+        self.put(".editorconfig", "[*]\nmax_line_length = 100\n[*.kt]\nmax_line_length = 300\n")
+        self.repo.commit()
+        rc, out = self.repo.guards()
+        self.assertEqual(sorted(ln for ln in out.splitlines() if ln.startswith("guard: raised")), [
+            "guard: raised line length: .editorconfig: 100 -> 300",
+            "guard: raised line length: editorconfig maxlinelength: 100 -> 300",
+            "guard: raised line length: editorconfig: 100 -> 300",
+        ], out)
+
+    def test_the_own_groups_keep_the_spelling_and_the_finite_bound(self):
+        """Mutation survivors of round 6: the `-`/`_` normalisation and the finite base bound of the own groups each decide a case."""
+        two = "[flake8]\n%s = %d\n[other]\nmax-line-length = 300\n"
+        base = "[tool.black]\nline-length = 400\n[tool.ruff]\nline-length = 1_00\n[tool.ruff.lint.x]\nline-length = 100\n"
+        self.assertRaised({
+            "respelled in a section, masked by a wider one": ({".flake8": two % ("max-line-length", 100)}, {".flake8": two % ("max_line_length", 200)}),
+            "a new section beyond the own finite bound": ({"pyproject.toml": base}, {"pyproject.toml": base + "[tool]\nruff.line-length = 300\n"}),
+        }, True)
+        self.assertRaised({
+            "respelled, lowered": ({".flake8": two % ("max-line-length", 100)}, {".flake8": two % ("max_line_length", 90)}),
+            "a new section within the own finite bound": ({"pyproject.toml": base}, {"pyproject.toml": base + "[tool]\nruff.line-length = 90\n"}),
+        }, False)
+
+    def test_a_deleted_file_is_compared_with_the_tool_at_head(self):
+        """R1-09: only the deleted-file fallback sees this: scripts/ruff.toml keeps 200, the root ruff.toml (100) goes, pyproject.toml has 150."""
+        self.assertRaised({
+            "deleted ruff.toml": (
+                {"ruff.toml": "line-length = 100\n", "scripts/ruff.toml": "line-length = 200\n"},
+                {"ruff.toml": None, "pyproject.toml": self.PP % 150},
+            ),
+        }, True)
+
+    def test_many_changed_paths_do_not_skip_the_check(self):
+        """R1-10: under pipefail `git diff | grep -q` died of SIGPIPE when the path list was longer than the pipe buffer."""
+        many = {f"app/src/main/kotlin/dev/listicles/app/ui/f{i:05d}_{'x' * 60}.kt": "" for i in range(1100)}
+        ec = "[*.kt]\nmax_line_length = %d\n"
+        self.assertRaised({"raise with 100 KB of other paths": ({".editorconfig": ec % 100}, {".editorconfig": ec % 300, **many})}, True)
+        self.assertRaised({"no raise with 100 KB of other paths": ({".editorconfig": ec % 100}, {".editorconfig": ec % 90, **many})}, False)
+
+    def test_a_section_that_is_new_or_renamed_cannot_pass_the_widest_limit(self):
+        """R1-01: with `[*.md] max_line_length = off` in the file, the groups of the tool and the setting are already no limit."""
+        md = "[*.md]\nmax_line_length = off\n"
+        self.assertRaised({
+            "reordered header": (
+                {".editorconfig": md + "[*.{kt,kts}]\nmax_line_length = 120\n"},
+                {".editorconfig": md + "[*.{kts,kt}]\nmax_line_length = 300\n"},
+            ),
+            "split section": (
+                {".editorconfig": md + "[*.{kt,kts}]\nmax_line_length = 120\n"},
+                {".editorconfig": md + "[*.kt]\nmax_line_length = 120\n[*.kts]\nmax_line_length = 300\n"},
+            ),
+            "added section": (
+                {".editorconfig": "[*]\nmax_line_length = 100\n" + md},
+                {".editorconfig": "[*]\nmax_line_length = 100\n" + md + "[*.kt]\nmax_line_length = 300\n"},
+            ),
+            "new section off": (
+                {".editorconfig": "[*]\nmax_line_length = 100\n" + md},
+                {".editorconfig": "[*]\nmax_line_length = 100\n" + md + "[*.kt]\nmax_line_length = off\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "renamed with the same value": (
+                {".editorconfig": md + "[*.{kt,kts}]\nmax_line_length = 120\n"},
+                {".editorconfig": md + "[*.{kts,kt}]\nmax_line_length = 120\n"},
+            ),
+            "added lower section": (
+                {".editorconfig": "[*]\nmax_line_length = 100\n" + md},
+                {".editorconfig": "[*]\nmax_line_length = 100\n" + md + "[*.kt]\nmax_line_length = 80\n"},
+            ),
+        }, False)
+
+    def test_the_default_counts_per_file_and_only_values_of_the_tool_count(self):
+        """R1-02: another tool's value of the same width, or another file of the tool, must not hide a removal below the default (R4-02: wider)."""
+        black = "[tool.black]\nline-length = 60\n"
+        self.assertRaised({
+            "black value beside a removed ruff one": ({"pyproject.toml": self.PP % 60 + black}, {"pyproject.toml": "[tool.ruff]\n" + black}),
+            "isort value beside a removed flake8 one": (
+                {"setup.cfg": "[flake8]\nmax-line-length = 60\n[isort]\nline_length = 60\n"},
+                {"setup.cfg": "[flake8]\nselect = E\n[isort]\nline_length = 60\n"},
+            ),
+            "removed from the nearer ruff.toml": (
+                {"ruff.toml": "line-length = 60\n", "scripts/ruff.toml": "line-length = 60\n"},
+                {"scripts/ruff.toml": "[lint]\nselect = [\"E\"]\n"},
+            ),
+            "a nearer ruff.toml without the setting": ({"ruff.toml": "line-length = 60\n"}, {"scripts/ruff.toml": "[lint]\nselect = [\"E501\"]\n"}),
+        }, True)
+        self.assertRaised({
+            "a nearer ruff.toml that extends": ({"ruff.toml": "line-length = 60\n"}, {"scripts/ruff.toml": "extend = \"../ruff.toml\"\n"}),
+        }, False)
+
+    def test_a_kept_file_that_lost_its_setting_is_not_compared_with_other_files(self):
+        """R1-03: a removal is stricter than the larger value in another config of the tool (ruff falls back to 88, prettier to 80)."""
+        self.assertRaised({
+            "ruff.toml": ({"ruff.toml": "line-length = 100\n", "scripts/ruff.toml": "line-length = 120\n"}, {"ruff.toml": "[lint]\nselect = [\"E\"]\n"}),
+            "pyproject.toml": ({"pyproject.toml": self.PP % 100, "tools/ruff.toml": "line-length = 120\n"}, {"pyproject.toml": "[tool.ruff]\n"}),
+            "prettier": (
+                {"firebase/.prettierrc.json": '{ "printWidth": 100 }\n', "web/.prettierrc.json": '{ "printWidth": 120 }\n'},
+                {"firebase/.prettierrc.json": "{}\n"},
+            ),
+        }, False)
+
+    def test_crlf_files_are_read_like_lf_files(self):
+        """R1-04: a trailing carriage return hid every section header and the ruff and flake8 markers."""
+        md = "[*.md]\r\nmax_line_length = off\r\n[*.kt]\r\nmax_line_length = %d\r\n"
+        self.assertRaised({
+            "off section": ({".editorconfig": md % 100}, {".editorconfig": md % 300}),
+            "removal below the ruff default": (
+                {"pyproject.toml": "[tool.ruff]\r\nline-length = 60\r\n"},
+                {"pyproject.toml": "[tool.ruff]\r\ntarget-version = \"py311\"\r\n"},
+            ),
+        }, True)
+        self.assertRaised({"lowered": ({".editorconfig": md % 100}, {".editorconfig": md % 80})}, False)
+
+    def test_values_that_are_not_a_plain_number_are_no_limit(self):
+        """R1-05: valid spellings of a raise were read as their leading digits, and a value on the next line was skipped."""
+        pj = '{ "printWidth": 100 }\n'
+        yml = "style:\n  MaxLineLength:\n    maxLineLength: %s\n"
+        self.assertRaised({
+            "TOML 1_60": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": "line-length = 1_60\n"}),
+            "TOML hex": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": "line-length = 0xA0\n"}),
+            "JS exponent": (
+                {"firebase/prettier.config.js": "export default { printWidth: 100 };\n"},
+                {"firebase/prettier.config.js": "export default { printWidth: 2e2 };\n"},
+            ),
+            "JS product": (
+                {"firebase/prettier.config.js": "export default { printWidth: 100 };\n"},
+                {"firebase/prettier.config.js": "export default { printWidth: 100 * 2 };\n"},
+            ),
+            "JSON next line": ({"firebase/.prettierrc.json": pj}, {"firebase/.prettierrc.json": '{\n  "printWidth":\n    300\n}\n'}),
+            "YAML next line": ({"config/detekt/detekt.yml": yml % "100"}, {"config/detekt/detekt.yml": yml % "\n      300"}),
+            "INI continuation": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "[flake8]\nmax-line-length =\n    300\n"}),
+        }, True)
+        self.assertRaised({
+            "digits then a delimiter": ({"firebase/.prettierrc.json": pj}, {"firebase/.prettierrc.json": '{ "printWidth": 90, "semi": true }\n'}),
+            "JSON next line, lowered": ({"firebase/.prettierrc.json": pj}, {"firebase/.prettierrc.json": '{\n  "printWidth":\n    90\n}\n'}),
+            "YAML parent key": ({"config/detekt/detekt.yml": yml % "100"}, {"config/detekt/detekt.yml": yml % "90"}),
+            "INI continuation, lowered": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "[flake8]\nmax-line-length =\n    90\n"}),
+        }, False)
+
+    def test_symlinks_and_non_ascii_paths_are_read(self):
+        """R1-06: a symlink is no limit (its target is not read), and a non-ASCII path is read like any other."""
+        self.assertRaised({
+            ".editorconfig to a symlink": ({".editorconfig": "[*.kt]\nmax_line_length = 100\n"}, {".editorconfig": ("link", "config/editorconfig")}),
+            "ruff.toml to a symlink": ({"ruff.toml": "line-length = 100\n"}, {"ruff.toml": ("link", "config/ruff-base.toml")}),
+            "non-ASCII directory": ({"\u00f8velser/.prettierrc.json": '{ "printWidth": 100 }\n'}, {"\u00f8velser/.prettierrc.json": '{ "printWidth": 300 }\n'}),
+            "non-ASCII .editorconfig": (
+                {"\u00f8/.editorconfig": "[*.kt]\nmax_line_length = 100\n"},
+                {"\u00f8/.editorconfig": "[*.kt]\nmax_line_length = 300\n"},
+            ),
+            "non-ASCII ruff.toml": ({"\u00f8/ruff.toml": "line-length = 100\n"}, {"\u00f8/ruff.toml": "line-length = 300\n"}),
+            "non-ASCII detekt.yml": (
+                {"\u00f8/detekt.yml": "style:\n  MaxLineLength:\n    maxLineLength: 100\n"},
+                {"\u00f8/detekt.yml": "style:\n  MaxLineLength:\n    maxLineLength: 300\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "non-ASCII directory, lowered": (
+                {"\u00f8velser/.prettierrc.json": '{ "printWidth": 100 }\n'},
+                {"\u00f8velser/.prettierrc.json": '{ "printWidth": 90 }\n'},
+            ),
+            "a symlink that stays": ({".editorconfig": ("link", "config/editorconfig")}, {".editorconfig": ("link", "config/other")}),
+        }, False)
+
+    def test_other_spellings_of_the_ruff_and_flake8_tables_are_read(self):
+        """R2-01, R3-01: TOML and INI spell the same table in several ways, and all of them are read by ruff and flake8."""
+        pp = "[tool.black]\nline-length = 60\n"
+        base_py = {"pyproject.toml": pp + self.PP % 100}
+        base_fl = {"setup.cfg": "[isort]\nline_length = 60\n[flake8]\nmax-line-length = 100\n"}
+        self.assertRaised({
+            '[tool."ruff"]': (base_py, {"pyproject.toml": pp + '[tool."ruff"]\nline-length = 300\n'}),
+            "[ tool.ruff ]": (base_py, {"pyproject.toml": pp + "[ tool.ruff ]\nline-length = 300\n"}),
+            "[tool] ruff.line-length": (base_py, {"pyproject.toml": pp + "[tool]\nruff.line-length = 300\n"}),
+            "root tool.ruff.line-length": (base_py, {"pyproject.toml": "tool.ruff.line-length = 300\n" + pp}),
+            "[tool] ruff = {}": (base_py, {"pyproject.toml": pp + "[tool]\nruff = { line-length = 300 }\n"}),
+            "comment after the header": (base_py, {"pyproject.toml": pp + "[tool.ruff]#c\nline-length = 300\n"}),
+            "flake8 header, comment": (base_fl, {"setup.cfg": "[isort]\nline_length = 60\n[flake8];c\nmax-line-length = 300\n"}),
+            "tox.ini header, comment": (
+                {"tox.ini": "[tox]\n[flake8]\nmax-line-length = 100\n"},
+                {"tox.ini": "[tox]\n[flake8]#c\nmax-line-length = 300\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "ruff lowered, comment": (base_py, {"pyproject.toml": pp + "[tool.ruff]#c\nline-length = 90\n"}),
+        }, False)
+
+    def test_extend_only_exempts_ruff_from_the_default(self):
+        """R2-04: flake8 has no `extend`, a `[flake8] extend = x` line is ignored and the default applies."""
+        self.assertRaised({
+            "flake8": ({".flake8": "[flake8]\nmax-line-length = 60\n"}, {".flake8": "[flake8]\nextend = x\n"}),
+        }, True)
+        self.assertRaised({
+            "ruff": ({"ruff.toml": "line-length = 60\n"}, {"ruff.toml": 'extend = "base.toml"\n'}),
+        }, False)
+
+    def test_block_comments_after_a_value_are_not_part_of_it(self):
+        """R2-05: `printWidth: 100 /* c */` was read as no limit, so a raise passed and an added comment failed."""
+        js = "export default { printWidth: %s };\n"
+        cfg = "firebase/prettier.config.js"
+        self.assertRaised({"raise": ({cfg: js % "100 /* c */"}, {cfg: js % "300 /* c */"})}, True)
+        self.assertRaised({"added comment": ({cfg: js % "100"}, {cfg: js % "100 /* note */"})}, False)
+
+    def test_style_files_under_docs_handoff_node_modules_and_build_are_not_read(self):
+        """R2-06"""
+        lowered = {"ruff.toml": "line-length = 90\n"}
+        self.assertRaised({
+            where: ({"ruff.toml": "line-length = 100\n"}, {**lowered, f"{where}/x/ruff.toml": "line-length = 300\n"})
+            for where in ("docs", "handoff", "web/node_modules", "app/build")
+        }, False)
+
+    def test_cr_only_line_ends_are_read(self):
+        """R2-07: a lone CR is a line end for flake8 and YAML, and a leading comment hid every value in such a file."""
+        self.assertRaised({
+            "flake8": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "# c\r[flake8]\rmax-line-length = 300\r"}),
+        }, True)
+        self.assertRaised({"lowered": ({".flake8": "[flake8]\nmax-line-length = 100\n"}, {".flake8": "# c\r[flake8]\rmax-line-length = 90\r"})}, False)
+
+    def test_a_file_that_is_not_parsed_fails_closed(self):
+        """R3-01: every value in pyproject.toml, setup.cfg and tox.ini counts, whatever the spelling; another tool's raise there fails too."""
+        black = "[tool.black]\nline-length = 60\n"
+        base = {"pyproject.toml": black + self.PP % 100}
+        for name, head in {
+            "quoted root key": 'tool."ruff".line-length = 300\n' + black,
+            "all quoted": '"tool"."ruff"."line-length" = 300\n' + black,
+            "single quotes": "tool.'ruff'.line-length = 300\n" + black,
+            "blanks": "tool . ruff . line-length = 300\n" + black,
+            "root inline table": "tool = { ruff = { line-length = 300 } }\n" + black,
+            "multi-line inline table": black + "[tool]\nruff = {\n  line-length = 300\n}\n",
+            "BOM": "\ufeff[tool.ruff]\nline-length = 300\n" + black,
+            "black raised": black.replace("60", "300") + self.PP % 100,
+        }.items():
+            self.assertRaised({name: (base, {"pyproject.toml": head})}, True)
+        fl = "[isort]\nline_length = 60\n[flake8]%s\nmax-line-length = %d\n"
+        self.assertRaised({
+            "[flake8]x": ({"setup.cfg": fl % ("", 100)}, {"setup.cfg": fl % ("x", 300)}),
+            "[flake8] (style)": ({"setup.cfg": fl % ("", 100)}, {"setup.cfg": fl % (" (style)", 300)}),
+            "[flake8] // c": ({"tox.ini": "[flake8]\nmax-line-length = 100\n"}, {"tox.ini": "[flake8] // c\nmax-line-length = 300\n"}),
+        }, True)
+        self.assertRaised({"lowered": (base, {"pyproject.toml": black + self.PP % 90})}, False)
+
+    def test_the_default_is_counted_when_the_files_own_setting_goes(self):
+        """R3-02: the `use` marker of ruff keys outside a `[tool.ruff]` table, and the owner of a value on the next line."""
+        self.assertRaised({
+            "[tool] ruff keys": (
+                {"pyproject.toml": '[tool]\nruff.line-length = 60\nruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": '[tool]\nruff.lint.select = ["E501"]\n'},
+            ),
+            "root ruff keys": (
+                {"pyproject.toml": 'tool.ruff.line-length = 60\ntool.ruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": 'tool.ruff.lint.select = ["E501"]\n'},
+            ),
+            "BOM before the ruff table": (
+                {"pyproject.toml": "\ufeff[tool.ruff]\nline-length = 60\n"},
+                {"pyproject.toml": "\ufeff[tool.ruff]\ntarget-version = \"py311\"\n"},
+            ),
+            "text after the flake8 header": (
+                {"setup.cfg": "[flake8] (style)\nmax-line-length = 60\n"},
+                {"setup.cfg": "[flake8] (style)\nselect = E\n"},
+            ),
+            "isort value on the next line": (
+                {"setup.cfg": "[isort]\nline_length =\n    60\n[flake8]\nmax-line-length = 60\n"},
+                {"setup.cfg": "[isort]\nline_length =\n    60\n[flake8]\nselect = E\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "setting kept": (
+                {"pyproject.toml": '[tool]\nruff.line-length = 60\nruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": '[tool]\nruff.line-length = 60\nruff.lint.select = ["E"]\n'},
+            ),
+        }, False)
+
+    def test_a_multi_line_block_comment_is_not_part_of_a_value(self):
+        """R3-03: prose such as `printWidth: 100 matches ktlint.` inside a comment read as no limit."""
+        cfg = "firebase/prettier.config.js"
+        doc = "/**\n * Prettier settings. printWidth: 100 matches ktlint.\n */\nexport default {\n  printWidth: %d,\n  files: \"src/*\",\n};\n"
+        glob = '{\n  "overrides": [{ "files": "docs/*.md", "options": { "proseWrap": "always" } }],\n  "printWidth": %d\n}\n'
+        after = "module.exports = {\n  /* keep in step\n     with ktlint */ printWidth: %d,\n};\n"
+        rc, cjs = "firebase/.prettierrc.json", "web/prettier.config.cjs"
+        self.assertRaised({
+            "raise under the comment": ({cfg: doc % 100}, {cfg: doc % 300}),
+            "a glob before printWidth opens no comment": ({rc: glob % 100}, {rc: glob % 300}),
+            "a value after the closing */": ({cjs: after % 100}, {cjs: after % 300}),
+        }, True)
+        self.assertRaised({
+            "comment added": ({cfg: "export default {\n  printWidth: 100,\n};\n"}, {cfg: doc % 100}),
+            "lowered": ({cfg: doc % 100}, {cfg: doc % 90}),
+            "lowered after a glob": ({rc: glob % 100}, {rc: glob % 90}),
+            "lowered after the closing */": ({cjs: after % 100}, {cjs: after % 90}),
+        }, False)
+
+    def test_another_tools_wider_value_does_not_hide_a_raise_of_the_tools_own_limit(self):
+        """R4-02: black and isort values count as ruff's and flake8's, so the tools' own values and the default get groups of their own."""
+        bl = "[tool.black]\nline-length = %d\n"
+        sel = '[tool.ruff]\nselect = ["E"]\n'
+        fl = "[isort]\nline_length = 100\n[flake8]\n%s\n"
+        self.assertRaised({
+            "first ruff setting": ({"pyproject.toml": bl % 120 + sel}, {"pyproject.toml": bl % 120 + sel + "line-length = 110\n"}),
+            "first flake8 setting": ({"setup.cfg": fl % "select = E"}, {"setup.cfg": fl % "max-line-length = 100"}),
+            "removal below the default": ({"pyproject.toml": bl % 100 + self.PP % 60}, {"pyproject.toml": bl % 100 + sel}),
+            "a new key": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120 + self.PP % 100 + self.PYCODESTYLE % 110}),
+            "moved to ruff.toml": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120, "ruff.toml": "line-length = 110\n"}),
+            "moved, pyproject.toml deleted": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": None, "ruff.toml": "line-length = 110\n"}),
+            "flake8 value on a continuation line": (
+                {"setup.cfg": fl % "select = E"},
+                {"setup.cfg": fl % "max-line-length =\n    100"},
+            ),
+            "flake8 continuation value removed": (
+                {".flake8": "[flake8]\nmax-line-length =\n    60\n"},
+                {".flake8": "[flake8]\nselect = E\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "black lowered": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 90 + self.PP % 100}),
+            "moved at the same width": ({"pyproject.toml": bl % 120 + self.PP % 100}, {"pyproject.toml": bl % 120, "ruff.toml": "line-length = 100\n"}),
+            "the default written out": ({"pyproject.toml": bl % 120 + sel}, {"pyproject.toml": bl % 120 + sel + "line-length = 88\n"}),
+            "flake8 continuation value lowered": (
+                {".flake8": "[flake8]\nmax-line-length =\n    100\n"},
+                {".flake8": "[flake8]\nmax-line-length =\n    90\n"},
+            ),
+        }, False)
 
 
 class WeakerPresets(DiffCase):
