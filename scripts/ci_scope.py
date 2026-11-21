@@ -70,7 +70,8 @@ def history_complete(top, base):
     below `base`, every commit from `base` up to both tips is present, so `base` is the merge base of the full history."""
     if git_lines(top, "rev-parse", "--is-shallow-repository") == ["false"]:
         return True
-    with open(git_lines(top, "rev-parse", "--absolute-git-dir")[0] + "/shallow", encoding="utf-8") as f:
+    # --git-path, not the git dir: a linked worktree keeps `shallow` in the common git dir.
+    with open(os.path.join(top, git_lines(top, "rev-parse", "--git-path", "shallow")[0]), encoding="utf-8") as f:
         cuts = f.read().split()
     if not cuts:
         return False
@@ -86,7 +87,7 @@ def local_paths():
             return None
         return (git_lines(top, "diff", "-z", "--name-only", "--no-renames", base)  # the merge base against the working tree
                 + git_lines(top, "ls-files", "-z", "--others", "--exclude-standard"))
-    except (OSError, IndexError, subprocess.CalledProcessError):
+    except (OSError, IndexError, ValueError, subprocess.CalledProcessError):  # ValueError: a path that is not UTF-8
         return None
 
 
