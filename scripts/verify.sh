@@ -66,6 +66,8 @@ step wireframes-safety python3 -I scripts/wireframes_safety.py
 step gradle-repos-tests python3 -I scripts/test_check_gradle_repos.py
 step gradle-repos python3 -I scripts/check_gradle_repos.py
 step test-results-gate-tests python3 -I scripts/test_check_test_results.py
+step screenshots-tests python3 -I scripts/test_screenshots.py
+step screenshots-wiring python3 -I scripts/check_screenshots.py
 step gitignore-secrets-tests python3 -I scripts/test_gitignore_secrets.py
 step wrapper-checksum-tests python3 -I scripts/test_check_gradle_wrapper.py
 step wrapper-checksum python3 -I scripts/check_gradle_wrapper.py
@@ -81,8 +83,9 @@ step lint gradle :app:lintDebug
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test
   step coverage gradle koverVerify
+  step screenshots ./scripts/screenshots.sh verify
 else
-  echo "skip  unit-tests, coverage (--fast)"; SKIPPED=1
+  echo "skip  unit-tests, coverage, screenshots (--fast)"; SKIPPED=1
 fi
 step build gradle :app:assembleDebug :app:assembleDebugAndroidTest
 step firebase-install bash -c 'cd firebase && npm ci --silent'

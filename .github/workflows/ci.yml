@@ -126,6 +126,28 @@ jobs:
           target: google_apis
           script: ./gradlew -q --console=plain :app:connectedDebugAndroidTest
 
+  screenshots:
+    name: screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: screenshots match the goldens exactly, light and dark, en and da (M1-03)
+        run: ./scripts/screenshots.sh verify
+      - name: screenshot diffs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: screenshot-diffs
+          path: app/build/outputs/roborazzi
+          if-no-files-found: ignore
+          retention-days: 14
+
   guards:
     name: guards
     runs-on: ubuntu-latest
@@ -202,6 +224,10 @@ jobs:
         run: python3 -I scripts/test_wireframes_safety.py
       - name: wireframes page has no URL or error text in innerHTML
         run: python3 -I scripts/wireframes_safety.py
+      - name: screenshot gate tests (M1-03)
+        run: python3 -I scripts/test_screenshots.py
+      - name: screenshot gate wiring (M1-03)
+        run: python3 -I scripts/check_screenshots.py
       - name: agent_metrics.py tests
         run: python3 -I scripts/test_agent_metrics.py
       - name: docs/agent-metrics.csv is up to date

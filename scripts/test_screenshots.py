@@ -137,13 +137,13 @@ class Wiring(unittest.TestCase):
         got = self.mutated("scripts/verify.sh", "step screenshots-tests python3 -I scripts/test_screenshots.py\n", "")
         self.assertEqual(got, ["verify.sh has no active step: step screenshots-tests python3 -I scripts/test_screenshots.py"])
 
-    def test_ci_must_run_the_screenshot_gate_in_the_unit_job(self):
+    def test_ci_must_run_the_screenshot_gate_in_the_screenshots_job(self):
         got = self.mutated(".github/workflows/ci.yml", "run: ./scripts/screenshots.sh verify", "run: ./gradlew :app:testDebugUnitTest")
-        self.assertEqual(got, ["ci.yml unit job has no step running: ./scripts/screenshots.sh verify"])
+        self.assertEqual(got, ["ci.yml screenshots job has no step running: ./scripts/screenshots.sh verify"])
 
     def test_ci_must_upload_the_diffs(self):
         got = self.mutated(".github/workflows/ci.yml", "uses: actions/upload-artifact@", "uses: actions/cache@")
-        self.assertEqual(got, ["ci.yml unit job has no actions/upload-artifact step"])
+        self.assertEqual(got, ["ci.yml screenshots job has no actions/upload-artifact step"])
 
     def test_the_upload_must_run_when_the_gate_failed(self):
         got = self.mutated(".github/workflows/ci.yml", "if: failure()", "if: success()")
@@ -151,10 +151,11 @@ class Wiring(unittest.TestCase):
 
     def test_the_upload_must_come_after_the_gate(self):
         text = (self.root / ".github/workflows/ci.yml").read_text()
-        step = text[text.index("      - name: screenshot diffs"):]
+        step = text[text.index("      - name: screenshot diffs") :]
         step = step[: step.index("\n\n") if "\n\n" in step else len(step)]
+        gate = "      - name: screenshots match the goldens"
         path = self.root / ".github/workflows/ci.yml"
-        moved = text.replace(step + "\n", "", 1).replace("      - name: unit tests and coverage", step + "\n      - name: unit tests and coverage", 1)
+        moved = text.replace(step + "\n", "", 1).replace(gate, step + "\n" + gate, 1)
         path.write_text(moved)
         self.assertEqual(c.wiring_problems(self.root), ["ci.yml screenshot-diffs upload must come after the screenshot gate step"])
 
@@ -167,12 +168,13 @@ class Wiring(unittest.TestCase):
         self.assertEqual(got, ["ci.yml upload-artifact must be pinned to a 40-character commit SHA"])
 
     def test_the_gate_step_must_not_be_allowed_to_fail(self):
-        got = self.mutated(".github/workflows/ci.yml", "run: ./scripts/screenshots.sh verify", "continue-on-error: true\n        run: ./scripts/screenshots.sh verify")
+        gate = "run: ./scripts/screenshots.sh verify"
+        got = self.mutated(".github/workflows/ci.yml", gate, f"continue-on-error: true\n        {gate}")
         self.assertEqual(got, ["ci.yml screenshot gate step has continue-on-error"])
 
     def test_the_wiring_tests_must_run_in_ci(self):
         got = self.mutated(".github/workflows/ci.yml", "run: python3 -I scripts/test_screenshots.py", "run: true")
-        self.assertEqual(got, ["ci.yml unit job has no step running: python3 -I scripts/test_screenshots.py"])
+        self.assertEqual(got, ["ci.yml tasks job has no step running: python3 -I scripts/test_screenshots.py"])
 
 
 if __name__ == "__main__":
