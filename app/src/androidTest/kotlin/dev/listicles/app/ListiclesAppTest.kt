@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dk.bjarkebjarke.tally.R
+import dk.bjarkebjarke.tally.TallyApp
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -22,14 +24,14 @@ class ListiclesAppTest {
     @Test
     fun showsWelcomeText() {
         val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
-        compose.setContent { ListiclesApp() }
+        compose.setContent { TallyApp() }
         compose.onNodeWithText(welcome).assertExists()
     }
 
     @Test
     fun showsWelcomeTextInDarkTheme() {
         val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
-        compose.setContent { ListiclesApp(darkTheme = true) }
+        compose.setContent { TallyApp(darkTheme = true) }
         compose.onNodeWithText(welcome).assertExists()
     }
 
@@ -37,7 +39,7 @@ class ListiclesAppTest {
     @Test
     fun darkThemeRendersADarkBackgroundAndLightThemeALightOne() {
         val dark = mutableStateOf(true)
-        compose.setContent { ListiclesApp(darkTheme = dark.value) }
+        compose.setContent { TallyApp(darkTheme = dark.value) }
 
         val darkLuminance = backgroundLuminance()
         dark.value = false

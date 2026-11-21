@@ -127,7 +127,7 @@ class GradleWiring(unittest.TestCase):
         self.assertIn(":app:checkUnitTestResults", r.stdout)
 
     def test_filtered_run_does_not_fail_the_gate(self):
-        r = gradle(":app:testDebugUnitTest", "--tests", "dev.listicles.app.ThemeTest")
+        r = gradle(":app:testDebugUnitTest", "--tests", "dk.bjarkebjarke.tally.ThemeTest")
         self.assertEqual(r.returncode, 0, r.stderr[-1500:])
 
 
