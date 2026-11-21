@@ -50,7 +50,7 @@ OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".git
                                                    "docs/product/", "design/", "gradle/wrapper/", "config/licensee/"))
 OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh",
                                                           "CLAUDE.md", "CLAUDE.local.md",  # Claude Code loads these as agent instructions in any directory
-                                                          ".gitattributes", ".mcp.json", ".gitleaks.toml", ".gitleaksignore")}  # what agents load, what checks see
+                                                          ".gitattributes", ".mcp.json", ".gitleaks.toml", ".gitleaksignore")}  # R5
 REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
 GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md",), ("docs/milestones/",)  # drafts without a sign-off (not design/tokens.json, R3-01)
 CI_YML = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
