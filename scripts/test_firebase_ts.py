@@ -430,7 +430,7 @@ class Config(unittest.TestCase):
         for name, command in SCRIPTS.items():
             self.assertEqual(scripts.get(name), command, name)
         self.assertIn("jest --runInBand", scripts["test"])
-        self.assertTrue(scripts["test"].startswith("firebase emulators:exec --only firestore --project demo-listicles"))
+        self.assertTrue(scripts["test"].startswith("firebase emulators:exec --only firestore --project demo-tally"))
 
     def test_tsconfig_is_strict(self):
         self.assertEqual(tsconfig_problems(json.loads(read("firebase", "tsconfig.json"))), [])
