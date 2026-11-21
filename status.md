@@ -158,7 +158,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | ready | M1-01 | implementer |  |
 | M1-51 | Build guards&#58; catalog-only coordinates, targetSdk floor, manifest cleartext and backup (checklist … | ready | M1-01 | implementer |  |
 | M1-35 | PLAN amendments from the follow-up triage (P1-P9 rules and users name, quota risk, PIT 80, ui … | ready | M1-01 | planner |  |
-| M1-36 | Product docs&#58; start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 … | ready | M1-O7 | planner |  |
+| M1-36 | Product docs&#58; start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 … | in progress | M1-O7 | planner | [#264](https://github.com/bondo/listicles2/issues/264) |
 | M1-37 | JVM modules&#58; check Java API use against minSdk 26 with api-versions.xml (issue 228) | ready | M1-01 | implementer |  |
 | M1-38 | Run the licensee and warnings gate self-tests only when their inputs change; licensee version as … | ready | M1-01 | implementer |  |
 | M1-39 | Your name (AUTH-12)&#58; users/{uid}.name, name step at first Google sign-in and at start, edit in A… | blocked | M1-08, M1-10, M1-18, M1-17, M1-25 | implementer |  |
@@ -228,7 +228,7 @@ flowchart LR
     n36["M1-50 Konsist: no data source in composables… (ready)"]:::ready
     n37["M1-51 Build guards: catalog-only coordinates,… (ready)"]:::ready
     n38["M1-35 PLAN amendments from the follow-up … (ready)"]:::ready
-    n39["M1-36 Product docs: start-up gates, M1 home… (ready)"]:::ready
+    n39["M1-36 Product docs: start-up gates, M1 home… (in progress)"]:::progress
     n40["M1-37 JVM modules: check Java API use again… (ready)"]:::ready
     n41["M1-38 Run the licensee and warnings gate sel… (ready)"]:::ready
     n42["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
