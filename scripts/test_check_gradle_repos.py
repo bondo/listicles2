@@ -361,6 +361,74 @@ class MirrorOrder(unittest.TestCase):
         self.assertEqual(c.check_settings(with_head(head) + "// mavenCentral()\n"), [])
 
 
+PLUGIN_REACHES_DEP = ["pluginManagement: refers to dependencyResolutionManagement, so repositories added there come before its own mirror"]
+
+
+def dep_text(repos, head=""):
+    """Good pluginManagement, and a dependencyResolutionManagement with `head` statements before `repositories { repos }`."""
+    return (
+        f"pluginManagement {{\n    repositories {{{GOOD_REPOS}    }}\n}}\n"
+        f"dependencyResolutionManagement {{\n{head}\n    repositories {{{repos}    }}\n}}\n"
+    )
+
+
+class MirrorIsARepository(unittest.TestCase):
+    """R2-01: the mirror counts only where it is a repository URL, not as any string literal in the block."""
+
+    def test_mirror_url_held_in_a_val_does_not_count(self):
+        val = f'val centralMirror = "{c.MIRROR}"'
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + 'mavenCentral()\nmaven(centralMirror) { name = "m" }\n', head=val)), MISSING)
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=val.replace("centralMirror", "unused"))), MISSING)
+
+    def test_mirror_url_in_other_calls_and_vals_inside_the_block_does_not_count(self):
+        for stray in (f'val s = "{c.MIRROR}"', f'println("{c.MIRROR}")', f'maven("{c.MIRROR}x")', f'listOf("{c.MIRROR}")'):
+            with self.subTest(stray=stray):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + stray + "\nmavenCentral()\n")), MISSING)
+
+    def test_every_form_of_a_mirror_repository_counts(self):
+        for call in (
+            f'maven("{c.MIRROR}")',
+            f'maven("{c.MIRROR}") {{ name = "m" }}',
+            f'maven(url = "{c.MIRROR}")',
+            f'maven(uri("{c.MIRROR}"))',
+            f'maven {{ url = "{c.MIRROR}" }}',
+            f'maven {{ url = uri("{c.MIRROR}") }}',
+            f'maven {{ setUrl("{c.MIRROR}") }}',
+            f'maven {{ setUrl(uri("{c.MIRROR}")) }}',
+            f'maven(\n  "{c.MIRROR}"\n)',
+            f'maven("""{c.MIRROR}""")',
+        ):
+            with self.subTest(call=call):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + call + "\nmavenCentral()\n")), [])
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + call + "\n")), BEFORE)
+
+    def test_dotted_mirror_repository_still_counts(self):
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=f'repositories.maven("{c.MIRROR}")')), [])
+
+
+class PluginManagementReachesDependencies(unittest.TestCase):
+    """R2-03: pluginManagement runs first, so a mention of dependencyResolutionManagement in it adds repositories ahead of the mirror."""
+
+    def test_dependency_repositories_changed_from_plugin_management_are_flagged(self):
+        for extra in (
+            "dependencyResolutionManagement.repositories.mavenCentral()",
+            "settings.dependencyResolutionManagement.repositories.mavenCentral()",
+            "dependencyResolutionManagement.repositories { mavenCentral() }",
+            "with(dependencyResolutionManagement.repositories) { mavenCentral() }",
+            "dependencyResolutionManagement { repositories { mavenCentral() } }",
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra("", plugin_extra=f"    {extra}\n")), PLUGIN_REACHES_DEP)
+
+    def test_the_reverse_direction_is_harmless(self):
+        extra = "pluginManagement.repositories.mavenCentral()"
+        self.assertEqual(c.check_settings(with_extra(extra)), [])
+
+    def test_the_name_in_a_comment_or_string_inside_plugin_management_is_fine(self):
+        extra = '    // dependencyResolutionManagement\n    val s = "dependencyResolutionManagement"\n'
+        self.assertEqual(c.check_settings(with_extra("", plugin_extra=extra)), [])
+
+
 NESTED = 'val s = "${ if (c) "}" else "" }"\n'
 
 
