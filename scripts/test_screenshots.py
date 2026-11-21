@@ -261,8 +261,8 @@ class Build(unittest.TestCase):
     def test_the_goldens_must_be_an_input_of_the_test_task(self):
         # Without it Gradle reports testDebugUnitTest UP-TO-DATE (or takes it from the build cache) after a golden changed,
         # and the verify gate passes without comparing anything.
-        got = self.mutated("app/build.gradle.kts", 'inputs.dir("src/test/screenshots")', 'inputs.dir("src/test/other")')
-        self.assertEqual(got, ["app/build.gradle.kts must declare src/test/screenshots as an input of the test tasks (else verify is skipped when only goldens changed)"])
+        got = self.mutated("app/build.gradle.kts", '.dir("src/test/screenshots")', '.dir("src/test/other")')
+        self.assertEqual(got, [c.INPUT_PROBLEM])
 
     def test_the_comparison_must_be_exact(self):
         want = ["ScreenshotOptions.kt must compare exactly: ThresholdValidator(0f), maxDistance = 0f, hShift = 0, vShift = 0"]
@@ -277,7 +277,8 @@ class Build(unittest.TestCase):
                 self.assertEqual(self.mutated("app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt", old, new), want)
 
     def test_a_tolerance_in_any_other_test_source_is_reported(self):
-        for tolerance in ("CompareOptions(changeThreshold = 0.5f)", "ThresholdValidator(0.5f)", "SimpleImageComparator()", "resultValidator = { true }", "imageComparator = null"):
+        tolerances = ("CompareOptions(changeThreshold = 0.5f)", "ThresholdValidator(0.5f)", "SimpleImageComparator()")
+        for tolerance in (*tolerances, "resultValidator = { true }", "imageComparator = null"):
             with self.subTest(tolerance=tolerance):
                 other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt"
                 other.write_text(f"val o = {tolerance}\n")

@@ -24,6 +24,7 @@ GOLDENS = tuple(f"TallyApp_{lang}_{mode}.png" for lang in ("en", "da") for mode 
 MAX_GOLDEN_BYTES = 300 * 1024  # the guards.sh limit for a PNG
 EXACT_OPTIONS = ("ThresholdValidator(0f)", "maxDistance = 0f", "hShift = 0", "vShift = 0")
 TOLERANCE = re.compile(r"changeThreshold|ThresholdValidator\(|SimpleImageComparator\(|(?:resultValidator|imageComparator)\s*=")
+INPUT_PROBLEM = "app/build.gradle.kts must declare src/test/screenshots as an input of the test tasks (else verify skips when only goldens changed)"
 OPTIONS_FILE = "app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt"
 PINNED = re.compile(r"uses:\s*actions/upload-artifact@[0-9a-f]{40}(?:\s|$)")
 
@@ -105,10 +106,8 @@ def build_problems(root):
         problems.append("app/build.gradle.kts does not apply the Roborazzi plugin")
     if not re.search(r"(?m)^roborazzi = \{ id = ", (root / "gradle/libs.versions.toml").read_text()):
         problems.append("libs.versions.toml has no roborazzi plugin")
-    if 'inputs.dir("src/test/screenshots")' not in (root / "app/build.gradle.kts").read_text():
-        problems.append(
-            "app/build.gradle.kts must declare src/test/screenshots as an input of the test tasks (else verify is skipped when only goldens changed)"
-        )
+    if not re.search(r'inputs\s*\.dir\("src/test/screenshots"\)', (root / "app/build.gradle.kts").read_text()):
+        problems.append(INPUT_PROBLEM)
     options = root / OPTIONS_FILE
     text = options.read_text() if options.is_file() else ""
     if not all(want in text for want in EXACT_OPTIONS) or len(re.findall(r"ThresholdValidator\(", text)) != 1:

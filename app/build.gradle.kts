@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
+    alias(libs.plugins.roborazzi)
 }
 
 // M0.5-10: shipped dependencies must be on the owner's licence allowlist.
@@ -91,6 +92,13 @@ class RobolectricOfflineArgs(
 }
 
 tasks.withType<Test>().configureEach {
+    // M1-03: the goldens are an input, or a test task that is UP-TO-DATE (or cached) after a golden changed would let
+    // `scripts/screenshots.sh verify` pass without comparing anything. scripts/check_screenshots.py checks this line.
+    inputs
+        .dir("src/test/screenshots")
+        .withPropertyName("screenshotGoldens")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .optional()
     dependsOn(syncRobolectricAndroidAll)
     jvmArgumentProviders.add(
         RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),
@@ -153,6 +161,10 @@ dependencies {
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.androidx.test.espresso.core)
     robolectricAndroidAll(libs.robolectric.android.all)
 
     androidTestImplementation(platform(libs.compose.bom))
