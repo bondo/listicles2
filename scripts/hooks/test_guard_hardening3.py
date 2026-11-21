@@ -87,7 +87,9 @@ class Round3(Base):
                 "IFS=$(printf _); X=git_push; $X --force origin work",
             ]
         )
-        self.allow(['while IFS= read -r line; do echo "$line"; done < f', "IFS=_; P=a_b; echo $P", 'git commit -m "handle IFS in the guard"', "git log --grep=IFS"])
+        self.allow(['while IFS= read -r line; do echo "$line"; done < f', "IFS=_; P=a_b; echo $P",
+                'git commit -m "handle IFS in the guard"',
+                "git log --grep=IFS"])
 
     def test_r3_04_env_split_string_with_expansions_comments_and_blanks_env_knows(self):
         self.deny(
