@@ -816,11 +816,11 @@ notes = "Normal env. Effort S. M0.5-03 must emit design/tokens.json. Also gates 
 id = "M1-05"
 title = "PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Normal env plus a CI step (tooling) if it is not inside the unit job's Gradle call. Effort S. Floor 80 % (owner decision on #15, comment 7057951193; PLAN section 4 aligned by M1-35)"
+notes = "Normal env plus a CI step (tooling) if it is not inside the unit job's Gradle call. Effort S. Done: PIT runs through the JUnit 5 plugin because kotest-extensions-pitest 1.2.0 needs Kotest 5 classes and crashes on Kotest 6.2.7; CI runs it via koverVerify dependsOn :core:domain:pitest, and the ci.yml tasks job runs scripts/check_pit_config.py and its tests so that wiring cannot be dropped unseen. Floor 80 % (owner decision on #15, comment 7057951193; PLAN section 4 aligned by M1-35)"
 
 [[task]]
 id = "M1-06"
@@ -1231,7 +1231,7 @@ notes = "Tooling env (process docs and prompts), rule test first, owner merge; a
 id = "M1-41"
 title = "check_gradle_repos.py: dotted repositories.google(), raw strings and nested templates (issues 226, 227)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]

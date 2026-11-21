@@ -580,3 +580,6 @@ val testDetektRules =
 
 // Shipped modules only: :core:testing is test support (never in the app), consumed via testImplementation.
 tasks.named("detekt") { dependsOn(testLicenseeGate, testDetektRules, ":app:licensee", ":core:domain:licensee") }
+
+// M1-05: CI's unit job calls koverVerify, so PIT on core/domain rides along without a separate workflow step.
+tasks.named("koverVerify") { dependsOn(":core:domain:pitest") }
