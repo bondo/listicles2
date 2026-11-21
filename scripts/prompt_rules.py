@@ -1012,7 +1012,8 @@ DOC_RULES = (
             r"stop deferring and fix follow-ups as their own small prs before new feature work \(re-deferral and majors still need the owner; "
             r"`mx-fu` depends on every task of its milestone, so it cannot start early\)",
         ),
-        "ORCHESTRATION 6.2 and 7.2.1: round 4 goes to the escalation reviewer; minors are fixed by default; at 8 deferral follow-ups they are fixed as small PRs",
+        "ORCHESTRATION 6.2 and 7.2.1: round 4 goes to the escalation reviewer; minors are fixed by default; "
+        "over 8 deferral follow-ups they are fixed as small PRs",
         forbidden=(
             r"round 4 with findings above `nit`: stop and ask the owner", r"defers the remaining minors and nits \(follow-up issues\) instead of running",
             r"stop deferring and report to the owner", r"start the milestone's burn-down task",
