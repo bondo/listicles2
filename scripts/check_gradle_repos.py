@@ -223,12 +223,12 @@ def _enclosing_brace(text, pos):
 
 
 def _on_own_repositories(outer, maven):
-    """True if the maven call starting at index `maven` of outer (a block's body) adds to that block's own repositories:
-    `repositories.maven(...)`, `this.repositories.maven(...)`, or a direct statement of a top-level `repositories { }` body.
-    Another object's handler (pluginManagement.repositories.maven(...)) and other receivers (with(x.repositories) { maven(...) }) do not."""
-    before = outer[:maven].rstrip()
-    if before.endswith("."):
-        return re.search(OWN + r"\s*\.$", before) is not None
+    """True if the maven call starting at index `maven` of outer (a block's body) is a direct statement of a top-level
+    `repositories { }`, `repositories() { }` or `this.repositories { }` body of that block: the form main counts too.
+    A dotted call (repositories.maven(...)) never counts: whether `repositories` is the block's own handler and whether the
+    statement runs depends on receivers, local names and control flow that a scanner cannot see, so it fails closed."""
+    if outer[:maven].rstrip().endswith("."):
+        return False
     brace = _enclosing_brace(outer, maven)
     return brace is not None and re.search(OWN + r"\s*(?:\(\s*\))?\s*$", outer[:brace]) is not None and _enclosing_brace(outer, brace) is None
 
