@@ -261,6 +261,16 @@ class Round4(Base):
         )
         self.allow(["(( i = 1 )); git status", "((i++)); git status", "time git status", "function f { git status; }; f"])
 
+    def test_witnesses_of_round_5_s_mutants(self):
+        # main's option tables in the floor pass: an option that takes a value there hides the next word, as on main (bash runs no git here)
+        opts = {"sudo": "-u -g -h -p -C -U -r -t -D -R --user --group --host", "ionice": "-c -n -p", "watch": "-n",
+                "xargs": "-I -n -P -d -E -L -s -a -R -S --arg-file"}
+        self.allow([f"{w} {o} git push --force origin work" for w, os_ in opts.items() for o in os_.split()])
+        self.allow(["env -S", "(( MYIFS = 1 )); git status", "(( IFSX = 1 )); git status"])
+        self.deny(["sudo -T git push --force origin work",  # -T takes no value in main's table, so main reads git as the program
+                   "env -S $'git status\\ngit push --force origin work'",  # main checks the -S string as a command line
+                   "(( IFS = 1 )); false && IFS=' '; P=--force1origin1work; git push $P"])  # bash: [--force][origin][work]
+
     def test_the_floor_keeps_main_s_denials_that_the_model_alone_would_allow(self):
         # main denies these; bash would not run them as the guard fears, but main's verdict is the floor (escalation of #252)
         self.deny([f"nice FOO=1 {PUSH}", "F=--force-with-lease; (F=--force); git push $F origin work"])
