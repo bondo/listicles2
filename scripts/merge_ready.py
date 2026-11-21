@@ -21,12 +21,14 @@ Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the hea
 Exit status: 0 merged, 1 refused or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
 
+import base64
 import json
 import os
 import re
 import subprocess
 import sys
 import time
+import tomllib
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
@@ -44,21 +46,26 @@ TASKS_FILES = ("docs/tasks.toml",)
 OWNER_ONLY_FILES = {f.casefold() for f in (
     "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
     "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
-    "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md", "gradle/verification-metadata.xml", "gradlew", "gradlew.bat",
+    "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md", "docs/COLLABORATING.md",
+    "gradle/verification-metadata.xml", "gradlew", "gradlew.bat",
     "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")}  # the last two run through `ci_scope.py selftests` (a test keeps them in sync)
 OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".githooks/", ".tools/", "agents/", "scripts/hooks/", "docs/reviews/",
                                                    "docs/product/", "design/", "gradle/wrapper/", "config/licensee/"))
 OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh",
                                                           "CLAUDE.md", "CLAUDE.local.md",  # Claude Code loads these as agent instructions in any directory
-                                                          ".gitattributes", ".mcp.json", ".gitleaks.toml", ".gitleaksignore")}  # R5
+                                                          ".gitattributes", ".mcp.json", ".gitleaks.toml", ".gitleaksignore",  # R5
+                                                          "lint.xml", "lint-baseline.xml", "ProjectConfig.kt", "PackageConfig.kt")}  # R7: lint, Kotest
 REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
 GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md",), ("docs/milestones/",)  # drafts without a sign-off (not design/tokens.json, R3-01)
 _SEG = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"  # one path component: no dot-prefix, no "..", no space, no odd characters; matched case-sensitively
 GENERAL_ALLOW = tuple(re.compile(p) for p in (
-    rf"app/src/(?:main|test|androidTest)/kotlin(?:/{_SEG})+\.kt", rf"app/src/main/res(?:/{_SEG})+\.(?:xml|png|webp)",  # app sources, tests, resources
-    rf"core/(?!testing/)[a-z][a-z0-9_-]*/src/(?:main|test)/kotlin(?:/{_SEG})+\.kt",  # core module sources and tests (core/testing is gate infrastructure)
-    rf"docs(?:/{_SEG})+\.(?:md|csv|png|txt)", r"README\.md"))  # docs (the owner-only ones are refused by the lists above)
-GENERAL_GATE_RE = re.compile(r"/architecture/|nonetwork|robolectric|junit4engine|jdkapilevel")  # tests that are gates, wherever they sit (casefolded)
+    rf"app/src/(?:main|test|androidTest)/kotlin/dev/listicles(?:/{_SEG})+\.kt", rf"app/src/main/res(?:/{_SEG})+\.(?:xml|png|webp)",  # app sources, tests, res
+    rf"core/(?!testing/)[a-z][a-z0-9_-]*/src/(?:main|test)/kotlin/dev/listicles(?:/{_SEG})+\.kt",  # core module sources and tests (not core/testing)
+    rf"docs(?:/{_SEG})+\.(?:md|csv|png|txt)", r"README\.md", r"docs/tasks\.toml"))  # docs (owner-only ones refused by the lists); tasks.toml: tasks_problems
+# Tests and config that are gates, wherever they sit (casefolded): the architecture package, the no-network, Robolectric and JUnit 4 engine tests, classes
+# named like core/testing's (R7-02), and res/xml (backup, device-transfer and network-security rules, R7-06).
+GENERAL_GATE_RE = re.compile(r"/architecture/|nonetwork|robolectric|junit4engine|jdkapilevel|/dev/listicles/testing/|/res/xml/")
+KOTEST_CONFIG_RE = re.compile(r"AbstractProjectConfig|AbstractPackageConfig|io\.kotest\.provided|AutoScan")  # R7-01: project-level Kotest config
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
 DEPENDABOT_FILES = ("gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar")
@@ -256,6 +263,9 @@ def file_problems(kind, files, resolve):
         if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or patch is None or drops_draft_status(patch)):
             problems.append(f"{name}: removes or renames a working draft, has no patch to check, or removes a '{DRAFT_STATUS}' status line "
                             "(a sign-off is the owner's)")
+        added = [ln for _, block in _changed_lines(patch or "") for ln in block]
+        if kind == "general" and name.endswith(".kt") and (patch is None or any(KOTEST_CONFIG_RE.search(ln) for ln in added)):
+            problems.append(f"{name}: no patch to check, or it touches Kotest project config ({KOTEST_CONFIG_RE.pattern})")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
         if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
@@ -269,6 +279,20 @@ def file_problems(kind, files, resolve):
             elif check is pin_only:
                 problems += pin_tag_problems(name, patch, resolve)
     return problems
+
+
+def tasks_problems(api, repo, base, sha):
+    """Reasons docs/tasks.toml at the head changes more than the `status` and `pr` of agent tasks against the base (R7-04, owner decision #15 7059534826)."""
+    try:
+        old, new = (tomllib.loads(base64.b64decode(api.get(f"repos/{repo}/contents/docs/tasks.toml?ref={ref}")["content"]).decode()) for ref in (base, sha))
+        a, b = ({task["id"]: task for task in d.get("task", [])} for d in (old, new))
+    except (KeyError, ValueError, TypeError) as e:
+        return [f"docs/tasks.toml cannot be compared with the base ({type(e).__name__}): owner-only"]
+    if {k: v for k, v in old.items() if k != "task"} != {k: v for k, v in new.items() if k != "task"} or a.keys() != b.keys():
+        return ["docs/tasks.toml: the file header or the set of tasks changed (only `status` and `pr` of agent tasks may change)"]
+    rest = lambda task: {k: v for k, v in task.items() if k not in ("status", "pr")}  # noqa: E731  # justified: two-use local helper
+    return [f"docs/tasks.toml: task {i} changes more than `status` and `pr`, or is an owner task" for i in a
+            if a[i] != b[i] and (rest(a[i]) != rest(b[i]) or "owner" in (a[i].get("assignee"), b[i].get("assignee")))]
 
 
 def check_problems(api, repo, base, sha):
@@ -320,6 +344,8 @@ def evaluate(api, repo, n, sha, kind, resolve):
         if m:
             problems.append(f"closing keyword in {where}: {m.group(0)!r} (rephrase, e.g. 'see issue N')")
     problems += file_problems(kind, files, resolve)
+    if kind == "general" and any("docs/tasks.toml" in (f["filename"], f.get("previous_filename")) for f in files):
+        problems += tasks_problems(api, repo, pr["base"]["ref"], sha)
     problems += check_problems(api, repo, pr["base"]["ref"], sha)
     return pr, problems
 
