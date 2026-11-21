@@ -277,6 +277,16 @@ class RolesYaml(unittest.TestCase):
                 self.assertIn(needle, impl, f"{'/'.join(path)}: {needle}")
             self.assertTrue(any(r.startswith("| **Merge agent**") for r in rows), f"{'/'.join(path)}: no merge agent row")
 
+    def test_the_merge_agent_rows_follow_7007421567(self):  # R1-03: D2 update-branch heads, D1 and D3 owner-approved owner-only PRs
+        orch = next(line for line in read("docs", "ORCHESTRATION.md").splitlines() if line.startswith("| **Merge agent**"))
+        plan = next(line for line in read("docs", "PLAN.md").splitlines() if line.startswith("| **Merge agent**"))
+        self.assertIn("except for update-branch merge commits of main", orch)
+        self.assertIn("once the owner's approval is recorded on #15", plan)
+
+    def test_deescalation_allows_an_owner_decision_and_the_roles_header_names_the_exception(self):  # R1-06
+        self.assertIn("only through the metrics retro (section 9.4) or an owner decision", read("docs", "PLAN.md"))
+        self.assertIn("7032210967", "\n".join(read("agents", "roles.yaml").splitlines()[:6]))
+
     def test_plan_no_longer_says_the_owner_merges_every_pr(self):
         plan = read("docs", "PLAN.md")
         for old in ("the owner squash-merges", "you squash-merge"):
