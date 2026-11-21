@@ -124,7 +124,7 @@ jobs:
           api-level: 34
           arch: x86_64
           target: google_apis
-          script: ./gradlew -q --console=plain :app:connectedDebugAndroidTest
+          script: ./gradlew -q --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest
 
   screenshots:
     name: screenshots
