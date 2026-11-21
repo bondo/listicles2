@@ -2,7 +2,8 @@
 Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
-docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/reviews/README.md and handoff/TEMPLATE.md).
+docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md, agents/roles.yaml
+and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -642,7 +643,8 @@ RULES = (
     Rule(
         "orch-merge-request", ("orchestrator",),
         (
-            r"merge request \(§7\.5, retro r2, r6\)", r"before you ask the owner to merge, check that",
+            r"merge request \(§7\.5, retro r2, r6\)",
+            r"before you send it \(to the merge agent, or to the owner for an owner-only pr\), check that",
             r"\(1\) the pr body is refreshed \(scope, review table, test evidence; no \"still to do\" or \"not yet reviewed\"\)",
             r"\(2\) the request says squash",
             r"\(3\) no commit message or pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
@@ -949,6 +951,35 @@ RULES = (
             r"never archive a session that does not clearly belong to this project \(list it for the owner\)",
         ),
         "worker sessions are archived as soon as done; the new orchestrator sweeps after every handover (owner decisions of 2026-11-17)",
+    ),
+    Rule(
+        "orch-owner-merge-exceptions", ("orchestrator",),
+        (
+            r"ask the owner for decisions and for the merges of owner-only prs \(the merge agent merges every other ready pr, §7\.5\)",
+        ),
+        "the orchestrator asks the owner for owner-only merges only; the merge agent merges every other READY PR (§7.5; issue 147)",
+        forbidden=(r"ask the owner for merges and decisions",),
+    ),
+    Rule(
+        "orch-token-rules", ("orchestrator",),
+        (
+            r"token rules \(§7\.2\.3, owner decision #15 comment 7070278995\)",
+            r"a `ready_nits_only` review goes to the merge request with its nits accepted \(no fix round, no re-review, no follow-up issue\)",
+            r"a re-check of a small fix-only or docs-only commit goes to a sonnet medium `recheck-reviewer`; full rounds stay opus",
+            r"on guard and prompt_rules hardening prs the second round that finds new bypass forms ends the pr "
+            r"\(accepted residuals, f18\)",
+            r"reviewer effort strictly per `agents/roles\.yaml`",
+            r"write each session's `metrics:session` row \(§6\.1\) just before archiving it",
+        ),
+        "the orchestrator carries the token rules of §7.2.3 (owner decision, #15 comment 7070278995) and logs a metrics:session row per archived session",
+    ),
+    Rule(
+        "reviewer-recheck", ("reviewer",),
+        (
+            r"a re-check reviewer \(sonnet, medium effort, role `recheck-reviewer` in `agents/roles\.yaml`, orchestration §7\.2\.3\) "
+            r"checks only the findings and the commit named in the spawn message",
+        ),
+        "the reviewer prompt covers the Sonnet medium re-check of a small fix-only or docs-only commit (§7.2.3)",
     ),
 )
 
@@ -1342,6 +1373,102 @@ DOC_RULES = (
         ),
         "ORCHESTRATION 8.5: 3 design rounds, as roles.yaml, design-reviewer.md and orchestrator.md (rev 46 row 5)",
         forbidden=(r"round \{round\} of max 2", r"max 2 rounds per design pr"),
+    ),
+    DocRule(
+        "orch-token-rules", ORCH,
+        (
+            r"### 7\.2\.3 token rules \(owner decision, #15 comment 7070278995, 2026-11-21\)",
+            r"the one home of these rules; `review\.md`, `agents/roles\.yaml` and the orchestrator prompt link here",
+            r"\*\*nits are accepted without a round\.\*\* a review with verdict `ready_nits_only` goes to the merge request \(§7\.5\)\. "
+            r"its nits are recorded as accepted in the pr review table and the round row: no fix round, no re-review, no follow-up issue",
+            r"\*\*a small fix is re-checked cheaply\.\*\* a re-check of a small fix-only or docs-only commit \(the fixes of the previous round's "
+            r"findings, each about 30 changed lines or fewer, or docs only\) is the delta review of §7\.2 done by a fresh sonnet medium reviewer "
+            r"\(`recheck-reviewer` in `agents/roles\.yaml`\), focused on those findings\. full rounds stay opus at the effort `agents/roles\.yaml` "
+            r"gives the reviewer",
+            r"\*\*guard and prompt_rules hardening prs stop early\.\*\* on a pr that hardens `scripts/guards\.sh`, "
+            r"`scripts/hooks/pretooluse_guard\.py` or `scripts/prompt_rules\.py`, the second round that finds new bypass forms ends the pr\. "
+            r"the forms are recorded as accepted residuals in the pr body \(the hook is a tripwire, f18\) and the pr goes to the merge request; "
+            r"any other finding above nit is still fixed",
+            r"\*\*reviewer effort\*\* is strictly per `agents/roles\.yaml`, which owns the rule",
+            r"### 6\.1 session row \(one per session, written as it is archived\)",
+            r"write it just before `archive_session` \(§7\.4\), for every role, reviewers included",
+            r"\*\*archive\*\* \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it \(result read, "
+            r"no follow-up planned\) and its `metrics:session` row \(§6\.1\) is written",
+            r"a small fix-only or docs-only commit gets the cheap re-check of §7\.2\.3",
+        ),
+        "ORCHESTRATION 7.2.3: ready_nits_only accepts its nits, cheap Sonnet re-check, hardening-PR stop, one metrics:session row per archived session "
+        "(owner decision, #15 comment 7070278995)",
+        forbidden=(r"a delta review always runs; there is no owner-acceptance alternative, for any pr\. record",),
+    ),
+    DocRule(
+        "orch-owner-merge-exceptions", ORCH,
+        (
+            r"owner-only prs wait in the owner's queue \(`is:open is:pr draft:false`\); every other ready pr goes to the merge agent",
+            r"\*\*before the merge request\*\* \(to the merge agent, or to the owner for an owner-only pr\) the orchestrator checks",
+            r"scan the pr body for them before the merge request",
+            r"after each merge by the owner, the \*\*orchestrator\*\* updates the next ready owner-only pr",
+            r"the merge agent merges it, or the owner for an owner-only pr \(§7\.5\)",
+        ),
+        "ORCHESTRATION 7.2, 7.5, 7.6: the owner merges owner-only PRs only; the merge agent merges every other READY PR (issue 147)",
+        forbidden=(
+            r"the owner's queue is `is:open is:pr draft:false`", r"before asking the owner to merge", r"after each owner merge, the \*\*orchestrator\*\*",
+            r"because it is mergeable; the owner merges\.",
+        ),
+    ),
+    DocRule(
+        "orch-labels-exist", ORCH,
+        (r"\*\*labels exist\.\*\* `orchestrator-state` and `owner-todo` were created by task m0-o9 and are in use",),
+        "ORCHESTRATION 4.5: the orchestrator-state and owner-todo labels exist (M0-O9 is done; #260 item 11)",
+        forbidden=(r"are not created yet", r"opens issues without the label"),
+    ),
+    DocRule(
+        "review-token-rules", "REVIEW.md",
+        (
+            r"6\. \*\*token rules\*\* \(owner decision, #15 comment 7070278995; the rules are in `docs/orchestration\.md` §7\.2\.3\): "
+            r"a `ready_nits_only` verdict is final, its nits are accepted with no fix round, no re-review and no follow-up issue; "
+            r"a re-check of a small fix-only or docs-only commit is a sonnet medium reviewer \(`recheck-reviewer`\), not a full round; "
+            r"on guard and prompt_rules hardening prs the second round that reports new bypass forms ends the pr",
+        ),
+        "REVIEW.md Loop and cap item 6 links the token rules of ORCHESTRATION 7.2.3 (owner decision, #15 comment 7070278995)",
+    ),
+    DocRule(
+        "review-dispatchers", "REVIEW.md",
+        (
+            r"14\. \*\*dispatchers \(`:core:data` and `:app` prs\)\*\*: until detekt 2\.0 is stable and gives the android modules type resolution "
+            r"\(#218, tracked on m6\), check by hand that dispatchers are injected and no `dispatchers\.io`, `dispatchers\.default` or "
+            r"`dispatchers\.main` is hard-coded in a class \(`docs/android-best-practices\.md` §5\); a hard-coded dispatcher is a `minor` finding",
+        ),
+        "REVIEW.md What to check item 14: manual dispatcher-injection check on :core:data and :app PRs until detekt 2.0 is stable (#218)",
+    ),
+    DocRule(
+        "roles-recheck-reviewer", "agents/roles.yaml",
+        (
+            r"recheck-reviewer: model: sonnet effort: medium session: fresh, for the re-check of a small fix-only or docs-only commit",
+            r"prompt: agents/prompts/reviewer\.md",
+            r"reviewer effort is strictly per `max_effort_when`: never max for consistency",
+        ),
+        "roles.yaml: the Sonnet medium recheck-reviewer, and reviewer effort strictly per max_effort_when (owner decision, #15 comment 7070278995)",
+        forbidden=(r"(?<!never )max for consistency", r"recheck-reviewer: model: opus"),
+    ),
+    DocRule(
+        "followups-title-forms", "docs/FOLLOW-UPS.md",
+        (
+            r"issue title: `follow-up from pr #<n>: <finding title>` \(the form in use\) or `\[follow-up\] <finding title>`; a standing item is "
+            r"`track: <what>`, a finding of a repo-wide review is `repo review \(<aspect>\): <finding title>`",
+        ),
+        "FOLLOW-UPS section 7: the issue title forms in use are allowed (#260 item 10)",
+        forbidden=(r"issue title: `\[follow-up\] <finding title>`\. labels",),
+    ),
+    DocRule(
+        "followups-burndown-alerts", "docs/FOLLOW-UPS.md",
+        (r"it also reviews every open dependabot alert \(`docs/security\.md` §1 item 2\)",),
+        "FOLLOW-UPS section 8: the Mx-FU burn-down includes the Dependabot alert review of SECURITY.md (#260 item 9)",
+    ),
+    DocRule(
+        "branch-protection-ten-jobs", "docs/BRANCH-PROTECTION.md",
+        (r"only the ten jobs above",),
+        "BRANCH-PROTECTION section 4: ten required jobs, as the ruleset and section 2 (#260 item 1)",
+        forbidden=(r"only the eight jobs above",),
     ),
 )
 
