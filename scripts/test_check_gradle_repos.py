@@ -418,7 +418,8 @@ class PluginManagementReachesDependencies(unittest.TestCase):
             "dependencyResolutionManagement { repositories { mavenCentral() } }",
         ):
             with self.subTest(extra=extra):
-                self.assertEqual(c.check_settings(with_extra("", plugin_extra=f"    {extra}\n")), PLUGIN_REACHES_DEP)
+                got = c.check_settings(with_extra("", plugin_extra=f"    {extra}\n"))
+                self.assertEqual([p for p in got if p.startswith("pluginManagement")], PLUGIN_REACHES_DEP)  # a nested block may add more
 
     def test_the_reverse_direction_is_harmless(self):
         extra = "pluginManagement.repositories.mavenCentral()"

@@ -28,6 +28,11 @@ BACKOFF = "systemProp.org.gradle.internal.repository.initial.backoff"
 
 CHAR_LITERAL = re.compile(r"'(?:[^\\'\n]|\\(?:u[0-9a-fA-F]{4}|[^\n]))'")
 INCLUDE = re.compile(r"\binclude\w*\s*\(")
+# The mirror as a repository URL: maven("<url>"), maven(url = "<url>"), maven(uri("<url>")), url = [uri(]"<url>"), setUrl([uri(]"<url>"),
+# with a plain or raw string. A val or any other call holding the URL does not declare the repository.
+MIRROR_REPOSITORY = re.compile(
+    r"(?:\bmaven\s*\(|\burl\s*=|\bsetUrl\s*\()\s*(?:url\s*=\s*)?(?:uri\s*\(\s*)?\"+" + re.escape(MIRROR) + r"\"+"
+)
 ONLY_GOOGLE = re.compile(r"\s*google\s*\(\s*\)\s*;?\s*")
 
 
@@ -254,7 +259,8 @@ def check_settings(text):
         else:
             # The mirror and the first mention of mavenCentral are looked for in the whole block, not only in braced
             # repositories { } bodies, so repositories.mavenCentral() before the block cannot hide behind them.
-            mirror = outer_kept.find(f'"{MIRROR}"')
+            found = MIRROR_REPOSITORY.search(outer_kept)
+            mirror = found.start() if found else -1
             central = re.search(r"\bmavenCentral\s*(?:\(\s*\)|\{\s*\})", repos)  # mavenCentral() or an empty mavenCentral { }
             first_central = re.search(r"(?<!\w)mavenCentral\b", outer)
             if mirror < 0:
@@ -265,6 +271,10 @@ def check_settings(text):
                 problems.append(f"{name}: Maven Central mirror must come before mavenCentral()")
         if name in unfiltered:
             problems.append(f"{name}: google() needs a content filter")
+    for a, b in _spans(blanked, "pluginManagement"):  # it runs first, so what it adds to the dependency repositories comes before the mirror
+        if re.search(r"(?<!\w)dependencyResolutionManagement\b", blanked[a:b]):
+            problems.append("pluginManagement: refers to dependencyResolutionManagement, so repositories added there come before its own mirror")
+            break
     where = " and ".join(BLOCKS)
     if None in unfiltered:
         problems.append(f"settings.gradle.kts: google() outside {where} needs a content filter")
