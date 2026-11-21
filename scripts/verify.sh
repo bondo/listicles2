@@ -42,6 +42,7 @@ else
   step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
   step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py
 fi
+step pit-config-tests python3 -I scripts/test_check_pit_config.py
 step tasks-tests python3 -I scripts/test_tasks.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
