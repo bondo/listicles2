@@ -69,6 +69,7 @@ ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\+?=")  # NAME=value and NAME+=value (bash appends)
+MAIN_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")  # the floor pass reads assignments as main did: this rule, at every position
 GIT_CONFIG_NAME = re.compile(r"^(GIT_CONFIG(_GLOBAL|_SYSTEM|_PARAMETERS)?|GIT_CONFIG_KEY_[0-9]+)$")
 ASSIGN_PARTS = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(\+?)=(.*)$", re.S)
 INDEXED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\[")  # bash never applies NAME[k]=v in front of a command, but still runs the command
@@ -198,7 +199,9 @@ def protection(path, cwd):
         while (nb := re.sub(r"\$\{[^{}]*\}|\$\([^()]*\)|`[^`]*`", "", bare)) != bare:
             bare = nb
         bare = re.sub(r"\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]", "", bare)  # R3-05: special parameters are empty in the Bash tool's shell
-        kinds = {_suffix_kind(path), _suffix_kind(bare), _suffix_kind(re.split(r"[)}'\"\\`]", path)[-1])}
+        loose = re.sub(r"\$\{[^}]*\}|\$\([^)]*\)", "", bare)  # R4-07: ${x#{} and $(: '(') hold a { or (, so the loop above leaves them
+        kinds = {_suffix_kind(path), _suffix_kind(bare), _suffix_kind(loose), _suffix_kind(re.split(r"[)}'\"\\`]", path)[-1]),
+                 "process" if re.search(r"\$[({]", bare) else None}  # an expansion the guard cannot strip may split any protected name
         return "always" if "always" in kinds else "process" if "process" in kinds else None
     abs_ = os.path.normpath(os.path.join(cwd, path))
     if HOME_GIT.search(os.path.realpath(abs_)):
@@ -786,7 +789,9 @@ def check_git(words, state, assigns_dirty=False):
 def is_assign(w, mode):
     """mode "shell": the shell takes a word as an assignment only when its name and the = are unquoted ("FOO=x" and FOO\\=x are command
     names). mode "env" (right after env or sudo): the program takes every word with an = as one, whatever its name or quotes. mode "prog"
-    (after nice, timeout, xargs, find -exec ...): the word is the program, bash runs it as a file name (R1-01)."""
+    (after nice, timeout, xargs, find -exec ...): the word is the program, bash runs it as a file name (R1-01). mode "floor": main's rule."""
+    if mode == "floor":
+        return bool(MAIN_ASSIGN.match(w))
     if mode == "env":
         return "=" in w
     return mode == "shell" and bool(ASSIGN.match(w)) and getattr(w, "asg", None) is not False
@@ -839,7 +844,7 @@ def unwrap(words, mode="shell"):
         if base in WRAPPERS:
             opts, npos = WRAPPERS[base]
             seen.add(base)
-            mode = "shell" if base == "time" else "env" if base in ("env", "sudo", "doas") else "prog"
+            mode = mode if mode == "floor" else "shell" if base == "time" else "env" if base in ("env", "sudo", "doas") else "prog"
             i += 1
             first_opt = i
             while i < len(words) and words[i].startswith("-") and words[i] != "--":
@@ -972,18 +977,23 @@ def check_command_string(command, state, depth=0):
                 r"\bgit\b|CLAUDE\.md|REVIEW\.md|\.claude|\.github|\.githooks|agents/|scripts/|\.git/|mark-ready|update-branch", command + " " + flat):
             deny("could not parse this command (unbalanced quote or substitution); simplify it")
         return
-    stack, has_case = [], any(c.words[:1] == ["case"] for c in cmds)  # R3-02: the ) that ends a case pattern is not a subshell's end
-    for cmd in cmds:
-        if cmd.group == "open":
-            stack.append((state["cwd"], state["known"], dict(state["vars"]), state.get("ifs"), state.get("ifs_unknown")))
+    stack, case, floor = [], any("case" in c.words for c in cmds), state.get("floor")  # R3-02, R4-12: a case pattern's ) pops a subshell's entry
+    for k, cmd in enumerate(cmds):
+        if cmd.group == "open":  # (( is arithmetic, not two subshells: what it assigns stays (R4-14)
+            twin = any(0 <= j < len(cmds) and cmds[j].group == "open" for j in (k - 1, k + 1))
+            stack.append((state["cwd"], state["known"], dict(state["vars"]), state.get("ifs"), state.get("ifs_unknown"), case or twin))
             continue
         if cmd.group == "close":
             if stack:
-                state["cwd"], state["known"], *saved = stack.pop()
-                if not has_case:
-                    state["vars"], state["ifs"], state["ifs_unknown"] = saved
+                cwd, known, saved, ifs, unknown, loose = stack.pop()
+                if not floor:  # the floor keeps main's scope: a ) restores only the directory, the model also restores variables and IFS
+                    moved = (state.get("ifs"), state.get("ifs_unknown")) != (ifs, unknown)
+                    state["vars"], state["ifs"], state["ifs_unknown"] = saved, ifs, unknown or (loose and moved)
+                state["cwd"], state["known"] = cwd, known and not (loose and state["cwd"] != cwd)
             continue
         for s in cmd.subs:
+            if not floor and s.startswith("(") and re.search(r"\bIFS\b", s):  # $((IFS=1)) assigns in this shell (R4-14)
+                state["ifs_unknown"] = state["ifs_taint"] = True
             check_command_string(s, child(state), depth + 1)
         check_simple(cmd, state, depth)
 
@@ -1057,7 +1067,8 @@ def check_mark_ready(cmd, assigns, words, wrappers, state):
 
 def split_value(v, ifs):
     """Bash's field splitting of the value v of an unquoted expansion: (fields, lead, trail). IFS blanks collapse and are trimmed, every other IFS
-    character ends a field (so a leading or doubled one leaves an empty field); lead and trail say that a delimiter touches the start or the end."""
+    character ends a field (so a leading or doubled one leaves an empty field); lead says that leading blanks end the text before the value, trail
+    that a delimiter touches its end."""
     ifs = " \t\n" if ifs is None else ifs
     if not v or not ifs:
         return ([v] if v else []), False, False
@@ -1069,8 +1080,9 @@ def split_value(v, ifs):
         fields.append(v[pos:m.start()])
         pos = m.end()
     fields.append(v[pos:])
-    lead, trail = bool(ms) and ms[0].start() == 0, bool(ms) and ms[-1].end() == len(v)
-    if lead and not re.search(oc, ms[0].group()):
+    lead = bool(ms) and ms[0].start() == 0 and not re.search(oc, ms[0].group())  # R4-11: after a leading IFS character the empty field joins the text before
+    trail = bool(ms) and ms[-1].end() == len(v)
+    if lead:
         fields.pop(0)  # leading blanks leave no empty field
     if trail:
         fields.pop()  # nor does a trailing delimiter
@@ -1126,19 +1138,39 @@ def track_ifs(a, state):
         state["ifs"], state["ifs_unknown"] = val, bool(re.search(r"[$`]", val)) or bool(state.get("ifs_taint"))
 
 
+def nameref(prog, args):
+    return prog in ("declare", "typeset", "local") and any(re.fullmatch(r"-[a-zA-Z]*n[a-zA-Z]*", a) for a in args)
+
+
 def sets_ifs(cmd, prog, args):
-    """R3-06: unset, read, printf -v, a nameref, a for loop and eval can set IFS where track_ifs cannot follow."""
-    text = " ".join(args)
-    if cmd.words[:2] == ["for", "IFS"] or prog == "eval":
-        return cmd.words[:2] == ["for", "IFS"] or bool(re.search(r"\bIFS\b", text))
-    verbs = ("unset", "read", "mapfile", "readarray", "printf", "export", "declare", "typeset", "local", "readonly")
-    return prog in verbs and bool(re.search(r"\bIFS\b(?!\+?=)", text))
+    """R3-06, R4-14, R4-15: how a statement other than IFS=v changes IFS. "default" for unset IFS; "unknown" for read, printf -v, a nameref, a for
+    loop, eval, let, ${IFS:=v} and a name built from an expansion; None when IFS is no name argument (a message that mentions IFS, export IFS)."""
+    k = 0
+    while k < len(cmd.words) and cmd.words[k] in RESERVED - {"for"}:
+        k += 1
+    if cmd.words[k:k + 2] == ["for", "IFS"] or any(re.search(r"\$\{IFS:?=", w) for w in cmd.words):
+        return "unknown"
+    if prog in ("eval", "let"):
+        return "unknown" if re.search(r"\bIFS\b", " ".join(args)) else None
+    if prog == "printf":
+        names = [a[2:] or b for a, b in zip(args, args[1:] + [""], strict=True) if a.startswith("-v")]
+    elif prog in ("unset", "read", "mapfile", "readarray", "export", "declare", "typeset", "local", "readonly"):
+        names = [a for a in args if not a.startswith("-") and "=" not in a]
+        names += [a.split("=", 1)[1] for a in args if "=" in a and not a.startswith("-") and nameref(prog, args)]
+    else:
+        return None
+    if any(re.search(r"[$`]", a) for a in names):
+        return "unknown"
+    if "IFS" not in names or prog in ("export", "readonly"):
+        return None
+    return "default" if prog == "unset" and all(a == "-v" or not a.startswith("-") for a in args) else "unknown"
 
 
 def record_var(a, state):
     """Remember the value of NAME=v, NAME+=v (also by export and declare, R3-09) and the IFS it may set."""
     name, plus, val = ASSIGN_PARTS.match(a).groups()
-    track_ifs(a, state)
+    if not state.get("floor"):  # main tracked no IFS
+        track_ifs(a, state)
     if plus:  # NAME+=v appends to a value we know (R1-03: also text that still holds an expansion); an unknown one is forgotten
         old = state["vars"].get(name)
         if old is None:
@@ -1147,6 +1179,8 @@ def record_var(a, state):
             state["vars"][name] = old + expand(Word(val), state)
     elif val in BRANCH_SUBS:
         state["vars"][name] = branch(state["cwd"]) or val
+    elif val in ("$IFS", "${IFS}") and not state.get("floor") and not state.get("ifs_unknown"):  # OLDIFS=$IFS copies the value (R4-15)
+        state["vars"][name] = " \t\n" if state.get("ifs") is None else state["ifs"]
     elif "$" in val or "`" in val:
         state["vars"].pop(name, None)
     else:
@@ -1160,7 +1194,8 @@ def check_simple(cmd, state, depth):
         deny('a $"..." word is translated by bash when it parses the line, so the guard cannot read it; write "..." without the $')
     for t in cmd.writes:
         guard_target(expand(t, state), state, "redirect to")
-    assigns, words, nested, wrappers = unwrap(cmd.words, "prog" if cmd.prog_first else "shell")
+    floor = state.get("floor")  # the floor pass judges the line with main's semantics, and check_bash denies if either pass does
+    assigns, words, nested, wrappers = unwrap(cmd.words, "floor" if floor else "prog" if cmd.prog_first else "shell")
     for a in assigns:
         if ASSIGN.match(a):  # after env or sudo every word with an = is one (A.B=1), but only NAME=v can be read
             check_assign(expand(a, state))
@@ -1173,21 +1208,25 @@ def check_simple(cmd, state, depth):
         deny("an indexed assignment such as NAME[k]=v in front of a command is not an assignment in bash, but the command still runs; remove it")
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values (R2-09: env and sudo set nothing in this shell)
-            if wrappers - {"time"}:
+            if wrappers - {"time"} and not floor:  # main recorded these too
                 continue
             record_var(a, state)
         return
-    if sets_ifs(cmd, os.path.basename(words[0]), words[1:]):
+    how = None if floor else sets_ifs(cmd, os.path.basename(words[0]), words[1:])
+    if how == "default":
+        state["ifs"], state["ifs_unknown"] = None, bool(state.get("ifs_taint"))
+    elif how:
         state["ifs_unknown"] = state["ifs_taint"] = True
-    if re.search(r"[$`]", words[0]) and any(a in SENSITIVE_SUBS for a in words[1:4]):  # R3-09: a tracked value may be stale, so keep this floor
-        deny("the command name is built from a variable or substitution; write it out")
-    rest = []
-    for w in words[1:]:
-        fs = expand_fields(w, state) if getattr(w, "ud", False) else [expand(w, state)]
-        for f in fs:
-            f.glob = f.glob or getattr(w, "glob", False)
-        rest += fs
-    first = expand_fields(words[0], state) if getattr(words[0], "ud", False) else [expand(words[0], state)]
+    if floor:  # main expanded without splitting, and never the command name
+        rest, first = [expand(w, state) for w in words[1:]], [words[0]]
+    else:
+        rest = []
+        for w in words[1:]:
+            fs = expand_fields(w, state) if getattr(w, "ud", False) else [expand(w, state)]
+            for f in fs:
+                f.glob = f.glob or getattr(w, "glob", False)
+            rest += fs
+        first = expand_fields(words[0], state) if getattr(words[0], "ud", False) else [expand(words[0], state)]
     if first != [words[0]]:  # R1-08, R2-08: X="git push"; $X --force origin work, also as "$X"; only an unquoted $X splits
         sub = Cmd()
         sub.words, sub.heredocs, sub.piped, sub.prog_first = first + rest, cmd.heredocs, cmd.piped, True
@@ -1197,6 +1236,8 @@ def check_simple(cmd, state, depth):
     words = [words[0]] + rest
     prog, args = os.path.basename(words[0]), words[1:]
     if "$" in words[0] or "`" in words[0]:
+        if floor and any(a in SENSITIVE_SUBS for a in args[:3]):  # R3-09: main's check; a tracked value may be stale
+            deny("the command name is built from a variable or substitution; write it out")
         return
     if prog in LINTER_FLAGS:
         check_linter(prog, args)
@@ -1219,13 +1260,18 @@ def check_simple(cmd, state, depth):
         return
     if prog in ("export", "declare", "typeset", "readonly", "local"):
         for a in args:
+            if "=" in a and re.search(r"[$`]", a.split("=", 1)[0]):  # R4-10: export $T=v, export GIT_CONFIG_PARAMETERS$X=v
+                deny("an assignment whose name is built from a variable or substitution cannot be checked; write the name out")
             if ASSIGN.match(a):
                 check_assign(a)
-                record_var(a, state)
+                if not floor:  # R4-09: main kept the old value, because the statement may not run in this shell
+                    record_var(a, state)
     if prog in ("export", "declare", "typeset", "readonly", "local", "read", "mapfile", "readarray", "printf"):  # R2-13: set without NAME=v
         pairs = zip(args, args[1:] + [""], strict=True)
         names = args if prog != "printf" else [a[2:] if len(a) > 2 else b for a, b in pairs if a.startswith("-v")]
-        if prog in ("declare", "typeset", "local") and any(re.fullmatch(r"-[a-zA-Z]*n[a-zA-Z]*", a) for a in args):  # a nameref: R=GIT_CONFIG_X
+        if nameref(prog, args):  # R=GIT_CONFIG_X; R4-13: declare -n R; R=X sets the target later, out of sight
+            if any(not a.startswith("-") and ("=" not in a or re.search(r"[$`]", a.split("=", 1)[1])) for a in args):
+                deny("a nameref without a literal target cannot be followed; write declare -n NAME=TARGET")
             names += [a.split("=", 1)[1] for a in args if "=" in a and not a.startswith("-")]
         if any(GIT_CONFIG_NAME.match(a) for a in names):
             deny("a GIT_CONFIG_* variable set this way (read, printf -v, export without a value) cannot be checked; assign it with NAME=value")
@@ -1285,14 +1331,16 @@ def check_simple(cmd, state, depth):
 def guard_target(path, state, what="write to"):
     """guard_path, but after a cd whose target could not be resolved a relative path cannot be judged: deny it."""
     if not state["known"] and path and not os.path.isabs(path) and not path.startswith(("~", "$")):
-        deny(f"{what} {path}: an earlier cd target is built from a variable or substitution; write the directory out")
+        deny(f"{what} {path}: an earlier cd target is built from a variable or substitution, or a ) on a line with a case may end the wrong "
+             "subshell; write the directory out")
     guard_path(path, state["cwd"], what)
 
 
 def check_bash(command, cwd):
     if re.search("(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")\\\r?\n", command):  # R5-02: `mark-ready.sh\<newline>1` joins to a different word
         deny("a line continuation right after a wrapper name is not allowed; write the exact call, e.g. `scripts/mark-ready.sh <PR number>`")
-    check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command})
+    for floor in (True, False):  # main's verdict is a floor: the line is denied if main's semantics or the model deny it (escalation of #252)
+        check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command, "floor": floor})
 
 
 def main():
