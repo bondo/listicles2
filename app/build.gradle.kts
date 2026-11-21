@@ -11,11 +11,11 @@ plugins {
 apply(from = rootProject.file("config/licensee/policy.gradle"))
 
 android {
-    namespace = "dev.listicles.app"
+    namespace = "dk.bjarkebjarke.tally"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.listicles.app"
+        applicationId = "dk.bjarkebjarke.tally"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
@@ -38,6 +38,8 @@ android {
 
     testOptions {
         unitTests.all { it.useJUnitPlatform() }
+        // RenameTest reads the merged manifest and string resources.
+        unitTests.isIncludeAndroidResources = true
     }
 
     buildFeatures {
@@ -84,7 +86,7 @@ class RobolectricOfflineArgs(
             "-Drobolectric.offline=true",
             "-Drobolectric.dependency.dir=${dependencyDir.get().asFile.absolutePath}",
             // RobolectricUnderNetworkBlockTest checks that Robolectric's SDK level (robolectric.properties) follows it.
-            "-Dlisticles.targetSdk=$targetSdk",
+            "-Dtally.targetSdk=$targetSdk",
         )
 }
 
@@ -167,9 +169,9 @@ kover {
                 annotatedBy("androidx.compose.runtime.Composable", "androidx.compose.ui.tooling.preview.Preview")
                 // Android entry points and generated classes have no JVM-testable logic.
                 classes(
-                    "dev.listicles.app.MainActivity",
-                    "dev.listicles.app.R",
-                    "dev.listicles.app.R$*",
+                    "dk.bjarkebjarke.tally.MainActivity",
+                    "dk.bjarkebjarke.tally.R",
+                    "dk.bjarkebjarke.tally.R$*",
                     "*ComposableSingletons*",
                 )
             }

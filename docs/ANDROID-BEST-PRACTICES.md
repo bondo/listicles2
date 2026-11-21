@@ -15,7 +15,7 @@ section ("strongly recommended" and so on) are Google's own labels. Google says 
 
 Facts about this repo were read from `build.gradle.kts`, `app/build.gradle.kts`, `gradle.properties`,
 `config/detekt/detekt.yml`, `scripts/verify.sh`, `docs/PLAN.md` and `REVIEW.md` on `main` at `ed6ec5b`.
-The architecture rules (M0.5-11) are on main: plain JUnit tests in `core/domain/src/test/kotlin/dev/listicles/architecture/` (`ArchitectureRules.kt`, `DomainNoFloatingPointTest.kt`, `UiNoRawValuesTest.kt`) run in `verify.sh` unit tests. They are JUnit tests that use Konsist to collect the files and regex rules to check their text: no floating point in domain code, and no raw colours, `dp`, `sp` or `em` in UI outside the theme.
+The architecture rules (M0.5-11) are on main: plain JUnit tests in `core/domain/src/test/kotlin/dk/bjarkebjarke/tally/architecture/` (`ArchitectureRules.kt`, `DomainNoFloatingPointTest.kt`, `UiNoRawValuesTest.kt`) run in `verify.sh` unit tests. They are JUnit tests that use Konsist to collect the files and regex rules to check their text: no floating point in domain code, and no raw colours, `dp`, `sp` or `em` in UI outside the theme.
 
 ## 1. Architecture
 Sources: [Guide to app architecture](https://developer.android.com/topic/architecture) and
@@ -33,7 +33,7 @@ Sources: [Guide to app architecture](https://developer.android.com/topic/archite
 | Reusable UI components use plain state holder classes, not ViewModels | review (M1) |
 | Dependency injection, constructor injection first; Hilt when the app has several screens with ViewModels (PLAN section 1 already chooses Hilt) | later (M1) |
 | Pure-Kotlin domain code with no Android classes | tooling in part: `core/domain` is its own JVM module; the no-float rule is tooling: `DomainNoFloatingPointTest` in the unit tests |
-| Use Jetpack libraries instead of hand-written boilerplate | review |
+| Use Jetpack libraries instead of hand-written boilerplate: lifecycle-aware collection (`collectAsStateWithLifecycle`), Navigation 3 for navigation, Hilt for dependency injection, DataStore for preferences | review |
 
 ## 2. Jetpack Compose
 Sources: [State hoisting](https://developer.android.com/develop/ui/compose/state-hoisting),

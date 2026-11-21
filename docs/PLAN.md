@@ -26,7 +26,7 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 | App Check | Play Integrity provider requiring **device integrity only**, not Play recognition or licensing (the default requires `PLAY_RECOGNIZED`, which a GitHub APK cannot meet[^pi]); debug provider in CI and the emulator; about two weeks of metrics before enforcing; set up before the first external tester (decided 2026-11-17) and enforced before it (owner, #204, #15 comment 7003828200) |
 | AI at runtime | No AI code and no LLM or cloud AI calls (on-device ML Kit only if barcode scanning returns after v1) |
 | Distribution | Signed APK on GitHub Releases on each `v*` tag, signed with an owner-held GitHub key (never committed). Play later, with its own Play App Signing key: **separate keys**, so moving from the GitHub APK to the Play build needs an uninstall (cloud data is kept; decided 2026-11-17). Play account type and the closed test are deferred until Play release is planned. Android developer verification: a free limited-distribution account when available in Denmark (owner task, issue #120) |
-| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then one escalation reviewer decides fix, split or owner) → the owner squash-merges |
+| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then one escalation reviewer decides fix, split or owner) → the merge agent squash-merges every READY PR that is not owner-only; an owner-only PR waits for the owner's approval (`docs/ORCHESTRATION.md` §7.5) |
 | Repo | **Public** (unlimited free GitHub Actions minutes). No secrets in the repo; secrets live in GitHub secrets |
 
 [^gsi]: https://developer.android.com/identity/sign-in/legacy-gsi-migration
@@ -460,7 +460,7 @@ enforce the rules rather than goodwill.
    * Danish and English plural strings use `<plurals>`, with a unit test per locale
      for 0, 1 and many.
    * `unit`: JVM tests + Kover verify + PIT on `core/domain`
-   * `firebase`: Firebase emulator (project `demo-listicles`, **no secrets needed**)
+   * `firebase`: Firebase emulator (project `demo-tally`, **no secrets needed**)
      → `tsc --noEmit` (strict), ESLint `strictTypeChecked` and Prettier over the TypeScript rules tests, then
      Jest rules tests
    * `ui`: Compose UI tests and the Kotlin data-layer integration tests (`connectedDebugAndroidTest` of `:app` and
@@ -495,13 +495,13 @@ enforce the rules rather than goodwill.
    `docs/FOLLOW-UPS.md`, listed explicitly because `docs/` has no directory rule), and screenshot
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
-   trusted on their own; the owner's merge is the review.
+   trusted on their own; the review is the reviewer rounds and the merge under the owner's authorization.
 6. **Branch protection** on `main`: PR required, all 10 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
    `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never
-   be met; the owner's merge is the review. **Empty bypass list**: a standing owner bypass
+   be met; the review is the reviewer rounds and the merge under the owner's authorization. **Empty bypass list**: a standing owner bypass
    would also bypass for agents. The owner adds themselves for an emergency merge only,
    then removes themselves. A separate machine account for agent PRs is a possible later
    improvement (it would allow 1 approval plus Code Owners review). You set this in GitHub
@@ -526,7 +526,7 @@ enforce the rules rather than goodwill.
    may be `deferred` to follow-up issues instead of another round.
 5. Each later round runs in a **new** reviewer session that gets the whole PR diff, the findings JSON of earlier rounds and `REVIEW.md`,
    and focuses on the commits since the last round: it re-checks open findings, reviews the new code and how the fixes interact with the old code.
-6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and you squash-merge.
+6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and the orchestrator marks the PR READY. The merge agent squash-merges it, or an owner-only PR waits for the owner (`docs/ORCHESTRATION.md` §7.5).
    If round 4 of a batch still has open findings above nit (deferred minors do not count), one escalation reviewer per PR decides
    fix, split or owner (`REVIEW.md`, Loop and cap); only what it sends to the owner reaches you.
 
@@ -594,13 +594,20 @@ members' changes; a conflict keeps the losing side; so v1 sync design should lea
 |---|---|---|---|---|
 | **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR; the PR-sized tasks with dependencies in `docs/tasks.toml` |
-| **Implementer** | Opus / high (max for `risk:high`) | Fresh session per PR, kept across its review rounds | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green |
+| **Implementer (Opus)** | Opus / high (max for `risk:high`) | Fresh session per PR, kept across its review rounds | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green. For the cases in the split below |
+| **Implementer (Sonnet)** | Sonnet / medium (high for tooling) | Same | Same | Same. For every other task |
 | **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
 | **Second reviewer** | Opus / high | Fresh session in the same round, for `risk:high` and the protected areas | Diff, PR description, `REVIEW.md`; not the first reviewer's findings | Findings (`S<round>-<nn>`), merged with the reviewer's |
 | **Escalation reviewer** | Opus / max | Fresh session, once per PR after round 4 or on a dispute | The whole review thread | `fix`, `split` or `owner` (`REVIEW.md`, Loop and cap) |
 | **Design reviewer** | Opus / high | Fresh session per design-PR round, max 3 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |
+| **Merge agent** | Sonnet / medium | Long-lived session started by the orchestrator, under an owner authorization on #15 | The READY PR list; `scripts/merge_ready.py`, `scripts/update-branch.sh` | Squash merges of READY PRs that are not owner-only (in the order the orchestrator names), and of owner-only PRs once the owner's approval is recorded on #15 (in the owner's batch order; 7007421567 D1, D3); settings outside git stay the owner's (`docs/ORCHESTRATION.md` §7.5) |
 | **Explorer** (subagent) | Sonnet / medium | Subagent inside an implementer or reviewer | A narrow question | File paths and short excerpts, no dumps |
 | **CI triage** (subagent) | Sonnet / medium | Subagent inside an implementer | Failing job log | The failing test or rule and the minimal error |
+
+Implementer split (owner decision, #15 comment 7032210967): the Opus implementer takes spikes, design or architecture tasks, `risk:high` tasks,
+Firestore security rules, sync and merge logic, guard, hook and command-parsing tooling, and a new implementer for a PR that already had 3 or more
+review rounds. The Sonnet implementer takes everything else: docs, strings, UI from an approved design, small fixes, dependency bumps, mechanical
+refactors and ordinary features with a clear spec. Running sessions keep their model. Reviewers stay fresh Opus. The lists are `agents/roles.yaml` (`use_when`).
 
 Escalation rules (written down so agents don't decide on their own):
 * Model and effort come from `agents/roles.yaml`. An agent that needs more asks in its `WORKER-RESULT`, and the orchestrator decides within that file.
@@ -612,7 +619,7 @@ Escalation rules (written down so agents don't decide on their own):
   matrix, `REVIEW.md` item 13). The M1 plan adds the auth flows that decide who is signed in (password, verification,
   reset, same email), account deletion and the household batches to `risk:high`, in PRs split by concern.
 * De-escalation (lower effort or a cheaper model for a role) happens only through the
-  metrics retro (section 9.4), never ad hoc.
+  metrics retro (section 9.4) or an owner decision, never ad hoc.
 
 Role definitions are checked in, so they get reviewed and versioned like code:
 * `.claude/agents/explorer.md` and `.claude/agents/ci-triage.md`: subagent definitions,
