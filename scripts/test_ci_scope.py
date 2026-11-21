@@ -66,6 +66,15 @@ def merge_repo(path_to_change):
     return d
 
 
+def rename_merge_repo(old, new):
+    """Like merge_repo, but the PR renames `old` (present on main) to `new`."""
+    d = merge_repo(old)
+    for args in (("checkout", "-q", "-b", "pr2"), ("mv", old, new), ("commit", "-q", "-m", "rename"), ("checkout", "-q", "main"),
+                 ("merge", "-q", "--no-ff", "-m", "merge", "pr2")):
+        git(d, *args)
+    return d
+
+
 def run_cli(cwd, *args, event="pull_request"):
     env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GITHUB_EVENT_NAME")}
     if event is not None:
@@ -87,6 +96,7 @@ class GradleExclude(unittest.TestCase):
             ("odd file name", merge_repo('docs/a b"c.md'), "pull_request", skip),
             ("build file PR", merge_repo("gradle/libs.versions.toml"), "pull_request", keep),
             ("licensee config PR", merge_repo("config/licensee/allowed.txt"), "pull_request", keep),
+            ("gate script renamed to a docs path", rename_merge_repo("scripts/test_warnings_gate.py", "README.md"), "pull_request", keep),
             ("unknown directory with a space", merge_repo("weird dir/x.md"), "pull_request", keep),
             ("push", merge_repo("docs/x.md"), "push", keep),
             ("no event", merge_repo("docs/x.md"), None, keep),
@@ -372,21 +382,24 @@ class LocalScope(unittest.TestCase):
     def test_each_owner_input_class_runs_committed_staged_unstaged_or_untracked(self):
         for what, paths in OWNER_INPUTS.items():
             for p in paths:
-                for how in ("committed", "staged", "unstaged", "untracked", "deleted") if p == paths[0] else ("committed",):
+                modes = ("committed", "staged", "unstaged", "untracked", "deleted", "renamed-staged", "renamed-committed")
+                for how in modes if p == paths[0] else ("committed",):
                     _src, repo = local_repo()
                     write(repo, "docs/unrelated.md")
-                    if how in ("unstaged", "deleted"):  # the file exists on the branch already, unchanged so far
+                    if how in ("unstaged", "deleted") or how.startswith("renamed"):  # the file exists on the branch already
                         write(repo, p, "before\n")
                     git(repo, "add", "-A")
                     git(repo, "commit", "-q", "-m", "setup")
                     git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")  # the setup commit is on main, not a change
                     if how == "deleted":
                         os.unlink(Path(repo, p))
+                    elif how.startswith("renamed"):  # to a path that skips: only the old path makes it run (--no-renames)
+                        git(repo, "mv", p, "docs/moved.txt")
                     else:
                         write(repo, p, "after\n")
                     if how in ("committed", "staged"):
                         git(repo, "add", "-A")
-                    if how == "committed":
+                    if how in ("committed", "renamed-committed"):
                         git(repo, "commit", "-q", "-m", "change")
                     self.assertEqual(local_scope(repo), "run", (what, p, how))
 
@@ -407,6 +420,40 @@ class LocalScope(unittest.TestCase):
         self.assertEqual(local_scope(repo), "skip")
         write(repo, "gradle/libs.versions.toml")
         self.assertEqual(local_scope(repo), "run")
+
+    def test_a_cut_equal_to_the_merge_base_is_scoped(self):
+        _src, repo = local_repo(shallow_depth=1)  # the only cut is main's tip, which is HEAD and the merge base
+        write(repo, "docs/x.md")
+        self.assertEqual(local_scope(repo), "skip")
+
+    def test_the_shallow_rule_is_anchored_on_the_merge_base(self):
+        """Owner rule 7060652618: every cut must be an ancestor of the merge base, not of HEAD or of origin/main."""
+        # A branch that merged main, cloned with limited depth: cuts p2 (the branch's own, above the merge base) and m3.
+        src = tempfile.mkdtemp(prefix="ci-scope-origin-")
+        for args in (("init", "-q", "-b", "main"), ("commit", "-q", "--allow-empty", "-m", "m0"), ("commit", "-q", "--allow-empty", "-m", "m1"),
+                     ("checkout", "-q", "-b", "pr"), ("commit", "-q", "--allow-empty", "-m", "p1"), ("commit", "-q", "--allow-empty", "-m", "p2"),
+                     ("checkout", "-q", "main"), ("commit", "-q", "--allow-empty", "-m", "m2"), ("commit", "-q", "--allow-empty", "-m", "m3"),
+                     ("checkout", "-q", "pr"), ("merge", "-q", "--no-ff", "-m", "update", "main"), ("commit", "-q", "--allow-empty", "-m", "p3"),
+                     ("commit", "-q", "--allow-empty", "-m", "p4")):
+            git(src, *args)
+        above_base = tempfile.mkdtemp(prefix="ci-scope-clone-")
+        git(above_base, "clone", "-q", "--depth", "4", "--branch", "pr", f"file://{src}", ".")
+        git(above_base, "fetch", "-q", "origin", "main:refs/remotes/origin/main")
+        # main merged the branch's p2; full branch history, main fetched with depth 2: cut m2 (on main), merge base p2.
+        src2 = tempfile.mkdtemp(prefix="ci-scope-origin-")
+        for args in (("init", "-q", "-b", "main"), ("commit", "-q", "--allow-empty", "-m", "m0"), ("checkout", "-q", "-b", "pr"),
+                     ("commit", "-q", "--allow-empty", "-m", "p1"), ("commit", "-q", "--allow-empty", "-m", "p2"), ("checkout", "-q", "main"),
+                     ("commit", "-q", "--allow-empty", "-m", "m1"), ("commit", "-q", "--allow-empty", "-m", "m2"),
+                     ("merge", "-q", "--no-ff", "-m", "m3 merges p2", "pr"), ("checkout", "-q", "pr"), ("commit", "-q", "--allow-empty", "-m", "p3")):
+            git(src2, *args)
+        on_main = tempfile.mkdtemp(prefix="ci-scope-clone-")
+        git(on_main, "clone", "-q", "--branch", "pr", f"file://{src2}", ".")
+        git(on_main, "fetch", "-q", "--depth", "2", "origin", "main:refs/remotes/origin/main")
+        for what, repo, cut in (("cut on the branch above the merge base", above_base, "p2"), ("cut on main above the merge base", on_main, "m2")):
+            cuts = Path(repo, git_out(repo, "rev-parse", "--git-path", "shallow")).read_text(encoding="utf-8").split()
+            self.assertIn(cut, [git_out(repo, "log", "-1", "--format=%s", c) for c in cuts], what)
+            write(repo, "docs/x.md")
+            self.assertEqual(local_scope(repo), "run", what)
 
     def test_a_linked_worktree_of_a_shallow_clone_is_scoped(self):
         _src, repo = local_repo(shallow_depth=2)
