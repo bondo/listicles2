@@ -1144,7 +1144,8 @@ def nameref(prog, args):
 
 def sets_ifs(cmd, prog, args):
     """R3-06, R4-14, R4-15: how a statement other than IFS=v changes IFS. "default" for unset IFS; "unknown" for read, printf -v, a nameref, a for
-    loop, eval, let, ${IFS:=v} and a name built from an expansion; None when IFS is no name argument (a message that mentions IFS, export IFS)."""
+    loop, eval, let, ${IFS:=v} and a name built from an expansion; None when IFS is no name argument (a message that mentions IFS) or the verb
+    never changes how bash splits (export, readonly, mapfile)."""
     k = 0
     while k < len(cmd.words) and cmd.words[k] in RESERVED - {"for"}:
         k += 1
@@ -1154,14 +1155,14 @@ def sets_ifs(cmd, prog, args):
         return "unknown" if re.search(r"\bIFS\b", " ".join(args)) else None
     if prog == "printf":
         names = [a[2:] or b for a, b in zip(args, args[1:] + [""], strict=True) if a.startswith("-v")]
-    elif prog in ("unset", "read", "mapfile", "readarray", "export", "declare", "typeset", "local", "readonly"):
+    elif prog in ("unset", "read", "declare", "typeset", "local"):
         names = [a for a in args if not a.startswith("-") and "=" not in a]
         names += [a.split("=", 1)[1] for a in args if "=" in a and not a.startswith("-") and nameref(prog, args)]
     else:
         return None
     if any(re.search(r"[$`]", a) for a in names):
         return "unknown"
-    if "IFS" not in names or prog in ("export", "readonly"):
+    if "IFS" not in names:
         return None
     return "default" if prog == "unset" and all(a == "-v" or not a.startswith("-") for a in args) else "unknown"
 
