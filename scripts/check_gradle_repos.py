@@ -41,7 +41,9 @@ def _strip(text, blank_strings=False):
     String and char literal contents become spaces if blank_strings, one space per character; the code inside a `${ }`
     template stays (it runs). Strings are modelled in full: escapes, raw strings (a run of quotes ends one with its last
     three), and templates, whose code can hold strings, comments and braces of its own, so the scanner recurses.
-    Raises Unparsable on an unterminated string, raw string or template, or a newline in a plain string. Block comments nest."""
+    Backtick identifiers are copied with their non-word characters replaced, so a quote or brace in one is not syntax.
+    Raises Unparsable on an unterminated string, raw string, template or backtick identifier, a newline in a plain string, a
+    multi-dollar string ($$"...") and a backtick short template ("$`a`"). Block comments nest."""
     out, n = [], len(text)
 
     def literal(chunk):
@@ -63,6 +65,8 @@ def _strip(text, blank_strings=False):
                 return i + 1
             if text.startswith("${", i):
                 i = template(i)
+            elif text.startswith("$`", i):
+                raise Unparsable("backtick in a string template")
             elif text[i] == "\\":
                 literal(text[i : i + 2])
                 i += 2
@@ -84,6 +88,8 @@ def _strip(text, blank_strings=False):
                 return i + quotes
             if text.startswith("${", i):
                 i = template(i)
+            elif text.startswith("$`", i):
+                raise Unparsable("backtick in a string template")
             else:
                 literal(text[i])
                 i += 1
@@ -111,6 +117,14 @@ def _strip(text, blank_strings=False):
                 literal(char.group()[1:-1])
                 out.append("'")
                 i = char.end()
+            elif text[i] == "$" and text.startswith('"', i + 1):
+                raise Unparsable("multi-dollar string")  # $$"${" is plain text in Kotlin 2.2+; not modelled
+            elif text[i] == "`":
+                end = text.find("`", i + 1)
+                if end < 0 or "\n" in text[i:end]:
+                    raise Unparsable("unterminated backtick identifier")
+                out.append("`" + re.sub(r"\W", "_", text[i + 1 : end]) + "`")  # a quote or brace in the name is not syntax
+                i = end + 1
             elif text.startswith('"""', i):
                 i = raw_string(i)
             elif text[i] == '"':
@@ -211,11 +225,17 @@ def _unfiltered_google(blanked):
     owners = [(name, a, b) for name in BLOCKS for a, b in _spans(blanked, name)]
     bad = set()
     # A qualified call (this.google(), foo.google()) counts too, and so does any other use of the name (google as a value).
-    for call in re.finditer(r"(?<!\w)google\b\s*(\(\s*\))?", blanked):
+    for call in re.finditer(r"(?<!\w)google\b`?\s*(\(\s*\))?", blanked):  # `google` in backticks is the same name
         if _filtered(blanked, call) or any(a <= call.start() < b for a, b in exclusive):
             continue
         bad.add(next((name for name, a, b in owners if a <= call.start() < b), None))
     return bad
+
+
+def _outer(blanked, kept, name):
+    """The `name { }` bodies joined in order (blanked, kept), and the (start, end) spans of those bodies in the whole text."""
+    spans = _spans(blanked, name)
+    return "\n".join(blanked[a:b] for a, b in spans), "\n".join(kept[a:b] for a, b in spans), spans
 
 
 def check_settings(text):
@@ -224,24 +244,32 @@ def check_settings(text):
     except Unparsable as e:
         return [f"settings.gradle.kts: cannot parse ({e}), so the repositories cannot be checked"]
     unfiltered = _unfiltered_google(blanked)
-    problems = []
+    problems, inside = [], []
     for name in BLOCKS:
-        repos, repos_text = _repositories(blanked, kept, name)
+        repos, _ = _repositories(blanked, kept, name)
+        outer, outer_kept, spans = _outer(blanked, kept, name)
+        inside += spans
         if repos is None:
             problems.append(f"{name}: no repositories block")
         else:
-            mirror = repos_text.find(f'"{MIRROR}"')
+            # The mirror and the first mention of mavenCentral are looked for in the whole block, not only in braced
+            # repositories { } bodies, so repositories.mavenCentral() before the block cannot hide behind them.
+            mirror = outer_kept.find(f'"{MIRROR}"')
             central = re.search(r"\bmavenCentral\s*(?:\(\s*\)|\{\s*\})", repos)  # mavenCentral() or an empty mavenCentral { }
+            first_central = re.search(r"(?<!\w)mavenCentral\b", outer)
             if mirror < 0:
                 problems.append(f"{name}: Maven Central mirror {MIRROR} missing")
             elif central is None:
                 problems.append(f"{name}: mavenCentral() fallback missing")
-            elif mirror > central.start():
+            elif first_central is not None and mirror > first_central.start():
                 problems.append(f"{name}: Maven Central mirror must come before mavenCentral()")
         if name in unfiltered:
             problems.append(f"{name}: google() needs a content filter")
+    where = " and ".join(BLOCKS)
     if None in unfiltered:
-        problems.append(f"settings.gradle.kts: google() outside {' and '.join(BLOCKS)} needs a content filter")
+        problems.append(f"settings.gradle.kts: google() outside {where} needs a content filter")
+    if any(not any(a <= m.start() < b for a, b in inside) for m in re.finditer(r"(?<!\w)mavenCentral\b", blanked)):
+        problems.append(f"settings.gradle.kts: mavenCentral() outside {where} cannot be ordered after the mirror")
     return problems
 
 
