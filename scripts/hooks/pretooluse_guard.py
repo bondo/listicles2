@@ -1236,7 +1236,7 @@ def check_simple(cmd, state, depth):
     words = [words[0]] + rest
     prog, args = os.path.basename(words[0]), words[1:]
     if "$" in words[0] or "`" in words[0]:
-        if floor and any(a in SENSITIVE_SUBS for a in args[:3]):  # R3-09: main's check; a tracked value may be stale
+        if any(a in SENSITIVE_SUBS for a in args[:3]):  # R3-09: main's check, in both passes (only the model reads A+=x or env A.B=1 as assignments)
             deny("the command name is built from a variable or substitution; write it out")
         return
     if prog in LINTER_FLAGS:
@@ -1340,7 +1340,7 @@ def check_bash(command, cwd):
     if re.search("(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")\\\r?\n", command):  # R5-02: `mark-ready.sh\<newline>1` joins to a different word
         deny("a line continuation right after a wrapper name is not allowed; write the exact call, e.g. `scripts/mark-ready.sh <PR number>`")
     for floor in (True, False):  # main's verdict is a floor: the line is denied if main's semantics or the model deny it (escalation of #252)
-        check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "whole": command, "floor": floor})
+        check_command_string(command, {"cwd": cwd, "known": True, "vars": {}, "ifs": None, "ifs_unknown": False, "whole": command, "floor": floor})
 
 
 def main():
