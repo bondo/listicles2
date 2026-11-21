@@ -1847,7 +1847,11 @@ class LineLengthPerTool(DiffCase):
                         self.put(rel, text)
                     self.repo.commit()
                     if expect:
-                        self.assertFails("guard: raised line length:")
+                        rc, out = self.repo.guards()
+                        lines = [ln for ln in out.splitlines() if ln.startswith("guard: raised line length:")]
+                        self.assertNotEqual(rc, 0, out)
+                        self.assertTrue(lines, out)
+                        self.assertEqual(len(lines), len(set(lines)), "a line is printed twice:\n" + out)  # R6-02
                     else:
                         self.assertPasses()
                 finally:
@@ -1963,6 +1967,37 @@ class LineLengthPerTool(DiffCase):
         for width, expect in ((200, True), (100, False)):
             for name, (b, h) in cases.items():
                 self.assertRaised({name: (b, {**h, "ruff.toml": f"line-length = {width}\n[lint.pycodestyle]\nmax-line-length = 300\n"})}, expect)
+
+    def test_the_own_section_group_alone_catches_a_raise(self):
+        """R6-01: a wider black value and a lowered nearer config hide this from every other group: E501 stays at 300, only ruff's
+        `line-length` in the `[tool]` table (or at the root) rises 100 to 200, and the nearer config is lowered 300 to 100."""
+        pc = "[tool.ruff.lint.pycodestyle]\nmax-line-length = 300\n"
+        tool = "[tool]\nblack.line-length = 400\nruff.line-length = %d\n" + pc
+        root = "tool.black.line-length = 400\ntool.ruff.line-length = %d\n"
+        for width, expect in ((200, True), (100, False)):
+            self.assertRaised({
+                "[tool] keys": (
+                    {"pyproject.toml": tool % 100, "scripts/ruff.toml": "line-length = 300\n"},
+                    {"pyproject.toml": tool % width, "scripts/ruff.toml": "line-length = 100\n"},
+                ),
+                "root keys": (
+                    {"pyproject.toml": root % 100, "scripts/pyproject.toml": self.PP % 300},
+                    {"pyproject.toml": root % width, "scripts/pyproject.toml": self.PP % 100},
+                ),
+            }, expect)
+
+    def test_the_own_groups_keep_the_spelling_and_the_finite_bound(self):
+        """Mutation survivors of round 6: the `-`/`_` normalisation and the finite base bound of the own groups each decide a case."""
+        two = "[flake8]\n%s = %d\n[other]\nmax-line-length = 300\n"
+        base = "[tool.black]\nline-length = 400\n[tool.ruff]\nline-length = 1_00\n[tool.ruff.lint.x]\nline-length = 100\n"
+        self.assertRaised({
+            "respelled in a section, masked by a wider one": ({".flake8": two % ("max-line-length", 100)}, {".flake8": two % ("max_line_length", 200)}),
+            "a new section beyond the own finite bound": ({"pyproject.toml": base}, {"pyproject.toml": base + "[tool]\nruff.line-length = 300\n"}),
+        }, True)
+        self.assertRaised({
+            "respelled, lowered": ({".flake8": two % ("max-line-length", 100)}, {".flake8": two % ("max_line_length", 90)}),
+            "a new section within the own finite bound": ({"pyproject.toml": base}, {"pyproject.toml": base + "[tool]\nruff.line-length = 90\n"}),
+        }, False)
 
     def test_a_deleted_file_is_compared_with_the_tool_at_head(self):
         """R1-09: only the deleted-file fallback sees this: scripts/ruff.toml keeps 200, the root ruff.toml (100) goes, pyproject.toml has 150."""
