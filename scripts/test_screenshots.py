@@ -288,13 +288,16 @@ class Build(unittest.TestCase):
 class Accessibility(unittest.TestCase):
     """Every Compose UI test in androidTest runs with ATF accessibility checks on (P15); a test that turns them off is reported."""
 
-    TEST = "app/src/androidTest/kotlin/dev/listicles/app/ListiclesAppTest.kt"
+    TEST = "app/src/androidTest/kotlin/dk/bjarkebjarke/tally/TallyAppTest.kt"
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (self.TEST, "app/build.gradle.kts"):
+        # Every androidTest source, so that moving or adding a test file cannot break these tests again (R1-01).
+        names = ["app/build.gradle.kts", *(str(p.relative_to(ROOT)) for p in ROOT.glob("**/src/androidTest/**/*.kt"))]
+        self.assertIn(self.TEST, names)
+        for name in names:
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / name, self.root / name)
 

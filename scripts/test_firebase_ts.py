@@ -98,7 +98,7 @@ def job(text, name):
 
 REQUIRED_CHECKS = (
     "wrapper", "static", "unit", "firebase", "ui", "screenshots", "guards", "secrets", "tasks", "python-lint", "workflow-lint",
-)  # the ruleset on main requires these eleven (M1-03 added screenshots; M1-O11 adds it to the ruleset) (docs/BRANCH-PROTECTION.md section 2, kept in sync per section 6; issue 184)
+)  # kept in sync with the ruleset on main (docs/BRANCH-PROTECTION.md sections 2 and 6; issue 184)
 
 
 def documented_checks(text):

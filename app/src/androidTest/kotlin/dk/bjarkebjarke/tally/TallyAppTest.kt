@@ -1,4 +1,4 @@
-package dev.listicles.app
+package dk.bjarkebjarke.tally
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -18,8 +18,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dk.bjarkebjarke.tally.R
-import dk.bjarkebjarke.tally.TallyApp
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -28,7 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class ListiclesAppTest {
+class TallyAppTest {
     @get:Rule
     val compose = createComposeRule()
 
