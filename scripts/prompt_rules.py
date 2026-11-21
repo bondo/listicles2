@@ -79,24 +79,15 @@ STANDING = (
     r"the merge agent merges under the owner's standing authorization \(#15 comment 7005366747, replacing the per-window rule of comment 7002904192\) "
     r"until the owner revokes it there"
 )
-CLASSES = (
-    r"an owner-only pr is merged by the merge agent as kind `owner-batch` once the owner's batch approval lists it, every other ready pr as kind "
-    r"`general` \(d3, #15 comment 7007421567\)"
-)
-BATCH = (
-    r"batch approval \(d1\): the owner posts one ordered list `batch approval: #n@sha, #m@sha` on #15 "
-    r"\(or in the merge agent's session, recorded on #15\); "
-    r"the merge agent merges the listed prs in that order, one at a time, with update-branch and green ci between merges"
-)
-SAME_PATCH = (
-    r"a listed pr may be merged at a head that differs from its approved sha only by update-branch merge commits of `main` whose tree equals "
-    r"git's automatic merge \(`git merge-tree` without conflicts, d2\); a hand-resolved conflict or any other change needs a new approval"
-)
-APPROVAL_FORM = (
-    r"an owner approval given in a decision comment or in the owner's chat is recorded as one anchored `batch approval: #n@sha` first line "
-    r"\(#15 comment 7014222068\); the check proves the account only, not the person\. "
-    r"only an owner approval starts with `batch approval:`; a proposed, requested, declined or quoted list never does, whatever its notes say"
-)
+CLASSES = (r"an owner-only pr is merged by the merge agent as kind `owner-batch` once the owner's batch approval lists it, every other ready pr as kind "
+           r"`general` \(d3, #15 comment 7007421567\)")
+BATCH = (r"batch approval \(d1\): the owner posts one ordered list `batch approval: #n@sha, #m@sha` on #15 \(or in the merge agent's session, "
+         r"recorded on #15\); the merge agent merges the listed prs in that order, one at a time, with update-branch and green ci between merges")
+SAME_PATCH = (r"a listed pr may be merged at a head that differs from its approved sha only by update-branch merge commits of `main` whose tree equals "
+              r"git's automatic merge \(`git merge-tree` without conflicts, d2\); a hand-resolved conflict or any other change needs a new approval")
+APPROVAL_FORM = (r"an owner approval given in a decision comment or in the owner's chat is recorded as one anchored `batch approval: #n@sha` first line "
+                 r"\(#15 comment 7014222068\); the check proves the account only, not the person\. only an owner approval starts with `batch approval:`; "
+                 r"a proposed, requested, declined or quoted list never does, whatever its notes say")
 ORDER_TAIL = (
     r"every ready `general` pr to the merge agent first, and asks? the owner for a batch approval of owner-only prs "
     r"only once no `general` pr is ready to go; an exception needs a stated reason in the merge request"

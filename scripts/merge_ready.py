@@ -15,15 +15,15 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * no closing keyword (close/fix/resolve and their -s/-d forms) sits directly before an issue number or URL in the title, body or commits;
   * the base is `main` and the API's file and commit lists are complete (it caps them at 3000 and 250);
   * every changed file (a rename's old name too) is inside the kind's allowed paths (general: only the allowlist, see owner_only; owner-batch: any).
-    For dependabot, a workflow may only re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
+    For dependabot, a workflow may only
+    re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
     in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
   * for owner-batch, the comment is the owner's account (it cannot tell the person from an agent), on #15 and unedited, its first non-empty line is
-    `batch approval: #N@sha, ...` (only entries and (notes)) and lists this PR once with a sha
-    (7+ hex) of one of its commits; earlier listed PRs are merged; the head is that commit or only adds update-branch merges of main (second parent
-    in main) whose tree equals git's automatic merge of their two parents (`git merge-tree --write-tree`, no conflicts, run in this checkout after
-    fetching main and pull/N/head; R1-02 of #245). A hand-resolved conflict, an edit or an extra file in the merge commit refuses (a fresh owner
-    approval is needed).
+    `batch approval: #N@sha, ...` (only entries and (notes)) and lists this PR once with a sha (7+ hex) of one of its commits; earlier listed PRs are
+    merged; the head is that commit or only adds update-branch merges of main (second parent in main) whose tree equals git's automatic merge of their
+    two parents (`git merge-tree --write-tree`, no conflicts, run in this checkout after fetching main and pull/N/head, deepening a shallow checkout;
+    R1-02 of #245). A hand-resolved conflict, an edit or an extra file in the merge commit refuses (a fresh owner approval is needed).
 Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the head moved) and the checked title and body as commit text.
 Exit status: 0 merged, 1 refused (or timed out waiting) or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
@@ -403,8 +403,9 @@ class GitMergeTree:
         return res
 
     def __call__(self, p1, p2):
-        if not self.fetched:
-            self._git("fetch", "--quiet", "origin", BASE, f"refs/pull/{self.n}/head")
+        if not self.fetched:  # a shallow checkout may lack the merge base of an old approved commit (R2-01)
+            shallow = self._git("rev-parse", "--is-shallow-repository").stdout.strip() == "true"
+            self._git("fetch", "--quiet", *(["--unshallow"] if shallow else []), "origin", BASE, f"refs/pull/{self.n}/head")
             self.fetched = True
         res = self._git("merge-tree", "--write-tree", "--no-messages", p1, p2)
         lines = res.stdout.splitlines()
@@ -433,13 +434,14 @@ def update_branch_problems(api, repo, base, head, approved, commits, merge_tree)
     if approved not in seen:
         return [f"head {head[:7]} does not descend from the approved commit {approved[:7]} (within the PR's commits)"]
     for sha in sorted(seen - old):
-        p1, *rest = parents(by[sha])
-        if len(rest) != 1 or p1 not in by:
+        ps = parents(by[sha])
+        if len(ps) != 2 or ps[0] not in by:  # a root commit too (R2-04)
             return [f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base}"]
-        if api.get(f"repos/{repo}/compare/{base}...{rest[0]}").get("status") not in ("behind", "identical"):
+        p1, p2 = ps
+        if api.get(f"repos/{repo}/compare/{base}...{p2}").get("status") not in ("behind", "identical"):
             return [f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base} (its second parent is not in {base})"]
         try:  # the merge must be exactly what git makes without help
-            auto = merge_tree(p1, rest[0])
+            auto = merge_tree(p1, p2)
         except MergeCheckError as e:
             return [f"cannot check the merge {sha[:7]}: {e}"]
         if auto is None:

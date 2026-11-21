@@ -852,8 +852,7 @@ class OwnerBatchTests(unittest.TestCase):
                   "a quoted line": f"> batch approval: {listed}", "6 hex": f"batch approval: #{N}@{C1[:6]}", "1 hex": f"batch approval: #{N}@{C1[:1]}"}
         for name, body in bodies.items():
             with self.subTest(name):
-                comment = approval_comment("", line=body)
-                self.refused(batch_api(comment=comment), r"batch approval")
+                self.refused(batch_api(comment=approval_comment("", line=body)), r"batch approval")
 
     def test_notes_in_parentheses_and_blank_lines_before_the_list_are_fine(self):
         listed = f"#70@{'7' * 7} (docs), #{N}@{C1[:7]} (the wrapper PR)"
@@ -871,8 +870,8 @@ class OwnerBatchTests(unittest.TestCase):
 
     def test_comment_not_by_the_owner_or_not_on_the_state_issue_or_edited(self):
         cases = {"login": approval_comment(f"#{N}@{C1[:7]}", login="mallory"), "association": approval_comment(f"#{N}@{C1[:7]}", assoc="NONE"),
-                 "other issue": approval_comment(f"#{N}@{C1[:7]}", issue=16), "#150": approval_comment(f"#{N}@{C1[:7]}", issue=150),
-                 "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True)}
+                 "other issue": approval_comment(f"#{N}@{C1[:7]}", issue=16),
+                 "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True), "#150": approval_comment(f"#{N}@{C1[:7]}", issue=150)}
         for name, comment in cases.items():
             with self.subTest(name):
                 self.refused(batch_api(comment=comment), r"approval comment.*(owner|#15|edited)")
