@@ -2065,6 +2065,14 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Reviewers that do not find issues reply and resolve the thread.",
         "Agents who don't hear back reply and resolve the thread.",
         "Not all agents reply and resolve the thread.",
+        # a bold label is a button name only when its line names no agent (self-review of the escalation fix): the same shape with an
+        # agent in the next cell or the parenthetical is a permission, as on main
+        "| **Resolve threads** | Orchestrator |",
+        "| **Resolve thread** | orchestrator may do it |",
+        "- **Resolve threads** (orchestrator, after replying)",
+        "* **Resolve conversation** (agents may resolve it after replying)",
+        "- **Resolve threads** after replying",
+        "| Orchestrator | **Resolve threads** |",
     )
     BAN = (
         # R3-03: a comma clause between the negation and the verb
@@ -2220,7 +2228,9 @@ class ResolveThreadSentenceTests(unittest.TestCase):
                 "None of the agents may resolve the thread.", "Under no circumstances may you resolve the thread.",
                 "Do not reply and resolve the thread.", "Never approve and resolve the thread.",
                 "Agents must never, not even with the API, resolve the thread.",
-                "Nobody may ever, for any reason, resolve the thread.", "Do not ever, for any reason, resolve the thread.")
+                "Nobody may ever, for any reason, resolve the thread.", "Do not ever, for any reason, resolve the thread.",
+                "An agent must not reply and resolve the thread.", "Please do not reply and resolve the thread.",
+                "Agents shouldn't answer and resolve it on the thread.", "An agent must never, even when asked, resolve the thread.")
         leads = ("", "- ", "* ", "Note: ", "1. ", "If a collaborator asks, ", "| ")
         flagged = [lead + ban for lead in leads for ban in bans if prompt_rules.resolve_permissions(lead + ban + "\n")]
         self.assertEqual(flagged, [])
