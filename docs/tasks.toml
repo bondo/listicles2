@@ -978,7 +978,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-11", "M1-18"]
-notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name)"
+notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name). P6: a plain member's self-heal under a tombstone deletes their own member doc before the clear, test incl. a crash between the two (PLAN 3.1)"
 
 [[task]]
 id = "M1-19"
@@ -1409,7 +1409,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and a member's invites under an abandoned tombstone (PR #265 R1-B-07, with the owner's answer on R1-A-02); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
 
 [[task]]
 id = "M2-FU"
