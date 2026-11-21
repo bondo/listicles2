@@ -3,6 +3,7 @@
 The GitHub REST API is replaced by a fake; no test touches the network. Every negative case must leave the merge call
 unmade (`FakeApi.merged` stays empty)."""
 
+import base64
 import copy
 import io
 import re
@@ -12,7 +13,10 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
+import ci_scope  # noqa: E402  # justified: its SELFTESTS are the gate self-tests CI runs without naming them
 import merge_ready  # noqa: E402  # justified: must follow the sys.path insert above
+import pretooluse_guard  # noqa: E402  # justified: its PROTECTED list is the source of the process files (R1-03)
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "merge_ready.py"
@@ -68,6 +72,8 @@ class FakeApi:
 
     def get(self, path):
         self.requested.append(path)
+        if "/contents/app/src/main/res/" in path and path not in self.data:  # a res XML file at the head: harmless unless a test says otherwise
+            return {"content": base64.b64encode(b"<resources><string name='a'>A</string></resources>").decode()}
         return copy.deepcopy(self.data[path])
 
     def pages(self, path, key=None):
@@ -440,8 +446,8 @@ class UsageTests(unittest.TestCase):
         self.assertEqual(api.requested, [])
         self.assertEqual(api.merged, [])
 
-    def test_kinds_are_exactly_the_three_authorized_ones(self):
-        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "tasks-sync", "working-draft-docs"])
+    def test_kinds_are_exactly_the_authorized_ones(self):
+        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "general", "tasks-sync", "working-draft-docs"])
 
     def test_cli_unknown_kind(self):
         res = self.cli("12", SHA, "everything")
@@ -476,6 +482,272 @@ class UsageTests(unittest.TestCase):
         self.assertIn("405", text)
 
 
+class GeneralKindTests(unittest.TestCase):
+    """Kind `general`: a PR that is not owner-only, merged under the owner's standing authorization (#15 comment 7005366747)."""
+
+    def refused(self, api, reason, **kwargs):
+        code, text = go(api, kind="general", **kwargs)
+        self.assertNotEqual(code, 0, text)
+        self.assertEqual(api.merged, [], "a refused PR must not be merged")
+        self.assertRegex(text, reason)
+
+    ALLOWED = ("app/src/main/kotlin/dev/listicles/app/Lists.kt", "app/src/main/res/values/strings.xml", "app/src/main/res/values-da/strings.xml",
+               "app/src/test/kotlin/dev/listicles/app/ListsTest.kt", "app/src/androidTest/kotlin/dev/listicles/app/ListsUiTest.kt",
+               "core/domain/src/main/kotlin/dev/listicles/domain/Lists.kt", "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt",
+               "app/src/main/kotlin/dk/bjarkebjarke/tally/Lists.kt", "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsTest.kt",  # after M1-29
+               "core/domain/src/main/kotlin/dk/bjarkebjarke/tally/domain/Lists.kt",
+               "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/domain/ListsTest.kt",
+               "docs/PLAN.md", "docs/milestones/M1.md", "docs/adr/0002-x.md", "docs/metrics/m0-backfill.txt", "README.md")
+
+    def test_the_allowlisted_classes_are_merged(self):  # owner decision #15 7058755858: only an allowlist merges as general
+        api = make_api(files=[file_entry(n) for n in self.ALLOWED])
+        self.assertEqual(go(api, kind="general")[0], 0)
+        self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_every_path_outside_the_allowlist_is_refused(self):  # fail closed: R6-01, R6-05, R6-03, R6-04 and everything unknown
+        names = ("firebase/.npmrc", "firebase/jest.config.cjs", "firebase/eslint.config.mjs", "firebase/nested/eslint.config.mjs",  # R6-01, R6-05, R6-03
+                 "scripts/shellcheckrc", "scripts/.shellcheckrc", "scripts/verify.sh", "scripts/new_tool.py",  # R6-04, scripts
+                 "app/build.gradle.kts", "build.gradle.kts", "gradle.properties", "ruff.toml", "mypy.ini", ".editorconfig", ".gitignore",
+                 "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "firebase/firestore.rules", "firebase/test/rules.test.ts",
+                 "app/src/main/AndroidManifest.xml", "app/proguard-rules.pro", "app/src/test/resources/robolectric.properties",
+                 "core/testing/src/main/kotlin/dev/listicles/testing/NoNetwork.kt", "core/domain/build.gradle.kts",
+                 "NEW_TOP_LEVEL.txt", "newdir/file.md", "app/src/main/kotlin/dev/listicles/app/Notes.md", "app/src/main/res/raw/x.sh",
+                 "app/src/main/kotlin/.hidden.kt", "app/src/main/res/.npmrc", "docs/.gitattributes",  # a new dotfile inside an allowlisted dir
+                 "core/domain/src/test/kotlin/dev/listicles/architecture/NewRule.kt", "app/src/test/kotlin/dev/listicles/app/NoNetworkInAppTest.kt",
+                 "app/src/test/kotlin/dev/listicles/app/RobolectricOfflineWiringTest.kt",  # gate tests
+                 "app/src/test/kotlin/dev/listicles/app/Junit4EngineTest.kt",
+                 "core/domain/src/test/kotlin/io/kotest/provided/ProjectConfig.kt", "core/domain/src/test/kotlin/dev/listicles/PackageConfig.kt",  # R7-01
+                 "core/domain/src/test/kotlin/dev/listicles/domain/ProjectConfig.kt", "app/src/test/kotlin/org/junit/Assert.kt",  # only dev/listicles
+                 "core/domain/src/test/kotlin/dev/listicles/testing/BlockingSelectorProvider.kt",  # R7-02: same-name classes of core/testing
+                 "app/src/test/kotlin/dev/listicles/testing/BlockingAsynchronousChannelProvider.kt",
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingSelectorProvider.kt",  # the same rules under the new root
+                 "app/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingInetAddressResolverProvider.kt",
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/PackageConfig.kt", "app/src/test/kotlin/dk/bjarkebjarke/other/X.kt",
+                 "app/src/main/kotlin/dk/bjarkebjarke/X.kt", "app/src/main/kotlin/dk/bjarkebjarke/tally/../X.kt",
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/architecture/NewRule.kt",
+                 "app/src/main/res/lint.xml", "app/src/main/res/xml/lint.xml", "app/src/main/res/values/lint-baseline.xml",  # R7-03: lint config
+                 "app/src/main/res/xml/backup_rules.xml", "app/src/main/res/xml/data_extraction_rules.xml",  # R7-06: backup, device transfer
+                 "app/src/main/res/xml-v31/data_extraction_rules.xml", "app/src/main/res/xml-v31/backup_rules.xml",  # R7-06 again: qualified xml dirs
+                 "app/src/main/res/xml-night/backup_rules.xml", "app/src/main/res/xml-da/data_extraction_rules.xml",
+                 "app/src/main/res/xml/network_security_config.xml", "docs/COLLABORATING.md",  # R7-07
+                 "app/src/main/kotlin/./x.kt", "app/src/main/kotlin//x.kt", "/app/src/main/kotlin/x.kt", "app\\src\\main\\kotlin\\x.kt",
+                 "app/src/main/kotlin/x y.kt", "app/src/main/kotlin/x\u202e.kt", "App/src/main/kotlin/x.kt", "DOCS/PLAN.md")  # odd and mixed-case names
+        for name in names:
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+
+    SPEC = "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt"
+
+    def test_a_kotlin_change_that_names_kotest_project_config_is_refused(self):  # R7-01: one extension makes every Kotest spec pass
+        for line in ("class Ext : AbstractProjectConfig() {", "import io.kotest.provided.ProjectConfig", "@AutoScan object Mask : TestCaseExtension",
+                     "object P : AbstractPackageConfig()"):
+            with self.subTest(line=line):
+                self.refused(make_api(files=[file_entry(self.SPEC, patch=f"@@ -1 +1 @@\n-x\n+{line}")]), r"Kotest")
+        ordinary = file_entry(self.SPEC, patch='@@ -1 +1 @@\n-x\n+class ListsTest : FunSpec({ test("a") {} })')
+        self.assertEqual(go(make_api(files=[ordinary]), kind="general")[0], 0)
+
+    def res_api(self, xml, name="app/src/main/res/values-v31/aliases.xml", patch="@@ -1 +1 @@\n-x\n+y"):
+        """A PR that changes one res XML file; its content at the head is `xml`, whatever the patch shows (R7-06: the head is parsed, not the patch)."""
+        api = make_api(files=[file_entry(name, patch=patch)])
+        api.data[f"repos/{REPO}/contents/{name}?ref={SHA}"] = {"content": base64.b64encode(xml.encode()).decode()}
+        return api
+
+    def test_a_res_xml_alias_of_an_xml_resource_is_refused_by_parsing_the_head(self):  # R7-06: aapt2 links all of these as xml aliases
+        item = '<item name="data_extraction_rules" type="%s">@xml/backup_rules</item>'
+        cases = {"type xml": f"<resources>{item % 'xml'}</resources>", "single quotes": "<resources><item name='x' type='xml'>@xml/y</item></resources>",
+                 "xml element": '<resources><xml name="data_extraction_rules">@xml/backup_rules</xml></resources>',
+                 "decimal char ref": f"<resources>{item % '&#120;ml'}</resources>", "hex char ref": f"<resources>{item % 'xm&#x6c;'}</resources>",
+                 "type split over lines": '<resources>\n<item name="x"\n  type\n  =\n"xml">@xml/y</item></resources>',
+                 "nested": f"<resources><group>{item % 'xml'}</group></resources>",
+                 "default namespace": '<resources xmlns="urn:x"><xml name="x">@xml/y</xml></resources>'}
+        for name, xml in cases.items():  # the patch of each case shows no `type` at all: the two-PR split
+            with self.subTest(name):
+                self.refused(self.res_api(xml, patch='@@ -3 +3 @@\n-="string">probe</item>\n+="x">y</item>'), r"xml resource alias")
+
+    def test_a_res_xml_with_a_doctype_is_refused(self):  # R7-06 round 10: expat skips declarations after a parameter-entity reference, AGP applies them
+        alias = '<resources><item name="data_extraction_rules" type="&t;">@xml/backup_rules</item></resources>'
+        cases = {"entity after a parameter entity": '<!DOCTYPE resources [<!ENTITY % nothing ""> %nothing; <!ENTITY t "xml">]>' + alias,
+                 "attlist default": '<!DOCTYPE resources [<!ENTITY % nothing ""> %nothing; <!ATTLIST item type CDATA "xml">]>'
+                                    '<resources><item name="probe">@xml/backup_rules</item></resources>',
+                 "nested parameter entity": '<!DOCTYPE resources [<!ENTITY % p "<!ENTITY t \'xml\'>"> %p;]>' + alias,
+                 "plain doctype": '<!DOCTYPE resources><resources><string name="a">A</string></resources>'}
+        for name, xml in cases.items():
+            with self.subTest(name):
+                self.refused(self.res_api(xml), r"cannot be parsed")
+
+    def test_an_unparseable_or_unreadable_res_xml_refuses_and_an_ordinary_one_merges(self):
+        self.refused(self.res_api("<resources><item"), r"cannot be parsed")
+        self.refused(self.res_api(""), r"cannot be parsed")
+        class Unreadable(FakeApi):
+            def get(self, path):
+                if "/contents/" in path:
+                    raise merge_ready.ApiError("404 not found")
+                return super().get(path)
+
+        api = Unreadable(self.res_api("<resources/>").data)
+        code, text = go(api, kind="general")
+        self.assertEqual((code, api.merged), (1, []), text)
+        for xml in ('<resources><string name="a">A</string><item name="x" type="string">y</item></resources>', "<resources/>"):
+            self.assertEqual(go(self.res_api(xml), kind="general")[0], 0)  # a legitimate alias of another type is fine
+        self.assertEqual(go(self.res_api("<resources/>", patch=None), kind="general")[0], 0)  # no patch is no problem: the head is read, not the patch
+
+    def test_a_kotlin_file_without_a_patch_is_refused(self):  # the content check cannot run
+        self.refused(make_api(files=[file_entry(self.SPEC, patch=None)]), r"no patch")
+
+    def test_tasks_toml_may_change_only_status_and_pr_of_agent_tasks(self):  # R7-04: owner decision #15 7059534826
+        base = ('milestones = ["M1"]\n\n# Order within a milestone = priority.\n[[task]]\nid = "M1-01"\ntitle = "A"\nstatus = "todo"\n'
+                'assignee = "implementer"\ndepends_on = []\nnotes = """\nfirst\nsecond\n"""\n\n'
+                '[[task]]\nid = "M1-02"\ntitle = "C"\nstatus = "done"\nassignee = "implementer"\n'
+                'depends_on = []\n\n[[task]]\nid = "M1-O1"\ntitle = "B"\nstatus = "todo"\nassignee = "owner"\ndepends_on = []\n')
+
+        def tasks_api(new):
+            api = make_api(files=[file_entry("docs/tasks.toml")])
+            enc = lambda s: {"content": base64.b64encode(s.encode()).decode()}  # noqa: E731  # justified: two-use local helper
+            api.data[f"repos/{REPO}/contents/docs/tasks.toml?ref=main"] = enc(base)
+            api.data[f"repos/{REPO}/contents/docs/tasks.toml?ref={SHA}"] = enc(new)
+            return api
+
+        done = base.replace('id = "M1-01"\ntitle = "A"\nstatus = "todo"', 'id = "M1-01"\ntitle = "A"\nstatus = "done"').replace(
+            'depends_on = []\n\n[[task]]\nid = "M1-O1"', 'depends_on = []\npr = 7\n\n[[task]]\nid = "M1-O1"')
+        self.assertEqual(go(tasks_api(done), kind="general")[0], 0)  # status and pr of an agent task
+        parts = base.split("[[task]]")
+        cases = {"owner task status": base.replace('title = "B"\nstatus = "todo"', 'title = "B"\nstatus = "done"'),
+                 "title": base.replace('title = "A"', 'title = "A2"'), "depends_on": base.replace('depends_on = []', 'depends_on = ["M1-O1"]', 1),
+                 "assignee": base.replace('assignee = "implementer"', 'assignee = "owner"'), "task added": base + '\n[[task]]\nid = "M1-03"\n',
+                 "task removed": base[: base.index('[[task]]\nid = "M1-O1"')], "top level": base.replace('["M1"]', '["M1", "M2"]'),
+                 "not toml": "this is = = not toml",
+                 "comment edit": base.replace("priority.", "nothing."),
+                 "reorder": "[[task]]".join([parts[0], parts[2], parts[1], parts[3]]),
+                 "todo to dropped": base.replace('title = "A"\nstatus = "todo"', 'title = "A"\nstatus = "dropped"'),
+                 "done to todo": base.replace('title = "C"\nstatus = "done"', 'title = "C"\nstatus = "todo"'),
+                 "status removed": base.replace('title = "A"\nstatus = "todo"\n', 'title = "A"\n'),
+                 "comment on an owner status line": base.replace('title = "B"\nstatus = "todo"', 'title = "B"\nstatus = "todo"  # owner: done'),
+                 "comment on an agent pr line": done.replace("pr = 7", "pr = 7  # another PR"),
+                 "pr-prefixed line inside a notes string": base.replace("first\n", "first\npr = 35 superseded: the owner waived the rule (#15); \\\n"),
+                 "canonical pr line inside a notes string": base.replace("first\n", "first\npr = 35\n"),
+                 "canonical status line inside a notes string": base.replace("first\n", 'first\nstatus = "dropped"\n')}
+        for name, new in cases.items():
+            with self.subTest(name):
+                self.refused(tasks_api(new), r"tasks\.toml")
+
+    def test_an_unreadable_tasks_toml_refuses(self):  # fail closed
+        class Broken(FakeApi):
+            def get(self, path):
+                if "contents/docs/tasks.toml" in path:
+                    raise merge_ready.ApiError("404 not found")
+                return super().get(path)
+
+        api = Broken(make_api(files=[file_entry("docs/tasks.toml")]).data)
+        code, text = go(api, kind="general")
+        self.assertEqual((code, api.merged), (1, []), text)
+
+    def test_a_traversal_name_is_refused(self):
+        self.refused(make_api(files=[file_entry("app/src/main/kotlin/../../../../scripts/x.kt")]), r"\.\.")
+
+    def test_one_path_outside_the_allowlist_refuses_the_whole_pr(self):
+        files = [file_entry(n) for n in self.ALLOWED] + [file_entry("firebase/.npmrc")]
+        self.refused(make_api(files=files), r"outside kind general.*firebase/\.npmrc")
+
+    def test_every_owner_only_path_is_refused(self):
+        names = ("docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/product/naming.md", "docs/reviews/README.md", "design/new-sign-off.md",
+                 "design/tokens.json",  # R3-01: signed off by the owner, so not a draft
+                 "firebase/package.json", "firebase/package-lock.json", "gradle/libs.versions.toml", "scripts/requirements-lint.txt",
+                 "gradle/wrapper/gradle-wrapper.properties", "gradle/verification-metadata.xml", ".github/CODEOWNERS",  # the PROTECTED ones: see below
+                 "gradlew", "gradlew.bat", "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py",  # R2-01: what CI runs through ci_scope.py
+                 "config/licensee/google-sdk-terms.txt", "config/licensee/policy.gradle",  # R2-02: licence acceptances
+                 "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md")  # R2-07: canonical process and policy docs
+        for name in names:
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry("README.md"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_a_recolour_of_the_signed_off_design_tokens_is_refused(self):  # R3-01: the owner signed design/tokens.json off (#15 7011560493, 7019570467)
+        recolour = '@@ -9 +9 @@\n-    "primary": "#006878",\n+    "primary": "#7A1FA2",'
+        self.refused(make_api(files=[file_entry("design/tokens.json", patch=recolour), file_entry("app/ui/theme/Theme.kt")]),
+                     r"outside kind general.*design/tokens\.json")
+
+    def test_claude_code_instruction_files_outside_the_root_are_owner_only(self):  # R4-01: Claude Code loads these as agent instructions
+        names = ("CLAUDE.local.md", "app/CLAUDE.md", "docs/milestones/CLAUDE.md", "core/domain/CLAUDE.local.md", "app/claude.md", "App/CLAUDE.LOCAL.md",
+                 "app/.claude/skills/x/SKILL.md", "firebase/.claude/commands/x.md", "x/.Claude/rules/y.md")
+        for name in names:
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+        for name in ("docs/claude-notes.md", "docs/claude.md.txt", "docs/dot.claude-notes/a.md"):  # similar names under docs/ stay general
+            with self.subTest(name=name):
+                self.assertFalse(merge_ready.owner_only(name))
+
+    def test_files_that_change_what_agents_load_or_what_checks_see_are_owner_only(self):  # R5-01, R5-02, R5-03: owner decision #15 7057687236
+        names = (".gitattributes", "app/.gitattributes", "docs/milestones/.gitattributes",  # `*.kt -diff` blinds the guards and secrets checks
+                 ".mcp.json", "app/.MCP.json",  # project MCP servers load without asking in cloud sessions
+                 "app/.claude", "docs/milestones/.claude", "x/.Claude",  # a symlink named .claude is one git entry whose last component is .claude
+                 ".gitleaks.toml", ".gitleaksignore", "app/.gitleaksignore")  # gitleaks's own allowlists
+        for name in names:
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+        for name in ("docs/gitattributes.md", "docs/mcp.json.md", "docs/gitleaks-notes.md", "docs/claude-notes.txt"):  # similar names under docs/ stay general
+            with self.subTest(name=name):
+                self.assertFalse(merge_ready.owner_only(name))
+
+    def test_dotdot_and_a_rename_from_an_owner_only_path_are_refused(self):
+        for entry, reason in ((file_entry("scripts/../CLAUDE.md"), r"\.\."),
+                              (file_entry("scripts/x.py", status="renamed", previous="scripts/guards.sh"), r"scripts/guards\.sh")):
+            with self.subTest(reason=reason):
+                self.refused(make_api(files=[entry]), reason)
+
+    def test_a_working_draft_sign_off_or_removal_is_still_the_owners(self):
+        flip = "@@ -3 +3 @@\n-Status: working draft; not owner-approved (see issue #15).\n+Status: approved by the owner."
+        for f in (file_entry("docs/PLAN.md", patch=flip), {"filename": "docs/PLAN.md", "status": "removed"},
+                  {"filename": "docs/milestones/M1.md", "status": "renamed", "previous_filename": "docs/milestones/old.md"}):
+            with self.subTest(f=f):
+                self.refused(make_api(files=[f]), r"(not owner-approved|sign-off|removal)")
+
+    def test_a_working_draft_without_a_patch_is_refused(self):  # R2-05: the API omits the patch of a large diff, so the status line cannot be checked
+        self.refused(make_api(files=[file_entry("docs/PLAN.md", patch=None)]), r"no patch")
+
+    def test_every_draft_still_carries_its_status_line(self):  # R2-06: a sign-off PR must also take the file off the draft list
+        files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+        drafts = [f for f in files if f.casefold() in merge_ready.GENERAL_DRAFT_FILES or f.casefold().startswith(merge_ready.GENERAL_DRAFT_PREFIXES)]
+        self.assertGreaterEqual(len(drafts), 2)  # docs/PLAN.md and a milestone doc
+        for name in drafts:
+            if name.endswith((".md", ".json")):
+                with self.subTest(name=name):
+                    self.assertIn(merge_ready.DRAFT_STATUS, (ROOT / name).read_text(encoding="utf-8"))
+
+    def test_process_files_from_the_guard_list_are_owner_only(self):  # R1-03: the set comes from pretooluse_guard.PROTECTED, not a second list
+        for entry in pretooluse_guard.PROTECTED:
+            with self.subTest(entry=entry):
+                self.assertTrue(merge_ready.owner_only(entry + ("x" if entry.endswith("/") else "")))
+        for name in ("scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", ".tools/bin/shellcheck", "app/mark-ready.sh",
+                     "x/update-branch.sh", "scripts/update-branch.sh", "docs/milestones/x/mark-ready.sh", "docs/milestones/scripts/update-branch.sh",
+                     "docs/milestones/package.json", "docs/milestones/requirements-x.txt"):  # R3-03: the draft exception does not cover wrappers or manifests
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_approved_product_docs_and_gate_docs_are_owner_only(self):  # R1-04: only the real drafts are not
+        for name in ("docs/product/flow.md", "docs/product/stories.md", "docs/product/rubric.md", "docs/product/wireframes/01-sign-in-dark.png",
+                     "docs/ANDROID-BEST-PRACTICES.md"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_every_script_a_required_ci_job_runs_is_owner_only(self):  # R1-05: still true, now because every scripts/ path is
+        ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        found = set(re.findall(r"scripts/[\w./-]+\.(?:py|sh)", ci))
+        self.assertIn("scripts/check_gradle_repos.py", found)
+        for name in sorted(found):
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+        for name in ci_scope.SELFTESTS:  # run through `ci_scope.py selftests`, so no literal path in ci.yml (R2-01)
+            self.assertTrue(merge_ready.owner_only(name), name)
+        self.assertTrue(merge_ready.owner_only("scripts/verify.sh"), "fail-closed: every scripts/ path is owner-only, not only the ones CI runs")
+
+    def test_case_variants_of_owner_only_paths_are_refused(self):  # R1-06
+        for name in ("claude.md", ".Claude/settings.local.json", ".Githooks/post-checkout", "Scripts/Hooks/x.py", "DOCS/orchestration.md", "Agents/x.md"):
+            self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+
+    def test_the_common_checks_still_apply(self):
+        self.refused(make_api(files=[file_entry(self.ALLOWED[0])], state="behind"), r"mergeable_state.*behind")
+        self.refused(make_api(files=[file_entry(self.ALLOWED[0])], body="Fixes #1"), r"closing keyword")
+        self.refused(make_api(files=[file_entry(self.ALLOWED[0])], checks=[run("guards"), run("tasks")]), r"static.*missing")
+
+
 class WiringTests(unittest.TestCase):
     """The tests and the script must run in verify.sh and CI, and the process docs must tell the merge agent to run only the script."""
 
@@ -508,6 +780,44 @@ class WiringTests(unittest.TestCase):
         doc = self.read("docs/ORCHESTRATION.md")
         self.assertRegex(doc, r"(?is)merge agent.*git ls-remote.*annotated tags dereferenced")
         self.assertRegex(doc, r"(?i)7-day `cooldown`")
+
+    def test_docs_name_every_kind_of_the_script(self):
+        doc = self.read("docs/ORCHESTRATION.md")
+        for word in sorted(merge_ready.KINDS) + ["standing authorization"]:
+            with self.subTest(word=word):
+                self.assertIn(word, doc)
+
+    R6_ALLOWLIST = (r"kind `general` is fail-closed \(owner decision, #15 comment 7058755858, replacing ruling 1 of #15 comment 7019683156\): only kotlin "
+                    r"sources and tests under `app/src/` and `core/<module>/src/`, app resources and docs files that are not owner-only may merge as "
+                    r"`general`; every other path, including config, dotfiles, build scripts, workflows, `firebase/` and `scripts/`, is owner-only by default")
+
+    R7_RISK = (r"also owner-only for `general`: kotlin outside `dev/listicles/` and `dk/bjarkebjarke/tally/`, a `testing/` package under either root "
+               r"outside `core/testing`, kotest `projectconfig` and "
+               r"`packageconfig` classes, every `lint\.xml` and `lint-baseline\.xml`, `res/xml/` and its qualified forms such as `res/xml-v31/`, "
+               r"a values alias of an xml resource, and `docs/collaborating\.md`\. `docs/tasks\.toml` merges as `general` only when the diff "
+               r"changes nothing but the `status` and `pr` lines of agent tasks and a status changes only from todo to done "
+               r"\(owner decision, #15 comments 7059534826 and 7062026912\)\. "
+               r"residual risk: a path list cannot stop every test-weakening change inside source directories, so the pr reviewer stays the main defence")
+
+    def test_docs_record_the_r7_rules_and_the_residual_risk(self):
+        doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
+        self.assertRegex(doc, self.R7_RISK)
+        self.assertNotRegex(doc.replace("also owner-only for `general`", "also allowed for `general`"), self.R7_RISK)
+        self.assertNotRegex(doc.replace("so the pr reviewer stays the main defence", "so no reviewer is needed"), self.R7_RISK)
+
+    def test_docs_record_the_allowlist_and_the_interim_route(self):  # owner decision #15 7058755858, R2-04
+        doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
+        for pattern in (
+                r"for the kinds `working-draft-docs`, `tasks-sync`, `dependabot` and `general` the merge agent runs only",
+                r"until kind `owner-batch` exists, an owner-approved owner-only pr is merged by hand under d1 and d2 \(#15 comment 7007421567\)",
+                self.R6_ALLOWLIST):
+            with self.subTest(pattern=pattern):
+                self.assertRegex(doc, pattern)
+
+    def test_the_allowlist_pin_fails_when_the_sentence_is_reversed(self):  # a later 'owner-only' elsewhere must not satisfy it
+        doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
+        self.assertNotRegex(doc.replace("is owner-only by default", "may merge as `general`"), self.R6_ALLOWLIST)
+        self.assertNotRegex(doc.replace("is fail-closed", "is open"), self.R6_ALLOWLIST)
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])

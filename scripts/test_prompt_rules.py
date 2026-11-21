@@ -1685,7 +1685,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         ("red green one push", r"a red/green pair may go up in one push \(say so in the pr body\)"),
         ("pr bodies by mcp", r"pr bodies only through the github mcp tools"),
         ("close after merge", r"comment on the completed issue, then close it with `state=closed`, `state_reason=completed`"),
-        ("merge agent authorization", r"merges only after a new owner-recorded authorization on #15"),
+        ("merge agent authorization", r"merges under the standing authorization on #15 \(§7\.5\)"),
         ("archive policy", r"keep implementers until their pr merges; archive the others when they are done"),
         ("owner-only list", r"owner-only merge list"),
     )
@@ -1712,24 +1712,22 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         self.assertRegex(text, r"until the hard stage, the orchestrator follows this section, not the soft reminder")
         self.assertNotIn("for other sessions", text)
 
-    # Owner decision on #15, comment 7002904192 (R2-01 of #179): one authorization covers exactly its window and the PRs it names.
+    # Owner decision on #15, comment 7005366747: a standing authorization replaces the per-window one of 7002904192 (R2-01 of #179).
     # R3-01 of #179: the record is a condition on merging, not a per-agent action.
-    SCOPE = (r"an owner-recorded authorization on #15: one authorization covers exactly the time window and the prs it names, "
-             r"whichever merge agent session runs under it; it ends with the window, and a merge outside a recorded window or list needs a new one")
-    AUTH = (r"owner authorizes it there before its first merge, and it merges only under " + SCOPE
-            + r" \(owner decision, #15 comment 7002904192\)")
+    STANDING = (r"merges under the owner's standing authorization \(#15 comment 7005366747, replacing the per-window rule of comment 7002904192\) "
+                r"until the owner revokes it there")
 
-    def test_merge_agent_authorization_is_stated_once_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179
+    def test_standing_authorization_is_stated_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179, updated for 7005366747
         doc = self.norm(self.ORCH_DOC).split("### 7.5 pull requests and the merge request", 1)[1].split("### 7.6", 1)[0]
-        self.assertRegex(doc, self.AUTH)
+        self.assertRegex(doc, r"the owner authorizes it there before its first merge, and then the merge agent " + self.STANDING)
         self.assertEqual(len(re.findall(r"owner authorizes it there", self.norm(self.ORCH_DOC))), 1)
         # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
         prompt = self.norm(self.ORCH_MD)
         self.assertRegex(prompt, r"the owner authorizes it there before its first merge, and you never pass an approval on to it\.")
-        self.assertRegex(prompt, r"the merge agent merges only under " + self.SCOPE + r" \(§7\.5, #15 comment 7002904192\)\.")
-        self.assertNotIn("records a new authorization", prompt)
-        self.assertNotIn("records a new authorization", self.norm(self.ORCH_DOC))
+        self.assertRegex(prompt, r"the merge agent " + self.STANDING)
         self.assertEqual(len(re.findall(r"owner authorizes it there", prompt)), 1)
+        for text in (doc, prompt):  # the per-window form is gone
+            self.assertNotRegex(text, r"one authorization covers exactly the time window|records a new authorization")
 
     def test_no_per_merge_agent_unit_of_authorization_is_left(self):  # R2-01 of #179: no owner source states it
         for path in (self.ORCH_MD, self.ORCH_DOC, ROOT / "scripts" / "prompt_rules.py"):
