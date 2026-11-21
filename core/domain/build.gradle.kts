@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
     alias(libs.plugins.licensee)
+    alias(libs.plugins.pitest)
 }
 
 // M0.5-10: shipped dependencies must be on the owner's licence allowlist.
@@ -57,4 +58,32 @@ kover {
             }
         }
     }
+}
+
+// M1-05 (PLAN P16): mutation testing so tests without real assertions cannot satisfy the coverage gate.
+// The floor is 80 (owner decision, issue 15): raise it later, never lower it (scripts/check_pit_config.py).
+pitest {
+    pitestVersion.set(libs.versions.pitest.get())
+    junit5PluginVersion.set("1.2.3")
+    targetClasses.set(listOf("dk.bjarkebjarke.tally.domain.*"))
+    targetTests.set(listOf("dk.bjarkebjarke.tally.domain.*"))
+    // PIT defaults without VOID_METHOD_CALLS: Kotlin's generated null checks (Intrinsics.checkNotNull*) are equivalent mutants no test
+    // can kill, and avoidCallsTo would drop every mutant on a line that calls them. Conditionals, returns and arithmetic stay mutated.
+    mutators.set(
+        listOf(
+            "CONDITIONALS_BOUNDARY",
+            "INCREMENTS",
+            "INVERT_NEGS",
+            "MATH",
+            "NEGATE_CONDITIONALS",
+            "EMPTY_RETURNS",
+            "FALSE_RETURNS",
+            "TRUE_RETURNS",
+            "NULL_RETURNS",
+            "PRIMITIVE_RETURNS",
+        ),
+    )
+    mutationThreshold.set(80)
+    outputFormats.set(listOf("XML", "HTML"))
+    timestampedReports.set(false)
 }
