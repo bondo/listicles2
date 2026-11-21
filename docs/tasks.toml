@@ -901,8 +901,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-10"]
-notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write"
+depends_on = ["M1-10", "M1-O11"]
+notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write. Starts after the owner decides #280 (M1-O11; R1-A-04 of PR #265, #15 comment 7064886556): implement the Query invites row as decided, and this PR writes the decision into PLAN 3.1"
 
 [[task]]
 id = "M1-30"
@@ -1432,6 +1432,16 @@ risk = "normal"
 depends_on = ["M1-29"]
 notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task, a further deferral included (record it on #15); a rename becomes a new owner task. Follow-on edits: docs/product/naming.md"
 
+[[task]]
+id = "M1-O11"
+title = "Decide #280 (who may list invites) before M1-12 starts"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU)"
+
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
 [[task]]
@@ -1442,7 +1452,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and a member's invites under an abandoned tombstone (PR #265 R1-B-07, with the owner's answer on R1-A-02); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
 
 [[task]]
 id = "M2-FU"
