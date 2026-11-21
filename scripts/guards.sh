@@ -634,37 +634,101 @@ narrowcheck() { # narrowcheck <merge-base>
   done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- '*ruff.toml' '*pyproject.toml' '*tsconfig*.json' '*jsconfig*.json' "${EXCL[@]}")
 }
 
-# 7. A raised line length (owner decision in #46). Per style config file the largest value of the setting family (line-length,
-# max-line-length, max_line_length, maxLineLength, printWidth; quotes and comments ignored, a word such as `off` counts as no limit)
-# is compared with the same file at the merge base, so an added setting counts as well as an edited one. A deleted file (rename or
-# move) is compared with the largest value in the style files of the same tool at HEAD (prettier, editorconfig, detekt, ruff, flake8
-# and their kin each form one group). Lowered or removed is stricter and passes. Not compared: a base
-# without the setting (the tool default is not known), and the same family split over two files when neither is deleted.
+# 7. A raised line length (owner decisions in #46 and #176). Every setting of the family (line-length, max-line-length, max_line_length,
+# maxLineLength, printWidth) is read from every style file of a tool, at the merge base and at HEAD, and the largest value is compared per
+# group: per file, per tool, per tool and setting name, and per tool, setting name and section (an `.editorconfig` section or a TOML table).
+# A larger group at HEAD fails, so an added setting counts like an edited one, a family split over two kept files is one group, and a raise
+# is not masked by a lowering of another setting or section. A value is a number only when its digits end at a delimiter (`off`, `1_60`,
+# `100 * 2` are no limit); a value on the next line is read. Files are not parsed, so it fails closed: every value in a pyproject.toml,
+# setup.cfg or tox.ini counts as the tool's, whatever holds it (another tool's raise there fails too). The default and the own groups need to know what
+# is the tool's own: a ruff or flake8 file in use (ruff.toml, a `[tool.ruff` table or ruff key, .flake8, `[flake8]`) with no setting of its
+# own counts the tool default (ruff 88, flake8 79) for that file, unless a ruff file has `extend =`. The tool's own values and the default
+# also get groups of their own, so another tool's wider value hides nothing. A section new at HEAD, while the setting is already no limit at
+# the base, is compared with the largest finite base value. A file gone at HEAD is compared with the same tool at HEAD; a symlink is no
+# limit. Not compared: a setting removed from a kept file (prettier, `.editorconfig`, detekt: no default), the same setting twice in a file.
 STYLERE='(ruff\.toml|pyproject\.toml|\.flake8|setup\.cfg|tox\.ini|\.editorconfig|detekt\.yml|prettierrc[^/]*|prettier\.config\.[^/]*)$'
-LL_AWK='{ lo = tolower($0); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
-  while (match(lo, /(max[-_]?line[-_]?length|line[-_]?length|printwidth)["\047]?[ \t]*[:=][ \t]*["\047]?/)) {
-    lo = substr(lo, RSTART + RLENGTH); if (lo ~ /^[ \t]*$/) continue  # a YAML parent key (`MaxLineLength:`) has no value
-    v = match(lo, /^[0-9]+/) ? substr(lo, 1, RLENGTH) + 0 : 999999999; if (!f || v > m) m = v; f = 1 } }
-  END { if (f) print m }'
-stylekind() { # the style files of the same tool as <path>
+STYLEX='^(docs|handoff)/|(^|/)(node_modules|build)/'
+# Per file: `side TAB file TAB tool TAB section TAB setting TAB value` lines, plus a `present` line and, for a ruff or flake8 file in use
+# with no setting, a `dflt` line. A 7th field says the value is the tool's own (ruff's table, flake8's section). Block comments are cut first.
+LL_AWK='function num(x) { if (!match(x, /^[0-9]+/)) return 999999999
+    d = substr(x, 1, RLENGTH); return (substr(x, RLENGTH + 1) ~ /^[ \t]*([,;}"\047]|\]|$)/) ? d + 0 : 999999999 }
+  function ownline(l) {  # is this setting ruff'"'"'s or flake8'"'"'s, in a file that also holds other tools?
+    if (f ~ /(^|\/)pyproject\.toml$/) return (sec ~ /^\[tool\.ruff/ || (sec == "[tool]" && l ~ /ruff/) || (sec == "" && l ~ /tool\.ruff/))
+    if (f ~ /(^|\/)(setup\.cfg|tox\.ini)$/) return (sec ~ /^\[flake8\]/)
+    return 1 }
+  function emit(k, v, o) { if (o) any = 1; print sd, f, t, sec, k, v, o + 0 }  # every value counts (fail closed); o: the tool'"'"'s own (own groups, no default)
+  BEGIN { OFS = "\t"; use = (f ~ /(^|\/)\.?(ruff\.toml|flake8)$/) }
+  { lo = tolower($0); if (NR == 1) sub(/^\357\273\277/, "", lo)  # a BOM
+    if (t == "prettier") {  # block comments, also over several lines (only one that opens at the start of a line, `src/*` is a glob)
+      if (inc) { if (!match(lo, /\*\//)) next; lo = substr(lo, RSTART + 2); inc = 0 }
+      gsub(/\/\*([^*]|\*+[^*\/])*\*+\//, "", lo)
+      if (lo ~ /^[ \t]*\/\*/) { inc = 1; next } }
+    hd = (f ~ /(setup\.cfg|tox\.ini|\.flake8)$/ ? lo ~ /^[ \t]*\[[^]]*\]/ : lo ~ /^[ \t]*\[[^]]*\][ \t]*([#;].*)?$/); sub(/(^|[ \t])(#|;|\/\/).*$/, "", lo)
+    if (pk != "" && lo !~ /^[ \t]*$/) {  # the value of the last key was empty: it is on this line, unless this line is a key or a header
+      if (lo !~ /^[ \t]*(\[.*\]|["\047]?[a-z0-9_.-]+["\047]?[ \t]*[:=])/) { sub(/^[ \t]*["\047]?/, "", lo); emit(pk, num(lo), po) }
+      pk = "" }
+    if (hd) { match(lo, /\[[^]]*\]/); sec = substr(lo, RSTART, RLENGTH); gsub(/[ \t"\047]/, "", sec)
+      if (sec ~ /^\[(tool\.ruff|flake8)/) use = 1; next }
+    ol = ownline(lo)
+    if (ol && f ~ /pyproject\.toml$/ && lo ~ /ruff/) use = 1
+    if (t == "ruff" && lo ~ /^[ \t]*extend[ \t]*=/) ext = 1
+    gsub(/ktlint_[a-z0-9_]*max[-_]?line[-_]?length/, "ktlint_rule", lo)  # a rule switch, not a limit
+    while (match(lo, /(max[-_]?line[-_]?length|line[-_]?length|printwidth)["\047]?[ \t]*[:=][ \t]*["\047]?/)) {
+      k = substr(lo, RSTART, RLENGTH); sub(/[^a-z_-].*$/, "", k); gsub(/[-_]/, "", k)
+      lo = substr(lo, RSTART + RLENGTH); if (lo ~ /^[ \t]*$/) { pk = k; po = ol; continue }  # a YAML parent key or a value on the next line
+      emit(k, num(lo), ol) } }
+  END { print sd, f, t, "", "present", 1; if (use && !any && !ext) print sd, f, t, "", "dflt", 1 }'
+# Input: the lines of both sides, `B` or `H` first. Output: one `raised line length: ...` line per group that is larger at HEAD.
+LL_CMP='BEGIN { FS = "\t"; DEF["ruff"] = 88; DEF["flake8"] = 79 }
+  function put(k, v) { if (!(k in M) || v > M[k]) M[k] = v }
+  function fmt(v) { return v > 99999 ? "no limit" : v }
+  function out(g, b, h,   l) { l = g; if (g ~ /^F\|/) sub(/^F\|[^|]*\|/, "", l); else { sub(/^[A-Z]\|/, "", l); gsub(/\|/, " ", l) }
+    print "raised line length: " l ": " fmt(b) " -> " fmt(h) }
+  function group(side, tool, file, key, sec, v) { put(side SUBSEP "F|" tool "|" file, v); put(side SUBSEP "T|" tool, v)
+    if (key == "") return
+    put(side SUBSEP "K|" tool "|" key, v); put(side SUBSEP "S|" tool "|" key "|" sec, v)
+    if (v <= 99999 && (!((side, tool "|" key) in KF) || v > KF[side, tool "|" key])) KF[side, tool "|" key] = v }
+  $5 == "present" { P[$1, $2] = 1; next }
+  $5 == "dflt" { group($1, $3, $2, "", "", DEF[$3]); group($1, $3 " own", $2, "", "", DEF[$3]); next }
+  { group($1, $3, $2, $5, $4, $6); if ($7 && $3 in DEF) group($1, $3 " own", $2, $5, $4, $6) }  # the tool'"'"'s own values and default, too
+  END {
+    for (k in M) {
+      split(k, p, SUBSEP); if (p[1] != "B") continue
+      g = p[2]; b = M[k]
+      if (("H", g) in M) h = M["H", g]
+      else if (g ~ /^F\|/) { fl = g; sub(/^F\|[^|]*\|/, "", fl); if (("H", fl) in P) continue
+        t = g; sub(/^F\|/, "", t); sub(/\|.*$/, "", t); if (!(("H", "T|" t) in M)) continue; h = M["H", "T|" t] }
+      else continue
+      if (h > b) out(g, b, h) }
+    for (k in M) {  # a section that is new at HEAD, while the setting is already no limit at the base
+      split(k, p, SUBSEP); if (p[1] != "H" || p[2] !~ /^S\|/ || ("B", p[2]) in M) continue
+      kk = p[2]; sub(/^S\|/, "", kk); split(kk, q, "|"); tk = q[1] "|" q[2]
+      if (!(("B", "K|" tk) in M) || M["B", "K|" tk] <= 99999 || !(("B", tk) in KF)) continue
+      if (M[k] > KF["B", tk]) out(p[2], KF["B", tk], M[k]) } }'
+styletool() { # the tool a style file belongs to
   case "$1" in
-    *prettierrc*|*prettier.config.*) echo 'prettierrc[^/]*$|prettier\.config\.[^/]*$' ;;
-    *.editorconfig) echo '\.editorconfig$' ;;
-    *detekt.yml) echo 'detekt\.yml$' ;;
-    *ruff.toml|*pyproject.toml) echo 'ruff\.toml$|pyproject\.toml$' ;;
-    *) echo '\.flake8$|setup\.cfg$|tox\.ini$' ;;
+    *prettierrc*|*prettier.config.*) echo prettier ;;
+    *.editorconfig) echo editorconfig ;;
+    *detekt.yml) echo detekt ;;
+    *ruff.toml|*pyproject.toml) echo ruff ;;
+    *) echo flake8 ;;
   esac
 }
-linemax() { git show "$1" 2>/dev/null | LC_ALL=C awk "$LL_AWK"; }
+styledump() { # styledump <rev> <side>: the settings of every style file at <rev>, each line starting with <side>
+  local e m f t  # -z keeps a non-ASCII path readable; the mode tells a symlink (120000), which is no limit; a lone CR is a line end too
+  git ls-tree -r -z "$1" | while IFS= read -r -d '' e; do
+    f=${e#*$'\t'}; m=${e%% *}
+    [[ $f =~ $STYLERE ]] && ! [[ $f =~ $STYLEX ]] || continue; t=$(styletool "$f")
+    if [ "$m" = 120000 ]; then printf '%s\t%s\t%s\t\tsymlink\t999999999\n%s\t%s\t%s\t\tpresent\t1\n' "$2" "$f" "$t" "$2" "$f" "$t"
+    else git show "$1:$f" 2>/dev/null | tr '\r' '\n' | LC_ALL=C awk -v sd="$2" -v f="$f" -v t="$t" "$LL_AWK"; fi
+  done
+}
 linecheck() { # linecheck <merge-base>
-  local mb="$1" f g b h kind
-  while IFS= read -r f; do
-    git cat-file -e "$mb:$f" 2>/dev/null || continue
-    b=$(linemax "$mb:$f"); [ -n "$b" ] || continue
-    if git cat-file -e "HEAD:$f" 2>/dev/null; then h=$(linemax "HEAD:$f")
-    else kind=$(stylekind "$f"); h=$(while IFS= read -r g; do linemax "HEAD:$g"; done < <(git ls-tree -r --name-only HEAD | grep -E "$kind") | sort -n | tail -1); fi
-    [ -n "$h" ] && [ "$h" -gt "$b" ] && bad "raised line length: $f: $([ "$b" -gt 99999 ] && echo "no limit" || echo "$b") -> $([ "$h" -gt 99999 ] && echo "no limit" || echo "$h")"
-  done < <(git diff --name-only --no-renames --diff-filter=MD "$mb" HEAD -- . "${EXCL[@]}" | grep -E "$STYLERE")
+  local names out l
+  names=$(git -c core.quotePath=false diff --name-only --no-renames --diff-filter=ADMT "$1" HEAD -- . "${EXCL[@]}")
+  grep -qE "$STYLERE" <<<"$names" || return 0  # not `git diff | grep -q`: under pipefail a long list kills git with SIGPIPE
+  out=$({ styledump "$1" B; styledump HEAD H; } | LC_ALL=C awk "$LL_CMP" | sort -u)
+  while IFS= read -r l; do [ -n "$l" ] && bad "$l"; done <<<"$out"
 }
 
 if [ "$STAGED" = 1 ]; then sizecheck --cached; fi
@@ -753,8 +817,9 @@ if [ "$STAGED" = 0 ]; then
     narrowcheck "$MB"
     linecheck "$MB"
     # Screenshot references.
-    if [ "${GOLDEN_UPDATE:-0}" != 1 ] && git diff --name-only "$MB" HEAD \
-      | grep -E '(screenshots|golden|snapshots|roborazzi)/.*\.png$|src/[A-Za-z]*[Tt]est[A-Za-z]*/.*\.png$' | grep -q .; then
+    # The list is read first: under pipefail `grep | grep -q` dies of SIGPIPE when more than one pipe buffer of paths matches (#251).
+    gnames=$(git -c core.quotePath=false diff --name-only "$MB" HEAD)
+    if [ "${GOLDEN_UPDATE:-0}" != 1 ] && grep -qE '(screenshots|golden|snapshots|roborazzi)/.*\.png$|src/[A-Za-z]*[Tt]est[A-Za-z]*/.*\.png$' <<<"$gnames"; then
       bad "screenshot references changed without the golden-update label"
     fi
     # Diff size outside generated files (docs count). Enforced in CI only.
