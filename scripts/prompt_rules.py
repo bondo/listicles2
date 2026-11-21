@@ -639,7 +639,7 @@ RULES = (
             r"sonnet, medium effort otherwise, high for tooling\)",
             r"60% of a 1m window, 40% of a 200k one", r"80% / 60%",
         ),
-        "the implementer prompt names the roles.yaml Opus / Sonnet split (owner decision 7032210967) and the hook's handoff thresholds (rev 46 rows 1, 12)",
+        "the implementer prompt names the roles.yaml model and the hook's handoff thresholds (rev 46 rows 1, 12)",
         forbidden=(r"at about 50% context", r"implementer for listicles\. opus, high effort"),
     ),
     Rule(
