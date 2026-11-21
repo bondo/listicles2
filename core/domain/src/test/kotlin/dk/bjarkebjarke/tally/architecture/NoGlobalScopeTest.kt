@@ -110,15 +110,24 @@ class NoGlobalScopeTest {
             "app/src/main",
             "app/src/test",
             "app/src/androidTest",
-            "app/build/generated",
+            "app/build/generated/src/main",
             "core/data/src/main",
             "core/data/src/test",
+            "feature/lists/ui/src/main",
+            "node_modules/x/src/main",
             "src/main",
         ).forEach { File(dir, it).mkdirs() }
         DataSourceRules
             .allSourceDirs(dir)
             .map { it.relativeTo(dir).path }
             .sorted() shouldBe
-            listOf("app/src/androidTest", "app/src/main", "app/src/test", "core/data/src/main", "core/data/src/test")
+            listOf(
+                "app/src/androidTest",
+                "app/src/main",
+                "app/src/test",
+                "core/data/src/main",
+                "core/data/src/test",
+                "feature/lists/ui/src/main",
+            )
     }
 }

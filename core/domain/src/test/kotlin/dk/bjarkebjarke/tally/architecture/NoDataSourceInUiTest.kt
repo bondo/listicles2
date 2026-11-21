@@ -267,20 +267,54 @@ class NoDataSourceInUiTest {
     // ---- which directories the rule scans ----
 
     @Test
-    fun scansTheMainSourcesOfEveryModuleButNotTestsOrBuildOutput() {
+    fun scansEveryNonTestSourceSetOfEveryModuleButNotBuildOutput() {
         listOf(
             "app/src/main",
+            "app/src/debug",
             "app/src/test",
             "app/src/androidTest",
-            "app/build/generated",
+            "app/src/testFixtures",
+            "app/build/generated/src/main",
             "core/data/src/main",
             "core/data/src/test",
-            "feature/lists/src/main",
+            "feature/lists/ui/src/main",
+            "data/src/main",
+            "node_modules/x/src/main",
+            ".gradle/x/src/main",
             "src/main",
         ).forEach { File(dir, it).mkdirs() }
         DataSourceRules
             .uiSourceDirs(dir)
             .map { it.relativeTo(dir).path }
-            .sorted() shouldBe listOf("app/src/main", "core/data/src/main", "feature/lists/src/main")
+            .sorted() shouldBe
+            listOf("app/src/debug", "app/src/main", "core/data/src/main", "data/src/main", "feature/lists/ui/src/main")
+    }
+
+    @Test
+    fun rejectsViewModelThatIsNotTheFirstSupertype() {
+        violationsOf(
+            "import com.google.firebase.firestore.FirebaseFirestore\n\n" +
+                "class A(val db: FirebaseFirestore) : DefaultLifecycleObserver, ViewModel()",
+        ).shouldNotBeEmpty()
+    }
+
+    @Test
+    fun acceptsAViewModelCallThatIsNotASupertype() {
+        violationsOf(
+            "import com.google.firebase.auth.FirebaseAuth\n\nval a: Any = FirebaseAuth::class\n" +
+                "val b = listOf(a, ViewModel())",
+        ).shouldBeEmpty()
+    }
+
+    @Test
+    fun rejectsComposableAnnotatedWithAUseSiteTarget() {
+        violationsOf(
+            "import com.google.firebase.auth.FirebaseAuth\n\n@get:Composable\nval a: FirebaseAuth get() = TODO()",
+        ).shouldNotBeEmpty()
+    }
+
+    @Test
+    fun classifiesTheRealComposablesAsUiFiles() {
+        DataSourceRules.uiFileNames(File("../../app/src/main")).shouldNotBeEmpty()
     }
 }

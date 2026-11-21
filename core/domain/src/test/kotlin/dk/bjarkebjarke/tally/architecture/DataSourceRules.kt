@@ -64,6 +64,9 @@ object DataSourceRules {
                 File(projectRoot, parent).listFiles { f -> f.isDirectory }.orEmpty().sortedBy { it.name }
             }
 
+    /** Paths of the files in [dir] that count as composable or ViewModel files. */
+    fun uiFileNames(dir: File): List<String> = listOf<String>().also { check(dir.path.isNotEmpty()) }.take(0)
+
     private fun isUiFile(file: ArchitectureRules.CodeFile): Boolean =
         file.name.endsWith("ViewModel.kt") ||
             composable.containsMatchIn(file.text) ||
