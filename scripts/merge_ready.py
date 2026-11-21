@@ -17,6 +17,9 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * every changed file (a rename's old name too) is inside the kind's allowed paths (general: only the allowlist, see owner_only; owner-batch: any).
     For dependabot, a workflow may only
     re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
+  * for working-draft-docs and general, a new draft, and a file that carried `not owner-approved` at the base, still opens with the status paragraph
+    `Status: working draft ...; not owner-approved (see issue #N).` at the head (structural, not a phrase count; R4-02). A diff with no patch, or an
+    empty one, cannot be checked and refuses (R5-01).
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
     in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
   * for owner-batch, the comment is the owner's account (it cannot tell the person from an agent), on #15 and unedited, its first non-empty line is
@@ -25,7 +28,8 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
     two parents (`git merge-tree --write-tree`, no conflicts, run in this checkout after fetching main and pull/N/head, deepening a shallow checkout;
     R1-02 of #245). A hand-resolved conflict, an edit or an extra file in the merge commit refuses (a fresh owner approval is needed).
 Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the head moved) and the checked title and body as commit text.
-Exit status: 0 merged, 1 refused (or timed out waiting) or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
+Exit status: 0 merged, 1 refused (or timed out waiting) or API error, 2 bad usage. REST only (`gh api`), never GraphQL; a call is retried only when `gh`
+reports HTTP 429, 500, 502, 503 or 504 (the merge PUT included).
 """
 
 import base64
@@ -41,6 +45,8 @@ import xml.etree.ElementTree as ET  # noqa: N817  # justified: the standard name
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
 RETRIES = 5
+# Rate limit and server flakes, the merge PUT included: a retry after a lost answer fails because the PR is merged already, it never merges twice.
+RETRY_STATUSES = {"429", "500", "502", "503", "504"}
 STATE_ISSUE = 15  # the issue that holds owner decisions and batch approvals
 WAIT_SECONDS, WAIT_POLL = 900, 30  # --wait: how long to wait for required checks, and the poll interval
 MERGE_TREE_TIMEOUT = 120  # seconds for one git fetch or merge-tree
@@ -175,7 +181,7 @@ def pin_tag_problems(name, patch, resolve):
 
 
 class GhApi:
-    """REST calls through `gh api` (retries 429/5xx flakes)."""
+    """REST calls through `gh api` (retries the RETRY_STATUSES flakes, matched on the HTTP status gh reports)."""
 
     def _gh(self, args):
         last = ""
@@ -184,7 +190,8 @@ class GhApi:
             if res.returncode == 0:
                 return res.stdout
             last = (res.stderr or res.stdout).strip()
-            if not re.search(r"\b(429|50[0-4])\b", last) or attempt == RETRIES - 1:
+            status = re.search(r"\(HTTP (\d{3})\)", last)  # what `gh api` reports; a number in a message is not a status (R1-09)
+            if not (status and status.group(1) in RETRY_STATUSES) or attempt == RETRIES - 1:
                 break
             time.sleep(2**attempt)
         raise ApiError(f"gh api {args[-1]}: {last[:200] or 'failed'}")
@@ -266,6 +273,46 @@ def drops_draft_status(patch):
     return count(0) > count(1)
 
 
+STATUS_PARAGRAPH_RE = re.compile(r"Status: working draft\b.*not owner-approved \(see issue #\d+\)\.", re.S)
+STATUS_WITHIN = 12  # lines from the top of a draft in which its status paragraph must start (title, blank line, status)
+
+
+def draft_status(text):
+    """True if the text opens with a working-draft status paragraph: within its first STATUS_WITHIN lines, the first blank-line-separated paragraph that
+    starts with `Status:` begins `Status: working draft` and ends `not owner-approved (see issue #N).` (R4-02). A phrase elsewhere, in a quote or in a
+    code fence, a reworded status or a sign-off that quotes the phrase is not one."""
+    top = "\n".join(text.splitlines()[:STATUS_WITHIN])
+    para = next((p.strip() for p in re.split(r"\n\s*\n", top) if p.strip().startswith("Status:")), "")
+    return bool(STATUS_PARAGRAPH_RE.fullmatch(para))
+
+
+def _draft_path(kind, name):
+    return (name in DOC_FILES or name.startswith(DOC_PREFIXES)) if kind == "working-draft-docs" else (
+        name.casefold() in GENERAL_DRAFT_FILES or name.casefold().startswith(GENERAL_DRAFT_PREFIXES))
+
+
+def sign_off_problems(api, repo, base, sha, kind, files):
+    """Reasons a changed working draft would not be one at the head any more (R4-02): a new draft, or a file that carried the `not owner-approved` phrase
+    at the base, must open with a status paragraph at the head (draft_status). A phrase count in the patch cannot tell a reworded or moved status from
+    an edit. A file that was never a draft (an approved doc) is not held to it. A head or base that cannot be read refuses (fail closed)."""
+    problems = []
+    for f in files:
+        name, old = f["filename"], f.get("previous_filename") or f["filename"]
+        if kind not in ("working-draft-docs", "general") or f.get("status") == "removed" or not name.endswith(".md"):
+            continue
+        if not (_draft_path(kind, name) or _draft_path(kind, old)):
+            continue
+        try:
+            text = lambda path, ref: base64.b64decode(api.get(f"repos/{repo}/contents/{path}?ref={ref}")["content"]).decode()  # noqa: E731  # justified: two-use local helper
+            was_draft = f.get("status") == "added" or DRAFT_STATUS in text(old, base)
+            if was_draft and not draft_status(text(name, sha)):
+                problems.append(f"{name}: the head has no working-draft status paragraph (`Status: working draft ...; {DRAFT_STATUS} (see issue #N).` "
+                                "at the top); a sign-off or a reworded status is the owner's")
+        except (KeyError, ValueError, TypeError, ApiError) as e:
+            problems.append(f"{name}: cannot read the file at the base or the head to check its status paragraph ({type(e).__name__}): owner-only")
+    return problems
+
+
 def file_problems(kind, files, resolve):
     if not files:
         return ["no changed files"]
@@ -276,19 +323,19 @@ def file_problems(kind, files, resolve):
                 problems.append(f"path outside kind {kind}: {name}")
         name, patch = f["filename"], f.get("patch")
         draft = any(x.casefold() in GENERAL_DRAFT_FILES or x.casefold().startswith(GENERAL_DRAFT_PREFIXES) for x in (name, f.get("previous_filename") or name))
-        if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or patch is None or drops_draft_status(patch)):
+        if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or not patch or drops_draft_status(patch)):
             problems.append(f"{name}: removes or renames a working draft, has no patch to check, or removes a '{DRAFT_STATUS}' status line "
                             "(a sign-off is the owner's)")
         added = [ln for _, block in _changed_lines(patch or "") for ln in block]
-        if kind == "general" and name.endswith(".kt") and (patch is None or any(KOTEST_CONFIG_RE.search(ln) for ln in added)):
+        if kind == "general" and name.endswith(".kt") and (not patch or any(KOTEST_CONFIG_RE.search(ln) for ln in added)):
             problems.append(f"{name}: no patch to check, or it touches Kotest project config ({KOTEST_CONFIG_RE.pattern})")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
-        if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
+        if kind == "working-draft-docs" and (drops_draft_status(patch or "") or not patch and not (name.endswith(".png") and f["status"] != "renamed")):
             problems.append(f"{name}: no patch to check, or removes a '{DRAFT_STATUS}' status line (a sign-off is the owner's)")
         check = pin_only if WORKFLOW_RE.match(name) else wrapper_only if name == WRAPPER_PROPS else None
         if kind == "dependabot" and check:
-            if patch is None:
+            if not patch:  # missing or empty (R5-01)
                 problems.append(f"{name}: no patch from the API, cannot verify a version bump only")
             elif not check(patch):
                 problems.append(f"{name}: changes beyond a version bump (re-pinned `uses:` lines, services.gradle.org distribution)")
@@ -409,11 +456,10 @@ class GitMergeTree:
             self.fetched = True
         res = self._git("merge-tree", "--write-tree", "--no-messages", p1, p2)
         lines = res.stdout.splitlines()
-        if res.returncode == 1:
-            return None  # conflicts
-        if not lines or not SHA_RE.fullmatch(lines[0]):
-            raise MergeCheckError(f"git merge-tree {p1[:7]} {p2[:7]}: unreadable output")
-        return lines[0]
+        if not lines or not SHA_RE.fullmatch(lines[0]):  # exit 1 also means a commit git does not have, with nothing on stdout (R3-02)
+            what = "missing commit" if res.returncode == 1 else "unreadable output"
+            raise MergeCheckError(f"git merge-tree {p1[:7]} {p2[:7]}: {what} ({(res.stderr or '').strip()[:100] or 'no message'})")
+        return None if res.returncode == 1 else lines[0]  # exit 1 with the result tree on stdout: conflicts
 
 
 def update_branch_problems(api, repo, base, head, approved, commits, merge_tree):
@@ -503,6 +549,7 @@ def evaluate(api, repo, n, sha, kind, resolve, approval=None, merge_tree=None):
         if m:
             problems.append(f"closing keyword in {where}: {m.group(0)!r} (rephrase, e.g. 'see issue N')")
     problems += file_problems(kind, files, resolve)
+    problems += sign_off_problems(api, repo, pr["base"]["ref"], sha, kind, files)
     if kind == "general" and any("docs/tasks.toml" in (f["filename"], f.get("previous_filename")) for f in files):
         problems += tasks_problems(api, repo, pr["base"]["ref"], sha)
     if kind == "general":

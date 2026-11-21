@@ -92,7 +92,7 @@ class FakeApi:
         self.requested.append(path)
         if "/contents/app/src/main/res/" in path and path not in self.data:  # a res XML file at the head: harmless unless a test says otherwise
             return {"content": base64.b64encode(b"<resources><string name='a'>A</string></resources>").decode()}
-        if f"repos/{REPO}/contents/docs/" in path and path not in self.data:  # a docs file: a working draft with its status paragraph, unless a test says otherwise
+        if f"repos/{REPO}/contents/docs/" in path and path not in self.data:  # a docs file: a working draft, unless a test says otherwise
             return {"content": base64.b64encode(doc_text().encode()).decode()}
         return copy.deepcopy(self.data[path])
 
@@ -511,12 +511,11 @@ class SignOffTests(unittest.TestCase):
     KINDS = (("working-draft-docs", "docs/milestones/M1.md"), ("general", "docs/milestones/M1.md"), ("general", "docs/PLAN.md"))
     SWAP = "@@ -3 +3 @@\n-" + DRAFT + "\n+{}"
 
-    def attempt(self, kind, name, head, base=None, status="modified", previous=None, api=None):
+    def attempt(self, kind, name, head, base=None, status="modified", previous=None):
         patch = self.SWAP.format(DRAFT if head is None else "Status: x; not owner-approved (see issue #15).")
-        api = api or with_contents(make_api(files=[file_entry(name, status=status, patch=patch, previous=previous)]), previous or name,
-                                   base=doc_text() if base is None else base, head=head)
-        if previous is None and head is not None:
-            with_contents(api, name, head=head)
+        api = make_api(files=[file_entry(name, status=status, patch=patch, previous=previous)])
+        with_contents(api, previous or name, base=doc_text() if base is None else base)
+        with_contents(api, name, head=head)
         code, text = go(api, kind=kind)
         return code, text, api
 
@@ -555,7 +554,8 @@ class SignOffTests(unittest.TestCase):
                 self.assertEqual(self.attempt(kind, "docs/milestones/M2.md", doc_text(), status="added")[0], 0)
 
     def test_a_renamed_draft_is_judged_against_the_old_file_at_the_base(self):
-        code, text, api = self.attempt("working-draft-docs", "docs/milestones/M1b.md", "# T\n\nNo status.\n", status="renamed", previous="docs/milestones/M1.md")
+        code, text, api = self.attempt("working-draft-docs", "docs/milestones/M1b.md", "# T\n\nNo status.\n", status="renamed",
+                                       previous="docs/milestones/M1.md")
         self.assertNotEqual(code, 0, text)
         self.assertRegex(text, r"status paragraph")
 
@@ -1188,9 +1188,8 @@ class MergeTreeGitTests(unittest.TestCase):
     def test_a_missing_commit_is_an_error_not_a_conflict(self):  # R3-02: git exits 1 for it too, with nothing on stdout to tell it from a conflict
         merge_tree = self.publish(self.merge_main())
         for p1, p2 in (("f" * 40, self.main2), (self.c1, "f" * 40)):
-            with self.subTest(p1=p1[:7], p2=p2[:7]):
-                with self.assertRaisesRegex(merge_ready.MergeCheckError, r"missing commit"):
-                    merge_tree(p1, p2)
+            with self.subTest(p1=p1[:7], p2=p2[:7]), self.assertRaisesRegex(merge_ready.MergeCheckError, r"missing commit"):
+                merge_tree(p1, p2)
 
     def test_fetch_failure_is_an_error_not_a_pass(self):
         merge = self.merge_main()
