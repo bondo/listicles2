@@ -401,7 +401,7 @@ enforce the rules rather than goodwill.
    * Danish and English plural strings use `<plurals>`, with a unit test per locale
      for 0, 1 and many.
    * `unit`: JVM tests + Kover verify + PIT on `core/domain`
-   * `firebase`: Firebase emulator (project `demo-listicles`, **no secrets needed**)
+   * `firebase`: Firebase emulator (project `demo-tally`, **no secrets needed**)
      → `tsc --noEmit` (strict), ESLint `strictTypeChecked` and Prettier over the TypeScript rules tests, then
      Jest rules tests + Kotlin data-layer integration tests
    * `ui`: Compose UI tests on an API 34 emulator against the Firebase emulator,
