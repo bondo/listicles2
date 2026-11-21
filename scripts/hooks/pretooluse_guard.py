@@ -1043,7 +1043,7 @@ def track_ifs(a, state):
         val = expand(Word(val), state)
         if plus:
             val = (" \t\n" if state.get("ifs") is None else state["ifs"]) + val
-        state["ifs"], state["ifs_unknown"] = val, bool(re.search(r"[$`]", val)) or (plus and bool(state.get("ifs_unknown")))
+        state["ifs"], state["ifs_unknown"] = val, bool(re.search(r"[$`]", val))
 
 
 def check_simple(cmd, state, depth):
@@ -1066,7 +1066,7 @@ def check_simple(cmd, state, depth):
         deny("an indexed assignment such as NAME[k]=v in front of a command is not an assignment in bash, but the command still runs; remove it")
     if not words:
         for a in assigns:  # a plain assignment statement: remember literal values (R2-09: env and sudo set nothing in this shell)
-            if wrappers - {"time"} or not ASSIGN_PARTS.match(a):
+            if wrappers - {"time"}:
                 continue
             name, plus, val = ASSIGN_PARTS.match(a).groups()
             track_ifs(a, state)

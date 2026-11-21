@@ -5,6 +5,7 @@ shell), R2-10 (option tables), R2-13 (printf -v, read). Run: python3 -I -m unitt
 import unittest
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
+from pretooluse_guard import Cmd, check_simple
 from test_guard_round1 import PUSH, Base
 
 Q = "`"
@@ -18,6 +19,8 @@ class Round2(Base):
 
     def test_r2_01_a_flag_with_an_expansion_never_makes_a_command_safe(self):
         self.deny(["X=$(printf W); git restore -S$X f.txt", "X=$(printf ' -W'); git restore --staged$X f.txt", "git restore -S$X f.txt"], d=self.dirty)
+        self.deny(["git checkout -b$X -- f.txt"], d=self.dirty)
+        self.deny(["git config --get$X alias.p '!sh'", "git config -l$X alias.p '!sh'"], both=False)
         self.allow(["git restore -S f.txt", "git restore --staged f.txt"], d=self.dirty)
 
     def test_r2_02_only_the_text_an_unquoted_expansion_produced_is_split(self):
@@ -47,19 +50,24 @@ class Round2(Base):
     def test_r2_07_ifs_through_export_append_and_nested_shells(self):
         self.deny(["export IFS=_; P=--force_origin_work; git push $P", "declare IFS=_; P=--force_origin_work; git push $P",
                    "IFS=_; IFS+=,; P=--force,origin_work; git push $P", "IFS=; bash -c 'P=\"--force origin\"; git push $P work'",
-                   "IFS=+; P=--force+origin; git push $P work"])
+                   "IFS=+; P=--force+origin; git push $P work",
+                   "IFS+=_; P='--force origin'; git push $P work", "IFS=$(printf _); IFS+=,; git status"])
         self.deny(["IFS=$(printf '\\121'); D=CLAUDE.mdQ; rm $D"], both=False)
         self.allow(["IFS+=_; P=a; git status $P", "IFS=; bash -c 'echo $HOME'"])
 
     def test_r2_08_a_quoted_command_name_variable_is_expanded(self):
         self.deny(['X=git; "$X" --no-pager -C . push --force origin work', 'X=git; "${X}" -C . -C . push --force origin work'])
         self.deny(['X=rm; "$X" CLAUDE.md'], both=False)
-        self.allow(['"$HOME/bin/tool" --version', 'X=ls; "$X" -la'])
+        self.allow(['"$HOME/bin/tool" --version', 'X=ls; "$X" -la', f"X='{PUSH.split(' origin')[0]}'; \"$X\" origin work"])
 
     def test_r2_09_a_variable_the_shell_never_sets_is_not_tracked(self):
         self.deny(["F=--force; env F=ok; git push $F origin work", "F=--force; (F=ok); git push $F origin work",
                    "(IFS=); P='--force origin'; git push $P work"])
         self.allow(["env A.B=1", "sudo A.B=1", "F=--force-with-lease; (F=--force); git push $F origin work"])
+
+    def test_the_nesting_cap_denies(self):
+        with self.assertRaises(SystemExit):
+            check_simple(Cmd(), {"cwd": "/", "known": True, "vars": {}}, 9)
 
     def test_r2_10_long_value_options_of_ionice_and_sudo(self):
         self.deny([f"ionice --class 3 {PUSH}", f"ionice --classdata 7 {PUSH}", f"sudo --chdir /tmp {PUSH}", f"sudo --prompt x {PUSH}", f"sudo -T 10 {PUSH}"])
