@@ -51,7 +51,8 @@ class Rule:
     patterns: tuple  # regexes, all must match (case-insensitive) in the normalized text
     message: str
     forbidden: tuple = ()  # regexes, none may match (case-insensitive): stale instructions the prompt must not carry
-    forbidden_sentences: Callable[[str], list] | None = None  # callable(text) -> patterns found per sentence, negation-aware (resolve_permissions); headings, blank lines and bullets end a sentence
+    # callable(text) -> patterns found per sentence, negation-aware (resolve_permissions); headings, blank lines and bullets end a sentence
+    forbidden_sentences: Callable[[str], list] | None = None
 
 
 @dataclass(frozen=True)
@@ -84,13 +85,15 @@ MATRIX_WRONG_SEVERITY = (
 # The ban itself is pinned by the patterns of the rules; this keeps a later edit from adding permission next to it. The check is per
 # sentence (resolve_permissions): a pattern is permission unless a negating word comes earlier in the same sentence and clause, however
 # many words back ("No orchestrator or implementer may ...", "must never, not even with the API, resolve ..."). A lead clause ("If it is
-# not answered, ...") and a clause after "but", "however", "instead", "except" or "otherwise" does not inherit an earlier negation. Wording pins are not exhaustive.
+# not answered, ...") and a clause after "but", "however", "instead", "except" or "otherwise" does not inherit an earlier negation.
+# Wording pins are not exhaustive.
 _AGENT = r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
 _NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
 _THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
 _ADVERB = r"(?:(?:also|then|now|still|just)\s+)?"
 _MARK = r"mark{s}\s+(?:[\w'`-]+\s+){{0,4}}?(?:as\s+)?resolved\b"
-_TOOL = r"\b(?:use|using|call|calling|invoke|invoking|run|via|with|through)\s+(?:the\s+)?`?(?:mcp__\w+__)?(?:resolve_?review_?threads?|resolveReviewThread)\b"
+_TOOL = (r"\b(?:use|using|call|calling|invoke|invoking|run|via|with|through)\s+(?:the\s+)?`?(?:mcp__\w+__)?"
+         r"(?:resolve_?review_?threads?|resolveReviewThread)\b")
 _MODAL = r"(?:may|can|could|should|must|will)"
 _PRONOUN = r"(?:it|them|that|those|these)\b"
 _LEAD = r"(?:^|[.:;,]\s+|[-*]\s+)"
