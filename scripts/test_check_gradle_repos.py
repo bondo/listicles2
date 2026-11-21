@@ -421,15 +421,41 @@ class MirrorIsARepository(unittest.TestCase):
             with self.subTest(wrap=wrap):
                 self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + wrap + "\n")), MISSING)
 
-    def test_mirror_on_the_blocks_own_repositories_in_any_spelling_counts(self):
+    # Escalation ruling: whether a dotted repositories.maven(...) reaches the block's own handler and runs depends on receivers,
+    # local names and control flow that a scanner cannot see, so it never counts. Main did not count it either.
+    def test_dotted_mirror_call_never_counts(self):
         for head in (
             f'repositories.maven("{c.MIRROR}")',
             f'this.repositories.maven("{c.MIRROR}")',
             f'repositories.maven {{ url = uri("{c.MIRROR}") }}',
             f'repositories.maven {{ name = "m"; setUrl("{c.MIRROR}") }}',
+            f'repositories.maven("{c.MIRROR}") {{ name = "MavenCentralMirror" }}',
         ):
             with self.subTest(head=head):
-                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), [])
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), MISSING)
+
+    def test_mirror_calls_that_reach_another_handler_or_never_run_do_not_count(self):
+        m = c.MIRROR
+        for head in (
+            f'with(pluginManagement) {{ repositories.maven("{m}") {{ name = "MavenCentralMirror" }} }}',
+            f'settings.pluginManagement {{ repositories.maven("{m}") }}',
+            f'with(settings.buildscript) {{ repositories.maven("{m}") }}',
+            f'val repositories = pluginManagement.repositories\nrepositories.maven("{m}")',
+            f'settings.pluginManagement.\nrepositories.maven("{m}")',
+            f'pluginManagement.run {{ repositories.maven("{m}") }}',
+            f'settings.buildscript.apply {{ repositories.maven("{m}") }}',
+            f'with(pluginManagement) {{ this.repositories.maven("{m}") }}',
+            f'with(pluginManagement) {{ repositories.maven {{ url = uri("{m}") }} }}',
+            f'if (false) repositories.maven("{m}")',
+            f'fun addMirror() = repositories.maven("{m}")',
+            f'for (x in emptyList<Int>()) repositories.maven("{m}")',
+            f'while (false) repositories.maven("{m}")',
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), MISSING)
+        plugin = with_extra("", plugin_extra=f'    with(settings.buildscript) {{ repositories.maven("{m}") }}\n')
+        plugin = plugin.replace(GOOD_REPOS, GOOD_REPOS.replace(MIRROR_CALL, ""), 1)
+        self.assertEqual(c.check_settings(plugin), [f"pluginManagement: Maven Central mirror {m} missing"])
 
     def test_mirror_url_in_maven_block_with_other_statements_counts(self):
         call = f'maven {{\n    name = "m"\n    url = uri("{c.MIRROR}")\n}}'
@@ -457,8 +483,8 @@ class MirrorIsARepository(unittest.TestCase):
                 self.assertEqual(c.check_settings(dep_text(GOOGLE + call + "\nmavenCentral()\n")), [])
                 self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + call + "\n")), BEFORE)
 
-    def test_dotted_mirror_repository_still_counts(self):
-        self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=f'repositories.maven("{c.MIRROR}")')), [])
+    def test_dotted_mirror_repository_does_not_count_without_a_braced_mirror(self):
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=f'repositories.maven("{c.MIRROR}")')), MISSING)
 
 
 class PluginManagementReachesDependencies(unittest.TestCase):
