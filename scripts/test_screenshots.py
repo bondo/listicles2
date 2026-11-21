@@ -6,6 +6,8 @@ screenshots.sh runs against a fake ./gradlew in a temporary tree, so no Gradle b
 (scripts/check_screenshots.py) runs against the real files and against mutated copies, which must each be reported.
 """
 
+import contextlib
+import io
 import os
 import shutil
 import stat
@@ -172,6 +174,30 @@ class Wiring(unittest.TestCase):
         got = self.mutated(".github/workflows/ci.yml", gate, f"continue-on-error: true\n        {gate}")
         self.assertEqual(got, ["ci.yml screenshot gate step has continue-on-error"])
 
+    def test_the_gate_and_check_steps_must_not_be_skipped_by_an_if(self):
+        for cmd in (c.GATE_CMD, c.TESTS_CMD, c.CHECK_CMD):
+            for condition in ("if: false", "if: github.event_name == 'push'"):
+                with self.subTest(cmd=cmd, condition=condition):
+                    self.setUp()
+                    got = self.mutated(".github/workflows/ci.yml", f"run: {cmd}", f"{condition}\n        run: {cmd}")
+                    self.assertEqual(got, [f"ci.yml step running {cmd} has if:"])
+
+    def test_a_folded_continuation_line_after_a_run_command_is_reported(self):
+        # YAML folds a more-indented line into the run value, so `|| true` neuters the step without changing its first line.
+        for cmd in (c.GATE_CMD, c.TESTS_CMD, c.CHECK_CMD):
+            with self.subTest(cmd=cmd):
+                self.setUp()
+                got = self.mutated(".github/workflows/ci.yml", f"run: {cmd}\n", f"run: {cmd}\n          || true\n")
+                self.assertEqual(got, [f"ci.yml step running {cmd} is followed by a more-indented line (a folded `|| true` or extra arguments)"])
+
+    def test_verify_sh_must_run_the_wiring_check(self):
+        got = self.mutated("scripts/verify.sh", "step screenshots-wiring python3 -I scripts/check_screenshots.py\n", "")
+        self.assertEqual(got, ["verify.sh has no active step: step screenshots-wiring python3 -I scripts/check_screenshots.py"])
+
+    def test_the_tasks_job_must_run_the_wiring_check(self):
+        got = self.mutated(".github/workflows/ci.yml", "run: python3 -I scripts/check_screenshots.py", "run: true")
+        self.assertEqual(got, ["ci.yml tasks job has no step running: python3 -I scripts/check_screenshots.py"])
+
     def test_the_wiring_tests_must_run_in_ci(self):
         got = self.mutated(".github/workflows/ci.yml", "run: python3 -I scripts/test_screenshots.py", "run: true")
         self.assertEqual(got, ["ci.yml tasks job has no step running: python3 -I scripts/test_screenshots.py"])
@@ -215,6 +241,15 @@ class Goldens(unittest.TestCase):
     def test_a_golden_that_does_not_follow_the_naming_scheme_is_reported(self):
         (self.dir / "Lists_en.png").write_bytes(PNG + b"x")
         self.assertEqual(c.golden_problems(self.root), [f"unexpected file {c.GOLDEN_DIR}/Lists_en.png"])
+
+    def test_an_extra_font_scale_variant_is_reported(self):
+        (self.dir / "TallyApp_en_light_font200.png").write_bytes(b"not a png")
+        self.assertEqual(c.golden_problems(self.root), [f"unexpected file {c.GOLDEN_DIR}/TallyApp_en_light_font200.png"])
+
+    def test_an_empty_golden_directory_reports_the_five_tally_app_goldens(self):
+        for path in self.dir.glob("*.png"):
+            path.unlink()
+        self.assertEqual(c.golden_problems(self.root), [f"missing golden {c.GOLDEN_DIR}/{name}" for name in c.GOLDENS])
 
     def test_a_missing_golden_is_reported(self):
         (self.dir / "TallyApp_da_dark.png").unlink()
@@ -292,16 +327,38 @@ class Build(unittest.TestCase):
 
     def test_a_capture_without_the_exact_options_is_reported(self):
         other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsScreenshotTest.kt"
-        for call in ('onRoot().captureRoboImage("src/test/screenshots/Lists_en_light.png")', "captureRoboImage(path, roborazziOptions = RoborazziOptions())"):
+        calls = (
+            'onRoot().captureRoboImage("src/test/screenshots/Lists_en_light.png")',
+            "captureRoboImage(path, roborazziOptions = RoborazziOptions())",
+            'captureScreenRoboImage("src/test/screenshots/Dialog_en_light.png")',
+            "captureRoboLastImage()",
+            "captureRoboGif(path)",
+            "captureRoboAllImage()",
+            "captureRoboImage(path, roborazziOptions = ScreenshotOptions.exact.copy(compareOptions = RoborazziOptions.CompareOptions()))",
+            "RoborazziRule(options = RoborazziRule.Options())",
+        )
+        for call in calls:
             with self.subTest(call=call):
                 other.write_text(f"fun capture() {{ {call} }}\n")
                 want = "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsScreenshotTest.kt captures without roborazziOptions = ScreenshotOptions.exact"
                 self.assertEqual(c.build_problems(self.root), [want])
 
+    def test_a_second_threshold_validator_in_the_options_file_is_reported(self):
+        got = self.mutated(
+            "app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt", "ThresholdValidator(0f)", "ThresholdValidator(0f) + ThresholdValidator(0.5f)"
+        )
+        self.assertEqual(got, ["ScreenshotOptions.kt must compare exactly: ThresholdValidator(0f), maxDistance = 0f, hShift = 0, vShift = 0"])
+
     def test_a_capture_with_the_exact_options_is_accepted(self):
         other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsScreenshotTest.kt"
-        other.write_text('fun capture() { node.captureRoboImage(f(a, (b)), roborazziOptions = ScreenshotOptions.exact) }\n')
-        self.assertEqual(c.build_problems(self.root), [])
+        for call in (
+            "node.captureRoboImage(f(a, (b)), roborazziOptions = ScreenshotOptions.exact)",
+            'captureScreenRoboImage("x.png", roborazziOptions = ScreenshotOptions.exact)',
+            "RoborazziRule(options = RoborazziRule.Options(roborazziOptions = ScreenshotOptions.exact))",
+        ):
+            with self.subTest(call=call):
+                other.write_text(f"fun capture() {{ {call} }}\n")
+                self.assertEqual(c.build_problems(self.root), [])
 
     def test_a_tolerance_in_any_other_test_source_is_reported(self):
         tolerances = ("CompareOptions(changeThreshold = 0.5f)", "ThresholdValidator(0.5f)", "SimpleImageComparator()")
@@ -353,6 +410,26 @@ class Accessibility(unittest.TestCase):
         want = "app/src/androidTest/kotlin/NewScreenTest.kt uses a Compose test rule but never calls enableAccessibilityChecks()"
         self.assertEqual(c.accessibility_problems(self.root), [want])
 
+    def test_every_way_to_start_a_compose_ui_test_needs_the_checks(self):
+        starters = (
+            "createEmptyComposeRule()",
+            "createAndroidComposeRule<ComponentActivity>()",
+            "runAndroidComposeUiTest<MainActivity> { }",
+            "runComposeUiTest { }",
+        )
+        for starter in starters:
+            with self.subTest(starter=starter):
+                extra = self.root / "app/src/androidTest/kotlin/StartTest.kt"
+                extra.write_text(f"fun t() {{ {starter} }}\n")
+                want = "app/src/androidTest/kotlin/StartTest.kt uses a Compose test rule but never calls enableAccessibilityChecks()"
+                self.assertEqual(c.accessibility_problems(self.root), [want])
+
+    def test_a_rule_that_enables_the_checks_but_never_runs_them_is_reported_for_every_rule_kind(self):
+        extra = self.root / "app/src/androidTest/kotlin/EnableOnlyTest.kt"
+        extra.write_text("fun t() { val r = createAndroidComposeRule<ComponentActivity>(); r.enableAccessibilityChecks() }\n")
+        want = "app/src/androidTest/kotlin/EnableOnlyTest.kt never calls tryPerformAccessibilityChecks(), so the checks never evaluate the screen"
+        self.assertEqual(c.accessibility_problems(self.root), [want])
+
     def test_turning_the_checks_off_is_reported(self):
         extra = self.root / "app/src/androidTest/kotlin/OffTest.kt"
         extra.write_text("fun off() { rule.enableAccessibilityChecks(); rule.disableAccessibilityChecks() }\n")
@@ -361,6 +438,79 @@ class Accessibility(unittest.TestCase):
     def test_the_accessibility_test_library_must_be_on_the_android_test_classpath(self):
         got = self.mutated("app/build.gradle.kts", "androidTestImplementation(libs.compose.ui.test.junit4.accessibility)", "")
         self.assertEqual(got, ["app/build.gradle.kts does not add compose.ui.test.junit4.accessibility to androidTestImplementation"])
+
+
+class Main(unittest.TestCase):
+    """main(root) is what verify.sh and CI run, and they read only its exit code: it must be 1 with one printed line per problem."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        names = [
+            "scripts/verify.sh",
+            ".github/workflows/ci.yml",
+            "app/build.gradle.kts",
+            "gradle/libs.versions.toml",
+            *(str(p.relative_to(ROOT)) for p in ROOT.glob("app/src/*/kotlin/**/*.kt")),
+            *(str(p.relative_to(ROOT)) for p in (ROOT / c.GOLDEN_DIR).glob("*.png")),
+        ]
+        for name in names:
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / name, self.root / name)
+
+    def run_main(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = c.main(self.root)
+        return code, out.getvalue().splitlines()
+
+    def edit(self, name, old, new):
+        path = self.root / name
+        text = path.read_text()
+        self.assertIn(old, text)
+        path.write_text(text.replace(old, new, 1))
+
+    def test_a_complete_tree_exits_0_and_prints_nothing(self):
+        self.assertEqual(self.run_main(), (0, []))
+
+    def test_the_repository_exits_0(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(c.main(ROOT), 0)
+
+    def test_each_group_of_problems_makes_it_exit_1_with_one_line_each(self):
+        defects = {
+            "wiring": (
+                "scripts/verify.sh",
+                "step screenshots ./scripts/screenshots.sh verify\n",
+                "",
+                "verify.sh has no active step: step screenshots ./scripts/screenshots.sh verify",
+            ),
+            "goldens": (f"{c.GOLDEN_DIR}/TallyApp_da_dark.png", None, None, f"missing golden {c.GOLDEN_DIR}/TallyApp_da_dark.png"),
+            "build": ("app/build.gradle.kts", "alias(libs.plugins.roborazzi)", "", "app/build.gradle.kts does not apply the Roborazzi plugin"),
+            "accessibility": (
+                "app/build.gradle.kts",
+                "androidTestImplementation(libs.compose.ui.test.junit4.accessibility)",
+                "",
+                "app/build.gradle.kts does not add compose.ui.test.junit4.accessibility to androidTestImplementation",
+            ),
+        }
+        for group, (name, old, new, message) in defects.items():
+            with self.subTest(group=group):
+                self.setUp()
+                if old is None:
+                    (self.root / name).unlink()
+                else:
+                    self.edit(name, old, new)
+                self.assertEqual(self.run_main(), (1, [f"check_screenshots: {message}"]))
+
+    def test_problems_of_several_groups_are_all_printed(self):
+        self.edit("scripts/verify.sh", "step screenshots ./scripts/screenshots.sh verify\n", "")
+        (self.root / c.GOLDEN_DIR / "TallyApp_da_dark.png").unlink()
+        code, lines = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertEqual(len(lines), 2)
 
 
 if __name__ == "__main__":
