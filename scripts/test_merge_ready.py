@@ -488,13 +488,41 @@ class GeneralKindTests(unittest.TestCase):
         self.assertEqual(api.merged, [], "a refused PR must not be merged")
         self.assertRegex(text, reason)
 
-    def test_non_gate_scripts_docs_and_build_files_are_merged(self):
-        names = ("scripts/verify.sh", "scripts/new_tool.py", "scripts/test_new_tool.py", "app/build.gradle.kts", "README.md",
-                 "core/domain/src/Lists.kt", "docs/PLAN.md", "docs/milestones/M1.md", "firebase/test/rules.test.ts",
-                 "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "scripts/status_publish.py")  # R2 ruling: detekt, other workflows' scripts
-        api = make_api(files=[file_entry(n) for n in names])
+    ALLOWED = ("app/src/main/kotlin/dev/listicles/app/Lists.kt", "app/src/main/res/values/strings.xml", "app/src/main/res/values-da/strings.xml",
+               "app/src/test/kotlin/dev/listicles/app/ListsTest.kt", "app/src/androidTest/kotlin/dev/listicles/app/ListsUiTest.kt",
+               "core/domain/src/main/kotlin/dev/listicles/domain/Lists.kt", "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt",
+               "docs/PLAN.md", "docs/milestones/M1.md", "docs/adr/0002-x.md", "docs/metrics/m0-backfill.txt", "README.md")
+
+    def test_the_allowlisted_classes_are_merged(self):  # owner decision #15 7058755858: only an allowlist merges as general
+        api = make_api(files=[file_entry(n) for n in self.ALLOWED])
         self.assertEqual(go(api, kind="general")[0], 0)
         self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_every_path_outside_the_allowlist_is_refused(self):  # fail closed: R6-01, R6-05, R6-03, R6-04 and everything unknown
+        names = ("firebase/.npmrc", "firebase/jest.config.cjs", "firebase/eslint.config.mjs", "firebase/nested/eslint.config.mjs",  # R6-01, R6-05, R6-03
+                 "scripts/shellcheckrc", "scripts/.shellcheckrc", "scripts/verify.sh", "scripts/new_tool.py",  # R6-04, scripts
+                 "app/build.gradle.kts", "build.gradle.kts", "gradle.properties", "ruff.toml", "mypy.ini", ".editorconfig", ".gitignore",
+                 "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "firebase/firestore.rules", "firebase/test/rules.test.ts",
+                 "app/src/main/AndroidManifest.xml", "app/proguard-rules.pro", "app/src/test/resources/robolectric.properties",
+                 "core/testing/src/main/kotlin/dev/listicles/testing/NoNetwork.kt", "core/domain/build.gradle.kts", "docs/tasks.toml",
+                 "NEW_TOP_LEVEL.txt", "newdir/file.md", "app/src/main/kotlin/dev/listicles/app/Notes.md", "app/src/main/res/raw/x.sh",
+                 "app/src/main/kotlin/.hidden.kt", "app/src/main/res/.npmrc", "docs/.gitattributes",  # a new dotfile inside an allowlisted dir
+                 "core/domain/src/test/kotlin/dev/listicles/architecture/NewRule.kt", "app/src/test/kotlin/dev/listicles/app/NoNetworkInAppTest.kt",
+                 "app/src/test/kotlin/dev/listicles/app/RobolectricOfflineWiringTest.kt",  # gate tests
+                 "app/src/test/kotlin/dev/listicles/app/Junit4EngineTest.kt",
+                 "app/src/main/kotlin/./x.kt", "app/src/main/kotlin//x.kt", "/app/src/main/kotlin/x.kt", "app\\src\\main\\kotlin\\x.kt",
+                 "app/src/main/kotlin/x y.kt", "app/src/main/kotlin/x\u202e.kt", "App/src/main/kotlin/x.kt", "DOCS/PLAN.md")  # odd and mixed-case names
+        for name in names:
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+
+    def test_a_traversal_name_is_refused(self):
+        self.refused(make_api(files=[file_entry("app/src/main/kotlin/../../../../scripts/x.kt")]), r"\.\.")
+
+    def test_one_path_outside_the_allowlist_refuses_the_whole_pr(self):
+        files = [file_entry(n) for n in self.ALLOWED] + [file_entry("firebase/.npmrc")]
+        self.refused(make_api(files=files), r"outside kind general.*firebase/\.npmrc")
 
     def test_every_owner_only_path_is_refused(self):
         names = ("docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/product/naming.md", "docs/reviews/README.md", "design/new-sign-off.md",
@@ -506,7 +534,7 @@ class GeneralKindTests(unittest.TestCase):
                  "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md")  # R2-07: canonical process and policy docs
         for name in names:
             with self.subTest(name=name):
-                self.refused(make_api(files=[file_entry("scripts/new_tool.py"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
+                self.refused(make_api(files=[file_entry("README.md"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
 
     def test_a_recolour_of_the_signed_off_design_tokens_is_refused(self):  # R3-01: the owner signed design/tokens.json off (#15 7011560493, 7019570467)
         recolour = '@@ -9 +9 @@\n-    "primary": "#006878",\n+    "primary": "#7A1FA2",'
@@ -519,7 +547,7 @@ class GeneralKindTests(unittest.TestCase):
         for name in names:
             with self.subTest(name=name):
                 self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
-        for name in ("docs/claude-notes.md", "app/claude.md.txt", "docs/dot.claude-notes/a.md"):  # similar names stay general
+        for name in ("docs/claude-notes.md", "docs/claude.md.txt", "docs/dot.claude-notes/a.md"):  # similar names under docs/ stay general
             with self.subTest(name=name):
                 self.assertFalse(merge_ready.owner_only(name))
 
@@ -531,7 +559,7 @@ class GeneralKindTests(unittest.TestCase):
         for name in names:
             with self.subTest(name=name):
                 self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
-        for name in ("docs/gitattributes.md", "docs/mcp.json.md", "app/.gitleaks-notes.md", "docs/claude"):  # similar names stay general
+        for name in ("docs/gitattributes.md", "docs/mcp.json.md", "docs/gitleaks-notes.md", "docs/claude-notes.txt"):  # similar names under docs/ stay general
             with self.subTest(name=name):
                 self.assertFalse(merge_ready.owner_only(name))
 
@@ -599,9 +627,9 @@ class GeneralKindTests(unittest.TestCase):
             self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
 
     def test_the_common_checks_still_apply(self):
-        self.refused(make_api(files=[file_entry("scripts/x.py")], state="behind"), r"mergeable_state.*behind")
-        self.refused(make_api(files=[file_entry("scripts/x.py")], body="Fixes #1"), r"closing keyword")
-        self.refused(make_api(files=[file_entry("scripts/x.py")], checks=[run("guards"), run("tasks")]), r"static.*missing")
+        self.refused(make_api(files=[file_entry(self.ALLOWED[0])], state="behind"), r"mergeable_state.*behind")
+        self.refused(make_api(files=[file_entry(self.ALLOWED[0])], body="Fixes #1"), r"closing keyword")
+        self.refused(make_api(files=[file_entry(self.ALLOWED[0])], checks=[run("guards"), run("tasks")]), r"static.*missing")
 
 
 class WiringTests(unittest.TestCase):
@@ -643,33 +671,23 @@ class WiringTests(unittest.TestCase):
             with self.subTest(word=word):
                 self.assertIn(word, doc)
 
-    R2_OWNER_ONLY = (r"`config/licensee/` \(licence acceptances\), `docs/follow-ups\.md`, `docs/security\.md` and `docs/orchestrator-state\.md` "
-                     r"are owner-only for `general`; so are the `ci_scope\.py` self-tests, `gradlew` and `gradlew\.bat`")
+    R6_ALLOWLIST = (r"kind `general` is fail-closed \(owner decision, #15 comment 7058755858, replacing ruling 1 of #15 comment 7019683156\): only kotlin "
+                    r"sources and tests under `app/src/` and `core/<module>/src/`, app resources and docs files that are not owner-only may merge as "
+                    r"`general`; every other path, including config, dotfiles, build scripts, workflows, `firebase/` and `scripts/`, is owner-only by default")
 
-    def test_docs_record_the_r2_rulings_and_the_interim_route(self):  # owner rulings #15 7019683156 and R2-04
+    def test_docs_record_the_allowlist_and_the_interim_route(self):  # owner decision #15 7058755858, R2-04
         doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
         for pattern in (
                 r"for the kinds `working-draft-docs`, `tasks-sync`, `dependabot` and `general` the merge agent runs only",
                 r"until kind `owner-batch` exists, an owner-approved owner-only pr is merged by hand under d1 and d2 \(#15 comment 7007421567\)",
-                self.R2_OWNER_ONLY,
-                r"guard thresholds do not include `config/detekt/detekt\.yml`",
-                r"scripts that only other workflows or `\.claude/settings\.json` run stay `general` \(owner ruling, #15 comment 7019683156\)"):
+                self.R6_ALLOWLIST):
             with self.subTest(pattern=pattern):
                 self.assertRegex(doc, pattern)
 
-    R5_OWNER_ONLY = (r"`\.gitattributes`, `\.mcp\.json`, `\.gitleaks\.toml` and `\.gitleaksignore` are owner-only for `general`, as are `claude\.md` and "
-                     r"`claude\.local\.md` in any directory and any path component named `\.claude` \(owner decision, #15 comment 7057687236\)")
-
-    def test_docs_record_the_r5_decision(self):  # owner decision #15 7057687236, exact so a reversed sentence fails
+    def test_the_allowlist_pin_fails_when_the_sentence_is_reversed(self):  # a later 'owner-only' elsewhere must not satisfy it
         doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
-        self.assertRegex(doc, self.R5_OWNER_ONLY)
-        self.assertNotRegex(doc.replace("are owner-only for `general`, as are", "stay `general`, as are"), self.R5_OWNER_ONLY)
-
-    def test_the_licensee_pin_fails_when_the_sentence_is_reversed(self):  # R3-02: a later 'owner-only' elsewhere must not satisfy it
-        reversed_text = ("`config/licensee/` (licence acceptances), `docs/follow-ups.md`, `docs/security.md` and `docs/orchestrator-state.md` stay `general`; "
-                         "so are the `ci_scope.py` self-tests, `gradlew` and `gradlew.bat`. An owner-only tooling change follows.")
-        self.assertNotRegex(reversed_text, self.R2_OWNER_ONLY)
-        self.assertNotRegex(reversed_text.replace("stay `general`", "are owner-only for `general`").replace("gradlew.bat", "gradlew"), self.R2_OWNER_ONLY)
+        self.assertNotRegex(doc.replace("is owner-only by default", "may merge as `general`"), self.R6_ALLOWLIST)
+        self.assertNotRegex(doc.replace("is fail-closed", "is open"), self.R6_ALLOWLIST)
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
