@@ -47,6 +47,11 @@ android {
         compose = true
     }
 
+    // M1-24 (LANG-02): the per-app language picker (Android 13+) offers the languages of values/ and values-da/.
+    androidResources {
+        generateLocaleConfig = true
+    }
+
     lint {
         warningsAsErrors = true
         abortOnError = true

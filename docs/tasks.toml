@@ -966,10 +966,11 @@ notes = "The name field calls a ProfileRepository interface with a fake (M1-39 i
 id = "M1-24"
 title = "LocaleConfig: generateLocaleConfig and resources.properties (LANG-02)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-29"]
+pr = 287
 
 [[task]]
 id = "M1-18"
@@ -1252,7 +1253,7 @@ notes = "Tooling env (process file), owner merge"
 id = "M1-43"
 title = "prompt_rules.py: sentence-level negation for the resolve-thread rule (issue 153)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
