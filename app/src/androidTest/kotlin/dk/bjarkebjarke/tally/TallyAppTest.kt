@@ -1,4 +1,4 @@
-package dev.listicles.app
+package dk.bjarkebjarke.tally
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.luminance
@@ -9,15 +9,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dk.bjarkebjarke.tally.R
-import dk.bjarkebjarke.tally.TallyApp
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class ListiclesAppTest {
+class TallyAppTest {
     @get:Rule
     val compose = createComposeRule()
 
