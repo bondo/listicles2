@@ -120,8 +120,8 @@ owner of the address can use the account.
 * Given I have not opened the link yet, when I tap "Continue", then I see a message that the email is not verified yet
   and stay on the screen.
 * Given I tap "Send again" many times, then I see "Try again later" instead of a new email.
-* Given my email is not verified, when I sign in again later, then I see this screen again, and the server refuses to
-  read or change any data of mine (rules allow and deny tests).
+* Given my email is not verified, when I sign in again later, then I see this screen again at every start, and the
+  server refuses to read or change any data of mine except my own account record (rules allow and deny tests).
 
 **AUTH-07 Sign in with email and password.** As a user with a password account, I want to sign in with my email and
 password, so that I reach my lists on any phone.

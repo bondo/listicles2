@@ -5,8 +5,8 @@
 **The name is Tally.** Decided by the owner on **2026-11-15** (owner comment on PR #77: "We have decided on the name Tally"). Task M0.5-O2 is the owner's pick; M0.5-04 delivered this document.
 
 - The earlier recommendation (**Nestlist**, section 4) is **superseded**. Sections 1 to 6 below are kept unchanged as history of how the shortlist was made. Tally is close to candidate 7 (Tallyhome) but was not itself researched in sections 1 to 6; see section 7.
-- **Nothing is renamed by this document.** Renaming the repo, `applicationId` and app labels is planned by task M1-01.
-- **`applicationId` is decided: `dk.bjarkebjarke.tally`** (stated by the owner in the orchestrator session on 2026-11-15, relayed by the orchestrator; not in a comment on this PR). The owner owns the domain `bjarkebjarke.dk` and wants the namespace `tally.bjarkebjarke.dk`; in Android reverse-domain form that is `dk.bjarkebjarke.tally`. The applicationId is **permanent once published on Google Play**. It is unique per app, so it cannot collide; the listing title and trademark questions (open items 1 and 2 in section 7) are unaffected. The rename of the current `dev.listicles.app`, repo, app label en/da and Firebase project stays a task for M1-01 planning.
+- **Nothing is renamed by this document.** Renaming `applicationId` and app labels is planned by tasks M1-29 and M1-01; renaming the repo is the owner's, in GitHub settings (task M1-O10, asked again before M1-O1; #258).
+- **`applicationId` is decided: `dk.bjarkebjarke.tally`** (stated by the owner in the orchestrator session on 2026-11-15, relayed by the orchestrator; not in a comment on this PR). The owner owns the domain `bjarkebjarke.dk` and wants the namespace `tally.bjarkebjarke.dk`; in Android reverse-domain form that is `dk.bjarkebjarke.tally`. The applicationId is **permanent once published on Google Play**. It is unique per app, so it cannot collide; the listing title and trademark questions (open items 1 and 2 in section 7) are unaffected. The rename of the current `dev.listicles.app`, app label en/da and Firebase project stays a task for M1 planning; the repo rename is the owner's (M1-O10).
 - Open items for the owner are listed in section 7 (Play listing title, trademark search, domains and org, app label en/da).
 
 Status: decided (Tally, 2026-11-15); sections 1 to 6 are the original proposal, kept as history; section 7 is current. No agent renames anything. Research date: **2026-11-13**.
@@ -63,7 +63,7 @@ It is meaningful in both languages, short, and fits households. If the owner's c
 
 ## 5. Where the name appears
 
-Renaming is a task for M1-01 to plan after the owner decides; nothing is renamed by this document.
+Renaming the code is planned by M1 tasks after the owner decides; the repo rename is the owner's (M1-O10); nothing is renamed by this document.
 
 | Place | Current value | Cost to change |
 |---|---|---|
@@ -109,7 +109,7 @@ Checked **2026-11-15**, public sources only, no personal details in any request.
 3. **Domains** at a registrar (.com, .dk, .app), and the **GitHub org name**, if an org is wanted.
 4. Same app label in English and Danish, or a Danish variant?
 
-### Consequences by site (planning is task M1-01; nothing is renamed here)
+### Consequences by site (planning is by M1 tasks, the repo rename is the owner's, M1-O10; nothing is renamed here)
 
 | Place | Consequence |
 |---|---|

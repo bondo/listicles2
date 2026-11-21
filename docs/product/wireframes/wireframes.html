@@ -468,7 +468,7 @@ const accountScreen = s => `${topbar(s.account, { back: true })}<div class="row"
 const SCREENS = [
   { id: '01', t: 'Sign-in', refs: 'AUTH-01, AUTH-02, SYNC-03, OQ-22, OQ-23. Google is the main button ("Continue with Google"); "Use email and password" leads to sign in, create account and reset (24 to 28). Shown only when signed out. No connection: snackbar, nothing else happens. Cancelling the account picker shows nothing.',
     f: s => signInScreen(s, '') + snack(s.needsConnection) },
-  { id: '02', t: 'Lists, empty', refs: 'LIST-01, VIS-01, OQ-1. First start of a new account.',
+  { id: '02', t: 'Lists, empty', refs: 'LIST-01, VIS-01, OQ-1. First start of a new account. In M1 this is also the home of every signed-in user, without the Create list button (same top bar; flow.md section 1).',
     f: s => `${listsBar(s)}<div class="center"><div class="bubble">${ic('checklist')}</div><div class="t-titleLarge">${s.noListsTitle}</div>
       <div class="t-bodyMedium var">${s.noListsBody}</div></div>${fab(s.createList)}` },
   { id: '03', t: 'Lists', refs: 'LIST-01, VIS-03, OQ-8 (most recently used first), OQ-9 (progress under the name). Private or shared, and who shared it, on every row.',
@@ -621,7 +621,7 @@ const phone = (T, theme, lang, sc) => `<div class="phone ${theme}" lang="${lang}
   <div class="status"><span>9:41</span><span>${ic('signal_cellular_alt')} ${ic('wifi')} ${ic('battery_full')}</span></div>
   <div class="body">${sc.f(S[lang])}</div><div class="gesture"></div></div>`;
 const shot = (T, sc, theme) => `<section class="shot" id="s${sc.id}-${theme}"><div class="cap"><span class="num">${sc.id}</span><span class="ttl">${sc.t}</span>
-  <span class="th">${theme === 'dark' ? 'Dark theme' : 'Light theme'} · draft, not approved</span></div><p class="refs">${sc.refs}</p>
+  <span class="th">${theme === 'dark' ? 'Dark theme' : 'Light theme'} · owner-approved 2026-11-18</span></div><p class="refs">${sc.refs}</p>
   <div class="pair"><figure>${phone(T, theme, 'en', sc)}<figcaption>English</figcaption></figure><figure>${phone(T, theme, 'da', sc)}<figcaption>Dansk</figcaption></figure></div></section>`;
 
 function lum(h) {
@@ -649,7 +649,7 @@ function tokensSheet(T) {
   const sp = Object.entries(T.spacing).map(([k, n]) => `<div class="typerow"><span class="k">spacing.${k} · ${n} dp</span><span class="bar" style="width:${n * 4}px;background:${T.color.light.primary}"></span></div>`).join('');
   const sh = Object.entries(T.shape).map(([k, n]) => `<div style="text-align:center;font-size:12px"><div style="width:72px;height:48px;border-radius:${n}px;background:${T.color.light.primaryContainer};border:1px solid ${T.color.light.outline};margin:0 auto 4px"></div>shape.${k} · ${n} dp</div>`).join('');
   const sz = Object.entries(T.size).map(([k, n]) => `<tr><td>size.${k}</td><td>${n} dp</td></tr>`).join('') + Object.entries(T.motion).map(([k, n]) => `<tr><td>motion.${k}</td><td>${n} ms</td></tr>`).join('');
-  return `<section class="tsheet"><h1>Tally design tokens</h1><p class="sub">Read from design/tokens.json · ${T.meta.units} · font: ${T.meta.font} · draft, not approved</p>
+  return `<section class="tsheet"><h1>Tally design tokens</h1><p class="sub">Read from design/tokens.json · ${T.meta.units} · font: ${T.meta.font} · owner-approved 2026-11-18</p>
     <div class="tcols">${panel('light')}${panel('dark')}</div>
     <div class="tcols"><div style="flex:3"><h2>Type scale (sp)</h2>${types}</div><div style="flex:2"><h2>Spacing (dp)</h2>${sp}
     <h2>Shape (corner radius, dp)</h2><div style="display:flex;gap:16px">${sh}</div><h2>Sizes and motion</h2><table class="ttable">${sz}</table></div></div></section>`;

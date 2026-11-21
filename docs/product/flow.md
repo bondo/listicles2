@@ -34,14 +34,19 @@ flowchart TD
     gate -- "yes" --> upd["Update the app, full screen, no way past it<br>START-01, wireframe 41"]
     gate -- "no, or cannot be read" --> signed{"Signed in?<br>AUTH-02"}
     signed -- "no" --> signin["Sign-in<br>AUTH-01"]
-    signed -- "yes, also offline" --> named{"Name saved?<br>AUTH-12"}
-    named -- "no" --> nm0["Your name, required; system Back leaves the app, nothing saved<br>AUTH-12, wireframe 42"] --> lists
-    named -- "yes" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
+    signed -- "yes, also offline" --> ver{"Email verified?<br>AUTH-06"}
+    ver -- "no, at every start until verified" --> verify
+    ver -- "yes (Google accounts always)" --> named{"Name saved?<br>AUTH-12"}
+    named -- "no" --> nm0["Your name, required; system Back leaves the app, nothing saved<br>AUTH-12, wireframe 42"] --> heal
+    named -- "yes" --> heal{"Removed from the household, or household deleted?<br>HH-06, M1-18"}
+    heal -- "yes" --> notice["Notice dialog once, then continue<br>HH-06"] --> lists
+    heal -- "no" --> lists["Lists<br>LIST-01<br>most recently used first, progress: OQ-8, OQ-9, OQ-35"]
     signin -- "Google account picked" --> lists
     signin -- "Use email and password" --> email["Email sign-in<br>AUTH-05, AUTH-07, AUTH-08, AUTH-10"]
     email -- "signed in, email verified" --> lists
     email -- "email not verified" --> verify["Verify email<br>AUTH-06"]
     verify -- "verified" --> lists
+    verify -- "Sign out" --> signin
     link(["Invite link opened<br>HH-03"]) --> signed2{"Signed in?"}
     signed2 -- "no" --> signin2["Sign-in or create account and verify, then Join<br>AUTH-01, AUTH-05, AUTH-06, HH-03"]
     signed2 -- "yes" --> join["Join<br>HH-03"]
@@ -54,6 +59,14 @@ flowchart TD
     open -- "back" --> lists
     account -- "sign out or account deleted" --> signin
 ```
+
+The start-up gates run in this order, and every step is skipped once it is passed (M1.md section 5, P10): update gate
+(START-01), signed in (AUTH-02), email verified (AUTH-06), name saved (AUTH-12), the household notices (the removed
+member and household deleted dialogs, HH-06), then the home. A signed-in user whose email is not verified sees the
+Verify email screen (27) at every start until verified; its "Sign out" leaves (owner decision on #15, comment
+7058176190, Q2 A). In M1 the home is the Lists screen in its empty state (wireframe 02) without "Create list", with the
+same top bar (household icon, avatar to Account; Q1 A); there is no separate wireframe, and M2 fills the same screen.
+Sign out is on the Account screen (wireframe 18; Q4 A), which holds the crash-report switch (M1-25); there is no separate Settings screen.
 
 ## 2. Sign-in, first use and account
 
