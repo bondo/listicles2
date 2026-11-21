@@ -314,6 +314,53 @@ class DottedGoogle(unittest.TestCase):
         self.assertEqual(c.check_settings(with_extra(extra) + "// google()\n"), [])
 
 
+OUTSIDE_CENTRAL = ["settings.gradle.kts: mavenCentral() outside pluginManagement and dependencyResolutionManagement cannot be ordered after the mirror"]
+
+
+def with_head(head, plugin_head=""):
+    """Settings whose outer blocks start with `head` statements, before their braced repositories blocks."""
+    return (
+        f"pluginManagement {{\n{plugin_head}    repositories {{{GOOD_REPOS}    }}\n}}\n"
+        f"dependencyResolutionManagement {{\n{head}\n    repositories {{{GOOD_REPOS}    }}\n}}\n"
+    )
+
+
+class MirrorOrder(unittest.TestCase):
+    """R1-03: mavenCentral() written outside the braced repositories block still has to come after the mirror."""
+
+    def test_dotted_central_before_the_braced_block_is_flagged(self):
+        for head in (
+            "repositories.mavenCentral()",
+            "this.repositories.mavenCentral()",
+            "repositories.mavenCentral { }",
+            "with(repositories) { mavenCentral() }",
+            "repositories.apply { mavenCentral() }",
+            "val c = repositories::mavenCentral",
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(with_head(head)), BEFORE)
+                plugin = c.check_settings(with_head("", plugin_head=f"    {head}\n"))
+                self.assertEqual(plugin, ["pluginManagement: Maven Central mirror must come before mavenCentral()"])
+
+    def test_dotted_central_after_the_mirror_passes(self):
+        for extra in ("repositories.mavenCentral()", "with(repositories) { mavenCentral() }", "repositories.mavenCentral { }"):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra(extra)), [])
+
+    def test_dotted_mirror_before_the_braced_block_passes(self):
+        head = f'repositories.maven("{c.MIRROR}")'
+        self.assertEqual(c.check_settings(with_head(head)), [])
+
+    def test_central_outside_both_outer_blocks_is_flagged(self):
+        for extra in ("pluginManagement.repositories.mavenCentral()", "settings.dependencyResolutionManagement.repositories { mavenCentral() }"):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra("") + extra + "\n"), OUTSIDE_CENTRAL)
+
+    def test_central_in_comments_and_strings_does_not_count(self):
+        head = '// repositories.mavenCentral()\n/* mavenCentral() */\nval s = "mavenCentral()"\nval r = """mavenCentral()"""'
+        self.assertEqual(c.check_settings(with_head(head) + "// mavenCentral()\n"), [])
+
+
 NESTED = 'val s = "${ if (c) "}" else "" }"\n'
 
 
@@ -403,7 +450,98 @@ class Strings(unittest.TestCase):
                 self.assertEqual(len(got), 1)
                 self.assertTrue(got[0].startswith("settings.gradle.kts: cannot parse"), got)
 
-    def test_strip_never_fails_open_on_random_input(self):
+    def cannot_parse(self, before):
+        got = self.dep(GOOGLE + TAIL + before)
+        self.assertEqual(len(got), 1, before)
+        self.assertTrue(got[0].startswith("settings.gradle.kts: cannot parse"), got)
+
+    # R1-01: Kotlin 2.2+ multi-dollar strings ($$"${" is plain text) are not modelled, so they fail closed.
+    def test_multi_dollar_strings_fail_closed(self):
+        for before in (
+            'val s = $$"${"; google(); val t = "}"\n',
+            'val s = $$"""${"""; google(); val t = """}"""\n',
+            'val s = $$$"${"\n',
+            'val s = $"x"\n',
+        ):
+            with self.subTest(before=before):
+                self.cannot_parse(before)
+
+    def test_dollar_next_to_quotes_inside_strings_is_fine(self):
+        for before in ('val s = "$"\n', 'val s = "cost: 5$"\n', 'val s = """5$"""\n', 'val s = "$$"\n', "val s = '$'\n"):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), [])
+
+    # R1-02: backtick identifiers may hold quotes and braces; they must neither open a string nor move a block bound.
+    def test_backtick_identifier_with_a_quote_does_not_hide_google(self):
+        self.assertEqual(self.dep(GOOGLE + TAIL + 'val `a"` = 1; google(); val `b"` = 2\n'), UNFILTERED)
+
+    def test_backtick_identifier_with_a_brace_does_not_move_a_block_bound(self):
+        before = 'google { val `{` = 0 }\nmaven("https://example.invalid/maven2") { content { includeGroup("x") } }\nval `}` = 0\n'
+        self.assertEqual(self.dep(GOOGLE + TAIL + before), UNFILTERED)
+
+    def test_backtick_google_is_still_google(self):
+        self.assertEqual(self.dep(GOOGLE + TAIL + "`google`()\n"), UNFILTERED)
+        self.assertEqual(self.dep(GOOGLE + TAIL + '`google` { content { includeGroup("x") } }\n'), [])
+
+    def test_backtick_identifiers_in_valid_code_pass(self):
+        for before in ('val `a"` = 1\n', "val `{` = 0\nval `}` = 0\n", "val `a b` = 1\n", "val `it's` = 1\n", "val s = \"a`b\" + '`'\n", "// `\n/* ` */\n"):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), [])
+
+    def test_unterminated_backtick_and_backtick_in_a_short_template_fail_closed(self):
+        for before in ("val `abc\n", "val `a\nb`\n", 'val s = "$`a"`"\n', 'val s = """$`a"`"""\n'):
+            with self.subTest(before=before):
+                self.cannot_parse(before)
+
+    # Oracle: random valid string literals (escapes, raw strings, nested templates) must blank to exactly the known text.
+    def test_random_valid_literals_blank_exactly(self):
+        rng = random.Random(263)
+
+        def plain(depth):
+            src, exp = '"', '"'
+            for _ in range(rng.randint(0, 4)):
+                kind = rng.randint(0, 3 if depth else 2)
+                if kind == 0:
+                    piece = rng.choice(["a", " ", "{", "}", "'", "/", "*", "//", "/*", "`", "$ "])
+                    src, exp = src + piece, exp + " " * len(piece)
+                elif kind == 1:
+                    piece = rng.choice(['\\"', "\\\\", "\\$", "\\n", "\\u0041"])
+                    src, exp = src + piece, exp + " " * len(piece)
+                elif kind == 2:
+                    src, exp = src + "$x", exp + "  "
+                else:
+                    t_src, t_exp = code(depth - 1)
+                    src, exp = src + "${" + t_src + "}", exp + "${" + t_exp + "}"
+            return src + '"', exp + '"'
+
+        def raw(depth):
+            body, exp_body = "", ""
+            for _ in range(rng.randint(0, 4)):
+                if depth and rng.random() < 0.3:
+                    t_src, t_exp = code(depth - 1)
+                    body, exp_body = body + "${" + t_src + "}", exp_body + "${" + t_exp + "}"
+                else:
+                    piece = rng.choice(["a", "\n", "{", "}", "\\", '"', '""', "$ ", "'", "`"])
+                    body, exp_body = body + piece + "a", exp_body + " " * len(piece) + " "  # a letter keeps quotes from running together
+            tail = rng.choice(["", '"', '""'])  # quotes right before the closing delimiter belong to the content
+            return '"""' + body + tail + '"""', '"""' + exp_body + " " * len(tail) + '"""'
+
+        def code(depth):
+            kind = rng.randint(0, 4 if depth else 2)
+            if kind == 0:
+                return "x", "x"
+            if kind == 1:
+                return "f { y }", "f { y }"
+            if kind == 2:
+                return rng.choice([("'}'", "' '"), ("'\"'", "' '")])  # a char literal blanks to one space between its quotes
+            return (plain if kind == 3 else raw)(depth)
+
+        for _ in range(400):
+            src, exp = (plain if rng.random() < 0.5 else raw)(3)
+            self.assertEqual(c._strip(src + " google()", blank_strings=True), exp + " google()", src)
+            self.assertEqual(c._strip(src + " google()"), src + " google()")
+
+    def test_strip_on_random_input_only_raises_unparsable_and_only_blanks(self):
         rng = random.Random(227)
         alphabet = ['"', '"""', "$", "${", "{", "}", "'", "\\", "/", "*", "//", "/*", "*/", "\n", "a", " ", "google()"]
         for _ in range(3000):
