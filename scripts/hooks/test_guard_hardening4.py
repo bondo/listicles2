@@ -174,6 +174,14 @@ class Round4(Base):
         )
         self.deny(["rm `echo \\`echo\\``CLAUDE.md"], both=False)
 
+    def test_main_s_command_name_check_also_runs_in_the_model_pass(self):
+        # an assignment only the model reads as one (NAME+=v, A.B=v after env) leaves a substituted command name for the model to judge (5e56935 denied these)
+        self.deny(["A+=x `echo git` push --force origin work", "env A.B=1 `echo git` push --force origin work", "env A.B=1 $X push --force origin work"])
+        self.deny(["FOO+=/usr/bin/git push --force origin work"])  # main reads FOO+=... as the program, so the floor denies it
+
+    def test_a_subshell_that_leaves_ifs_as_it_was_does_not_make_it_unknown(self):
+        self.allow(["case x in a) ;; esac; (unset IFS); git status", "((i = 1)); (unset IFS); git status"])
+
     def test_the_floor_keeps_main_s_denials_that_the_model_alone_would_allow(self):
         # main denies these; bash would not run them as the guard fears, but main's verdict is the floor (escalation of #252)
         self.deny([f"nice FOO=1 {PUSH}", "F=--force-with-lease; (F=--force); git push $F origin work"])
