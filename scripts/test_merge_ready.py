@@ -3,6 +3,7 @@
 The GitHub REST API is replaced by a fake; no test touches the network. Every negative case must leave the merge call
 unmade (`FakeApi.merged` stays empty)."""
 
+import base64
 import copy
 import io
 import re
@@ -504,18 +505,72 @@ class GeneralKindTests(unittest.TestCase):
                  "app/build.gradle.kts", "build.gradle.kts", "gradle.properties", "ruff.toml", "mypy.ini", ".editorconfig", ".gitignore",
                  "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "firebase/firestore.rules", "firebase/test/rules.test.ts",
                  "app/src/main/AndroidManifest.xml", "app/proguard-rules.pro", "app/src/test/resources/robolectric.properties",
-                 "core/testing/src/main/kotlin/dev/listicles/testing/NoNetwork.kt", "core/domain/build.gradle.kts", "docs/tasks.toml",
+                 "core/testing/src/main/kotlin/dev/listicles/testing/NoNetwork.kt", "core/domain/build.gradle.kts",
                  "NEW_TOP_LEVEL.txt", "newdir/file.md", "app/src/main/kotlin/dev/listicles/app/Notes.md", "app/src/main/res/raw/x.sh",
                  "app/src/main/kotlin/.hidden.kt", "app/src/main/res/.npmrc", "docs/.gitattributes",  # a new dotfile inside an allowlisted dir
                  "core/domain/src/test/kotlin/dev/listicles/architecture/NewRule.kt", "app/src/test/kotlin/dev/listicles/app/NoNetworkInAppTest.kt",
                  "app/src/test/kotlin/dev/listicles/app/RobolectricOfflineWiringTest.kt",  # gate tests
                  "app/src/test/kotlin/dev/listicles/app/Junit4EngineTest.kt",
+                 "core/domain/src/test/kotlin/io/kotest/provided/ProjectConfig.kt", "core/domain/src/test/kotlin/dev/listicles/PackageConfig.kt",  # R7-01
+                 "core/domain/src/test/kotlin/dev/listicles/domain/ProjectConfig.kt", "app/src/test/kotlin/org/junit/Assert.kt",  # only dev/listicles
+                 "core/domain/src/test/kotlin/dev/listicles/testing/BlockingSelectorProvider.kt",  # R7-02: same-name classes of core/testing
+                 "app/src/test/kotlin/dev/listicles/testing/BlockingAsynchronousChannelProvider.kt",
+                 "app/src/main/res/lint.xml", "app/src/main/res/xml/lint.xml", "app/src/main/res/values/lint-baseline.xml",  # R7-03: lint config
+                 "app/src/main/res/xml/backup_rules.xml", "app/src/main/res/xml/data_extraction_rules.xml",  # R7-06: backup, device transfer
+                 "app/src/main/res/xml/network_security_config.xml", "docs/COLLABORATING.md",  # R7-07
                  "app/src/main/kotlin/./x.kt", "app/src/main/kotlin//x.kt", "/app/src/main/kotlin/x.kt", "app\\src\\main\\kotlin\\x.kt",
                  "app/src/main/kotlin/x y.kt", "app/src/main/kotlin/x\u202e.kt", "App/src/main/kotlin/x.kt", "DOCS/PLAN.md")  # odd and mixed-case names
         for name in names:
             with self.subTest(name=name):
                 self.assertTrue(merge_ready.owner_only(name))
                 self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+
+    SPEC = "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt"
+
+    def test_a_kotlin_change_that_names_kotest_project_config_is_refused(self):  # R7-01: one extension makes every Kotest spec pass
+        for line in ("class Ext : AbstractProjectConfig() {", "import io.kotest.provided.ProjectConfig", "@AutoScan object Mask : TestCaseExtension",
+                     "object P : AbstractPackageConfig()"):
+            with self.subTest(line=line):
+                self.refused(make_api(files=[file_entry(self.SPEC, patch=f"@@ -1 +1 @@\n-x\n+{line}")]), r"Kotest")
+        ordinary = file_entry(self.SPEC, patch='@@ -1 +1 @@\n-x\n+class ListsTest : FunSpec({ test("a") {} })')
+        self.assertEqual(go(make_api(files=[ordinary]), kind="general")[0], 0)
+
+    def test_a_kotlin_file_without_a_patch_is_refused(self):  # the content check cannot run
+        self.refused(make_api(files=[file_entry(self.SPEC, patch=None)]), r"no patch")
+
+    def test_tasks_toml_may_change_only_status_and_pr_of_agent_tasks(self):  # R7-04: owner decision #15 7059534826
+        base = ('milestones = ["M1"]\n\n[[task]]\nid = "M1-01"\ntitle = "A"\nstatus = "todo"\nassignee = "implementer"\ndepends_on = []\n\n'
+                '[[task]]\nid = "M1-O1"\ntitle = "B"\nstatus = "todo"\nassignee = "owner"\ndepends_on = []\n')
+
+        def tasks_api(new):
+            api = make_api(files=[file_entry("docs/tasks.toml")])
+            enc = lambda s: {"content": base64.b64encode(s.encode()).decode()}  # noqa: E731  # justified: two-use local helper
+            api.data[f"repos/{REPO}/contents/docs/tasks.toml?ref=main"] = enc(base)
+            api.data[f"repos/{REPO}/contents/docs/tasks.toml?ref={SHA}"] = enc(new)
+            return api
+
+        done = base.replace('id = "M1-01"\ntitle = "A"\nstatus = "todo"', 'id = "M1-01"\ntitle = "A"\nstatus = "done"').replace(
+            'depends_on = []\n\n[[task]]\nid = "M1-O1"', 'depends_on = []\npr = 7\n\n[[task]]\nid = "M1-O1"')
+        self.assertEqual(go(tasks_api(done), kind="general")[0], 0)  # status and pr of an agent task
+        cases = {"owner task status": base.replace('title = "B"\nstatus = "todo"', 'title = "B"\nstatus = "done"'),
+                 "title": base.replace('title = "A"', 'title = "A2"'), "depends_on": base.replace('depends_on = []', 'depends_on = ["M1-O1"]', 1),
+                 "assignee": base.replace('assignee = "implementer"', 'assignee = "owner"'), "task added": base + '\n[[task]]\nid = "M1-02"\n',
+                 "task removed": base[: base.index('[[task]]\nid = "M1-O1"')], "top level": base.replace('["M1"]', '["M1", "M2"]'),
+                 "not toml": "this is = = not toml"}
+        for name, new in cases.items():
+            with self.subTest(name):
+                self.refused(tasks_api(new), r"tasks\.toml")
+
+    def test_an_unreadable_tasks_toml_refuses(self):  # fail closed
+        class Broken(FakeApi):
+            def get(self, path):
+                if "contents/docs/tasks.toml" in path:
+                    raise merge_ready.ApiError("404 not found")
+                return super().get(path)
+
+        api = Broken(make_api(files=[file_entry("docs/tasks.toml")]).data)
+        code, text = go(api, kind="general")
+        self.assertEqual((code, api.merged), (1, []), text)
 
     def test_a_traversal_name_is_refused(self):
         self.refused(make_api(files=[file_entry("app/src/main/kotlin/../../../../scripts/x.kt")]), r"\.\.")
@@ -665,6 +720,17 @@ class WiringTests(unittest.TestCase):
     R6_ALLOWLIST = (r"kind `general` is fail-closed \(owner decision, #15 comment 7058755858, replacing ruling 1 of #15 comment 7019683156\): only kotlin "
                     r"sources and tests under `app/src/` and `core/<module>/src/`, app resources and docs files that are not owner-only may merge as "
                     r"`general`; every other path, including config, dotfiles, build scripts, workflows, `firebase/` and `scripts/`, is owner-only by default")
+
+    R7_RISK = (r"also owner-only for `general`: kotlin outside `dev/listicles/`, `dev/listicles/testing/` outside `core/testing`, kotest `projectconfig` and "
+               r"`packageconfig` classes, every `lint\.xml` and `lint-baseline\.xml`, `res/xml/` and `docs/collaborating\.md`\. `docs/tasks\.toml` merges as "
+               r"`general` only when the diff changes nothing but the `status` and `pr` fields of agent tasks \(owner decision, #15 comment 7059534826\)\. "
+               r"residual risk: a path list cannot stop every test-weakening change inside source directories, so the pr reviewer stays the main defence")
+
+    def test_docs_record_the_r7_rules_and_the_residual_risk(self):
+        doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
+        self.assertRegex(doc, self.R7_RISK)
+        self.assertNotRegex(doc.replace("also owner-only for `general`", "also allowed for `general`"), self.R7_RISK)
+        self.assertNotRegex(doc.replace("so the pr reviewer stays the main defence", "so no reviewer is needed"), self.R7_RISK)
 
     def test_docs_record_the_allowlist_and_the_interim_route(self):  # owner decision #15 7058755858, R2-04
         doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
