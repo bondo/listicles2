@@ -55,7 +55,7 @@ class Hardening(unittest.TestCase):
     def test_a_quoted_assignment_word_after_a_wrapper_is_still_an_assignment(self):
         self.deny([f'env "FOO=1" {PUSH}', f"env 'FOO=1' {PUSH}", f"env FOO{ESC}=1 {PUSH}", 'env -i "FOO=1" git commit --no-verify -m x',
                    f'sudo "FOO=1" {PUSH}', f'nice env "A=1" {PUSH}', f'xargs env "A=1" {PUSH}', f'env FOO=1 "BAR=2" {PUSH}',
-                   'env "GIT_CONFIG_GLOBAL=/tmp/x" git commit -m x', f'command "FOO=1" {PUSH}', f"env $'FOO=1' {PUSH}"])
+                   'env "GIT_CONFIG_GLOBAL=/tmp/x" git commit -m x', f"env $'FOO=1' {PUSH}"])
         self.deny(["$'FOO=/usr/bin/git' push --force origin work", f'FOO=1 env "BAR+=2" {PUSH}'])
         self.allow(['env "FOO=1" git status', "env 'FOO=1 2' git status"])
 

@@ -53,7 +53,8 @@ class Round1(unittest.TestCase):
 
     def test_r1_03_a_computed_plus_equals_keeps_the_known_value_and_a_flag_with_a_suffix_counts_by_its_literal_part(self):
         self.deny(["F=--force; F+=$X; git push $F origin work", "F=--force; F+=$(true); git push $F origin work", "F=--no-verify; F+=$X; git commit $F -m x",
-                   "F=--for; X=ce; F+=$X; git push $F origin work", "D=.git/hooks; D+=/$X; touch $D/pre-commit", "git push --force$Q origin work",
+                   "F=--for; X=ce; F+=$X; git push $F origin work",
+                   "F=--; X=force; F+=$X; git push $F origin work", "D=.git/hooks; D+=/$X; touch $D/pre-commit", "git push --force$Q origin work",
                    "git commit --no-verify$Q -m x"])
         self.deny(["D=.claude; D+=/$X; rm -rf $D"], both=False)
         self.allow(["F=--force-with-lease; F+=$X; git push $F origin work", "git push --force-with-lease$Q origin work", "git commit -m x$Q"])
@@ -84,17 +85,19 @@ class Round1(unittest.TestCase):
                    "git -c core.hooks${x}Path=/nonexistent commit -m x", 'git -c "$(printf core.hooksPath)=/nonexistent" commit -m x',
                    "X=core.hooksPath; GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=$X GIT_CONFIG_VALUE_0=/nonexistent git commit -m x",
                    "GIT_CONFIG_PARAMETERS=\"'core.hooks${x}Path'='/x'\" git commit -m x"])
-        self.allow(['git -c user.name="$N" commit -m x', "git -c user.name=$N commit -m x", "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=$N git status"])
+        self.allow(['git -c user.name="$N" commit -m x', "git -c user.name=$N commit -m x",
+                    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=$N git status"])
 
     def test_r1_08_ifs_a_command_name_variable_and_a_quote_right_after_a_name(self):
         self.deny(["IFS=_; P=--force_origin_work; git push $P", "IFS=,; P=--force,origin; git push $P work", 'X="git push"; $X --force origin work',
                    'X="git commit --no-verify"; $X -m x', 'A=--for; git push $A"ce" origin work', "A=--for; git push $A'ce' origin work",
-                   f"A=--for; git push $A{ESC}ce origin work", "IFS=$X; git status"])
+                   f"A=--for; git push $A{ESC}ce origin work", "IFS=$X; git status",
+                   f"X='FOO+={GIT}'; $X push --force origin work"])
         self.allow(["while IFS= read -r l; do echo $l; done < f", "X=ls; $X -la", "IFS=,; echo a", "IFS=_; P=a_b; git status $P", 'A=x; echo $A"y"'])
 
     def test_r1_11_a_double_dollar_before_a_quote_is_the_pid_not_a_translated_string(self):
         self.allow(['echo $$"x"'])
-        self.deny(['echo $"x"', 'echo $$$"x"'])
+        self.deny(['echo $"x"', 'echo $$$"x"', "echo '$'$\"x\""])
 
 
 if __name__ == "__main__":
