@@ -1,8 +1,8 @@
 {
-  "blockers": 1,
-  "current_milestone": "M0.5",
-  "followups": 45,
-  "generated_at": "2026-11-21T05:21:16Z",
+  "blockers": 44,
+  "current_milestone": "M1",
+  "followups": 41,
+  "generated_at": "2026-11-21T07:06:01Z",
   "milestones": [
     {
       "done": 28,
@@ -11,22 +11,22 @@
       "total": 28
     },
     {
-      "done": 34,
+      "done": 35,
       "id": "M0.5",
       "title": "Product design and guardrails",
       "total": 35
     },
     {
-      "done": 0,
+      "done": 2,
       "id": "M1",
       "title": "Accounts and households",
-      "total": 39
+      "total": 64
     },
     {
       "done": 0,
       "id": "M2",
       "title": "Inventory lists",
-      "total": 0
+      "total": 2
     },
     {
       "done": 0,
