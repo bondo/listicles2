@@ -38,6 +38,8 @@ android {
 
     testOptions {
         unitTests.all { it.useJUnitPlatform() }
+        // RenameTest reads the merged manifest and string resources.
+        unitTests.isIncludeAndroidResources = true
     }
 
     buildFeatures {
