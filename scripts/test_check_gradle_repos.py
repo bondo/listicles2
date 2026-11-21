@@ -380,6 +380,61 @@ class MirrorIsARepository(unittest.TestCase):
         self.assertEqual(c.check_settings(dep_text(GOOGLE + 'mavenCentral()\nmaven(centralMirror) { name = "m" }\n', head=val)), MISSING)
         self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=val.replace("centralMirror", "unused"))), MISSING)
 
+    def test_vals_named_url_do_not_count(self):
+        for decl in (f'val url = "{c.MIRROR}"', f'var url = "{c.MIRROR}"', f'val url = uri("{c.MIRROR}")', f'val url: String = "{c.MIRROR}"',
+                     f'val setUrl = "{c.MIRROR}"', f'val x = 1; val url = "{c.MIRROR}"', f'{{ val url = "{c.MIRROR}" }}'):
+            with self.subTest(decl=decl):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\nmaven(url) { name = \"m\" }\n", head=decl)), MISSING)
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + decl + "\nmaven(url)\n")), MISSING)
+
+    def test_url_assignment_outside_a_maven_block_does_not_count(self):
+        for stray in (
+            f'url = "{c.MIRROR}"',
+            f'repos.configureEach {{ url = "{c.MIRROR}" }}',
+            f'foo {{ setUrl("{c.MIRROR}") }}',
+            f'other {{ url = uri("{c.MIRROR}") }}',
+        ):
+            with self.subTest(stray=stray):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + stray + "\nmavenCentral()\n")), MISSING)
+
+    # R3-02: the mirror counts only on this block's own repositories, not on another object's repository handler.
+    def test_mirror_on_another_objects_repositories_does_not_count(self):
+        for call in (
+            f'pluginManagement.repositories.maven("{c.MIRROR}") {{ name = "m" }}',
+            f'settings.pluginManagement.repositories.maven("{c.MIRROR}")',
+            f'with(pluginManagement.repositories) {{ maven("{c.MIRROR}") }}',
+            f'settings.buildscript.repositories.maven("{c.MIRROR}")',
+            f'with(settings.buildscript.repositories) {{ maven("{c.MIRROR}") }}',
+            f'pluginManagement.repositories.maven {{ url = uri("{c.MIRROR}") }}',
+            f'settings.buildscript.repositories.maven {{ setUrl("{c.MIRROR}") }}',
+            f'pluginManagement.repositories.maven(url = "{c.MIRROR}")',
+            f'foo.maven("{c.MIRROR}")',
+            f'foo().repositories.maven("{c.MIRROR}")',
+        ):
+            with self.subTest(call=call):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=call)), MISSING)
+                plugin = with_extra("", plugin_extra=f"    {call}\n").replace(GOOD_REPOS, GOOD_REPOS.replace(MIRROR_CALL, ""), 1)
+                self.assertEqual(c.check_settings(plugin), [f"pluginManagement: Maven Central mirror {c.MIRROR} missing"])
+
+    def test_mirror_nested_in_another_receivers_block_inside_the_repositories_body_does_not_count(self):
+        for wrap in (f'with(pluginManagement.repositories) {{ maven("{c.MIRROR}") }}', f'apply {{ maven("{c.MIRROR}") }}', f'run {{ maven("{c.MIRROR}") }}'):
+            with self.subTest(wrap=wrap):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + wrap + "\n")), MISSING)
+
+    def test_mirror_on_the_blocks_own_repositories_in_any_spelling_counts(self):
+        for head in (
+            f'repositories.maven("{c.MIRROR}")',
+            f'this.repositories.maven("{c.MIRROR}")',
+            f'repositories.maven {{ url = uri("{c.MIRROR}") }}',
+            f'repositories.maven {{ name = "m"; setUrl("{c.MIRROR}") }}',
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), [])
+
+    def test_mirror_url_in_maven_block_with_other_statements_counts(self):
+        call = f'maven {{\n    name = "m"\n    url = uri("{c.MIRROR}")\n}}'
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + call + "\nmavenCentral()\n")), [])
+
     def test_mirror_url_in_other_calls_and_vals_inside_the_block_does_not_count(self):
         for stray in (f'val s = "{c.MIRROR}"', f'println("{c.MIRROR}")', f'maven("{c.MIRROR}x")', f'listOf("{c.MIRROR}")'):
             with self.subTest(stray=stray):
@@ -416,6 +471,13 @@ class PluginManagementReachesDependencies(unittest.TestCase):
             "dependencyResolutionManagement.repositories { mavenCentral() }",
             "with(dependencyResolutionManagement.repositories) { mavenCentral() }",
             "dependencyResolutionManagement { repositories { mavenCentral() } }",
+            "settings.getDependencyResolutionManagement().repositories.mavenCentral()",
+            "settings.getDependencyResolutionManagement().getRepositories().mavenCentral()",
+            "getDependencyResolutionManagement().repositories { mavenCentral() }",
+            "with(getDependencyResolutionManagement().repositories) { mavenCentral() }",
+            "val d = settings::getDependencyResolutionManagement",
+            "val d by settings::dependencyResolutionManagement",
+            "settings.dependencyResolutionManagement { repositories.maven(\"https://example.invalid\") }",
         ):
             with self.subTest(extra=extra):
                 got = c.check_settings(with_extra("", plugin_extra=f"    {extra}\n"))
