@@ -83,16 +83,14 @@ MATRIX_WRONG_SEVERITY = (
 )
 # Wording that would allow an agent to resolve a thread (follow-up #44; R1-01, R1-02 of #150, R2-01 to R2-03, R3-01 to R3-04 of #150, #153).
 # The ban itself is pinned by the patterns of the rules; this keeps a later edit from adding permission next to it. The check is per
-# sentence (resolve_permissions): a pattern is permission unless a negating word comes earlier in the same sentence and clause, however
-# many words back ("No orchestrator or implementer may ...", "must never, not even with the API, resolve ..."). A lead clause ("If it is
-# not answered, ...") and a clause after "but", "however", "instead", "except" or "otherwise" does not inherit an earlier negation.
+# sentence (resolve_permissions): a pattern is permission unless a negation governs it (_negated_before has the scope rules).
 # Wording pins are not exhaustive.
 _AGENT = r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
 _NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
 _THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
 _ADVERB = r"(?:(?:also|then|now|still|just)\s+)?"
 _MARK = r"mark{s}\s+(?:[\w'`-]+\s+){{0,4}}?(?:as\s+)?resolved\b"
-_TOOL = (r"\b(?:use|using|call|calling|invoke|invoking|run|via|with|through)\s+(?:the\s+)?`?(?:mcp__\w+__)?"
+_TOOL = (r"\b(?:use|using|call|calling|invoke|invoking|run)\s+(?:the\s+)?`?(?:mcp__\w+__)?"
          r"(?:resolve_?review_?threads?|resolveReviewThread)\b")
 _MODAL = r"(?:may|can|could|should|must|will)"
 _PRONOUN = r"(?:it|them|that|those|these)\b"
@@ -131,26 +129,64 @@ RESOLVE_PATTERNS = _resolve_patterns()
 _THREAD_WORD = re.compile(r"\b(?:threads?|conversations?)\b", re.I)
 _SENTENCE_END = re.compile(r"(?<=[.!?;])\s+")
 _ABBREVIATION = re.compile(r"\b(e\.g|i\.e)\.", re.I)
-_NEGATION = re.compile(r"\b(?:never|not|no|nor|neither|cannot|nobody|without|only)\b|n't\b", re.I)
-_CLAUSE_BREAK = re.compile(r"\b(?:but|however|instead|except|otherwise)\b", re.I)
-_LEAD_CLAUSE = re.compile(r"\b(?:if|when|whenever|once|after|before|unless|until|because|since|while|although|though)\b[^,;]*,\s*", re.I)
+_NEGATION = re.compile(r"\b(?:never|not|no|nor|neither|none|cannot|nobody|only)\b|n't\b", re.I)
+_ENDS_NEGATED = re.compile(r"(?:\b(?:never|not|no|nor|neither|none|cannot)|n't)\W*$", re.I)
+_NEGATING_PHRASE = re.compile(r"\s*(?:not even|(?:at|under|in|on|by) no)\b", re.I)
+_CLAUSE_BREAK = re.compile(r":\s|\b(?:but|however|instead|except|otherwise|so)\b", re.I)
+_LEAD_WORDS = r"(?:if|when|whenever|once|after|before|unless|until|because|since|while|although|though)"
+_LEAD_CLAUSE = re.compile(rf"\b{_LEAD_WORDS}\b[^,;]*,\s*", re.I)
+_LEADS_THE_SENTENCE = re.compile(rf"\s*{_LEAD_WORDS}\b", re.I)
 
 
-def _negated_before(sentence, start):
-    """True if a negating word stands in front of position `start` in its own clause (scope rules: the comment above _AGENT)."""
-    prefix = _CLAUSE_BREAK.split(sentence[:start])[-1]
-    return bool(_NEGATION.search(_LEAD_CLAUSE.sub(" ", prefix)))
+def _negated_before(sentence, match):
+    """True if a negation governs this match: a negating word in front of it in its own clause (the subject, "no orchestrator or implementer
+    may"), or a comma segment before it that ends with a negating word or starts "not even" / "under no" ("must never, not even with the API,
+    resolve"). The scope ends at ".", ";", ":", but, however, instead, except, otherwise and so. A lead clause ("If it is not answered, ...",
+    also without its comma) is skipped. A line without end punctuation does not end the scope (accepted: the next line reads as one sentence)."""
+    lead = match.group()[:1]
+    if lead in ".:;":
+        return False
+    prefix = _CLAUSE_BREAK.split(sentence[: match.start()])[-1]
+    prefix = _LEAD_CLAUSE.sub(" ", prefix)
+    if _LEADS_THE_SENTENCE.match(prefix):
+        return False
+    segments = prefix.split(",") + ([""] if lead == "," else [])
+    return bool(_NEGATION.search(segments[-1])) or any(_ENDS_NEGATED.search(x) or _NEGATING_PHRASE.match(x) for x in segments[:-1])
+
+
+def _blocks(text):
+    """The runs of lines between blank lines and headings (a heading is a block of its own): the thread named in a lead-in line or an earlier
+    sentence of a block is the one "resolve it" means."""
+    block = []
+    for line in _HTML_COMMENT.sub(" ", text).splitlines():
+        if line.strip() and not line.strip().startswith("#"):
+            block.append(line)
+            continue
+        if block:
+            yield "\n".join(block)
+            block = []
+        if line.strip():
+            yield line
+    if block:
+        yield "\n".join(block)
 
 
 def resolve_permissions(text):
-    """The RESOLVE_PATTERNS that match somewhere in the text outside a negated clause, per sentence (normalize_sentences breaks)."""
+    """The RESOLVE_PATTERNS that match somewhere in the text outside a negated clause, per sentence (normalize_sentences breaks). A pronoun or
+    "mark as resolved" match needs a thread word before it in its block. Accepted: "If a review thread points at a merge conflict, merge main
+    and resolve it." is flagged, because the thread word comes first."""
     found = []
-    for sentence in _SENTENCE_END.split(_ABBREVIATION.sub(r"\1", normalize_sentences(text))):
-        for pattern, needs_thread_word in RESOLVE_PATTERNS:
-            if pattern in found or (needs_thread_word and not _THREAD_WORD.search(sentence)):
-                continue
-            if any(not _negated_before(sentence, m.start()) for m in re.finditer(pattern, sentence, re.I)):
-                found.append(pattern)
+    for block in _blocks(text):
+        earlier = ""
+        for sentence in _SENTENCE_END.split(_ABBREVIATION.sub(r"\1", normalize_sentences(block))):
+            for pattern, needs_thread_word in RESOLVE_PATTERNS:
+                for m in re.finditer(pattern, sentence, re.I) if pattern not in found else ():
+                    if needs_thread_word and not _THREAD_WORD.search(earlier + " " + sentence[: m.end()]):
+                        continue
+                    if not _negated_before(sentence, m):
+                        found.append(pattern)
+                        break
+            earlier += " " + sentence
     return found
 
 
