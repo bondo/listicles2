@@ -9,16 +9,17 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -41,6 +42,8 @@ class TallyAppTest {
         val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
         compose.setContent { TallyApp() }
         compose.onNodeWithText(welcome).assertExists()
+        // Assertions run no accessibility check; only actions do, so run them on the whole screen (R1-03).
+        compose.onAllNodes(isRoot()).tryPerformAccessibilityChecks()
     }
 
     @Test
@@ -48,6 +51,8 @@ class TallyAppTest {
         val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
         compose.setContent { TallyApp(darkTheme = true) }
         compose.onNodeWithText(welcome).assertExists()
+        // Assertions run no accessibility check; only actions do, so run them on the whole screen (R1-03).
+        compose.onAllNodes(isRoot()).tryPerformAccessibilityChecks()
     }
 
     /** R9-09: unlike the text assertions above, this fails if the dark flag does not reach the rendered pixels. */
@@ -72,8 +77,12 @@ class TallyAppTest {
             Box(Modifier.size(TINY_DP.dp).testTag(TAG).clickable { })
         }
         val failure = runCatching { compose.onNodeWithTag(TAG).performClick() }.exceptionOrNull()
-        val message = "performClick passed on a tiny unlabelled target: the accessibility checks are not running"
-        assertNotNull(message, failure)
+        // Not any exception (a missing node or a failed input injection would also pass): it must be the ATF failure.
+        val causes = generateSequence(failure) { it.cause }.map { it.javaClass.simpleName }.toList()
+        assertTrue(
+            "performClick on a tiny unlabelled target must fail an accessibility check, but threw $causes",
+            "AccessibilityViewCheckException" in causes,
+        )
     }
 
     private fun backgroundLuminance(): Float {

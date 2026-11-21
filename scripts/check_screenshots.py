@@ -21,7 +21,15 @@ GATE_CMD = "./scripts/screenshots.sh verify"
 VERIFY_STEPS = (f"step screenshots-tests {TESTS_CMD}", f"step screenshots-wiring {CHECK_CMD}", f"step screenshots {GATE_CMD}")
 DIFF_PATH = "app/build/outputs/roborazzi"
 GOLDEN_DIR = "app/src/test/screenshots"
-GOLDENS = tuple(f"TallyApp_{lang}_{mode}.png" for lang in ("en", "da") for mode in ("light", "dark")) + ("TallyApp_da_light_font200.png",)
+GOLDEN_NAME = re.compile(r"(?P<screen>[A-Za-z][A-Za-z0-9]*)_(?:en|da)_(?:light|dark)(?:_font200)?\.png")
+
+
+def screen_goldens(screen):
+    """The goldens one screen needs: light and dark in en and da, plus the 200 % font-scale Danish light one (Q3 A, #15 comment 7058176190)."""
+    return tuple(f"{screen}_{lang}_{mode}.png" for lang in ("en", "da") for mode in ("light", "dark")) + (f"{screen}_da_light_font200.png",)
+
+
+GOLDENS = screen_goldens("TallyApp")  # the screen there is today; later screens add their own set, found by name
 MAX_GOLDEN_BYTES = 300 * 1024  # the guards.sh limit for a PNG
 EXACT_OPTIONS = ("ThresholdValidator(0f)", "maxDistance = 0f", "hShift = 0", "vShift = 0")
 TOLERANCE = re.compile(r"changeThreshold|ThresholdValidator\(|SimpleImageComparator\(|(?:resultValidator|imageComparator)\s*=")
@@ -82,10 +90,12 @@ def golden_problems(root):
     folder = Path(root) / GOLDEN_DIR
     problems = []
     present = {p.name: p for p in folder.glob("*")} if folder.is_dir() else {}
-    problems += [f"missing golden {GOLDEN_DIR}/{name}" for name in GOLDENS if name not in present]
-    problems += [f"unexpected file {GOLDEN_DIR}/{name}" for name in sorted(present) if name not in GOLDENS]
+    screens = sorted({m.group("screen") for name in present if (m := GOLDEN_NAME.fullmatch(name))} | {"TallyApp"})
+    wanted = [name for screen in screens for name in screen_goldens(screen)]
+    problems += [f"missing golden {GOLDEN_DIR}/{name}" for name in wanted if name not in present]
+    problems += [f"unexpected file {GOLDEN_DIR}/{name}" for name in sorted(present) if not GOLDEN_NAME.fullmatch(name)]
     seen = {}
-    for name in GOLDENS:
+    for name in wanted:
         if name not in present:
             continue
         data = present[name].read_bytes()
@@ -100,6 +110,19 @@ def golden_problems(root):
     return problems
 
 
+def _calls(text, opener):
+    """The argument text of each `opener ... )` call in text (balanced parentheses)."""
+    calls, start = [], text.find(opener)
+    while start != -1:
+        depth, i = 1, start + len(opener)
+        while i < len(text) and depth:
+            depth += {"(": 1, ")": -1}.get(text[i], 0)
+            i += 1
+        calls.append(text[start + len(opener) : i - 1])
+        start = text.find(opener, i)
+    return calls
+
+
 def build_problems(root):
     root = Path(root)
     problems = []
@@ -107,15 +130,20 @@ def build_problems(root):
         problems.append("app/build.gradle.kts does not apply the Roborazzi plugin")
     if not re.search(r"(?m)^roborazzi = \{ id = ", (root / "gradle/libs.versions.toml").read_text()):
         problems.append("libs.versions.toml has no roborazzi plugin")
-    if not re.search(r'inputs\s*\.dir\("src/test/screenshots"\)', (root / "app/build.gradle.kts").read_text()):
+    # files(fileTree(..)), not dir(..): a directory input must exist, a file tree may be empty (R1-07).
+    if not re.search(r'inputs\s*\.files\(\s*fileTree\("src/test/screenshots"\)', (root / "app/build.gradle.kts").read_text()):
         problems.append(INPUT_PROBLEM)
     options = root / OPTIONS_FILE
     text = options.read_text() if options.is_file() else ""
     if not all(want in text for want in EXACT_OPTIONS) or len(re.findall(r"ThresholdValidator\(", text)) != 1:
         problems.append("ScreenshotOptions.kt must compare exactly: " + ", ".join(EXACT_OPTIONS))
     for source in sorted((root / "app/src/test").rglob("*.kt")):
-        if source != options and TOLERANCE.search(source.read_text()):
-            problems.append(f"{source.relative_to(root)} sets a comparison tolerance")
+        text, name = source.read_text(), source.relative_to(root)
+        if source != options and TOLERANCE.search(text):
+            problems.append(f"{name} sets a comparison tolerance")
+        # captureRoboImage defaults to Roborazzi's own options, which forgive a colour distance of 0.007 per pixel (R1-04).
+        if any("roborazziOptions = ScreenshotOptions.exact" not in call for call in _calls(text, "captureRoboImage(")):
+            problems.append(f"{name} captures without roborazziOptions = ScreenshotOptions.exact")
     return problems
 
 
@@ -128,6 +156,9 @@ def accessibility_problems(root):
         text, name = source.read_text(), source.relative_to(root)
         if re.search(r"createComposeRule|createAndroidComposeRule", text) and "enableAccessibilityChecks()" not in text:
             problems.append(f"{name} uses a Compose test rule but never calls enableAccessibilityChecks()")
+        elif re.search(r"createComposeRule|createAndroidComposeRule", text) and "tryPerformAccessibilityChecks()" not in text:
+            # The checks run only inside actions (performClick and so on); assertions and captureToImage() run none (R1-03).
+            problems.append(f"{name} never calls tryPerformAccessibilityChecks(), so the checks never evaluate the screen")
         if "disableAccessibilityChecks" in text:
             problems.append(f"{name} calls disableAccessibilityChecks()")
     return problems

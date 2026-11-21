@@ -173,7 +173,7 @@ After any dependency, plugin or Gradle wrapper bump (including a Dependabot PR),
 rm gradle/verification-metadata.xml
 ./gradlew --no-configuration-cache --refresh-dependencies --write-verification-metadata sha256 \
   spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest \
-  :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
+  :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:verifyRoborazziDebug :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
 The file must be generated on Linux (CI's platform), and then given the other two operating systems' `aapt2` jars. AGP resolves `com.android.tools.build:aapt2:<version>:<os>` for the build host's OS only, so a Linux run records only the `linux` jar and a macOS or Windows build fails verification. Regenerating on macOS or Windows instead would drop the `linux` jar and break CI. After the command above, add the other two from a throwaway project (`<version>` is the `aapt2` version in the file; the write mode only adds entries):

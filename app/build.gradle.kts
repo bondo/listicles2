@@ -93,12 +93,12 @@ class RobolectricOfflineArgs(
 
 tasks.withType<Test>().configureEach {
     // M1-03: the goldens are an input, or a test task that is UP-TO-DATE (or cached) after a golden changed would let
-    // `scripts/screenshots.sh verify` pass without comparing anything. scripts/check_screenshots.py checks this line.
+    // `scripts/screenshots.sh verify` pass without comparing anything. A file tree, not dir(..): a missing directory
+    // is then an empty input instead of a validation error. scripts/check_screenshots.py checks this line.
     inputs
-        .dir("src/test/screenshots")
+        .files(fileTree("src/test/screenshots"))
         .withPropertyName("screenshotGoldens")
         .withPathSensitivity(PathSensitivity.RELATIVE)
-        .optional()
     dependsOn(syncRobolectricAndroidAll)
     jvmArgumentProviders.add(
         RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),

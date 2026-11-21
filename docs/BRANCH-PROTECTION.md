@@ -81,7 +81,7 @@ The repo hooks also block agent pushes to `main`, but the server-side rule is th
 
 ## 4. What NOT to require (and the stuck-run lesson)
 Required checks block a merge until they report. If a check never reports, the PR hangs forever.
-- Only the eight jobs above. Do **not** require the `CI` workflow name, `Dependabot`, or any check
+- Only the jobs listed above (every job in `ci.yml`). Do **not** require the `CI` workflow name, `Dependabot`, or any check
   that only runs on some PRs.
 - `ui` is the riskiest: it boots an Android emulator on a GitHub runner (45 min timeout) and can stall
   or queue when runners are busy. If it is stuck, see the escape hatch below rather than removing it.
