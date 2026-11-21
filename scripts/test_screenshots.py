@@ -202,6 +202,20 @@ class Goldens(unittest.TestCase):
     def test_a_complete_synthetic_set_has_no_problems(self):
         self.assertEqual(c.golden_problems(self.root), [])
 
+    def test_every_screen_needs_the_four_light_dark_en_da_goldens_and_the_200_percent_danish_one(self):
+        for name in c.screen_goldens("Lists")[:-1]:  # all but the font200 golden
+            (self.dir / name).write_bytes(PNG + name.encode())
+        self.assertEqual(c.golden_problems(self.root), [f"missing golden {c.GOLDEN_DIR}/Lists_da_light_font200.png"])
+
+    def test_a_second_screen_with_its_full_set_has_no_problems(self):
+        for name in c.screen_goldens("Lists"):
+            (self.dir / name).write_bytes(PNG + name.encode())
+        self.assertEqual(c.golden_problems(self.root), [])
+
+    def test_a_golden_that_does_not_follow_the_naming_scheme_is_reported(self):
+        (self.dir / "Lists_en.png").write_bytes(PNG + b"x")
+        self.assertEqual(c.golden_problems(self.root), [f"unexpected file {c.GOLDEN_DIR}/Lists_en.png"])
+
     def test_a_missing_golden_is_reported(self):
         (self.dir / "TallyApp_da_dark.png").unlink()
         self.assertEqual(c.golden_problems(self.root), [f"missing golden {c.GOLDEN_DIR}/TallyApp_da_dark.png"])
@@ -261,7 +275,7 @@ class Build(unittest.TestCase):
     def test_the_goldens_must_be_an_input_of_the_test_task(self):
         # Without it Gradle reports testDebugUnitTest UP-TO-DATE (or takes it from the build cache) after a golden changed,
         # and the verify gate passes without comparing anything.
-        got = self.mutated("app/build.gradle.kts", '.dir("src/test/screenshots")', '.dir("src/test/other")')
+        got = self.mutated("app/build.gradle.kts", 'fileTree("src/test/screenshots")', 'fileTree("src/test/other")')
         self.assertEqual(got, [c.INPUT_PROBLEM])
 
     def test_the_comparison_must_be_exact(self):
@@ -275,6 +289,19 @@ class Build(unittest.TestCase):
             with self.subTest(old=old):
                 self.setUp()
                 self.assertEqual(self.mutated("app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt", old, new), want)
+
+    def test_a_capture_without_the_exact_options_is_reported(self):
+        other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsScreenshotTest.kt"
+        for call in ('onRoot().captureRoboImage("src/test/screenshots/Lists_en_light.png")', "captureRoboImage(path, roborazziOptions = RoborazziOptions())"):
+            with self.subTest(call=call):
+                other.write_text(f"fun capture() {{ {call} }}\n")
+                want = "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsScreenshotTest.kt captures without roborazziOptions = ScreenshotOptions.exact"
+                self.assertEqual(c.build_problems(self.root), [want])
+
+    def test_a_capture_with_the_exact_options_is_accepted(self):
+        other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsScreenshotTest.kt"
+        other.write_text('fun capture() { node.captureRoboImage(f(a, (b)), roborazziOptions = ScreenshotOptions.exact) }\n')
+        self.assertEqual(c.build_problems(self.root), [])
 
     def test_a_tolerance_in_any_other_test_source_is_reported(self):
         tolerances = ("CompareOptions(changeThreshold = 0.5f)", "ThresholdValidator(0.5f)", "SimpleImageComparator()")
@@ -314,6 +341,11 @@ class Accessibility(unittest.TestCase):
     def test_a_compose_ui_test_without_the_checks_is_reported(self):
         got = self.mutated(self.TEST, "enableAccessibilityChecks()", "doNothing()")
         self.assertEqual(got, [f"{self.TEST} uses a Compose test rule but never calls enableAccessibilityChecks()"])
+
+    def test_a_compose_ui_test_that_never_runs_the_checks_is_reported(self):
+        # enableAccessibilityChecks() alone checks nothing until an action runs; assertions and captureToImage() run no check (R1-03).
+        got = self.mutated(self.TEST, "tryPerformAccessibilityChecks()", "assertExists()")
+        self.assertEqual(got, [f"{self.TEST} never calls tryPerformAccessibilityChecks(), so the checks never evaluate the screen"])
 
     def test_a_new_compose_ui_test_file_without_the_checks_is_reported(self):
         extra = self.root / "app/src/androidTest/kotlin/NewScreenTest.kt"
