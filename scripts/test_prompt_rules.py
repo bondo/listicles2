@@ -1064,6 +1064,7 @@ class Pr3RuleTests(unittest.TestCase):
         "plan-roles": "docs/PLAN.md",
         "plan-implementer-split": "docs/PLAN.md",  # #255: owner decision 7032210967 and the merge agent
         "followups-cap-exemption": "docs/FOLLOW-UPS.md",  # #256: owner decision 7003661679
+        "followups-accepted-signal": "docs/FOLLOW-UPS.md",  # R2-01: the accepted: comment signals READY, not an owner merge
         "orch-implementer-split": "docs/ORCHESTRATION.md",
         "template-handoff": "handoff/TEMPLATE.md",
         "reviews-retro": "docs/reviews/README.md",  # #129 R2-02: the R6 retro is Opus/high as in PLAN 9.4 and roles.yaml
@@ -1087,6 +1088,9 @@ class Pr3RuleTests(unittest.TestCase):
         ("docs/PLAN.md", "plan-roles", "| **Orchestrator** | Sonnet / low | One long-lived session |"),
         ("docs/PLAN.md", "plan-implementer-split", "the owner squash-merges"),
         ("docs/PLAN.md", "plan-implementer-split", "you squash-merge."),
+        ("docs/FOLLOW-UPS.md", "followups-accepted-signal", "`ready_deferred`); that is the owner's signal to merge."),  # R2-01
+        ("docs/FOLLOW-UPS.md", "followups-accepted-signal", "Deferrals are re-checked by the owner at merge time (PR review table)"),
+        ("docs/ORCHESTRATION.md", "orch-cap-and-minors", "`cap_reached`); that is the owner's signal to merge."),
         ("docs/PLAN.md", "plan-implementer-split", "trusted on their own; the owner's merge is the review."),  # R1-04
         ("REVIEW.md", "review-minors-and-cap", "the reviewer posts `ready_nits_only` and the owner squash-merges."),  # R1-04
         ("REVIEW.md", "review-minors-and-cap", "`ready_deferred`, `accepted:` comment): a second signal for the owner to merge."),
