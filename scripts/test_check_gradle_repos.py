@@ -416,6 +416,25 @@ class MirrorIsARepository(unittest.TestCase):
                 plugin = with_extra("", plugin_extra=f"    {call}\n").replace(GOOD_REPOS, GOOD_REPOS.replace(MIRROR_CALL, ""), 1)
                 self.assertEqual(c.check_settings(plugin), [f"pluginManagement: Maven Central mirror {c.MIRROR} missing"])
 
+    # R5-01: each clause of the rule "the mirror counts only as a direct statement of a top-level braced repositories body of the same
+    # block" has a test that fails without it: the top-level check, the lookbehind in OWN, and the dot rule (plus the two allow spellings).
+    def test_only_the_blocks_own_top_level_braced_repositories_counts(self):
+        m = c.MIRROR
+        for head in (
+            f'with(pluginManagement) {{ repositories {{ maven("{m}") }} }}',
+            f'settings.pluginManagement {{ repositories {{ maven("{m}") }} }}',
+            f'pluginManagement.repositories {{ maven("{m}") }}',
+            f'settings.buildscript.repositories {{ maven("{m}") }}',
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), MISSING)
+        for stray in (f'pluginManagement.repositories.maven("{m}")', f'settings.buildscript.repositories.maven("{m}")'):
+            with self.subTest(stray=stray):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + stray + "\nmavenCentral()\n")), MISSING)
+        for own in (f'this.repositories {{ maven("{m}") }}', f'repositories() {{ maven("{m}") }}'):
+            with self.subTest(own=own):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=own)), [])
+
     def test_mirror_nested_in_another_receivers_block_inside_the_repositories_body_does_not_count(self):
         for wrap in (f'with(pluginManagement.repositories) {{ maven("{c.MIRROR}") }}', f'apply {{ maven("{c.MIRROR}") }}', f'run {{ maven("{c.MIRROR}") }}'):
             with self.subTest(wrap=wrap):
