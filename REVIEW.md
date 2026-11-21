@@ -99,11 +99,11 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 1. The author (the same implementer session in every round) fixes everything above `nit` and every `minor` whose fix is small
    (about 30 changed lines or fewer), or disputes with a reason, and pushes every turn.
 2. A new reviewer session runs the next round, with the whole PR diff.
-3. When only nits or deferred minors remain the reviewer posts `ready_nits_only` and the owner squash-merges.
+3. When only nits or deferred minors remain the reviewer posts `ready_nits_only`; the orchestrator then marks the PR READY and the merge agent squash-merges it (an owner-only PR waits for the owner's approval; `docs/ORCHESTRATION.md` §7.5).
    Deferral: once no blocker or major is open, a `minor` whose fix is larger than about 30 changed lines or outside the PR's scope, and any `nit`, may be deferred
    to follow-up issues instead of another round, by the rules and issue template of `docs/FOLLOW-UPS.md` (one issue per deferred finding: title, file:line, scenario; linked in the PR and its review table).
    Blockers are never deferred; majors and protected areas only with owner OK. If every finding above `nit` was deferred and no commit
-   followed the reviewed range, the decider accepts the PR without another round (`ready_deferred`, `accepted:` comment): a second signal for the owner to merge.
+   followed the reviewed range, the decider accepts the PR without another round (`ready_deferred`, `accepted:` comment): the signal to mark the PR READY.
 4. **Maximum 4 rounds per batch** (a one-batch PR: per PR; `docs/ORCHESTRATION.md` 6.2). The cap and the "only nits remain" test count only unresolved, non-deferred findings.
    If round 4 still has open findings above `nit` (deferred minors do not count), **one escalation reviewer per PR** (Opus, max effort,
    `agents/prompts/escalation-reviewer.md`, started by the orchestrator) reads the whole thread and decides `fix`, `split` or `owner`:

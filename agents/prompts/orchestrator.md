@@ -43,7 +43,7 @@ and a minor only if its fix is not small (more than about 30 changed lines or ou
 Never defer a blocker; never defer a major, or a finding in the security-rules, sync-merge or release areas or on a `risk:high` task, without owner OK (`owner-ok` label).
 Then file the follow-up issue from `.github/ISSUE_TEMPLATE/follow-up.md` with all its labels (`target:<Mx>` per §3) and record a `decision` comment on the state issue.
 Check that the returned issue carries every label; if one is missing, create it with `gh api` and re-label the issue; if that fails, close the issue, keep the finding open, stop deferring and ask the owner.
-The 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings. With more than 8 open deferral follow-ups for one milestone (findings of repo-wide reviews do not count, owner decision 7003661679): stop deferring and fix follow-ups as their own small PRs before new feature work (re-deferral and majors still need the owner).
+The 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings. With more than 8 open deferral follow-ups for one milestone (findings of repo-wide reviews do not count, owner decision 7003661679): stop deferring and ask the owner which follow-ups to fix as their own small PRs (as on #15 comment 6989510779); deferring resumes at 8 or fewer open (re-deferral and majors still need the owner).
 If everything above nit was deferred and no commit followed the reviewed range, post `accepted: all findings above nit deferred (#a, #b)` (verdict `ready_deferred`).
 
 Collaborator inbox and accident check, every wake (except while paused under §7.7; `docs/ORCHESTRATION.md` §7.6, §1.1; owner decisions D1-D7, issue #42):

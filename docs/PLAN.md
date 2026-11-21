@@ -435,13 +435,13 @@ enforce the rules rather than goodwill.
    `docs/FOLLOW-UPS.md`, listed explicitly because `docs/` has no directory rule), and screenshot
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
-   trusted on their own; the owner's merge is the review.
+   trusted on their own; the review is the reviewer rounds and the merge under the owner's authorization.
 6. **Branch protection** on `main`: PR required, all 10 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
    `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never
-   be met; the owner's merge is the review. **Empty bypass list**: a standing owner bypass
+   be met; the review is the reviewer rounds and the merge under the owner's authorization. **Empty bypass list**: a standing owner bypass
    would also bypass for agents. The owner adds themselves for an emergency merge only,
    then removes themselves. A separate machine account for agent PRs is a possible later
    improvement (it would allow 1 approval plus Code Owners review). You set this in GitHub
@@ -539,7 +539,7 @@ members' changes; a conflict keeps the losing side; so v1 sync design should lea
 | **Second reviewer** | Opus / high | Fresh session in the same round, for `risk:high` and the protected areas | Diff, PR description, `REVIEW.md`; not the first reviewer's findings | Findings (`S<round>-<nn>`), merged with the reviewer's |
 | **Escalation reviewer** | Opus / max | Fresh session, once per PR after round 4 or on a dispute | The whole review thread | `fix`, `split` or `owner` (`REVIEW.md`, Loop and cap) |
 | **Design reviewer** | Opus / high | Fresh session per design-PR round, max 3 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |
-| **Merge agent** | Sonnet / medium | Long-lived session started by the orchestrator, under an owner authorization on #15 | The READY PR list; `scripts/merge_ready.py`, `scripts/update-branch.sh` | Squash merges of READY PRs that are not owner-only, one at a time, in the order the orchestrator names (`docs/ORCHESTRATION.md` §7.5) |
+| **Merge agent** | Sonnet / medium | Long-lived session started by the orchestrator, under an owner authorization on #15 | The READY PR list; `scripts/merge_ready.py`, `scripts/update-branch.sh` | Squash merges of READY PRs that are not owner-only (in the order the orchestrator names), and of owner-only PRs once the owner's approval is recorded on #15 (in the owner's batch order; 7007421567 D1, D3); settings outside git stay the owner's (`docs/ORCHESTRATION.md` §7.5) |
 | **Explorer** (subagent) | Sonnet / medium | Subagent inside an implementer or reviewer | A narrow question | File paths and short excerpts, no dumps |
 | **CI triage** (subagent) | Sonnet / medium | Subagent inside an implementer | Failing job log | The failing test or rule and the minimal error |
 
@@ -558,7 +558,7 @@ Escalation rules (written down so agents don't decide on their own):
   matrix, `REVIEW.md` item 13). The M1 plan adds the auth flows that decide who is signed in (password, verification,
   reset, same email), account deletion and the household batches to `risk:high`, in PRs split by concern.
 * De-escalation (lower effort or a cheaper model for a role) happens only through the
-  metrics retro (section 9.4), never ad hoc.
+  metrics retro (section 9.4) or an owner decision, never ad hoc.
 
 Role definitions are checked in, so they get reviewed and versioned like code:
 * `.claude/agents/explorer.md` and `.claude/agents/ci-triage.md`: subagent definitions,

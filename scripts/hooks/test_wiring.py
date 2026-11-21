@@ -284,7 +284,7 @@ class RolesYaml(unittest.TestCase):
         self.assertIn("once the owner's approval is recorded on #15", plan)
 
     def test_deescalation_allows_an_owner_decision_and_the_roles_header_names_the_exception(self):  # R1-06
-        self.assertIn("only through the metrics retro (section 9.4) or an owner decision", read("docs", "PLAN.md"))
+        self.assertIn("only through the metrics retro (section 9.4) or an owner decision", " ".join(read("docs", "PLAN.md").split()))
         self.assertIn("7032210967", "\n".join(read("agents", "roles.yaml").splitlines()[:6]))
 
     def test_plan_no_longer_says_the_owner_merges_every_pr(self):

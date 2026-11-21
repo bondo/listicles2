@@ -1,6 +1,6 @@
 # Single source of truth for agent roles (PLAN section 9.1). Changed only through a reviewed PR,
 # and only by the metrics retro (9.4) or the owner. Agent Usage Redesign (rev 46): roles that judge or write code run on
-# a strong model at high effort; there are no per-session token budgets (spend is reported per PR class and milestone).
+# a strong model at high effort (`implementer-sonnet` is the owner's exception, decision 7032210967 on #15); there are no per-session token budgets (spend is reported per PR class and milestone).
 # `max_effort_when` lists the cases that raise effort to max; an agent may ask for more in its WORKER-RESULT and the
 # orchestrator decides within this file. Agents must not escalate on their own judgment.
 # Roles without a `prompt` have none yet (retro): its prompt follows in a later redesign PR.
