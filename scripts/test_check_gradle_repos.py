@@ -1,5 +1,6 @@
 """Tests for scripts/check_gradle_repos.py. Run: python3 -I scripts/test_check_gradle_repos.py"""
 
+import random
 import re
 import sys
 import unittest
@@ -241,6 +242,178 @@ class Hardening(unittest.TestCase):
     def test_apostrophe_in_comment_or_string_is_not_a_char_literal(self):
         ok = GOOGLE + "// it's\n/* don't */\nval s = \"it's\"\n" + MIRROR_CALL + "mavenCentral()\n"
         self.assertEqual(self.dep(ok), [])
+
+
+PLUGIN_UNFILTERED = ["pluginManagement: google() needs a content filter"]
+OUTSIDE = ["settings.gradle.kts: google() outside pluginManagement and dependencyResolutionManagement needs a content filter"]
+TAIL = MIRROR_CALL + "mavenCentral()\n"
+
+
+def with_extra(extra, plugin_extra=""):
+    """Settings whose two good repositories blocks are followed by `extra` statements inside their outer blocks."""
+    return (
+        f"pluginManagement {{\n    repositories {{{GOOD_REPOS}    }}\n{plugin_extra}}}\n"
+        f"dependencyResolutionManagement {{\n    repositories {{{GOOD_REPOS}    }}\n{extra}\n}}\n"
+    )
+
+
+class DottedGoogle(unittest.TestCase):
+    """Issue 226: google() written as repositories.google() (or any form outside a braced repositories block) needs the same filter."""
+
+    def test_unfiltered_dotted_forms_are_flagged(self):
+        for extra in (
+            "repositories.google()",
+            "repositories.google",
+            "this.repositories.google()",
+            "repositories.google { }",
+            "repositories.google() { }",
+            "repositories.google { content { } }",
+            'repositories.google { content { excludeGroup("x") } }',
+            "repositories.apply { google() }",
+            "with(repositories) { google() }",
+            "val g = repositories::google",
+            "repositories.exclusiveContent { forRepository { google() } }",
+            "repositories.exclusiveContent { forRepository { google() } filter { } }",
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra(extra)), UNFILTERED)
+
+    def test_unfiltered_dotted_google_in_plugin_management_is_flagged(self):
+        self.assertEqual(c.check_settings(with_extra("", plugin_extra="    repositories.google()\n")), PLUGIN_UNFILTERED)
+
+    def test_dotted_google_outside_both_outer_blocks_is_flagged(self):
+        for extra in (
+            "pluginManagement.repositories.google()",
+            "settings.dependencyResolutionManagement.repositories { google() }",
+            "buildscript { repositories { google() } }",
+            "gradle.settings.pluginManagement.repositories.google()",
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra("") + extra + "\n"), OUTSIDE)
+
+    def test_dotted_google_without_a_braced_repositories_block_reports_both(self):
+        text = f"pluginManagement {{\n    repositories {{{GOOD_REPOS}    }}\n}}\ndependencyResolutionManagement {{ repositories.google() }}\n"
+        self.assertEqual(c.check_settings(text), ["dependencyResolutionManagement: no repositories block"] + UNFILTERED)
+
+    def test_every_unfiltered_place_is_reported_once_per_block(self):
+        got = c.check_settings(with_extra("repositories.google()\nrepositories.google()", "    repositories.google()\n") + "repositories.google()\n")
+        self.assertEqual(got, PLUGIN_UNFILTERED + UNFILTERED + OUTSIDE)
+
+    def test_filtered_dotted_forms_pass(self):
+        for extra in (
+            'repositories.google { content { includeGroup("androidx") } }',
+            'repositories.google() { content { includeGroupAndSubgroups("androidx") } }',
+            'repositories.exclusiveContent { forRepository { google() } filter { includeGroup("x") } }',
+            'with(repositories) { google { content { includeGroup("x") } } }',
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra(extra)), [])
+
+    def test_google_in_comments_and_strings_outside_the_block_is_not_a_call(self):
+        extra = '// repositories.google()\n/* repositories.google() */\nval s = "repositories.google()"\nval r = """repositories.google()"""'
+        self.assertEqual(c.check_settings(with_extra(extra) + "// google()\n"), [])
+
+
+NESTED = 'val s = "${ if (c) "}" else "" }"\n'
+
+
+class Strings(unittest.TestCase):
+    """Issue 227: raw strings and string templates with nested strings, braces or code must not hide an unfiltered google()."""
+
+    def dep(self, repos):
+        return c.check_settings(settings(dep_repos=repos))
+
+    def hidden(self, before):
+        """`before` is a statement that must not swallow the unfiltered google() that follows it."""
+        return self.dep(GOOGLE + TAIL + before + "google()\n")
+
+    def test_nested_string_with_brace_in_a_template_does_not_hide_google(self):
+        self.assertEqual(self.hidden(NESTED), UNFILTERED)
+
+    def test_raw_string_with_an_odd_number_of_quotes_does_not_hide_google(self):
+        for before in ('val s = """a"b"""\n', 'val s = """x""""\n', 'val s = """\\"""\n', 'val s = """"""\n', 'val s = """a""b"""\n'):
+            with self.subTest(before=before):
+                self.assertEqual(self.hidden(before), UNFILTERED)
+
+    def test_templates_inside_raw_strings_and_nested_templates_do_not_hide_google(self):
+        for before in (
+            'val s = """${ "}" }"""\n',
+            'val s = """${ "${ "}" }" }"""\n',
+            'val s = "${ "${ "}" }" }"\n',
+            "val s = \"${ '}' }\"\n",
+            'val s = "${ /* } */ 1 }"\n',
+            'val s = "${ 1 // }\\n }"\n',
+            'val s = "${ mapOf("a" to "}").size }"\n',
+        ):
+            with self.subTest(before=before):
+                self.assertEqual(self.hidden(before), UNFILTERED)
+
+    def test_google_called_inside_a_template_is_code(self):
+        for before in ('val s = "${google()}"\n', 'val s = """${ google() }"""\n', 'val s = "${ "${ google() }" }"\n'):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), UNFILTERED)
+
+    def test_filtered_google_inside_a_template_passes(self):
+        ok = 'val s = "${ google { content { includeGroup("x") } } }"\n'
+        self.assertEqual(self.dep(GOOGLE + TAIL + ok), [])
+
+    def test_valid_strings_keep_the_check_green(self):
+        for before in (
+            NESTED,
+            'val s = """a"b"""\n',
+            'val s = """x""""\n',
+            'val s = """\\"""\n',
+            'val s = """a\n}\n"{"\n"""\n',
+            'val s = """${ "}" }"""\n',
+            'val s = "${ "${ "}" }" }"\n',
+            'val s = "${ if (c) \'}\' else \'{\' }"\n',
+            'val s = "$x and ${y} and \\$z and \\${w}"\n',
+            'val s = """$ $x ${\'$\'}"""\n',
+            'val s = "// /* \\" \'"\n',
+            'val s = ""\nval t = ""\n',
+            "val q = '\"'\nval s = \"it's\"\n",
+        ):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), [])
+                self.assertEqual(self.dep(GOOGLE + before + TAIL), [])
+
+    def test_mirror_in_a_raw_string_call_counts(self):
+        self.assertEqual(self.dep(GOOGLE + f'maven("""{c.MIRROR}""")\nmavenCentral()\n'), [])
+
+    def test_mirror_order_and_missing_checks_survive_nested_templates(self):
+        self.assertEqual(self.dep(GOOGLE + NESTED + "mavenCentral()\n" + MIRROR_CALL), BEFORE)
+        self.assertEqual(self.dep(GOOGLE + NESTED + "mavenCentral()\n"), MISSING)
+
+    def test_commented_mirror_after_nested_template_does_not_count(self):
+        self.assertEqual(self.dep(GOOGLE + NESTED + "// " + MIRROR_CALL + "mavenCentral()\n"), MISSING)
+
+    def test_unparsable_strings_fail_closed(self):
+        for before in (
+            'val s = "abc\n',
+            'val s = "abc',
+            'val s = """abc\n',
+            'val s = "${ x\n',
+            'val s = "${ "}" \n',
+            'val s = """${ x """\n',
+            'val s = "${ "abc }"\n',
+            'val s = "\\',
+        ):
+            with self.subTest(before=before):
+                got = self.dep(GOOGLE + TAIL + before)
+                self.assertEqual(len(got), 1)
+                self.assertTrue(got[0].startswith("settings.gradle.kts: cannot parse"), got)
+
+    def test_strip_never_fails_open_on_random_input(self):
+        rng = random.Random(227)
+        alphabet = ['"', '"""', "$", "${", "{", "}", "'", "\\", "/", "*", "//", "/*", "*/", "\n", "a", " ", "google()"]
+        for _ in range(3000):
+            text = "".join(rng.choice(alphabet) for _ in range(rng.randint(1, 14)))
+            try:
+                blanked, kept = c._strip(text, blank_strings=True), c._strip(text)
+            except c.Unparsable:
+                continue
+            self.assertEqual(len(blanked), len(kept), repr(text))
+            self.assertTrue(all(b in (k, " ") for b, k in zip(blanked, kept, strict=True)), repr(text))  # blanking only ever writes spaces
 
 
 class Properties(unittest.TestCase):
