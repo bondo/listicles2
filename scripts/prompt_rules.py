@@ -103,7 +103,9 @@ MATRIX_WRONG_SEVERITY = (
 # Accepted false positives (fail closed; nothing in the text tells them from a permission of the same shape, such as the table row
 # "| Orchestrator | Resolve threads after replying |"): a Never cell that starts "Resolve threads, ...", a definition of the button
 # ("**Resolve conversation**: only the owner presses it."), and a condition with an agent subject ("If an agent calls
-# `mcp__github__resolve_review_thread`, the PreToolUse hook denies the call.", as the check flags "If an agent resolves a thread, ...").
+# `mcp__github__resolve_review_thread`, the PreToolUse hook denies the call.", as the check flags "If an agent resolves a thread, ..."),
+# and a button note that names an agent ("* **Resolve conversation** (only the owner, never an agent)").
+_AGENT_NOUN = r"\b(?:(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
 _AGENT = r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
 _NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
 _THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
@@ -181,7 +183,9 @@ _CLAUSE_START = rf"\s*(?:please\s+)?{_DETERMINER}(?:{_NP}\s+(?:{_MODAL}\s+)?)?"
 # starts no ban: "Not all agents ..."), then a few plain words (no comma, no conjunction, no "to": an infinitive means the negator governs
 # another verb, "Don't hesitate to reply and resolve ...")
 _CONJ_NEGATOR = rf"(?:(?:please\s+)?(?:do\s+not|don't|never)|{_DETERMINER}{_NP}\s+(?:{_MODAL}\s+)?{_NEGATOR})"
-_NEGATED_CONJUNCTION = re.compile(rf"\s*{_CONJ_NEGATOR}\s+(?:ever\s+)?(?:(?!to\b){_WORD}){{0,3}}$", re.I)
+# an adverb after the negator takes the negation off the act ("Do not immediately reply and resolve ...", "Don't always ..."): no ban
+_ADVERB_WORD = r"(?:(?!(?:re|ap|com|sup)ply\b)\w+ly|always|first|yet|still|also|often|again|anymore)"
+_NEGATED_CONJUNCTION = re.compile(rf"\s*{_CONJ_NEGATOR}\s+(?:ever\s+)?(?:(?!(?:to|{_ADVERB_WORD})\b){_WORD}){{0,3}}$", re.I)
 # "Agents must never, not even with the API, resolve ...": the first comma segment ends with the negation, the others are asides
 _NEGATION_SEGMENT = re.compile(
     rf"\s*(?:{_CLAUSE_START}{_NEGATOR}(?:\s+ever|\s+at any (?:time|point))?"
@@ -195,8 +199,8 @@ def _negated(kind, sentence, match):
     agents are allowed to resolve the thread."), a bare answer before a comma ("Need the owner? Never, resolve the thread.", "Wait for
     approval? You don't, resolve the thread.") and a run-on with no comma ("Do not wait reply and resolve the thread."). Accepted false
     positives: a ban whose subject has a relative clause ("Implementers who disagree must not reply and resolve the thread."), an adverb
-    or a subject outside the closed template ("Agents also must not ...", "Absolutely do not ...", "Claude must not ..."), a focus adverb
-    after the negator ("Never just reply and resolve the thread.") and the cases named above _resolve_patterns."""
+    or a subject outside the closed template ("Agents also must not ...", "Absolutely do not ...", "Claude must not ...") and the cases
+    named above _resolve_patterns."""
     if sentence.rstrip().endswith("?"):  # "Why don't you reply and resolve ...?" suggests; a question bans nothing
         return False
     prefix = _LEAD_CLAUSE.sub("", _LIST_MARKER.sub("", _BOUNDARY.split(sentence[: match.start()])[-1]))
@@ -247,9 +251,9 @@ def _has_thread(earlier, sentence, match):
 _LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 _EMPHASIS = re.compile(r"(?<![\w*])(\*\*|\*|__|_)(?=\S)(.+?)(?<=\S)\1(?![\w*])")  # not inside a word: the __ of a tool name stays
 # a button name (COLLABORATING's do-not-press list): a bold label of at most two words that starts a bullet or table cell and ends it or
-# comes before a parenthetical, on a line that names no agent ("| **Resolve threads** | Orchestrator |" stays a permission); it becomes
-# a neutral word, and no line is ever deleted
-_BUTTON = re.compile(rf"^(\s*(?:[-*]|\|)\s+)\*\*\w+(?:[ /-]\w+)?\*\*(?=\s*(?:\(|\||$))(?![^\n]*{_AGENT}\b)", re.M | re.I)
+# comes before a parenthetical, on a line that names no agent ("| **Resolve threads** | Orchestrator |" stays a permission; "you" is
+# COLLABORATING's reader, not an agent); it becomes a neutral word, and no line is ever deleted
+_BUTTON = re.compile(rf"^(\s*(?:[-*]|\|)\s+)\*\*\w+(?:[ /-]\w+)?\*\*(?=\s*(?:\(|\||$))(?![^\n]*{_AGENT_NOUN}\b)", re.M | re.I)
 
 
 def resolve_permissions(text):
