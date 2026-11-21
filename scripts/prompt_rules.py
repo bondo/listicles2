@@ -358,7 +358,7 @@ RULES = (
     ),
     Rule(
         "impl-test-first", ("implementer",),
-        (r"failing test first", r"negative cases", r"wired into `scripts/verify\.sh`/ci", r"tooling", r"reviewers flag untested changes"),
+        (r"failing test first", r"negative cases", r"wired into `scripts/verify\.sh`/ci", r"this includes tooling: hooks", r"reviewers flag untested changes"),
         "test-first for all code including tooling: failing test first, negative cases, wired into verify.sh/CI (ORCHESTRATION 2.0)",
     ),
     Rule(
@@ -396,14 +396,14 @@ RULES = (
             r"check that the returned issue carries every label; if one is missing, create it with `gh api` and re-label the issue; "
             r"if that fails, close the issue, keep the finding open, stop deferring and ask the owner\.",
             r"the 4-round cap and the only-nits-remain test count only unresolved, non-deferred findings",
-            r"with more than 8 open follow-ups for one milestone: stop deferring and start the milestone's burn-down task `mx-fu` next "
-            r"\(re-deferral and majors still need the owner\)",
+            r"with more than 8 open deferral follow-ups for one milestone \(findings of repo-wide reviews do not count, owner decision 7003661679\): "
+            r"stop deferring and fix follow-ups as their own small prs before new feature work \(re-deferral and majors still need the owner\)",
             r"if everything above nit was deferred and no commit followed the reviewed range, "
             r"post `accepted: all findings above nit deferred \(#a, #b\)` \(verdict `ready_deferred`\)",
         ),
         "the orchestrator decides deferral by FOLLOW-UPS 2 and 4: small minors (30 lines) are fixed, never blockers, "
         "majors or protected areas without owner OK, limit 8 per milestone",
-        forbidden=(r"more than about 15 changed lines", r"ask the owner to do m0-o10"),
+        forbidden=(r"more than about 15 changed lines", r"ask the owner to do m0-o10", r"start the milestone's burn-down task"),
     ),
     Rule(
         "impl-deferral", ("implementer",),
@@ -417,7 +417,7 @@ RULES = (
             r"never a major, or a finding in the security-rules, sync-merge or release areas or on a `risk:high` task, without owner ok",
             r"then file the issue from the template, post the `decision` comment and any `accepted:` comment "
             r"\(with its `metrics:round` block, verdict `ready_deferred`\) on the pr \(§4, §6\), "
-            r"and with more than 8 open follow-ups for the milestone ask the owner",
+            r"and with more than 8 open deferral follow-ups for the milestone \(repo-wide review issues do not count\) ask the owner",
             r"put every owner-ok question in `needs_owner` of your worker-result",
         ),
         "implementers propose deferrals in WORKER-RESULT and decide only in a manual loop; never blockers, majors or protected areas without owner OK",
@@ -634,11 +634,13 @@ RULES = (
     Rule(
         "impl-model-and-handoff", ("implementer",),
         (
-            r"opus, high effort \(max for risk:high prs per `agents/roles\.yaml`", r"60% of a 1m window, 40% of a 200k one",
-            r"80% / 60%",
+            r"model and effort come from `agents/roles\.yaml` \(opus, high effort for spikes, design, risk:high, security rules, "
+            r"sync/merge, guard/hook tooling and a pr with 3\+ review rounds, max for risk:high prs; "
+            r"sonnet, medium effort otherwise, high for tooling\)",
+            r"60% of a 1m window, 40% of a 200k one", r"80% / 60%",
         ),
-        "the implementer prompt names the roles.yaml model and the hook's handoff thresholds (rev 46 rows 1, 12)",
-        forbidden=(r"sonnet, medium", r"at about 50% context"),
+        "the implementer prompt names the roles.yaml Opus / Sonnet split (owner decision 7032210967) and the hook's handoff thresholds (rev 46 rows 1, 12)",
+        forbidden=(r"at about 50% context", r"implementer for listicles\. opus, high effort"),
     ),
     Rule(
         "impl-minors-and-triage", ("implementer",),
@@ -903,6 +905,24 @@ DOC_RULES = (
         forbidden=(r"sonnet / low", r"haiku", r"token budget", r"starting budgets", r"tokens/pr", r"label `escaped`", r"retro session \(sonnet"),
     ),
     DocRule(
+        "plan-implementer-split", "docs/PLAN.md",
+        (
+            r"\*\*implementer \(opus\)\*\*", r"\*\*implementer \(sonnet\)\*\*", r"\*\*merge agent\*\*",
+            r"implementer split \(owner decision, #15 comment 7032210967\)", r"the merge agent squash-merges every ready pr that is not owner-only",
+        ),
+        "PLAN 1, 6 and 9.1: the Opus / Sonnet implementer split and the merge agent, not an owner who squash-merges every PR (#255)",
+        forbidden=(r"the owner squash-merges", r"you squash-merge"),
+    ),
+    DocRule(
+        "followups-cap-exemption", "docs/FOLLOW-UPS.md",
+        (
+            r"repo-wide reviews \(owner decision, #15 comment 7003661679\):\*\* the cap of 8 per milestone counts only deferrals from individual pr reviews",
+            r"`mx-fu` depends on every task of its milestone, so it cannot start early",
+        ),
+        "FOLLOW-UPS 1 and 2: the cap counts only PR-review deferrals, and over the cap follow-ups are fixed as small PRs, not by starting Mx-FU (#256)",
+        forbidden=(r"stops deferring and starts the milestone's burn-down task", r"more than 8 open per milestone starts the burn-down"),
+    ),
+    DocRule(
         "reviews-retro", "docs/reviews/README.md",
         (r"\| r6 \| opus high worker \| plan 9\.4", r"opus high worker \| the csv, `docs/agent-tuning\.md` and a sample of transcripts and pr threads"),
         "the reviews README names the R6 retro as Opus/high with transcripts, as PLAN 9.4 and roles.yaml do (#129 R2-02)",
@@ -989,13 +1009,24 @@ DOC_RULES = (
         (
             r"round 4 with findings above `nit`: the escalation of §7\.2\.2 decides `fix`, `split` or `owner`; it does not stop at the owner",
             r"\*\*default:\*\* fix a minor in the pr when its fix is small \(about 30 changed lines or fewer\)",
-            r"stop deferring and start the milestone's burn-down task `mx-fu` next \(re-deferral and majors still need the owner\)",
+            r"stop deferring and fix follow-ups as their own small prs before new feature work \(re-deferral and majors still need the owner; "
+            r"`mx-fu` depends on every task of its milestone, so it cannot start early\)",
         ),
-        "ORCHESTRATION 6.2 and 7.2.1: round 4 goes to the escalation reviewer; minors are fixed by default; the burn-down starts at 8 follow-ups",
+        "ORCHESTRATION 6.2 and 7.2.1: round 4 goes to the escalation reviewer; minors are fixed by default; at 8 deferral follow-ups they are fixed as small PRs",
         forbidden=(
             r"round 4 with findings above `nit`: stop and ask the owner", r"defers the remaining minors and nits \(follow-up issues\) instead of running",
-            r"stop deferring and report to the owner",
+            r"stop deferring and report to the owner", r"start the milestone's burn-down task",
         ),
+    ),
+    DocRule(
+        "orch-implementer-split", ORCH,
+        (
+            r"\| \*\*merge agent\*\* \|", r"or sonnet / medium \(high for tooling\), by the split of plan §9\.1",
+            r"use `implementer` \(opus\) for the cases in its `use_when` list, `implementer-sonnet` otherwise",
+            r"a running implementer keeps its model \(owner decision, #15 comment 7032210967\)",
+        ),
+        "ORCHESTRATION 1 and 7.1: the implementer is Opus or Sonnet by the split in roles.yaml and PLAN 9.1, and the merge agent has a role row (#255)",
+        forbidden=(r"\| \*\*implementer\*\* \| opus / high \(max for `risk:high`\) \| one batch or pr",),
     ),
     DocRule(
         "orch-spawn-checks", ORCH,
