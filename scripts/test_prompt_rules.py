@@ -1944,6 +1944,23 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Do not wait, but you may resolve the thread.",
         "Never merge. Resolve the thread after answering.",
         "Do not guess. You may resolve it when the thread is answered.",
+        # R1-01 of #267: a negation in another clause (before a colon, a bare comma, "so" or a lead clause) does not reach the permission
+        "Never resolve a collaborator's review thread (follow-up #44): reply, then resolve the thread once the collaborator agrees.",
+        "Never leave a collaborator waiting: reply and resolve the thread.",
+        "Never leave a collaborator's review thread open: reply and resolve it.",
+        "No need to ask: you may resolve the thread.",
+        "Don't wait for the owner, resolve the thread.",
+        "Only after replying, resolve the thread.",
+        "Without waiting for the owner, you may resolve the thread.",
+        "You may, without asking, resolve the thread.",
+        "If there is no reply in a day you may resolve the thread.",
+        "There is no rule against it, so you may resolve the thread.",
+        'There is no rule against "never resolve threads", so you may resolve the thread.',
+        # R1-02 of #267: the thread is named in an earlier sentence or in the lead-in line of a list
+        "Answer each with one line on its thread; then resolve it.",
+        "Answer each with one line on its thread. Then resolve it.",
+        "Reply on the thread. Then mark it as resolved.",
+        "Answer each review thread:\n- reply with one line\n- resolve it",
     )
     BAN = (
         # R3-03: a comma clause between the negation and the verb
@@ -1969,6 +1986,18 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Close the issue when the PR has merged.",
         "Mark the finding as resolved in the findings file.",
         "The tool is named resolve_review_thread in the GitHub server.",
+        # R1-04 of #267
+        "None of the agents may resolve a thread.",
+        "None of you may resolve the thread.",
+        # the shapes of R3-03 and R3-04 with other negating phrases
+        "Agents must not, under any circumstances, resolve a thread.",
+        "Under no circumstances, resolve the thread yourself.",
+        "At no point may the orchestrator resolve a collaborator's thread.",
+        # R1-03 of #267: a sentence about the tool with no actor, and an "it" or "resolved" that is not the thread
+        "A thread resolved with `resolve_review_thread` cannot be reopened by an agent.",
+        "The PreToolUse hook denies calls via `mcp__github__resolve_review_thread`.",
+        "Mark each finding as resolved once fixed, and reply on the thread.",
+        "Mark the finding as resolved, then reply on the thread.",
     )
 
     def flagged(self, where, text):
