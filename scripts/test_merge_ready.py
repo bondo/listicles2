@@ -523,6 +523,18 @@ class GeneralKindTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(merge_ready.owner_only(name))
 
+    def test_files_that_change_what_agents_load_or_what_checks_see_are_owner_only(self):  # R5-01, R5-02, R5-03: owner decision #15 7057687236
+        names = (".gitattributes", "app/.gitattributes", "docs/milestones/.gitattributes",  # `*.kt -diff` blinds the guards and secrets checks
+                 ".mcp.json", "app/.MCP.json",  # project MCP servers load without asking in cloud sessions
+                 "app/.claude", "docs/milestones/.claude", "x/.Claude",  # a symlink named .claude is one git entry whose last component is .claude
+                 ".gitleaks.toml", ".gitleaksignore", "app/.gitleaksignore")  # gitleaks's own allowlists
+        for name in names:
+            with self.subTest(name=name):
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general.*" + re.escape(name))
+        for name in ("docs/gitattributes.md", "docs/mcp.json.md", "app/.gitleaks-notes.md", "docs/claude"):  # similar names stay general
+            with self.subTest(name=name):
+                self.assertFalse(merge_ready.owner_only(name))
+
     def test_dotdot_and_a_rename_from_an_owner_only_path_are_refused(self):
         for entry, reason in ((file_entry("scripts/../CLAUDE.md"), r"\.\."),
                               (file_entry("scripts/x.py", status="renamed", previous="scripts/guards.sh"), r"scripts/guards\.sh")):
@@ -644,6 +656,14 @@ class WiringTests(unittest.TestCase):
                 r"scripts that only other workflows or `\.claude/settings\.json` run stay `general` \(owner ruling, #15 comment 7019683156\)"):
             with self.subTest(pattern=pattern):
                 self.assertRegex(doc, pattern)
+
+    R5_OWNER_ONLY = (r"`\.gitattributes`, `\.mcp\.json`, `\.gitleaks\.toml` and `\.gitleaksignore` are owner-only for `general`, as are `claude\.md` and "
+                     r"`claude\.local\.md` in any directory and any path component named `\.claude` \(owner decision, #15 comment 7057687236\)")
+
+    def test_docs_record_the_r5_decision(self):  # owner decision #15 7057687236, exact so a reversed sentence fails
+        doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
+        self.assertRegex(doc, self.R5_OWNER_ONLY)
+        self.assertNotRegex(doc.replace("are owner-only for `general`, as are", "stay `general`, as are"), self.R5_OWNER_ONLY)
 
     def test_the_licensee_pin_fails_when_the_sentence_is_reversed(self):  # R3-02: a later 'owner-only' elsewhere must not satisfy it
         reversed_text = ("`config/licensee/` (licence acceptances), `docs/follow-ups.md`, `docs/security.md` and `docs/orchestrator-state.md` stay `general`; "
