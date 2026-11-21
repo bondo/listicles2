@@ -327,7 +327,7 @@ Rules of thumb:
 **Misuse and the shared quota (accepted risk, #204; owner, #15 comment 7003828200).** The quota is project-wide and
 nothing in the rules yet bounds lists per user, items per list or invites per household, so one account (with or without a
 household), a scripted member or a buggy client loop can use up a day's writes or reads for every household. The
-owner accepts this while only invited testers use the app. Response when it happens, in the Firebase console: disable
+owner accepts this until the first external tester (section 7): the acceptance covers only the owner's own use (#15 comment 7064913106). Response when it happens, in the Firebase console: disable
 the account in Authentication, then remove its data in Firestore, but never delete a `households/{hid}` doc by hand: the
 #199 rule holds in the console too, because a deleted household doc frees its id for a takeover. For a household the
 account owns: soft-delete it (`deleted: true`, `name: ""`) and delete its invites, `removed` markers and the account's
@@ -337,6 +337,8 @@ with their items, and its users doc last. Requests work again after the daily re
 first external tester: App Check is enforced (section 3.1), and the rules cap items per list and invites per household.
 The caps need stored counters, so their rule shape (with allow and deny tests, for example deny the 2,001st item and
 the invite past the household limit) is decided in M2 planning (M2-01) with the counters above, and the M2 rules task it plans adds those tests.
+Accepted residual (owner, #15 comment 7064904144): after the two caps one account can still use up the daily quota
+through many lists; App Check and the console response above are the only controls; M2-01 revisits it.
 
 [^quota]: https://firebase.google.com/docs/firestore/quotas
 [^price]: https://firebase.google.com/docs/firestore/pricing
