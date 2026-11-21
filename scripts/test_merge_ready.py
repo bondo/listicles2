@@ -54,6 +54,21 @@ def fake_resolver(table=None, calls=None):
     return resolve
 
 
+DRAFT = "Status: working draft, 2026-11-21; not owner-approved (see issue #15)."
+
+
+def doc_text(status=DRAFT, lines_before=0):
+    return "# Title\n\n" + "filler\n" * lines_before + f"{status}\n\nBody.\n"
+
+
+def with_contents(api, name, base=None, head=None):
+    """Serve a file's text at the base (main) and at the head (SHA), as the contents API does."""
+    for ref, text in (("main", base), (SHA, head)):
+        if text is not None:
+            api.data[f"repos/{REPO}/contents/{name}?ref={ref}"] = {"content": base64.b64encode(text.encode()).decode()}
+    return api
+
+
 def file_entry(name, status="modified", patch="@@ -1 +1 @@\n-old\n+new", previous=None):
     entry = {"filename": name, "status": status, "patch": patch}
     if previous:
@@ -77,6 +92,8 @@ class FakeApi:
         self.requested.append(path)
         if "/contents/app/src/main/res/" in path and path not in self.data:  # a res XML file at the head: harmless unless a test says otherwise
             return {"content": base64.b64encode(b"<resources><string name='a'>A</string></resources>").decode()}
+        if f"repos/{REPO}/contents/docs/" in path and path not in self.data:  # a docs file: a working draft with its status paragraph, unless a test says otherwise
+            return {"content": base64.b64encode(doc_text().encode()).decode()}
         return copy.deepcopy(self.data[path])
 
     def pages(self, path, key=None):
@@ -488,6 +505,168 @@ class UsageTests(unittest.TestCase):
         self.assertIn("405", text)
 
 
+class SignOffTests(unittest.TestCase):
+    """R4-02: the sign-off check reads the status paragraph of the head, not a count of phrases in the patch."""
+
+    KINDS = (("working-draft-docs", "docs/milestones/M1.md"), ("general", "docs/milestones/M1.md"), ("general", "docs/PLAN.md"))
+    SWAP = "@@ -3 +3 @@\n-" + DRAFT + "\n+{}"
+
+    def attempt(self, kind, name, head, base=None, status="modified", previous=None, api=None):
+        patch = self.SWAP.format(DRAFT if head is None else "Status: x; not owner-approved (see issue #15).")
+        api = api or with_contents(make_api(files=[file_entry(name, status=status, patch=patch, previous=previous)]), previous or name,
+                                   base=doc_text() if base is None else base, head=head)
+        if previous is None and head is not None:
+            with_contents(api, name, head=head)
+        code, text = go(api, kind=kind)
+        return code, text, api
+
+    def test_a_valid_status_paragraph_at_the_head_merges(self):
+        two_lines = "Status: working draft, matched to the stories\n(task OQ-15); the plan itself is not owner-approved (see issue #15)."
+        for kind, name in self.KINDS:
+            for head in (doc_text(), doc_text(two_lines), doc_text(DRAFT.replace("2026-11-21", "2026-12-01"))):
+                with self.subTest(kind=kind, name=name, head=head):
+                    code, text, api = self.attempt(kind, name, head)
+                    self.assertEqual(code, 0, text)
+
+    def test_a_reworded_misplaced_or_quoted_status_is_refused_even_when_the_phrase_survives(self):
+        bad = {"sign-off that quotes the phrase": doc_text("Status: approved by the owner, 2026-11-21 (was: not owner-approved (see issue #15))."),
+               "status pushed below the top": doc_text(lines_before=30),
+               "status in a code fence": "# T\n\n```\n" + DRAFT + "\n```\n",
+               "status in a quote": "# T\n\n> " + DRAFT + "\n",
+               "no issue reference": doc_text("Status: working draft; not owner-approved."),
+               "not a working draft": doc_text("Status: final; not owner-approved (see issue #15)."),
+               "phrase only in the body": "# T\n\nText.\n\nThis part is not owner-approved (see issue #15).\n"}
+        for kind, name in self.KINDS:
+            for why, head in bad.items():
+                with self.subTest(kind=kind, name=name, why=why):
+                    code, text, api = self.attempt(kind, name, head)
+                    self.assertNotEqual(code, 0, text)
+                    self.assertRegex(text, r"status paragraph")
+                    self.assertEqual(api.merged, [])
+
+    def test_a_new_draft_needs_its_status_paragraph(self):
+        for kind in ("working-draft-docs", "general"):
+            with self.subTest(kind=kind, case="missing"):
+                code, text, api = self.attempt(kind, "docs/milestones/M2.md", "# M2\n\nNo status here.\n", status="added")
+                self.assertNotEqual(code, 0, text)
+                self.assertRegex(text, r"M2\.md.*status paragraph")
+                self.assertEqual(api.merged, [])
+            with self.subTest(kind=kind, case="present"):
+                self.assertEqual(self.attempt(kind, "docs/milestones/M2.md", doc_text(), status="added")[0], 0)
+
+    def test_a_renamed_draft_is_judged_against_the_old_file_at_the_base(self):
+        code, text, api = self.attempt("working-draft-docs", "docs/milestones/M1b.md", "# T\n\nNo status.\n", status="renamed", previous="docs/milestones/M1.md")
+        self.assertNotEqual(code, 0, text)
+        self.assertRegex(text, r"status paragraph")
+
+    def test_a_doc_that_was_never_a_draft_is_not_held_to_the_status(self):  # approved docs and ordinary docs keep merging
+        approved = "# Stories\n\nStatus: owner-approved 2026-11-18 (issue #15 comment 6991804241).\n"
+        self.assertEqual(self.attempt("working-draft-docs", "docs/product/stories.md", approved, base=approved)[0], 0)
+        api = with_contents(make_api(files=[file_entry("docs/notes.md", status="added")]), "docs/notes.md", head="# Notes\n")
+        self.assertEqual(go(api, kind="general")[0], 0)
+
+    def test_an_unreadable_head_refuses(self):  # fail closed
+        class NoContents(FakeApi):
+            def get(self, path):
+                if "/contents/" in path:
+                    raise merge_ready.ApiError("gh api contents: HTTP 502")
+                return super().get(path)
+
+        for kind, name in self.KINDS:
+            with self.subTest(kind=kind, name=name):
+                api = NoContents(make_api(files=[file_entry(name, patch=self.SWAP.format(DRAFT))]).data)
+                code, text = go(api, kind=kind)
+                self.assertNotEqual(code, 0, text)
+                self.assertEqual(api.merged, [])
+
+    def test_the_real_drafts_pass_the_structural_check(self):
+        for name in ("docs/PLAN.md", "docs/milestones/M1.md"):
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.draft_status((ROOT / name).read_text(encoding="utf-8")))
+
+
+class EmptyPatchTests(unittest.TestCase):
+    """R5-01: an entry with `"patch": ""` (the API sends that for some changes) is a missing patch, not a diff with nothing in it."""
+
+    def test_every_check_that_needs_a_patch_refuses_an_empty_one(self):
+        cases = (("working-draft-docs", "docs/milestones/M1.md", r"no patch"), ("general", "docs/PLAN.md", r"no patch"),
+                 ("general", "app/src/main/kotlin/dev/listicles/A.kt", r"no patch"), ("dependabot", ".github/workflows/ci.yml", r"no patch from the API"),
+                 ("dependabot", "gradle/wrapper/gradle-wrapper.properties", r"no patch from the API"))
+        for kind, name, reason in cases:
+            for patch in ("", None):
+                with self.subTest(kind=kind, name=name, patch=patch):
+                    api = make_api(files=[file_entry(name, patch=patch)])
+                    code, text = go(api, kind=kind)
+                    self.assertNotEqual(code, 0, text)
+                    self.assertRegex(text, reason)
+                    self.assertEqual(api.merged, [])
+
+    def test_an_image_without_a_patch_still_merges(self):  # binary files have none, in either form
+        for patch in ("", None):
+            with self.subTest(patch=patch):
+                self.assertEqual(go(make_api(files=[file_entry("docs/product/wireframes/01-sign-in-dark.png", patch=patch)]))[0], 0)
+
+
+class GhApiTests(unittest.TestCase):
+    """R1-09: GhApi retries a flake by the HTTP status `gh api` reports, also for the merge PUT, and never because a number appears in a message."""
+
+    def call(self, *results, method="get"):
+        """Run one GhApi call against fake `gh api` results (returncode, stdout, stderr), in order: (value or the ApiError, argv list, sleeps)."""
+        argv, sleeps = [], []
+
+        def fake_run(args, **kwargs):
+            argv.append(args)
+            code, out, err = results[min(len(argv), len(results)) - 1]
+            return subprocess.CompletedProcess(args, code, out, err)
+
+        api = merge_ready.GhApi()
+        with mock.patch.object(merge_ready.subprocess, "run", fake_run), mock.patch.object(merge_ready.time, "sleep", sleeps.append):
+            try:
+                value = api.get("repos/x/y") if method == "get" else api.put("repos/x/y/merge", {"merge_method": "squash", "sha": SHA})
+            except merge_ready.ApiError as e:
+                value = e
+        return value, argv, sleeps
+
+    def test_a_flake_status_is_retried_and_the_second_answer_counts(self):
+        for status in (429, 500, 502, 503, 504):
+            with self.subTest(status=status):
+                value, argv, sleeps = self.call((1, "", f"gh: Server Error (HTTP {status})"), (0, '{"ok": 1}', ""))
+                self.assertEqual(value, {"ok": 1})
+                self.assertEqual(len(argv), 2)
+                self.assertEqual(sleeps, [1])
+
+    def test_the_merge_put_is_retried_with_the_same_arguments(self):
+        value, argv, sleeps = self.call((1, "", "gh: Bad Gateway (HTTP 502)"), (0, '{"merged": true}', ""), method="put")
+        self.assertEqual(value, {"merged": True})
+        self.assertEqual(argv[0], argv[1])
+        self.assertEqual(argv[0][:4], ["gh", "api", "-X", "PUT"])
+        self.assertIn(f"sha={SHA}", argv[0])
+
+    def test_other_statuses_and_a_number_in_a_message_are_not_retried(self):
+        errors = {"not mergeable": "gh: Pull Request is not mergeable (HTTP 405)", "head moved": "gh: Head branch was modified (HTTP 409)",
+                  "validation": "gh: Validation Failed (HTTP 422)", "not found": "gh: Not Found (HTTP 404)", "forbidden": "gh: Forbidden (HTTP 403)",
+                  "no status": "gh: error connecting to api.github.com",
+                  "502 in the message": "gh: PR 502 is not mergeable, 429 files changed, sha 5030a (HTTP 405)"}
+        for why, err in errors.items():
+            for method in ("get", "put"):
+                with self.subTest(why=why, method=method):
+                    value, argv, sleeps = self.call((1, "", err), (0, "{}", ""), method=method)
+                    self.assertIsInstance(value, merge_ready.ApiError)
+                    self.assertEqual((len(argv), sleeps), (1, []))
+
+    def test_a_status_in_the_body_on_stdout_does_not_count_when_gh_reports_another(self):
+        body = '{"message": "Conflict: 502 files", "status": "502"}'
+        value, argv, _ = self.call((1, body, "gh: Conflict (HTTP 409)"), (0, "{}", ""))
+        self.assertIsInstance(value, merge_ready.ApiError)
+        self.assertEqual(len(argv), 1)
+
+    def test_it_gives_up_after_the_retries_and_reports_the_last_error(self):
+        value, argv, sleeps = self.call((1, "", "gh: Service Unavailable (HTTP 503)"))
+        self.assertIsInstance(value, merge_ready.ApiError)
+        self.assertIn("503", str(value))
+        self.assertEqual((len(argv), len(sleeps)), (merge_ready.RETRIES, merge_ready.RETRIES - 1))
+
+
 class GeneralKindTests(unittest.TestCase):
     """Kind `general`: a PR that is not owner-only, merged under the owner's standing authorization (#15 comment 7005366747)."""
 
@@ -887,6 +1066,14 @@ class OwnerBatchTests(unittest.TestCase):
             with self.subTest(name):
                 self.refused(batch_api(**kwargs), r"(not an update-branch merge of main|descend)")
 
+    def test_an_octopus_merge_after_the_approved_sha_is_refused(self):  # R3-01: only a merge with exactly two parents can be an update-branch merge
+        for name, parents in (("main twice", [M1, MAIN1, MAIN2]), ("a third parent that is not main", [M1, MAIN2, C1]), ("one parent", [M1])):
+            with self.subTest(name):
+                calls = []
+                commits = [commit(C1, [BASE0]), commit(M1, [C1, MAIN1], "Merge branch 'main' into x"), commit(M2, parents, "Merge branches into x")]
+                self.refused(batch_api(commits=commits), r"not an update-branch merge of main", merge_tree=fake_merge_tree(calls=calls))
+                self.assertEqual(calls, [(C1, MAIN1)], "the octopus is refused before git is asked about it")
+
     def test_a_merge_whose_tree_is_not_gits_automatic_merge_is_refused(self):  # a moved line, an edit or an extra file in the merge commit
         for name, first, second in (("the head merge", TREE, "e" * 40), ("the first of two merges", "e" * 40, TREE)):
             with self.subTest(name):
@@ -997,6 +1184,13 @@ class MergeTreeGitTests(unittest.TestCase):
         self.git(self.work, "switch", "-q", "pr")
         merge_tree = self.publish(self.c1)
         self.assertIsNone(merge_tree(self.c1, main3))
+
+    def test_a_missing_commit_is_an_error_not_a_conflict(self):  # R3-02: git exits 1 for it too, with nothing on stdout to tell it from a conflict
+        merge_tree = self.publish(self.merge_main())
+        for p1, p2 in (("f" * 40, self.main2), (self.c1, "f" * 40)):
+            with self.subTest(p1=p1[:7], p2=p2[:7]):
+                with self.assertRaisesRegex(merge_ready.MergeCheckError, r"missing commit"):
+                    merge_tree(p1, p2)
 
     def test_fetch_failure_is_an_error_not_a_pass(self):
         merge = self.merge_main()
