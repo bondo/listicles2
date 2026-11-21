@@ -808,8 +808,8 @@ class DiffChecks(GuardsCase):
         self.assertPasses(GOLDEN_UPDATE="1")
 
     def test_many_changed_goldens_do_not_skip_the_label_check(self):
-        """#251: under pipefail `grep -E | grep -q .` died of SIGPIPE when more than one pipe buffer of golden paths changed."""
-        for n in (1, 300):
+        """#251: under pipefail `grep -E | grep -q .` died of SIGPIPE when more than one pipe buffer (64 KiB) of golden paths changed."""
+        for n in (1, 2000):  # more than a pipe buffer, so the old `grep | grep -q` pipe fails under load too (R7-04)
             with self.subTest(goldens=n):
                 for i in range(n):
                     self.repo.write(f"app/src/test/screenshots/{i:04d}_{'x' * 50}.png", "png")
@@ -1973,7 +1973,7 @@ class LineLengthPerTool(DiffCase):
         `line-length` in the `[tool]` table (or at the root) rises 100 to 200, and the nearer config is lowered 300 to 100."""
         pc = "[tool.ruff.lint.pycodestyle]\nmax-line-length = 300\n"
         tool = "[tool]\nblack.line-length = 400\nruff.line-length = %d\n" + pc
-        root = "tool.black.line-length = 400\ntool.ruff.line-length = %d\n"
+        root = "tool.black.line-length = 400\ntool.ruff.line-length = %d\n" + pc
         for width, expect in ((200, True), (100, False)):
             self.assertRaised({
                 "[tool] keys": (
@@ -1985,6 +1985,78 @@ class LineLengthPerTool(DiffCase):
                     {"pyproject.toml": root % width, "scripts/pyproject.toml": self.PP % 100},
                 ),
             }, expect)
+
+    def test_the_own_file_tool_and_fallback_groups_each_catch_a_raise(self):
+        """R7-02: E501 for the root files is 100 at the base and 200 at the head in each case, and only one own group sees it."""
+        bl = "[tool.black]\nline-length = 400\n" + self.PP % 100
+        pc = "[tool.ruff.lint.pycodestyle]\nmax-line-length = %d\n"
+        near = {"scripts/ruff.toml": "line-length = 300\n"}
+        for width, expect in ((200, True), (100, False)):
+            self.assertRaised({
+                "own file group": (
+                    {"pyproject.toml": bl, **near},
+                    {"pyproject.toml": "[tool.black]\nline-length = 400\n" + pc % width, **near},
+                ),
+                "own tool group": (
+                    {"pyproject.toml": bl},
+                    {"pyproject.toml": "[tool.black]\nline-length = 400\n", "ruff.toml": f"[lint.pycodestyle]\nmax-line-length = {width}\n"},
+                ),
+            }, expect)
+        # the deleted-file fallback of the own groups: the 100 variant fails too, because a deleted file is compared with the widest value
+        self.assertRaised({
+            "own deleted-file fallback": ({"pyproject.toml": bl, **near}, {"pyproject.toml": None, "ruff.toml": "line-length = 200\n", **near}),
+        }, True)
+
+    def test_a_dot_ruff_toml_and_extend_select_do_not_hide_the_default(self):
+        """R7-03: `.ruff.toml` is a ruff config that is in use, and only the key `extend` (not `extend-select`) inherits a limit."""
+        ext = '[lint]\nextend-select = ["E501"]\n'
+        self.assertRaised({
+            ".ruff.toml, 60 removed": ({".ruff.toml": "line-length = 60\n"}, {".ruff.toml": '[lint]\nselect = ["E"]\n'}),
+            ".ruff.toml, 100 added": ({".ruff.toml": '[lint]\nselect = ["E"]\n'}, {".ruff.toml": 'line-length = 100\n[lint]\nselect = ["E"]\n'}),
+            "extend-select, 60 removed": ({"ruff.toml": "line-length = 60\n" + ext}, {"ruff.toml": ext}),
+            "extend-select, 100 added": ({"ruff.toml": ext}, {"ruff.toml": "line-length = 100\n" + ext}),
+        }, True)
+
+    def test_other_flake8_named_sections_are_not_flake8s_own_and_a_raise_prints_one_line_per_group(self):
+        """Mutation survivors of round 7 without a finding: `[flake8-x]` is not `[flake8]`; a section group needs no line of its own when the
+        setting group already fails; a value on the line after its key keeps the owner of the key (unparsed input)."""
+        self.assertRaised({
+            "[flake8-x] keeps 60, [flake8] loses it": (
+                {"setup.cfg": "[flake8]\nmax-line-length = 60\n[flake8-x]\nmax-line-length = 60\n"},
+                {"setup.cfg": "[flake8]\nselect = E\n[flake8-x]\nmax-line-length = 60\n"},
+            ),
+            "[tool] ruff value on the next line": (
+                {"pyproject.toml": '[tool]\nruff.line-length =\n    60\nruff.lint.select = ["E501"]\n'},
+                {"pyproject.toml": '[tool]\nruff.lint.select = ["E501"]\n'},
+            ),
+        }, True)
+        isort = "[isort]\nline_length = %d\n"
+        self.assertRaised({
+            "an emptied .flake8 is flake8's default": ({".flake8": "[flake8]\nmax-line-length = 60\n"}, {".flake8": "# nothing\n"}),
+            "tool group alone: isort 100, a new flake8 file 200": (
+                {"setup.cfg": isort % 100},
+                {"setup.cfg": isort % 100, "tox.ini": "[flake8]\nmax-line-length = 200\n"},
+            ),
+            "setting group alone: isort moves to a new section": (
+                {"setup.cfg": isort % 100 + "[flake8]\nmax-line-length = 300\n"},
+                {"setup.cfg": "[tool:isort]\nline_length = 200\n[flake8]\nmax-line-length = 300\n"},
+            ),
+        }, True)
+        self.assertRaised({
+            "a finite section beside `off` is stricter": (
+                {".editorconfig": "[*.md]\nmax_line_length = off\n"},
+                {".editorconfig": "[*.md]\nmax_line_length = off\n[*.kt]\nmax_line_length = 100\n"},
+            ),
+        }, False)
+        self.base_files({".editorconfig": "[*]\nmax_line_length = 100\n"})
+        self.put(".editorconfig", "[*]\nmax_line_length = 100\n[*.kt]\nmax_line_length = 300\n")
+        self.repo.commit()
+        rc, out = self.repo.guards()
+        self.assertEqual(sorted(ln for ln in out.splitlines() if ln.startswith("guard: raised")), [
+            "guard: raised line length: .editorconfig: 100 -> 300",
+            "guard: raised line length: editorconfig maxlinelength: 100 -> 300",
+            "guard: raised line length: editorconfig: 100 -> 300",
+        ], out)
 
     def test_the_own_groups_keep_the_spelling_and_the_finite_bound(self):
         """Mutation survivors of round 6: the `-`/`_` normalisation and the finite base bound of the own groups each decide a case."""
