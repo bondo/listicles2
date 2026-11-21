@@ -16,7 +16,7 @@ PUSH = "git push --force origin work"
 GIT = "/usr/bin/git"
 
 
-class Round1(unittest.TestCase):
+class Base(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.d = repo()
@@ -39,6 +39,8 @@ class Round1(unittest.TestCase):
             with self.subTest(c=c):
                 self.assertEqual(self.bash(c, d=d), 0)
 
+
+class Round1(Base):
     def test_r1_01_a_name_plus_equals_word_after_a_wrapper_other_than_env_is_the_program(self):
         self.deny([f"{w} FOO+={GIT} push --force origin work" for w in ("nice", "timeout 5", "command", "exec", "xargs", "nohup", "stdbuf -oL", "setsid")])
         self.deny([f'nice "FOO+={GIT}" push --force origin work', f'time "FOO+={GIT}" push --force origin work',
