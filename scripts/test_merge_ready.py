@@ -750,8 +750,10 @@ class WiringTests(unittest.TestCase):
 
     R7_RISK = (r"also owner-only for `general`: kotlin outside `dev/listicles/` and `dk/bjarkebjarke/tally/`, a `testing/` package under either root "
                r"outside `core/testing`, kotest `projectconfig` and "
-               r"`packageconfig` classes, every `lint\.xml` and `lint-baseline\.xml`, `res/xml/` and `docs/collaborating\.md`\. `docs/tasks\.toml` merges as "
-               r"`general` only when the diff changes nothing but the `status` and `pr` fields of agent tasks \(owner decision, #15 comment 7059534826\)\. "
+               r"`packageconfig` classes, every `lint\.xml` and `lint-baseline\.xml`, `res/xml/` and its qualified forms such as `res/xml-v31/`, a values alias "
+               r"of an xml resource, and `docs/collaborating\.md`\. `docs/tasks\.toml` merges as `general` only when the diff changes nothing but the "
+               r"`status` and `pr` lines of agent tasks and a status changes only from todo to done "
+               r"\(owner decision, #15 comments 7059534826 and 7062026912\)\. "
                r"residual risk: a path list cannot stop every test-weakening change inside source directories, so the pr reviewer stays the main defence")
 
     def test_docs_record_the_r7_rules_and_the_residual_risk(self):
