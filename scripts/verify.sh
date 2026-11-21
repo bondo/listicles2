@@ -43,6 +43,7 @@ else
   step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py
 fi
 step pit-config-tests python3 -I scripts/test_check_pit_config.py
+step pit-config python3 -I scripts/check_pit_config.py
 step tasks-tests python3 -I scripts/test_tasks.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
@@ -82,6 +83,7 @@ step lint gradle :app:lintDebug
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test
   step coverage gradle koverVerify
+  step mutation gradle :core:domain:pitest
 else
   echo "skip  unit-tests, coverage (--fast)"; SKIPPED=1
 fi
