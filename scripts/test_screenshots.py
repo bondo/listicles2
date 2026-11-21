@@ -177,5 +177,98 @@ class Wiring(unittest.TestCase):
         self.assertEqual(got, ["ci.yml tasks job has no step running: python3 -I scripts/test_screenshots.py"])
 
 
+PNG = b"\x89PNG\r\n\x1a\n"
+
+
+class Goldens(unittest.TestCase):
+    """The golden set: light and dark x en and da, plus the one 200 % font-scale Danish light golden (Q3 A, #15 comment 7058176190)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.dir = self.root / c.GOLDEN_DIR
+        self.dir.mkdir(parents=True)
+        for i, name in enumerate(c.GOLDENS):
+            (self.dir / name).write_bytes(PNG + bytes([i]))
+
+    def test_the_repository_goldens_are_complete(self):
+        self.assertEqual(c.golden_problems(ROOT), [])
+
+    def test_the_expected_set_is_light_and_dark_in_both_languages_plus_one_font_scale_golden(self):
+        self.assertEqual(
+            sorted(c.GOLDENS),
+            sorted(f"TallyApp_{lang}_{mode}.png" for lang in ("en", "da") for mode in ("light", "dark")) + ["TallyApp_da_light_font200.png"],
+        )
+
+    def test_a_complete_synthetic_set_has_no_problems(self):
+        self.assertEqual(c.golden_problems(self.root), [])
+
+    def test_a_missing_golden_is_reported(self):
+        (self.dir / "TallyApp_da_dark.png").unlink()
+        self.assertEqual(c.golden_problems(self.root), [f"missing golden {c.GOLDEN_DIR}/TallyApp_da_dark.png"])
+
+    def test_an_unexpected_png_is_reported(self):
+        (self.dir / "TallyApp_fr_light.png").write_bytes(PNG + b"x")
+        self.assertEqual(c.golden_problems(self.root), [f"unexpected file {c.GOLDEN_DIR}/TallyApp_fr_light.png"])
+
+    def test_a_compare_or_actual_image_left_in_the_golden_directory_is_reported(self):
+        (self.dir / "TallyApp_en_light_compare.png").write_bytes(PNG + b"x")
+        self.assertEqual(c.golden_problems(self.root), [f"unexpected file {c.GOLDEN_DIR}/TallyApp_en_light_compare.png"])
+
+    def test_a_file_that_is_not_a_png_is_reported(self):
+        (self.dir / "TallyApp_en_dark.png").write_bytes(b"not a png")
+        self.assertEqual(c.golden_problems(self.root), [f"{c.GOLDEN_DIR}/TallyApp_en_dark.png is not a PNG"])
+
+    def test_a_golden_over_300_kb_is_reported(self):
+        (self.dir / "TallyApp_en_dark.png").write_bytes(PNG + bytes(300 * 1024))
+        self.assertEqual(c.golden_problems(self.root), [f"{c.GOLDEN_DIR}/TallyApp_en_dark.png is over 300 KB"])
+
+    def test_two_identical_goldens_are_reported_because_a_variant_did_not_take_effect(self):
+        (self.dir / "TallyApp_en_dark.png").write_bytes(PNG + bytes([0]))
+        self.assertEqual(c.golden_problems(self.root), [f"{c.GOLDEN_DIR}/TallyApp_en_dark.png and TallyApp_en_light.png are identical"])
+
+
+class Build(unittest.TestCase):
+    """The Gradle and test-source side: plugin applied, exact comparison (changeThreshold 0), no tolerance anywhere."""
+
+    FILES = ("app/build.gradle.kts", "app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt", "gradle/libs.versions.toml")
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        for name in self.FILES:
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / name, self.root / name)
+
+    def mutated(self, name, old, new):
+        path = self.root / name
+        text = path.read_text()
+        self.assertIn(old, text, f"{name} no longer contains {old!r}: update the test")
+        path.write_text(text.replace(old, new, 1))
+        return c.build_problems(self.root)
+
+    def test_the_repository_build_is_set_up(self):
+        self.assertEqual(c.build_problems(ROOT), [])
+
+    def test_the_roborazzi_plugin_must_be_applied_to_app(self):
+        got = self.mutated("app/build.gradle.kts", "alias(libs.plugins.roborazzi)", "")
+        self.assertEqual(got, ["app/build.gradle.kts does not apply the Roborazzi plugin"])
+
+    def test_the_plugin_must_be_in_the_version_catalog(self):
+        got = self.mutated("gradle/libs.versions.toml", "roborazzi = { id =", "roborazziX = { id =")
+        self.assertIn("libs.versions.toml has no roborazzi plugin", got)
+
+    def test_the_comparison_must_be_exact(self):
+        got = self.mutated("app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt", "changeThreshold = 0f", "changeThreshold = 0.01f")
+        self.assertEqual(got, ["ScreenshotOptions.kt must set changeThreshold = 0f, the only value allowed"])
+
+    def test_a_tolerance_in_any_other_test_source_is_reported(self):
+        other = self.root / "app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt"
+        other.write_text("val o = CompareOptions(changeThreshold = 0.5f)\n")
+        self.assertEqual(c.build_problems(self.root), ["app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt sets a changeThreshold"])
+
+
 if __name__ == "__main__":
     unittest.main()
