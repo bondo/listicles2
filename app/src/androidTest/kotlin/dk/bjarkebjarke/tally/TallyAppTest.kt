@@ -1,15 +1,27 @@
 package dk.bjarkebjarke.tally
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.tryPerformAccessibilityChecks
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,11 +31,19 @@ class TallyAppTest {
     @get:Rule
     val compose = createComposeRule()
 
+    /** P15: ATF checks (touch target size, contrast, labels) run before every action of every test in this class. */
+    @Before
+    fun enableChecks() {
+        compose.enableAccessibilityChecks()
+    }
+
     @Test
     fun showsWelcomeText() {
         val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
         compose.setContent { TallyApp() }
         compose.onNodeWithText(welcome).assertExists()
+        // Assertions run no accessibility check; only actions do, so run them on the whole screen (R1-03).
+        compose.onAllNodes(isRoot()).tryPerformAccessibilityChecks()
     }
 
     @Test
@@ -31,6 +51,8 @@ class TallyAppTest {
         val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
         compose.setContent { TallyApp(darkTheme = true) }
         compose.onNodeWithText(welcome).assertExists()
+        // Assertions run no accessibility check; only actions do, so run them on the whole screen (R1-03).
+        compose.onAllNodes(isRoot()).tryPerformAccessibilityChecks()
     }
 
     /** R9-09: unlike the text assertions above, this fails if the dark flag does not reach the rendered pixels. */
@@ -48,6 +70,21 @@ class TallyAppTest {
         assertTrue("light background luminance $lightLuminance should be above 0.8", lightLuminance > LIGHT_MIN)
     }
 
+    /** M1-03: proves the checks are live: a tiny unlabelled click target must fail, not pass silently. */
+    @Test
+    fun accessibilityChecksRejectATinyUnlabelledClickTarget() {
+        compose.setContent {
+            Box(Modifier.size(TINY_DP.dp).testTag(TAG).clickable { })
+        }
+        val failure = runCatching { compose.onNodeWithTag(TAG).performClick() }.exceptionOrNull()
+        // Not any exception (a missing node or a failed input injection would also pass): it must be the ATF failure.
+        val causes = generateSequence(failure) { it.cause }.map { it.javaClass.simpleName }.toList()
+        assertTrue(
+            "performClick on a tiny unlabelled target must fail an accessibility check, but threw $causes",
+            "AccessibilityViewCheckException" in causes,
+        )
+    }
+
     private fun backgroundLuminance(): Float {
         val pixels = compose.onRoot().captureToImage().toPixelMap()
         // The corner is Scaffold background, away from the centered text.
@@ -55,6 +92,8 @@ class TallyAppTest {
     }
 
     private companion object {
+        const val TAG = "tiny-target"
+        const val TINY_DP = 8
         const val CORNER_PX = 2
         const val DARK_MAX = 0.2f
         const val LIGHT_MIN = 0.8f

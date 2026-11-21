@@ -406,8 +406,11 @@ enforce the rules rather than goodwill.
      Jest rules tests + Kotlin data-layer integration tests
    * `ui`: Compose UI tests on an API 34 emulator against the Firebase emulator,
      with accessibility checks turned on (`enableAccessibilityChecks`: touch target
-     size, contrast, content descriptions). Roborazzi screenshot tests (JVM) in
-     light/dark × en/da.
+     size, contrast, content descriptions).
+   * `screenshots` (`scripts/screenshots.sh verify`, M1-03): Roborazzi screenshot tests (JVM), exact-match goldens in
+     light/dark × en/da plus one 200 % font-scale Danish light golden per screen; a failing run uploads the diffs as the
+     `screenshot-diffs` artifact. Its own job because the artifact step needs `if: failure()`, which the required jobs
+     that `scripts/test_ci_scope.py` guards may not have
    * `guards` (`scripts/guards.sh`) fails on:
      * `@Ignore`, `@Disabled`, `xit`, `.only`
      * `@Suppress`, `tools:ignore`, `ktlint-disable`, `detekt:` suppressions, or
@@ -436,8 +439,8 @@ enforce the rules rather than goodwill.
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
    trusted on their own; the review is the reviewer rounds and the merge under the owner's authorization.
-6. **Branch protection** on `main`: PR required, all 10 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
-   `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
+6. **Branch protection** on `main`: PR required, all 11 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
+   `screenshots`, `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never

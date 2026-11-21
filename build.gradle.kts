@@ -25,6 +25,7 @@ plugins {
     alias(libs.plugins.spotless)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee) apply false
+    alias(libs.plugins.roborazzi) apply false
 }
 
 spotless {
