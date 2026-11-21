@@ -4,15 +4,14 @@ PIT with kotest-pitest runs on core/domain with a mutation score floor of 80 (ow
 The checker reads the build files, so a removed plugin, a lowered or commented-out threshold, or a dropped verify.sh step fails.
 """
 
-import importlib.util
 import os
+import runpy
+import types
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
-_spec = importlib.util.spec_from_file_location("check_pit_config", os.path.join(HERE, "check_pit_config.py"))
-c = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(c)
+c = types.SimpleNamespace(**runpy.run_path(os.path.join(HERE, "check_pit_config.py")))
 
 
 def read(*parts):
@@ -22,7 +21,8 @@ def read(*parts):
 
 GOOD_DOMAIN = (
     "plugins {\n    alias(libs.plugins.pitest)\n}\n"
-    "pitest {\n    pitestVersion.set(libs.versions.pitest.get())\n    junit5PluginVersion.set(\"1.2.3\")\n    avoidCallsTo.set(setOf(\"kotlin.jvm.internal.Intrinsics\"))\n"
+    "pitest {\n    pitestVersion.set(libs.versions.pitest.get())\n    junit5PluginVersion.set(\"1.2.3\")\n"
+    "    avoidCallsTo.set(setOf(\"kotlin.jvm.internal.Intrinsics\"))\n"
     '    targetClasses.set(listOf("dk.bjarkebjarke.tally.domain.*"))\n    mutationThreshold.set(80)\n}\n'
 )
 GOOD_ROOT = "tasks.named(\"koverVerify\") { dependsOn(\":core:domain:pitest\") }\n"
