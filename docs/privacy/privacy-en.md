@@ -1,5 +1,7 @@
 # Privacy in Tally
 
+Status: working draft 2026-11-21; not owner-approved (see issue #15)
+
 > **Draft for the owner to approve (task M1-O5, OQ-30).** Not approved, not legal advice, and not a claim that the
 > app meets any law. Text in `[square brackets]` is a placeholder the owner fills in. The Danish text is
 > `privacy-da.md`; both have the same sections.

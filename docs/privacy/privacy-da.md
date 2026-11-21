@@ -1,5 +1,7 @@
 # Privatliv i Tally
 
+Status: working draft 2026-11-21; not owner-approved (see issue #15)
+
 > **Udkast, som ejeren skal godkende (opgave M1-O5, OQ-30).** Ikke godkendt, ikke juridisk rådgivning og ingen
 > påstand om, at appen overholder nogen lov. Tekst i `[firkantede parenteser]` er pladsholdere, som ejeren udfylder.
 > Den engelske tekst er `privacy-en.md`; de har de samme afsnit.
