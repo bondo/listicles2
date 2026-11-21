@@ -5,7 +5,8 @@
     diffs when a step failed (a pinned actions/upload-artifact step after the gate), and the gate step cannot be allowed
     to fail. It is its own job because test_ci_scope.py forbids `if:` in the jobs that are required checks.
   * the golden set under app/src/test/screenshots is exactly light and dark x en and da plus the 200 % font-scale Danish
-    light golden (valid, small, all different), and the Roborazzi build setup compares exactly (no colour distance, shift or changed-pixel tolerance, anywhere).
+    light golden (valid, small, all different), and the Roborazzi build setup compares exactly (no colour distance, shift or changed-pixel tolerance, anywhere),
+    and every Compose UI test in androidTest turns the ATF accessibility checks on and none turns them off (P15).
 Run: python3 -I scripts/check_screenshots.py  (exit 1 and one line per problem).
 """
 
@@ -118,8 +119,22 @@ def build_problems(root):
     return problems
 
 
+def accessibility_problems(root):
+    root = Path(root)
+    problems = []
+    if "androidTestImplementation(libs.compose.ui.test.junit4.accessibility)" not in (root / "app/build.gradle.kts").read_text():
+        problems.append("app/build.gradle.kts does not add compose.ui.test.junit4.accessibility to androidTestImplementation")
+    for source in sorted(root.glob("**/src/androidTest/**/*.kt")):
+        text, name = source.read_text(), source.relative_to(root)
+        if re.search(r"createComposeRule|createAndroidComposeRule", text) and "enableAccessibilityChecks()" not in text:
+            problems.append(f"{name} uses a Compose test rule but never calls enableAccessibilityChecks()")
+        if "disableAccessibilityChecks" in text:
+            problems.append(f"{name} calls disableAccessibilityChecks()")
+    return problems
+
+
 def main():
-    problems = wiring_problems(ROOT) + golden_problems(ROOT) + build_problems(ROOT)
+    problems = wiring_problems(ROOT) + golden_problems(ROOT) + build_problems(ROOT) + accessibility_problems(ROOT)
     for p in problems:
         print(f"check_screenshots: {p}")
     return 1 if problems else 0

@@ -285,5 +285,48 @@ class Build(unittest.TestCase):
                 self.assertEqual(c.build_problems(self.root), ["app/src/test/kotlin/dk/bjarkebjarke/tally/OtherTest.kt sets a comparison tolerance"])
 
 
+class Accessibility(unittest.TestCase):
+    """Every Compose UI test in androidTest runs with ATF accessibility checks on (P15); a test that turns them off is reported."""
+
+    TEST = "app/src/androidTest/kotlin/dev/listicles/app/ListiclesAppTest.kt"
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        for name in (self.TEST, "app/build.gradle.kts"):
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / name, self.root / name)
+
+    def mutated(self, name, old, new):
+        path = self.root / name
+        text = path.read_text()
+        self.assertIn(old, text, f"{name} no longer contains {old!r}: update the test")
+        path.write_text(text.replace(old, new))
+        return c.accessibility_problems(self.root)
+
+    def test_the_repository_ui_tests_run_with_accessibility_checks(self):
+        self.assertEqual(c.accessibility_problems(ROOT), [])
+
+    def test_a_compose_ui_test_without_the_checks_is_reported(self):
+        got = self.mutated(self.TEST, "enableAccessibilityChecks()", "doNothing()")
+        self.assertEqual(got, [f"{self.TEST} uses a Compose test rule but never calls enableAccessibilityChecks()"])
+
+    def test_a_new_compose_ui_test_file_without_the_checks_is_reported(self):
+        extra = self.root / "app/src/androidTest/kotlin/NewScreenTest.kt"
+        extra.write_text("class NewScreenTest { val rule = createAndroidComposeRule<ComponentActivity>() }\n")
+        want = "app/src/androidTest/kotlin/NewScreenTest.kt uses a Compose test rule but never calls enableAccessibilityChecks()"
+        self.assertEqual(c.accessibility_problems(self.root), [want])
+
+    def test_turning_the_checks_off_is_reported(self):
+        extra = self.root / "app/src/androidTest/kotlin/OffTest.kt"
+        extra.write_text("fun off() { rule.enableAccessibilityChecks(); rule.disableAccessibilityChecks() }\n")
+        self.assertEqual(c.accessibility_problems(self.root), ["app/src/androidTest/kotlin/OffTest.kt calls disableAccessibilityChecks()"])
+
+    def test_the_accessibility_test_library_must_be_on_the_android_test_classpath(self):
+        got = self.mutated("app/build.gradle.kts", "androidTestImplementation(libs.compose.ui.test.junit4.accessibility)", "")
+        self.assertEqual(got, ["app/build.gradle.kts does not add compose.ui.test.junit4.accessibility to androidTestImplementation"])
+
+
 if __name__ == "__main__":
     unittest.main()
