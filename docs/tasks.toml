@@ -901,8 +901,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-10"]
-notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write"
+depends_on = ["M1-10", "M1-O12"]
+notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write. Starts after the owner decides #280 (M1-O12; R1-A-04 of PR #265, #15 comment 7064886556): implement the Query invites row as decided, and this PR writes the decision into PLAN 3.1"
 
 [[task]]
 id = "M1-30"
@@ -979,7 +979,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-54", "M1-14", "M1-30", "M1-02"]
-notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name)"
+notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
 id = "M1-31"
@@ -989,7 +989,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-11", "M1-18"]
-notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name)"
+notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name). P6: a plain member's self-heal under a tombstone deletes their own member doc before the clear, test incl. a crash between the two (PLAN 3.1)"
 
 [[task]]
 id = "M1-19"
@@ -1171,11 +1171,12 @@ notes = "Issue 257. Tooling env where it touches guards; failing fixtures first"
 id = "M1-35"
 title = "PLAN amendments from the follow-up triage (P1-P9 rules and users name, quota risk, PIT 80, ui job, layout nits)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "planner"
 risk = "high"
 depends_on = ["M1-01"]
 notes = "Docs only, area:security-rules; before M1-08. Issues #200, #203, #204 (PLAN 3.3), #206, #210 (items 1-3, 5, 6), #242, #243, #250, #253, #254, #260 (items 2-5) and #205 item 5 (docs/milestones/M1.md sections 5.1 and 8)"
+pr = 265
 
 [[task]]
 id = "M1-36"
@@ -1431,6 +1432,16 @@ risk = "normal"
 depends_on = ["M1-29"]
 notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task, a further deferral included (record it on #15); a rename becomes a new owner task. Follow-on edits: docs/product/naming.md"
 
+[[task]]
+id = "M1-O12"
+title = "Decide #280 (who may list invites) before M1-12 starts"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU)"
+
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
 [[task]]
@@ -1441,7 +1452,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
 
 [[task]]
 id = "M2-FU"
