@@ -76,9 +76,9 @@ kover {
                 // Same exclusions as app/build.gradle.kts (the aggregate report does not inherit them).
                 annotatedBy("androidx.compose.runtime.Composable", "androidx.compose.ui.tooling.preview.Preview")
                 classes(
-                    "dev.listicles.app.MainActivity",
-                    "dev.listicles.app.R",
-                    "dev.listicles.app.R$*",
+                    "dk.bjarkebjarke.tally.MainActivity",
+                    "dk.bjarkebjarke.tally.R",
+                    "dk.bjarkebjarke.tally.R$*",
                     "*ComposableSingletons*",
                 )
             }
@@ -311,8 +311,8 @@ subprojects {
     tasks.withType<Test>().configureEach {
         jvmArgs(
             "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-            "-Djava.nio.channels.spi.SelectorProvider=dev.listicles.testing.BlockingSelectorProvider",
-            "-Djava.nio.channels.spi.AsynchronousChannelProvider=dev.listicles.testing.BlockingAsynchronousChannelProvider",
+            "-Djava.nio.channels.spi.SelectorProvider=dk.bjarkebjarke.tally.testing.BlockingSelectorProvider",
+            "-Djava.nio.channels.spi.AsynchronousChannelProvider=dk.bjarkebjarke.tally.testing.BlockingAsynchronousChannelProvider",
         )
     }
 }
