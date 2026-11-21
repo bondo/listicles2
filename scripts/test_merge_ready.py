@@ -492,7 +492,7 @@ class GeneralKindTests(unittest.TestCase):
     ALLOWED = ("app/src/main/kotlin/dev/listicles/app/Lists.kt", "app/src/main/res/values/strings.xml", "app/src/main/res/values-da/strings.xml",
                "app/src/test/kotlin/dev/listicles/app/ListsTest.kt", "app/src/androidTest/kotlin/dev/listicles/app/ListsUiTest.kt",
                "core/domain/src/main/kotlin/dev/listicles/domain/Lists.kt", "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt",
-               "app/src/main/kotlin/dk/bjarkebjarke/tally/Lists.kt", "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsTest.kt",  # after M1-29 renames the packages
+               "app/src/main/kotlin/dk/bjarkebjarke/tally/Lists.kt", "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsTest.kt",  # after M1-29
                "core/domain/src/main/kotlin/dk/bjarkebjarke/tally/domain/Lists.kt",
                "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/domain/ListsTest.kt",
                "docs/PLAN.md", "docs/milestones/M1.md", "docs/adr/0002-x.md", "docs/metrics/m0-backfill.txt", "README.md")
