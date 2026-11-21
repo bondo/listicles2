@@ -123,6 +123,11 @@ class Round3(Base):
         self.deny(["echo x >> $1.git/config", "touch $1.git/hooks/pre-commit", "cp /tmp/x $@.git/hooks/pre-push", r"echo x > $(: \)).git/config"])
         self.allow([r"rm $(: \))notes.md", "rm $1notes.md"])
 
+    def test_the_field_rules_of_the_splitter_lead_trail_and_empty_values(self):
+        self.deny(['P="x "; git commit -m $P-n'])  # a trailing blank ends the word: the literal -n is a flag of its own
+        self.allow(['P=" -n"; git commit -m $P', 'P="-m "; git commit $P -n', 'E=""; git commit -m $E -n', "export IFS=_; P=a; git status $P",
+                    'P="--force origin"; git push "$P"$Q work'])  # a quoted $P in a mixed word stays one word
+
     def test_r3_07_only_the_expanded_text_splits_and_it_joins_the_literal_text_next_to_it(self):
         self.deny(['A=" --no-verify"; git commit -m "a -- b"$A', 'A=" --force"; git push -o "x -- y"$A origin work'])
         self.allow(['A=y; git commit -m "a -- b"$A', 'A=" y"; git commit -m "a -- b"$A', 'A="b c"; git commit -m a$A'])

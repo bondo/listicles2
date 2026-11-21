@@ -198,7 +198,7 @@ def protection(path, cwd):
         while (nb := re.sub(r"\$\{[^{}]*\}|\$\([^()]*\)|`[^`]*`", "", bare)) != bare:
             bare = nb
         bare = re.sub(r"\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]", "", bare)  # R3-05: special parameters are empty in the Bash tool's shell
-        kinds = {_suffix_kind(path), _suffix_kind(bare), _suffix_kind(re.split(r"[)}'\"\\`]", path)[-1]), "process" if re.search(r"\$[({]", bare) else None}
+        kinds = {_suffix_kind(path), _suffix_kind(bare), _suffix_kind(re.split(r"[)}'\"\\`]", path)[-1])}
         return "always" if "always" in kinds else "process" if "process" in kinds else None
     abs_ = os.path.normpath(os.path.join(cwd, path))
     if HOME_GIT.search(os.path.realpath(abs_)):
@@ -368,14 +368,15 @@ class Word(str):
     glob = False  # the word has an unquoted { } * ? [ ~ @ + ! that the shell expands after the guard has read it
     asg = None  # the text up to its first = is unquoted, so bash takes the word as an assignment (None: not from lex)
     ud = False  # the word has an unquoted $, so bash splits what it expands to on blanks
-    qd = frozenset()  # offsets of the $ that sit in quoted or escaped text
+    qd: frozenset[int] = frozenset()  # offsets of the $ that sit in quoted or escaped text
 
 
 def lex(src):
     """Split a shell command string into simple commands. Raises ValueError when it cannot be parsed."""
     cmds, cur = [], Cmd()
     word, in_word, quoted, pending, ug = [], False, False, None, False
-    qs, ud, qd = None, False, set()  # where the first quoted character sits in the word; an unquoted $ was seen; offsets of quoted $
+    qs, ud = None, False  # where the first quoted character sits in the word; an unquoted $ was seen
+    qd: set[int] = set()  # offsets of the $ in quoted text
     heredocs = []
     i, n = 0, len(src)
 
