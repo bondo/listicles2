@@ -110,6 +110,15 @@ class Negative(unittest.TestCase):
                 self.assertNotEqual(shrunk, GOOD_DOMAIN)
                 self.assertTrue(self.check(domain=shrunk))
 
+    def test_second_mutators_or_threshold_assignment_is_refused(self):
+        # R3-01: Gradle's Property.set keeps the last value, so a later assignment would override the pinned one unseen.
+        shrunk = '    mutators.set(listOf("CONDITIONALS_BOUNDARY"))\n'
+        lowered = "    mutationThreshold.set(10)\n"
+        for name, bad in (("mutators", GOOD_MUTATORS + shrunk), ("threshold", "    mutationThreshold.set(80)\n" + lowered)):
+            with self.subTest(name=name):
+                good = GOOD_MUTATORS if name == "mutators" else "    mutationThreshold.set(80)\n"
+                self.assertTrue(self.check(domain=GOOD_DOMAIN.replace(good, bad)))
+
     def test_only_two_conditionals_fails(self):
         two = GOOD_DOMAIN.replace(GOOD_MUTATORS, '    mutators.set(listOf("CONDITIONALS_BOUNDARY", "NEGATE_CONDITIONALS"))\n')
         self.assertTrue(self.check(domain=two))
