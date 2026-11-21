@@ -796,7 +796,7 @@ notes = "Tooling env, owner merge (.github is protected); widened from the known
 id = "M1-03"
 title = "Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff artifact, ATF and enableAccessibilityChecks (P14, P15)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
@@ -1080,10 +1080,11 @@ depends_on = ["M1-08", "M1-30"]
 id = "M1-28"
 title = "Privacy text draft in English and Danish (OQ-30)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M1-01"]
+pr = 286
 
 [[task]]
 id = "M1-33"
@@ -1443,6 +1444,16 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M1-29"]
 notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task, a further deferral included (record it on #15); a rename becomes a new owner task. Follow-on edits: docs/product/naming.md"
+
+[[task]]
+id = "M1-O11"
+title = "Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as required)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-03"]
+notes = "M1-03 runs the Roborazzi verify in its own CI job `screenshots`, not in `unit`, because test_ci_scope.py forbids `if:` in the jobs it guards and the diff artifact upload needs `if: failure()`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 11. Do it right after the M1-03 PR merges, in the same sitting (BRANCH-PROTECTION.md section 6): a required check that no open PR has yet reports `Expected, waiting for status` on every other PR until it takes main in, so adding it earlier stalls them. Until then no ruleset rule requires `screenshots`, so the M1-03 merge must confirm by hand that the screenshots job is green on the head"
 
 [[task]]
 id = "M1-O12"

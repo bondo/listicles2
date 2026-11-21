@@ -97,8 +97,8 @@ def job(text, name):
 
 
 REQUIRED_CHECKS = (
-    "wrapper", "static", "unit", "firebase", "ui", "guards", "secrets", "tasks", "python-lint", "workflow-lint",
-)  # the ruleset on main requires these ten (docs/BRANCH-PROTECTION.md section 2, kept in sync per section 6; issue 184)
+    "wrapper", "static", "unit", "firebase", "ui", "screenshots", "guards", "secrets", "tasks", "python-lint", "workflow-lint",
+)  # kept in sync with the ruleset on main (docs/BRANCH-PROTECTION.md sections 2 and 6; issue 184)
 
 
 def documented_checks(text):
