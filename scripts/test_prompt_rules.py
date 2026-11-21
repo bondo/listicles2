@@ -1873,6 +1873,95 @@ class NoResolveThreadTests(unittest.TestCase):
         self.assertTrue({"docs/ORCHESTRATION.md", "docs/COLLABORATING.md"} <= {r.path for r in prompt_rules.DOC_RULES})
 
 
+class ResolveThreadSentenceTests(unittest.TestCase):
+    """#153 (R3-01 to R3-04 of #150): the resolve-thread permission check works per sentence. A negating word anywhere earlier in the
+    sentence (not only one word back) makes it a ban; a verb other than "reply" before "and resolve", a pronoun object, the tool name,
+    "mark as resolved" and "close the conversation" count as permission when nothing negates them."""
+
+    PERMISSION_IDS = {"no-resolve-thread", "orch-no-resolve-thread", "collab-no-resolve"}
+    WHERE = (*ROLES, "docs/ORCHESTRATION.md", "docs/COLLABORATING.md")
+
+    # R3-01: any verb before "and resolve", and "it"/"them" as the object.
+    PERMISSION = (
+        "Answer each with one line on its thread and resolve it.",
+        "Post one line on each thread, then resolve them.",
+        "Answer the question and resolve the thread.",
+        "Once the thread is answered, resolve it.",
+        # R3-02: the tool name, "mark as resolved", "close the conversation".
+        "Use `mcp__github__resolve_review_thread` once you have replied.",
+        "Call resolve_review_thread when the question is answered.",
+        "Mark the thread as resolved after replying.",
+        "Agents may mark conversations as resolved.",
+        "Close the conversation once it is answered.",
+        "You can close the thread when the collaborator is satisfied.",
+        "The orchestrator closes the conversation after replying.",
+        # a negation that belongs to another clause or sentence does not turn a permission into a ban
+        "If the question is not answered, you may resolve the thread.",
+        "Agents must not wait; you may resolve the thread.",
+        "Do not wait, but you may resolve the thread.",
+        "Never merge. Resolve the thread after answering.",
+        "Do not guess. You may resolve it when the thread is answered.",
+    )
+    BAN = (
+        # R3-03: a comma clause between the negation and the verb
+        "Agents must never, not even with the API, resolve a thread.",
+        "Never, not even via the tool, resolve the thread yourself.",
+        "Agents must never, even when asked, resolve a conversation.",
+        # R3-04: the negation is more than one word before the subject
+        "No orchestrator or implementer may resolve the thread.",
+        "Not even the orchestrator may resolve a collaborator's thread.",
+        "Not even the orchestrator or the reviewer resolves a thread.",
+        "Neither the orchestrator nor the reviewer nor the planner may resolve the conversation.",
+        # the new wordings, negated
+        "Never call `mcp__github__resolve_review_thread`.",
+        "Never resolve a thread, not even with `mcp__github__resolve_review_thread`: reply and leave it.",
+        "Do not mark the thread as resolved.",
+        "Do not answer and resolve it on the thread.",
+        "Only the owner closes the conversation.",
+        "Agents never close a collaborator's conversation.",
+        "Leave the thread for the collaborator; do not resolve it.",
+        # not about an agent resolving a thread at all
+        "The owner marks the thread as resolved when done.",
+        "The collaborator, who resolves the thread, is told.",
+        "Close the issue when the PR has merged.",
+        "Mark the finding as resolved in the findings file.",
+        "The tool is named resolve_review_thread in the GitHub server.",
+    )
+
+    def flagged(self, where, text):
+        if where in ROLES:
+            return ids(prompt_rules.check_text(where, text))
+        return ids(prompt_rules.check_doc_text(where, text))
+
+    def base(self, where):
+        return real(where) if where in ROLES else (ROOT / where).read_text(encoding="utf-8")
+
+    def test_the_real_prompts_and_docs_still_pass(self):
+        for where in self.WHERE:
+            with self.subTest(where=where):
+                self.assertFalse(self.PERMISSION_IDS & self.flagged(where, self.base(where)))
+
+    def test_permission_wording_is_rejected_everywhere(self):
+        for stale in self.PERMISSION:
+            for where in self.WHERE:
+                with self.subTest(where=where, stale=stale):
+                    self.assertTrue(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n\n" + stale + "\n"))
+
+    def test_negated_and_unrelated_wording_is_not_rejected_anywhere(self):
+        for good in self.BAN:
+            for where in self.WHERE:
+                with self.subTest(where=where, good=good):
+                    self.assertFalse(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n\n" + good + "\n"))
+
+    def test_a_hard_wrapped_sentence_is_one_sentence(self):
+        wrapped = "Agents must never,\nnot even with the API,\nresolve a thread.\n"
+        loose = "Agents may\nresolve a thread.\n"
+        for where in self.WHERE:
+            with self.subTest(where=where):
+                self.assertFalse(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n" + wrapped))
+                self.assertTrue(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n" + loose))
+
+
 class Issue134ReviewerEffortTests(unittest.TestCase):
     """#134 (owner decision, comment 6989468926): a reviewer of an area:security-rules or area:sync-merge PR runs at max effort even
     without risk:high, as docs/reviews/README.md R7 says. The reviewer prompt must say so, in step with agents/roles.yaml."""
