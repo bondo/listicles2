@@ -1,6 +1,6 @@
 # Single source of truth for agent roles (PLAN section 9.1). Changed only through a reviewed PR,
 # and only by the metrics retro (9.4) or the owner. Agent Usage Redesign (rev 46): roles that judge or write code run on
-# a strong model at high effort; there are no per-session token budgets (spend is reported per PR class and milestone).
+# a strong model at high effort (`implementer-sonnet` is the owner's exception, decision 7032210967 on #15); there are no per-session token budgets (spend is reported per PR class and milestone).
 # `max_effort_when` lists the cases that raise effort to max; an agent may ask for more in its WORKER-RESULT and the
 # orchestrator decides within this file. Agents must not escalate on their own judgment.
 # Roles without a `prompt` have none yet (retro): its prompt follows in a later redesign PR.
@@ -15,13 +15,37 @@ roles:
     effort: high
     session: fresh, once per milestone
     prompt: agents/prompts/planner.md
+  # The implementer split (owner decision 7032210967 on #15, supersedes 7031987942): the orchestrator picks the profile per task
+  # from `use_when` and says which in the spawn message. Running implementer sessions keep their model.
   implementer:
     model: opus
     effort: high
     session: fresh, one per PR, kept across review rounds
     prompt: agents/prompts/implementer.md
+    use_when:
+      - spikes
+      - design or architecture tasks
+      - risk:high tasks
+      - Firestore security rules
+      - sync and merge logic
+      - guard, hook and command-parsing tooling
+      - a new implementer for a PR that already had 3 or more review rounds
     max_effort_when:
       - the PR is tagged risk:high in the milestone doc
+  implementer-sonnet:
+    model: sonnet
+    effort: medium
+    session: fresh, one per PR, kept across review rounds
+    prompt: agents/prompts/implementer.md
+    use_when:
+      - everything the `implementer` list does not name, for example docs, strings and translations, UI from an approved design, small fixes, dependency bumps, mechanical refactors, ordinary features with a clear spec
+    high_effort_when:
+      - the task is tooling (scripts, CI checks, metrics) that is not guard, hook or command-parsing tooling
+  merge-agent:
+    model: sonnet
+    effort: medium
+    session: long-lived, started by the orchestrator; merges only under an owner authorization on #15 (7005366747 standing, 7007421567 batches)
+    definition: docs/ORCHESTRATION.md section 7.5
   reviewer:
     model: opus
     effort: high

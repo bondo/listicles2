@@ -1,12 +1,12 @@
 {
-  "name": "listicles-firebase",
+  "name": "tally-firebase",
   "private": true,
   "description": "Firestore rules and emulator tests",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint --max-warnings 0 .",
     "format:check": "prettier --check .",
-    "test": "firebase emulators:exec --only firestore --project demo-listicles \"jest --runInBand\""
+    "test": "firebase emulators:exec --only firestore --project demo-tally \"jest --runInBand\""
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
