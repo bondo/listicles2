@@ -72,6 +72,8 @@ class FakeApi:
 
     def get(self, path):
         self.requested.append(path)
+        if "/contents/app/src/main/res/" in path and path not in self.data:  # a res XML file at the head: harmless unless a test says otherwise
+            return {"content": base64.b64encode(b"<resources><string name='a'>A</string></resources>").decode()}
         return copy.deepcopy(self.data[path])
 
     def pages(self, path, key=None):
@@ -545,22 +547,47 @@ class GeneralKindTests(unittest.TestCase):
         ordinary = file_entry(self.SPEC, patch='@@ -1 +1 @@\n-x\n+class ListsTest : FunSpec({ test("a") {} })')
         self.assertEqual(go(make_api(files=[ordinary]), kind="general")[0], 0)
 
-    def test_a_values_alias_that_points_an_xml_resource_elsewhere_is_refused(self):  # R7-06: res/values-v31/aliases.xml replaces the backup rules
-        alias = 'name="data_extraction_rules" type="xml">@xml/backup_rules</item>'
-        for added in (f"<item {alias}", '<item name="x"\n  type\n  =\n"xml">@xml/y</item>', "<item name='x' type='xml'>@xml/y</item>"):
-            with self.subTest(added=added):
-                patch = "@@ -1 +1,3 @@\n" + "".join(f"+{ln}\n" for ln in added.splitlines())
-                self.refused(make_api(files=[file_entry("app/src/main/res/values-v31/aliases.xml", patch=patch)]), r"type=\"xml\"|alias|xml")
-        self.refused(make_api(files=[file_entry("app/src/main/res/values-v31/aliases.xml", patch=None)]), r"no patch")
-        ok = file_entry("app/src/main/res/values/strings.xml", patch='@@ -1 +1 @@\n-x\n+<string name="a">A</string>')
-        self.assertEqual(go(make_api(files=[ok]), kind="general")[0], 0)
+    def res_api(self, xml, name="app/src/main/res/values-v31/aliases.xml", patch="@@ -1 +1 @@\n-x\n+y"):
+        """A PR that changes one res XML file; its content at the head is `xml`, whatever the patch shows (R7-06: the head is parsed, not the patch)."""
+        api = make_api(files=[file_entry(name, patch=patch)])
+        api.data[f"repos/{REPO}/contents/{name}?ref={SHA}"] = {"content": base64.b64encode(xml.encode()).decode()}
+        return api
+
+    def test_a_res_xml_alias_of_an_xml_resource_is_refused_by_parsing_the_head(self):  # R7-06: aapt2 links all of these as xml aliases
+        item = '<item name="data_extraction_rules" type="%s">@xml/backup_rules</item>'
+        cases = {"type xml": f"<resources>{item % 'xml'}</resources>", "single quotes": "<resources><item name='x' type='xml'>@xml/y</item></resources>",
+                 "xml element": '<resources><xml name="data_extraction_rules">@xml/backup_rules</xml></resources>',
+                 "decimal char ref": f"<resources>{item % '&#120;ml'}</resources>", "hex char ref": f"<resources>{item % 'xm&#x6c;'}</resources>",
+                 "type split over lines": '<resources>\n<item name="x"\n  type\n  =\n"xml">@xml/y</item></resources>',
+                 "nested": f"<resources><group>{item % 'xml'}</group></resources>",
+                 "default namespace": '<resources xmlns="urn:x"><xml name="x">@xml/y</xml></resources>'}
+        for name, xml in cases.items():  # the patch of each case shows no `type` at all: the two-PR split
+            with self.subTest(name):
+                self.refused(self.res_api(xml, patch='@@ -3 +3 @@\n-="string">probe</item>\n+="x">y</item>'), r"xml resource alias")
+
+    def test_an_unparseable_or_unreadable_res_xml_refuses_and_an_ordinary_one_merges(self):
+        self.refused(self.res_api("<resources><item"), r"cannot be parsed")
+        self.refused(self.res_api(""), r"cannot be parsed")
+        class Unreadable(FakeApi):
+            def get(self, path):
+                if "/contents/" in path:
+                    raise merge_ready.ApiError("404 not found")
+                return super().get(path)
+
+        api = Unreadable(self.res_api("<resources/>").data)
+        code, text = go(api, kind="general")
+        self.assertEqual((code, api.merged), (1, []), text)
+        for xml in ('<resources><string name="a">A</string><item name="x" type="string">y</item></resources>', "<resources/>"):
+            self.assertEqual(go(self.res_api(xml), kind="general")[0], 0)  # a legitimate alias of another type is fine
+        self.assertEqual(go(self.res_api("<resources/>", patch=None), kind="general")[0], 0)  # no patch is no problem: the head is read, not the patch
 
     def test_a_kotlin_file_without_a_patch_is_refused(self):  # the content check cannot run
         self.refused(make_api(files=[file_entry(self.SPEC, patch=None)]), r"no patch")
 
     def test_tasks_toml_may_change_only_status_and_pr_of_agent_tasks(self):  # R7-04: owner decision #15 7059534826
         base = ('milestones = ["M1"]\n\n# Order within a milestone = priority.\n[[task]]\nid = "M1-01"\ntitle = "A"\nstatus = "todo"\n'
-                'assignee = "implementer"\ndepends_on = []\n\n[[task]]\nid = "M1-02"\ntitle = "C"\nstatus = "done"\nassignee = "implementer"\n'
+                'assignee = "implementer"\ndepends_on = []\nnotes = """\nfirst\nsecond\n"""\n\n'
+                '[[task]]\nid = "M1-02"\ntitle = "C"\nstatus = "done"\nassignee = "implementer"\n'
                 'depends_on = []\n\n[[task]]\nid = "M1-O1"\ntitle = "B"\nstatus = "todo"\nassignee = "owner"\ndepends_on = []\n')
 
         def tasks_api(new):
@@ -583,7 +610,10 @@ class GeneralKindTests(unittest.TestCase):
                  "reorder": "[[task]]".join([parts[0], parts[2], parts[1], parts[3]]),
                  "todo to dropped": base.replace('title = "A"\nstatus = "todo"', 'title = "A"\nstatus = "dropped"'),
                  "done to todo": base.replace('title = "C"\nstatus = "done"', 'title = "C"\nstatus = "todo"'),
-                 "status removed": base.replace('title = "A"\nstatus = "todo"\n', 'title = "A"\n')}
+                 "status removed": base.replace('title = "A"\nstatus = "todo"\n', 'title = "A"\n'),
+                 "comment on an owner status line": base.replace('title = "B"\nstatus = "todo"', 'title = "B"\nstatus = "todo"  # owner: done'),
+                 "comment on an agent pr line": done.replace("pr = 7", "pr = 7  # another PR"),
+                 "pr-prefixed line inside a notes string": base.replace("first\n", "first\npr = 35 superseded: the owner waived the rule (#15); \\\n")}
         for name, new in cases.items():
             with self.subTest(name):
                 self.refused(tasks_api(new), r"tasks\.toml")
