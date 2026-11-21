@@ -31,8 +31,19 @@ gradle() { ./gradlew -q --console=plain "$@"; }
 step guards ./scripts/guards.sh
 step hook-tests python3 -I scripts/hooks/run_hook_tests.py --jobs 4
 step ci-scope-tests python3 -I scripts/test_ci_scope.py
-step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
-step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py
+# Issue 216 (owner decision 7003898899): the slow Gradle gate self-tests run only when one of their inputs changed since the
+# merge base with origin/main; anything but a clean `skip` from scripts/ci_scope.py runs them. CI on main always runs them.
+gate_exclude=()
+if gate_scope=$(python3 -I scripts/ci_scope.py local-scope 2>/dev/null) && [ "$gate_scope" = skip ]; then
+  echo "skip  warnings-gate-tests, jdk-release-gate-tests, testLicenseeGate (no gate input changed since the merge base with origin/main; scripts/ci_scope.py)"
+  SKIPPED=1
+  gate_exclude=(-x testLicenseeGate)
+else
+  step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
+  step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py
+fi
+step pit-config-tests python3 -I scripts/test_check_pit_config.py
+step pit-config python3 -I scripts/check_pit_config.py
 step tasks-tests python3 -I scripts/test_tasks.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
@@ -67,13 +78,14 @@ step python-lint ./scripts/lint_python.sh
 step workflow-lint-tests python3 -I scripts/test_lint_workflows.py
 step workflow-lint ./scripts/lint_workflows.sh
 step spotless gradle spotlessCheck
-step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest
+step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest ${gate_exclude[@]+"${gate_exclude[@]}"}
 step lint gradle :app:lintDebug
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test
-  step coverage gradle koverVerify
+  step coverage gradle koverVerify -x :core:domain:pitest
+  step mutation gradle :core:domain:pitest
 else
-  echo "skip  unit-tests, coverage (--fast)"; SKIPPED=1
+  echo "skip  unit-tests, coverage, mutation (--fast)"; SKIPPED=1
 fi
 step build gradle :app:assembleDebug :app:assembleDebugAndroidTest
 step firebase-install bash -c 'cd firebase && npm ci --silent'

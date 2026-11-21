@@ -13,6 +13,10 @@ security review, comment 6927207374), and [the plan](../PLAN.md). Decided questi
 * **Story ids** are stable and never reused: `START` app start, `AUTH` sign-in and account, `HH` household, `LIST` lists, `ITEM` items,
   `VIS` private and shared, `SYNC` offline and sync, `LANG` language, `THEME` app theme (parked after v1).
 * Each story has a "so that" value and acceptance criteria written as **Given / When / Then**, so a test can check them.
+* **Accessibility lines for every START, AUTH and HH screen** (owner decision on #15, comment 7058176190): every
+  icon-only button has its own English and Danish label; screen titles are headings; at 200 % font scale in Danish
+  nothing is cut off (one light golden per screen). The item-row checkbox label is
+  decided with ITEM-04 in M2 planning.
 * **Words used:** *user* = a signed-in person. *Household* = a group of users (PLAN section 1). *Household owner* = the
   one member who manages the household. *List creator* = the user who created a list (not the same as household owner).
   *Private list* = only its creator can see it. *Shared list* = every member of the creator's household can see it and
@@ -29,7 +33,7 @@ security review, comment 6927207374), and [the plan](../PLAN.md). Decided questi
 ## 1. App start, sign-in and account
 
 Two sign-in methods in v1: Google (the main one) and email with password (OQ-23). No email-link ("magic link") sign-in
-(OQ-27). **Server access:** every Firestore read and write needs a signed-in user whose email is verified
+(OQ-27). **Server access:** every Firestore read and write, except a user's own account record, needs a signed-in user whose email is verified
 (`email_verified`; Google accounts are verified by Google, password accounts after AUTH-06), invites included. No
 security rule may rely on a two-step (MFA) claim: two-step verification (AUTH-09) protects the sign-in, not the rules.
 Rules allow and deny tests cover both. Before anyone but the owner installs the app, a privacy text in English and
@@ -116,8 +120,8 @@ owner of the address can use the account.
 * Given I have not opened the link yet, when I tap "Continue", then I see a message that the email is not verified yet
   and stay on the screen.
 * Given I tap "Send again" many times, then I see "Try again later" instead of a new email.
-* Given my email is not verified, when I sign in again later, then I see this screen again, and the server refuses to
-  read or change any data of mine (rules allow and deny tests).
+* Given my email is not verified, when I sign in again later, then I see this screen again at every start, and the
+  server refuses to read or change any data of mine except my own account record (rules allow and deny tests).
 
 **AUTH-07 Sign in with email and password.** As a user with a password account, I want to sign in with my email and
 password, so that I reach my lists on any phone.
@@ -246,7 +250,7 @@ ownership or delete the household, so that the household stays under control.
   with all its items, and every private list stays as it was: nothing is lost (OQ-17).
 * Given a list I created went back to private because the household was deleted, when I next open the app, then I see
   a dialog I must acknowledge saying that the household was deleted and my shared lists are private again; I can share them again once I am in a
-  household (VIS-02).
+  household (VIS-02). The owner who deleted the household sees no such dialog (owner decision, #15 comment 7021901747).
 * Given the household owner removed me, when I next open the app, then I see a dialog I must acknowledge: "You were
   removed from the household" / "Du er fjernet fra husstanden", saying that the lists I created will stay with me and
   stay private, and that I will no longer see lists others shared (wireframe 40, M1-21).
