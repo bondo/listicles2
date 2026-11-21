@@ -246,7 +246,7 @@ ownership or delete the household, so that the household stays under control.
   with all its items, and every private list stays as it was: nothing is lost (OQ-17).
 * Given a list I created went back to private because the household was deleted, when I next open the app, then I see
   a dialog I must acknowledge saying that the household was deleted and my shared lists are private again; I can share them again once I am in a
-  household (VIS-02).
+  household (VIS-02). The owner who deleted the household sees no such dialog (owner decision, #15 comment 7021901747).
 * Given the household owner removed me, when I next open the app, then I see a dialog I must acknowledge: "You were
   removed from the household" / "Du er fjernet fra husstanden", saying that the lists I created will stay with me and
   stay private, and that I will no longer see lists others shared (wireframe 40, M1-21).
