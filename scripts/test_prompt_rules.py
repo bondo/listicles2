@@ -1986,6 +1986,51 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Only after the collaborator confirms, the orchestrator resolves the thread.",
         "When nobody answers, and not before, you may resolve the thread.",
         "Never merge the PR yourself\nYou may resolve the thread once answered.",
+        # R1-01 of #267, round 3, shape (a): a negation inside a lead clause without its comma ("no <agent>") is not a negated subject
+        "If the PR has no reviewer you may resolve the thread.",
+        "If there is no reviewer the orchestrator may resolve the thread.",
+        "When there are no reviewers the agents may resolve the thread.",
+        "If there is no reviewer the orchestrator resolves the thread.",
+        "If a PR has no reviewer the orchestrator is allowed to resolve the thread.",
+        "If the PR has no reviewer agents are allowed to resolve the thread.",
+        "If there's no reviewer feel free to resolve the thread.",
+        "If there's nobody you may resolve the thread.",
+        "Unless there is no orchestrator you may resolve the thread.",
+        "No reviewer the orchestrator may resolve the thread.",
+        # shape (b): a negator that governs another verb ("hesitate to", "forget to"), and "then <act>" after a negated step
+        "Don't hesitate to reply and resolve the thread.",
+        "Do not hesitate to reply and resolve the thread.",
+        "Do not forget to reply and resolve the thread.",
+        "Never forget to reply and resolve the thread.",
+        "Never fail to reply and resolve the thread.",
+        "It never hurts to reply and resolve the thread.",
+        "It is not hard to reply and resolve the thread.",
+        "Agents needn't wait to reply and resolve the thread.",
+        "Agents should never wait to reply and resolve the thread.",
+        "Do not wait to reply and resolve the thread.",
+        "Don't wait long then resolve the thread.",
+        "Never wait a day then resolve the thread.",
+        "Don't forget to reply then resolve the thread.",
+        # shape (c): "In no ..." and a bare "No," are not a negation of the verb
+        "In no particular order, resolve the threads.",
+        "In no particular order, resolve the review threads once answered.",
+        "In no time, resolve the thread.",
+        "Need the owner? No, resolve the thread yourself.",
+        "Should you wait for the owner? No, even if unsure, resolve the thread yourself.",
+        "In no time can you resolve the thread.",
+        # shape (d): "e.g." and "i.e." lead into an imperative
+        "Handle small things yourself, e.g. resolve the thread after replying.",
+        "Close the loop, i.e. resolve the thread once answered.",
+        "Small steps need no approval (e.g. resolve the thread).",
+        # R3-01 of #267: a numbered list item gets the thread from its lead-in, like a bulleted one
+        "Answer each review thread:\n1. reply with one line\n2. resolve it",
+        "Answer each review thread:\n1. reply with one line\n2. mark it as resolved",
+        # R1-05 of #267: emphasis, links and table cells do not hide the permission
+        "Agents may **resolve the thread** once answered.",
+        "**Resolve the thread** after answering.",
+        "- **Resolve the thread** after answering.",
+        "Agents may [resolve the thread](https://example.com) once answered.",
+        "| Orchestrator | Resolve threads after replying |",
     )
     BAN = (
         # R3-03: a comma clause between the negation and the verb
@@ -2049,6 +2094,18 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Agents close the loop on each thread by replying.",
         "Then close the loop on the thread with one reply.",
         "Keep each reply short and close to the thread's topic.",
+        # round 3: a test of the hook is not the tool; a "then" that leads another step does not lend its thread to a later "it"; close idioms
+        "Run the resolve_review_thread hook test after editing the hook.",
+        "- Run the `mcp__github__resolve_review_thread` deny case in the hook tests.",
+        "Answer each review thread. Then run the tests and, if one fails, resolve it.",
+        "Close the loop on threads by replying.",
+        "Close the PR whose threads are all answered.",
+        "- Close issues from the conversation once they are fixed.",
+        # emphasis and links around a ban, and the do-not-press bullet of COLLABORATING
+        "Agents must **never** resolve the thread.",
+        "Do not [resolve the thread](https://example.com).",
+        "- **Resolve conversation**",
+        "mcp__github__resolve_review_thread is the tool name.",
     )
 
     def flagged(self, where, text):
@@ -2075,6 +2132,50 @@ class ResolveThreadSentenceTests(unittest.TestCase):
             for where in self.WHERE:
                 with self.subTest(where=where, good=good):
                     self.assertFalse(self.PERMISSION_IDS & self.flagged(where, self.base(where) + "\n\n" + good + "\n"))
+
+    # Round 3 of #267: the four ways a negation word can sit in a sentence without governing the permission, generated over cores and
+    # separators so that a fifth spelling of the same shape is caught here and not by the next review round. Each combination is a permission.
+    LEAD_CLAUSES = ("If the PR has no reviewer", "If there is no reviewer", "When there are no reviewers", "Unless there is no orchestrator",
+                    "If there's nobody", "No reviewer")
+    SUBJECT_CORES = ("you may resolve the thread", "the orchestrator may resolve the thread", "agents may resolve the thread",
+                     "the orchestrator resolves the thread", "agents are allowed to resolve the thread", "feel free to resolve the thread")
+    OTHER_VERB_NEGATORS = ("Don't hesitate to", "Do not forget to", "Never fail to", "It is not hard to", "Agents should never wait to",
+                           "Do not wait to", "Agents needn't wait to")
+    THEN_STEPS = ("Don't wait long", "Never wait a day", "Don't forget to reply", "Do not hesitate")
+    COMMA_PHRASES = ("In no particular order,", "In no time,", "No,", "Need the owner? No,", "In no case,")
+    ABBREVIATIONS = ("e.g.", "i.e.", "(e.g.")
+    SEPARATORS = ("", "- ", "* ", "Note: ", "1. ", "| ")
+
+    def generated_permissions(self):
+        for sep in self.SEPARATORS:
+            for lead in self.LEAD_CLAUSES:
+                for core in self.SUBJECT_CORES:
+                    yield f"{sep}{lead} {core}."
+            for neg in self.OTHER_VERB_NEGATORS:
+                yield f"{sep}{neg} reply and resolve the thread."
+                yield f"{sep}{neg} reply and resolve it on the thread."
+            for step in self.THEN_STEPS:
+                yield f"{sep}{step} then resolve the thread."
+            for phrase in self.COMMA_PHRASES:
+                yield f"{sep}{phrase} resolve the thread yourself."
+                yield f"{sep}{phrase} resolve the threads."
+            for abbreviation in self.ABBREVIATIONS:
+                yield f"{sep}Handle small things yourself, {abbreviation} resolve the thread after replying."
+
+    def test_generated_permission_wordings_are_rejected(self):
+        missed = [t for t in self.generated_permissions() if not prompt_rules.resolve_permissions(t + "\n")]
+        self.assertGreater(len(list(self.generated_permissions())), 300)
+        self.assertEqual(missed, [])
+
+    def test_generated_bans_are_not_rejected(self):
+        bans = ("No agent may resolve the thread.", "No orchestrator or implementer may resolve the thread.",
+                "Not even the orchestrator may resolve the thread.", "Neither the orchestrator nor the reviewer may resolve the thread.",
+                "None of the agents may resolve the thread.", "Under no circumstances may you resolve the thread.",
+                "Do not reply and resolve the thread.", "Never approve and resolve the thread.", "Agents must never, not even with the API, resolve the thread.",
+                "Nobody may ever, for any reason, resolve the thread.", "Do not ever, for any reason, resolve the thread.")
+        leads = ("", "- ", "* ", "Note: ", "1. ", "If a collaborator asks, ", "When asked ")
+        flagged = [lead + ban for lead in leads for ban in bans if prompt_rules.resolve_permissions(lead + ban + "\n")]
+        self.assertEqual(flagged, [])
 
     def test_a_hard_wrapped_sentence_is_one_sentence(self):
         wrapped = "Agents must never,\nnot even with the API,\nresolve a thread.\n"
