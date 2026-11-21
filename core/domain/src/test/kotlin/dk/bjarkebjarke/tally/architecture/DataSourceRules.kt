@@ -19,7 +19,9 @@ import java.io.File
  * **No `GlobalScope`** ([globalScopeViolations]), in every source set: work that must outlive a screen uses an
  * injected external scope.
  *
- * Which directories are scanned is [uiSourceDirs] (`src/main` of each module) and [allSourceDirs] (every source set).
+ * Which directories are scanned is [uiSourceDirs] (every production source set of each module) and [allSourceDirs]
+ * (every source set). Assumes the data layer's package is `dk.bjarkebjarke.tally.data`; a module that picks another
+ * package must extend the rule. Not covered either: `@Composable` through an import alias.
  */
 object DataSourceRules {
     private val dataSource =
@@ -28,15 +30,22 @@ object DataSourceRules {
                 """(?!\w)""",
         )
 
-    private val composable = Regex("""(?<!\w)@(?:\w+\.)*Composable(?!\w)""")
+    private val composable = Regex("""(?<!\w)@(?:\w+:)?(?:\w+\.)*Composable(?!\w)""")
 
-    // `class A(...) : ViewModel()`, `: AndroidViewModel(app)`, `: androidx.lifecycle.ViewModel()`; a supertype call.
+    // `class A(...) : ViewModel()`, `: AndroidViewModel(app)`, `: androidx.lifecycle.ViewModel()`; the first supertype.
     private val viewModelSupertype = Regex(""":\s*(?:\w+\.)*(?:Android)?ViewModel\s*\(""")
+
+    // The same call later in a class header's supertype list (`class A : Observer, ViewModel()`).
+    private val viewModelLaterSupertype =
+        Regex("""(?<![:\w.])(?:class|object)\s[^{;]*?,\s*(?:\w+\.)*(?:Android)?ViewModel\s*\(""")
 
     private val globalScope = Regex("""(?<![\w])GlobalScope(?!\w)""")
 
-    // Module directories (`app`, `core/*`, `feature/*`) that can hold source sets.
-    private val moduleParents = listOf("core", "feature")
+    // Source sets that are not production code; a UI file in one of them may use a fake or an emulator client.
+    private val testSourceSets = setOf("test", "androidTest", "testFixtures")
+
+    // Directories that hold no module: build output, dependency caches and hidden directories.
+    private val skippedDirs = setOf("build", "node_modules")
 
     fun dataSourceInUiViolations(dir: File): List<String> =
         ArchitectureRules
@@ -47,30 +56,31 @@ object DataSourceRules {
     fun globalScopeViolations(dir: File): List<String> =
         ArchitectureRules.codeFiles(dir).flatMap { matches(it, globalScope) }
 
-    /** `src/main` of the app and of every module under `core` and `feature`: where composables and ViewModels live. */
-    fun uiSourceDirs(projectRoot: File): List<File> = sourceSets(projectRoot).filter { it.name == "main" }
+    /** Every production source set (all but test, androidTest and testFixtures) of every module. */
+    fun uiSourceDirs(projectRoot: File): List<File> = sourceSets(projectRoot).filter { it.name !in testSourceSets }
 
-    /** Every source set (`main`, `test`, `androidTest`, ...) of those modules. Build output is never scanned. */
+    /** Every source set (`main`, `test`, `androidTest`, ...) of every module. Build output is never scanned. */
     fun allSourceDirs(projectRoot: File): List<File> = sourceSets(projectRoot)
 
+    // A module is any directory below the project root that has a `src` directory, at any depth (`app`, `core/data`,
+    // `feature/lists/ui`); the root itself is not one.
     private fun sourceSets(projectRoot: File): List<File> =
-        modules(projectRoot).flatMap { module ->
-            File(module, "src").listFiles { f -> f.isDirectory }.orEmpty().sortedBy { it.name }
-        }
-
-    private fun modules(projectRoot: File): List<File> =
-        listOf(File(projectRoot, "app")) +
-            moduleParents.flatMap { parent ->
-                File(projectRoot, parent).listFiles { f -> f.isDirectory }.orEmpty().sortedBy { it.name }
-            }
+        projectRoot
+            .walkTopDown()
+            .onEnter { it == projectRoot || (it.name !in skippedDirs && !it.name.startsWith(".")) }
+            .filter { it.isDirectory && it.name == "src" && it.parentFile != projectRoot }
+            .flatMap { src -> src.listFiles { f -> f.isDirectory }.orEmpty().asSequence() }
+            .sortedBy { it.path }
+            .toList()
 
     /** Paths of the files in [dir] that count as composable or ViewModel files. */
-    fun uiFileNames(dir: File): List<String> = listOf<String>().also { check(dir.path.isNotEmpty()) }.take(0)
+    fun uiFileNames(dir: File): List<String> = ArchitectureRules.codeFiles(dir).filter { isUiFile(it) }.map { it.name }
 
     private fun isUiFile(file: ArchitectureRules.CodeFile): Boolean =
         file.name.endsWith("ViewModel.kt") ||
             composable.containsMatchIn(file.text) ||
-            viewModelSupertype.containsMatchIn(file.text)
+            viewModelSupertype.containsMatchIn(file.text) ||
+            viewModelLaterSupertype.containsMatchIn(file.text)
 
     private fun matches(
         file: ArchitectureRules.CodeFile,
