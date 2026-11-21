@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Deterministic pre-merge checks for the merge agent (issue 136), then a sha-pinned squash merge.
 
-Usage: python3 -I scripts/merge_ready.py <N> <sha> <kind>
+Usage: python3 -I scripts/merge_ready.py [--wait] [--approval <comment-id>] <N> <sha> <kind>
   kind: working-draft-docs | tasks-sync | dependabot   (the owner-authorized merge-agent kinds)
         general      a PR whose every path is on the allowlist (GENERAL_ALLOW), under the owner's standing authorization (#15 comment 7005366747);
                      fail-closed since #15 comment 7058755858: any other path is owner-only
+        owner-batch  any paths, but only a PR the owner's batch approval lists (--approval, the id of that comment on #15; D1 and D2 of #229)
+  --wait  while required checks are pending or not reported yet, poll (WAIT_POLL s, up to WAIT_SECONDS) instead of refusing; anything else still refuses at once
 
 Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * the PR head is exactly <sha>;
@@ -12,13 +14,18 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * every check the base ruleset requires has a latest run with conclusion `success` (none configured, missing or pending: refused);
   * no closing keyword (close/fix/resolve and their -s/-d forms) sits directly before an issue number or URL in the title, body or commits;
   * the base is `main` and the API's file and commit lists are complete (it caps them at 3000 and 250);
-  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: only the allowlist, see owner_only).
-    For dependabot, a workflow may only
-    re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
+  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: only the allowlist, see owner_only; owner-batch: any).
+    For dependabot, a workflow may only re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
     in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
+  * for owner-batch, the comment is the owner's account (it cannot tell the person from an agent), on #15 and unedited, its first non-empty line is
+    `batch approval: #N@sha, ...` (only entries and (notes)) and lists this PR once with a sha
+    (7+ hex) of one of its commits; earlier listed PRs are merged; the head is that commit or only adds update-branch merges of main (second parent
+    in main) whose tree equals git's automatic merge of their two parents (`git merge-tree --write-tree`, no conflicts, run in this checkout after
+    fetching main and pull/N/head; R1-02 of #245). A hand-resolved conflict, an edit or an extra file in the merge commit refuses (a fresh owner
+    approval is needed).
 Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the head moved) and the checked title and body as commit text.
-Exit status: 0 merged, 1 refused or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
+Exit status: 0 merged, 1 refused (or timed out waiting) or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
 
 import base64
@@ -34,6 +41,9 @@ import xml.etree.ElementTree as ET  # noqa: N817  # justified: the standard name
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
 RETRIES = 5
+STATE_ISSUE = 15  # the issue that holds owner decisions and batch approvals
+WAIT_SECONDS, WAIT_POLL = 900, 30  # --wait: how long to wait for required checks, and the poll interval
+MERGE_TREE_TIMEOUT = 120  # seconds for one git fetch or merge-tree
 
 # An explicit list of working drafts (R3-01): naming, docs/reviews/ and other owner-decided or gate docs are owner-only. A new draft needs an owner merge here.
 DOC_PREFIXES = ("docs/milestones/", "docs/product/wireframes/")
@@ -44,6 +54,7 @@ TASKS_FILES = ("docs/tasks.toml",)
 # these explicit lists, compared casefolded, stay as a second layer inside it: the protected process files (the list of
 # scripts/hooks/pretooluse_guard.py PROTECTED, which a test keeps in sync), the wrappers by name anywhere, gate docs and approved product and design docs,
 # dependency manifests, licence acceptances, canonical process docs and gradlew.
+# The owner's batch approval lifts all of it.
 OWNER_ONLY_FILES = {f.casefold() for f in (
     "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
     "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
@@ -207,6 +218,8 @@ def allowed(kind, name):
     """Whether a changed path belongs to the kind (workflow pins are judged on their patch, see pin_only)."""
     if ".." in name.split("/"):
         return False
+    if kind == "owner-batch":
+        return True
     if kind == "general":
         return not owner_only(name)
     if kind == "working-draft-docs":
@@ -353,7 +366,120 @@ def check_problems(api, repo, base, sha):
     return problems
 
 
-def evaluate(api, repo, n, sha, kind, resolve):
+APPROVAL_RE = re.compile(r"batch approval:(.*)", re.I)
+ENTRY_RE = re.compile(r"#(\d+)@([0-9a-f]{7,40})\b", re.I)
+
+
+def approval_entries(body):
+    """[(PR, sha)] from a comment whose first non-empty line is `batch approval:` and holds only `#N@sha` entries and (notes): agents post as the owner
+    too, so a request, a refusal or a quoted decision (R1-01 of #245) must not read as an approval. [] otherwise."""
+    first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+    m = APPROVAL_RE.fullmatch(first)
+    rest = re.sub(r"\([^()]*\)", " ", m.group(1)) if m else ""
+    if not m or re.sub(r"[\s,;]", "", ENTRY_RE.sub("", rest)):
+        return []
+    return [(int(num), sha.lower()) for num, sha in ENTRY_RE.findall(rest)]
+
+
+class MergeCheckError(Exception):
+    """git could not tell what the automatic merge is (fetch or merge-tree failed): the check refuses rather than guesses."""
+
+
+class GitMergeTree:
+    """`merge_tree(p1, p2)`: the tree git makes by merging p2 (a commit of main) into p1 (a commit of the PR), or None if that has conflicts.
+    Runs in this checkout (the merge agent's clean checkout of origin/main), after fetching main and refs/pull/N/head once."""
+
+    def __init__(self, n, cwd=None):
+        self.n, self.cwd, self.fetched = n, cwd, False
+
+    def _git(self, *args):
+        try:
+            res = subprocess.run(["git", *args], cwd=self.cwd, capture_output=True, text=True, timeout=MERGE_TREE_TIMEOUT,
+                                 env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+        except (OSError, subprocess.SubprocessError) as e:
+            raise MergeCheckError(f"git {args[0]} failed: {type(e).__name__}") from e
+        if res.returncode not in (0, 1 if args[0] == "merge-tree" else 0):
+            raise MergeCheckError(f"git {args[0]} failed: {(res.stderr or '').strip()[:120] or res.returncode}")
+        return res
+
+    def __call__(self, p1, p2):
+        if not self.fetched:
+            self._git("fetch", "--quiet", "origin", BASE, f"refs/pull/{self.n}/head")
+            self.fetched = True
+        res = self._git("merge-tree", "--write-tree", "--no-messages", p1, p2)
+        lines = res.stdout.splitlines()
+        if res.returncode == 1:
+            return None  # conflicts
+        if not lines or not SHA_RE.fullmatch(lines[0]):
+            raise MergeCheckError(f"git merge-tree {p1[:7]} {p2[:7]}: unreadable output")
+        return lines[0]
+
+
+def update_branch_problems(api, repo, base, head, approved, commits, merge_tree):
+    """Reasons the head is not the approved commit plus update-branch merges of the base whose tree is git's automatic merge (D2, R1-02 of #245)."""
+    by = {c["sha"]: c for c in commits}
+    parents = lambda c: [p["sha"] for p in c["parents"]]  # noqa: E731  # justified: two-use local helper
+
+    def reach(start):  # the PR's own commits a commit descends from
+        seen, todo = set(), [start]
+        while todo:
+            sha = todo.pop()
+            if sha in by and sha not in seen:
+                seen.add(sha)
+                todo += parents(by[sha])
+        return seen
+
+    seen, old = reach(head), reach(approved)
+    if approved not in seen:
+        return [f"head {head[:7]} does not descend from the approved commit {approved[:7]} (within the PR's commits)"]
+    for sha in sorted(seen - old):
+        p1, *rest = parents(by[sha])
+        if len(rest) != 1 or p1 not in by:
+            return [f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base}"]
+        if api.get(f"repos/{repo}/compare/{base}...{rest[0]}").get("status") not in ("behind", "identical"):
+            return [f"commit {sha[:7]} after the approved sha is not an update-branch merge of {base} (its second parent is not in {base})"]
+        try:  # the merge must be exactly what git makes without help
+            auto = merge_tree(p1, rest[0])
+        except MergeCheckError as e:
+            return [f"cannot check the merge {sha[:7]}: {e}"]
+        if auto is None:
+            return [f"merge {sha[:7]} of {base} conflicts in git: a hand-resolved conflict needs a fresh owner approval"]
+        if auto != by[sha]["commit"]["tree"]["sha"]:
+            return [f"the tree of merge {sha[:7]} is not git's automatic merge of its parents (an edit or an extra file needs a fresh owner approval)"]
+    return []
+
+
+def batch_problems(api, repo, n, head, base, commits, approval_id, merge_tree):
+    """Reasons PR n is not covered by the owner's batch approval (the comment on the state issue), see the module header."""
+    comment = api.get(f"repos/{repo}/issues/comments/{approval_id}")
+    if (comment.get("user") or {}).get("login") != repo.split("/")[0] or comment.get("author_association") != "OWNER":
+        return [f"approval comment {approval_id} is not by the owner"]
+    if not str(comment.get("issue_url") or "").endswith(f"/issues/{STATE_ISSUE}"):
+        return [f"approval comment {approval_id} is not on issue #{STATE_ISSUE}"]
+    if comment.get("created_at") != comment.get("updated_at"):
+        return [f"approval comment {approval_id} was edited after it was posted (post a new batch approval)"]
+    entries = approval_entries(comment.get("body") or "")
+    if not entries:
+        return [f"approval comment {approval_id} is not an anchored `batch approval: #N@sha, ...` first line"]
+    numbers = [num for num, _ in entries]
+    if len(set(numbers)) != len(numbers):
+        return [f"the batch approval lists a PR twice: {sorted(x for x in set(numbers) if numbers.count(x) > 1)}"]
+    if n not in numbers:
+        return [f"PR {n} is not in the batch approval ({approval_id})"]
+    prefix = dict(entries)[n]
+    approved = [c["sha"] for c in commits if c["sha"].startswith(prefix)]
+    if len(approved) != 1:
+        return [f"approved sha {prefix} is not exactly one of the commits of PR {n}"]
+    problems = []
+    for earlier in numbers[: numbers.index(n)]:
+        if not api.get(f"repos/{repo}/pulls/{earlier}").get("merged"):
+            problems.append(f"PR {earlier} comes earlier in the batch and is not merged yet (the batch is merged in order)")
+    if head != approved[0]:
+        problems += update_branch_problems(api, repo, base, head, approved[0], commits, merge_tree)
+    return problems
+
+
+def evaluate(api, repo, n, sha, kind, resolve, approval=None, merge_tree=None):
     """(the PR, all reasons it must not be merged); no reasons means ready."""
     pr = api.get(f"repos/{repo}/pulls/{n}")
     problems = []
@@ -379,24 +505,65 @@ def evaluate(api, repo, n, sha, kind, resolve):
         problems += tasks_problems(api, repo, pr["base"]["ref"], sha)
     if kind == "general":
         problems += res_xml_problems(api, repo, sha, files)
+    if kind == "owner-batch" and pr["head"]["sha"] == sha:  # a moved head is already refused above
+        problems += batch_problems(api, repo, n, sha, pr["base"]["ref"], commits, approval, merge_tree or GitMergeTree(n))
     problems += check_problems(api, repo, pr["base"]["ref"], sha)
     return pr, problems
 
 
-KINDS = {"working-draft-docs", "tasks-sync", "dependabot", "general"}
+KINDS = {"working-draft-docs", "tasks-sync", "dependabot", "general", "owner-batch"}
 
 
-def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None):
-    if len(argv) != 3 or not argv[0].isdigit() or not SHA_RE.fullmatch(argv[1]):
-        print("usage: merge_ready.py <N> <40-hex head sha> <kind>", file=err)
+PENDING_RE = re.compile(r"^required check .*: (?:pending|missing)")
+STATE_WAIT_RE = re.compile(r"^mergeable_state is (?:blocked|unknown|unstable),")
+
+
+def only_waiting(problems):
+    """True if every reason is a required check that is pending or not reported yet (the state is blocked meanwhile): worth waiting for."""
+    return any(PENDING_RE.match(p) for p in problems) and all(PENDING_RE.match(p) or STATE_WAIT_RE.match(p) for p in problems)
+
+
+def parse_args(argv):
+    """(wait, approval id or None, n, sha, kind), or None for bad usage."""
+    wait, approval, rest, it = False, None, [], iter(argv)
+    for arg in it:
+        if arg == "--wait":
+            wait = True
+        elif arg == "--approval":
+            approval = next(it, "")
+            if not approval.isdigit():
+                return None
+        else:
+            rest.append(arg)
+    if len(rest) != 3 or not rest[0].isdigit() or not SHA_RE.fullmatch(rest[1]) or rest[2].startswith("-"):
+        return None
+    return wait, approval, int(rest[0]), rest[1], rest[2]
+
+
+def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=time.sleep, clock=time.monotonic, merge_tree=None):
+    args = parse_args(argv)
+    if args is None:
+        print("usage: merge_ready.py [--wait] [--approval <comment-id>] <N> <40-hex head sha> <kind>", file=err)
         return 2
-    n, sha, kind = int(argv[0]), argv[1], argv[2]
+    wait, approval, n, sha, kind = args
     if kind not in KINDS:
         print(f"merge_ready: unknown kind {kind!r}; expected one of {', '.join(sorted(KINDS))}", file=err)
         return 2
+    if (kind == "owner-batch") != (approval is not None):
+        print("merge_ready: --approval <comment-id> goes with kind owner-batch, and only with it", file=err)
+        return 2
     api = api or GhApi()
+    resolve = resolver or ls_remote_resolver()
     try:
-        pr, problems = evaluate(api, REPO, n, sha, kind, resolver or ls_remote_resolver())
+        deadline = clock() + WAIT_SECONDS
+        while True:
+            pr, problems = evaluate(api, REPO, n, sha, kind, resolve, approval, merge_tree)
+            if not (problems and wait and only_waiting(problems)):
+                break
+            if clock() >= deadline:
+                problems.append(f"timed out after {WAIT_SECONDS}s waiting for the required checks")
+                break
+            sleep(WAIT_POLL)
         if problems:
             for p in problems:
                 print(f"merge_ready: refused PR {n}: {p}", file=err)
