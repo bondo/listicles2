@@ -1150,13 +1150,13 @@ notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owne
 
 [[task]]
 id = "M1-56"
-title = "Java API level check: also look up classes used only by checkcast, instanceof, catch and annotations (follow-up of M1-37)"
+title = "Java API level check: also look up classes used only as class literals, annotations, checkcast, instanceof or catch targets (follow-up of M1-37)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-37"]
-notes = "Tooling env. Gap recorded in scripts/check_java_api_level.py: a java/ or android/ class that is only a checkcast, instanceof or catch target has no member reference, so it is not looked up. Needs a bytecode walk or the constant pool Class entries minus the bootstrap ones. Low value until domain code uses newer exception or interface types; schedule only if M1 domain code needs it"
+notes = "Tooling env. Gap recorded in scripts/check_java_api_level.py: a java/ or android/ class that is only a class literal (X.class), an annotation type, or a checkcast, instanceof or catch target has no member reference, so it is not looked up. Needs a bytecode walk or the constant pool Class entries minus the bootstrap ones. Low value until domain code uses newer exception or interface types; schedule only if M1 domain code needs it"
 
 [[task]]
 id = "M1-50"
@@ -1208,7 +1208,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
 pr = 288
-notes = "Tooling env. Test-first: Stream.toList and Objects.requireNonNullElse in :core:domain fail, an API 26 call passes, a missing api-versions.xml fails closed. Before M1-13. Done: scripts/check_java_api_level.py scans the JVM modules' main classes against the compileSdk platform's api-versions.xml (task checkJavaApiLevel, minSdk from :app); known gaps (a class used only by checkcast, instanceof or catch) are in its docstring"
+notes = "Tooling env. Test-first: Stream.toList and Objects.requireNonNullElse in :core:domain fail, an API 26 call passes, a missing api-versions.xml fails closed. Before M1-13. Done: scripts/check_java_api_level.py scans the JVM modules' main classes against the compileSdk platform's api-versions.xml (task checkJavaApiLevel, minSdk from :app); known gaps (a class used only as a class literal, annotation, checkcast, instanceof or catch target) are in its docstring"
 
 [[task]]
 id = "M1-38"

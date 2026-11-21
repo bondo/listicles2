@@ -6,17 +6,17 @@ Usage: python3 -I scripts/check_java_api_level.py --api-versions FILE --min-sdk 
 Android lint's NewApi skips pure JVM modules such as :core:domain, and no core library desugaring is configured, so a Java 9 to 17
 member that is newer than minSdk (Stream.toList is API 34, Objects.requireNonNullElse is API 30) compiles and then crashes on old devices.
 This reads every field and method reference in the class files and looks it up in api-versions.xml, following the superclass and interface
-chain (also through the scanned project classes). A reference to a java/ or android/ class or member that the file does not list, or lists
-with a `since` above minSdk, is a violation. invokedynamic bootstrap methods (lambdas, string concatenation) are desugared by D8 and not checked.
-Known gaps: a class used only by checkcast, instanceof or a catch clause (no member reference) is not looked up; a project class whose
-parent is a third-party class that is not scanned is not resolved further.
+chain (also through the scanned project classes). A reference to a java/ or android/ class or member that the file does not list, lists with
+a `since` above minSdk, or lists with `removed` (a later Android dropped it: Thread.suspend, removed in API 36) is a violation.
+invokedynamic bootstrap methods (lambdas, string concatenation) are desugared by D8 and not checked.
+Known gaps: a class that is only used as a class literal (`X.class`), an annotation type, or a checkcast, instanceof or catch target has no
+member reference, so it is not looked up; a project class whose parent is a third-party class that is not scanned is not resolved further.
 
 Exit: 0 clean, 1 violations, 2 the check could not run (missing, empty or unreadable api file, no class files, a corrupt class file, bad usage).
 Whole-number arithmetic only: a level is the tuple (major, minor) of integers, so `37.0` and `26.1` are above 26.
 """
 
 import argparse
-import heapq
 import os
 import re
 import struct
@@ -27,6 +27,7 @@ CHECKED_PREFIXES = ("java/", "android/")
 ANCHOR_CLASSES = ("java/lang/Object", "java/util/List")  # a file without these is not a platform api-versions.xml
 LEVEL = re.compile(r"(\d+)(?:\.(\d+))?")
 ONE = (1, 0)
+NEVER = (10**9, 0)  # the `removed` level of an entry that Android never removed
 
 
 class CheckError(Exception):
@@ -41,7 +42,7 @@ def level(text, where):
 
 
 class Api:
-    """classes[name] = (since, {member key: since}, [(parent, since)]); a member key is "M:name(desc)ret" or "F:name"."""
+    """classes[name] = (since, removed, {member key: (since, removed)}, [(parent, since, removed)]); a member key is "M:name(desc)ret" or "F:name"."""
 
     def __init__(self, path):
         self.classes = {}
@@ -59,19 +60,25 @@ class Api:
         if missing:
             raise CheckError(f"{path} is not a platform api-versions.xml: it lists no {', '.join(missing)}")
 
+    @staticmethod
+    def span(el, where):
+        """(since, removed) of an entry; `removed` is the first API level that no longer has it."""
+        removed = level(el.get("removed"), where + " removed") if el.get("removed") is not None else NEVER
+        return level(el.get("since", "1"), where), removed
+
     def add(self, el):
         name = el.get("name", "")
-        since = level(el.get("since", "1"), name)
+        since, removed = self.span(el, name)
         members, parents = {}, []
         for child in el:
-            s = level(child.get("since", "1"), f"{name} {child.get('name')}")
+            span = self.span(child, f"{name} {child.get('name')}")
             if child.tag == "method":
-                members["M:" + child.get("name", "")] = s
+                members["M:" + child.get("name", "")] = span
             elif child.tag == "field":
-                members["F:" + child.get("name", "")] = s
+                members["F:" + child.get("name", "")] = span
             elif child.tag in ("extends", "implements"):
-                parents.append((child.get("name", ""), s))
-        self.classes[name] = (since, members, parents)
+                parents.append((child.get("name", ""), *span))
+        self.classes[name] = (since, removed, members, parents)
 
 
 class Reader:
@@ -172,55 +179,64 @@ class Checker:
         self.project = {}  # scanned class name -> (super, interfaces, declared member keys)
 
     def lookup(self, owner, key):
-        """(lowest level at which the member exists on `owner`, whether some parent was unknown); level None if it is on no path."""
-        best, opaque = None, False
-        reached = {}
-        queue = [(ONE, owner)]
+        """((lowest level at which `owner` has the member, level that removed it or NEVER), whether a parent was unknown).
+
+        The first element is None when the member is on no path; a path on which nothing was removed wins over one that was."""
+        found, opaque, seen = [], False, set()
+        queue = [(owner, ONE, NEVER)]
         while queue:
-            lvl, cls = heapq.heappop(queue)
-            if cls in reached and reached[cls] <= lvl:
+            state = queue.pop()
+            if state in seen:
                 continue
-            reached[cls] = lvl
+            seen.add(state)
+            cls, lvl, gone = state
             if cls in self.api.classes:
-                since, members, parents = self.api.classes[cls]
-                lvl = max(lvl, since)
-                if key in members and (best is None or max(lvl, members[key]) < best):
-                    best = max(lvl, members[key])
-                nxt = parents
+                since, removed, members, parents = self.api.classes[cls]
+                lvl, gone = max(lvl, since), min(gone, removed)
+                if key in members:
+                    found.append((max(lvl, members[key][0]), min(gone, members[key][1])))
             elif cls in self.project:
                 sup, interfaces, declared = self.project[cls]
                 if key in declared:
-                    best = ONE if best is None else min(best, ONE)
-                nxt = [(p, ONE) for p in [sup, *interfaces] if p]
+                    found.append((lvl, gone))
+                parents = [(p, ONE, NEVER) for p in [sup, *interfaces] if p]
             else:
                 opaque = opaque or not cls.startswith(CHECKED_PREFIXES)
                 continue
-            for parent, since in nxt:
-                heapq.heappush(queue, (max(lvl, since), parent))
-        if best is None and "java/lang/Object" in self.api.classes:
-            members = self.api.classes["java/lang/Object"][1]
-            best = members.get(key)
-        return best, opaque
+            queue += [(p, max(lvl, since), min(gone, removed)) for p, since, removed in parents]
+        if not found and "java/lang/Object" in self.api.classes and key in self.api.classes["java/lang/Object"][2]:
+            found.append(self.api.classes["java/lang/Object"][2][key])
+        alive = [f for f in found if f[1] == NEVER]
+        if alive:
+            return min(alive), opaque
+        return (min(f[0] for f in found), max(f[1] for f in found)) if found else None, opaque
 
     def unknown(self, cls):
         return cls.startswith(CHECKED_PREFIXES) and cls not in self.api.classes
+
+    def problem(self, shown, lvl, gone):
+        if gone != NEVER:
+            return f"{shown} was removed in API {fmt(gone)} (NoSuchMethodError or NoSuchFieldError on newer Android)"
+        return f"{shown} requires API {fmt(lvl)} (minSdk {self.limit[0]})" if lvl > self.limit else None
 
     def check_ref(self, owner, key, shown):
         if owner.startswith("["):
             return None
         if owner in self.project or owner in self.api.classes:
-            lvl, opaque = self.lookup(owner, key)
-            if lvl is None:
+            found, opaque = self.lookup(owner, key)
+            if found is None:
                 return None if opaque else f"{shown} is not in the Android API (api-versions.xml lists no such member)"
-            return f"{shown} requires API {fmt(lvl)} (minSdk {self.limit[0]})" if lvl > self.limit else None
+            return self.problem(shown, *found)
         return f"{shown} is not in the Android API (api-versions.xml lists no class {owner})" if self.unknown(owner) else None
 
     def check_header(self, name, sup, interfaces):
         for parent in [sup, *interfaces]:
             if parent and self.unknown(parent):
                 yield f"{name} extends or implements {parent}, which is not in the Android API (api-versions.xml lists no such class)"
-            elif parent in self.api.classes and self.api.classes[parent][0] > self.limit:
-                yield f"{name} extends or implements {parent}, which requires API {fmt(self.api.classes[parent][0])} (minSdk {self.limit[0]})"
+            elif parent in self.api.classes:
+                msg = self.problem(f"{name} extends or implements {parent}, which", *self.api.classes[parent][:2])
+                if msg:
+                    yield msg
 
 
 def fmt(lvl):
