@@ -64,8 +64,10 @@ GENERAL_ALLOW = tuple(re.compile(p) for p in (
     rf"core/(?!testing/)[a-z][a-z0-9_-]*/src/(?:main|test)/kotlin/{ROOT}(?:/{_SEG})+\.kt",  # core module sources and tests (not core/testing)
     rf"docs(?:/{_SEG})+\.(?:md|csv|png|txt)", r"README\.md", r"docs/tasks\.toml"))  # docs (owner-only ones refused by the lists); tasks.toml: tasks_problems
 # Tests and config that are gates, wherever they sit (casefolded): the architecture package, the no-network, Robolectric and JUnit 4 engine tests, classes
-# named like core/testing's (R7-02), and res/xml (backup, device-transfer and network-security rules, R7-06).
-GENERAL_GATE_RE = re.compile(r"/architecture/|nonetwork|robolectric|junit4engine|jdkapilevel|/(?:dev/listicles|dk/bjarkebjarke/tally)/testing/|/res/xml/")
+# named like core/testing's (R7-02), and res/xml and qualified forms such as xml-v31 (backup, device-transfer, network-security rules; R7-06).
+GENERAL_GATE_RE = re.compile(r"/architecture/|nonetwork|robolectric|junit4engine|jdkapilevel|"
+                             r"/(?:dev/listicles|dk/bjarkebjarke/tally)/testing/|/res/xml(?:-[^/]*)?/")
+ALIAS_XML_RE = re.compile(r"type\s*=\s*[\"']xml[\"']")  # R7-06: a values alias <item name="x" type="xml"> repoints an xml resource
 KOTEST_CONFIG_RE = re.compile(r"AbstractProjectConfig|AbstractPackageConfig|io\.kotest\.provided|AutoScan")  # R7-01: project-level Kotest config
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
@@ -267,6 +269,8 @@ def file_problems(kind, files, resolve):
         added = [ln for _, block in _changed_lines(patch or "") for ln in block]
         if kind == "general" and name.endswith(".kt") and (patch is None or any(KOTEST_CONFIG_RE.search(ln) for ln in added)):
             problems.append(f"{name}: no patch to check, or it touches Kotest project config ({KOTEST_CONFIG_RE.pattern})")
+        if kind == "general" and name.endswith(".xml") and (patch is None or ALIAS_XML_RE.search("\n".join(added))):
+            problems.append(f"{name}: no patch to check, or it declares an xml resource alias (type=\"xml\"), which can replace the backup rules")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
         if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
@@ -283,17 +287,19 @@ def file_problems(kind, files, resolve):
 
 
 def tasks_problems(api, repo, base, sha):
-    """Reasons docs/tasks.toml at the head changes more than the `status` and `pr` of agent tasks against the base (R7-04, owner decision #15 7059534826)."""
+    """Reasons docs/tasks.toml at the head changes more than the `status` and `pr` lines of agent tasks against the base, and a status only todo to done
+    (R7-04, R8-01; owner decision #15 7059534826): comments, order, other fields, owner tasks and any other status refuse."""
+    strip = lambda s: re.sub(r"(?m)^[ \t]*(?:status|pr)[ \t]*=.*\n?", "", s)  # noqa: E731  # justified: two-use local helper
     try:
-        old, new = (tomllib.loads(base64.b64decode(api.get(f"repos/{repo}/contents/docs/tasks.toml?ref={ref}")["content"]).decode()) for ref in (base, sha))
-        a, b = ({task["id"]: task for task in d.get("task", [])} for d in (old, new))
+        old_t, new_t = (base64.b64decode(api.get(f"repos/{repo}/contents/docs/tasks.toml?ref={ref}")["content"]).decode() for ref in (base, sha))
+        a, b = ({task["id"]: task for task in tomllib.loads(text).get("task", [])} for text in (old_t, new_t))
     except (KeyError, ValueError, TypeError) as e:
         return [f"docs/tasks.toml cannot be compared with the base ({type(e).__name__}): owner-only"]
-    if {k: v for k, v in old.items() if k != "task"} != {k: v for k, v in new.items() if k != "task"} or a.keys() != b.keys():
-        return ["docs/tasks.toml: the file header or the set of tasks changed (only `status` and `pr` of agent tasks may change)"]
-    rest = lambda task: {k: v for k, v in task.items() if k not in ("status", "pr")}  # noqa: E731  # justified: two-use local helper
-    return [f"docs/tasks.toml: task {i} changes more than `status` and `pr`, or is an owner task" for i in a
-            if a[i] != b[i] and (rest(a[i]) != rest(b[i]) or "owner" in (a[i].get("assignee"), b[i].get("assignee")))]
+    if strip(old_t) != strip(new_t) or a.keys() != b.keys():
+        return ["docs/tasks.toml: more than the `status` and `pr` lines changed (a comment, the order, another field, a task added or removed)"]
+    bad = lambda x, y: x != y and (x, y) != ("todo", "done")  # noqa: E731  # justified: one-use local helper
+    return [f"docs/tasks.toml: task {i} is an owner task, or its status changes other than todo to done" for i in a
+            if a[i] != b[i] and ("owner" in (a[i].get("assignee"), b[i].get("assignee")) or bad(a[i].get("status"), b[i].get("status")))]
 
 
 def check_problems(api, repo, base, sha):
