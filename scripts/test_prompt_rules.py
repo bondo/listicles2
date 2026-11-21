@@ -2064,13 +2064,24 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Agents who don't hear back reply and resolve the thread.",
         "Not all agents reply and resolve the thread.",
         # a bold label is a button name only when its line names no agent (self-review of the escalation fix): the same shape with an
-        # agent in the next cell or the parenthetical is a permission, as on main
+        # agent in the next cell or the parenthetical is a permission (stricter than main, which passes these rows)
         "| **Resolve threads** | Orchestrator |",
         "| **Resolve thread** | orchestrator may do it |",
         "- **Resolve threads** (orchestrator, after replying)",
         "* **Resolve conversation** (agents may resolve it after replying)",
         "- **Resolve threads** after replying",
         "| Orchestrator | **Resolve threads** |",
+        # R1-01 of #267, round 5: an adverb after the negator takes the negation off the act; R5-02: merely and simply after a real negator
+        "Do not immediately reply and resolve the thread; give the collaborator a day to answer.",
+        "Never automatically reply and resolve the thread.",
+        "Agents should not unilaterally reply and resolve the thread.",
+        "Don't always reply and resolve the thread yourself.",
+        "The orchestrator does not immediately reply and resolve the thread; it waits a day.",
+        "Agents do not usually reply and resolve the thread themselves.",
+        "Please don't blindly reply and resolve the thread.",
+        "Do not prematurely reply and resolve the thread.",
+        "Don't merely reply and resolve the thread; also add a test.",
+        "Never simply reply and resolve the thread; also thank them.",
     )
     BAN = (
         # R3-03: a comma clause between the negation and the verb
@@ -2152,6 +2163,13 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "An agent must not reply and resolve the thread.",
         "Please do not reply and resolve the thread.",
         "Agents shouldn't answer and resolve it on the thread.",
+        # R5-01 of #267: "you" in a button note is COLLABORATING's reader, not an agent; adverb-free bans with "ever" or an object stay bans
+        "* **Resolve conversation** (even after you get an answer)",
+        "* **Resolve conversation** (on a review thread you started)",
+        "* **Resolve conversation** (the owner resolves threads, not you)",
+        "| **Resolve conversation** | not you: only the owner |",
+        "Do not ever reply and resolve the thread.",
+        "Agents must never approve the PR and resolve the thread.",
     )
 
     def flagged(self, where, text):
@@ -2193,6 +2211,9 @@ class ResolveThreadSentenceTests(unittest.TestCase):
     # escalation ruling of #267: a negation that does not start the clause as an imperative or after the agent subject is no ban
     CONJ_NON_NEGATORS = ("Not just", "Don't just", "Not all agents", "Reviewers that do not find issues", "Agents who don't hear back")
     QUESTIONS = ("Why don't you", "Can't you")
+    # round 5 of #267: a negator, then an adverb that takes the negation, before "reply and resolve"
+    ADVERB_NEGATORS = ("Do not", "Don't", "Never", "Please don't", "Agents should not", "The orchestrator does not")
+    ADVERBS = ("immediately", "automatically", "always", "blindly", "unilaterally", "usually", "prematurely", "just", "merely", "simply")
     ABBREVIATIONS = ("e.g.", "i.e.", "(e.g.")
     SEPARATORS = ("", "- ", "* ", "Note: ", "1. ", "| ")
 
@@ -2204,6 +2225,9 @@ class ResolveThreadSentenceTests(unittest.TestCase):
             for neg in self.OTHER_VERB_NEGATORS + self.CONJ_NON_NEGATORS:
                 yield f"{sep}{neg} reply and resolve the thread."
                 yield f"{sep}{neg} reply and resolve it on the thread."
+            for neg in self.ADVERB_NEGATORS:
+                for adverb in self.ADVERBS:
+                    yield f"{sep}{neg} {adverb} reply and resolve the thread."
             for question in self.QUESTIONS:
                 yield f"{sep}{question} reply and resolve the thread?"
                 yield f"{sep}{question} reply and resolve it on the thread?"
