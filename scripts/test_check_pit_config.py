@@ -22,8 +22,7 @@ def read(*parts):
 
 GOOD_DOMAIN = (
     "plugins {\n    alias(libs.plugins.pitest)\n}\n"
-    "dependencies {\n    testImplementation(libs.kotest.pitest)\n}\n"
-    "pitest {\n    pitestVersion.set(libs.versions.pitest.get())\n    junit5PluginVersion.set(\"1.2.3\")\n"
+    "pitest {\n    pitestVersion.set(libs.versions.pitest.get())\n    junit5PluginVersion.set(\"1.2.3\")\n    avoidCallsTo.set(setOf(\"kotlin.jvm.internal.Intrinsics\"))\n"
     '    targetClasses.set(listOf("dk.bjarkebjarke.tally.domain.*"))\n    mutationThreshold.set(80)\n}\n'
 )
 GOOD_ROOT = "tasks.named(\"koverVerify\") { dependsOn(\":core:domain:pitest\") }\n"
@@ -60,9 +59,13 @@ class Negative(unittest.TestCase):
     def test_non_literal_threshold_fails(self):
         self.assertTrue(self.check(domain=GOOD_DOMAIN.replace("set(80)", "set(thr)")))
 
-    def test_missing_plugin_or_kotest_extension_fails(self):
+    def test_missing_plugin_or_junit5_engine_support_fails(self):
         self.assertTrue(self.check(domain=GOOD_DOMAIN.replace("alias(libs.plugins.pitest)", "")))
-        self.assertTrue(self.check(domain=GOOD_DOMAIN.replace("libs.kotest.pitest", "libs.kotest.runner")))
+        self.assertTrue(self.check(domain=GOOD_DOMAIN.replace("junit5PluginVersion", "otherVersion")))
+
+    def test_kotest_pitest_extension_is_refused(self):
+        # kotest-extensions-pitest 1.2.0 needs Kotest 5 classes (io.kotest.mpp) and crashes the PIT minion on Kotest 6.
+        self.assertTrue(self.check(domain=GOOD_DOMAIN + "dependencies { testImplementation(libs.kotest.pitest) }\n"))
 
     def test_target_must_be_domain_package(self):
         self.assertTrue(self.check(domain=GOOD_DOMAIN.replace("tally.domain.*", "tally.other.*")))
