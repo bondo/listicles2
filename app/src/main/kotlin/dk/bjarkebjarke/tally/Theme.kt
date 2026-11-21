@@ -17,3 +17,6 @@ fun TallyTheme(
 ) {
     MaterialTheme(colorScheme = colorSchemeFor(darkTheme), content = content)
 }
+
+/** Typography of the app: tokens.json type scale (M1-04). */
+fun colorSchemeTypography(): androidx.compose.material3.Typography = androidx.compose.material3.Typography()

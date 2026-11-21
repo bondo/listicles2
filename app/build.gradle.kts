@@ -104,6 +104,10 @@ tasks.withType<Test>().configureEach {
         .files(fileTree("src/test/screenshots"))
         .withPropertyName("screenshotGoldens")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // M1-04: ThemeTokensTest reads design/tokens.json; it is an input so an edited token re-runs the test.
+    val tokensFile = rootProject.file("design/tokens.json")
+    inputs.file(tokensFile).withPropertyName("designTokens").withPathSensitivity(PathSensitivity.NONE)
+    systemProperty("tally.tokensFile", tokensFile.path)
     dependsOn(syncRobolectricAndroidAll)
     jvmArgumentProviders.add(
         RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),
