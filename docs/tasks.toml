@@ -38,17 +38,17 @@ purpose = "Private and shared lists, plain and collection items, real-time sync 
 [[milestone]]
 id = "M3"
 title = "Packing rules (domain)"
-purpose = "Scaling, per-person templates and merging as property-tested pure Kotlin."
+purpose = "(After v1.) Scaling, per-person templates and merging as property-tested pure Kotlin."
 
 [[milestone]]
 id = "M4"
 title = "Packing templates and trips"
-purpose = "Template and rule editor, create a trip, trip checklist and one-off items."
+purpose = "(After v1.) Template and rule editor, create a trip, trip checklist and one-off items."
 
 [[milestone]]
 id = "M5"
 title = "Barcode scanning"
-purpose = "Camera scanning, product lookup with a fallback to manual entry, duplicate warning."
+purpose = "(After v1.) Camera scanning, product lookup with a fallback to manual entry, duplicate warning."
 
 [[milestone]]
 id = "M6"
@@ -166,6 +166,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 35
 notes = """Delivered by PR #35 (squash-merged to main). Needed LISTICLES_TASK=tooling (process files are hook-protected). Tests first with negative cases (CLAUDE.md "Tests first"; ORCHESTRATION 2.0). \
 (1) CI and scripts/verify.sh: run `python3 -I scripts/test_tasks.py` and `python3 -I scripts/tasks.py validate`; \
 (2) CODEOWNERS: docs/ORCHESTRATION.md, docs/orchestrator-state.md, docs/tasks.toml, scripts/tasks.py, docs/FOLLOW-UPS.md; \
@@ -221,6 +222,7 @@ status = "done"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M0-13", "M0-O11"]
+pr = 37
 notes = "Adds the adopted tasks to this file in the milestone they belong to (tooling work that must precede M0.5 goes in M0 and into M0-FU depends_on; validate enforces it). Tooling tasks are test-first with negative cases (ORCHESTRATION 2.0). Done by the PR that adds M0-15, M0-16, M0.5-05..15 and M1-03..07 (the id mapping and the rejected/deferred items are in the comment block above M0.5-05). Follow-up issues for the deferred items are open: P9 = #38, P18 = #39, P20 = #40 (labels follow-up, severity, target:M1; the deferred-tooling label was not used)"
 
 [[task]]
@@ -531,6 +533,7 @@ status = "done"
 assignee = "process"
 risk = "normal"
 depends_on = ["M0-O11"]
+pr = 41
 notes = "Normal env (docs only). Effort S. Orchestrator checks added to the merge-request step (review R2, R6): the PR body is refreshed and the request says squash. F18 records the frozen shell model of D1 (a tripwire, not a security boundary). Protected prompt parts go to M0.5-15."
 
 [[task]]
@@ -541,6 +544,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0-11", "M0.5-14", "M0.5-23"]
+pr = 83
 notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session if it has not started yet. The environment pick (tooling vs normal) is part of the prompt work (C2). Design-reviewer role (review R5, docs/reviews/README.md): scores the rubric, max 2 Opus rounds per design PR, then one joint hand-off comment on the PR that mentions the owner and the collaborator at the same time (same review sheet and screenshots, plus a #15 line); collaborator input is advisory, the owner decides (D5); `owner-todo` only after 7 days pending."
 
 [[task]]
@@ -618,6 +622,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-O3"]
+pr = 56
 notes = "Tooling env (.github/). Effort S. Forms only: no collaborators.toml (D2). Test-first, wired into verify.sh and the tasks job; negatives: unknown label (checked against a fixture list of the five labels), missing field. Blank issues stay allowed"
 
 [[task]]
@@ -628,6 +633,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-17"]
+pr = 64
 notes = "Tooling env. Effort M. Filters by the API author_association / repo role (Write or better), not an id list (D2); strips hidden markup. Tests include a renamed login, a public non-Write author and an edited comment"
 
 [[task]]
@@ -638,6 +644,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-16", "M0.5-18"]
+pr = 67
 issue = 44
 notes = "Tooling env (agents/prompts). Effort S. Links follow-up #44: agents never resolve a collaborator's review thread"
 
@@ -682,6 +689,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-21"]
+pr = 72
 notes = "Normal env (docs only). Effort S. Also carries the four docs fixes for the joint hand-off to the owner and the collaborator (collaborator-workflow 7, M0.5-15 notes, ORCHESTRATION 1.1 and 7.6, COLLABORATING item 3). Ids 23-26 are the rollout rows of #65; 27 belongs to the status picture."
 
 [[task]]
@@ -692,6 +700,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-23"]
+pr = 73
 notes = "Tooling env (scripts/, CI wiring). Effort M. Test-first: commit the failing test first, wired into scripts/verify.sh and CI. Columns: date, review_id (R1..R12 except R2, README 5.1), run_ref, findings, acted_on, ignored, disputed, deferred, cost_usd, window_end. Negatives: unknown review_id, counts that do not add up to findings, window_end before date, non-integer counts, formula-looking text. Replaces the by-hand R3 digest numbers (D-4.4) once the first two digests are done."
 
 [[task]]
@@ -702,6 +711,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-19", "M0.5-21", "M0.5-23"]
+pr = 74
 notes = "Tooling env (agents/prompts). Effort S. Test-first through scripts/prompt_rules.py (a rule per new step; fails when the step is deleted or weakened). R3: Mondays, first wake after 10:00 UTC, skipped if nothing merged (docs/reviews/README.md 3.1). Ledger: post the `review` row at window_end. R10: one owner-todo per milestone from M2. Usage text: read usage at each wake, the pause protocol steps of ORCHESTRATION 7.7 in the orchestrator, worker and reviewer prompts. Separate from M0.5-19 so that task stays small."
 
 [[task]]
@@ -1171,7 +1181,7 @@ notes = "Docs only, area:security-rules; before M1-08. Issues #200, #203, #204 (
 id = "M1-36"
 title = "Product docs: start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 A)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "planner"
 risk = "normal"
 depends_on = ["M1-O7"]
@@ -1298,6 +1308,17 @@ depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]
+id = "M1-34"
+title = "guards.sh: compare line length per tool across all style files, with ruff and flake8 defaults (issue 176)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+issue = 176
+notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_sh.py, docs/guards-known-gaps.md). Test-first with negative cases: family split over two kept files, raise masked by a lowering in the same file or under a no-limit section, removal below the tool default, base without the setting. Owner merge: scripts/guards.sh"
+
+[[task]]
 id = "M1-FU"
 title = "Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)"
 milestone = "M1"
@@ -1307,8 +1328,8 @@ risk = "normal"
 depends_on = [
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
-  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37",
-  "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
+  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36",
+  "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55",
 ]
 
