@@ -1,5 +1,6 @@
 """Tests for scripts/check_gradle_repos.py. Run: python3 -I scripts/test_check_gradle_repos.py"""
 
+import random
 import re
 import sys
 import unittest
@@ -241,6 +242,492 @@ class Hardening(unittest.TestCase):
     def test_apostrophe_in_comment_or_string_is_not_a_char_literal(self):
         ok = GOOGLE + "// it's\n/* don't */\nval s = \"it's\"\n" + MIRROR_CALL + "mavenCentral()\n"
         self.assertEqual(self.dep(ok), [])
+
+
+PLUGIN_UNFILTERED = ["pluginManagement: google() needs a content filter"]
+OUTSIDE = ["settings.gradle.kts: google() outside pluginManagement and dependencyResolutionManagement needs a content filter"]
+TAIL = MIRROR_CALL + "mavenCentral()\n"
+
+
+def with_extra(extra, plugin_extra=""):
+    """Settings whose two good repositories blocks are followed by `extra` statements inside their outer blocks."""
+    return (
+        f"pluginManagement {{\n    repositories {{{GOOD_REPOS}    }}\n{plugin_extra}}}\n"
+        f"dependencyResolutionManagement {{\n    repositories {{{GOOD_REPOS}    }}\n{extra}\n}}\n"
+    )
+
+
+class DottedGoogle(unittest.TestCase):
+    """Issue 226: google() written as repositories.google() (or any form outside a braced repositories block) needs the same filter."""
+
+    def test_unfiltered_dotted_forms_are_flagged(self):
+        for extra in (
+            "repositories.google()",
+            "repositories.google",
+            "this.repositories.google()",
+            "repositories.google { }",
+            "repositories.google() { }",
+            "repositories.google { content { } }",
+            'repositories.google { content { excludeGroup("x") } }',
+            "repositories.apply { google() }",
+            "with(repositories) { google() }",
+            "val g = repositories::google",
+            "repositories.exclusiveContent { forRepository { google() } }",
+            "repositories.exclusiveContent { forRepository { google() } filter { } }",
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra(extra)), UNFILTERED)
+
+    def test_unfiltered_dotted_google_in_plugin_management_is_flagged(self):
+        self.assertEqual(c.check_settings(with_extra("", plugin_extra="    repositories.google()\n")), PLUGIN_UNFILTERED)
+
+    def test_dotted_google_outside_both_outer_blocks_is_flagged(self):
+        for extra in (
+            "pluginManagement.repositories.google()",
+            "settings.dependencyResolutionManagement.repositories { google() }",
+            "buildscript { repositories { google() } }",
+            "gradle.settings.pluginManagement.repositories.google()",
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra("") + extra + "\n"), OUTSIDE)
+
+    def test_dotted_google_without_a_braced_repositories_block_reports_both(self):
+        text = f"pluginManagement {{\n    repositories {{{GOOD_REPOS}    }}\n}}\ndependencyResolutionManagement {{ repositories.google() }}\n"
+        self.assertEqual(c.check_settings(text), ["dependencyResolutionManagement: no repositories block"] + UNFILTERED)
+
+    def test_every_unfiltered_place_is_reported_once_per_block(self):
+        got = c.check_settings(with_extra("repositories.google()\nrepositories.google()", "    repositories.google()\n") + "repositories.google()\n")
+        self.assertEqual(got, PLUGIN_UNFILTERED + UNFILTERED + OUTSIDE)
+
+    def test_filtered_dotted_forms_pass(self):
+        for extra in (
+            'repositories.google { content { includeGroup("androidx") } }',
+            'repositories.google() { content { includeGroupAndSubgroups("androidx") } }',
+            'repositories.exclusiveContent { forRepository { google() } filter { includeGroup("x") } }',
+            'with(repositories) { google { content { includeGroup("x") } } }',
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra(extra)), [])
+
+    def test_google_in_comments_and_strings_outside_the_block_is_not_a_call(self):
+        extra = '// repositories.google()\n/* repositories.google() */\nval s = "repositories.google()"\nval r = """repositories.google()"""'
+        self.assertEqual(c.check_settings(with_extra(extra) + "// google()\n"), [])
+
+
+OUTSIDE_CENTRAL = ["settings.gradle.kts: mavenCentral() outside pluginManagement and dependencyResolutionManagement cannot be ordered after the mirror"]
+
+
+def with_head(head, plugin_head=""):
+    """Settings whose outer blocks start with `head` statements, before their braced repositories blocks."""
+    return (
+        f"pluginManagement {{\n{plugin_head}    repositories {{{GOOD_REPOS}    }}\n}}\n"
+        f"dependencyResolutionManagement {{\n{head}\n    repositories {{{GOOD_REPOS}    }}\n}}\n"
+    )
+
+
+class MirrorOrder(unittest.TestCase):
+    """R1-03: mavenCentral() written outside the braced repositories block still has to come after the mirror."""
+
+    def test_dotted_central_before_the_braced_block_is_flagged(self):
+        for head in (
+            "repositories.mavenCentral()",
+            "this.repositories.mavenCentral()",
+            "repositories.mavenCentral { }",
+            "with(repositories) { mavenCentral() }",
+            "repositories.apply { mavenCentral() }",
+            "val c = repositories::mavenCentral",
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(with_head(head)), BEFORE)
+                plugin = c.check_settings(with_head("", plugin_head=f"    {head}\n"))
+                self.assertEqual(plugin, ["pluginManagement: Maven Central mirror must come before mavenCentral()"])
+
+    def test_dotted_central_after_the_mirror_passes(self):
+        for extra in ("repositories.mavenCentral()", "with(repositories) { mavenCentral() }", "repositories.mavenCentral { }"):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra(extra)), [])
+
+    def test_dotted_mirror_before_the_braced_block_passes(self):
+        head = f'repositories.maven("{c.MIRROR}")'
+        self.assertEqual(c.check_settings(with_head(head)), [])
+
+    def test_central_outside_both_outer_blocks_is_flagged(self):
+        for extra in ("pluginManagement.repositories.mavenCentral()", "settings.dependencyResolutionManagement.repositories { mavenCentral() }"):
+            with self.subTest(extra=extra):
+                self.assertEqual(c.check_settings(with_extra("") + extra + "\n"), OUTSIDE_CENTRAL)
+
+    def test_central_in_comments_and_strings_does_not_count(self):
+        head = '// repositories.mavenCentral()\n/* mavenCentral() */\nval s = "mavenCentral()"\nval r = """mavenCentral()"""'
+        self.assertEqual(c.check_settings(with_head(head) + "// mavenCentral()\n"), [])
+
+
+PLUGIN_REACHES_DEP = ["pluginManagement: refers to dependencyResolutionManagement, so repositories added there come before its own mirror"]
+
+
+def dep_text(repos, head=""):
+    """Good pluginManagement, and a dependencyResolutionManagement with `head` statements before `repositories { repos }`."""
+    return (
+        f"pluginManagement {{\n    repositories {{{GOOD_REPOS}    }}\n}}\n"
+        f"dependencyResolutionManagement {{\n{head}\n    repositories {{{repos}    }}\n}}\n"
+    )
+
+
+class MirrorIsARepository(unittest.TestCase):
+    """R2-01: the mirror counts only where it is a repository URL, not as any string literal in the block."""
+
+    def test_mirror_url_held_in_a_val_does_not_count(self):
+        val = f'val centralMirror = "{c.MIRROR}"'
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + 'mavenCentral()\nmaven(centralMirror) { name = "m" }\n', head=val)), MISSING)
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=val.replace("centralMirror", "unused"))), MISSING)
+
+    def test_vals_named_url_do_not_count(self):
+        for decl in (f'val url = "{c.MIRROR}"', f'var url = "{c.MIRROR}"', f'val url = uri("{c.MIRROR}")', f'val url: String = "{c.MIRROR}"',
+                     f'val setUrl = "{c.MIRROR}"', f'val x = 1; val url = "{c.MIRROR}"', f'{{ val url = "{c.MIRROR}" }}'):
+            with self.subTest(decl=decl):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\nmaven(url) { name = \"m\" }\n", head=decl)), MISSING)
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + decl + "\nmaven(url)\n")), MISSING)
+
+    def test_url_assignment_outside_a_maven_block_does_not_count(self):
+        for stray in (
+            f'url = "{c.MIRROR}"',
+            f'repos.configureEach {{ url = "{c.MIRROR}" }}',
+            f'foo {{ setUrl("{c.MIRROR}") }}',
+            f'other {{ url = uri("{c.MIRROR}") }}',
+        ):
+            with self.subTest(stray=stray):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + stray + "\nmavenCentral()\n")), MISSING)
+
+    # R3-02: the mirror counts only on this block's own repositories, not on another object's repository handler.
+    def test_mirror_on_another_objects_repositories_does_not_count(self):
+        for call in (
+            f'pluginManagement.repositories.maven("{c.MIRROR}") {{ name = "m" }}',
+            f'settings.pluginManagement.repositories.maven("{c.MIRROR}")',
+            f'with(pluginManagement.repositories) {{ maven("{c.MIRROR}") }}',
+            f'settings.buildscript.repositories.maven("{c.MIRROR}")',
+            f'with(settings.buildscript.repositories) {{ maven("{c.MIRROR}") }}',
+            f'pluginManagement.repositories.maven {{ url = uri("{c.MIRROR}") }}',
+            f'settings.buildscript.repositories.maven {{ setUrl("{c.MIRROR}") }}',
+            f'pluginManagement.repositories.maven(url = "{c.MIRROR}")',
+            f'foo.maven("{c.MIRROR}")',
+            f'foo().repositories.maven("{c.MIRROR}")',
+        ):
+            with self.subTest(call=call):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=call)), MISSING)
+                plugin = with_extra("", plugin_extra=f"    {call}\n").replace(GOOD_REPOS, GOOD_REPOS.replace(MIRROR_CALL, ""), 1)
+                self.assertEqual(c.check_settings(plugin), [f"pluginManagement: Maven Central mirror {c.MIRROR} missing"])
+
+    # R5-01: each clause of the rule "the mirror counts only as a direct statement of a top-level braced repositories body of the same
+    # block" has a test that fails without it: the top-level check, the lookbehind in OWN, and the dot rule (plus the two allow spellings).
+    def test_only_the_blocks_own_top_level_braced_repositories_counts(self):
+        m = c.MIRROR
+        for head in (
+            f'with(pluginManagement) {{ repositories {{ maven("{m}") }} }}',
+            f'settings.pluginManagement {{ repositories {{ maven("{m}") }} }}',
+            f'pluginManagement.repositories {{ maven("{m}") }}',
+            f'settings.buildscript.repositories {{ maven("{m}") }}',
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), MISSING)
+        for stray in (f'pluginManagement.repositories.maven("{m}")', f'settings.buildscript.repositories.maven("{m}")'):
+            with self.subTest(stray=stray):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + stray + "\nmavenCentral()\n")), MISSING)
+        for own in (f'this.repositories {{ maven("{m}") }}', f'repositories() {{ maven("{m}") }}'):
+            with self.subTest(own=own):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=own)), [])
+
+    def test_mirror_nested_in_another_receivers_block_inside_the_repositories_body_does_not_count(self):
+        for wrap in (f'with(pluginManagement.repositories) {{ maven("{c.MIRROR}") }}', f'apply {{ maven("{c.MIRROR}") }}', f'run {{ maven("{c.MIRROR}") }}'):
+            with self.subTest(wrap=wrap):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + wrap + "\n")), MISSING)
+
+    # Escalation ruling: whether a dotted repositories.maven(...) reaches the block's own handler and runs depends on receivers,
+    # local names and control flow that a scanner cannot see, so it never counts. Main did not count it either.
+    def test_dotted_mirror_call_never_counts(self):
+        for head in (
+            f'repositories.maven("{c.MIRROR}")',
+            f'this.repositories.maven("{c.MIRROR}")',
+            f'repositories.maven {{ url = uri("{c.MIRROR}") }}',
+            f'repositories.maven {{ name = "m"; setUrl("{c.MIRROR}") }}',
+            f'repositories.maven("{c.MIRROR}") {{ name = "MavenCentralMirror" }}',
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), MISSING)
+
+    def test_mirror_calls_that_reach_another_handler_or_never_run_do_not_count(self):
+        m = c.MIRROR
+        for head in (
+            f'with(pluginManagement) {{ repositories.maven("{m}") {{ name = "MavenCentralMirror" }} }}',
+            f'settings.pluginManagement {{ repositories.maven("{m}") }}',
+            f'with(settings.buildscript) {{ repositories.maven("{m}") }}',
+            f'val repositories = pluginManagement.repositories\nrepositories.maven("{m}")',
+            f'settings.pluginManagement.\nrepositories.maven("{m}")',
+            f'pluginManagement.run {{ repositories.maven("{m}") }}',
+            f'settings.buildscript.apply {{ repositories.maven("{m}") }}',
+            f'with(pluginManagement) {{ this.repositories.maven("{m}") }}',
+            f'with(pluginManagement) {{ repositories.maven {{ url = uri("{m}") }} }}',
+            f'if (false) repositories.maven("{m}")',
+            f'fun addMirror() = repositories.maven("{m}")',
+            f'for (x in emptyList<Int>()) repositories.maven("{m}")',
+            f'while (false) repositories.maven("{m}")',
+        ):
+            with self.subTest(head=head):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=head)), MISSING)
+        plugin = with_extra("", plugin_extra=f'    with(settings.buildscript) {{ repositories.maven("{m}") }}\n')
+        plugin = plugin.replace(GOOD_REPOS, GOOD_REPOS.replace(MIRROR_CALL, ""), 1)
+        self.assertEqual(c.check_settings(plugin), [f"pluginManagement: Maven Central mirror {m} missing"])
+
+    def test_mirror_url_in_maven_block_with_other_statements_counts(self):
+        call = f'maven {{\n    name = "m"\n    url = uri("{c.MIRROR}")\n}}'
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + call + "\nmavenCentral()\n")), [])
+
+    def test_mirror_url_in_other_calls_and_vals_inside_the_block_does_not_count(self):
+        for stray in (f'val s = "{c.MIRROR}"', f'println("{c.MIRROR}")', f'maven("{c.MIRROR}x")', f'listOf("{c.MIRROR}")'):
+            with self.subTest(stray=stray):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + stray + "\nmavenCentral()\n")), MISSING)
+
+    def test_every_form_of_a_mirror_repository_counts(self):
+        for call in (
+            f'maven("{c.MIRROR}")',
+            f'maven("{c.MIRROR}") {{ name = "m" }}',
+            f'maven(url = "{c.MIRROR}")',
+            f'maven(uri("{c.MIRROR}"))',
+            f'maven {{ url = "{c.MIRROR}" }}',
+            f'maven {{ url = uri("{c.MIRROR}") }}',
+            f'maven {{ setUrl("{c.MIRROR}") }}',
+            f'maven {{ setUrl(uri("{c.MIRROR}")) }}',
+            f'maven(\n  "{c.MIRROR}"\n)',
+            f'maven("""{c.MIRROR}""")',
+        ):
+            with self.subTest(call=call):
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + call + "\nmavenCentral()\n")), [])
+                self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n" + call + "\n")), BEFORE)
+
+    def test_dotted_mirror_repository_does_not_count_without_a_braced_mirror(self):
+        self.assertEqual(c.check_settings(dep_text(GOOGLE + "mavenCentral()\n", head=f'repositories.maven("{c.MIRROR}")')), MISSING)
+
+
+class PluginManagementReachesDependencies(unittest.TestCase):
+    """R2-03: pluginManagement runs first, so a mention of dependencyResolutionManagement in it adds repositories ahead of the mirror."""
+
+    def test_dependency_repositories_changed_from_plugin_management_are_flagged(self):
+        for extra in (
+            "dependencyResolutionManagement.repositories.mavenCentral()",
+            "settings.dependencyResolutionManagement.repositories.mavenCentral()",
+            "dependencyResolutionManagement.repositories { mavenCentral() }",
+            "with(dependencyResolutionManagement.repositories) { mavenCentral() }",
+            "dependencyResolutionManagement { repositories { mavenCentral() } }",
+            "settings.getDependencyResolutionManagement().repositories.mavenCentral()",
+            "settings.getDependencyResolutionManagement().getRepositories().mavenCentral()",
+            "getDependencyResolutionManagement().repositories { mavenCentral() }",
+            "with(getDependencyResolutionManagement().repositories) { mavenCentral() }",
+            "val d = settings::getDependencyResolutionManagement",
+            "val d by settings::dependencyResolutionManagement",
+            "settings.dependencyResolutionManagement { repositories.maven(\"https://example.invalid\") }",
+        ):
+            with self.subTest(extra=extra):
+                got = c.check_settings(with_extra("", plugin_extra=f"    {extra}\n"))
+                self.assertEqual([p for p in got if p.startswith("pluginManagement")], PLUGIN_REACHES_DEP)  # a nested block may add more
+
+    def test_the_reverse_direction_is_harmless(self):
+        extra = "pluginManagement.repositories.mavenCentral()"
+        self.assertEqual(c.check_settings(with_extra(extra)), [])
+
+    def test_the_name_in_a_comment_or_string_inside_plugin_management_is_fine(self):
+        extra = '    // dependencyResolutionManagement\n    val s = "dependencyResolutionManagement"\n'
+        self.assertEqual(c.check_settings(with_extra("", plugin_extra=extra)), [])
+
+
+NESTED = 'val s = "${ if (c) "}" else "" }"\n'
+
+
+class Strings(unittest.TestCase):
+    """Issue 227: raw strings and string templates with nested strings, braces or code must not hide an unfiltered google()."""
+
+    def dep(self, repos):
+        return c.check_settings(settings(dep_repos=repos))
+
+    def hidden(self, before):
+        """`before` is a statement that must not swallow the unfiltered google() that follows it."""
+        return self.dep(GOOGLE + TAIL + before + "google()\n")
+
+    def test_nested_string_with_brace_in_a_template_does_not_hide_google(self):
+        self.assertEqual(self.hidden(NESTED), UNFILTERED)
+
+    def test_raw_string_with_an_odd_number_of_quotes_does_not_hide_google(self):
+        for before in ('val s = """a"b"""\n', 'val s = """x""""\n', 'val s = """\\"""\n', 'val s = """"""\n', 'val s = """a""b"""\n'):
+            with self.subTest(before=before):
+                self.assertEqual(self.hidden(before), UNFILTERED)
+
+    def test_templates_inside_raw_strings_and_nested_templates_do_not_hide_google(self):
+        for before in (
+            'val s = """${ "}" }"""\n',
+            'val s = """${ "${ "}" }" }"""\n',
+            'val s = "${ "${ "}" }" }"\n',
+            "val s = \"${ '}' }\"\n",
+            'val s = "${ /* } */ 1 }"\n',
+            'val s = "${ 1 // }\n }"\n',
+            'val s = "${ mapOf("a" to "}").size }"\n',
+        ):
+            with self.subTest(before=before):
+                self.assertEqual(self.hidden(before), UNFILTERED)
+
+    def test_google_called_inside_a_template_is_code(self):
+        for before in ('val s = "${google()}"\n', 'val s = """${ google() }"""\n', 'val s = "${ "${ google() }" }"\n'):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), UNFILTERED)
+
+    def test_filtered_google_inside_a_template_passes(self):
+        ok = 'val s = "${ google { content { includeGroup("x") } } }"\n'
+        self.assertEqual(self.dep(GOOGLE + TAIL + ok), [])
+
+    def test_valid_strings_keep_the_check_green(self):
+        for before in (
+            NESTED,
+            'val s = """a"b"""\n',
+            'val s = """x""""\n',
+            'val s = """\\"""\n',
+            'val s = """a\n}\n"{"\n"""\n',
+            'val s = """${ "}" }"""\n',
+            'val s = "${ "${ "}" }" }"\n',
+            'val s = "${ if (c) \'}\' else \'{\' }"\n',
+            'val s = "$x and ${y} and \\$z and \\${w}"\n',
+            'val s = """$ $x ${\'$\'}"""\n',
+            'val s = "// /* \\" \'"\n',
+            'val s = ""\nval t = ""\n',
+            "val q = '\"'\nval s = \"it's\"\n",
+        ):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), [])
+                self.assertEqual(self.dep(GOOGLE + before + TAIL), [])
+
+    def test_mirror_in_a_raw_string_call_counts(self):
+        self.assertEqual(self.dep(GOOGLE + f'maven("""{c.MIRROR}""")\nmavenCentral()\n'), [])
+
+    def test_mirror_order_and_missing_checks_survive_nested_templates(self):
+        self.assertEqual(self.dep(GOOGLE + NESTED + "mavenCentral()\n" + MIRROR_CALL), BEFORE)
+        self.assertEqual(self.dep(GOOGLE + NESTED + "mavenCentral()\n"), MISSING)
+
+    def test_commented_mirror_after_nested_template_does_not_count(self):
+        self.assertEqual(self.dep(GOOGLE + NESTED + "// " + MIRROR_CALL + "mavenCentral()\n"), MISSING)
+
+    def test_unparsable_strings_fail_closed(self):
+        for before in (
+            'val s = "abc\n',
+            'val s = "abc',
+            'val s = """abc\n',
+            'val s = "${ x\n',
+            'val s = "${ "}" \n',
+            'val s = """${ x """\n',
+            'val s = "${ "abc }"\n',
+            'val s = "\\',
+        ):
+            with self.subTest(before=before):
+                got = self.dep(GOOGLE + TAIL + before)
+                self.assertEqual(len(got), 1)
+                self.assertTrue(got[0].startswith("settings.gradle.kts: cannot parse"), got)
+
+    def cannot_parse(self, before):
+        got = self.dep(GOOGLE + TAIL + before)
+        self.assertEqual(len(got), 1, before)
+        self.assertTrue(got[0].startswith("settings.gradle.kts: cannot parse"), got)
+
+    # R1-01: Kotlin 2.2+ multi-dollar strings ($$"${" is plain text) are not modelled, so they fail closed.
+    def test_multi_dollar_strings_fail_closed(self):
+        for before in (
+            'val s = $$"${"; google(); val t = "}"\n',
+            'val s = $$"""${"""; google(); val t = """}"""\n',
+            'val s = $$$"${"\n',
+            'val s = $"x"\n',
+        ):
+            with self.subTest(before=before):
+                self.cannot_parse(before)
+
+    def test_dollar_next_to_quotes_inside_strings_is_fine(self):
+        for before in ('val s = "$"\n', 'val s = "cost: 5$"\n', 'val s = """5$"""\n', 'val s = "$$"\n', "val s = '$'\n"):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), [])
+
+    # R1-02: backtick identifiers may hold quotes and braces; they must neither open a string nor move a block bound.
+    def test_backtick_identifier_with_a_quote_does_not_hide_google(self):
+        self.assertEqual(self.dep(GOOGLE + TAIL + 'val `a"` = 1; google(); val `b"` = 2\n'), UNFILTERED)
+
+    def test_backtick_identifier_with_a_brace_does_not_move_a_block_bound(self):
+        before = 'google { val `{` = 0 }\nmaven("https://example.invalid/maven2") { content { includeGroup("x") } }\nval `}` = 0\n'
+        self.assertEqual(self.dep(GOOGLE + TAIL + before), UNFILTERED)
+
+    def test_backtick_google_is_still_google(self):
+        self.assertEqual(self.dep(GOOGLE + TAIL + "`google`()\n"), UNFILTERED)
+        self.assertEqual(self.dep(GOOGLE + TAIL + '`google` { content { includeGroup("x") } }\n'), [])
+
+    def test_backtick_identifiers_in_valid_code_pass(self):
+        for before in ('val `a"` = 1\n', "val `{` = 0\nval `}` = 0\n", "val `a b` = 1\n", "val `it's` = 1\n", "val s = \"a`b\" + '`'\n", "// `\n/* ` */\n"):
+            with self.subTest(before=before):
+                self.assertEqual(self.dep(GOOGLE + TAIL + before), [])
+
+    def test_unterminated_backtick_and_backtick_in_a_short_template_fail_closed(self):
+        for before in ("val `abc\n", "val `a\nb`\n", 'val s = "$`a"`"\n', 'val s = """$`a"`"""\n'):
+            with self.subTest(before=before):
+                self.cannot_parse(before)
+
+    # Oracle: random valid string literals (escapes, raw strings, nested templates) must blank to exactly the known text.
+    def test_random_valid_literals_blank_exactly(self):
+        rng = random.Random(263)
+
+        def plain(depth):
+            src, exp = '"', '"'
+            for _ in range(rng.randint(0, 4)):
+                kind = rng.randint(0, 3 if depth else 2)
+                if kind == 0:
+                    piece = rng.choice(["a", " ", "{", "}", "'", "/", "*", "//", "/*", "`", "$ "])
+                    src, exp = src + piece, exp + " " * len(piece)
+                elif kind == 1:
+                    piece = rng.choice(['\\"', "\\\\", "\\$", "\\n", "\\u0041"])
+                    src, exp = src + piece, exp + " " * len(piece)
+                elif kind == 2:
+                    src, exp = src + "$x", exp + "  "
+                else:
+                    t_src, t_exp = code(depth - 1)
+                    src, exp = src + "${" + t_src + "}", exp + "${" + t_exp + "}"
+            return src + '"', exp + '"'
+
+        def raw(depth):
+            body, exp_body = "", ""
+            for _ in range(rng.randint(0, 4)):
+                if depth and rng.random() < 0.3:
+                    t_src, t_exp = code(depth - 1)
+                    body, exp_body = body + "${" + t_src + "}", exp_body + "${" + t_exp + "}"
+                else:
+                    piece = rng.choice(["a", "\n", "{", "}", "\\", '"', '""', "$ ", "'", "`"])
+                    body, exp_body = body + piece + "a", exp_body + " " * len(piece) + " "  # a letter keeps quotes from running together
+            tail = rng.choice(["", '"', '""'])  # quotes right before the closing delimiter belong to the content
+            return '"""' + body + tail + '"""', '"""' + exp_body + " " * len(tail) + '"""'
+
+        def code(depth):
+            kind = rng.randint(0, 4 if depth else 2)
+            if kind == 0:
+                return "x", "x"
+            if kind == 1:
+                return "f { y }", "f { y }"
+            if kind == 2:
+                return rng.choice([("'}'", "' '"), ("'\"'", "' '")])  # a char literal blanks to one space between its quotes
+            return (plain if kind == 3 else raw)(depth)
+
+        for _ in range(400):
+            src, exp = (plain if rng.random() < 0.5 else raw)(3)
+            self.assertEqual(c._strip(src + " google()", blank_strings=True), exp + " google()", src)
+            self.assertEqual(c._strip(src + " google()"), src + " google()")
+
+    def test_strip_on_random_input_only_raises_unparsable_and_only_blanks(self):
+        rng = random.Random(227)
+        alphabet = ['"', '"""', "$", "${", "{", "}", "'", "\\", "/", "*", "//", "/*", "*/", "\n", "a", " ", "google()"]
+        for _ in range(3000):
+            text = "".join(rng.choice(alphabet) for _ in range(rng.randint(1, 14)))
+            try:
+                blanked, kept = c._strip(text, blank_strings=True), c._strip(text)
+            except c.Unparsable:
+                continue
+            self.assertEqual(len(blanked), len(kept), repr(text))
+            self.assertTrue(all(b in (k, " ") for b, k in zip(blanked, kept, strict=True)), repr(text))  # blanking only ever writes spaces
 
 
 class Properties(unittest.TestCase):
