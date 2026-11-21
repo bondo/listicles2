@@ -1,6 +1,7 @@
-"""Pins .claude/settings.json permissions: exactly four rules (owner approval of three checksum-pinned linters, issue #15, plus the
-scripts/mark-ready.sh wrapper), and a documented-semantics model of rule matching (`*` spans spaces and slashes; compound commands need
-every part allowed). The wrapper (test_mark_ready.py) validates the PR number; no rule may allow `gh api` directly. How the real matcher
+"""Pins .claude/settings.json permissions: exactly five rules (owner approval of three checksum-pinned linters, issue #15, plus the
+scripts/mark-ready.sh and scripts/update-branch.sh wrappers), and a documented-semantics model of rule matching (`*` spans
+spaces and slashes; compound commands need every part allowed). The wrappers (test_mark_ready.py,
+test_update_branch.py) validate their arguments; no rule may allow `gh api` directly. How the real matcher
 or the classifier behaves is NOT tested (see the residual risks in docs/ORCHESTRATION.md section 7.5).
 Owner-only change (CODEOWNERS covers /.claude/ and /scripts/). Run: python3 -I -m unittest discover -s scripts/hooks"""
 
@@ -11,11 +12,13 @@ import unittest
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 WRAPPER_RULE = "Bash(scripts/mark-ready.sh *)"
+UPDATE_RULE = "Bash(scripts/update-branch.sh *)"  # owner decision, #15 comment 7008033864: the merge agent may update PR branches
 PINNED_ALLOW = frozenset({
     "Bash(.tools/bin/shellcheck *)",
     "Bash(.tools/bin/actionlint *)",
     "Bash(.tools/bin/zizmor --offline *)",
     WRAPPER_RULE,
+    UPDATE_RULE,
 })
 SEPARATORS = re.compile(r"&&|\|\||\|&|[;&|\n]")
 
@@ -52,7 +55,7 @@ def command_allowed(rules, command):
 
 
 def check_allow(rules):
-    """Problems with an allow list; empty when it is exactly the four pinned rules."""
+    """Problems with an allow list; empty when it is exactly the five pinned rules."""
     dup = ["duplicate rule"] * (len(rules) != len(set(rules)))
     return dup + [f"unexpected rule: {r}" for r in sorted(set(rules) - PINNED_ALLOW)] + [f"missing rule: {r}" for r in sorted(PINNED_ALLOW - set(rules))]
 
@@ -95,7 +98,8 @@ class AllowList(unittest.TestCase):
             "Bash(.tools/bin/zizmor *--offline*)", "Read(*)",
             "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review *)",
             "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review)", "Bash(gh pr merge *)", "Bash",
-            "Bash(scripts/*)", "Bash(scripts/mark-ready.sh)", "Bash(bash scripts/mark-ready.sh *)",
+            "Bash(scripts/*)", "Bash(scripts/mark-ready.sh)", "Bash(bash scripts/mark-ready.sh *)", "Bash(scripts/update-branch.sh)",
+            "Bash(bash scripts/update-branch.sh *)", "Bash(./scripts/update-branch.sh *)", "Bash(gh api -X PUT repos/bondo/listicles2/pulls/*/update-branch *)",
             "mcp__github__merge_pull_request", "Bash(gh api -X PUT repos/bondo/listicles2/pulls/*/merge *)",
         ]
         for extra in bad_extras:
@@ -104,6 +108,7 @@ class AllowList(unittest.TestCase):
             self.assertTrue(check_allow([r for r in base if r != dropped]), dropped)
         self.assertTrue(check_allow(base + [base[0]]), "duplicate")
         self.assertTrue(check_allow(base + [WRAPPER_RULE]), "duplicate wrapper rule")
+        self.assertTrue(check_allow(base + [UPDATE_RULE]), "duplicate update-branch rule")
         self.assertTrue(check_allow([]))
         self.assertEqual(check_allow(base), [])
 
@@ -130,6 +135,15 @@ class WrapperRule(unittest.TestCase):
                     "scripts/mark-ready.shx 12", "cat scripts/mark-ready.sh 12"]:
             self.assertFalse(rx.fullmatch(cmd), cmd)
 
+    def test_update_branch_rule_is_present_once_and_matches_only_that_script(self):
+        self.assertEqual(self.settings["permissions"]["allow"].count(UPDATE_RULE), 1)
+        rx = rule_regex(UPDATE_RULE)
+        self.assertTrue(rx.fullmatch("scripts/update-branch.sh 12 " + "a" * 40))
+        for cmd in ["gh api -X PUT repos/bondo/listicles2/pulls/12/update-branch", "gh api -X PUT repos/bondo/listicles2/pulls/12/merge",
+                    "scripts/update-branch.sh", "bash scripts/update-branch.sh 12", "scripts/update-branch.shx 12", "cat scripts/update-branch.sh 12",
+                    "scripts/mark-ready.sh 12"]:
+            self.assertFalse(rx.fullmatch(cmd), cmd)
+
     def test_no_gh_api_or_merge_pattern_anywhere_in_permissions(self):
         text = json.dumps(self.settings.get("permissions", {}))
         for bad in ("gh", "api", "merge", "PUT", "DELETE", "bypassPermissions", "dangerously", "ccr/"):
@@ -154,6 +168,24 @@ class WrapperRule(unittest.TestCase):
         self.assertNotIn("any command that runs", bullet)
         for stale in ("any agent session", "no wildcard on the repo", "gh api"):
             self.assertNotIn(stale, bullet, stale)
+
+
+class WrapperResidualRisksAreDocumented(unittest.TestCase):
+    """R1-03 of #237: the owner accepts the wrappers' residual risks by merging, so the list names them all."""
+
+    def bullet(self, title):
+        m = re.search(r"\* \*\*" + title + r".*?(?=\n\* \*\*|\n\n)", read("docs", "ORCHESTRATION.md"), re.S)
+        self.assertIsNotNone(m, title)
+        return m.group(0)
+
+    def test_both_wrapper_bullets_name_the_planted_gh_and_the_injected_environment(self):
+        marking, updating = self.bullet("Marking a PR ready:"), self.bullet("Updating a branch")
+        for needle in ("fixed directories", "root session", "LD_PRELOAD", "shell snapshot",
+                       "function named `scripts/mark-ready.sh` or `scripts/update-branch.sh`"):
+            self.assertIn(needle, marking, needle)
+        self.assertRegex(updating, r"residual risks are those of `mark-ready\.sh`")
+        self.assertIn("GH_HOST/GH_REPO cannot redirect the call", updating)
+        self.assertNotIn("no environment redirect", updating)
 
 
 class RuleMatching(unittest.TestCase):
@@ -192,8 +224,9 @@ class RuleMatching(unittest.TestCase):
                 self.assertFalse(command_allowed(self.rules, c), c)
                 c = f"{evil} {sep} .tools/bin/shellcheck a.sh"
                 self.assertFalse(command_allowed(self.rules, c), c)
-                c = f"scripts/mark-ready.sh 12 {sep} {evil}"
-                self.assertFalse(command_allowed(self.rules, c), c)
+                for script in ("scripts/mark-ready.sh 12", "scripts/update-branch.sh 12 " + "a" * 40):
+                    c = f"{script} {sep} {evil}"
+                    self.assertFalse(command_allowed(self.rules, c), c)
         self.assertTrue(command_allowed(self.rules, ".tools/bin/shellcheck a.sh && .tools/bin/actionlint b.yml"))
 
     def test_the_model_is_not_vacuous(self):
