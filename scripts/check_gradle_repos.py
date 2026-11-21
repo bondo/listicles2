@@ -28,11 +28,12 @@ BACKOFF = "systemProp.org.gradle.internal.repository.initial.backoff"
 
 CHAR_LITERAL = re.compile(r"'(?:[^\\'\n]|\\(?:u[0-9a-fA-F]{4}|[^\n]))'")
 INCLUDE = re.compile(r"\binclude\w*\s*\(")
-# The mirror as a repository URL: maven("<url>"), maven(url = "<url>"), maven(uri("<url>")), url = [uri(]"<url>"), setUrl([uri(]"<url>"),
-# with a plain or raw string. A val or any other call holding the URL does not declare the repository.
-MIRROR_REPOSITORY = re.compile(
-    r"(?:\bmaven\s*\(|\burl\s*=|\bsetUrl\s*\()\s*(?:url\s*=\s*)?(?:uri\s*\(\s*)?\"+" + re.escape(MIRROR) + r"\"+"
-)
+MIRROR_LITERAL = re.compile(r"\"+" + re.escape(MIRROR) + r"\"+")  # plain or raw string
+# What may precede the mirror literal for it to declare a repository: maven("<url>"), maven(url = "<url>"), maven(uri("<url>")), or,
+# inside a `maven { }` block, a statement url = [uri(]"<url>") or setUrl([uri(]"<url>"). A val or any other call holding the URL does not.
+CALL_HEAD = re.compile(r"\bmaven\s*\(\s*(?:url\s*=\s*)?(?:uri\s*\(\s*)?$")
+URL_HEAD = re.compile(r"(?:^|[{;.\n])[ \t]*(?:url\s*=|setUrl\s*\()\s*(?:uri\s*\(\s*)?$")
+OWN = r"(?<![\w.)\]])(?:this\s*\.\s*)?repositories"  # the enclosing block's own repositories, not another object's
 ONLY_GOOGLE = re.compile(r"\s*google\s*\(\s*\)\s*;?\s*")
 
 
@@ -208,6 +209,43 @@ def _exclusive(repos):
     return spans
 
 
+def _enclosing_brace(text, pos):
+    """Index of the `{` of the innermost block of text that contains pos, or None at top level."""
+    depth = 0
+    for i in range(pos - 1, -1, -1):
+        if text[i] == "}":
+            depth += 1
+        elif text[i] == "{":
+            if depth == 0:
+                return i
+            depth -= 1
+    return None
+
+
+def _on_own_repositories(outer, maven):
+    """True if the maven call starting at index `maven` of outer (a block's body) adds to that block's own repositories:
+    `repositories.maven(...)`, `this.repositories.maven(...)`, or a direct statement of a top-level `repositories { }` body.
+    Another object's handler (pluginManagement.repositories.maven(...)) and other receivers (with(x.repositories) { maven(...) }) do not."""
+    before = outer[:maven].rstrip()
+    if before.endswith("."):
+        return re.search(OWN + r"\s*\.$", before) is not None
+    brace = _enclosing_brace(outer, maven)
+    return brace is not None and re.search(OWN + r"\s*(?:\(\s*\))?\s*$", outer[:brace]) is not None and _enclosing_brace(outer, brace) is None
+
+
+def _mirror_start(outer, outer_kept):
+    """Index of the first mirror URL that declares a repository of the block (outer is its code, outer_kept the same with strings), or -1."""
+    for lit in MIRROR_LITERAL.finditer(outer_kept):
+        before = outer[: lit.start()]
+        head = CALL_HEAD.search(before)
+        if head is None and URL_HEAD.search(before) is not None:
+            brace = _enclosing_brace(outer, lit.start())
+            head = re.search(r"\bmaven\s*$", outer[:brace]) if brace is not None else None
+        if head is not None and _on_own_repositories(outer, head.start()):
+            return lit.start()
+    return -1
+
+
 def _repositories(blanked, kept, name):
     """Every repositories { } body inside every `name { }` block, joined in order (Gradle adds them all up).
 
@@ -259,8 +297,7 @@ def check_settings(text):
         else:
             # The mirror and the first mention of mavenCentral are looked for in the whole block, not only in braced
             # repositories { } bodies, so repositories.mavenCentral() before the block cannot hide behind them.
-            found = MIRROR_REPOSITORY.search(outer_kept)
-            mirror = found.start() if found else -1
+            mirror = _mirror_start(outer, outer_kept)
             central = re.search(r"\bmavenCentral\s*(?:\(\s*\)|\{\s*\})", repos)  # mavenCentral() or an empty mavenCentral { }
             first_central = re.search(r"(?<!\w)mavenCentral\b", outer)
             if mirror < 0:
@@ -272,7 +309,7 @@ def check_settings(text):
         if name in unfiltered:
             problems.append(f"{name}: google() needs a content filter")
     for a, b in _spans(blanked, "pluginManagement"):  # it runs first, so what it adds to the dependency repositories comes before the mirror
-        if re.search(r"(?<!\w)dependencyResolutionManagement\b", blanked[a:b]):
+        if re.search(r"(?<!\w)(?:get)?[dD]ependencyResolutionManagement\b", blanked[a:b]):
             problems.append("pluginManagement: refers to dependencyResolutionManagement, so repositories added there come before its own mirror")
             break
     where = " and ".join(BLOCKS)
