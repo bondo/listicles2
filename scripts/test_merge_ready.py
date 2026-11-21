@@ -565,6 +565,17 @@ class GeneralKindTests(unittest.TestCase):
             with self.subTest(name):
                 self.refused(self.res_api(xml, patch='@@ -3 +3 @@\n-="string">probe</item>\n+="x">y</item>'), r"xml resource alias")
 
+    def test_a_res_xml_with_a_doctype_is_refused(self):  # R7-06 round 10: expat skips declarations after a parameter-entity reference, AGP applies them
+        alias = '<resources><item name="data_extraction_rules" type="&t;">@xml/backup_rules</item></resources>'
+        cases = {"entity after a parameter entity": '<!DOCTYPE resources [<!ENTITY % nothing ""> %nothing; <!ENTITY t "xml">]>' + alias,
+                 "attlist default": '<!DOCTYPE resources [<!ENTITY % nothing ""> %nothing; <!ATTLIST item type CDATA "xml">]>'
+                                    '<resources><item name="probe">@xml/backup_rules</item></resources>',
+                 "nested parameter entity": '<!DOCTYPE resources [<!ENTITY % p "<!ENTITY t \'xml\'>"> %p;]>' + alias,
+                 "plain doctype": '<!DOCTYPE resources><resources><string name="a">A</string></resources>'}
+        for name, xml in cases.items():
+            with self.subTest(name):
+                self.refused(self.res_api(xml), r"cannot be parsed")
+
     def test_an_unparseable_or_unreadable_res_xml_refuses_and_an_ordinary_one_merges(self):
         self.refused(self.res_api("<resources><item"), r"cannot be parsed")
         self.refused(self.res_api(""), r"cannot be parsed")
@@ -613,7 +624,9 @@ class GeneralKindTests(unittest.TestCase):
                  "status removed": base.replace('title = "A"\nstatus = "todo"\n', 'title = "A"\n'),
                  "comment on an owner status line": base.replace('title = "B"\nstatus = "todo"', 'title = "B"\nstatus = "todo"  # owner: done'),
                  "comment on an agent pr line": done.replace("pr = 7", "pr = 7  # another PR"),
-                 "pr-prefixed line inside a notes string": base.replace("first\n", "first\npr = 35 superseded: the owner waived the rule (#15); \\\n")}
+                 "pr-prefixed line inside a notes string": base.replace("first\n", "first\npr = 35 superseded: the owner waived the rule (#15); \\\n"),
+                 "canonical pr line inside a notes string": base.replace("first\n", "first\npr = 35\n"),
+                 "canonical status line inside a notes string": base.replace("first\n", 'first\nstatus = "dropped"\n')}
         for name, new in cases.items():
             with self.subTest(name):
                 self.refused(tasks_api(new), r"tasks\.toml")
