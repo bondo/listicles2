@@ -867,7 +867,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-09"]
-notes = "Includes the one-household check on the owner's member create (PLAN 3.1)"
+notes = "Includes the one-household check on the owner's member create (PLAN 3.1). Deny test: re-creating a tombstoned household id (#199). Transfer: allow on a household seeded with createdBy null; deny by a plain member (single update and full batch), by a non-member who names an existing member, and partial transfers (no role updates, only one role update); O(uid), not M(uid)"
 
 [[task]]
 id = "M1-11"
@@ -877,7 +877,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-12"]
-notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2"
+notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user; deny soft delete by a plain member or non-member; allow soft delete, tombstone read and cleanup with createdBy seeded null; deny every write under a tombstone except the cleanup deletes (#199, #205)"
 
 [[task]]
 id = "M1-12"
@@ -960,7 +960,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-12", "M1-30", "M1-02"]
+depends_on = ["M1-12", "M1-14", "M1-30", "M1-02"]
+notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name)"
 
 [[task]]
 id = "M1-31"
@@ -970,6 +971,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-11", "M1-18"]
+notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name)"
 
 [[task]]
 id = "M1-19"

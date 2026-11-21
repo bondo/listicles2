@@ -525,7 +525,7 @@ const SCREENS = [
   { id: '19', t: 'Delete account', refs: 'AUTH-04, OQ-5. A household owner with other members is first told to transfer ownership; nothing is deleted. Needs a connection.',
     f: s => `${topbar(s.account, { back: true })}${dialog({ icon: 'delete_forever', title: s.deleteAccountQ, body: s.deleteAccountBody,
       acts: `<span class="btn text">${s.cancel}</span><span class="btn text danger">${s.deleteAccount}</span>` })}` },
-  { id: '20', t: 'Household deleted notice', refs: 'HH-06, OQ-17. Shown once to each list creator at the next app start.',
+  { id: '20', t: 'Household deleted notice', refs: 'HH-06, OQ-17. Shown once to each list creator other than the owner who deleted it, at the next app start.',
     f: s => `${listsBar(s)}<div class="scroll" style="padding-top:var(--sp-s)">${LISTS.filter(l => !l.by).map(l => listRow(s, { ...l, shared: false })).join('')}</div>${dialog({
       icon: 'info', title: s.hhDeleted, body: s.hhDeletedBody(HH), acts: `<span class="btn text">${s.ok}</span>` })}` },
   { id: '21', t: 'Invite link without the app (web page)', refs: 'HH-02, HH-03, OQ-21. A plain web page in the phone browser; host and address not decided (owner item).',
