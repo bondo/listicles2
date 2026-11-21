@@ -2011,6 +2011,7 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         "Don't wait long then resolve the thread.",
         "Never wait a day then resolve the thread.",
         "Don't forget to reply then resolve the thread.",
+        "Not only reply and resolve the thread.",
         # shape (c): "In no ..." and a bare "No," are not a negation of the verb
         "In no particular order, resolve the threads.",
         "In no particular order, resolve the review threads once answered.",
@@ -2142,7 +2143,7 @@ class ResolveThreadSentenceTests(unittest.TestCase):
     OTHER_VERB_NEGATORS = ("Don't hesitate to", "Do not forget to", "Never fail to", "It is not hard to", "Agents should never wait to",
                            "Do not wait to", "Agents needn't wait to")
     THEN_STEPS = ("Don't wait long", "Never wait a day", "Don't forget to reply", "Do not hesitate")
-    COMMA_PHRASES = ("In no particular order,", "In no time,", "No,", "Need the owner? No,", "In no case,")
+    COMMA_PHRASES = ("In no particular order,", "In no time,", "No,", "Need the owner? No,", "In no way whatsoever,")
     ABBREVIATIONS = ("e.g.", "i.e.", "(e.g.")
     SEPARATORS = ("", "- ", "* ", "Note: ", "1. ", "| ")
 
@@ -2171,9 +2172,10 @@ class ResolveThreadSentenceTests(unittest.TestCase):
         bans = ("No agent may resolve the thread.", "No orchestrator or implementer may resolve the thread.",
                 "Not even the orchestrator may resolve the thread.", "Neither the orchestrator nor the reviewer may resolve the thread.",
                 "None of the agents may resolve the thread.", "Under no circumstances may you resolve the thread.",
-                "Do not reply and resolve the thread.", "Never approve and resolve the thread.", "Agents must never, not even with the API, resolve the thread.",
+                "Do not reply and resolve the thread.", "Never approve and resolve the thread.",
+                "Agents must never, not even with the API, resolve the thread.",
                 "Nobody may ever, for any reason, resolve the thread.", "Do not ever, for any reason, resolve the thread.")
-        leads = ("", "- ", "* ", "Note: ", "1. ", "If a collaborator asks, ", "When asked ")
+        leads = ("", "- ", "* ", "Note: ", "1. ", "If a collaborator asks, ", "| ")
         flagged = [lead + ban for lead in leads for ban in bans if prompt_rules.resolve_permissions(lead + ban + "\n")]
         self.assertEqual(flagged, [])
 

@@ -93,9 +93,9 @@ _CLOSE_OBJECT = r"(?:(?:the|a|an|any|their|all|each|every)\s+)?(?:[\w'`-]+\s+)?(
 _ADVERB = r"(?:(?:also|then|now|still|just)\s+)?"
 _MODAL = r"(?:may|can|could|should|must|will)"
 _TOOL = r"`?(?:mcp__\w+__)?(?:resolve_?review_?threads?|resolveReviewThread)\b"
-_LEAD = r"(?:^|[.:;,]\s+|[-*]\s+)"
+_LEAD = r"(?:^|[.:;,|]\s+|[-*]\s+|\b(?:e\.g|i\.e),?\s+)"
 # Pattern kinds decide which negation shape can suppress a match: "subject" starts with its own subject or "is allowed to", "conj" is
-# "and/then <act>", "lead" is an imperative after a sentence start, a bullet, a colon or a comma.
+# "and/then <act>", "lead" is an imperative after a sentence start, a bullet, a table cell, a colon, a comma or "e.g.".
 
 
 def _acts(sfx):
@@ -104,7 +104,7 @@ def _acts(sfx):
         (rf"(?:resolve{sfx}\s+{_THREAD}|close{sfx}\s+{_CLOSE_OBJECT})", False),
         (rf"resolve{sfx}\s+(?:it|them)\b", True),
         (rf"mark{sfx}\s+(?:it|them|{_NOUN})\s+(?:as\s+)?resolved\b", True),
-        (rf"(?:use|call|invoke|run){sfx}\s+(?:the\s+)?{_TOOL}", False),
+        (rf"(?:use|call|invoke){sfx}\s+(?:the\s+)?{_TOOL}(?!`?\s+(?:test|hook|check|case|rule|deny)s?\b)", False),
     )
 
 
@@ -124,44 +124,61 @@ def _resolve_patterns():
     # an article-free plural only starts a sentence or bullet.
     out.append((rf"{_LEAD}resolve\s+(?:the|a|an|any|their|all)\s+{_NOUN}", "lead", False))
     out.append((rf"{_LEAD}close\s+(?:the|a|an|any|their|all|each|every)\s+(?:[\w'`-]+\s+)?(?:threads?|conversations?)\b", "lead", False))
-    out.append((r"(?:^|[.:;]\s+|[-*]\s+)(?:resolve|close)\s+" + _NOUN, "lead", False))
+    out.append((r"(?:^|[.:;|]\s+|[-*]\s+|\b(?:e\.g|i\.e),?\s+)(?:resolve\s+" + _NOUN + r"|close\s+(?:[\w'`-]+\s+)?(?:threads?|conversations?)\b)",
+                "lead", False))
     return tuple(out)
 
 
 RESOLVE_PATTERNS = _resolve_patterns()
 _THREAD_WORD = re.compile(r"\b(?:threads?|conversations?)\b", re.I)
-_FOLLOW_ON = re.compile(r"\b(?:then|next|after that)\b", re.I)
+_FOLLOW_ON = re.compile(r"\b(?:then|next|after that)\b[\s,]*(?:\S+\s+){0,2}$", re.I)
 _LIST_ITEM = re.compile(r"\s*(?:[-*]|\d+\.)\s")
-_SENTENCE_END = re.compile(r"(?<=[.!?;])\s+")
+_SENTENCE_END = re.compile(r"(?<=[.!?;])(?<!\. \d\.)(?<!\. \d\d\.)\s+")  # a list number stays with its item
 _ABBREVIATION = re.compile(r"\b(e\.g|i\.e)\.", re.I)
+_LIST_MARKER = re.compile(r"^\s*(?:[-*|]|\d+\.)\s+")  # a bullet, table cell or list number in front of the sentence
 _BOUNDARY = re.compile(r"[:;()–—/]|\s-{1,2}\s")  # the scope of a negation never crosses these
 _SUBJECT_WORD = r"(?:the|or|nor|of|you|agents?|(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?|escalation|design|second)"
 _OPENER = r"(?:no|not even|neither|none of|nobody)"
 _LEAD_WORDS = r"(?:if|when|whenever|once|after|before|unless|until|because|since|while|although|though)"
-_STOP = r"(?:and|but|so|or|nor|then|if|when|whenever|while|because|unless|once|after|before|until|since)"
+_STOP = r"(?:and|but|so|or|nor|then|only|if|when|whenever|while|because|unless|once|after|before|until|since)"
 _WORD = rf"(?!{_STOP}\b)[\w'`-]+\s+"
+_LEAD_CLAUSE = re.compile(rf"^\s*{_LEAD_WORDS}\b[^,]*,\s*", re.I)  # "If asked, ...": a conditional lead clause does not change the shape
 _NEGATOR = r"(?:(?:do|does|did)\s+not|(?:must|should|may|can|could|will|shall)\s+not|cannot|\w*n't|never|not)"
-# "No orchestrator or implementer may ...", "Not even the reviewer ...", "When asked no agent may ..." (a lead clause is skipped)
+_NP = r"(?:the\s+)?(?:(?:escalation|design|second)[\s-]+)?(?:you|agents?|(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
+_CHAIN = rf"{_NP}(?:\s+(?:or|nor)\s+{_NP})*"
+_SKIP_LEAD = rf"\s*(?:{_LEAD_WORDS}\b\s+(?:[^,]*,\s*|[\w'-]+(?:\s+[\w'-]+)*?\s+))?"
+# Agent-led match: the prefix is the opener itself or a coordination the match's agent continues ("No orchestrator or", "Neither the
+# orchestrator nor the"); a lead clause is skipped ("When asked no agent may ..."), but its own "no <noun>" is not the opener.
 _NEGATED_SUBJECT = re.compile(
-    rf"\s*(?:{_LEAD_WORDS}\b\s+(?:[^,]*,\s*|[\w'-]+(?:\s+[\w'-]+)*?\s+))?{_OPENER}(?:\s+{_SUBJECT_WORD})*\s*$", re.I)
-_FRONTED = re.compile(r"\s*(?:at|under|in|on|by)\s+no\s+\w+(?:\s+\w+)?\s+(?:may|can|could|should|must|will)\s+(?:the\s+)?$", re.I)
-# "Do not reply and resolve ...", "Never approve and resolve ...": a negator, then a few plain words (no comma, no conjunction)
-_NEGATED_CONJUNCTION = re.compile(rf"\s*(?:{_WORD}){{0,3}}{_NEGATOR}\s+(?:ever\s+)?(?:{_WORD}){{0,3}}$", re.I)
+    rf"{_SKIP_LEAD}(?:no|not even|neither|none of)(?:\s+{_CHAIN}\s+(?:or|nor))?(?:\s+the)?(?:\s+(?:escalation|design|second))?\s*$", re.I)
+# "is allowed to": the opener and exactly one coordinated noun phrase ("No agent is allowed", "Nobody is allowed")
+_NEGATED_NP = re.compile(rf"{_SKIP_LEAD}(?:nobody|(?:no|not even|neither|none of)\s+{_CHAIN})\s*$", re.I)
+_NO_PHRASE = r"(?:at no (?:point|time)|under no circumstances?|in no case|on no account|by no means|in no way)"
+_FRONTED = re.compile(rf"\s*{_NO_PHRASE}\s+(?:may|can|could|should|must|will)\s+(?:the\s+)?$", re.I)
+# "Do not reply and resolve ...", "Never approve and resolve ...": a negator, then a few plain words (no comma, no conjunction, no "to": an
+# infinitive means the negator governs another verb, "Don't hesitate to reply and resolve ...")
+_NEGATED_CONJUNCTION = re.compile(rf"\s*(?:{_WORD}){{0,3}}{_NEGATOR}\s+(?:ever\s+)?(?:(?!to\b){_WORD}){{0,3}}$", re.I)
 # "Agents must never, not even with the API, resolve ...": the first comma segment ends with the negation, the others are asides
 _NEGATION_SEGMENT = re.compile(
     rf"\s*(?:(?:{_WORD}){{0,3}}{_NEGATOR}(?:\s+ever|\s+at any (?:time|point))?"
-    rf"|{_OPENER}(?:\s+{_SUBJECT_WORD})*(?:\s+{_MODAL})?(?:\s+ever)?|(?:at|under|in|on|by)\s+no\s+\w+(?:\s+\w+)?)\s*$", re.I)
+    rf"|(?:nobody|{_OPENER}\s+{_CHAIN})\s+{_MODAL}(?:\s+ever)?|{_NO_PHRASE})\s*$", re.I)
 _ASIDE = re.compile(r"\s*(?:not even|even|for any reason|under any circumstances|in any case|at any time|at any point|no matter)\b", re.I)
 
 
 def _negated(kind, sentence, match):
     """True if a negation provably governs this match, in one of the simple shapes above. Everything else is not negated (fail closed)."""
-    prefix = _BOUNDARY.split(sentence[: match.start()])[-1]
+    prefix = _LEAD_CLAUSE.sub("", _LIST_MARKER.sub("", _BOUNDARY.split(sentence[: match.start()])[-1]))
+    matched = match.group()
     if kind == "subject":
-        return bool(_NEGATED_SUBJECT.match(prefix) or _FRONTED.match(prefix))
-    if kind == "conj":
-        return bool(_NEGATED_CONJUNCTION.match(prefix))
-    if match.group()[:1] != ",":  # a sentence, bullet, colon or dash starts a clause of its own
+        if matched.lower().startswith("feel"):  # an imperative: there is no subject to negate
+            return False
+        if re.match(_AGENT, matched, re.I):  # "no" is a determiner only before a bare noun ("no agent", not "no the", "no you")
+            bare = not re.match(r"(?:the|you)\b", matched, re.I) or not re.search(r"\bno\s*$", prefix, re.I)
+            return bool(bare and _NEGATED_SUBJECT.match(prefix) or _FRONTED.match(prefix))
+        return bool(_NEGATED_NP.match(prefix))
+    if kind == "conj":  # "then <act>" is a next step: a negation of the step before it does not reach it (as on main)
+        return not matched.lower().startswith("then") and bool(_NEGATED_CONJUNCTION.match(prefix))
+    if matched[:1] != ",":  # a sentence, bullet, colon or dash starts a clause of its own
         return False
     segments = prefix.split(",")
     return bool(_NEGATION_SEGMENT.match(segments[0])) and all(_ASIDE.match(x) for x in segments[1:])
@@ -190,7 +207,14 @@ def _has_thread(earlier, sentence, match):
     resolve it." is flagged, because the sentence names a thread."""
     if _THREAD_WORD.search(sentence):
         return True
-    return bool(_THREAD_WORD.search(earlier) and (_FOLLOW_ON.search(sentence[: match.end()]) or _LIST_ITEM.match(sentence)))
+    verb = list(re.finditer(r"\b(?:resolves?|marks?)\b", sentence[: match.end()], re.I))[-1].start()
+    led = _FOLLOW_ON.search(sentence[:verb])  # the follow-on word leads the act: at most two words between it and the verb
+    return bool(_THREAD_WORD.search(earlier) and (led or _LIST_ITEM.match(sentence)))
+
+
+_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_EMPHASIS = re.compile(r"(?<![\w*])(\*\*|\*|__|_)(?=\S)(.+?)(?<=\S)\1(?![\w*])")  # not inside a word: the __ of a tool name stays
+_BUTTON = re.compile(r"^\s*[-*]\s+\*\*[^*\n]+\*\*\s*$", re.M)  # a bullet that is only a bold button name (COLLABORATING's do-not-press list)
 
 
 def resolve_permissions(text):
@@ -198,7 +222,8 @@ def resolve_permissions(text):
     found = []
     for block in _blocks(text):
         earlier = ""
-        for sentence in _SENTENCE_END.split(_ABBREVIATION.sub(r"\1", normalize_sentences(block))):
+        plain = _EMPHASIS.sub(r"\2", _LINK.sub(r"\1", normalize_sentences(_BUTTON.sub("", block))))
+        for sentence in _SENTENCE_END.split(_ABBREVIATION.sub(r"\1", plain)):
             for pattern, kind, needs_thread in RESOLVE_PATTERNS:
                 for m in re.finditer(pattern, sentence, re.I) if pattern not in found else ():
                     if (not needs_thread or _has_thread(earlier, sentence, m)) and not _negated(kind, sentence, m):
