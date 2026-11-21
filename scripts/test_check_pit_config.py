@@ -22,7 +22,7 @@ def read(*parts):
 GOOD_DOMAIN = (
     "plugins {\n    alias(libs.plugins.pitest)\n}\n"
     "pitest {\n    pitestVersion.set(libs.versions.pitest.get())\n    junit5PluginVersion.set(\"1.2.3\")\n"
-    "    avoidCallsTo.set(setOf(\"kotlin.jvm.internal.Intrinsics\"))\n"
+    "    mutators.set(listOf(\"CONDITIONALS_BOUNDARY\", \"NEGATE_CONDITIONALS\", \"EMPTY_RETURNS\"))\n"
     '    targetClasses.set(listOf("dk.bjarkebjarke.tally.domain.*"))\n    mutationThreshold.set(80)\n}\n'
 )
 GOOD_ROOT = "tasks.named(\"koverVerify\") { dependsOn(\":core:domain:pitest\") }\n"
@@ -69,6 +69,24 @@ class Negative(unittest.TestCase):
 
     def test_target_must_be_domain_package(self):
         self.assertTrue(self.check(domain=GOOD_DOMAIN.replace("tally.domain.*", "tally.other.*")))
+
+    def test_avoid_calls_and_exclusions_are_refused(self):
+        # avoidCallsTo drops every mutant on a line that calls the class, so it empties the gate (review R1-02).
+        for extra in (
+            '    avoidCallsTo.set(setOf("kotlin.jvm.internal.Intrinsics"))\n',
+            '    avoidCallsTo.set(setOf("kotlin"))\n',
+            '    excludedClasses.set(listOf("dk.bjarkebjarke.tally.domain.*"))\n',
+            '    excludedMethods.set(listOf("of"))\n',
+            '    excludedTestClasses.set(listOf("*Test"))\n',
+        ):
+            with self.subTest(extra=extra):
+                self.assertTrue(self.check(domain=GOOD_DOMAIN.replace("}\n", extra + "}\n")))
+
+    def test_mutators_are_pinned_and_keep_conditionals(self):
+        no_mutators = GOOD_DOMAIN.replace('    mutators.set(listOf("CONDITIONALS_BOUNDARY", "NEGATE_CONDITIONALS", "EMPTY_RETURNS"))\n', "")
+        self.assertTrue(self.check(domain=no_mutators))
+        self.assertTrue(self.check(domain=GOOD_DOMAIN.replace('"CONDITIONALS_BOUNDARY", ', "")))
+        self.assertTrue(self.check(domain=GOOD_DOMAIN.replace('"NEGATE_CONDITIONALS"', '"NEGATE_CONDITIONALS", "VOID_METHOD_CALLS"')))
 
     def test_ci_wiring_via_koverVerify_required(self):
         self.assertTrue(self.check(root="// no wiring\n"))
