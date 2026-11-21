@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 5/65 (7%) | 60 |
+| M1 | Accounts and households | 6/65 (9%) | 59 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -34,11 +34,11 @@ Gradle skeleton, CI, hooks, review loop and agent setup, proven green on a hello
 | M0-07 | Prove the gates&#58; CI green on GitHub, a deliberately broken commit fails CI, then revert | done | M0-04, M0-05, M0-06, M0-O1 | implementer | [#1](https://github.com/bondo/listicles2/issues/1) |
 | M0-08 | Branch-protection guide for the owner | done | M0-03 | implementer | [#34](https://github.com/bondo/listicles2/issues/34) |
 | M0-09 | Orchestration process&#58; docs/ORCHESTRATION.md, state template, task graph + scripts/tasks.py | done | none | process | [#16](https://github.com/bondo/listicles2/issues/16) |
-| M0-10 | Tooling session A&#58; run tasks.py and its tests in CI and verify.sh; CODEOWNERS for the process docs | done | none | implementer |  |
+| M0-10 | Tooling session A&#58; run tasks.py and its tests in CI and verify.sh; CODEOWNERS for the process docs | done | none | implementer | [#35](https://github.com/bondo/listicles2/issues/35) |
 | M0-11 | Tooling session B&#58; align REVIEW.md, CLAUDE.md, agents/prompts, handoff template with ORCHESTR… | done | M0-04, M0-05, M0-10, M0-12 | implementer | [#80](https://github.com/bondo/listicles2/issues/80) |
 | M0-12 | Follow-ups process&#58; docs/FOLLOW-UPS.md, tasks.py follow-up counts and burn-down checks | done | none | process | [#16](https://github.com/bondo/listicles2/issues/16) |
 | M0-13 | Process and tooling review (#20)&#58; written review in docs/, prioritised proposals with effort an… | done | none | process | [#33](https://github.com/bondo/listicles2/issues/33) |
-| M0-14 | Turn the proposals the owner adopts (M0-O11) into PR-sized tasks with dependencies; open follow… | done | M0-13, M0-O11 | planner |  |
+| M0-14 | Turn the proposals the owner adopts (M0-O11) into PR-sized tasks with dependencies; open follow… | done | M0-13, M0-O11 | planner | [#37](https://github.com/bondo/listicles2/issues/37) |
 | M0-15 | Lower the big-pr diff cap in ci.yml from 6000 to 1500 (D2) | done | M0-O11 | implementer | [#36](https://github.com/bondo/listicles2/issues/36) |
 | M0-16 | Close follow-ups #21-#26 as by-design once branch protection is confirmed on (D1) | done | M0-O6 | process |  |
 | M0-FU | Follow-up burn-down for M0 (close or re-defer each open follow-up targeting M0) | done | M0-01, M0-02, M0-03, M0-04, M0-05, M0-06, M0-07, M0-08, M0-09, M0-10, M0-11, M0-12, M0-13, M0-14, M0-15, M0-16 | implementer |  |
@@ -81,23 +81,23 @@ User stories, app flow, design tokens and the test, lint and review guardrails, 
 | M0.5-11 | Konsist&#58; no floating point in core/domain, no raw colors/dp in UI; network-blocking JUnit extens… | done | M0-O11 | implementer | [#59](https://github.com/bondo/listicles2/issues/59) |
 | M0.5-12 | Docs check&#58; relative links and backticked repo paths exist, planned paths allowlisted (P12) | done | M0.5-05, M0-11 | implementer | [#78](https://github.com/bondo/listicles2/issues/78) |
 | M0.5-13 | Metrics&#58; orchestrator CSV comments per ORCHESTRATION 6 and scripts/agent_metrics.py to docs/age… | done | M0-O11 | implementer | [#58](https://github.com/bondo/listicles2/issues/58) |
-| M0.5-14 | ORCHESTRATION.md retro changes&#58; delta review, one batch per PR, env pick, default deferral, early… | done | M0-O11 | process |  |
-| M0.5-15 | Prompts&#58; design-reviewer role and checklist, PR-body refresh, delta review, environment pick (P… | done | M0-11, M0.5-14, M0.5-23 | implementer |  |
+| M0.5-14 | ORCHESTRATION.md retro changes&#58; delta review, one batch per PR, env pick, default deferral, early… | done | M0-O11 | process | [#41](https://github.com/bondo/listicles2/issues/41) |
+| M0.5-15 | Prompts&#58; design-reviewer role and checklist, PR-body refresh, delta review, environment pick (P… | done | M0-11, M0.5-14, M0.5-23 | implementer | [#83](https://github.com/bondo/listicles2/issues/83) |
 | M0.5-FU | Follow-up burn-down for M0.5 | done | M0.5-01, M0.5-02, M0.5-03, M0.5-04, M0.5-05, M0.5-06, M0.5-07, M0.5-08, M0.5-09, M0.5-10, M0.5-11, M0.5-12, M0.5-13, M0.5-14, M0.5-15, M0.5-16, M0.5-17, M0.5-18, M0.5-19, M0.5-20, M0.5-21, M0.5-22, M0.5-23, M0.5-24, M0.5-25, M0.5-26, M0.5-27, M0.5-28, M0.5-29 | implementer |  |
 | M0.5-27 | Status picture on the README&#58; scripts render docs/tasks.toml plus PR and issue state to an SVG, a… | done | none | implementer | [#71](https://github.com/bondo/listicles2/issues/71) |
 | M0.5-O1 | Approve stories, flow and design | done | M0.5-01, M0.5-02, M0.5-03 | owner |  |
 | M0.5-O2 | Pick the app and repo name from the shortlist | done | M0.5-04 | owner | [#77](https://github.com/bondo/listicles2/issues/77) |
 | M0.5-O3 | Log collaborator decisions D1-D7, create the five labels, check Actions settings (C5) | done | none | owner |  |
 | M0.5-16 | COLLABORATING.md plus ORCHESTRATION, PLAN and orchestrator-state changes for the collaborator | done | M0.5-O3 | process | [#55](https://github.com/bondo/listicles2/issues/55) |
-| M0.5-17 | Issue forms for feedback, ideas and questions, with a test that parses them | done | M0.5-O3 | implementer |  |
-| M0.5-18 | scripts/collab_inbox.py&#58; digest of trusted collaborator activity since a time, from saved API JSON | done | M0.5-17 | implementer |  |
-| M0.5-19 | Orchestrator and worker prompts&#58; inbox and accident-check wake steps, tiers, fenced text, label … | done | M0.5-16, M0.5-18 | implementer |  |
+| M0.5-17 | Issue forms for feedback, ideas and questions, with a test that parses them | done | M0.5-O3 | implementer | [#56](https://github.com/bondo/listicles2/issues/56) |
+| M0.5-18 | scripts/collab_inbox.py&#58; digest of trusted collaborator activity since a time, from saved API JSON | done | M0.5-17 | implementer | [#64](https://github.com/bondo/listicles2/issues/64) |
+| M0.5-19 | Orchestrator and worker prompts&#58; inbox and accident-check wake steps, tiers, fenced text, label … | done | M0.5-16, M0.5-18 | implementer | [#67](https://github.com/bondo/listicles2/issues/67) |
 | M0.5-20 | docs/ANDROID-BEST-PRACTICES.md&#58; checklist from Google's Android guidance, enforced vs reviewer-c… | done | none | process | [#62](https://github.com/bondo/listicles2/issues/62) |
 | M0.5-21 | Usage-limit handling&#58; ORCHESTRATION pause protocol, early warning, limit failures are not stalls… | done | M0.5-13 | process | [#63](https://github.com/bondo/listicles2/issues/63) |
 | M0.5-22 | CLAUDE.md&#58; allow one reviewer session to review several small docs-only PRs (the pending bulle… | done | M0.5-21 | implementer | [#93](https://github.com/bondo/listicles2/issues/93) |
-| M0.5-23 | docs/reviews/README.md&#58; review catalogue R1-R12, procedures, visual-quality rubric, meta-revie… | done | M0.5-21 | implementer |  |
-| M0.5-24 | scripts/agent_metrics.py&#58; &#96;review&#96; row type (ledger of docs/reviews/README.md section 5), fai… | done | M0.5-23 | implementer |  |
-| M0.5-25 | Orchestrator prompt&#58; R3 weekly digest step, ledger row after each review, R10 owner-todo per … | done | M0.5-19, M0.5-21, M0.5-23 | implementer |  |
+| M0.5-23 | docs/reviews/README.md&#58; review catalogue R1-R12, procedures, visual-quality rubric, meta-revie… | done | M0.5-21 | implementer | [#72](https://github.com/bondo/listicles2/issues/72) |
+| M0.5-24 | scripts/agent_metrics.py&#58; &#96;review&#96; row type (ledger of docs/reviews/README.md section 5), fai… | done | M0.5-23 | implementer | [#73](https://github.com/bondo/listicles2/issues/73) |
+| M0.5-25 | Orchestrator prompt&#58; R3 weekly digest step, ledger row after each review, R10 owner-todo per … | done | M0.5-19, M0.5-21, M0.5-23 | implementer | [#74](https://github.com/bondo/listicles2/issues/74) |
 | M0.5-26 | REVIEW.md&#58; R9 visual-rubric item (agent score below 3 is a minor finding) and R7 rules allow/… | done | M0.5-03, M0.5-15, M0.5-23 | implementer | [#133](https://github.com/bondo/listicles2/issues/133) |
 | M0.5-O4 | Collaborator invite sent and accepted | done | M0.5-19, M0.5-O3 | owner |  |
 | M0.5-O5 | Confirm the collaborator's 2FA and run the live test | done | M0.5-O4 | owner |  |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 5/65 done (7%), 60 open.
+**Progress:** 6/65 done (9%), 59 open.
 
 ### Tasks
 
@@ -159,7 +159,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | ready | M1-01 | implementer |  |
 | M1-51 | Build guards&#58; catalog-only coordinates, targetSdk floor, manifest cleartext and backup (checklist … | ready | M1-01 | implementer |  |
 | M1-35 | PLAN amendments from the follow-up triage (P1-P9 rules and users name, quota risk, PIT 80, ui … | ready | M1-01 | planner |  |
-| M1-36 | Product docs&#58; start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 … | in progress | M1-O7 | planner | [#264](https://github.com/bondo/listicles2/issues/264) |
+| M1-36 | Product docs&#58; start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 … | done | M1-O7 | planner |  |
 | M1-37 | JVM modules&#58; check Java API use against minSdk 26 with api-versions.xml (issue 228) | ready | M1-01 | implementer |  |
 | M1-38 | Run the licensee and warnings gate self-tests only when their inputs change; licensee version as … | done | M1-01 | implementer |  |
 | M1-39 | Your name (AUTH-12)&#58; users/{uid}.name, name step at first Google sign-in and at start, edit in A… | blocked | M1-08, M1-10, M1-18, M1-17, M1-25 | implementer |  |
@@ -228,28 +228,27 @@ flowchart LR
     n35["M1-50 Konsist: no data source in composables… (ready)"]:::ready
     n36["M1-51 Build guards: catalog-only coordinates,… (ready)"]:::ready
     n37["M1-35 PLAN amendments from the follow-up … (ready)"]:::ready
-    n38["M1-36 Product docs: start-up gates, M1 home… (in progress)"]:::progress
-    n39["M1-37 JVM modules: check Java API use again… (ready)"]:::ready
-    n40["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n41["M1-40 Process docs wording: owner-merge ex… (ready)"]:::ready
-    n42["M1-41 check_gradle_repos.py: dotted repositor… (ready)"]:::ready
-    n43["M1-42 guards check 2c: actionlint flags and r… (ready)"]:::ready
-    n44["M1-43 prompt_rules.py: sentence-level negati… (ready)"]:::ready
-    n45["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
-    n46["M1-45 merge_ready.py nits still open after P… (ready)"]:::ready
-    n47["M1-46 build-logic convention plugins#59; no allp… (blocked)"]:::blocked
-    n48["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n49["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n50["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n51["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n52["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n53["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n54["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n55["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n56["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n57["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n58["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n59["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
+    n38["M1-37 JVM modules: check Java API use again… (ready)"]:::ready
+    n39["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
+    n40["M1-40 Process docs wording: owner-merge ex… (ready)"]:::ready
+    n41["M1-41 check_gradle_repos.py: dotted repositor… (ready)"]:::ready
+    n42["M1-42 guards check 2c: actionlint flags and r… (ready)"]:::ready
+    n43["M1-43 prompt_rules.py: sentence-level negati… (ready)"]:::ready
+    n44["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
+    n45["M1-45 merge_ready.py nits still open after P… (ready)"]:::ready
+    n46["M1-46 build-logic convention plugins#59; no allp… (blocked)"]:::blocked
+    n47["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n48["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n49["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n50["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n51["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n52["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n53["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n54["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n55["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n56["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
+    n57["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
+    n58["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
     n1 --> n2
     n8 --> n4
     n31 --> n6
@@ -259,8 +258,7 @@ flowchart LR
     n32 --> n9
     n8 --> n10
     n0 --> n11
-    n38 --> n11
-    n39 --> n12
+    n38 --> n12
     n11 --> n13
     n12 --> n13
     n0 --> n13
@@ -286,7 +284,7 @@ flowchart LR
     n23 --> n24
     n22 --> n24
     n24 --> n25
-    n53 --> n25
+    n52 --> n25
     n11 --> n26
     n13 --> n26
     n11 --> n27
@@ -296,25 +294,72 @@ flowchart LR
     n37 --> n31
     n8 --> n32
     n10 --> n33
-    n6 --> n40
-    n8 --> n40
-    n18 --> n40
-    n16 --> n40
-    n26 --> n40
-    n0 --> n47
+    n6 --> n39
+    n8 --> n39
+    n18 --> n39
+    n16 --> n39
+    n26 --> n39
+    n0 --> n46
+    n15 --> n47
+    n16 --> n47
+    n20 --> n47
+    n21 --> n47
+    n22 --> n47
+    n23 --> n47
+    n25 --> n47
+    n26 --> n47
+    n28 --> n47
+    n24 --> n47
+    n39 --> n47
+    n1 --> n47
+    n2 --> n47
+    n0 --> n48
+    n1 --> n48
+    n2 --> n48
+    n3 --> n48
+    n4 --> n48
+    n5 --> n48
+    n6 --> n48
+    n7 --> n48
+    n8 --> n48
+    n9 --> n48
+    n10 --> n48
+    n12 --> n48
+    n13 --> n48
+    n14 --> n48
     n15 --> n48
     n16 --> n48
+    n18 --> n48
     n20 --> n48
     n21 --> n48
     n22 --> n48
     n23 --> n48
     n25 --> n48
+    n17 --> n48
     n26 --> n48
+    n27 --> n48
     n28 --> n48
+    n29 --> n48
+    n11 --> n48
+    n19 --> n48
     n24 --> n48
+    n30 --> n48
+    n37 --> n48
+    n38 --> n48
+    n39 --> n48
     n40 --> n48
-    n1 --> n48
-    n2 --> n48
+    n41 --> n48
+    n42 --> n48
+    n43 --> n48
+    n44 --> n48
+    n45 --> n48
+    n46 --> n48
+    n47 --> n48
+    n35 --> n48
+    n36 --> n48
+    n31 --> n48
+    n32 --> n48
+    n33 --> n48
     n0 --> n49
     n1 --> n49
     n2 --> n49
@@ -363,65 +408,16 @@ flowchart LR
     n31 --> n49
     n32 --> n49
     n33 --> n49
-    n0 --> n50
-    n1 --> n50
-    n2 --> n50
-    n3 --> n50
-    n4 --> n50
-    n5 --> n50
-    n6 --> n50
-    n7 --> n50
-    n8 --> n50
-    n9 --> n50
-    n10 --> n50
-    n12 --> n50
-    n13 --> n50
-    n14 --> n50
-    n15 --> n50
-    n16 --> n50
-    n18 --> n50
-    n20 --> n50
-    n21 --> n50
-    n22 --> n50
-    n23 --> n50
-    n25 --> n50
-    n17 --> n50
-    n26 --> n50
-    n27 --> n50
-    n28 --> n50
-    n29 --> n50
-    n11 --> n50
-    n19 --> n50
-    n24 --> n50
-    n30 --> n50
-    n37 --> n50
-    n38 --> n50
-    n39 --> n50
-    n40 --> n50
-    n41 --> n50
-    n42 --> n50
-    n43 --> n50
-    n44 --> n50
-    n45 --> n50
-    n46 --> n50
-    n47 --> n50
-    n48 --> n50
-    n49 --> n50
-    n35 --> n50
-    n36 --> n50
-    n31 --> n50
-    n32 --> n50
-    n33 --> n50
-    n34 --> n50
-    n59 --> n51
-    n51 --> n52
-    n51 --> n53
-    n51 --> n54
-    n27 --> n54
-    n29 --> n55
-    n51 --> n56
-    n9 --> n56
-    n45 --> n58
+    n34 --> n49
+    n58 --> n50
+    n50 --> n51
+    n50 --> n52
+    n50 --> n53
+    n27 --> n53
+    n29 --> n54
+    n50 --> n55
+    n9 --> n55
+    n44 --> n57
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -462,19 +458,19 @@ flowchart LR
 
 ## M3 Packing rules (domain)
 
-Scaling, per-person templates and merging as property-tested pure Kotlin.
+(After v1.) Scaling, per-person templates and merging as property-tested pure Kotlin.
 
 Not planned yet.
 
 ## M4 Packing templates and trips
 
-Template and rule editor, create a trip, trip checklist and one-off items.
+(After v1.) Template and rule editor, create a trip, trip checklist and one-off items.
 
 Not planned yet.
 
 ## M5 Barcode scanning
 
-Camera scanning, product lookup with a fallback to manual entry, duplicate warning.
+(After v1.) Camera scanning, product lookup with a fallback to manual entry, duplicate warning.
 
 Not planned yet.
 
@@ -519,7 +515,6 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **PR to merge** [#249](https://github.com/bondo/listicles2/issues/249): guards&#58; compare line length per tool across style files (#176)
 - **task** M1-04: waits on M1-03
 - **task** M1-06: waits on M1-10
 - **task** M1-08: waits on M1-52
@@ -527,7 +522,7 @@ flowchart LR
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-12: waits on M1-10
-- **task** M1-30: waits on M1-02, M1-36
+- **task** M1-30: waits on M1-02
 - **task** M1-13: waits on M1-37
 - **task** M1-14: waits on M1-30, M1-13, M1-02 +1
 - **task** M1-15: waits on M1-14
@@ -551,8 +546,8 @@ flowchart LR
 - **task** M1-39: waits on M1-08, M1-10, M1-18 +2
 - **task** M1-46: waits on M1-02
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +10
-- **task** M1-48: waits on M1-02, M1-03, M1-04 +45
-- **task** M1-FU: waits on M1-02, M1-03, M1-04 +47
+- **task** M1-48: waits on M1-02, M1-03, M1-04 +44
+- **task** M1-FU: waits on M1-02, M1-03, M1-04 +46
 - **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
