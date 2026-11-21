@@ -184,7 +184,9 @@ _CLAUSE_START = rf"\s*(?:please\s+)?{_DETERMINER}(?:{_NP}\s+(?:{_MODAL}\s+)?)?"
 # another verb, "Don't hesitate to reply and resolve ...")
 _CONJ_NEGATOR = rf"(?:(?:please\s+)?(?:do\s+not|don't|never)|{_DETERMINER}{_NP}\s+(?:{_MODAL}\s+)?{_NEGATOR})"
 # an adverb after the negator takes the negation off the act ("Do not immediately reply and resolve ...", "Don't always ..."): no ban
-_ADVERB_WORD = r"(?:(?!(?:re|ap|com|sup)ply\b)\w+ly|always|first|yet|still|also|often|again|anymore)"
+# (also a phrase: "Agents do not by default reply and resolve ..."; not "again": "Never again reply and resolve ..." is a ban)
+_ADVERB_WORD = (r"(?:(?!(?:re|ap|com|sup)ply\b)\w+ly|always|first|yet|still|also|often"
+                r"|by\s+default|in\s+general|(?:right|straight)\s+away|(?:for|right)\s+now)")
 _NEGATED_CONJUNCTION = re.compile(rf"\s*{_CONJ_NEGATOR}\s+(?:ever\s+)?(?:(?!(?:to|{_ADVERB_WORD})\b){_WORD}){{0,3}}$", re.I)
 # "Agents must never, not even with the API, resolve ...": the first comma segment ends with the negation, the others are asides
 _NEGATION_SEGMENT = re.compile(
@@ -197,10 +199,11 @@ def _negated(kind, sentence, match):
     """True if a negation provably governs this match, in one of the simple shapes above. Everything else is not negated (fail closed).
     Accepted false negatives (each also reads as a ban): a lead clause without its comma that ends in the opener ("Unless the owner says no
     agents are allowed to resolve the thread."), a bare answer before a comma ("Need the owner? Never, resolve the thread.", "Wait for
-    approval? You don't, resolve the thread.") and a run-on with no comma ("Do not wait reply and resolve the thread."). Accepted false
-    positives: a ban whose subject has a relative clause ("Implementers who disagree must not reply and resolve the thread."), an adverb
-    or a subject outside the closed template ("Agents also must not ...", "Absolutely do not ...", "Claude must not ...") and the cases
-    named above _resolve_patterns."""
+    approval? You don't, resolve the thread."), a run-on with no comma ("Do not wait reply and resolve the thread.") and a phrase after the
+    negator outside the adverb class ("Do not both reply and resolve the thread.", "Do not without asking reply and resolve the thread.").
+    Accepted false positives: a ban whose subject has a relative clause ("Implementers who disagree must not reply and resolve the
+    thread."), an adverb or a subject outside the closed template ("Agents also must not ...", "Absolutely do not ...", "Claude must not
+    ...") and the cases named above _resolve_patterns."""
     if sentence.rstrip().endswith("?"):  # "Why don't you reply and resolve ...?" suggests; a question bans nothing
         return False
     prefix = _LEAD_CLAUSE.sub("", _LIST_MARKER.sub("", _BOUNDARY.split(sentence[: match.start()])[-1]))
