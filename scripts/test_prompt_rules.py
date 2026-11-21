@@ -2387,7 +2387,8 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
 
     # Rule 2: a Sonnet medium re-check of a small fix-only or docs-only commit; full rounds stay Opus.
     def test_a_weakened_recheck_rule_is_rejected(self):
-        self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "done by a fresh sonnet medium reviewer", "done by a fresh opus max reviewer"))
+        self.assertIn("orch-token-rules", self.doc_replace(
+            "docs/ORCHESTRATION.md", "done by a fresh sonnet medium reviewer", "done by a fresh opus max reviewer"))
         self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "full rounds stay opus", "full rounds are sonnet"))
         self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "each about 30 changed lines or fewer, or docs only", "of any size"))
         self.assertIn("orch-token-rules", self.role_replace("orchestrator", "goes to a sonnet medium `recheck-reviewer`; full rounds stay opus",
@@ -2458,7 +2459,7 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
         for old, new in (
             ("(`:core:data` and `:app` prs)", "(`:core:data` prs)"),
             ("tracked on m6", "tracked on m1"),
-            ("is a `minor` finding", "is a `nit`"),
+            ("a hard-coded dispatcher is a `minor` finding", "a hard-coded dispatcher is a `nit`"),
             ("`dispatchers.io`, `dispatchers.default` or `dispatchers.main`", "`dispatchers.io`"),
         ):
             with self.subTest(old=old):
@@ -2472,7 +2473,8 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
             "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\nThe `owner-todo` label is not created yet.\n"))
         self.assertIn("followups-title-forms", self.doc_ids(
             "docs/FOLLOW-UPS.md", self.doc("docs/FOLLOW-UPS.md") + "\nIssue title: `[follow-up] <finding title>`. Labels exist.\n"))
-        self.assertIn("followups-burndown-alerts", self.doc_replace("docs/FOLLOW-UPS.md", "it also reviews every open dependabot alert", "it also closes nothing"))
+        self.assertIn("followups-burndown-alerts", self.doc_replace(
+            "docs/FOLLOW-UPS.md", "it also reviews every open dependabot alert", "it also closes nothing"))
 
 
 if __name__ == "__main__":

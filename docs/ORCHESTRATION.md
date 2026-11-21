@@ -13,7 +13,7 @@ If they disagree, fix the disagreement in a PR rather than picking one.
 | **Owner** (human) | n/a | n/a | GitHub settings, labels, merges, decisions | n/a |
 | **Orchestrator** | Opus / medium | Long-lived; hands over (§5) | The state issue (body and comments), owner-todo and follow-up issues, draft PRs, Dependabot PR closes, scheduled tasks, session tags | Commits, pushes (the one exception: the server-side `update_pull_request_branch` of §7.5), edits files, reviews code, reads whole transcripts, merges |
 | **Implementer** | Opus / high (max for `risk:high`) or Sonnet / medium (high for tooling), by the split of PLAN §9.1 and `agents/roles.yaml` | One batch or PR | Its branch only; `handoff/<branch>.md`; one result comment on its PR; only when no orchestrator is active: follow-up issues, the deferral decision and the `accepted:` comment as PR comments (FOLLOW-UPS.md §4) | Pushes to `main` or to any branch it was not assigned |
-| **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
+| **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`); the re-check of a small fix-only or docs-only commit is Sonnet / medium (§7.2.3) | One review round | One findings comment on the PR | **Edits or pushes to the PR branch (never, §7.2)**, approves or merges |
 | **Merge agent** | Sonnet / medium | Long-lived; started by the orchestrator (§7.5) | Squash merges of READY PRs, through `scripts/merge_ready.py` and `scripts/update-branch.sh` only | Edits files, reviews, merges an owner-only PR without the owner's recorded approval, merges a head other than the one approved, except for update-branch merge commits of main (§7.5; 7007421567 D2) |
 | **Collaborator** (human, trusted Write role, [`COLLABORATING.md`](COLLABORATING.md)) | n/a | n/a | Comments, issues from the forms, PR reviews; nothing else | Merge, enable auto-merge, mark ready, edit files, close, delete branches, resolve threads, labels, comment on #15; sign off design (owner only) |
 | **Planner / retro / process reviewer** | See PLAN §9 | One task | Its own branch (`claude/<task>`) | Pushes to a branch another session owns |
@@ -312,10 +312,8 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
 * Title `[owner] <task id>: <imperative>`, label `owner-todo`. Older issues (#12-#14) are linked through
   the task's `issue` field instead. The orchestrator creates these issues without asking (§1.1) and records
   the number in the state body; the `issue` field is added by the next PR that touches the file.
-* **Labels must exist first.** `orchestrator-state` and `owner-todo` are not created yet, and the GitHub tools
-  agents have can't create labels. Task M0-O9 asks the owner to create both (Issues, Labels, New label; exact names).
-  Until then the orchestrator opens issues without the label and says so in the state issue, and
-  `owner-todo` is not relied on for lookups (titles are: `[owner] <id>: …`).
+* **Labels exist.** `orchestrator-state` and `owner-todo` were created by task M0-O9 and are in use (#15, #120); the orchestrator
+  files every owner issue with `owner-todo`. Lookups still go by the title `[owner] <id>: …`.
 * Body, in this order:
   * **What**: one sentence.
   * **Where**: the exact click path or command.
@@ -430,7 +428,9 @@ The script rejects malformed rows, missing or unknown columns, duplicate `sessio
 Numbers come from tools, never from memory or estimates. If a value is unknown, write
 an empty field, not a guess.
 
-### 6.1 Session row (one per worker, once it is idle)
+### 6.1 Session row (one per session, written as it is archived)
+
+Write it just before `archive_session` (§7.4), for every role, reviewers included (owner decision, #15 comment 7070278995, as the cost history had gaps).
 
 ```csv
 # metrics:session
@@ -535,8 +535,8 @@ total cost, incidents. Then refresh the PR description's review table from the r
   `review` list (§4.3).
 * Any commit after `reviewed_through` is **unreviewed** until the next round covers it. Handoff-only and docs-only commits still count. They are listed, not silently skipped.
 * **Delta review** (retro R4): a commit after the last round gets one delta review before the merge request: a fresh
-  reviewer with the whole PR diff, focused on `reviewed_through..head_sha` (about $1-2). A delta review always runs; there is no owner-acceptance alternative, for any PR. Record
-  `reviewed_through` afterwards.
+  reviewer with the whole PR diff, focused on `reviewed_through..head_sha` (about $1-2). A delta review always runs; there is no owner-acceptance alternative, for any PR.
+  A small fix-only or docs-only commit gets the cheap re-check of §7.2.3. Record `reviewed_through` afterwards.
 
 ### 7.2.1 Deferring findings
 
@@ -563,6 +563,15 @@ is refreshed at batch close and no later than when the PR is declared ready.
 * **Second reviewer:** for `risk:high` PRs and the security-rules, sync-merge and release areas, the orchestrator spawns a second fresh session in the same round (`agents/prompts/second-reviewer.md`); it never gets the reviewer's findings, and a `risk:high` PR is marked READY only after that pass.
 * **Escalation:** when round 4 still has a confirmed finding above nit (deferred minors do not count) or a dispute is still open, the orchestrator spawns one escalation reviewer per PR (`agents/prompts/escalation-reviewer.md`). Its ruling per PR: `fix` gets one fresh round 5, `split` opens a new PR from `main` with merge commits, `owner` goes to the owner; there is no second escalation.
 * **Escaped defects:** a bug found after merge gets a `Caused by: #N` line in its issue and one `escaped` row in the metrics CSV (`scripts/agent_metrics.py`).
+
+### 7.2.3 Token rules (owner decision, #15 comment 7070278995, 2026-11-21)
+
+The one home of these rules; `REVIEW.md`, `agents/roles.yaml` and the orchestrator prompt link here.
+
+1. **Nits are accepted without a round.** A review with verdict `ready_nits_only` goes to the merge request (§7.5). Its nits are recorded as accepted in the PR review table and the round row: no fix round, no re-review, no follow-up issue.
+2. **A small fix is re-checked cheaply.** A re-check of a small fix-only or docs-only commit (the fixes of the previous round's findings, each about 30 changed lines or fewer, or docs only) is the delta review of §7.2 done by a fresh Sonnet medium reviewer (`recheck-reviewer` in `agents/roles.yaml`), focused on those findings. Full rounds stay Opus at the effort `agents/roles.yaml` gives the reviewer.
+3. **Guard and prompt_rules hardening PRs stop early.** On a PR that hardens `scripts/guards.sh`, `scripts/hooks/pretooluse_guard.py` or `scripts/prompt_rules.py`, the second round that finds new bypass forms ends the PR. The forms are recorded as accepted residuals in the PR body (the hook is a tripwire, F18) and the PR goes to the merge request; any other finding above nit is still fixed.
+4. **Reviewer effort** is strictly per `agents/roles.yaml`, which owns the rule. The metrics row per archived session is §6.1.
 
 ### 7.3 Results
 
@@ -607,18 +616,18 @@ The orchestrator collects results in this order, from cheapest to most expensive
 | Two worker sessions in a row fail or stall | Read both with targeted `list_events`, log an incident, retry once with a changed brief; ask the owner after a third failure (§1.1). Usage-limit failures are not counted (§7.7.3) |
 | Failures with a usage-limit message (the 5-hour limit) | Confirm with the detection step of §7.7.3, then run the pause protocol (§7.7.2) if not already paused. Do not respawn: after the reset, resume with `send_message` (§7.7.4). A limit failure never counts toward the two-failure stop rule above, and is not a `dead-session`. |
 
-**Archive** (`archive_session`) each worker, reviewer and planner session as soon as you are done with it (result read, no follow-up planned); keep an implementer until its PR is merged or handed elsewhere.
+**Archive** (`archive_session`) each worker, reviewer and planner session as soon as you are done with it (result read, no follow-up planned) and its `metrics:session` row (§6.1) is written; keep an implementer until its PR is merged or handed elsewhere.
 **Sweep** after every handover (§5.2 step 7): the new orchestrator archives every finished worker, reviewer, planner and previous-orchestrator session of this project; it keeps itself, the merge agent and any session still running or with unpushed work, and never archives a session that does not clearly belong to this project (it lists it for the owner).
 
 ### 7.5 Pull requests and the merge request
 
 * **PR convention:** a **draft** PR is not ready. A **non-draft** PR is mergeable and carries a comment with checks run,
-  skips and decisions. The owner's queue is `is:open is:pr draft:false`.
-* **Before asking the owner to merge** the orchestrator checks (retro R2, R6): (1) the PR body is refreshed (scope, review
+  skips and decisions. Owner-only PRs wait in the owner's queue (`is:open is:pr draft:false`); every other READY PR goes to the merge agent.
+* **Before the merge request** (to the merge agent, or to the owner for an owner-only PR) the orchestrator checks (retro R2, R6): (1) the PR body is refreshed (scope, review
   table, test evidence; no "still to do" or "not yet reviewed"); (2) the request says **squash**.
   (3) **Closing keywords:** never write close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly
   before an issue number in a commit or PR body unless closing that issue is intended; write "gated on #N", "see #N" or
-  "mark #N done" instead. Scan the PR body for them before asking the owner to merge.
+  "mark #N done" instead. Scan the PR body for them before the merge request.
 * **Merge agent:** the merge agent merges every READY PR that is not owner-only under the owner's standing authorization, one at a time, and an owner-only PR only as kind `owner-batch`. Owner-only: permissions and `.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, licence acceptances, design and product sign-off, docs that are themselves a gate (a decision to approve before work relies on it), naming and protected process files.
   A `risk:high` PR is marked READY only after the independent second-reviewer pass is clean (owner decision B, 2026-11-17). Docs PRs whose owner approval can wait go to it too and carry the status line `working draft ...; not owner-approved (see issue #15)` until the owner approves them in a later PR.
   A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, and then the merge agent merges under the owner's standing authorization (#15 comment 7005366747, replacing the per-window rule of comment 7002904192) until the owner revokes it there; the orchestrator never passes an approval on to it.
@@ -650,7 +659,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
 * **Updating a branch (owner decision, #15 comment 7008033864):** The merge agent updates a PR's branch itself with `scripts/update-branch.sh <N> <expected head sha>` (owner decision, #15 comment 7008033864), then waits for the checks; the script is the one call besides `scripts/merge_ready.py` that the merge agent runs. `scripts/update-branch.sh` makes one fixed PUT to `pulls/N/update-branch` with `expected_head_sha` (GitHub refuses a moved head). Same pattern as `mark-ready.sh`: exactly two arguments (digits, no leading zero; 40 lowercase hex), `/bin/bash -p`, `gh` only from fixed directories, fixed PATH; GH_HOST/GH_REPO cannot redirect the call.
   `.claude/settings.json` pre-allows exactly one more rule for it, `Bash(scripts/update-branch.sh *)`; the PreToolUse guard treats every file named `update-branch.sh` as a process file, allows the command only as the whole command, exactly `scripts/update-branch.sh <PR number> <40-hex sha>` from the project root, and only while the script is a regular file whose SHA-256 equals its pin (`UPDATE_BRANCH_SHA256`); the residual risks are those of `mark-ready.sh`. Tests: `scripts/hooks/test_update_branch.py`, `test_guard_update_branch.py`, `test_settings_permissions.py`.
 * **Strict up-to-date merge procedure:** `main` requires branches to be up to date, so merge one PR at a time. After each
-  owner merge, the **orchestrator** updates the next ready PR with `update_pull_request_branch`, passing `expectedHeadSha`
+  merge by the owner, the **orchestrator** updates the next ready owner-only PR with `update_pull_request_branch`, passing `expectedHeadSha`
   set to its current head, waits about 4 minutes for CI, and only then tells the owner it is ready. This is the single
   documented exception to "the orchestrator never commits or pushes" (§1 role table): it is a server-side merge of `main`,
   not authored code. Do it only when no worker holds that branch (F6, two writers); otherwise the branch-holding worker
@@ -702,7 +711,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
    list (`pull_request_read get_commits`): the author or committer `login` is the owner's, or the author name/email is the agent identity `Claude <noreply@anthropic.com>`
    (the Co-Authored-By trailer is not the author; check the author field). Anything else (for example a web edit by someone else) is foreign. Never judge by `git log` names alone. Three cases: **agent** = author email `noreply@anthropic.com` (API login `claude`, a separate account); agent work done through the GitHub MCP or update-branch shows the owner login `bondo` (committer `web-flow`) and counts as the owner; a **collaborator's web edit** shows their login (committer `web-flow`) and is **foreign**. A hit: **stop spawning and pushing on the affected PR and ask the owner; this is not the §7.7 usage pause** (the 45-min check-in stays);
    **never self-revert** (a revert is a PR the owner merges; no force-push). Log a one-line `decision` comment.
-3. **Draft and ready** follow §7.5: agent PRs stay draft until the orchestrator marks one ready because it is mergeable; the owner merges. A collaborator is asked never to press Ready for review or Merge (COLLABORATING.md).
+3. **Draft and ready** follow §7.5: agent PRs stay draft until the orchestrator marks one ready because it is mergeable; then the merge agent merges it, or the owner for an owner-only PR (§7.5). A collaborator is asked never to press Ready for review or Merge (COLLABORATING.md).
 
 ### 7.7 Usage limits: early warning, pause, resume
 
@@ -912,5 +921,5 @@ The orchestrator fills `{collaborator_handle}` with `none` until the owner says 
 | F15 | Finished-but-unmerged work looks ready again to a cold orchestrator, or a task file exists in two branches with different status | `--in-review` from the Branches table (§4.4); one canonical tasks ref (§4.2) |
 | F16 | A reviewer "helpfully" fixes the PR and so is both author and reviewer | Reviewers never edit or push to the PR branch (§7.2, §8.3) |
 | F17 | Minor findings block acceptance, or are deferred and forgotten | Follow-up issues with a mandatory burn-down task per milestone that the ready query enforces ([`FOLLOW-UPS.md`](FOLLOW-UPS.md)) |
-| F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. Do not extend its shell model. The boundary is branch protection, required CODEOWNERS review and squash-only. "By design" closing of #21-#26 (all open) applies only once M0-O6 is done (branch protection confirmed on). Until then hook-bypass findings are recorded, not dismissed, and are deferred only as §7.2.1 allows (minors and nits; a major needs owner OK) |
+| F18 | The PreToolUse hook models shell syntax, and every review round finds a new bypass form (an arms race) | Frozen, owner decision D1: the hook is a **tripwire against accidents, not a security boundary**. Do not extend its shell model. The boundary is branch protection, required CODEOWNERS review and squash-only. "By design" closing of #21-#26 (all open) applies only once M0-O6 is done (branch protection confirmed on). Until then hook-bypass findings are recorded, not dismissed, and are deferred only as §7.2.1 allows (minors and nits; a major needs owner OK). On a hardening PR the second round with new bypass forms ends it, the forms recorded as accepted residuals (§7.2.3) |
 | F19 | The 5-hour limit stops all workers and the check-in together; the loop does not resume, work is lost, or limit failures are mistaken for stalls and trip the stop rule | Early warning from `rate_limit_info` on every wake, one pause protocol with a single resume reminder at reset + 5 minutes, limit failures excluded from the stop rule, push after each step, throttling near a rate limit (§7.7, §7.1, §8) |

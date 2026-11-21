@@ -1419,7 +1419,7 @@ DOC_RULES = (
         "orch-labels-exist", ORCH,
         (r"\*\*labels exist\.\*\* `orchestrator-state` and `owner-todo` were created by task m0-o9 and are in use",),
         "ORCHESTRATION 4.5: the orchestrator-state and owner-todo labels exist (M0-O9 is done; #260 item 11)",
-        forbidden=(r"are not created yet", r"opens issues without the label"),
+        forbidden=(r"\b(?:are|is) not created yet", r"opens issues without the label"),
     ),
     DocRule(
         "review-token-rules", "REVIEW.md",

@@ -596,11 +596,12 @@ members' changes; a conflict keeps the losing side; so v1 sync design should lea
 
 | Role | Model / effort | Runs as | Gets | Produces |
 |---|---|---|---|---|
-| **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
+| **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for decisions and for owner-only merges (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR; the PR-sized tasks with dependencies in `docs/tasks.toml` |
 | **Implementer (Opus)** | Opus / high (max for `risk:high`) | Fresh session per PR, kept across its review rounds | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green. For the cases in the split below |
 | **Implementer (Sonnet)** | Sonnet / medium (high for tooling) | Same | Same | Same. For every other task |
 | **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
+| **Re-check reviewer** | Sonnet / medium | Fresh session for the re-check of a small fix-only or docs-only commit (the delta review) | The previous findings, the commit, `REVIEW.md` | The same findings block, focused on the fixed findings (`docs/ORCHESTRATION.md` §7.2.3) |
 | **Second reviewer** | Opus / high | Fresh session in the same round, for `risk:high` and the protected areas | Diff, PR description, `REVIEW.md`; not the first reviewer's findings | Findings (`S<round>-<nn>`), merged with the reviewer's |
 | **Escalation reviewer** | Opus / max | Fresh session, once per PR after round 4 or on a dispute | The whole review thread | `fix`, `split` or `owner` (`REVIEW.md`, Loop and cap) |
 | **Design reviewer** | Opus / high | Fresh session per design-PR round, max 3 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |

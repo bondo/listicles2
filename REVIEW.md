@@ -40,6 +40,9 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 13. **Rules allow/deny matrix (R7)**: on a PR labelled `area:security-rules`, `area:sync-merge` or `risk:high`, check that the rules allow/deny matrix (D-2.6, `firebase/test`)
     covers each changed rule with an allow case and a deny case. A changed rule without both is a `major` finding (area `security-rules`), and a `blocker` when the missing case hides a real security hole
     (a non-member, or a member without the right, could read or write); name the rule and the missing case.
+14. **Dispatchers (`:core:data` and `:app` PRs)**: until detekt 2.0 is stable and gives the Android modules type resolution (#218, tracked on M6),
+    check by hand that dispatchers are injected and no `Dispatchers.IO`, `Dispatchers.Default` or `Dispatchers.Main` is hard-coded in a class
+    (`docs/ANDROID-BEST-PRACTICES.md` §5); a hard-coded dispatcher is a `minor` finding. When detekt 2.0 is on, this line is removed.
 
 ## Severity
 | Severity | Meaning | Author must |
@@ -114,3 +117,4 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
    There is no second escalation, and no commit lands unreviewed: a commit after a round gets a delta review.
 5. Disputes: the reviewer either withdraws or restates with new evidence. If it is still disputed, the escalation reviewer rules with both arguments in front of it
    (this uses the PR's one escalation); taste or scope goes to the owner.
+6. **Token rules** (owner decision, #15 comment 7070278995; the rules are in `docs/ORCHESTRATION.md` §7.2.3): a `ready_nits_only` verdict is final, its nits are accepted with no fix round, no re-review and no follow-up issue; a re-check of a small fix-only or docs-only commit is a Sonnet medium reviewer (`recheck-reviewer`), not a full round; on guard and prompt_rules hardening PRs the second round that reports new bypass forms ends the PR.
