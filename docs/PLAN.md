@@ -19,11 +19,11 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 | Lists | Private to their creator by default (Q3, VIS-01); the creator may share a list with their household (VIS-02) and stop sharing it (VIS-04). A household is needed only to share (OQ-1). Type `kind` is `PLAIN` or `COLLECTION`, chosen at creation and fixed (OQ-32). Access: the creator does everything; household members of a list shared with their household do everything except stop the share or change its creator or household (OQ-2, OQ-3, OQ-4). A member who joins later sees every list already shared (OQ-16, confirmed 2026-11-18) |
 | Items (v1) | Name + "I have it"; collection lists add an optional release year and re-release year (1900 to the current year + 50, OQ-6, OQ-19). Sorted per type (OQ-8, OQ-33), "show only missing" filter, progress "12 of 30" (OQ-9). Equal names are allowed, with a quiet "Already in this list" hint while typing (OQ-11). An item belongs to its list (OQ-18). No notes, tags, quantity, barcode or search in v1 (stories section 8) |
 | Backup | No Firestore backups (they need Blaze). An in-app export of every list I can see (my own lists and lists shared with me) to a JSON or CSV file through the system file picker, in M2, before the first external tester; it also covers data portability (OQ-38, scope decided) |
-| Sharing | Households: one per user; members join through a **single-use invite link** (random code of 16+ characters, expires after 7 days, can be revoked). Household, invite and sharing actions need a connection (OQ-22) |
+| Sharing | Households: one per user; members join through a **single-use invite link** (code `<householdId>_<secret>`, a random 22-character secret of 132 bits bound to its household, M1 plan P3, #243; expires after 7 days, can be revoked). Household, invite and sharing actions need a connection (OQ-22) |
 | After v1 (M3 to M5 and later) | Packing templates, scaling, merging and trips (section 4); barcode scanning (ML Kit + CameraX) and title lookup (UPCitemdb); infinite global undo/redo internally for each list, with conflict handling (owner requirement, 2026-11-18, quoted in section 7; the leave-room constraint on v1 is in section 3.2). Not in M1 or M2 (OQ-36 2026-11-17, OQ-15 2026-11-18, section 7) |
 | i18n | English + Danish; all strings in resources; CI fails on missing translations. Android 13+: the system per-app language setting, made visible by an auto-generated `LocaleConfig`[^lang]; Android 8-12 follow the phone language; no in-app picker, `minSdk` stays 26 (OQ-12, decided 2026-11-17) |
 | Crash reporting | Firebase Crashlytics **off by default**, turned on by an opt-in setting ("Send crash reports")[^crash]; **no Google Analytics**; declared in the privacy text and Play Data safety; in place before the first external tester (decided 2026-11-17) |
-| App Check | Play Integrity provider requiring **device integrity only**, not Play recognition or licensing (the default requires `PLAY_RECOGNIZED`, which a GitHub APK cannot meet[^pi]); debug provider in CI and the emulator; about two weeks of metrics before enforcing; set up before the first external tester (decided 2026-11-17) |
+| App Check | Play Integrity provider requiring **device integrity only**, not Play recognition or licensing (the default requires `PLAY_RECOGNIZED`, which a GitHub APK cannot meet[^pi]); debug provider in CI and the emulator; about two weeks of metrics before enforcing; set up before the first external tester (decided 2026-11-17) and enforced before it (owner, #204, #15 comment 7003828200) |
 | AI at runtime | No AI code and no LLM or cloud AI calls (on-device ML Kit only if barcode scanning returns after v1) |
 | Distribution | Signed APK on GitHub Releases on each `v*` tag, signed with an owner-held GitHub key (never committed). Play later, with its own Play App Signing key: **separate keys**, so moving from the GitHub APK to the Play build needs an uninstall (cloud data is kept; decided 2026-11-17). Play account type and the closed test are deferred until Play release is planned. Android developer verification: a free limited-distribution account when available in Denmark (owner task, issue #120) |
 | Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then one escalation reviewer decides fix, split or owner) → the owner squash-merges |
@@ -43,8 +43,8 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 /core/domain          Pure Kotlin/JVM: models, sorting, filtering, validation (scaling and merging after v1)
 /core/data            Firestore + Auth repositories, mappers
 /core/testing         Fakes (in-memory repositories), test fixtures
-/firebase             firestore.rules, firestore.indexes.json, firebase.json, rules tests (Jest)
-/docs                 PLAN.md, ORCHESTRATION.md, ARCHITECTURE.md, ADRs
+/firebase             firestore.rules, firebase.json, rules tests (Jest); firestore.indexes.json comes with the first composite query (none in M1)
+/docs                 PLAN.md, ORCHESTRATION.md, ADRs (adr/), milestone plans, product docs
 /scripts              verify.sh and guard scripts used by CI and git hooks
 REVIEW.md             Review rubric and severity definitions
 CLAUDE.md             Agent instructions: the only commands to run, and the rules
@@ -55,11 +55,11 @@ CLAUDE.md             Agent instructions: the only commands to run, and the rule
 ## 3. Data model (Firestore)
 
 ```
-users/{uid}                      { householdId? }                      // only readable by the user
+users/{uid}                      { householdId, name? }                // only the user; name: AUTH-12 (P9)
 households/{hid}                 { name, createdBy, createdAt, ownerUid, deleted: bool }
 households/{hid}/members/{uid}   { role: owner|member, displayName, joinedAt, viaInvite? }
 households/{hid}/removed/{uid}   { removedAt }                         // owner only: unsharing still to do
-invites/{code}                   { householdId, createdBy, createdAt, expiresAt }
+invites/{code}                   { householdId, householdName, createdBy, createdAt, expiresAt }  // code: <householdId>_<secret>
 lists/{lid}                      { kind: PLAIN|COLLECTION, name, createdBy, sharedWith: hid|null,
                                    schemaVersion, createdAt, updatedAt, updatedBy }
 lists/{lid}/items/{iid}          { name, have: bool, releaseYear?, reReleaseYear?,   // years: COLLECTION only
@@ -81,7 +81,9 @@ opened on this device follow `updatedAt`. Where the overview progress counts (OQ
 ### 3.1 Security rules (no Cloud Functions, so everything is enforced here)
 
 Every rule below gets at least one allow test and one deny test in the emulator.
-Notation: `get`/`exists` see the state **before** a batch, `getAfter`/`existsAfter`
+P1 to P9 are the rules decisions of the M1 plan (`docs/milestones/M1.md` section 8), written into this section by M1-35.
+Notation: `uid` is always the caller, `request.auth.uid` (P1, #206), so a path such as `/users/uid` or `members/uid`
+is the caller's own doc; `{uid}` in a path is the document id, which a row ties to the caller where it says so. `get`/`exists` see the state **before** a batch, `getAfter`/`existsAfter`
 see it **after**. `M(x)` means `exists(/households/$(hid)/members/$(x))`. `O(x)` means
 `get(/households/$(hid)).data.ownerUid == x`. `LIVE` means
 `get(/households/$(hid)).data.deleted == false`. Every household, member, invite and shared-list rule below
@@ -97,22 +99,34 @@ old app can say "Update the app" before sign-in or verification). The `config` a
 **Reads**: members (`M(uid)`, `LIVE`) can read the household doc, its members and its invites; the `removed`
 markers are owner-only (no recursive member read rule over the household).
 `users/{uid}` can be read and written only by that user, and holds nothing but
-`householdId`, which enforces one household per user (HH-01, HH-03). The field is always present: the doc is
+`householdId`, which enforces one household per user (HH-01, HH-03), and `name`, the user's own name (AUTH-12, P9). The
+`householdId` field is always present: the doc is
 created with `householdId: null` (first sign-in, or before the first household action), and no write may drop
-the field. Deleting the doc counts as a clear (below), so it is allowed only when `householdId` is `null`
-(account deletion leaves or self-heals first):
-* set (`null` → `hid`) only together with `existsAfter(/households/hid/members/uid)` (the create-household
-  and join batches); a direct change from one household to another is denied;
+the field. Deleting the doc is allowed only when `householdId` is `null`, never while it holds a value, live or stale
+(P5, #210 item 1; account deletion leaves or self-heals first):
+* `name` may be missing (the start gate then shows the name step, AUTH-12); when written it is a string of 1-50 code
+  points, non-empty after trim (P4). The own-doc exception for unverified users (below) covers it, so create account
+  saves the name before verification. It is not the Auth profile `displayName`, which Google sign-in fills in. The
+  member doc's `displayName` is a copy: set from `name` in the create-household and join batches (M1-18) and changed
+  together with it in one batch (M1-39); no rule compares the two. Tests (M1-08): allow create with and without
+  `name`, an update of `name` alone, by an unverified user too, a 50-code-point name with non-BMP characters; deny a
+  51-code-point name, spaces only, a non-string, an unknown field;
+* set (`null` → `hid`) only together with `existsAfter(/households/hid/members/uid)` **and**
+  `getAfter(/households/$(hid)).data.deleted == false` (the create-household and join batches; P5, #210 item 2: a user
+  cannot point back at a tombstone whose cleanup still keeps their member doc); a direct change from one household to
+  another is denied;
 * cleared (`hid` → `null`) only when `!existsAfter(/households/hid/members/uid)` (in the Leave batch, or after
   a removal) or the household is deleted. The owner never writes another user's doc: a removed member's or a
   deleted household's former member's app sees the stale value at start and clears it itself (self-heal; the tombstone's own owner clears it after the cleanup instead, see Delete household).
   Self-heal order: first set `sharedWith = null` on the user's own lists shared with the stale `hid` (all
-  pages; M2), then clear `householdId`. Join needs a cleared value, so the person cannot rejoin, and so
+  pages; M2), then, for a tombstone, delete the user's own member doc (P6, Delete household row), then clear `householdId`. Join needs a cleared value, so the person cannot rejoin, and so
   re-share their lists, before the unsharing has finished (OQ-5).
 * Tests: allow create with `householdId: null`, set in create and join, clear in the Leave batch, clear after
   removal, clear after deletion, delete the doc when `null`; deny create with a household, set without
-  membership, `hid1` → `hid2`, clear while still a member of a live household, delete the doc or drop the field
-  while it holds a live household that still has the user as a member, any write to another user's doc. A user may also `get` their own `members/{uid}` path in any household (it may not
+  membership, `hid1` → `hid2`, clear while still a member of a live household, drop the field, delete the doc while
+  `householdId` holds a live household and while it holds a stale one (after removal, and a tombstone; P5), set
+  `null` → the id of a tombstone while the user's member doc still exists there (P5), any write to another user's doc
+  (all M1-08). A user may also `get` their own `members/{uid}` path in any household (it may not
   exist) and the household doc while it is a tombstone and their `householdId` points at it: that is the
   signal for the HH-06 "household deleted" dialog and for the self-heal, except for the tombstone's own owner (`ownerUid` is the user), whose start resumes the cleanup and the owner's clear (Delete household row) with no HH-06 dialog and no self-heal clear.
 A list is readable by its creator (`createdBy == uid`) always, and by others only when
@@ -124,34 +138,40 @@ A list is readable by its creator (`createdBy == uid`) always, and by others onl
 
 | Path / action | Allowed when |
 |---|---|
-| Create household + owner (one batch) | Household: `!exists(household)`, `createdBy == ownerUid == uid`, `deleted == false`, **and** `existsAfter(members/uid)`. Member doc: `!exists(household)` **and** `getAfter(household).ownerUid == uid` **and** `role == owner` **and** the one-household check (below). Household docs are never deleted: no rule allows `delete` on `households/{hid}`, for anyone, live or tombstone (see Delete household). So `!exists` can never be true again for an id that has existed. A former creator can't become owner again, and nobody can reclaim leftover data. Tests: deny re-creating a deleted household's id (tombstone in place), also by its former owner with the owner member doc in the same batch. |
-| Create invite `invites/{code}` | `M(uid)` of `householdId`; `createdBy == uid`; `createdAt == request.time`; `expiresAt <= request.time + duration.value(7, 'd')`; `code.size() >= 16`. No updates. |
-| Read one invite (`get`) | Any signed-in user with a verified email (they need the code). |
+| Create household + owner (one batch) | Household: `hid.matches('^[A-Za-z0-9]{20}$')` (Firestore's auto-id; P3, #243), `!exists(household)`, `createdBy == ownerUid == uid`, `deleted == false`, **and** `existsAfter(members/uid)`. Member doc: its id is `request.auth.uid` (P1, #206) **and** `!exists(household)` **and** `getAfter(household).ownerUid == uid` **and** `role == owner` **and** the one-household check (below). Tests (M1-10): deny a member doc for another uid, alone and as a second member doc next to the caller's own; deny a household id of 19 or 21 characters or with `_` or `-` (P3); allow the 20-character auto-id. The P4 key and length tests of both docs are in field validation (below). Household docs are never deleted: no rule allows `delete` on `households/{hid}`, for anyone, live or tombstone (see Delete household). So `!exists` can never be true again for an id that has existed. A former creator can't become owner again, and nobody can reclaim leftover data. Tests: deny re-creating a deleted household's id (tombstone in place), also by its former owner with the owner member doc in the same batch. |
+| Create invite `invites/{code}` | `M(uid)` of `householdId`; `createdBy == uid`; `createdAt == request.time`; `expiresAt <= request.time + duration.value(7, 'd')`; `code.matches('^' + householdId + '_[A-Za-z0-9_-]{22}$')`: the code is `<householdId>_<secret>`, the secret 22 characters from a secure random source (132 bits), so a deleted code can be re-created only for its own household (P3, #243, #210 item 3; household ids are auto-ids, so the pattern holds no regex characters); `householdName == get(/households/$(householdId)).data.name` (P2, #200; spike (e) counts the read). No updates. Tests (M1-12): allow a member's create with the household's name and a well-formed code; deny a stored name that differs from the household's, a code with another household's prefix (a revoked or used code of `h1` re-created by a member of `h2`, the #243 probe), a secret of 21 or 23 characters or with a character outside the alphabet, a code without the prefix. Accepted residual (P3): a member of the same household can re-create a revoked code of that household; they could send a new link anyway. |
+| Read one invite (`get`) | Any signed-in user with a verified email (they need the code). The join screen shows the invite's `householdName`, never a name from the URL (P2, M1-20). Tests (M1-12): allow a verified non-member with the code to read it, `householdName` included. |
 | Query invites (`list`) | Only queries filtered on `householdId == hid` where `M(uid)`, so members can see and revoke their household's invites. Nobody can enumerate other codes. |
 | Delete invite | Its creator or the owner (revoke); **any member** once `expiresAt < request.time` (cleanup); the joiner in the join batch (below). |
-| Join (one batch) | Create `members/{uid}` with `role == member`, `joinedAt == request.time`, `viaInvite == code`, where: `!M(uid)` before the batch; the invite exists, points at `hid` and hasn't expired; the invite's creator is **still a member** (`M(invite.createdBy)`); **and** `!existsAfter(invites/{code})`, so the join is only valid if the same batch deletes the invite. That delete is allowed only if `!M(uid) && getAfter(member).viaInvite == code`, so an existing member can't burn someone else's invite. Single use follows from the delete. The member create also needs the one-household check. |
+| Join (one batch) | Create `members/{uid}`, its id `request.auth.uid` (P1, #206), with `role == member`, `joinedAt == request.time`, `viaInvite == code`, where: `!M(uid)` before the batch; the invite exists, points at `hid` and hasn't expired; the invite's creator is **still a member** (`M(invite.createdBy)`); **and** `!existsAfter(invites/{code})`, so the join is only valid if the same batch deletes the invite. That delete is allowed only if `!M(uid) && getAfter(member).viaInvite == code`, so an existing member can't burn someone else's invite. Single use follows from the delete. The member create also needs the one-household check. Tests (M1-54, P1): deny the #206 batch (the caller's own member doc, a member doc for another uid, the invite delete and the caller's users-doc set), and a batch whose only member doc is for another uid. |
 | One-household check (member create in Create household and Join) | `exists(/users/uid)` **and** `get(/users/uid).data.householdId == null` **and** `getAfter(/users/uid).data.householdId == hid`, so the same batch must write the users doc. A missing doc fails the check (no bypass by deleting it). A stale value (after removal or deletion) must be self-healed first. Deny tests: join or create without the users-doc write; with no users doc; while `householdId` points at another household. The extra `get`/`getAfter` count in spike (e). |
-| Update own member doc | Only `displayName` may change. |
+| Update own member doc | Only `displayName` may change (`affectedKeys().hasOnly(['displayName'])`), 1-50 code points, non-empty after trim (P4). Tests (M1-10): allow exactly 50 code points; deny 51, spaces only, another member's doc, an added field. |
 | Leave | A member who is not the owner (`!O(uid)`) deletes their own member doc. The client also deletes that member's invites (allowed: the creator may delete their own invites) and sets `sharedWith = null` on the lists they created (allowed: creator), so those lists go with them (OQ-5). Order, as for the self-heal: first unshare the user's own lists shared with `hid` (all pages; M2), then send the Leave batch (member delete, invite deletes, users-doc clear), so an interrupted Leave leaves a member with private lists, never shared lists with no way to resume. |
-| Remove member | `O(uid)`, and the target isn't the owner before **or after** the batch (`target != getAfter(household).data.ownerUid`), so a batch can't hand ownership to someone and remove them at the same time. The same batch deletes the removed member's open invites and writes the marker `households/{hid}/removed/{uid}` with `removedAt == request.time`: a create **or an overwrite** of a leftover marker, so removing the same person again after a rejoin works (the member delete requires `getAfter(removed/target).data.removedAt == request.time`). Write: only `O(uid)`, only when `M(target)` before and `!existsAfter(members/target)`. Read, list and delete: only the owner. Tests: allow remove, rejoin, remove again; deny a non-owner write, a write while the target stays a member, a non-owner member reading, listing or deleting a marker. **M1 writes and deletes it**: M1 has no lists, so the owner's client deletes the marker right after the Remove batch; M2 inserts the list unsharing below before that delete. The owner's client then sets `sharedWith = null` on the removed member's lists shared with this household, in pages (query `sharedWith == hid && createdBy == target`; allowed to the owner only when `!existsAfter(members/createdBy)`; OQ-5), and deletes the marker last; an unfinished marker is resumed at the owner's next app start. If an unshare is denied because the person is a member again (rejoined through another invite) or the household was deleted meanwhile, the client deletes the marker instead of retrying; cleanup deletes any markers left. The removed member's own app also unshares them at its next start (creator path). Until one of them finishes, the remaining members can still read those lists, which they could already read; the removed member loses access to everyone else's lists at once. A list query on `sharedWith` cannot also check that the creator is a member, because rules are not filters: the condition would depend on each document's `createdBy`. Even if that cleanup is skipped, the `M(invite.createdBy)` check makes those invites unusable while the person is not a member. Accepted residual risk: if they rejoin through someone else's link, any of their old invites that haven't expired (7 days at most) start working again. |
+| Remove member | `O(uid)`, and the target isn't the owner before **or after** the batch (`target != getAfter(household).data.ownerUid`), so a batch can't hand ownership to someone and remove them at the same time. The same batch deletes the removed member's open invites and writes the marker `households/{hid}/removed/{uid}` with `removedAt == request.time`: a create **or an overwrite** of a leftover marker, so removing the same person again after a rejoin works (the member delete requires `getAfter(removed/target).data.removedAt == request.time`). Write: only `O(uid)`, only when `M(target)` before and `!existsAfter(members/target)`; the marker holds only `removedAt` (P4). Read, list and delete: only the owner. Tests (M1-11): allow remove, rejoin, remove again; deny a marker create or overwrite with another field (P4); deny a non-owner write, a write while the target stays a member, a non-owner member reading, listing or deleting a marker. **M1 writes and deletes it**: M1 has no lists, so the owner's client deletes the marker right after the Remove batch; M2 inserts the list unsharing below before that delete. The owner's client then sets `sharedWith = null` on the removed member's lists shared with this household, in pages (query `sharedWith == hid && createdBy == target`; allowed to the owner only when `!existsAfter(members/createdBy)`; OQ-5), and deletes the marker last; an unfinished marker is resumed at the owner's next app start. If an unshare is denied because the person is a member again (rejoined through another invite) or the household was deleted meanwhile, the client deletes the marker instead of retrying; cleanup deletes any markers left. The removed member's own app also unshares them at its next start (creator path). Until one of them finishes, the remaining members can still read those lists, which they could already read; the removed member loses access to everyone else's lists at once. A list query on `sharedWith` cannot also check that the creator is a member, because rules are not filters: the condition would depend on each document's `createdBy`. Even if that cleanup is skipped, the `M(invite.createdBy)` check makes those invites unusable while the person is not a member. Accepted residual risk: if they rejoin through someone else's link, any of their old invites that haven't expired (7 days at most) start working again. |
 | Transfer ownership (one batch) | Updates `household.ownerUid` and the `role` of both member docs. Household update: `O(uid)`, only `ownerUid` changes, the new owner is a member both before and after the batch (`M(new)` and `existsAfter(members/new)`), **and** after the batch the old owner's member doc has `role == member` and the new owner's has `role == owner` (`getAfter(members/<old ownerUid>).data.role` and `getAfter(members/<new ownerUid>).data.role`; two more calls, counted in spike (e)), so a partial transfer is denied. Each member-doc update: only `role` changes, `O(uid)` before the batch, and the new role equals `getAfter(household).ownerUid == thisDoc ? owner : member`. `ownerUid` is the single source of truth, so there is always exactly one owner. `role` is a cached copy for display, and rules use `O(x)`. The caller check is `O(uid)`, never `M(uid)`: only the current owner can transfer, so a plain member cannot make themselves owner. Tests: allow the owner's transfer batch, also on a household seeded with `createdBy: null`; deny a plain member setting `ownerUid` to themselves, with a single household-doc update and with the full transfer batch (the member-doc updates also need `O(uid)`); deny a signed-in non-member setting `ownerUid` to an existing plain member (the role checks deny any household update without both role updates, so a plain member's full batch is the case that tests the caller checks); deny a transfer to a non-member; deny partial transfers: the household update with no role updates, with only the old owner's role update (no owner), and with only the new owner's role update (two owners). |
 | Create list | `createdBy == uid`, `sharedWith == null`, `kind` in `PLAIN`, `COLLECTION`, plus field validation (below). |
 | Update list | The creator, or a member of `sharedWith` while `LIVE` (OQ-3). `kind`, `createdBy` and `createdAt` never change. `sharedWith` changes only: by the creator, `null` → their own household (`M(uid)`, `LIVE`) or back to `null` (VIS-02, VIS-04, and the self-heal after leaving, removal or deletion); by the owner in Remove member (above), to `null` only. |
 | Items: create, update | Same people as Update list. On create `createdBy == uid` and `createdAt <= request.time` (OQ-37, decided: Undo keeps the original value). An Undo by another member restores the original adder (OQ-18, section 3.2); how the create rule allows that is settled in M2 planning. On update `createdBy` and `createdAt` never change, with one exception: **anonymise**, the planner's proposal for OQ-18 (the owner decided only that the person's name is removed; the shape is confirmed in M2 planning, `risk:high`, `area:security-rules`; the alternative of no rules exception is weighed there, because items store a uid, display names live in `members/{uid}`, and `households/{hid}.createdBy` keeps a uid anyway). An update by the person named in `createdBy` and/or `updatedBy` may set exactly those fields to `null` and change nothing else (`updatedAt` untouched); it is allowed only while that person can still read the list. Years only in `COLLECTION` lists. Deny tests: changing `createdBy` or `createdAt` on update, a future `createdAt`, years in a `PLAIN` list; anonymise: allow the person's own uid → `null`, deny setting another user's uid to `null`, deny changing any other field in the same write, deny `null` → a uid. |
 | Delete list, items | Same people as Update list; the client deletes the items first, in pages, then the list. |
-| Delete household | `O(uid)`. **Soft delete**: first one update sets `deleted: true`. This update **must** clear the name (`request.resource.data.name == ""`, owner decision on #205) and may change only `deleted` (false → true) and `name` (→ empty); `ownerUid`, `createdBy` and `createdAt` stay as they are, so no household name, for example a street address, outlives the household. From that moment `LIVE` is false, so every read and write under the household is denied to everyone except the owner's cleanup. Then the client deletes invites → `removed` markers → members in pages. Lists shared with the household go back to their creators (OQ-17) without any owner write: from the moment `LIVE` is false only creators pass the list read rule. Each creator's app sees the tombstone at its next start (the tombstone read above), shows the HH-06 dialog, clears `sharedWith` on its own lists and its `householdId`. This follows the stories planner note (`docs/product/stories.md` section 11): creators, not the owner, make their lists private again. The tombstone's name is cleared, so the dialog shows the household name from the app's own copy (kept while the household was live, see "HH-06 household name" below) and, when the device has none (after sign-out or a reinstall), the body without the name: "Your household was deleted. ..." / "Din husstand er slettet. ...", the rest of the approved wireframe 20 text unchanged (owner decision, #15 comments 7011161000 and 7013424005). **Cleanup rule**: while `deleted == true`, the owner (`O(uid)`) may read, list (including the invites query on `householdId`) and delete what is under the household: **one rule per subcollection** (`members/{uid}`, `removed/{uid}`), plus the top-level `invites` with that `householdId`; nobody else may do anything. It is never written as `match /households/{hid}/{document=**}`: with `rules_version = '2'` a recursive wildcard also matches zero segments, so it would match the household doc itself, and the owner could delete the tombstone and re-create the id (#199). If a recursive match is used, it needs at least one segment (`/households/{hid}/{sub}/{document=**}`). No rule ever allows `delete` on `households/{hid}`, not even for the owner while `deleted == true`. The household doc itself stays as a tombstone (`{ createdBy, createdAt, ownerUid, deleted: true, name: "" }`; field validation accepts the empty name only on tombstones), so its id can never be reused. Tests: allow a soft delete by the owner that clears `name`; deny a soft delete by a member who is not the owner and by a signed-in non-member (with `name` cleared, so only the caller check can fail); deny a soft delete that leaves `name` non-empty, one that changes anything besides `deleted` and `name`, and `deleted` true → false; deny deleting the household doc by the owner while `deleted == true`, by the owner of a live household, and by any other user; allow the cleanup deletes of invites, `removed` markers and members; deny cleanup by a non-owner, and the owner deleting a member doc of a live household outside Remove member (for example their own), which shows that the cleanup rule needs `deleted == true`. Deny every write under a soft-deleted household except the cleanup deletes: the owner's full transfer batch (the household update plus both role updates; the role checks already deny the household update alone), a join with an unexpired invite, an invite create, a member's `displayName` update, and an owner create or update of a member doc (the cleanup allows only read, list and delete). The end-to-end case (delete the tombstone, re-create the id, read a list still shared with it: deny) needs the list read rule, so it is an M2 list-rules test; in M1 the tombstone-delete deny above catches the same hole. A crash mid-cleanup leaves data no one can access, and the next app start resumes the cleanup. When the cleanup has finished, the owner's client clears its own `householdId` (M1-31; M2 first unshares the owner's own lists shared with the household, as in the self-heal order) and deletes the household-name copy; the owner sees no HH-06 dialog. Until then the stale `householdId` lets the next start resume the cleanup (owner decision, #15 comment 7021901747). |
+| Delete household | `O(uid)`. **Soft delete**: first one update sets `deleted: true`. This update **must** clear the name (`request.resource.data.name == ""`, owner decision on #205) and may change only `deleted` (false → true) and `name` (→ empty); `ownerUid`, `createdBy` and `createdAt` stay as they are, so no household name, for example a street address, outlives the household. From that moment `LIVE` is false, so every read and write under the household is denied to everyone except the owner's cleanup. Then the client deletes invites → `removed` markers → members in pages. Lists shared with the household go back to their creators (OQ-17) without any owner write: from the moment `LIVE` is false only creators pass the list read rule. Each creator's app sees the tombstone at its next start (the tombstone read above), shows the HH-06 dialog, clears `sharedWith` on its own lists and its `householdId`. This follows the stories planner note (`docs/product/stories.md` section 11): creators, not the owner, make their lists private again. The tombstone's name is cleared, so the dialog shows the household name from the app's own copy (kept while the household was live, see "HH-06 household name" below) and, when the device has none (after sign-out or a reinstall), the body without the name: "Your household was deleted. ..." / "Din husstand er slettet. ...", the rest of the approved wireframe 20 text unchanged (owner decision, #15 comments 7011161000 and 7013424005). **Cleanup rule**: while `deleted == true`, the owner (`O(uid)`) may read, list (including the invites query on `householdId`) and delete what is under the household: **one rule per subcollection** (`members/{uid}`, `removed/{uid}`), plus the top-level `invites` with that `householdId`. The one other write: a member may delete their own `members/{uid}` (nobody else's), which the self-heal does before it clears `householdId` (P6, #242; M1-31), so no display name stays when the owner never finishes the cleanup. Nobody else may do anything. It is never written as `match /households/{hid}/{document=**}`: with `rules_version = '2'` a recursive wildcard also matches zero segments, so it would match the household doc itself, and the owner could delete the tombstone and re-create the id (#199). If a recursive match is used, it needs at least one segment (`/households/{hid}/{sub}/{document=**}`). No rule ever allows `delete` on `households/{hid}`, not even for the owner while `deleted == true`. The household doc itself stays as a tombstone (`{ createdBy, createdAt, ownerUid, deleted: true, name: "" }`; field validation accepts the empty name only on tombstones), so its id can never be reused. Tests: allow a soft delete by the owner that clears `name`; deny a soft delete by a member who is not the owner and by a signed-in non-member (with `name` cleared, so only the caller check can fail); deny a soft delete that leaves `name` non-empty, one that changes anything besides `deleted` and `name`, and `deleted` true → false; deny deleting the household doc by the owner while `deleted == true`, by the owner of a live household, and by any other user; allow the cleanup deletes of invites, `removed` markers and members; allow a plain member deleting their own member doc under a tombstone and deny them deleting another member's (P6, M1-11; under a live household the Leave row applies unchanged); deny cleanup by a non-owner, and the owner deleting a member doc of a live household outside Remove member (for example their own), which shows that the cleanup rule needs `deleted == true`. Deny every write under a soft-deleted household except the cleanup deletes and P6: the owner's full transfer batch (the household update plus both role updates; the role checks already deny the household update alone), a join with an unexpired invite, an invite create, a member's `displayName` update, and an owner create or update of a member doc (the cleanup allows only read, list and delete). The end-to-end case (delete the tombstone, re-create the id, read a list still shared with it: deny) needs the list read rule, so it is an M2 list-rules test; in M1 the tombstone-delete deny above catches the same hole. A crash mid-cleanup leaves data no one can access, and the next app start resumes the cleanup. When the cleanup has finished, the owner's client clears its own `householdId` (M1-31; M2 first unshares the owner's own lists shared with the household, as in the self-heal order) and deletes the household-name copy; the owner sees no HH-06 dialog. Until then the stale `householdId` lets the next start resume the cleanup (owner decision, #15 comment 7021901747). |
 
 **HH-06 household name.** The dialog's household name does not come from Firestore's offline cache: once the tombstone is read (by the self-heal or a listener), that cache holds the tombstone with `name: ""`. The app keeps its own copy of the live household's id and name (`{householdId, name}`) in app-private storage: M1-18 owns the store and writes it whenever the app reads the live household doc, replacing a copy that holds another household id. The HH-06 state uses the name only when the copy's `householdId` equals the tombstone's id, and otherwise shows the body without the name. The copy is deleted by the code that ends the state: M1-18 on acknowledgement of its HH-06 state and in the removal self-heal; M1-31 wherever it clears `householdId` itself, in Leave and in the owner's clear once the Delete household cleanup has finished (Delete household row); and in the sign-out steps: M1-18 adds the deletion to step 3 of the M1-14 sign-out (next to `clearPersistence`), which M1-32 repeats after the Auth user is deleted, so a device that signed out or deleted the account keeps no name. Tests (M1-18, emulator): the HH-06 state carries the name the device saw while the household was live; a copy saved for household A gives no name for B's tombstone; the copy is gone after acknowledgement, after the removal self-heal and after sign-out. Tests (M1-31): the copy is gone after Leave and after the owner's clear once the cleanup has finished.
+
+**Removal notice** (wireframe 40, P8, #250): the removal self-heal moves the name from the copy, with the same
+`householdId` match, into the removal-notice state before it deletes the copy. With no usable copy the notice uses the
+approved story text without a name: "You were removed from the household" / "Du er fjernet fra husstanden". Tests:
+M1-18 (the state carries the name; a copy for another household gives none), M1-21 (both texts, en and da).
 
 Rules can't count members, so "the owner can't leave while others remain" is
 enforced by the rule shapes above: the owner can't use Leave, so they must transfer
 ownership or delete the household.
 
-**Spike first (M1, PR 1)**: prove in the emulator that (a) the invite `list` rule,
+**Spike (M1-09, after the rules base M1-08, which it builds on; #260 item 5)**: prove in the emulator that (a) the invite `list` rule,
 filtered on `householdId` with a membership `exists()`, is accepted, (b) the join
 batch with `existsAfter`/`getAfter` works, (c) the transfer batch works, (d) the list query
 `sharedWith == hid` with `M(hid)` and `LIVE` is accepted, and (e) every batch stays within the
-rules limits of 10 `get`/`exists` calls per single-document request or query and 20 per batch[^calls]
+rules limits of 10 `get`/`exists` calls per single-document request or query and 20 per batch[^calls],
+counting the reads added by P2 (household name on invite create) and P5 (tombstone check on the users-doc set)
 (Remove member and cleanup batches are paged to fit). If (a)
 fails, the fallback is to nest invites under the household, with a top-level
 `inviteCodes/{code} → hid` index used only for `get`.
@@ -159,9 +179,24 @@ fails, the fallback is to nest invites under the household, with a top-level
 [^calls]: https://firebase.google.com/docs/firestore/security/rules-conditions#access_call_limits
 
 **Field validation** on every write:
-* types, string lengths and allowed enum values;
+* types, string lengths and allowed enum values. **Keys** (P4, #203): every create checks
+  `request.resource.data.keys().hasOnly([...])` and `hasAll([...required])`; every update row checks
+  `request.resource.data.diff(resource.data).affectedKeys().hasOnly([...])` with the keys its row names (users doc:
+  `householdId`, `name`; own member doc: `displayName`; transfer: `ownerUid`, `role`; soft delete: `deleted`, `name`;
+  marker overwrite: `removedAt`). Keys, all required unless marked: `users` `householdId`, `name` (optional);
+  `households` `name`, `createdBy`, `createdAt`, `ownerUid`, `deleted`; `members` `role`, `displayName`, `joinedAt`,
+  `viaInvite` (Join only); `removed` `removedAt`; `invites` `householdId`, `householdName`, `createdBy`, `createdAt`,
+  `expiresAt`; lists and items as in section 3 (M2). **Lengths** in code points as the app counts them (`size()` in
+  the rules), non-empty after trim: household name, `displayName` and `users.name` 1-50 (`householdName` equals the
+  household's; a tombstone's empty name is the one exception, Delete household); M2 planning sets list and item names (proposal: 80 and 200). The same numbers drive the UI field errors
+  (M1-13). Tests per collection (M1-08 users, M1-10 households and members, M1-12 invites, M1-54 the join member doc,
+  M1-11 markers, M1-53 the transfer updates): an unknown field on create and an update that adds one (deny); for each
+  name exactly the maximum (allow), the maximum + 1 and spaces only (deny), and 50 code points with non-BMP characters
+  (allow; M1-13 has the matching property). If that last test shows `size()` counting other units, the task stops and
+  asks rather than changing a number;
 * years: whole numbers from 1900 to `request.time.year() + 50`, both optional, no rule between them (OQ-6, OQ-19);
-* `updatedBy == request.auth.uid` and `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`;
+* on documents that have those fields (lists, items; P5, #210 item 6), `updatedBy == request.auth.uid` and
+  `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`;
 * `createdAt` and `createdBy` can't change on update; on create `createdBy == request.auth.uid` and
   `createdAt == request.time`, except items, where `createdAt <= request.time` (OQ-37, decided 2026-11-17);
 * type and presence checks accept `null` for `createdBy`, `ownerUid` and `updatedBy` where the stored value is already `null`; comparisons with the caller (`O(x)`, `M(new)`, `updatedBy == request.auth.uid` on the written value) still apply. "Never changes" is a separate clause per field, so a later narrow exception that sets one of them to `null` (on a tombstone, on `households.createdBy`, on `lists.updatedBy`; #205, M2 planning decides whether kept uids are acceptable at all) is an addition, not a rewrite of the rows above. Tests: allow a transfer and a soft delete on a household seeded with `createdBy: null`, and the tombstone read and the cleanup on a tombstone seeded with `createdBy: null` (M1-10, M1-11); a list update on a list seeded with `updatedBy: null` (M2). `ownerUid` stays a uid in these tests: `null` there would end the cleanup for good, which M2 planning must weigh;
@@ -179,7 +214,10 @@ kept by the owner as the working design (#15 comment 7000527780: own uid → `nu
 in M2 planning together with the gap below: per list a query on `createdBy == uid` and one on `updatedBy == uid`, in pages,
 using the anonymise rule (section 3.1; M2, together with the unsharing steps). Then the
 member leaves, and the app deletes the lists the user created (items first, which also removes what others added to
-them), `users/{uid}` and the Auth user. Deletion needs a recent sign-in[^reauth]
+them), `users/{uid}` and the Auth user. A last member's household cleanup (all pages) and the clear of their
+`householdId` finish before `users/{uid}` and the Auth user are deleted; a crash in between resumes the cleanup first
+(P7, #205 item 5). Test (M1-32): crash after the soft delete, restart, then no member doc remains and the account is
+gone. Deletion needs a recent sign-in[^reauth]
 (`FirebaseAuthRecentLoginRequiredException`): the app asks for Google, or the password plus a TOTP code when
 two-step verification is on, before it starts, so nothing is left half-done.
 **Still open, deferred to M2 planning by the owner (#15 comment 7000513565, on questions 6992973369 and
@@ -199,11 +237,12 @@ release. Options on file: a static page with a mailto link on the owner's domain
 [^playdel]: https://support.google.com/googleplay/android-developer/answer/13327111 (cited by the 2026-11-17 best-practices investigation, issue #15)
 
 **Expired invites**: a member's app queries its household's invites when the household
-screen opens and deletes the expired ones. TTL policies are not relied on.
+screen opens and deletes the expired ones. The query filters on `householdId` only and checks `expiresAt` on the
+client, so it needs no composite index (P5, #210 item 5). TTL policies are not relied on.
 
 **App Check** (Play Integrity, free) as decided in section 1: device integrity only, debug provider
-in CI and the emulator[^acdebug], metrics watched for about two weeks before enforcing[^acmon]; set up
-before the first external tester. It is extra protection against scripted abuse, also of sign-up (email
+in CI and the emulator[^acdebug], metrics watched for about two weeks before enforcing[^acmon]; set up and enforced
+before the first external tester (#204, section 3.3). It is extra protection against scripted abuse, also of sign-up (email
 enumeration protection still returns `EMAIL_EXISTS` on sign-up[^enum]; the owner accepts that for v1, OQ-34(d),
 2026-11-18: the app shows the same screen either way).
 
@@ -267,7 +306,7 @@ Rules of thumb:
 * One snapshot listener per open list, detached when the screen closes, so items
   are served from the local cache when you go back. Sorting and filtering run
   on the client over that listener's data. Lists are capped at 2,000 items
-  (enforced by the UI and documented).
+  (enforced by the UI and documented; the rules cap follows before external testers, below).
 * Estimate (redone for C4): 10 users, each opening a 300-item list 10 times a day, more than 30 minutes
   apart, is about 30k item reads, plus about 10 reads per overview open (two queries and rules reads)
   at 10 overview opens per user a day, 1k reads: about 31k reads a day, under the 50k limit but not with a large margin. The data-layer PR for M2 must
@@ -279,6 +318,15 @@ Rules of thumb:
   system file picker, before the first external tester (the owner's words). Scope decided (#15 comment 7000534815):
   every list the user can see, their own lists plus the lists shared with them, replacing "my lists" (any member
   can delete a shared list). The export reads every item once, so it is counted in the M2 read-cost estimate.
+
+**Misuse and the shared quota (accepted risk, #204; owner, #15 comment 7003828200).** The quota is project-wide and
+nothing in the rules yet bounds lists per user, items per list or invites per household, so one account (with or without a
+household), a scripted member or a buggy client loop can use up a day's writes or reads for every household. The
+owner accepts this while only invited testers use the app. Response when it happens, in the Firebase console: disable
+the account in Authentication, delete its data in Firestore; requests work again after the daily reset. Before the
+first external tester: App Check is enforced (section 3.1), and the rules cap items per list and invites per household.
+The caps need stored counters, so their rule shape (with allow and deny tests, for example deny the 2,001st item and
+the invite past the household limit) is decided in M2 planning (M2-01) with the counters above, and the M2 rules task it plans adds those tests.
 
 [^quota]: https://firebase.google.com/docs/firestore/quotas
 [^price]: https://firebase.google.com/docs/firestore/pricing
@@ -362,7 +410,8 @@ Testing:
   * results are never negative and never exceed 9,999. Scaling is checked against a `BigInteger` reference
   implementation.
 * **Mutation testing** (PIT) on `core/domain`, so tests without real assertions
-  can't satisfy the coverage gate. The mutation score floor is 85%.
+  can't satisfy the coverage gate. The mutation score floor starts at 80% (owner, #254, #15 comment 7057951193;
+  raised once measured, and the guard forbids lowering it).
 * Kover floors: **95% line and 90% branch on core/domain**, 80% overall across
   `domain`, `data` and `app` (generated and Compose preview code excluded).
 
@@ -384,7 +433,7 @@ enforce the rules rather than goodwill.
    * PreToolUse denies `git commit --no-verify`, `git push --force`, `git reset --hard`
      on shared branches, and pushes to `main`.
    * PreToolUse denies agent edits to the process files: `CLAUDE.md`, `REVIEW.md`,
-     `agents/`, `.claude/`, `scripts/guards.sh` and `.github/`, unless the session
+     `agents/`, `.claude/`, `.githooks/`, `scripts/guards.sh`, `scripts/hooks/` and `.github/`, unless the session
      was started for a `tooling` task (an environment flag set at spawn).
    * A context-% warning (section 9.3).
 4. **CI (GitHub Actions)**, required checks on `main`:
@@ -403,8 +452,9 @@ enforce the rules rather than goodwill.
    * `unit`: JVM tests + Kover verify + PIT on `core/domain`
    * `firebase`: Firebase emulator (project `demo-listicles`, **no secrets needed**)
      → `tsc --noEmit` (strict), ESLint `strictTypeChecked` and Prettier over the TypeScript rules tests, then
-     Jest rules tests + Kotlin data-layer integration tests
-   * `ui`: Compose UI tests on an API 34 emulator against the Firebase emulator,
+     Jest rules tests
+   * `ui`: Compose UI tests and the Kotlin data-layer integration tests (`connectedDebugAndroidTest` of `:app` and
+     `:core:data` inside `firebase emulators:exec --only auth,firestore`; M1-02, #254) on an API 34 emulator against the Firebase emulator,
      with accessibility checks turned on (`enableAccessibilityChecks`: touch target
      size, contrast, content descriptions). Roborazzi screenshot tests (JVM) in
      light/dark × en/da.
@@ -484,8 +534,9 @@ enforce the rules rather than goodwill.
 | M6 | Release: signed APK on tag → GitHub Release (owner-held GitHub key); App Check enforcement after the monitoring period; Play workflow prepared but off (Play account deferred) | Tag `v0.1.0` produces an installable signed APK |
 
 **Before the first external tester** (anyone but the owner installs the app): the privacy text is approved
-(OQ-30, names Google as processor, Auth in the US and Firestore in `eur3`, Crashlytics); Crashlytics opt-in and
-App Check monitoring are in; the web account-deletion page is decided and the in-app export (OQ-38, M2) is built;
+(OQ-30, names Google as processor, Auth in the US and Firestore in `eur3`, Crashlytics); Crashlytics opt-in is in;
+App Check is enforced after its monitoring, and the rules cap items per list and invites per household (#204,
+section 3.3); the web account-deletion page is decided and the in-app export (OQ-38, M2) is built;
 the owner has the developer-verification account if it is required by then (issue #120).
 
 **OQ-36 (decided 2026-11-17) and OQ-15 (decided 2026-11-18): packing, trips and barcodes come after v1, in M3 or
@@ -513,13 +564,12 @@ members' changes; a conflict keeps the losing side; so v1 sync design should lea
   GitHub key when it is made, the Play App Signing key when Play starts.
 * Create the GitHub release keystore, keep it yourself (never committed), and add it to GitHub secrets (M6).
 * Register App Check (Play Integrity, device integrity only) and a CI debug token; turn enforcement on
-  after about two weeks of metrics.
+  after about two weeks of metrics, before the first external tester (#204).
+* If one account uses up the daily quota: disable it in Authentication and delete its data (section 3.3).
 * Register a limited-distribution developer account when it is available in Denmark (issue #120).
 * Approve the privacy text (OQ-30) before anyone else installs the app.
-* Make the repository public (decided: unlimited free Actions minutes).
-* Add yourself as CODEOWNER (the M0 PR adds the file; you confirm the handle).
-* Turn on branch protection using the guide from M0.
-* Collaborator: check the Actions settings, invite them, ask for 2FA, create the labels `feedback`, `idea`, `decision`, `needs-collaborator`, `needs-owner`, send them `docs/COLLABORATING.md`, run the live test (tasks M0.5-O3, M0.5-O4).
+* Done (#260 item 4): the repository is public (M0-O3), the CODEOWNERS handle is confirmed (M0-O4), branch protection
+  is on (M0-O6), and the collaborator setup with labels, 2FA and the live test is finished (M0.5-O3..O5).
 * Deferred decisions (2026-11-17): the web account-deletion page (before the first external tester) and the Play
   account type and the 12-tester closed test (when Play release is planned). The palette (T1) was decided later the
   same day: Petrol (issue #15 comment 6956773225). The undo snackbar timing (OQ-39) and backups/export (OQ-38) were
