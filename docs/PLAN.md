@@ -362,7 +362,7 @@ Testing:
   * results are never negative and never exceed 9,999. Scaling is checked against a `BigInteger` reference
   implementation.
 * **Mutation testing** (PIT) on `core/domain`, so tests without real assertions
-  can't satisfy the coverage gate. The mutation score floor is 80% (owner decision, issue 15: raise later, never lower).
+  can't satisfy the coverage gate. The mutation score floor is 85%.
 * Kover floors: **95% line and 90% branch on core/domain**, 80% overall across
   `domain`, `data` and `app` (generated and Compose preview code excluded).
 

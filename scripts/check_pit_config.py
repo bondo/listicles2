@@ -28,6 +28,18 @@ def problems(domain, root, verify):
         out.append("pitest must run Kotest through the JUnit 5 plugin (junit5PluginVersion)")
     if not re.search(r'targetClasses\.set\(listOf\("dk\.bjarkebjarke\.tally\.domain\.\*"\)\)', d):
         out.append("pitest targetClasses must be dk.bjarkebjarke.tally.domain.*")
+    if re.search(r"avoidCallsTo|excludedClasses|excludedMethods|excludedTestClasses", d):
+        out.append("pitest must not use avoidCallsTo or exclusions: they drop real mutants and empty the gate")
+    ml = re.search(r"mutators\.set\(\s*listOf\(([^)]*)\)\s*,?\s*\)", d)
+    names = re.findall(r'"(\w+)"', ml.group(1)) if ml else []
+    if not names:
+        out.append("pitest mutators must be pinned explicitly (PIT defaults without VOID_METHOD_CALLS)")
+    else:
+        for need in ("CONDITIONALS_BOUNDARY", "NEGATE_CONDITIONALS"):
+            if need not in names:
+                out.append(f"pitest mutators must include {need}")
+        if "VOID_METHOD_CALLS" in names:
+            out.append("pitest mutators must not include VOID_METHOD_CALLS (Kotlin null-check intrinsics are equivalent mutants)")
     m = re.search(r"mutationThreshold\.set\((\w+)\)", d)
     if not m or not m.group(1).isdigit():
         out.append("pitest mutationThreshold must be a literal number")

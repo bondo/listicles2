@@ -67,8 +67,22 @@ pitest {
     junit5PluginVersion.set("1.2.3")
     targetClasses.set(listOf("dk.bjarkebjarke.tally.domain.*"))
     targetTests.set(listOf("dk.bjarkebjarke.tally.domain.*"))
-    // Kotlin generates Intrinsics null checks that no test can observe (equivalent mutants); everything else is mutated.
-    avoidCallsTo.set(setOf("kotlin.jvm.internal.Intrinsics"))
+    // PIT defaults without VOID_METHOD_CALLS: Kotlin's generated null checks (Intrinsics.checkNotNull*) are equivalent mutants no test
+    // can kill, and avoidCallsTo would drop every mutant on a line that calls them. Conditionals, returns and arithmetic stay mutated.
+    mutators.set(
+        listOf(
+            "CONDITIONALS_BOUNDARY",
+            "INCREMENTS",
+            "INVERT_NEGS",
+            "MATH",
+            "NEGATE_CONDITIONALS",
+            "EMPTY_RETURNS",
+            "FALSE_RETURNS",
+            "TRUE_RETURNS",
+            "NULL_RETURNS",
+            "PRIMITIVE_RETURNS",
+        ),
+    )
     mutationThreshold.set(80)
     outputFormats.set(listOf("XML", "HTML"))
     timestampedReports.set(false)

@@ -82,10 +82,10 @@ step detekt gradle detekt :core:domain:detektMain :core:domain:detektTest :core:
 step lint gradle :app:lintDebug
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test
-  step coverage gradle koverVerify
+  step coverage gradle koverVerify -x :core:domain:pitest
   step mutation gradle :core:domain:pitest
 else
-  echo "skip  unit-tests, coverage (--fast)"; SKIPPED=1
+  echo "skip  unit-tests, coverage, mutation (--fast)"; SKIPPED=1
 fi
 step build gradle :app:assembleDebug :app:assembleDebugAndroidTest
 step firebase-install bash -c 'cd firebase && npm ci --silent'
