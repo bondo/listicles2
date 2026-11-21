@@ -148,7 +148,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01..03) | blocked | M1-14, M1-03 | implementer |  |
 | M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16 | implementer |  |
 | M1-24 | LocaleConfig&#58; generateLocaleConfig and resources.properties (LANG-02) | blocked | M1-29 | implementer |  |
-| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | blocked | M1-12, M1-30, M1-02 | implementer |  |
+| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | blocked | M1-12, M1-14, M1-30, M1-02 | implementer |  |
 | M1-31 | Household data 2&#58; leave, remove (marker, resumable), transfer, delete with cleanup resume (em… | blocked | M1-11, M1-18 | implementer |  |
 | M1-19 | Household UI&#58; create, members, invite share sheet, revoke (HH-01, HH-02, HH-04) | blocked | M1-18 | implementer |  |
 | M1-20 | Invite link and join screen (HH-03), incl. signed-out routing through sign-in | blocked | M1-19, M1-17 | implementer |  |
@@ -241,6 +241,7 @@ flowchart LR
     n17 --> n18
     n7 --> n19
     n12 --> n20
+    n15 --> n20
     n13 --> n20
     n1 --> n20
     n11 --> n21
