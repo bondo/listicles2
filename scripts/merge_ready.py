@@ -3,6 +3,8 @@
 
 Usage: python3 -I scripts/merge_ready.py <N> <sha> <kind>
   kind: working-draft-docs | tasks-sync | dependabot   (the owner-authorized merge-agent kinds)
+        general      a PR whose every path is on the allowlist (GENERAL_ALLOW), under the owner's standing authorization (#15 comment 7005366747);
+                     fail-closed since #15 comment 7058755858: any other path is owner-only
 
 Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * the PR head is exactly <sha>;
@@ -10,7 +12,8 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
   * every check the base ruleset requires has a latest run with conclusion `success` (none configured, missing or pending: refused);
   * no closing keyword (close/fix/resolve and their -s/-d forms) sits directly before an issue number or URL in the title, body or commits;
   * the base is `main` and the API's file and commit lists are complete (it caps them at 3000 and 250);
-  * every changed file (a rename's old name too) is inside the kind's allowed paths. For dependabot, a workflow may only
+  * every changed file (a rename's old name too) is inside the kind's allowed paths (general: only the allowlist, see owner_only).
+    For dependabot, a workflow may only
     re-pin the same actions (nothing added or removed) and gradle-wrapper.properties only a services.gradle.org version;
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
     in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
@@ -18,12 +21,15 @@ Otherwise it squash-merges via REST with <sha> pinned (GitHub refuses if the hea
 Exit status: 0 merged, 1 refused or API error, 2 bad usage. REST only (`gh api`), never GraphQL.
 """
 
+import base64
 import json
 import os
 import re
 import subprocess
 import sys
 import time
+import tomllib
+import xml.etree.ElementTree as ET  # noqa: N817  # justified: the standard name of this module
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
@@ -34,6 +40,35 @@ DOC_PREFIXES = ("docs/milestones/", "docs/product/wireframes/")
 DOC_FILES = ("docs/PLAN.md", "docs/product/stories.md", "docs/product/flow.md", "docs/product/rubric.md", "design/tokens.json")
 DRAFT_STATUS = "not owner-approved"
 TASKS_FILES = ("docs/tasks.toml",)
+# Kind `general` is fail-closed (owner decision #15 7058755858, replacing ruling 1 of 7019683156): only GENERAL_ALLOW paths may merge as general, and
+# these explicit lists, compared casefolded, stay as a second layer inside it: the protected process files (the list of
+# scripts/hooks/pretooluse_guard.py PROTECTED, which a test keeps in sync), the wrappers by name anywhere, gate docs and approved product and design docs,
+# dependency manifests, licence acceptances, canonical process docs and gradlew.
+OWNER_ONLY_FILES = {f.casefold() for f in (
+    "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
+    "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
+    "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md", "docs/COLLABORATING.md",
+    "gradle/verification-metadata.xml", "gradlew", "gradlew.bat",
+    "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")}  # the last two run through `ci_scope.py selftests` (a test keeps them in sync)
+OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".githooks/", ".tools/", "agents/", "scripts/hooks/", "docs/reviews/",
+                                                   "docs/product/", "design/", "gradle/wrapper/", "config/licensee/"))
+OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh",
+                                                          "CLAUDE.md", "CLAUDE.local.md",  # Claude Code loads these as agent instructions in any directory
+                                                          ".gitattributes", ".mcp.json", ".gitleaks.toml", ".gitleaksignore",  # R5
+                                                          "lint.xml", "lint-baseline.xml", "ProjectConfig.kt", "PackageConfig.kt")}  # R7: lint, Kotest
+REQUIREMENTS_RE = re.compile(r"^requirements[\w.-]*\.txt$")
+GENERAL_DRAFT_FILES, GENERAL_DRAFT_PREFIXES = ("docs/plan.md",), ("docs/milestones/",)  # drafts without a sign-off (not design/tokens.json, R3-01)
+_SEG = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"  # one path component: no dot-prefix, no "..", no space, no odd characters; matched case-sensitively
+ROOT = r"(?:dev/listicles|dk/bjarkebjarke/tally)"  # the Kotlin package roots: the current one and the one M1-29 renames to (naming.md)
+GENERAL_ALLOW = tuple(re.compile(p) for p in (
+    rf"app/src/(?:main|test|androidTest)/kotlin/{ROOT}(?:/{_SEG})+\.kt", rf"app/src/main/res(?:/{_SEG})+\.(?:xml|png|webp)",  # app sources, tests, res
+    rf"core/(?!testing/)[a-z][a-z0-9_-]*/src/(?:main|test)/kotlin/{ROOT}(?:/{_SEG})+\.kt",  # core module sources and tests (not core/testing)
+    rf"docs(?:/{_SEG})+\.(?:md|csv|png|txt)", r"README\.md", r"docs/tasks\.toml"))  # docs (owner-only ones refused by the lists); tasks.toml: tasks_problems
+# Tests and config that are gates, wherever they sit (casefolded): the architecture package, the no-network, Robolectric and JUnit 4 engine tests, classes
+# named like core/testing's (R7-02), and res/xml and qualified forms such as xml-v31 (backup, device-transfer, network-security rules; R7-06).
+GENERAL_GATE_RE = re.compile(r"/architecture/|nonetwork|robolectric|junit4engine|jdkapilevel|"
+                             r"/(?:dev/listicles|dk/bjarkebjarke/tally)/testing/|/res/xml(?:-[^/]*)?/")
+KOTEST_CONFIG_RE = re.compile(r"AbstractProjectConfig|AbstractPackageConfig|io\.kotest\.provided|AutoScan")  # R7-01: project-level Kotest config
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
 DEPENDABOT_FILES = ("gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar")
@@ -159,10 +194,21 @@ class GhApi:
         return json.loads(self._gh([*args, path]))
 
 
+def owner_only(name):
+    """Whether a path needs the owner's approval first (kind `general` refuses it): fail-closed, so everything but a GENERAL_ALLOW path is."""
+    n = name.casefold()
+    base = n.rsplit("/", 1)[-1]
+    if base in OWNER_ONLY_BASENAMES or REQUIREMENTS_RE.match(base) or n in OWNER_ONLY_FILES or n.startswith(OWNER_ONLY_PREFIXES) or GENERAL_GATE_RE.search(n):
+        return True
+    return not any(p.fullmatch(name) for p in GENERAL_ALLOW)
+
+
 def allowed(kind, name):
     """Whether a changed path belongs to the kind (workflow pins are judged on their patch, see pin_only)."""
     if ".." in name.split("/"):
         return False
+    if kind == "general":
+        return not owner_only(name)
     if kind == "working-draft-docs":
         return name in DOC_FILES or name.startswith(DOC_PREFIXES)
     if kind == "tasks-sync":
@@ -216,6 +262,13 @@ def file_problems(kind, files, resolve):
             if name and not allowed(kind, name):
                 problems.append(f"path outside kind {kind}: {name}")
         name, patch = f["filename"], f.get("patch")
+        draft = any(x.casefold() in GENERAL_DRAFT_FILES or x.casefold().startswith(GENERAL_DRAFT_PREFIXES) for x in (name, f.get("previous_filename") or name))
+        if kind == "general" and draft and (f.get("status") in ("removed", "renamed") or patch is None or drops_draft_status(patch)):
+            problems.append(f"{name}: removes or renames a working draft, has no patch to check, or removes a '{DRAFT_STATUS}' status line "
+                            "(a sign-off is the owner's)")
+        added = [ln for _, block in _changed_lines(patch or "") for ln in block]
+        if kind == "general" and name.endswith(".kt") and (patch is None or any(KOTEST_CONFIG_RE.search(ln) for ln in added)):
+            problems.append(f"{name}: no patch to check, or it touches Kotest project config ({KOTEST_CONFIG_RE.pattern})")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
         if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
@@ -228,6 +281,48 @@ def file_problems(kind, files, resolve):
                 problems.append(f"{name}: changes beyond a version bump (re-pinned `uses:` lines, services.gradle.org distribution)")
             elif check is pin_only:
                 problems += pin_tag_problems(name, patch, resolve)
+    return problems
+
+
+def tasks_problems(api, repo, base, sha):
+    """Reasons docs/tasks.toml at the head changes more than the `status` and `pr` lines of agent tasks against the base, and a status only todo to done
+    (R7-04, R8-01, R9-01; owner decision #15 7059534826): comments, order, other fields, owner tasks and any other status refuse."""
+    strip = lambda s: re.sub(r'(?m)^(?:status = "[a-z]+"|pr = [1-9][0-9]*)\n', "", s)  # noqa: E731  # justified: two-use local helper
+    try:
+        old_t, new_t = (base64.b64decode(api.get(f"repos/{repo}/contents/docs/tasks.toml?ref={ref}")["content"]).decode() for ref in (base, sha))
+        a, b = ({task["id"]: task for task in tomllib.loads(text).get("task", [])} for text in (old_t, new_t))
+    except (KeyError, ValueError, TypeError) as e:
+        return [f"docs/tasks.toml cannot be compared with the base ({type(e).__name__}): owner-only"]
+    rest = lambda task: {k: v for k, v in task.items() if k not in ("status", "pr")}  # noqa: E731  # justified: one-use local helper
+    if strip(old_t) != strip(new_t) or a.keys() != b.keys() or any(rest(a[i]) != rest(b[i]) for i in a):
+        return ["docs/tasks.toml: more than the `status` and `pr` lines changed (a comment, the order, another field, a task added or removed)"]
+    bad = lambda x, y: x != y and (x, y) != ("todo", "done")  # noqa: E731  # justified: one-use local helper
+    return [f"docs/tasks.toml: task {i} is an owner task, or its status changes other than todo to done" for i in a
+            if a[i] != b[i] and ("owner" in (a[i].get("assignee"), b[i].get("assignee")) or bad(a[i].get("status"), b[i].get("status")))]
+
+
+class _NoDoctype(ET.TreeBuilder):
+    """A tree builder that refuses any DOCTYPE: expat skips declarations after a parameter-entity reference, and AGP applies them (R7-06, round 10)."""
+
+    def doctype(self, name, pubid, system):
+        raise ValueError("DOCTYPE")
+
+
+def res_xml_problems(api, repo, sha, files):
+    """Reasons a changed res XML file declares an xml resource alias at the head (R7-06, R9): an element named xml or a `type` attribute of xml makes aapt2
+    link @xml/... elsewhere (the backup and device-transfer rules). The head is parsed, so character references and a type split over PRs are seen."""
+    problems = []
+    for f in files:
+        name = f["filename"]
+        if f.get("status") == "removed" or not (name.startswith("app/src/main/res/") and name.endswith(".xml")):
+            continue
+        try:
+            root = ET.fromstring(base64.b64decode(api.get(f"repos/{repo}/contents/{name}?ref={sha}")["content"]), parser=ET.XMLParser(target=_NoDoctype()))
+        except (KeyError, ValueError, TypeError, ET.ParseError) as e:
+            problems.append(f"{name}: cannot be parsed at the head ({type(e).__name__}): owner-only")
+            continue
+        if any(el.tag.rsplit("}", 1)[-1] == "xml" or (el.get("type") or "").strip() == "xml" for el in root.iter()):
+            problems.append(f"{name}: declares an xml resource alias (an element or a type `xml`), which can replace the backup rules")
     return problems
 
 
@@ -280,11 +375,15 @@ def evaluate(api, repo, n, sha, kind, resolve):
         if m:
             problems.append(f"closing keyword in {where}: {m.group(0)!r} (rephrase, e.g. 'see issue N')")
     problems += file_problems(kind, files, resolve)
+    if kind == "general" and any("docs/tasks.toml" in (f["filename"], f.get("previous_filename")) for f in files):
+        problems += tasks_problems(api, repo, pr["base"]["ref"], sha)
+    if kind == "general":
+        problems += res_xml_problems(api, repo, sha, files)
     problems += check_problems(api, repo, pr["base"]["ref"], sha)
     return pr, problems
 
 
-KINDS = {"working-draft-docs", "tasks-sync", "dependabot"}
+KINDS = {"working-draft-docs", "tasks-sync", "dependabot", "general"}
 
 
 def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None):
