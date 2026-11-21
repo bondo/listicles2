@@ -29,6 +29,7 @@ import subprocess
 import sys
 import time
 import tomllib
+import xml.etree.ElementTree as ET  # noqa: N817  # justified: the standard name of this module
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
 BASE = "main"
@@ -67,7 +68,6 @@ GENERAL_ALLOW = tuple(re.compile(p) for p in (
 # named like core/testing's (R7-02), and res/xml and qualified forms such as xml-v31 (backup, device-transfer, network-security rules; R7-06).
 GENERAL_GATE_RE = re.compile(r"/architecture/|nonetwork|robolectric|junit4engine|jdkapilevel|"
                              r"/(?:dev/listicles|dk/bjarkebjarke/tally)/testing/|/res/xml(?:-[^/]*)?/")
-ALIAS_XML_RE = re.compile(r"type\s*=\s*[\"']xml[\"']")  # R7-06: a values alias <item name="x" type="xml"> repoints an xml resource
 KOTEST_CONFIG_RE = re.compile(r"AbstractProjectConfig|AbstractPackageConfig|io\.kotest\.provided|AutoScan")  # R7-01: project-level Kotest config
 # Only files whose content this script checks (workflow pins, wrapper properties) or CI validates (the wrapper jar). npm, gradle catalog and
 # pip manifests carry runnable or fetchable content (scripts, URLs), so those Dependabot PRs go to the owner (R2-01).
@@ -269,8 +269,6 @@ def file_problems(kind, files, resolve):
         added = [ln for _, block in _changed_lines(patch or "") for ln in block]
         if kind == "general" and name.endswith(".kt") and (patch is None or any(KOTEST_CONFIG_RE.search(ln) for ln in added)):
             problems.append(f"{name}: no patch to check, or it touches Kotest project config ({KOTEST_CONFIG_RE.pattern})")
-        if kind == "general" and name.endswith(".xml") and (patch is None or ALIAS_XML_RE.search("\n".join(added))):
-            problems.append(f"{name}: no patch to check, or it declares an xml resource alias (type=\"xml\"), which can replace the backup rules")
         if kind == "dependabot" and f.get("status") != "modified":
             problems.append(f"{name}: status {f.get('status')}; a dependency bump only modifies files")
         if kind == "working-draft-docs" and (drops_draft_status(patch or "") or patch is None and not (name.endswith(".png") and f["status"] != "renamed")):
@@ -288,8 +286,8 @@ def file_problems(kind, files, resolve):
 
 def tasks_problems(api, repo, base, sha):
     """Reasons docs/tasks.toml at the head changes more than the `status` and `pr` lines of agent tasks against the base, and a status only todo to done
-    (R7-04, R8-01; owner decision #15 7059534826): comments, order, other fields, owner tasks and any other status refuse."""
-    strip = lambda s: re.sub(r"(?m)^[ \t]*(?:status|pr)[ \t]*=.*\n?", "", s)  # noqa: E731  # justified: two-use local helper
+    (R7-04, R8-01, R9-01; owner decision #15 7059534826): comments, order, other fields, owner tasks and any other status refuse."""
+    strip = lambda s: re.sub(r'(?m)^(?:status = "[a-z]+"|pr = [1-9][0-9]*)\n', "", s)  # noqa: E731  # justified: two-use local helper
     try:
         old_t, new_t = (base64.b64decode(api.get(f"repos/{repo}/contents/docs/tasks.toml?ref={ref}")["content"]).decode() for ref in (base, sha))
         a, b = ({task["id"]: task for task in tomllib.loads(text).get("task", [])} for text in (old_t, new_t))
@@ -300,6 +298,24 @@ def tasks_problems(api, repo, base, sha):
     bad = lambda x, y: x != y and (x, y) != ("todo", "done")  # noqa: E731  # justified: one-use local helper
     return [f"docs/tasks.toml: task {i} is an owner task, or its status changes other than todo to done" for i in a
             if a[i] != b[i] and ("owner" in (a[i].get("assignee"), b[i].get("assignee")) or bad(a[i].get("status"), b[i].get("status")))]
+
+
+def res_xml_problems(api, repo, sha, files):
+    """Reasons a changed res XML file declares an xml resource alias at the head (R7-06, R9): an element named xml or a `type` attribute of xml makes aapt2
+    link @xml/... elsewhere (the backup and device-transfer rules). The head is parsed, so character references and a type split over PRs are seen."""
+    problems = []
+    for f in files:
+        name = f["filename"]
+        if f.get("status") == "removed" or not (name.startswith("app/src/main/res/") and name.endswith(".xml")):
+            continue
+        try:
+            root = ET.fromstring(base64.b64decode(api.get(f"repos/{repo}/contents/{name}?ref={sha}")["content"]))
+        except (KeyError, ValueError, TypeError, ET.ParseError) as e:
+            problems.append(f"{name}: cannot be parsed at the head ({type(e).__name__}): owner-only")
+            continue
+        if any(el.tag.rsplit("}", 1)[-1] == "xml" or (el.get("type") or "").strip() == "xml" for el in root.iter()):
+            problems.append(f"{name}: declares an xml resource alias (an element or a type `xml`), which can replace the backup rules")
+    return problems
 
 
 def check_problems(api, repo, base, sha):
@@ -353,6 +369,8 @@ def evaluate(api, repo, n, sha, kind, resolve):
     problems += file_problems(kind, files, resolve)
     if kind == "general" and any("docs/tasks.toml" in (f["filename"], f.get("previous_filename")) for f in files):
         problems += tasks_problems(api, repo, pr["base"]["ref"], sha)
+    if kind == "general":
+        problems += res_xml_problems(api, repo, sha, files)
     problems += check_problems(api, repo, pr["base"]["ref"], sha)
     return pr, problems
 
