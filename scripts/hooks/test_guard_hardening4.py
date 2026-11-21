@@ -182,6 +182,47 @@ class Round4(Base):
     def test_a_subshell_that_leaves_ifs_as_it_was_does_not_make_it_unknown(self):
         self.allow(["case x in a) ;; esac; (unset IFS); git status", "((i = 1)); (unset IFS); git status"])
 
+    def test_export_readonly_and_mapfile_never_change_how_bash_splits(self):
+        self.allow(["export $N; git status", "readonly $N; git status", "mapfile -t $N < f; git status", "readarray -t IFS < f; git status"])
+
+    def test_witnesses_of_this_round_s_mutants(self):
+        # one-line mutants of the lines this round added; each command below flips under one of them (deny tests in both sessions)
+        names = ("p", "_p", "p1", "p_q", "Pq")  # main's assignment rule in the floor pass: every character class of the name
+        self.deny([f"false && IFS=-; {v}=--force; git push ${v} origin work" for v in names])
+        self.deny(
+            [
+                ": $((IFS=1)); false && IFS=' '; P=--force1origin1work; git push $P",
+                f'declare -ng R=GIT_CONFIG_PARAMETERS; export R="{P}"; git commit -m x',
+                "printf -vIFS %s _; P=--force_origin_work; git push $P",
+                "IFS=_; f() { declare IFS; P='--force origin'; git push $P work; }; f",
+                "read -r `echo IFS` <<< _; P=--force_origin_work; git push $P",
+                "OLDIFS=$IFS; IFS=,; IFS=$OLDIFS; P=$'--force\\torigin'; git push $P work",
+                "IFS=,; OLDIFS=$IFS; IFS=' '; IFS=$OLDIFS; P=--force,origin,work; git push $P",
+                "read -r IFS <<< _; false && unset IFS; P=--force_origin_work; git push $P",
+                f'export `echo GIT_CONFIG_PARAMETERS`="{P}"; git commit -m x',
+                "F=ok; env F=--force; git push $F origin work",  # main records an env assignment, so the floor denies; bash leaves F=ok
+                "OLDIFS=$IFS; git push origin $OLDIFS",  # main's refspec check: the floor never reads $IFS
+            ]
+        )
+        self.deny_git(["touch .git/$y${x#{}config"])
+        self.deny(["rm notes$(: '(').md"], both=False)
+        self.deny_git(["echo case; (cd .git); touch hooks/pre-commit"])  # deny-only: a line that names case is read as one with a case statement
+        self.allow(
+            [
+                "(IFS=,); git status",
+                "case x in a) ;; esac; (true); touch notes.md",
+                "(cd docs); touch notes.md",
+                "(: $((IFS=1))); git status",
+                "X=$(echo IFS); git status",
+                ": $((1 + 1)); git status",
+                "read -$O line <<< y; git status",
+                "OLDIFS=${IFS}; IFS=,; IFS=$OLDIFS; git status",
+                "IFS=' '; read -r IFS <<< x; O=$IFS; echo $O",
+                "(read -r IFS <<< x); git status",
+                "$X a b c push --force",
+            ]
+        )
+
     def test_the_floor_keeps_main_s_denials_that_the_model_alone_would_allow(self):
         # main denies these; bash would not run them as the guard fears, but main's verdict is the floor (escalation of #252)
         self.deny([f"nice FOO=1 {PUSH}", "F=--force-with-lease; (F=--force); git push $F origin work"])
