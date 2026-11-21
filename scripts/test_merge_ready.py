@@ -525,6 +525,8 @@ class GeneralKindTests(unittest.TestCase):
                  "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/architecture/NewRule.kt",
                  "app/src/main/res/lint.xml", "app/src/main/res/xml/lint.xml", "app/src/main/res/values/lint-baseline.xml",  # R7-03: lint config
                  "app/src/main/res/xml/backup_rules.xml", "app/src/main/res/xml/data_extraction_rules.xml",  # R7-06: backup, device transfer
+                 "app/src/main/res/xml-v31/data_extraction_rules.xml", "app/src/main/res/xml-v31/backup_rules.xml",  # R7-06 again: qualified xml dirs
+                 "app/src/main/res/xml-night/backup_rules.xml", "app/src/main/res/xml-da/data_extraction_rules.xml",
                  "app/src/main/res/xml/network_security_config.xml", "docs/COLLABORATING.md",  # R7-07
                  "app/src/main/kotlin/./x.kt", "app/src/main/kotlin//x.kt", "/app/src/main/kotlin/x.kt", "app\\src\\main\\kotlin\\x.kt",
                  "app/src/main/kotlin/x y.kt", "app/src/main/kotlin/x\u202e.kt", "App/src/main/kotlin/x.kt", "DOCS/PLAN.md")  # odd and mixed-case names
@@ -543,12 +545,23 @@ class GeneralKindTests(unittest.TestCase):
         ordinary = file_entry(self.SPEC, patch='@@ -1 +1 @@\n-x\n+class ListsTest : FunSpec({ test("a") {} })')
         self.assertEqual(go(make_api(files=[ordinary]), kind="general")[0], 0)
 
+    def test_a_values_alias_that_points_an_xml_resource_elsewhere_is_refused(self):  # R7-06: res/values-v31/aliases.xml replaces the backup rules
+        alias = 'name="data_extraction_rules" type="xml">@xml/backup_rules</item>'
+        for added in (f"<item {alias}", '<item name="x"\n  type\n  =\n"xml">@xml/y</item>', "<item name='x' type='xml'>@xml/y</item>"):
+            with self.subTest(added=added):
+                patch = "@@ -1 +1,3 @@\n" + "".join(f"+{ln}\n" for ln in added.splitlines())
+                self.refused(make_api(files=[file_entry("app/src/main/res/values-v31/aliases.xml", patch=patch)]), r"type=\"xml\"|alias|xml")
+        self.refused(make_api(files=[file_entry("app/src/main/res/values-v31/aliases.xml", patch=None)]), r"no patch")
+        ok = file_entry("app/src/main/res/values/strings.xml", patch='@@ -1 +1 @@\n-x\n+<string name="a">A</string>')
+        self.assertEqual(go(make_api(files=[ok]), kind="general")[0], 0)
+
     def test_a_kotlin_file_without_a_patch_is_refused(self):  # the content check cannot run
         self.refused(make_api(files=[file_entry(self.SPEC, patch=None)]), r"no patch")
 
     def test_tasks_toml_may_change_only_status_and_pr_of_agent_tasks(self):  # R7-04: owner decision #15 7059534826
-        base = ('milestones = ["M1"]\n\n[[task]]\nid = "M1-01"\ntitle = "A"\nstatus = "todo"\nassignee = "implementer"\ndepends_on = []\n\n'
-                '[[task]]\nid = "M1-O1"\ntitle = "B"\nstatus = "todo"\nassignee = "owner"\ndepends_on = []\n')
+        base = ('milestones = ["M1"]\n\n# Order within a milestone = priority.\n[[task]]\nid = "M1-01"\ntitle = "A"\nstatus = "todo"\n'
+                'assignee = "implementer"\ndepends_on = []\n\n[[task]]\nid = "M1-02"\ntitle = "C"\nstatus = "done"\nassignee = "implementer"\n'
+                'depends_on = []\n\n[[task]]\nid = "M1-O1"\ntitle = "B"\nstatus = "todo"\nassignee = "owner"\ndepends_on = []\n')
 
         def tasks_api(new):
             api = make_api(files=[file_entry("docs/tasks.toml")])
@@ -560,11 +573,17 @@ class GeneralKindTests(unittest.TestCase):
         done = base.replace('id = "M1-01"\ntitle = "A"\nstatus = "todo"', 'id = "M1-01"\ntitle = "A"\nstatus = "done"').replace(
             'depends_on = []\n\n[[task]]\nid = "M1-O1"', 'depends_on = []\npr = 7\n\n[[task]]\nid = "M1-O1"')
         self.assertEqual(go(tasks_api(done), kind="general")[0], 0)  # status and pr of an agent task
+        parts = base.split("[[task]]")
         cases = {"owner task status": base.replace('title = "B"\nstatus = "todo"', 'title = "B"\nstatus = "done"'),
                  "title": base.replace('title = "A"', 'title = "A2"'), "depends_on": base.replace('depends_on = []', 'depends_on = ["M1-O1"]', 1),
-                 "assignee": base.replace('assignee = "implementer"', 'assignee = "owner"'), "task added": base + '\n[[task]]\nid = "M1-02"\n',
+                 "assignee": base.replace('assignee = "implementer"', 'assignee = "owner"'), "task added": base + '\n[[task]]\nid = "M1-03"\n',
                  "task removed": base[: base.index('[[task]]\nid = "M1-O1"')], "top level": base.replace('["M1"]', '["M1", "M2"]'),
-                 "not toml": "this is = = not toml"}
+                 "not toml": "this is = = not toml",
+                 "comment edit": base.replace("priority.", "nothing."),
+                 "reorder": "[[task]]".join([parts[0], parts[2], parts[1], parts[3]]),
+                 "todo to dropped": base.replace('title = "A"\nstatus = "todo"', 'title = "A"\nstatus = "dropped"'),
+                 "done to todo": base.replace('title = "C"\nstatus = "done"', 'title = "C"\nstatus = "todo"'),
+                 "status removed": base.replace('title = "A"\nstatus = "todo"\n', 'title = "A"\n')}
         for name, new in cases.items():
             with self.subTest(name):
                 self.refused(tasks_api(new), r"tasks\.toml")
