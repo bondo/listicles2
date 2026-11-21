@@ -225,6 +225,42 @@ class Round4(Base):
             ]
         )
 
+    def test_r5_03_the_floor_pass_keeps_main_s_code_wherever_this_pr_changed_shared_code(self):
+        # main denies each line; its option handling, raw prefix assignments, $A"ce" as $Ace and the ANSI-C parse failure stay in the floor pass
+        self.deny(
+            [
+                "watch -dn git push --force origin work",
+                "watch -dq git push --force origin work",
+                "echo x | xargs -iI git push --force origin work",
+                "echo x | xargs -eI git push --force origin work",
+                "echo x | xargs -in git push --force upstream work",
+                "core=core; false && core=; GIT_CONFIG_PARAMETERS=\"'$core.hooksPath'='/x'\" git commit -m x",
+                "alias=alias; false && alias=; GIT_CONFIG_PARAMETERS=\"'$alias.st'='push --force'\" git st origin work",
+                'A=--for; false && A=x; Ace=--force; git push $A"ce" origin work',
+                ": $'\\U110000'; git push ${x:---force} origin work",
+                ": $'\\U110000'; git push {--force,origin} work",
+            ]
+        )
+
+    def test_r5_04_a_nameref_target_built_from_a_substitution_is_denied_without_the_ifs_rule(self):
+        # git run by another program (gh pr create pushes) reads the exported GIT_CONFIG_PARAMETERS, so the R4-13 deny matters by itself
+        self.deny([f'X=$(echo GIT_CONFIG_PARAMETERS); declare -n R=$X; export R="{P}"; gh pr create --fill',
+                   f'declare -n R=`echo GIT_CONFIG_PARAMETERS`; export R="{P}"; gh pr create --fill'])
+
+    def test_r4_14_arithmetic_naming_ifs_select_time_and_function_loops(self):
+        self.deny(
+            [
+                "(( IFS = 1 )); P=--force1origin1work; git push $P",
+                "((IFS = 1)); P=--force1origin1work; git push $P",
+                "((IFS++)); P=--force1origin1work; git push $P",
+                "select IFS in _; do P=--force_origin_work; git push $P; break; done <<< 1",
+                "time for IFS in _; do P=--force_origin_work; git push $P; done",
+                "time -p for IFS in _; do P=--force_origin_work; git push $P; done",
+                "function f { for IFS in _; do P=--force_origin_work; git push $P; done; }; f",
+            ]
+        )
+        self.allow(["(( i = 1 )); git status", "((i++)); git status", "time git status", "function f { git status; }; f"])
+
     def test_the_floor_keeps_main_s_denials_that_the_model_alone_would_allow(self):
         # main denies these; bash would not run them as the guard fears, but main's verdict is the floor (escalation of #252)
         self.deny([f"nice FOO=1 {PUSH}", "F=--force-with-lease; (F=--force); git push $F origin work"])
