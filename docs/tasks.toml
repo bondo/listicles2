@@ -901,8 +901,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-10", "M1-O11"]
-notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write. Starts after the owner decides #280 (M1-O11; R1-A-04 of PR #265, #15 comment 7064886556): implement the Query invites row as decided, and this PR writes the decision into PLAN 3.1"
+depends_on = ["M1-10", "M1-O12"]
+notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write. Starts after the owner decides #280 (M1-O12; R1-A-04 of PR #265, #15 comment 7064886556): implement the Query invites row as decided, and this PR writes the decision into PLAN 3.1"
 
 [[task]]
 id = "M1-30"
@@ -1433,7 +1433,7 @@ depends_on = ["M1-29"]
 notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task, a further deferral included (record it on #15); a rename becomes a new owner task. Follow-on edits: docs/product/naming.md"
 
 [[task]]
-id = "M1-O11"
+id = "M1-O12"
 title = "Decide #280 (who may list invites) before M1-12 starts"
 milestone = "M1"
 status = "todo"
