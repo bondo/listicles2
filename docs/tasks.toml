@@ -547,10 +547,11 @@ notes = "Tooling env (agents/, REVIEW.md). Effort S. Fold into the M0-11 session
 id = "M0.5-FU"
 title = "Follow-up burn-down for M0.5"
 milestone = "M0.5"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-01", "M0.5-02", "M0.5-03", "M0.5-04", "M0.5-05", "M0.5-06", "M0.5-07", "M0.5-08", "M0.5-09", "M0.5-10", "M0.5-11", "M0.5-12", "M0.5-13", "M0.5-14", "M0.5-15", "M0.5-16", "M0.5-17", "M0.5-18", "M0.5-19", "M0.5-20", "M0.5-21", "M0.5-22", "M0.5-23", "M0.5-24", "M0.5-25", "M0.5-26", "M0.5-27", "M0.5-28", "M0.5-29"]
+notes = "Closed with no work: 0 open target:M0.5 follow-ups (see #259); set done by the M1 planning refresh, PR #261. Issue #65 still carries target:M0.5 but is the review programme issue, not a follow-up; the orchestrator re-targets it with owner OK"
 
 [[task]]
 id = "M0.5-27"
@@ -758,16 +759,18 @@ pr = 141
 notes = "Tooling env (scripts/guards.sh, scripts/hooks/). Test-first, with negative cases; the guard runs in verify.sh, the pre-commit hook (--staged) and the CI guards job. Owner decision on #15, comment 6974778901 (Git LFS not adopted, guard now, LFS deferred to M6-O4). Owner merge: scripts/ and a guard limit"
 
 # ---------------------------------------------------------------- M1 auth + households
-# The planner (M1-01) breaks M1 into PR-sized tasks and adds them here in its PR.
+# The planner (M1-01) broke M1 into PR-sized tasks (PRs #124, #125); the refresh of 2026-11-21 (PR #261) added M1-35..M1-51.
 
 [[task]]
 id = "M1-01"
 title = "Plan M1: docs/milestones/M1.md and PR-sized tasks in this file"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M0.5"]
+notes = "Delivered by PRs #124 and #125 (draft plan and tasks); refreshed by PR #261 (triage of the target:M1 follow-ups, owner answers 7058176190)"
+pr = 124
 
 [[task]]
 id = "M1-02"
@@ -777,7 +780,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-29"]
-notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-listicles); tests live in core/data/src/androidTest. Test-first: the first commit adds a smoke test there that signs in against the Auth emulator and writes and reads a document on the Firestore emulator (10.0.2.2), failing when the emulators are not running. Adds the Firebase BoM, Auth and Firestore to the catalog and :core:data (no Google Services plugin; that is M1-30). After the rename M1-29"
+notes = "Tooling env, owner merge (.github is protected); widened from the known gap R6-09 by the M1 plan. The ui job runs connectedDebugAndroidTest of :app and :core:data inside firebase emulators:exec --only auth,firestore (demo-listicles); tests live in core/data/src/androidTest. Test-first: the first commit adds a smoke test there that signs in against the Auth emulator and writes and reads a document on the Firestore emulator (10.0.2.2), failing when the emulators are not running. Adds the Firebase BoM, Auth and Firestore to the catalog and :core:data (no Google Services plugin; that is M1-30). After the rename M1-29. Adds :core:testing to the :core:data test classpath (#217 item 3)"
 
 [[task]]
 id = "M1-03"
@@ -787,7 +790,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env (CI). Effort M. Exact-match goldens (no tolerance)."
+notes = "Tooling env (CI). Effort M. Exact-match goldens (no tolerance). Also a 200 % font-scale, Danish, light golden per screen (Q3 A, #15 comment 7058176190)"
 
 [[task]]
 id = "M1-04"
@@ -797,7 +800,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M0.5-03", "M1-03"]
-notes = "Normal env. Effort S. M0.5-03 must emit design/tokens.json."
+notes = "Normal env. Effort S. M0.5-03 must emit design/tokens.json. Also gates outline on surfaceContainerLow and surfaceContainerHigh and states that other type styles are M3 defaults (#198 items 2, 3)"
 
 [[task]]
 id = "M1-05"
@@ -807,7 +810,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Normal env plus a CI step (tooling) if it is not inside the unit job's Gradle call. Effort S."
+notes = "Normal env plus a CI step (tooling) if it is not inside the unit job's Gradle call. Effort S. Floor 80 % (owner decision on #15, comment 7057951193; PLAN section 4 aligned by M1-35)"
 
 [[task]]
 id = "M1-06"
@@ -843,12 +846,13 @@ notes = "Normal env. Must merge before M1-O1 registers the Android app in Fireba
 
 [[task]]
 id = "M1-08"
-title = "Rules base: signedIn() with email_verified, users/{uid} householdId set/clear, tombstone read, config/app"
+title = "Rules base: signedIn() with email_verified, users/{uid} householdId set/clear and name, tombstone read, config/app"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-01"]
+depends_on = ["M1-52"]
+notes = "PLAN as amended by M1-35 (P4, P5, P9); the test harness rewrite is M1-52"
 
 [[task]]
 id = "M1-09"
@@ -861,7 +865,7 @@ depends_on = ["M1-08"]
 
 [[task]]
 id = "M1-10"
-title = "Rules: create household, member display name, transfer ownership, allow and deny tests"
+title = "Rules: create household and member display name, allow and deny tests (transfer is M1-53)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
@@ -876,12 +880,12 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-12"]
-notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user; deny soft delete by a plain member or non-member; allow soft delete, tombstone read and cleanup with createdBy seeded null; deny every write under a tombstone except the cleanup deletes (#199, #205)"
+depends_on = ["M1-54", "M1-53"]
+notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user; deny soft delete by a plain member or non-member; allow soft delete, tombstone read and cleanup with createdBy seeded null; deny every write under a tombstone except the cleanup deletes (#199, #205). Estimated ~450 with P6: accepted conditional split (R2-08), if the first commit's tests pass 450 lines, soft delete and cleanup go first as their own PR and the orchestrator adds that task"
 
 [[task]]
 id = "M1-12"
-title = "Rules: invites (create, get, list, revoke, cleanup) and the join batch, incl. unverified get denied"
+title = "Rules: invites (create, get, list, revoke, cleanup), incl. unverified get denied (join is M1-54)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
@@ -891,21 +895,23 @@ notes = "Join includes the one-household check (PLAN 3.1): deny a join without t
 
 [[task]]
 id = "M1-30"
-title = "App skeleton: Hilt, Navigation 3, signed-in/signed-out root, connectivity helper, Google Services plugin + stand-in config"
+title = "App skeleton: Hilt, Navigation 3, root with the start-up gates, M1 home, connectivity helper, Google Services plugin + stand-in config"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-29", "M1-02"]
+depends_on = ["M1-29", "M1-02", "M1-36", "M1-49"]
+notes = "Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A; one routing test with fakes over all gates (#194, #195)"
 
 [[task]]
 id = "M1-13"
-title = "Domain: email and password validation (12+ code points), property tests"
+title = "Domain: email, password and name validation (12+ code points, name 1-50), property tests"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-01"]
+depends_on = ["M1-37"]
+notes = "Lengths as in docs/milestones/M1.md P4; property: a 50-code-point name with non-BMP characters passes"
 
 [[task]]
 id = "M1-14"
@@ -914,7 +920,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-30", "M1-13", "M1-02"]
+depends_on = ["M1-30", "M1-13", "M1-02", "M1-50"]
 notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
 
 [[task]]
@@ -928,12 +934,12 @@ depends_on = ["M1-14"]
 
 [[task]]
 id = "M1-16"
-title = "Sign-in UI: sign-in screen and Google button (AUTH-01..03)"
+title = "Sign-in UI: sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-14", "M1-03"]
+depends_on = ["M1-14", "M1-03", "M1-49"]
 
 [[task]]
 id = "M1-17"
@@ -943,6 +949,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-15", "M1-16"]
+notes = "The name field calls a ProfileRepository interface with a fake (M1-39 implements it). Screen 24: one error under the form; show/hide password button en/da (P12, #198 item 6)"
 
 [[task]]
 id = "M1-24"
@@ -960,7 +967,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-12", "M1-14", "M1-30", "M1-02"]
+depends_on = ["M1-54", "M1-14", "M1-30", "M1-02"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name)"
 
 [[task]]
@@ -1027,16 +1034,17 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-32", "M1-O3"]
-notes = "Dropped if the Identity Platform upgrade needs billing (OQ-25, M1-O3)"
+notes = "Dropped if the Identity Platform upgrade needs billing (OQ-25, M1-O3). Names the QR code library for the licence approval (#198 item 7)"
 
 [[task]]
 id = "M1-25"
-title = "Settings screen and navigation (owner of the screen), Crashlytics off by default with an opt-in switch, no Analytics"
+title = "Account screen (wireframe 18) and navigation: sign-out UI (AUTH-03), Crashlytics opt-in switch, no Analytics"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-30"]
+depends_on = ["M1-30", "M1-14"]
+notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194)"
 
 [[task]]
 id = "M1-26"
@@ -1075,6 +1083,208 @@ risk = "normal"
 depends_on = ["M1-30"]
 notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4)"
 
+# Added by the M1 planning refresh (2026-11-21, docs/milestones/M1.md sections 5.1, 7 and 8).
+
+[[task]]
+id = "M1-52"
+title = "Rules test harness: default-deny paths from PLAN section 3, list and collection-group queries, unverified client, mutant check, ts-jest isolatedModules"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-35"]
+notes = "Issues 202 and 210 item 7, area:security-rules; tooling env for the scripts/test_firebase_ts.py allowlist. Before M1-08"
+
+[[task]]
+id = "M1-53"
+title = "Rules: transfer ownership, allow and deny tests (partial transfers, plain member, non-member)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-10"]
+notes = "Split from M1-10 by the refresh (size); tests as in docs/milestones/M1.md section 5 (M1-10 paragraph, #234)"
+
+[[task]]
+id = "M1-54"
+title = "Rules: the join batch with the one-household check, allow and deny tests"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-12"]
+notes = "Split from M1-12 by the refresh (size); P1 deny tests; tests as in docs/milestones/M1.md section 5 (M1-12 paragraph)"
+
+[[task]]
+id = "M1-49"
+title = "detekt LongParameterList: ignoreAnnotated [Composable] for that rule only (issue 217 item 5)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owner merge. Test first: a 7-parameter composable passes, a 7-parameter plain function fails. Before M1-16"
+
+[[task]]
+id = "M1-50"
+title = "Konsist: no data source in composables or ViewModels, no GlobalScope (checklist proposed follow-up 1)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Issue 257. Failing fixtures first. Before M1-14, the first repository"
+
+[[task]]
+id = "M1-51"
+title = "Build guards: catalog-only coordinates, targetSdk floor, manifest cleartext and backup (checklist follow-ups 3-5)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Issue 257. Tooling env where it touches guards; failing fixtures first"
+
+[[task]]
+id = "M1-35"
+title = "PLAN amendments from the follow-up triage (P1-P9 rules and users name, quota risk, PIT 80, ui job, layout nits)"
+milestone = "M1"
+status = "todo"
+assignee = "planner"
+risk = "high"
+depends_on = ["M1-01"]
+notes = "Docs only, area:security-rules; before M1-08. Issues #200, #203, #204 (PLAN 3.3), #206, #210 (items 1-3, 5, 6), #242, #243, #250, #253, #254, #260 (items 2-5) and #205 item 5 (docs/milestones/M1.md sections 5.1 and 8)"
+
+[[task]]
+id = "M1-36"
+title = "Product docs: start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 A)"
+milestone = "M1"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["M1-O7"]
+notes = "Owner merge (signed-off docs). Issues #194, #195, #196, #198 items 1 and 9, #210 item 4, #258 (naming.md says the rename is the owner's, M1-O10), #260 items 7 and 8 (pr fields, after v1)"
+
+[[task]]
+id = "M1-37"
+title = "JVM modules: check Java API use against minSdk 26 with api-versions.xml (issue 228)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env. Test-first: Stream.toList and Objects.requireNonNullElse in :core:domain fail, an API 26 call passes, a missing api-versions.xml fails closed. Before M1-13"
+
+[[task]]
+id = "M1-38"
+title = "Run the licensee and warnings gate self-tests only when their inputs change; licensee version as a task input (issue 216)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env; owner approval (it narrows when gate self-tests run). Owner decision 7003898899: verify.sh and PR CI run them only when their inputs changed against the merge base, CI on main every time. Inputs (owner list): licensee config and version, gate scripts and code, their fixtures, build-logic, Gradle wrapper, versions catalog; a negative case each. Schedule before the M1 product PRs"
+
+[[task]]
+id = "M1-39"
+title = "Your name (AUTH-12): users/{uid}.name, name step at first Google sign-in and at start, edit in Account with the member displayName"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-08", "M1-10", "M1-18", "M1-17", "M1-25"]
+notes = "P9 of docs/milestones/M1.md; wireframes 42, 43; implements the ProfileRepository of M1-17"
+
+[[task]]
+id = "M1-40"
+title = "Process docs wording: owner-merge exceptions next to the merge-agent rule (issue 147), dispatcher review line (issue 218)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env (process docs and prompts), rule test first, owner merge; after the #255/#256 process-docs PR. Also #260 items 1, 9-11. Then the detekt 2.0 tracking of issue 218 moves to M6 (Q7)"
+
+[[task]]
+id = "M1-41"
+title = "check_gradle_repos.py: dotted repositories.google(), raw strings and nested templates (issues 226, 227)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env, failing tests first in scripts/test_check_gradle_repos.py, fail closed"
+
+[[task]]
+id = "M1-42"
+title = "guards check 2c: actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env (process file), owner merge"
+
+[[task]]
+id = "M1-43"
+title = "prompt_rules.py: sentence-level negation for the resolve-thread rule (issue 153)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env, owner merge; R3-01..R3-04 as failing tests first"
+
+[[task]]
+id = "M1-44"
+title = "CI hardening nits: job timeouts, pinned python and node, gitleaks download, npm install scripts, pip hashes (issues 189, 127)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line. Q6 A (7058176190): an advanced CodeQL workflow for java-kotlin with a Gradle build, weekly and on pushes to main; it also takes over actions, javascript-typescript and python with their pull_request trigger kept, because GitHub rejects advanced uploads while default setup is on; only java-kotlin is weekly and push to main (M1-O9 at merge)"
+
+[[task]]
+id = "M1-45"
+title = "merge_ready.py nits still open after PRs 248 and 245 (issue 148)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Tooling env, owner merge. Start only after PRs 248 and 245 have merged; first list the items they already fixed"
+
+[[task]]
+id = "M1-46"
+title = "build-logic convention plugins; no allprojects or subprojects configuration (issues 217 items 1-4, 48)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-02"]
+notes = "After M1-02, so :core:data is the fourth module it covers. Issue 217 item 5 is M1-49"
+
+[[task]]
+id = "M1-47"
+title = "R12 screens vs wireframes for M1 (issue 65 review catalogue)"
+milestone = "M1"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = ["M1-16", "M1-17", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-25", "M1-27", "M1-32", "M1-39", "M1-03", "M1-04"]
+notes = "Opus worker, one-off prompt (docs/reviews/README.md section 3.4); result to owner and collaborator together; findings target M2"
+
+[[task]]
+id = "M1-48"
+title = "R8 milestone quality review for M1 (issue 65 review catalogue)"
+milestone = "M1"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
+notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
+
 [[task]]
 id = "M1-34"
 title = "guards.sh: compare line length per tool across all style files, with ruff and flake8 defaults (issue 176)"
@@ -1096,7 +1306,9 @@ risk = "normal"
 depends_on = [
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
-  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34",
+  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36",
+  "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54",
 ]
 
 [[task]]
@@ -1106,7 +1318,7 @@ milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["milestone:M0", "M0.5-O2", "M1-29"]
+depends_on = ["milestone:M0", "M0.5-O2", "M1-29", "M1-O10"]
 notes = "Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
 
 [[task]]
@@ -1146,6 +1358,78 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-28"]
+
+[[task]]
+id = "M1-O6"
+title = "Deploy firestore.rules to the real project after each merged rules PR and before each tester build"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M1-11"]
+notes = "docs/milestones/M1.md R7 (issue 209): firebase deploy --only firestore:rules from that main commit, note the commit on #15, compare the live ruleset with main before a tester build"
+
+[[task]]
+id = "M1-O7"
+title = "Answer the M1 planning questions Q1-Q7 (docs/milestones/M1.md section 6.1)"
+milestone = "M1"
+status = "done"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Answered on #15, comment 7058176190: Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A, Q7 approve (docs/milestones/M1.md section 6.1)"
+
+[[task]]
+id = "M1-O8"
+title = "Turn on secret scanning non-provider patterns and validity checks (repo settings)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1"
+
+[[task]]
+id = "M1-O9"
+title = "Turn off CodeQL default setup when the advanced workflow of M1-44 merges"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-44"]
+notes = "Owner decisions 7003645427 and 7058176190 (Q6 A); issue 258 item 2. Done as part of the M1-44 merge, so the new workflow's first upload is accepted"
+
+[[task]]
+id = "M1-O10"
+title = "Ask the owner about the repo rename to Tally (right before M1-O1)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-29"]
+notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task, a further deferral included (record it on #15); a rename becomes a new owner task. Follow-on edits: docs/product/naming.md"
+
+# ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
+
+[[task]]
+id = "M2-01"
+title = "Plan M2: docs/milestones/M2.md and PR-sized tasks in this file"
+milestone = "M2"
+status = "todo"
+assignee = "planner"
+risk = "normal"
+depends_on = ["milestone:M1"]
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
+
+[[task]]
+id = "M2-FU"
+title = "Follow-up burn-down for M2 (planner: add each new M2 task to depends_on)"
+milestone = "M2"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M2-01"]
+notes = "docs/FOLLOW-UPS.md section 8"
 
 # ---------------------------------------------------------------- M6 owner tasks (from the M1 plan)
 
