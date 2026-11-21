@@ -220,6 +220,8 @@ class Round4(Base):
                 "IFS=' '; read -r IFS <<< x; O=$IFS; echo $O",
                 "(read -r IFS <<< x); git status",
                 "$X a b c push --force",
+                "declare X=$Y; git status",  # a NAME=v argument is no name for sets_ifs, and its value no nameref target
+                "declare X=IFS; git status",
             ]
         )
 
