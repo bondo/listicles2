@@ -86,6 +86,10 @@ MATRIX_WRONG_SEVERITY = (
 # sentence (resolve_permissions) and fails closed: a match is permission, as it always was, unless a negation provably governs it in one of the
 # few simple shapes of _negated. A structure the check does not know (parentheses, dashes, a slash, "and" before a new subject, a lead
 # clause with "only") keeps the match. Wording pins are not exhaustive.
+# Accepted false positives (fail closed; nothing in the text tells them from a permission of the same shape, such as the table row
+# "| Orchestrator | Resolve threads after replying |"): a Never cell that starts "Resolve threads, ...", a definition of the button
+# ("**Resolve conversation**: only the owner presses it."), and a condition with an agent subject ("If an agent calls
+# `mcp__github__resolve_review_thread`, the PreToolUse hook denies the call.", as main flags "If an agent resolves a thread, ...").
 _AGENT = r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
 _NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
 _THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
@@ -140,7 +144,7 @@ _BOUNDARY = re.compile(r"[:;()–—/]|\s-{1,2}\s")  # the scope of a negation n
 _SUBJECT_WORD = r"(?:the|or|nor|of|you|agents?|(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?|escalation|design|second)"
 _OPENER = r"(?:no|not even|neither|none of|nobody)"
 _LEAD_WORDS = r"(?:if|when|whenever|once|after|before|unless|until|because|since|while|although|though)"
-_STOP = r"(?:and|but|so|or|nor|then|only|if|when|whenever|while|because|unless|once|after|before|until|since)"
+_STOP = r"(?:and|but|so|or|nor|then|only|just|merely|simply|if|when|whenever|while|because|unless|once|after|before|until|since)"
 _WORD = rf"(?!{_STOP}\b)[\w'`-]+\s+"
 _LEAD_CLAUSE = re.compile(rf"^\s*{_LEAD_WORDS}\b[^,]*,\s*", re.I)  # "If asked, ...": a conditional lead clause does not change the shape
 _NEGATOR = r"(?:(?:do|does|did)\s+not|(?:must|should|may|can|could|will|shall)\s+not|cannot|\w*n't|never|not)"
@@ -155,18 +159,31 @@ _NEGATED_SUBJECT = re.compile(
 _NEGATED_NP = re.compile(rf"{_SKIP_LEAD}(?:nobody|(?:no|not even|neither|none of)\s+{_CHAIN})\s*$", re.I)
 _NO_PHRASE = r"(?:at no (?:point|time)|under no circumstances?|in no case|on no account|by no means|in no way)"
 _FRONTED = re.compile(rf"\s*{_NO_PHRASE}\s+(?:may|can|could|should|must|will)\s+(?:the\s+)?$", re.I)
-# "Do not reply and resolve ...", "Never approve and resolve ...": a negator, then a few plain words (no comma, no conjunction, no "to": an
-# infinitive means the negator governs another verb, "Don't hesitate to reply and resolve ...")
-_NEGATED_CONJUNCTION = re.compile(rf"\s*(?:{_WORD}){{0,3}}{_NEGATOR}\s+(?:ever\s+)?(?:(?!to\b){_WORD}){{0,3}}$", re.I)
+# A negator counts only at the start of its clause, in a closed template: at most "please", a determiner, the agent subject and a modal
+# before it. No open word window ("Need the owner? Of course not, resolve ...", "Reviewers that do not find issues reply and resolve ...").
+_DETERMINER = r"(?:(?:an?|any|each|every)\s+)?"
+_CLAUSE_START = rf"\s*(?:please\s+)?{_DETERMINER}(?:{_NP}\s+(?:{_MODAL}\s+)?)?"
+# "Do not reply and resolve ...", "Agents must never approve and resolve ...": an imperative ban or a negated agent subject (a bare "Not"
+# starts no ban: "Not all agents ..."), then a few plain words (no comma, no conjunction, no "to": an infinitive means the negator governs
+# another verb, "Don't hesitate to reply and resolve ...")
+_CONJ_NEGATOR = rf"(?:(?:please\s+)?(?:do\s+not|don't|never)|{_DETERMINER}{_NP}\s+(?:{_MODAL}\s+)?{_NEGATOR})"
+_NEGATED_CONJUNCTION = re.compile(rf"\s*{_CONJ_NEGATOR}\s+(?:ever\s+)?(?:(?!to\b){_WORD}){{0,3}}$", re.I)
 # "Agents must never, not even with the API, resolve ...": the first comma segment ends with the negation, the others are asides
 _NEGATION_SEGMENT = re.compile(
-    rf"\s*(?:(?:{_WORD}){{0,3}}{_NEGATOR}(?:\s+ever|\s+at any (?:time|point))?"
+    rf"\s*(?:{_CLAUSE_START}{_NEGATOR}(?:\s+ever|\s+at any (?:time|point))?"
     rf"|(?:nobody|{_OPENER}\s+{_CHAIN})\s+{_MODAL}(?:\s+ever)?|{_NO_PHRASE})\s*$", re.I)
 _ASIDE = re.compile(r"\s*(?:not even|even|for any reason|under any circumstances|in any case|at any time|at any point|no matter)\b", re.I)
 
 
 def _negated(kind, sentence, match):
-    """True if a negation provably governs this match, in one of the simple shapes above. Everything else is not negated (fail closed)."""
+    """True if a negation provably governs this match, in one of the simple shapes above. Everything else is not negated (fail closed).
+    Accepted false negatives (each also reads as a ban): a lead clause without its comma that ends in the opener ("Unless the owner says no
+    agents are allowed to resolve the thread."), a bare answer before a comma ("Need the owner? Never, resolve the thread.", "Wait for
+    approval? You don't, resolve the thread.") and a run-on with no comma ("Do not wait reply and resolve the thread."). Accepted false
+    positives: a ban whose subject has a relative clause ("Implementers who disagree must not reply and resolve the thread.") and the
+    cases named above _resolve_patterns."""
+    if sentence.rstrip().endswith("?"):  # "Why don't you reply and resolve ...?" suggests; a question bans nothing
+        return False
     prefix = _LEAD_CLAUSE.sub("", _LIST_MARKER.sub("", _BOUNDARY.split(sentence[: match.start()])[-1]))
     matched = match.group()
     if kind == "subject":
@@ -214,7 +231,9 @@ def _has_thread(earlier, sentence, match):
 
 _LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 _EMPHASIS = re.compile(r"(?<![\w*])(\*\*|\*|__|_)(?=\S)(.+?)(?<=\S)\1(?![\w*])")  # not inside a word: the __ of a tool name stays
-_BUTTON = re.compile(r"^\s*[-*]\s+\*\*[^*\n]+\*\*\s*$", re.M)  # a bullet that is only a bold button name (COLLABORATING's do-not-press list)
+# a button name (COLLABORATING's do-not-press list): a bold label of at most two words that starts a bullet or table cell and ends it or
+# comes before a parenthetical; it becomes a neutral word, and no line is ever deleted
+_BUTTON = re.compile(r"^(\s*(?:[-*]|\|)\s+)\*\*\w+(?:[ /-]\w+)?\*\*(?=\s*(?:\(|\||$))", re.M)
 
 
 def resolve_permissions(text):
@@ -222,7 +241,7 @@ def resolve_permissions(text):
     found = []
     for block in _blocks(text):
         earlier = ""
-        plain = _EMPHASIS.sub(r"\2", _LINK.sub(r"\1", normalize_sentences(_BUTTON.sub("", block))))
+        plain = _EMPHASIS.sub(r"\2", _LINK.sub(r"\1", normalize_sentences(_BUTTON.sub(r"\1button", block))))
         for sentence in _SENTENCE_END.split(_ABBREVIATION.sub(r"\1", plain)):
             for pattern, kind, needs_thread in RESOLVE_PATTERNS:
                 for m in re.finditer(pattern, sentence, re.I) if pattern not in found else ():
