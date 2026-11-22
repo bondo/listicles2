@@ -862,10 +862,11 @@ notes = "Normal env. Must merge before M1-O1 registers the Android app in Fireba
 id = "M1-08"
 title = "Rules base: signedIn() with email_verified, users/{uid} householdId set/clear and name, tombstone read, config/app"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-52"]
+pr = 314
 notes = "PLAN as amended by M1-35 (P4, P5, P9); the test harness rewrite is M1-52"
 
 [[task]]
@@ -941,6 +942,28 @@ depends_on = ["M1-60"]
 notes = "Gate order P10 (docs/milestones/M1.md section 8) as a pure domain function with property tests, in front of the M1-60 home; each gate a domain interface with a stand-in binding until its task implements it (update M1-27, email verified M1-15, name M1-39, notices M1-18), and a placeholder step until its screen exists. Extends StartRoutingTest to update, signed out, unverified, no name, a notice, home"
 
 [[task]]
+id = "M1-64"
+title = "guards check 2c: YAML folded and multi-line values as one line, in addition to the per-line check (issue 164 item 2)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-42"]
+issue = 164
+notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py, docs/guards-known-gaps.md). Escalation ruling PR 309 comment 7084379032: check the joined line of a folded (run: >) or multi-line plain or quoted value IN ADDITION to the per-line check on main, never instead of it, so it cannot regress main (Y1, Y3, Y5 in the ruling as tests). PR 309 residuals R2-04 and R2-05 belong here. May reuse code from branch tooling/guards-2c-42. Test-first with negative cases. Owner merge: scripts/guards.sh"
+
+[[task]]
+id = "M1-65"
+title = "guards check 2c: npm `--` tail resolved through package.json scripts, fail closed by construction (issue 164 item 3)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-42"]
+issue = 164
+notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py, docs/guards-known-gaps.md). Escalation ruling PR 309 comment 7084379032: any \"scripts\" or \\u token in a package.json other than the one strict top-level layout makes every tail unknown; npm forms only; only a script whose last command is a plain [npx] <runner> <words> with no shell metacharacters is resolved. PR 309 R4-01 must be fixed here, with N1-N4 and C1-C2 from the ruling as failing tests; residual R3-03 belongs here. May reuse code from branch tooling/guards-2c-42. Owner merge: scripts/guards.sh"
+
+[[task]]
 id = "M1-13"
 title = "Domain: email, password and name validation (12+ code points, name 1-50), property tests"
 milestone = "M1"
@@ -959,7 +982,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
-notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
+notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState(). Also check and record which fields the Firebase Auth record keeps for Google sign-in: name, email, photo link (feeds privacy Q5)"
 
 [[task]]
 id = "M1-15"
@@ -1037,7 +1060,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-19", "M1-17"]
-notes = "Invite page and assetlinks.json on tally.bjarkebjarke.dk (OQ-21, decided 2026-11-17); this PR proposes the hosting. Unverified links open the browser on Android 12+, so the domain is a prerequisite for the first external tester, no paste-link field (OQ-40, decided). See docs/milestones/M1.md"
+notes = "Invite page and assetlinks.json on tally.bjarkebjarke.dk (OQ-21, decided 2026-11-17); this PR proposes the hosting. Unverified links open the browser on Android 12+, so the domain is a prerequisite for the first external tester, no paste-link field (OQ-40, decided). See docs/milestones/M1.md. Privacy Q2 and Q12: the web deletion page and the web host are named in the privacy text"
 
 [[task]]
 id = "M1-21"
@@ -1084,7 +1107,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60", "M1-14"]
-notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists"
+notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, tested; the in-app privacy link is privacy Q10"
 
 [[task]]
 id = "M1-26"
@@ -1118,7 +1141,7 @@ pr = 286
 id = "M1-33"
 title = "Release smoke build with R8 in CI (best-practices checklist follow-up 7)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30"]
@@ -1200,6 +1223,26 @@ depends_on = ["M1-56"]
 notes = "Tooling env. Gaps left by M1-56 (listed in the docstring of scripts/check_java_api_level.py): a java/ or android/ type that appears only in a field or method descriptor, a Signature, an Exceptions attribute, a StackMapTable frame or a RuntimeVisibleTypeAnnotations attribute. Low value: the JVM and ART load these lazily or not at all, and Kotlin emits type annotations only with -Xemit-jvm-type-annotations. Schedule only if M1 domain code needs it. Failing fixtures first, parse each attribute with the bounds-checked Reader and fail closed"
 
 [[task]]
+id = "M1-63"
+title = "Debug APK as a CI artifact on every push to main"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30"]
+notes = "Tooling env (.github/ is protected). Owner request, #15 comment 7081546814: the unit job uploads the debug APK it already builds as tally-debug-<short sha> (30 days) on push to main only, contents read only, no release, no new secrets or actions. The APK carries the demo-tally stand-in Firebase config (M1-30): own device only until M1-O5 (#291). scripts/check_debug_apk.py freezes the step"
+
+[[task]]
+id = "M1-70"
+title = "Status: dependency graph of the open tasks under the README status picture (status-graph.svg)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "Owner request, #15 comment 7086087003: open-task dependency graph under the status cards. Two PRs (split 2026-11-22, the 600-line CI limit): part A is scripts/status_graph.py with its tests (not called yet); part B is the render and publish wiring, the README picture, docs/STATUS.md and this task done"
+
+[[task]]
 id = "M1-50"
 title = "Konsist: no data source in composables or ViewModels, no GlobalScope (checklist proposed follow-up 1)"
 milestone = "M1"
@@ -1247,11 +1290,12 @@ pr = 308
 id = "M1-59"
 title = "Build guard: catalog-only coordinates (checklist follow-up 3), in scripts/check_build_guards.py"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-51"]
 notes = "Issue 257. Tooling env where it touches guards or CI; failing fixtures first. Fail on a literal group:artifact coordinate in a dependency declaration (any configuration, platform, add, force, group notation, Groovy forms), a literal plugin version and a catalog declared in Gradle code, with the justified escape hatch of scripts/guards.sh; do not pass vacuously (no Gradle files, no declarations). Update follow-up 3 of docs/ANDROID-BEST-PRACTICES.md"
+pr = 310
 
 [[task]]
 id = "M1-35"
@@ -1330,10 +1374,11 @@ notes = "Tooling env, failing tests first in scripts/test_check_gradle_repos.py,
 id = "M1-42"
 title = "guards check 2c: actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
+pr = 321
 notes = "Tooling env (process file), owner merge"
 
 [[task]]
@@ -1421,7 +1466,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-70",
 ]
 
 [[task]]
@@ -1536,11 +1581,21 @@ notes = "M1-03 runs the Roborazzi verify in its own CI job `screenshots`, not in
 id = "M1-O12"
 title = "Decide #280 (who may list invites) before M1-12 starts"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU)"
+notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU). Done: owner decision recorded on #15, comment 7081223083"
+
+[[task]]
+id = "M1-O13"
+title = "Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it as required)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-33"]
+notes = "M1-33 runs the release build with R8 in its own CI job `release-smoke`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 12. Same sitting rule as M1-O11 (BRANCH-PROTECTION.md section 6): add it right after the M1-33 PR merges, never earlier, or every other open PR waits on `Expected, waiting for status` until it takes main in. Until then no ruleset rule requires `release-smoke`, so the M1-33 merge must confirm by hand that the job is green on the head"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
@@ -1552,7 +1607,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da)"
 
 [[task]]
 id = "M2-FU"

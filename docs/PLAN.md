@@ -192,15 +192,15 @@ same equality check, and its create rule has the same code check), with the Crea
   marker overwrite: `removedAt`). Keys, all required unless marked: `users` `householdId`, `name` (optional);
   `households` `name`, `createdBy`, `createdAt`, `ownerUid`, `deleted`; `members` `role`, `displayName`, `joinedAt`,
   `viaInvite` (Join only); `removed` `removedAt`; `invites` `householdId`, `householdName`, `createdBy`, `createdAt`,
-  `expiresAt`; lists and items as in section 3 (M2). **Lengths** in code points as the app counts them (`size()` in
-  the rules), non-empty after trim: household name, `displayName` and `users.name` 1-50 (`householdName` equals the
+  `expiresAt`; lists and items as in section 3 (M2). **Lengths** in code points as the app counts them (in the
+  rules `matches('(?s).{1,N}')`, because `size()` counts UTF-16 units; owner decision, #15 comment 7083518706), non-empty after trim: household name, `displayName` and `users.name` 1-50 (`householdName` equals the
   household's; a tombstone's empty name is the one exception, Delete household); M2 planning sets list and item names (proposal: 80 and 200). The same numbers drive the UI field errors
   (M1-13). Tests per collection (M1-08 users, M1-10 households and members, M1-12 invites, M1-54 the join member doc,
   M1-11 markers, M1-53 the transfer updates): an unknown field on create and an update that adds one (deny); a create without one required key (deny; at least
   the owner's member doc without `joinedAt`, M1-10); a transfer that adds `role` to the household doc (deny, M1-53); for each
   name exactly the maximum (allow), the maximum + 1 and spaces only (deny), and 50 code points with non-BMP characters
-  (allow; M1-13 has the matching property). If that last test shows `size()` counting other units, the task stops and
-  asks rather than changing a number;
+  (allow; M1-13 has the matching property). That test showed `size()` counting UTF-16 units (M1-08), so the task stopped
+  and asked, and the owner chose the regex above rather than a changed number;
 * years: whole numbers from 1900 to `request.time.year() + 50`, both optional, no rule between them (OQ-6, OQ-19);
 * on documents that have those fields (lists, items; P5, #210 item 6), `updatedBy == request.auth.uid` and
   `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`;
@@ -491,6 +491,7 @@ enforce the rules rather than goodwill.
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label
      * a diff over 600 changed lines outside generated files
+   * `release-smoke`: the release variant with R8 on builds in CI (`:app:assembleRelease`, unsigned, demo-tally stand-in config, nothing signed or uploaded; M1-33); the stand-in opt-in flag is allowed in this job only
    * `python-lint`: ruff and mypy on `scripts/`, versions pinned, with tests that deliberate violations fail
    * `workflow-lint`: shellcheck, actionlint and zizmor on `.github/` and `scripts/`, pinned binaries
    * `secrets`: gitleaks
@@ -505,8 +506,8 @@ enforce the rules rather than goodwill.
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
    trusted on their own; the review is the reviewer rounds and the merge under the owner's authorization.
-6. **Branch protection** on `main`: PR required, all 11 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
-   `screenshots`, `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
+6. **Branch protection** on `main`: PR required, all 12 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
+   `screenshots`, `release-smoke`, `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never

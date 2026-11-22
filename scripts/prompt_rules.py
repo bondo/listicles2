@@ -2,8 +2,8 @@
 Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
-docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md, agents/roles.yaml
-and handoff/TEMPLATE.md).
+docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md,
+docs/reviews/collaborator-workflow.md, agents/roles.yaml and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -38,6 +38,16 @@ NEVER_LABELS = (
     "target:*",
     "owner-ok",
     "area:*",
+)
+# Owner decision, #15 comment 7082564807: the orchestrator adds `golden-update` after a review round found the goldens intended.
+_GOLDEN_CHECKED = (r"add the `golden-update` label to a pr only after that pr's review round has checked the new or changed screenshot goldens "
+                   r"and found them intended \(no reviewer finding open against them\)")
+# The label given to the wrong party, or back to the owner alone.
+_GOLDEN_BAD = (
+    r"only the owner (?:may |can |should )?(?:add|apply|set)s? the `golden-update`",
+    r"`golden-update` (?:label )?(?:stays|is|remains) owner-only",
+    r"(?:implementers?|workers?|collaborators?|reviewers?|second reviewers?|escalation reviewers?|design reviewers?|approvers?|merge agents?) "
+    r"(?:(?:may|can|will|should) )?(?:add|apply|set)s? the `golden-update`",
 )
 TIER0_LINE = r"tier 0 labels \(only these\):"
 NEVER_LINE = r"never apply:"
@@ -541,6 +551,16 @@ RULES = (
         forbidden=(r"`big-pr` label is set only with the owner's say-so", r"the 4-round cap being hit") + _STALE_ASKS,
     ),
     Rule(
+        "golden-update-delegation", ("orchestrator",),
+        (
+            _GOLDEN_CHECKED, r"post a one-line note on #15 naming the pr, head sha and round each time",
+            r"only you add it; no other role and no collaborator does",
+            r"\(for `golden-update` the note names the pr, head sha and round\)",
+        ),
+        "the orchestrator adds `golden-update` only after a review round found the goldens intended, with a note on #15 each time (#15 comment 7082564807)",
+        forbidden=_GOLDEN_BAD,
+    ),
+    Rule(
         "checkin", ("orchestrator",),
         (r"one `send_later` check-in of 45 minutes", r"re-schedule it on every wake"),
         "one 45-minute check-in, re-scheduled on every wake (§1.1)",
@@ -643,6 +663,12 @@ RULES = (
         "worker-foreign-commits", ("implementer", "planner"),
         (r"before each push", r"foreign commit", r"noreply@anthropic\.com", r"stop and report"),
         "check for foreign commits on the PR branch before each push; if any, stop and report",
+    ),
+    Rule(
+        "worker-golden-update", ("implementer",),
+        (r"never add the `golden-update` label yourself: the orchestrator adds it after a review round found the goldens intended",),
+        "an implementer never adds `golden-update`; the orchestrator does after a review round (#15 comment 7082564807)",
+        forbidden=_GOLDEN_BAD,
     ),
     Rule(
         "worker-no-labels", ("implementer", "reviewer", "design-reviewer"),
@@ -1309,6 +1335,27 @@ DOC_RULES = (
         ),
         "ORCHESTRATION 1.1: escalation reviewer, merge agent, big-pr and the retry before the owner (owner decisions of 2026-11-17)",
         forbidden=(r"applies `big-pr` only with the owner's explicit say-so", r"\* merges \(of any pr\)", r"the 4-round cap being hit") + _STALE_ASKS,
+    ),
+    DocRule(
+        "orch-golden-update", ORCH,
+        (
+            _GOLDEN_CHECKED, r"a one-line note on #15 naming the pr, the head sha and the round",
+            r"only the orchestrator adds `golden-update`, and only as in the bullet above; no other agent role \(implementer, reviewer, "
+            r"second reviewer, escalation reviewer, approver, merge agent\) and no collaborator adds it; the collaborator tier 0 label list is unchanged",
+            r"\(for `golden-update`, the orchestrator's one-line note naming the pr, the head sha and the round\)",
+        ),
+        "ORCHESTRATION 1.1, 7.6: the orchestrator adds `golden-update` after a review round found the goldens intended, "
+        "with a note on #15 (#15 comment 7082564807)",
+        forbidden=_GOLDEN_BAD,
+    ),
+    DocRule(
+        "collab-golden-update", "docs/reviews/collaborator-workflow.md",
+        (
+            r"\(never a collaborator; only the orchestrator adds them, orchestration §1\.1\)",
+            r"ci-steering labels \(the orchestrator under §1\.1, never a collaborator\)",
+        ),
+        "collaborator workflow: CI-steering labels are never a collaborator's; the orchestrator adds them (#15 comment 7082564807)",
+        forbidden=(r"\(owner-only, orchestration §1\.1\)", r"\*owner-only\*: merges, settings, spend, `risk:high`, tooling, ci-steering labels\."),
     ),
     DocRule(
         "orch-handover", ORCH,

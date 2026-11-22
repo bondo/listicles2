@@ -56,9 +56,9 @@ Tick these rules:
 | - Allowed merge methods | **Squash** only |
 | Require status checks to pass | on |
 | - Require branches to be up to date before merging | on |
-| - Status checks that are required | the 11 checks below, each with its source set to **GitHub Actions** |
+| - Status checks that are required | the 12 checks below, each with its source set to **GitHub Actions** |
 
-Required checks (11): `wrapper`, `static`, `unit`, `firebase`, `ui`, `screenshots`, `guards`, `secrets`, `tasks`,
+Required checks (12): `wrapper`, `static`, `unit`, `firebase`, `ui`, `screenshots`, `release-smoke`, `guards`, `secrets`, `tasks`,
 `python-lint`, `workflow-lint`. These are all the jobs in `ci.yml`; `scripts/test_firebase_ts.py` fails when the
 jobs, this list and the list in `docs/PLAN.md` differ.
 
