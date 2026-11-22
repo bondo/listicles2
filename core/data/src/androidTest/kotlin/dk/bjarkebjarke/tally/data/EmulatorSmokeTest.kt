@@ -29,18 +29,12 @@ class EmulatorSmokeTest {
     @Before
     fun setUp() {
         FirebaseEmulator.requireRunning()
-        app =
-            FirebaseEmulator.newApp(
-                InstrumentationRegistry.getInstrumentation().targetContext,
-                "smoke-${UUID.randomUUID()}",
-            )
-        FirebaseAuth.getInstance(app).useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.AUTH_PORT)
-        FirebaseFirestore.getInstance(app).useEmulator(FirebaseEmulator.HOST, FirebaseEmulator.FIRESTORE_PORT)
+        app = FirebaseEmulator.app(InstrumentationRegistry.getInstrumentation().targetContext)
     }
 
     @After
     fun tearDown() {
-        if (::app.isInitialized) app.delete()
+        if (::app.isInitialized) FirebaseAuth.getInstance(app).signOut()
         // The project's rules deny everything until M1-08, so the Firestore test loads allow-all ones; later tests need
         // the real ones.
         if (rulesReplaced) FirebaseEmulator.restoreProjectRules()

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -23,6 +25,7 @@ object FirebaseEmulator {
     const val FIRESTORE_PORT = 8080
     const val PROJECT_ID = "demo-tally"
 
+    private const val APP_NAME = "emulators"
     private const val CONNECT_TIMEOUT_MS = 2_000
     private const val RULES_FILE = "firestore.rules"
     private const val ALLOW_ALL_RULES =
@@ -50,21 +53,29 @@ object FirebaseEmulator {
         requireReachable(HOST, FIRESTORE_PORT, "Firestore")
     }
 
-    /** A fresh app named [name] for [PROJECT_ID]; delete it after the test. */
-    fun newApp(
-        context: Context,
-        name: String,
-    ): FirebaseApp =
-        FirebaseApp.initializeApp(
-            context,
-            FirebaseOptions
-                .Builder()
-                .setProjectId(PROJECT_ID)
-                .setApplicationId("1:1:android:0")
-                .setApiKey("fake-api-key")
-                .build(),
-            name,
-        )
+    /**
+     * The one [FirebaseApp] of the test process, pointed at both emulators. Shared and never deleted: Firebase Auth
+     * keeps the first app it saw in a static, so an app deleted after one test breaks Auth in every later test.
+     */
+    @Synchronized
+    fun app(context: Context): FirebaseApp {
+        val existing = FirebaseApp.getApps(context).firstOrNull { it.name == APP_NAME }
+        if (existing != null) return existing
+        val app =
+            FirebaseApp.initializeApp(
+                context,
+                FirebaseOptions
+                    .Builder()
+                    .setProjectId(PROJECT_ID)
+                    .setApplicationId("1:1:android:0")
+                    .setApiKey("fake-api-key")
+                    .build(),
+                APP_NAME,
+            )
+        FirebaseAuth.getInstance(app).useEmulator(HOST, AUTH_PORT)
+        FirebaseFirestore.getInstance(app).useEmulator(HOST, FIRESTORE_PORT)
+        return app
+    }
 
     /** Replaces the Firestore emulator's rules with allow-all ones, for a test of the plumbing and not of the rules. */
     fun loadAllowAllRules() = putRules(ALLOW_ALL_RULES)

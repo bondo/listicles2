@@ -132,7 +132,7 @@ jobs:
           api-level: 34
           arch: x86_64
           target: google_apis
-          # Not -q: the names and messages of failing instrumented tests are otherwise only in the HTML report on the runner.
+          # Gradle's log names no failing instrumented test, only the HTML report on the runner does: print the result XML on failure.
           script: cd firebase && npx --no-install firebase emulators:exec --only auth,firestore --project demo-tally "cd .. && ./gradlew --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest || (find core/data/build/outputs -name '*.xml' -print -exec head -c 7000 {} \\; ; false)"
 
   screenshots:
