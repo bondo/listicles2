@@ -49,6 +49,12 @@ test("the suite probes every collection of PLAN section 3; the UNPLANNED ones ar
     expect(h.UNPLANNED.filter((u) => planned.includes(h.collectionIdOf(u)))).toEqual([]);
 });
 
+// A new rule cannot forget signedIn() (M1-08): every allow statement but those of the users doc and
+// config/app (PLAN 3.1 "Signed in") makes it a conjunct of its whole condition.
+test("every allow statement but the users doc's and config/app's requires signedIn()", () => {
+    expect(h.withoutSignedIn(h.RULES)).toEqual([]);
+});
+
 // Every client is denied every operation on every path, except the probes h.ALLOWED carves out. The
 // suite runs exactly h.PROBES, the probes of the mutant check, so each mutant that check kills turns it
 // red.

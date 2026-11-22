@@ -122,6 +122,12 @@ describe("users/{uid}", () => {
         await assertFails(dbs.verified.doc(user()).set({ name: "Alice" }));
     });
 
+    // name may be missing (PLAN 3.1, P9): the start gate then asks for it again (AUTH-12).
+    test("allowed: an overwrite that drops the name", async () => {
+        await seed({ [user()]: { householdId: null, name: "Alice" } });
+        await assertSucceeds(dbs.verified.doc(user()).set({ householdId: null }));
+    });
+
     // PLAN 3.1 and P5: set only into a live household with the own member doc after the write, clear
     // only without one, never from one household straight to another.
     test.each<[h.Outcome, string, string | null, string[], string | null]>([
@@ -148,6 +154,11 @@ describe("users/{uid}", () => {
         await check(want, dbs.verified.doc(user()).delete());
     });
 
+    // P7: an account deletion that crashed after this delete repeats it on resume.
+    test("allowed: delete of the own doc when there is none", async () => {
+        await assertSucceeds(dbs.verified.doc(user()).delete());
+    });
+
     test("denied: any request to another user's doc, from any client", async () => {
         await seed({ [user(BOB)]: { householdId: null } });
         for (const client of h.CLIENT_NAMES) {
@@ -156,6 +167,7 @@ describe("users/{uid}", () => {
             await assertFails(db.doc(user(BOB)).update({ name: "Bob" }));
             await assertFails(db.doc(user(BOB)).delete());
             await assertFails(db.doc(user("carol")).set({ householdId: null }));
+            await assertFails(db.doc(user("carol")).delete());
         }
     });
 });
@@ -227,7 +239,7 @@ describe("the household doc", () => {
         await mine(LIVE);
         await expect(
             h.verifiedOnly(dbs, (db) => db.doc(`households/${LIVE}`).get()),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ code: "permission-denied" });
     });
 });
 
@@ -241,7 +253,10 @@ test("a Google token is a verified caller", async () => {
         })
         .firestore();
     await mine(TOMB);
+    await seed({ [CONFIG]: { minVersionCode: 1 }, [user(BOB)]: { householdId: null } });
+    await assertSucceeds(google.doc(CONFIG).get());
     await assertSucceeds(google.doc(user()).get());
+    await assertFails(google.doc(user(BOB)).get());
     await assertSucceeds(google.doc(`households/${TOMB}`).get());
     await assertSucceeds(google.doc(member(TOMB)).get());
     await assertSucceeds(google.doc(user()).update({ householdId: null }));

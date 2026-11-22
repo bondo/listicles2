@@ -134,3 +134,43 @@ test("outcome: allowed, denied for permission-denied only, and any other error t
     await expect(h.outcome(Promise.reject(error("not-found")))).rejects.toThrow("not-found");
     await expect(h.outcome(Promise.reject(new Error("permission-denied")))).rejects.toThrow();
 });
+
+// M1-08: a new rule cannot forget signedIn(). The rules below differ only in the statement under test.
+const rulesWith = (...blocks: string[]): string =>
+    `service cloud.firestore {\n  match /databases/{database}/documents {\n${blocks.join("\n")}\n  }\n}`;
+const at = (path: string, statement: string): string => `    match ${path} { ${statement} }`;
+
+test("withoutSignedIn accepts signedIn() as a conjunct, and no sign-in on the users doc or config/app", () => {
+    const rules = rulesWith(
+        at("/a/{b}", "allow get: if signedIn();"),
+        at("/a/{b}", "allow create: if signedIn()\n && (x || y) && f(z ? 1 : 2);"),
+        at("/users/{uid}", "allow get: if isCaller(uid);"),
+        at("/config/app", "allow get: if true;"),
+    );
+    expect(h.withoutSignedIn(rules)).toEqual([]);
+});
+
+test.each([
+    "allow get: if x;",
+    "allow get;",
+    "allow get: if x && signedIn();",
+    "allow get: if signedIn() || x;",
+    "allow get: if signedIn() && x || y;",
+    "allow get: if signedIn() && x ? y : z;",
+    "allow get: if signedInSoon();",
+])("withoutSignedIn names %s", (statement) => {
+    const rules = rulesWith(at("/a/{b}", statement), at("/users/{uid}/x/{y}", statement));
+    expect(h.withoutSignedIn(rules)).toHaveLength(2);
+});
+
+test("withoutSignedIn reads nested matches past comments and strings, and throws on what it cannot read", () => {
+    const nested =
+        "    // a } and the caller's '\n    match /h/{x} {\n      match /m/{y} { allow get: if y == '}'; }\n    }";
+    expect(h.withoutSignedIn(rulesWith(nested))).toEqual([
+        "/databases/{database}/documents/h/{x}/m/{y}: y == ''",
+    ]);
+    expect(() => h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if x }")))).toThrow();
+    expect(() =>
+        h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if signedIn();") + " {")),
+    ).toThrow();
+});
