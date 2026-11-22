@@ -30,7 +30,7 @@ def tasks_text(*rows, milestones=("A", "B", "C", "D")):
     return head + "".join(rows)
 
 
-# A-01 done, A-03 dropped but waiting on the open A-O1 (no node, no edge); A-O1 -> A-04 -> A-05 -> B-01 -> B-02, plus the shortcuts A-O1 -> A-05 and A-05 -> B-02
+# A-01 done, A-03 dropped but waiting on the open A-O1 (no node, no edge); A-O1 -> A-04 -> A-05 -> B-01 -> B-02, plus the shortcuts A-O1 -> A-05, A-05 -> B-02
 # (transitive) and A-02 -> B-02 (not transitive). Milestone C has no tasks yet, milestone D is all done.
 ROWS = (
     task("A-01", "A", "done"),
