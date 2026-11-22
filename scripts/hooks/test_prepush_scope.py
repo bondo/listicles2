@@ -304,6 +304,7 @@ def rows_of(var, call, parent):
 
 PATH_WRAPPERS = ("os.path.normpath", "os.path.realpath", "os.path.abspath")
 DEFAULT_ROOTS = {"ROOT": ".", "SCRIPT_ROOT": ".", "HERE": "scripts/hooks"}
+DIRS = (".", "scripts/hooks")
 
 
 def is_file_dir(node):
@@ -355,7 +356,7 @@ def is_implicit_root(node, up, root_names):
     sys.path[i] or sys.argv[i], or the string '__file__' as a key or argument (globals()['__file__'], getattr(m, '__file__'))."""
     if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load) and node.attr in root_names | {"__file__"}:
         return True
-    if isinstance(node, ast.Name) and node.id == "__spec__":
+    if isinstance(node, ast.Name) and node.id in ("__spec__", "__loader__", "__cached__"):
         return True
     if isinstance(node, ast.Subscript) and ast.unparse(node.value) in ("sys.path", "sys.argv") and not isinstance(node.slice, ast.Slice):
         return True
@@ -367,25 +368,28 @@ def hook_code_reads(sources):
     root. A root is ROOT, SCRIPT_ROOT (the repo root), HERE or a hook file's own directory (scripts/hooks), or a module-level name
     defined as one of those. A name resolves only through its innermost enclosing `for`; only the `read` helper's own pass-through
     of its *parts is exempt. Every other use of a root (f-string, pathlib, cwd=ROOT, a bare __file__, a join that names the whole
-    repo) is a root use (R1-02). Returns (paths as {path: [file]}, unreadable as [file:line], root uses as {file: [line]})."""
+    repo) is a root use (R1-02), and so is any other expression that resolves to a root outside a join (R3-02). An imported root
+    name resolves through its own module; one from a module outside `sources` is a root use wherever it is loaded.
+    Returns (paths as {path: [file]}, unreadable as [file:line], root uses as {file: [line]})."""
     paths, unreadable, root_uses = {}, [], {}
     trees = {name: ast.parse(src) for name, src in sources.items()}
-    root_bases = dict(DEFAULT_ROOTS)  # root names defined anywhere, for imports and attributes in other files
-    for tree in trees.values():
-        for k, v in module_paths(tree, DEFAULT_ROOTS)[0].items():
-            if v in (".", "scripts/hooks"):
-                root_bases.setdefault(k, v)
+    module_roots = {n[:-3]: {k: v for k, v in module_paths(t, DEFAULT_ROOTS)[0].items() if v in DIRS} for n, t in trees.items()}
+    root_names = set(DEFAULT_ROOTS).union(*module_roots.values())  # R3-02: imports resolve by module, attributes by name
     for name, tree in sorted(trees.items()):
         parent = {id(c): n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
         names = {t.id: n.value.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
                  and isinstance(n.value.value, str) for t in n.targets if isinstance(t, ast.Name)}
-        roots = dict(DEFAULT_ROOTS)
-        for node in ast.walk(tree):  # `from m import ROOT as R` makes R a root here
+        roots, unknown = dict(DEFAULT_ROOTS), set()
+        for node in ast.walk(tree):  # `from m import ROOT as R` makes R m's root here; a root name from elsewhere is unknown
             if isinstance(node, ast.ImportFrom):
-                roots.update({a.asname or a.name: root_bases[a.name] for a in node.names if a.name in root_bases})
+                for a in node.names:
+                    if a.name in module_roots.get(node.module or "", {}):
+                        roots[a.asname or a.name] = module_roots[node.module][a.name]
+                    elif a.name in root_names:
+                        unknown.add(a.asname or a.name)
+                        roots.pop(a.asname or a.name, None)
         consts, defined = module_paths(tree, roots)
         roots.update(consts)
-        own_roots = {k for k, v in roots.items() if v in (".", "scripts/hooks")}
         helper_args = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "read" and node.args.vararg:
@@ -398,8 +402,10 @@ def hook_code_reads(sources):
             up1 = parent.get(id(node))
             up2 = parent.get(id(up1)) if up1 is not None else None
             bare_file = isinstance(node, ast.Name) and node.id == "__file__" and not is_file_dir(up1) and not is_file_dir(up2)
-            rootish = ((isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in own_roots) or is_file_dir(node)
-                       or bare_file or is_implicit_root(node, up1, set(root_bases)))
+            loaded = not isinstance(node, ast.Name) or isinstance(node.ctx, ast.Load)
+            derived = loaded and base_of(node, roots) in DIRS and base_of(up1, roots) not in DIRS  # outermost root expression
+            rootish = (derived or bare_file or (isinstance(node, ast.Name) and node.id in unknown and loaded)
+                       or is_implicit_root(node, up1, root_names))
             is_base = (isinstance(up1, ast.Call) and ast.unparse(up1.func) == "os.path.join" and up1.args and up1.args[0] is node
                        and base_of(node, roots) is not None)
             if rootish and not is_base:
@@ -419,9 +425,7 @@ def hook_code_reads(sources):
                 unreadable.append(f"{name}:{node.lineno}")
                 continue
             for p in found:
-                if p == ".":
-                    root_uses.setdefault(name, []).append(node.lineno)
-                else:
+                if p != ".":  # a join naming the whole repo is counted as a derived root above
                     paths.setdefault(p, []).append(name)
     return paths, unreadable, {f: sorted(lines) for f, lines in root_uses.items()}
 
