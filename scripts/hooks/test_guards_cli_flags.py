@@ -753,5 +753,147 @@ class ReviewRound3Tests(CliFlagCase):
         self.assertPasses()
 
 
+class Issue164RemainingTests(CliFlagCase):
+    """Issue 164: item 3 (R2-05) npm `--` passthrough resolved through the package.json scripts, item 2 (R1-06) YAML folded `run: >`,
+    `with:` args of a lint action and pre-commit `args:`, item 1 (optional part) the `ignore:` entries of `.github/actionlint.y*ml`."""
+
+    PKG = """{
+  "scripts": {
+    "test": "jest --runInBand",
+    "e2e": "playwright test",
+    "fb": "firebase emulators:exec --only firestore \\"jest --runInBand\\"",
+    "lint": "eslint --max-warnings 0 .",
+    "check": "eslint --max-warnings 0 . && prettier --check .",
+    "wrap": "node scripts/lint.mjs",
+    "deep": "npm run lint",
+    "envlint": "NODE_OPTIONS=x npx eslint .",
+    "tap": "tap"
+  }
+}
+"""
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def lines_fail(self, path, lines, where=":1:"):
+        for line in lines:
+            with self.subTest(line=line):
+                self.put(path, line)
+                self.assertFails(MARK + ": " + path + where)
+
+    def lines_pass(self, path, lines):
+        for line in lines:
+            with self.subTest(ok=line):
+                self.put(path, line)
+                self.assertPasses()
+
+    def test_npm_passthrough_to_a_script_that_runs_no_js_lint_tool_passes(self):
+        self.write("firebase/package.json", self.PKG)
+        self.lines_pass("scripts/lint.sh", [
+            "npm test -- -u", "npm run e2e -- -c x.ts", "yarn test -- -u", "pnpm run e2e -- -c x.ts", "cd firebase && npm test -- -u",
+            "npm run fb -- -u", "npm t -- -u", "npm run --silent e2e -- -c x.ts", "npm run lint -- --max-warnings 0",
+        ])
+
+    def test_npm_passthrough_to_a_lint_tool_or_an_unknown_command_still_fails(self):
+        self.write("firebase/package.json", self.PKG)
+        self.lines_fail("scripts/lint.sh", [
+            "npm run lint -- --fix", "npm run check -- --quiet", "npm run check -- --max-warnings 0", "npm run wrap -- --quiet",
+            "npm run deep -- --quiet", "npm run nosuch -- --quiet", "npm run envlint -- --quiet", "npm run tap -- -u",
+            "npm exec -- eslint --quiet", "npm --prefix install test -- --quiet", "npm run lint -- --rule 'no-console: off'",
+        ])
+
+    def test_every_package_json_that_defines_the_script_counts(self):
+        self.write("firebase/package.json", self.PKG)
+        self.write("tools/package.json", '{\n  "scripts": {\n    "test": "eslint ."\n  }\n}\n')
+        self.lines_fail("scripts/lint.sh", ["npm test -- -u"])
+
+    def test_a_folded_run_block_is_one_command(self):
+        for ind in [">", ">-", ">+"]:
+            with self.subTest(ind=ind):
+                self.write(".github/workflows/ci.yml", "      - run: %s\n          ruff check\n          --ignore E501 .\n" % ind)
+                self.assertFails(MARK + ": .github/workflows/ci.yml:2:")
+        self.write(".github/actions/lint/action.yml", "    - shell: bash\n      run: >\n        eslint\n        --quiet .\n")
+        self.assertFails(MARK + ": .github/actions/lint/action.yml:3:")
+
+    def test_folded_blocks_with_allowed_flags_or_a_reason_pass(self):
+        for text in [
+            "      - run: >\n          ruff check\n          --config ruff.toml .\n",
+            "      - run: >\n          ruff check # justified: generated code from the owner\n          --ignore E501 .\n",
+            "      - run: >\n          ruff check .\n        name: lint --fix\n",
+            "      - run: >\n          ruff check .\n\n          echo --fix\n",
+        ]:
+            with self.subTest(text=text):
+                self.write(".github/workflows/ci.yml", text)
+                self.assertPasses()
+
+    def test_lint_action_args_are_the_tool_flags(self):
+        bad = [
+            ("      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check --ignore E501\n", 3),
+            ("      - name: lint\n        with:\n          args: 'check --fix'\n        uses: astral-sh/ruff-action@v3\n", 3),
+            ("      - uses: reviewdog/action-eslint@v1\n        with:\n          eslint_flags: '--quiet src'\n", 3),
+            ("      - uses: reviewdog/action-actionlint@v1\n        with:\n          actionlint_flags: -ignore SC2086\n", 3),
+            ("      - uses: astral-sh/ruff-action@v3\n        with:\n          args: >\n            check\n            --exit-zero\n", 3),
+            ("      - uses: docker://rhysd/actionlint:1.7.7\n        with:\n          args: -pyflakes= .github/workflows/ci.yml\n", 3),
+        ]
+        for text, n in bad:
+            with self.subTest(text=text):
+                self.write(".github/workflows/ci.yml", text)
+                self.assertFails(MARK + ": .github/workflows/ci.yml:%d:" % n)
+
+    def test_allowed_action_args_other_actions_and_reasons_pass(self):
+        for text in [
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check --config ruff.toml\n",
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: format --check\n",
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check\n      - uses: actions/upload-artifact@v4\n"
+            "        with:\n          args: --fix\n",
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check --fix # justified: formatting job commits the result\n",
+        ]:
+            with self.subTest(text=text):
+                self.write(".github/workflows/ci.yml", text)
+                self.assertPasses()
+
+    def test_pre_commit_args_are_the_hook_flags(self):
+        head = "repos:\n  - repo: https://github.com/astral-sh/ruff-pre-commit\n    rev: v0.8.0\n    hooks:\n"
+        bad = [
+            (head + "      - id: ruff\n        args: [--fix]\n      - id: ruff-format\n", 6),
+            (head + "      - id: ruff-check\n        args: [--target-version, py37]\n", 6),
+            (head + "      - id: mypy\n        args:\n        - --ignore-missing-imports\n", 6),
+            (head + "      - id: mypy\n        args:\n          - --strict\n          - --allow-untyped-defs\n", 6),
+            (head + "      - id: lint\n        entry: eslint\n        language: system\n        args: ['--quiet']\n", 8),
+            (head + "      - {id: ruff, args: [--fix]}\n", 5),
+            (head + "      - id: ruff-format\n        args: [--line-length=120]\n", 6),
+        ]
+        for text, n in bad:
+            with self.subTest(text=text):
+                self.write(".pre-commit-config.yaml", text)
+                self.assertFails(MARK + ": .pre-commit-config.yaml:%d:" % n)
+        for text in [
+            head + "      - id: ruff-format\n        args: [--check]\n      - id: ruff\n        args: [--config, ruff.toml]\n",
+            head + "      - id: mypy\n        args: [--strict]\n        additional_dependencies:\n          - types-requests\n",
+            head + "      - id: check-yaml\n        args: [--unsafe]\n",
+            head + "      - id: ruff\n        args: [--fix]  # justified: local hook only, CI checks again\n",
+        ]:
+            with self.subTest(ok=text):
+                self.write(".pre-commit-config.yaml", text)
+                self.assertPasses()
+
+    def test_actionlint_config_ignore_entries_need_a_reason_each(self):
+        SUP = "guard: unjustified suppression: "
+        for path in [".github/actionlint.yaml", ".github/actionlint.yml"]:
+            with self.subTest(path=path):
+                self.write(path, "paths:\n  .github/workflows/**/*.yml:\n    ignore:\n      - 'SC2086'\n")
+                self.assertFails(SUP + path + ":3:")
+                self.write(path, "paths:\n  .github/workflows/**/*.yml:\n    ignore: # justified: upstream false positive tracked\n      - 'SC2086'\n")
+                self.assertFails(SUP + path + ":4:")
+                self.write(path, "paths:\n  x.yml:\n    ignore: ['SC2086']\n")
+                self.assertFails(SUP + path + ":3:")
+                self.repo.git("rm", "-q", path)
+                self.repo.commit()
+        self.write(".github/actionlint.yaml", "paths:\n  .github/workflows/**/*.yml:\n    ignore: # justified: upstream false positive tracked\n"
+                   "      - 'SC2086' # justified: upstream false positive tracked\nself-hosted-runner:\n  labels: [big]\n")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
