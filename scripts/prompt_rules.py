@@ -914,7 +914,7 @@ RULES = (
         "the orchestrator spawns the reviewer on the push, the implementer does not loop-wait for CI, CI must be green before READY and the merge request "
         "(owner decision, #15 comment 7075952806; ORCHESTRATION 7.1)",
         forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
-                   r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
+                   r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
     ),
     Rule(
         "implementer-reviews-on-push", ("implementer",),
@@ -926,7 +926,7 @@ RULES = (
         ),
         "the implementer checks with verify.sh, pushes and ends the turn; it does not loop-wait for CI (owner decision, #15 comment 7075952806)",
         forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
-                   r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
+                   r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
     ),
     Rule(
         "orch-model", ("orchestrator",),
@@ -1664,7 +1664,7 @@ DOC_RULES = (
         "ORCHESTRATION 7.1 (home), 7.5, 7.8 and 8.2: reviews start on push, no loop-wait for CI, CI green before READY and the merge request "
         "(owner decision, #15 comment 7075952806)",
         forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
-                   r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
+                   r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
     ),
 )
 
