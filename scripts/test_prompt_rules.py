@@ -2896,6 +2896,19 @@ class SpeedWordingTests(unittest.TestCase):
         self.assertIn("review-escalation", self.doc_swap("REVIEW.md", "and one more fresh round (round 5) reviews. " + clause,
                                                          "and one more fresh round (round 5) reviews."))
 
+    # PR #306 round 2, R2-02: PLAN section 6 item 2 followed the decision.
+    PLAN_REVIEW = ("A **fresh Claude session** (no shared context) reviews the diff against `REVIEW.md` as soon as the author has pushed, "
+                   "without waiting for CI (`docs/ORCHESTRATION.md` §7.1; CI must be green before the PR is marked READY and before the merge request)")
+
+    def test_plan_section_6_starts_the_review_on_the_push_and_keeps_ci_green_before_ready(self):
+        self.assertIn(self.PLAN_REVIEW.lower(), prompt_rules.normalize(self.doc("docs/PLAN.md")).lower())
+        self.assertIn("plan-review-loop", self.doc_swap(
+            "docs/PLAN.md", self.PLAN_REVIEW, "After CI is green, a **fresh Claude session** (no shared context) reviews the diff"))
+        for part in ("as soon as the author has pushed, without waiting for CI",
+                     "CI must be green before the PR is marked READY and before the merge request"):
+            with self.subTest(part=part):
+                self.assertIn("plan-review-loop", self.doc_swap("docs/PLAN.md", part, "after CI is green"))
+
 
 if __name__ == "__main__":
     unittest.main()

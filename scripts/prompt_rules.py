@@ -1210,9 +1210,13 @@ DOC_RULES = (
             r"the same implementer session in every round", r"about 30 changed lines or fewer", r"the whole pr diff",
             r"how the fixes interact with the old code", r"one escalation reviewer per pr decides fix, split or owner",
             r"only nits or deferred minors remain", r"deferred minors do not count",
+            r"2\. a \*\*fresh claude session\*\* \(no shared context\) reviews the diff against `review\.md` as soon as the author has pushed, "
+            r"without waiting for ci \(`docs/orchestration\.md` §7\.1; ci must be green before the pr is marked ready and before the merge request\)",
         ),
-        "PLAN section 6 follows REVIEW.md: whole-diff rounds, minors fixed by default, the single escalation (#129 R1-02)",
-        forbidden=(r"sees only the commits since the last", r"doesn't re-review unchanged code", r"the loop stops and you decide"),
+        "PLAN section 6 follows REVIEW.md: whole-diff rounds, minors fixed by default, the single escalation (#129 R1-02); the review starts on "
+        "the push, CI green before READY (#15 comment 7075952806)",
+        forbidden=(r"sees only the commits since the last", r"doesn't re-review unchanged code", r"the loop stops and you decide",
+                   r"after ci is green, a \*\*fresh claude session\*\*"),
     ),
     DocRule(
         "plan-working-rules", "docs/PLAN.md",
