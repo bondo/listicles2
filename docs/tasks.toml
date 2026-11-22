@@ -1199,6 +1199,16 @@ depends_on = ["M1-56"]
 notes = "Tooling env. Gaps left by M1-56 (listed in the docstring of scripts/check_java_api_level.py): a java/ or android/ type that appears only in a field or method descriptor, a Signature, an Exceptions attribute, a StackMapTable frame or a RuntimeVisibleTypeAnnotations attribute. Low value: the JVM and ART load these lazily or not at all, and Kotlin emits type annotations only with -Xemit-jvm-type-annotations. Schedule only if M1 domain code needs it. Failing fixtures first, parse each attribute with the bounds-checked Reader and fail closed"
 
 [[task]]
+id = "M1-63"
+title = "Debug APK as a CI artifact on every push to main"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30"]
+notes = "Tooling env (.github/ is protected). Owner request, #15 comment 7081546814: the unit job uploads the debug APK it already builds as tally-debug-<short sha> (30 days) on push to main only, contents read only, no release, no new secrets or actions. The APK carries the demo-tally stand-in Firebase config (M1-30): own device only until M1-O5 (#291). scripts/check_debug_apk.py freezes the step"
+
+[[task]]
 id = "M1-50"
 title = "Konsist: no data source in composables or ViewModels, no GlobalScope (checklist proposed follow-up 1)"
 milestone = "M1"
@@ -1421,7 +1431,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62",
+  "M1-62", "M1-63",
 ]
 
 [[task]]
@@ -1536,11 +1546,11 @@ notes = "M1-03 runs the Roborazzi verify in its own CI job `screenshots`, not in
 id = "M1-O12"
 title = "Decide #280 (who may list invites) before M1-12 starts"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU)"
+notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU). Done: owner decision recorded on #15, comment 7081223083"
 
 [[task]]
 id = "M1-O13"
