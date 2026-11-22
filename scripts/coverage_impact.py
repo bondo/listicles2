@@ -122,7 +122,7 @@ def render(r):
 
 
 def git(*args, top=None):
-    r = subprocess.run(["git", *(["-C", top] if top else []), *args], capture_output=True, text=True)
+    r = subprocess.run(["git", *(["-C", top] if top else []), *args], capture_output=True, encoding="utf-8", errors="replace")
     if r.returncode:
         raise CoverageError(r.stderr.strip() or f"git {args[0]} failed")
     return r.stdout
