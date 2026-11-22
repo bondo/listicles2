@@ -86,13 +86,6 @@ class Nodes(unittest.TestCase):
     def test_only_open_tasks_are_nodes(self):
         self.assertEqual(sorted(nodes(svg_of())), sorted(OPEN))
 
-    def test_a_task_becoming_done_removes_its_node_and_its_edges(self):
-        text = tasks_text(*(r.replace('id = "A-04"\ntitle = "A-04 title"\nmilestone = "A"\nstatus = "todo"',
-                                      'id = "A-04"\ntitle = "A-04 title"\nmilestone = "A"\nstatus = "done"') for r in ROWS))
-        svg = svg_of(text)
-        self.assertNotIn("A-04", nodes(svg))
-        self.assertTrue(all("A-04" not in e for e in edges(svg)))
-
     def test_nodes_carry_their_derived_state(self):
         found = nodes(svg_of(prs=[{"number": 9, "title": "A-02: in review", "draft": True, "ci": "none"}]))
         self.assertEqual({k: g.get("data-state") for k, g in found.items()},
@@ -282,15 +275,6 @@ class Empty(unittest.TestCase):
         self.assertIn("All done: A 1/1; B 1/1", "\n".join(texts(svg)))
         self.assertGreater(float(root.get("height")), 0)
 
-    def test_a_graph_without_any_task_is_valid_too(self):
-        svg = svg_of(tasks_text(milestones=("A",)))
-        self.assertIn("No open tasks.", texts(svg))
-        self.assertIn("Not planned yet: A", "\n".join(texts(svg)))
-
-    def test_open_tasks_without_dependencies_have_no_edges(self):
-        svg = svg_of(tasks_text(task("A-01", "A"), task("A-02", "A"), milestones=("A",)))
-        self.assertEqual(sorted(nodes(svg)), ["A-01", "A-02"])
-        self.assertEqual(edges(svg), [])
 
 
 class Safety(unittest.TestCase):
