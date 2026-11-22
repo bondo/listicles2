@@ -31,7 +31,7 @@ Sources: [Guide to app architecture](https://developer.android.com/topic/archite
 | Expose one `uiState: StateFlow<...>` (`stateIn(..., WhileSubscribed(5_000), ...)` for streams); `MutableStateFlow` stays private | review (M1) |
 | Collect with `collectAsStateWithLifecycle`; do not send one-off events from the ViewModel to the UI, update state instead | review (M1) |
 | Reusable UI components use plain state holder classes, not ViewModels | review (M1) |
-| Dependency injection, constructor injection first; Hilt when the app has several screens with ViewModels (PLAN section 1 already chooses Hilt) | later (M1) |
+| Dependency injection, constructor injection first; Hilt when the app has several screens with ViewModels (PLAN section 1 already chooses Hilt) | review (Hilt with KSP since M1-30) |
 | Pure-Kotlin domain code with no Android classes | tooling in part: `core/domain` is its own JVM module; the no-float rule is tooling: `DomainNoFloatingPointTest` in the unit tests |
 | Use Jetpack libraries instead of hand-written boilerplate: lifecycle-aware collection (`collectAsStateWithLifecycle`), Navigation 3 for navigation, Hilt for dependency injection, DataStore for preferences | review |
 

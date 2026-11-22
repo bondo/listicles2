@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Tally</string>
     <string name="welcome">Shared lists for your household</string>
+    <!-- SYNC-03: shown when an action needs the server and the phone is offline. -->
+    <string name="needs_connection">This needs a connection</string>
 </resources>

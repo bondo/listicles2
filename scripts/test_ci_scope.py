@@ -147,7 +147,8 @@ class Selftests(unittest.TestCase):
     def test_the_default_scripts_are_the_warnings_jdk_and_java_api_gate_tests(self):
         self.assertEqual(
             ci_scope.SELFTESTS,
-            ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/test_java_api_level_gate.py"),
+            ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/test_java_api_level_gate.py",
+             "scripts/test_google_services_release_gate.py"),
         )
         for p in ci_scope.SELFTESTS:
             self.assertTrue((ROOT / p).is_file(), p)
@@ -524,7 +525,8 @@ echo "SKIPPED $SKIPPED"
 """
 GATE_STEPS = ("step warnings-gate-tests python3 -I scripts/test_warnings_gate.py",
               "step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py",
-              "step java-api-level-gate-tests python3 -I scripts/test_java_api_level_gate.py")
+              "step java-api-level-gate-tests python3 -I scripts/test_java_api_level_gate.py",
+              "step google-services-release-gate-tests python3 -I scripts/test_google_services_release_gate.py")
 
 
 def gate_block(verify):
@@ -550,11 +552,13 @@ def verify_gate_problems(verify):
     if block is None:
         return ["verify.sh has no top-level ci_scope.py local-scope block"]
     problems = []
-    run_all = ["RAN warnings-gate-tests", "RAN jdk-release-gate-tests", "RAN java-api-level-gate-tests", "EXCLUDE ", "SKIPPED 0"]
+    run_all = ["RAN warnings-gate-tests", "RAN jdk-release-gate-tests", "RAN java-api-level-gate-tests", "RAN google-services-release-gate-tests",
+               "EXCLUDE ", "SKIPPED 0"]
     for stdout, code in (("run", 0), ("", 0), ("skip\nskip", 0), ("skip ", 0), ("Skip", 0), ("skip", 1), ("", 1)):
         if run_gate_block(block, stdout, code) != run_all:
             problems.append(f"does not run the self-tests for scope output {stdout!r}, exit {code}")
-    if run_gate_block(block, "skip") != ["skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, testLicenseeGate "
+    if run_gate_block(block, "skip") != ["skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, "
+                                         "google-services-release-gate-tests, testLicenseeGate "
                                          "(no gate input changed since the merge base with origin/main; scripts/ci_scope.py)",
                                          "EXCLUDE -x testLicenseeGate", "SKIPPED 1"]:
         problems.append("does not skip the self-tests and testLicenseeGate for `skip`")
