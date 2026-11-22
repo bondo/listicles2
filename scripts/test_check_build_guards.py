@@ -174,7 +174,10 @@ class Coordinates(unittest.TestCase):
         for text, name in (
             ('configurations.all { resolutionStrategy.eachDependency { useTarget("a.b:c:1") } }', "app/build.gradle.kts"),
             ("configurations.all { resolutionStrategy.eachDependency { details -> details.useTarget 'a.b:c:1' } }", "lib/build.gradle"),
-            ("configurations.all { resolutionStrategy.eachDependency { details ->\n    details.useTarget group: 'a.b', name: 'c', version: '1'\n} }", "lib/build.gradle"),
+            (
+                "configurations.all { resolutionStrategy.eachDependency { details ->\n    details.useTarget group: 'a.b', name: 'c', version: '1'\n} }",
+                "lib/build.gradle",
+            ),
             ('configurations.all { resolutionStrategy.eachDependency { useTarget(mapOf("group" to "a.b", "name" to "c")) } }', "app/build.gradle.kts"),
             ('configurations.all { resolutionStrategy.forcedModules = setOf("a.b:c:1") }', "app/build.gradle.kts"),
             ("configurations.all { resolutionStrategy.forcedModules = ['a.b:c:1'] }", "lib/build.gradle"),
@@ -199,7 +202,8 @@ class Coordinates(unittest.TestCase):
             with self.subTest(call=call):
                 self.assert_flagged(f"dependencies {{\n    {call}\n}}\n", name=name)
         self.assert_clean(
-            'dependencies {\n    implementation(libs.a) { exclude(mapOf("group" to "org.x")) }\n    implementation(project(mapOf("path" to ":core:testing")))\n}\n'
+            'dependencies {\n    implementation(libs.a) { exclude(mapOf("group" to "org.x")) }\n'
+            '    implementation(project(mapOf("path" to ":core:testing")))\n}\n'
             'val m = mapOf("group" to "x")\n'
         )
 

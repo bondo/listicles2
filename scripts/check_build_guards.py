@@ -18,9 +18,11 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
 
 3. Catalog-only coordinates (M1-59, follow-up 3). Libraries and plugins come from gradle/libs.versions.toml as `libs.<name>`. A Gradle file
    fails on: a string literal that starts with a literal `group:artifact` anywhere inside a `dependencies { }` block (so any
-   configuration, Kotlin or Groovy, wrapped in `platform(...)` or not, in `constraints` too); group notation with a literal group and
+   configuration, Kotlin or Groovy, wrapped in `platform(...)` or not, in `constraints` too; also `dependencies.apply { }`, `run`,
+   `also`, `with` and `with(dependencies) { }`); group notation with a literal group (named arguments, a Groovy map, `mapOf`) and
    the positional `(group, name, ...)` form there (`exclude` is not a declaration); outside such a block `add(<conf>, "g:a...")`,
-   `force`, `useModule`, `platform`, `enforcedPlatform`, `module` and `create` with a literal coordinate; a literal version
+   `dependencies.<conf>("g:a...")`, `force`, `useModule`, `useTarget` (also in group notation), `platform`, `enforcedPlatform`,
+   `module` and `create` with a literal coordinate, and one in a `forcedModules` assignment; a literal version
    (`id(...) version "1"`, `.version("1")`, `useVersion("1")`, and `version = "1"` or `strictly("1")` in a dependencies block); and
    a version catalog declared in Gradle code (`versionCatalogs`).
    A literal that has to stay says why in a comment on its line: `// justified: <at least 3 words>` (the rule of scripts/guards.sh).
@@ -347,17 +349,31 @@ def justified(line):
 
 
 COORD = re.compile(r"[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+(?=[:@\"']|$)", re.M)  # a literal group:artifact; the version may be anything
-DEPS_BLOCK = re.compile(r"(?<![\w$])dependencies(?:[ \t\r\n]*\.[ \t\r\n]*constraints)?[ \t\r\n]*\{")
+WS = r"[ \t\r\n]*"
+# `dependencies { }`, `dependencies.constraints { }` and the scope functions `dependencies.apply { }` (run, also, with), `with(dependencies) { }`.
+DEPS_BLOCK = re.compile(
+    rf"(?<![\w$])(?:with[ \t]*\({WS}dependencies{WS}\)|dependencies(?:{WS}\.{WS}constraints)?(?:{WS}\.{WS}(?:apply|run|also|with))?){WS}\{{"
+)
+# A configuration called on the handler outside a block: `dependencies.implementation(x)`, Groovy `dependencies.implementation x`.
+DEPS_CALL = re.compile(
+    rf"""(?<![\w$])dependencies{WS}\.{WS}(?:constraints{WS}\.{WS})?(?!(?:apply|run|also|with)\b)[A-Za-z_]\w*(?=[ \t]*\(|[ \t]+[\w"'\[])"""
+)
 # A statement in a dependencies block that is a call: `implementation(x)`, `"implementation"(x)`, Groovy `implementation x`.
 STATEMENT = re.compile(r"""(?:^|[{;])[ \t]*("[ \t]*"|'[ \t]*'|[A-Za-z_]\w*)(?=[ \t]*\(|[ \t]+[\w"'\[])""", re.M)
 KEYWORDS = {"if", "else", "for", "while", "when", "return", "val", "var", "def", "try", "catch", "throw", "fun", "import", "in", "is", "as"}
-NAMED = re.compile(r"""(?<![\w$])(?:group[ \t]*[:=][ \t]*["'](?=[A-Za-z0-9_.-])|(version)[ \t]*[:=][ \t]*["'])""")
+# Group notation with a literal group, or a literal version, as a named argument, a Groovy map entry or a Kotlin `mapOf` entry.
+NAMED = re.compile(
+    rf"""(?<![\w$])(?:group[ \t]*[:=]{WS}["'](?=[A-Za-z0-9_.-])|(version)[ \t]*[:=]{WS}["'])"""
+    rf"""|(["'])(?:group\2{WS}to{WS}["'](?=[A-Za-z0-9_.-])|(version)\2{WS}to{WS}["'])"""
+)
+MAPS = {"mapOf", "mutableMapOf", "hashMapOf", "linkedMapOf"}
+FORCED = re.compile(r"(?<![\w$])(?:forcedModules[ \t]*=[ \t]*|setForcedModules[ \t]*)")  # resolutionStrategy.forcedModules = setOf("g:a:1")
 RICH = re.compile(r"(?<![\w$])(?:strictly|require|prefer)(?:[ \t]*\([ \t\r\n]*|[ \t]+)[\"']")  # `version { strictly("1.0") }`
 POSITIONAL = re.compile(r"""(?<![\w$.])([A-Za-z_]\w*)[ \t]*\([ \t\r\n]*(["'])(?=[A-Za-z0-9_.-]+\2[ \t\r\n]*,[ \t\r\n]*["'])""")
-NOT_DECLARATIONS = {"exclude", "add", "because", "listOf", "setOf", "mapOf", "arrayOf"}
+NOT_DECLARATIONS = {"exclude", "add", "because", "listOf", "setOf", "arrayOf"}
 OPEN = r"(?:[ \t]*\([ \t\r\n]*|[ \t]+)"
 ADD = re.compile(r"(?<![\w$])add" + OPEN + r"""(["'])[^"'\n]*\1[ \t\r\n]*,[ \t\r\n]*["'](?=""" + COORD.pattern + ")")
-ANYWHERE = re.compile(r"(?<![\w$])(?:force|useModule|platform|enforcedPlatform|module|create)" + OPEN + r"""["'](?=""" + COORD.pattern + ")")
+ANYWHERE = re.compile(r"(?<![\w$])(?:force|useModule|useTarget|platform|enforcedPlatform|module|create)" + OPEN + r"""["'](?=""" + COORD.pattern + ")")
 PLUGIN_VERSION = re.compile(r"""[)"'`](?:[ \t]+version[ \t]*\(?|[ \t\r\n]*\.[ \t\r\n]*version[ \t]*\()[ \t]*["']""")
 USE_VERSION = re.compile(r"(?<![\w$])useVersion" + OPEN + r"""["']""")
 CATALOG_IN_CODE = re.compile(r"(?<![\w$])versionCatalogs\b")
@@ -398,8 +414,25 @@ def enclosing_call(blank, pos):
             stop = i + 1
             break
     start = max(stop, blank.rfind("\n", 0, pos) + 1)
-    m = re.compile(r"[ \t]*([A-Za-z_]\w*)").match(blank, start)
+    m = re.compile(r"[ \t]*(?:[A-Za-z_]\w*[ \t]*\.[ \t]*)*([A-Za-z_]\w*)").match(blank, start)  # `details.useTarget group: ...`
     return (m.group(1), m.start(1)) if m else ("", pos)
+
+
+def statement_end(blank, i):
+    """The offset where the expression starting at i ends: a line end or `;` outside brackets, or a closing bracket it did not open."""
+    depth = 0
+    while i < len(blank):
+        c = blank[i]
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            if not depth:
+                return i
+            depth -= 1
+        elif c in "\n;" and not depth:
+            return i
+        i += 1
+    return i
 
 
 def scan_catalog(root):
@@ -421,10 +454,22 @@ def scan_catalog(root):
         for m in STATEMENT.finditer(blank):
             if inside(m.start(1)) and m.group(1) not in KEYWORDS:
                 declarations += 1
-        for m in NAMED.finditer(code):  # reported once per call, at its name
+        for m in DEPS_CALL.finditer(blank):
+            declarations += 1
+            lit = re.compile(OPEN + r"""["'](?=""" + COORD.pattern + ")").match(code, m.end())
+            if lit:
+                hits.setdefault(lit.end(), f'dependency "{COORD.match(code, lit.end()).group()}"')
+        for m in FORCED.finditer(blank):
+            for s in starts:
+                if m.end() <= s < statement_end(blank, m.end()) and COORD.match(code, s):
+                    hits.setdefault(s, f'forced module "{COORD.match(code, s).group()}"')
+        for m in NAMED.finditer(code):  # reported once per call, at its name; a map is read as the argument of the call around it
             name, at = enclosing_call(blank, m.start())
-            if inside(m.start()) and name not in NOT_DECLARATIONS:
-                hits.setdefault(at, "literal version (plugin or catalog entry)" if m.group(1) else "dependency in group notation")
+            while name in MAPS:
+                name, at = enclosing_call(blank, at)
+            if (inside(m.start()) and name not in NOT_DECLARATIONS) or name == "useTarget":
+                what = "literal version (plugin or catalog entry)" if m.group(1) or m.group(3) else "dependency in group notation"
+                hits.setdefault(at, what)
         for m in RICH.finditer(blank):
             if inside(m.start()):
                 hits.setdefault(m.end(), "literal version (plugin or catalog entry)")
