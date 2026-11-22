@@ -70,8 +70,8 @@ class Wiring(unittest.TestCase):
         got = self.mutated(HELPER, 'PROJECT_ID = "demo-tally"', 'PROJECT_ID = "listicles"')
         self.assertEqual(got, ["FirebaseEmulator.kt PROJECT_ID must be demo-tally (a demo- project never reaches the real Firebase)"])
 
-    def test_the_ui_script_is_exactly_the_expected_command(self):
-        # Fail closed (R1-01, R2-01, R2-02): any other command line is rejected, however harmless it looks, so no deny list can be bypassed.
+    def test_the_ui_job_is_exactly_the_pinned_one(self):
+        # Fail closed (R1-01, R2-01, R2-02, R3-01): the parsed job must equal EXPECTED_UI, so no deny list can be bypassed.
         tasks = ":core:data:connectedDebugAndroidTest"
         mutations = {
             "no emulators:exec": (EXEC, "echo"),
@@ -93,23 +93,21 @@ class Wiring(unittest.TestCase):
             "trailing true": ('; false)"', '; false)" ; true'),
             "trailing pipe": ('; false)"', '; false)" | tee /dev/null'),
             "block scalar": ("script: cd firebase", "script: |\n            cd firebase"),
+            "runner swapped for another action": ("reactivecircus/android-emulator-runner@", "actions/checkout@"),
+            "pre-emulator-launch-script": ("          target: google_apis\n", "          target: google_apis\n          pre-emulator-launch-script: x\n"),
+            "extra step": ("      - name: enable KVM\n", "      - run: printf x > gradlew\n      - name: enable KVM\n"),
+            "quoted if on the runner": ("        with:\n          api-level", '        "if": false\n        with:\n          api-level'),
+            "if on a step": ("      - name: enable KVM\n", "      - name: enable KVM\n        if: github.event_name == 'push'\n"),
+            "continue-on-error": ("      - name: enable KVM\n", "      - name: enable KVM\n        continue-on-error: true\n"),
+            "needs a skipped job": ("  ui:\n    name: ui\n", "  ui:\n    name: ui\n    needs: [never]\n"),
+            "quoted if on the job": ("  ui:\n    name: ui\n", "  ui:\n    name: ui\n    'if': false\n"),
+            "no npm ci": ("run: npm ci --silent\n      - name: enable KVM", "run: npm install --silent\n      - name: enable KVM"),
+            "no ui job": ("  ui:\n    name: ui\n", "  ui2:\n    name: ui\n"),
         }
         for name, (old, new) in mutations.items():
             with self.subTest(name):
                 shutil.copy(ROOT / CI, self.root / CI)
-                self.assertEqual(self.mutated(CI, old, new), [c.SCRIPT_PROBLEM])
-
-    def test_the_ui_job_must_install_the_firebase_cli(self):
-        got = self.mutated(CI, "npm ci --silent", "npm install --silent", count=2)
-        self.assertEqual(got, ["ci.yml ui job has no `npm ci` step in firebase/ (the emulators come from firebase-tools)"])
-
-    def test_a_ui_step_must_not_continue_on_error(self):
-        got = self.mutated(CI, "      - name: enable KVM\n", "      - name: enable KVM\n        continue-on-error: true\n")
-        self.assertEqual(got, ["ci.yml ui job swallows a test failure (`continue-on-error`)"])
-
-    def test_the_ui_job_must_not_be_skippable(self):
-        got = self.mutated(CI, "      - name: enable KVM\n", "      - name: enable KVM\n        if: github.event_name == 'push'\n")
-        self.assertEqual(got, ["ci.yml ui job has a step with `if:` (the job is a required check)"])
+                self.assertEqual(self.mutated(CI, old, new), [c.UI_PROBLEM])
 
     def test_verify_sh_must_run_the_check(self):
         got = self.mutated(VERIFY, "step ui-emulators python3 -I scripts/check_ui_emulators.py\n", "")
