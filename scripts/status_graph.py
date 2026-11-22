@@ -7,7 +7,8 @@ only, with transitive arrows removed (A to C is not drawn when A to B to C exist
 milestone are not drawn; the legend counts them. A node is coloured and shaped by its derived state (ready, in progress,
 blocked, owner to-do), the same states and marker shapes as status.svg.
 
-Used by scripts/status_visual.py render, which writes the file next to status.svg. Offline, standard library only,
+Part A of task M1-70: nothing calls it yet. Part B makes `status_visual.py render` write the file next to status.svg and
+`status_publish.py` publish it. Offline, standard library only,
 deterministic: the same model gives the same bytes, and there is no clock in the picture. A pure layered layout: a task's
 column is the length of its longest chain of open dependencies, rows are ordered by a few barycentre sweeps.
 Every title is untrusted text: stripped of control characters, clipped and escaped (it only appears in the node tooltips).
