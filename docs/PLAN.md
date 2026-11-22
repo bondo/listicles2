@@ -491,6 +491,7 @@ enforce the rules rather than goodwill.
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
      * changed screenshot reference images, unless the PR has the `golden-update` label
      * a diff over 600 changed lines outside generated files
+   * `release-smoke`: the release variant with R8 on builds in CI (`:app:assembleRelease`, unsigned, demo-tally stand-in config, nothing signed or uploaded; M1-33); the stand-in opt-in flag is allowed in this job only
    * `python-lint`: ruff and mypy on `scripts/`, versions pinned, with tests that deliberate violations fail
    * `workflow-lint`: shellcheck, actionlint and zizmor on `.github/` and `scripts/`, pinned binaries
    * `secrets`: gitleaks
@@ -505,8 +506,8 @@ enforce the rules rather than goodwill.
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
    trusted on their own; the review is the reviewer rounds and the merge under the owner's authorization.
-6. **Branch protection** on `main`: PR required, all 11 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
-   `screenshots`, `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
+6. **Branch protection** on `main`: PR required, all 12 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
+   `screenshots`, `release-smoke`, `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never

@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Tally</string>
-    <string name="welcome">Delte lister til din husstand</string>
+    <!-- The app's tagline under its name on sign-in (wireframe 01). -->
+    <string name="app_tag">Samlinger og lister, delt med din husstand</string>
+    <!-- Wireframe 02: the Lists screen, the M1 home (Q1 A). -->
+    <string name="lists_title">Lister</string>
+    <string name="lists_empty_title">Ingen lister endnu</string>
+    <string name="lists_empty_body">Lav en liste over det, du samler på eller mangler, og sæt flueben ved det, du har. En ny liste er privat, indtil du deler den.</string>
     <!-- SYNC-03: shown when an action needs the server and the phone is offline. -->
     <string name="needs_connection">Det kræver internetforbindelse</string>
 </resources>
