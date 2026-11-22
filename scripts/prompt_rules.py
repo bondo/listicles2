@@ -90,8 +90,14 @@ OWNER_HANDS = (
 )
 STANDING = (
     r"the merge agent merges under the owner's standing authorization \(#15 comment 7005366747, replacing the per-window rule of comment 7002904192\) "
-    r"until the owner revokes it there"
+    r"until the owner revokes it on #15"
 )
+# Owner decision on #15, comment 7085221356: no authorization in the merge agent's own session; it checks the decision comment itself.
+VERIFY_DECISION = (
+    r"before its first merge it reads comment 7085221356 itself on #15 and checks that it is the owner's account, unedited, and that its first "
+    r"line starts with `decision \(owner` \(the same check as for a batch approval; the check proves the account, not the person\)"
+)
+OLD_MERGE_AGENT_AUTH = (r"owner authorizes it there", r"has no owner authorization in its own session", r"authorizing each new merge agent")
 CLASSES = (r"an owner-only pr is merged by the merge agent as kind `owner-batch` once the owner's batch approval lists it, every other ready pr as kind "
            r"`general` \(d3, #15 comment 7007421567\)")
 BATCH = (r"batch approval \(d1\): the owner posts one ordered list `batch approval: #n@sha, #m@sha` on #15 \(or in the merge agent's session, "
@@ -1011,13 +1017,15 @@ RULES = (
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
-            r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
-            r"and you never pass an approval on to it",
+            r"a merge agent you spawn needs no owner authorization in its own session \(#15 comment 7085221356\): it carries the tag "
+            r"`role:merge-agent`, its `parent_session_id` is you and the body of #15 names it as active; " + VERIFY_DECISION + r"; "
+            r"you never pass an approval on to it\.",
             r"the owner-only exception above means not under the standing authorization",
             STANDING, CLASSES, OWNER_HANDS, BATCH, APPROVAL_FORM, SAME_PATCH,
             r"merge order \(#15 comment 7005414860\): send " + ORDER_TAIL,
         ),
         "the merge agent merges general PRs under the standing authorization and owner-only PRs from the owner's batch approval (D1-D3 of #229)",
+        forbidden=OLD_MERGE_AGENT_AUTH,
     ),
     Rule(
         "orch-update-branch", ("orchestrator",),
@@ -1480,12 +1488,15 @@ DOC_RULES = (
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
-            r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, "
-            r"and then " + STANDING + r"; the orchestrator never passes an approval on to it",
+            r"a merge agent the orchestrator spawns needs no owner authorization in its own session \(owner decision, #15 comment 7085221356\): "
+            r"when it carries the tag `role:merge-agent`, its `parent_session_id` is that orchestrator and the body of #15 names it as active, "
+            r"the merge agent " + STANDING + r"; " + VERIFY_DECISION + r"; the orchestrator never passes an approval on to it; "
+            r"owner-only prs still need a batch approval, `veto #n` still stops a merge and `scripts/merge_ready\.py` still runs every check",
             CLASSES, OWNER_HANDS, BATCH, APPROVAL_FORM, SAME_PATCH,
             r"merge order \(#15 comment 7005414860\): the orchestrator sends " + ORDER_TAIL,
         ),
         "ORCHESTRATION 7.5: the merge agent merges general PRs under the standing authorization and owner-only PRs from the batch approval (D1-D3 of #229)",
+        forbidden=OLD_MERGE_AGENT_AUTH,
     ),
     DocRule(
         "orch-update-branch", ORCH,
