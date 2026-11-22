@@ -42,11 +42,13 @@ class Publish(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.svg, self.json = root / "status.svg", root / "status.json"
 
-    def publish(self, stamp="2026-11-13 12:00 UTC", body="one", md=None):
+    def publish(self, stamp="2026-11-13 12:00 UTC", body="one", md=None, graph=None):
         self.svg.write_text(svg(stamp, body))
         self.json.write_text(f'{{"generated_at": "{stamp}"}}\n')
         if md is not None:
             (self.svg.parent / "status.md").write_text(md)
+        if graph is not None:
+            (self.svg.parent / "status-graph.svg").write_text(graph)
         return status_publish.publish(str(self.work), str(self.svg), str(self.json))
 
     def count(self):
@@ -112,6 +114,54 @@ class Publish(unittest.TestCase):
         self.publish()
         self.assertEqual(self.publish(body="two"), "updated")
         self.assertEqual(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split(), ["status.json", "status.svg"])
+
+    def test_publishes_the_graph_found_next_to_the_svg(self):
+        self.assertEqual(self.publish(graph="<svg>g</svg>\n"), "created")
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status-graph.svg"), "<svg>g</svg>")
+        self.assertEqual(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split(),
+                         ["status-graph.svg", "status.json", "status.svg"])
+
+    def test_the_graph_is_published_with_the_page_too(self):
+        self.publish(md="# page\n", graph="<svg>g</svg>\n")
+        self.assertEqual(git(self.origin, "ls-tree", "--name-only", "refs/heads/status").split(),
+                         ["status-graph.svg", "status.json", "status.md", "status.svg"])
+
+    def test_an_unchanged_graph_makes_no_commit_and_a_changed_one_does(self):
+        self.publish(graph="<svg>g</svg>\n")
+        self.assertEqual(self.publish(stamp="2026-11-13 12:30 UTC", graph="<svg>g</svg>\n"), "unchanged")
+        self.assertEqual(self.count(), 1)
+        self.assertEqual(self.publish(graph="<svg>g2</svg>\n"), "updated")
+        self.assertEqual(self.count(), 2)
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status-graph.svg"), "<svg>g2</svg>")
+
+    def test_a_graph_change_alone_is_a_real_change_even_with_the_same_page(self):
+        self.publish(md="# page\n", graph="<svg>g</svg>\n")
+        self.assertEqual(self.publish(md="# page\n", graph="<svg>other</svg>\n"), "updated")
+
+    def test_adding_a_graph_to_a_branch_that_has_none_is_a_real_change(self):
+        self.publish(md="# page\n")
+        self.assertEqual(self.publish(md="# page\n", graph="<svg>g</svg>\n"), "updated")
+
+    def test_publishing_without_a_graph_keeps_the_graph_already_on_the_branch(self):
+        self.publish(graph="<svg>g</svg>\n")
+        (self.svg.parent / "status-graph.svg").unlink()
+        self.assertEqual(self.publish(body="two"), "updated")
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status-graph.svg"), "<svg>g</svg>")
+
+    def test_the_graph_is_compared_exactly_not_ignoring_a_stamp(self):
+        stamped = svg("2026-11-13 12:00 UTC", "g")
+        self.publish(graph=stamped)
+        self.assertEqual(self.publish(graph=svg("2026-11-13 13:00 UTC", "g")), "updated")
+
+    def test_an_explicit_graph_path_is_used_and_an_unreadable_one_is_an_error(self):
+        other = Path(self.tmp.name) / "elsewhere.svg"
+        other.write_text("<svg>x</svg>\n")
+        self.svg.write_text(svg())
+        self.json.write_text("{}")
+        self.assertEqual(status_publish.publish(str(self.work), str(self.svg), str(self.json), graph_path=str(other)), "created")
+        self.assertEqual(git(self.origin, "show", "refs/heads/status:status-graph.svg"), "<svg>x</svg>")
+        with self.assertRaises(status_publish.PublishError):
+            status_publish.publish(str(self.work), str(self.svg), str(self.json), graph_path="/nonexistent.svg")
 
     def test_stamp_only_change_makes_no_commit(self):
         self.publish()
