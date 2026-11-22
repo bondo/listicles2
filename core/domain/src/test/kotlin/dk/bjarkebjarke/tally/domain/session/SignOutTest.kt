@@ -73,8 +73,9 @@ class SignOutTest :
 
         test("the timeout boundary: one millisecond less signs out, the timeout itself asks") {
             runTest {
-                Phone(backgroundScope, acknowledgeAfterMs = 4_999).signOut() shouldBe SignOutResult.SignedOut
-                Phone(backgroundScope, acknowledgeAfterMs = 5_000).signOut() shouldBe
+                val timeoutMs = SignOut.PENDING_WRITES_TIMEOUT_MS
+                Phone(backgroundScope, acknowledgeAfterMs = timeoutMs - 1).signOut() shouldBe SignOutResult.SignedOut
+                Phone(backgroundScope, acknowledgeAfterMs = timeoutMs).signOut() shouldBe
                     SignOutResult.ConfirmUnsentChanges(false)
             }
         }
@@ -122,7 +123,7 @@ class SignOutTest :
             }
         }
 
-        test("cancel: leaving during the wait or answering Cancel keeps the session and the copy on the phone") {
+        test("cancel: leaving during the wait keeps the session and the copy on the phone") {
             runTest {
                 val phone = Phone(backgroundScope, acknowledgeAfterMs = null)
                 val caller = launch { phone.signOut() }
