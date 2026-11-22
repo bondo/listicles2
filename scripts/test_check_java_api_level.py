@@ -60,6 +60,8 @@ SOURCES = {
         " state = Thread.State.NEW)"
         " class AnnotationOldTypes { }"
     ),
+    "MultiNew": "class MultiNew { static Object f() { return new java.util.HexFormat[1][1]; } }",  # multianewarray
+    "ParamVisible": "class ParamVisible { void f(int a, @VisibleHolder(type = java.util.HexFormat.class) int b) { } }",  # RuntimeVisibleParameterAnnotations
     # Passing cases: old classes in every position, a primitive class literal and arrays, a try/finally (catch type 0), lambda, string concat.
     "ClassRefsOld": (
         "class ClassRefsOld { @Deprecated static Object f(Object o, Runnable r) { Runnable lambda = () -> { };"
@@ -84,6 +86,10 @@ SOURCES["WideLocals"] = (
     "class WideLocals { static Object f() { " + " ".join(f"int v{i} = {i};" for i in range(260)) + " v259++; v258 += v259 + v257;"
     " return java.util.HexFormat.class; } }"
 )
+SOURCES["WideIncrement"] = (  # wide iinc with a constant that is not 1: its bytes must be skipped, not decoded as instructions
+    "class WideIncrement { static Object f() { " + " ".join(f"int v{i} = {i};" for i in range(260)) + " v259 += 1000;"
+    " return java.util.HexFormat.class; } }"
+)
 SOURCES["LdcWide"] = (
     "class LdcWide { static Object f() { Object[] a = { " + ", ".join(f'"s{i}"' for i in range(300)) + " }; return java.util.HexFormat.class; } }"
 )
@@ -92,6 +98,9 @@ SOURCES["Holder"] = (
     " Inner nested() default @Inner; Inner[] more() default { }; String name() default \"\"; int count() default 0; boolean flag() default false;"
     " double ratio() default 0;"
     " long big() default 0; char ch() default 'a'; }"
+)
+SOURCES["VisibleHolder"] = (
+    "@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME) @interface VisibleHolder { Class<?> type(); }"
 )
 SOURCES["Inner"] = (
     "@interface Inner { Class<?> type() default Object.class; }"
@@ -122,6 +131,8 @@ API = """<?xml version="1.0" encoding="utf-8"?>
 	<class name="java/lang/Deprecated" since="1"/>
 	<class name="java/lang/FunctionalInterface" since="34"/>
 	<class name="java/lang/annotation/Annotation" since="1"/>
+	<class name="java/lang/annotation/Retention" since="1"/>
+	<class name="java/lang/annotation/RetentionPolicy" since="1"><extends name="java/lang/Object"/></class>
 	<class name="java/lang/Thread$State" since="1"><extends name="java/lang/Object"/></class>
 	<class name="java/io/UncheckedIOException" since="34"><extends name="java/lang/RuntimeException"/></class>
 	<class name="java/util/HexFormat" since="34"><extends name="java/lang/Object"/></class>
@@ -149,24 +160,31 @@ API = """<?xml version="1.0" encoding="utf-8"?>
 
 
 def run(*args):
-    r = subprocess.run([sys.executable, "-I", CHECKER, *args], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-I", CHECKER, *args], capture_output=True, text=True, timeout=60)  # a hang is a failure
     return r.returncode, r.stdout + r.stderr
 
 
-def synthetic_class(code, catch_type=0):
-    """A minimal class file `Synth` whose static method f()V has the given bytecode (and one catch handler of catch_type over it)."""
+def synthetic_class(code=b"\xb1", catch_type=0, extra_pool=(), attributes=()):
+    """A minimal class file `Synth` whose static method f()V has the given bytecode (and one catch handler of catch_type over it).
+
+    extra_pool entries are raw constant pool entries numbered from 8; attributes are (name pool index, body) pairs on the class."""
 
     def utf8(text):
         return b"\x01" + len(text).to_bytes(2, "big") + text.encode()
 
-    pool = [utf8("Synth"), b"\x07\x00\x01", utf8("java/lang/Object"), b"\x07\x00\x03", utf8("f"), utf8("()V"), utf8("Code")]
+    pool = [utf8("Synth"), b"\x07\x00\x01", utf8("java/lang/Object"), b"\x07\x00\x03", utf8("f"), utf8("()V"), utf8("Code"), *extra_pool]
     table = b"\x00\x01" + (0).to_bytes(2, "big") + len(code).to_bytes(2, "big") + (0).to_bytes(2, "big") + catch_type.to_bytes(2, "big")
     body = b"\x00\x01\x00\x01" + len(code).to_bytes(4, "big") + code + table + b"\x00\x00"
     method = b"\x00\x09\x00\x05\x00\x06\x00\x01\x00\x07" + len(body).to_bytes(4, "big") + body
+    attrs = b"".join(idx.to_bytes(2, "big") + len(data).to_bytes(4, "big") + data for idx, data in attributes)
     return (
         b"\xca\xfe\xba\xbe\x00\x00\x00\x3d" + (len(pool) + 1).to_bytes(2, "big") + b"".join(pool)
-        + b"\x00\x20\x00\x02\x00\x04\x00\x00\x00\x00\x00\x01" + method + b"\x00\x00"
+        + b"\x00\x20\x00\x02\x00\x04\x00\x00\x00\x00\x00\x01" + method + len(attributes).to_bytes(2, "big") + attrs
     )
+
+
+def utf8_entry(text):
+    return b"\x01" + len(text).to_bytes(2, "big") + text.encode()
 
 
 class CheckerTest(unittest.TestCase):
@@ -374,7 +392,7 @@ class CheckerTest(unittest.TestCase):
         self.assert_class_violation("CatchNew", cls="java/io/UncheckedIOException")
 
     def test_array_element_types_are_looked_up(self):
-        for name in ("AnewarrayNew", "CheckcastArrayNew"):  # anewarray java/util/HexFormat, checkcast [[Ljava/util/HexFormat;
+        for name in ("AnewarrayNew", "CheckcastArrayNew", "MultiNew"):  # anewarray, checkcast [[Ljava/util/HexFormat;, multianewarray
             with self.subTest(name=name):
                 self.assert_class_violation(name)
 
@@ -384,7 +402,7 @@ class CheckerTest(unittest.TestCase):
     def test_class_values_inside_annotations_fail_in_every_position(self):
         # Holder has class retention (RuntimeInvisibleAnnotations); the class value is a descriptor, not a constant pool Class entry.
         names = ("AnnotationOnClass", "AnnotationOnField", "AnnotationOnMethod", "AnnotationOnParameter", "AnnotationNested", "AnnotationArray")
-        for name in (*names, "AnnotationDefault"):
+        for name in (*names, "AnnotationDefault", "ParamVisible"):
             with self.subTest(name=name):
                 self.assert_class_violation(name)
 
@@ -397,14 +415,14 @@ class CheckerTest(unittest.TestCase):
         self.assertIn("java/lang/Thread$State requires API 30", out)
 
     def test_old_classes_in_every_position_pass(self):
-        for name in ("ClassRefsOld", "AnnotationOldTypes", "AnnotationEnumValue", "Api26", "Holder"):
+        for name in ("ClassRefsOld", "AnnotationOldTypes", "AnnotationEnumValue", "Api26", "Holder", "VisibleHolder"):
             with self.subTest(name=name):
                 rc, out = self.check(name)
                 self.assertEqual(rc, 0, out)
 
     def test_class_references_pass_when_min_sdk_is_high_enough(self):
         names = ("ClassLiteralNew", "CheckcastNew", "InstanceofNew", "CatchNew", "AnewarrayNew", "CheckcastArrayNew")
-        for name in (*names, "AnnotationNew", "AnnotationOnParameter"):
+        for name in (*names, "AnnotationNew", "AnnotationOnParameter", "ParamVisible", "MultiNew"):
             with self.subTest(name=name):
                 self.assertEqual(self.check(name, min_sdk="34")[0], 0)
 
@@ -418,7 +436,7 @@ class CheckerTest(unittest.TestCase):
         self.assertIn("NoClassDefFoundError", out)
 
     def test_the_bytecode_walk_steps_over_switches_wide_and_ldc_w(self):
-        names = [f"Switch{kind}{pad}" for kind in ("Table", "Lookup") for pad in range(4)] + ["WideLocals", "LdcWide"]
+        names = [f"Switch{kind}{pad}" for kind in ("Table", "Lookup") for pad in range(4)] + ["WideLocals", "WideIncrement", "LdcWide"]
         for name in names:
             with self.subTest(name=name):
                 self.assert_class_violation(name)
@@ -430,6 +448,9 @@ class CheckerTest(unittest.TestCase):
             ("truncated-switch", b"\xaa\x00\x00"),
             ("ldc-outside-the-pool", b"\x12\x63\xb1"),
             ("checkcast-outside-the-pool", b"\xc0\x00\x63\xb1"),
+            ("tableswitch-high-below-low", b"\xaa\x00\x00\x00" + (0).to_bytes(4, "big") + (5).to_bytes(4, "big") + (0).to_bytes(4, "big")),
+            ("lookupswitch-negative-pairs", b"\xab\x00\x00\x00" + (0).to_bytes(4, "big") + (-1).to_bytes(4, "big", signed=True)),
+            ("unknown-wide-opcode", b"\xc4\x57\x00\x01\xb1"),
         ):
             with self.subTest(label=label):
                 path = os.path.join(self.tmp.name, f"{label}.class")
@@ -437,6 +458,29 @@ class CheckerTest(unittest.TestCase):
                     f.write(synthetic_class(code))
                 rc, out = run("--api-versions", self.api, "--min-sdk", "26", path)
                 self.assertEqual(rc, 2, out)
+
+    def test_a_name_index_that_is_not_a_utf8_entry_fails_closed(self):
+        # Constant pool #8 is a Class entry pointing at #2 (a Class, not a Utf8): every use of it as a name must exit 2, not crash.
+        deep = b"\x00\x09\x00\x00"  # annotation of type #9 ("LA;") without pairs
+        for _ in range(2000):
+            deep = b"\x00\x09\x00\x01\x00\x09@" + deep  # one pair whose value is the next nested annotation
+        annotations = (utf8_entry("RuntimeVisibleAnnotations"), utf8_entry("LA;"))
+        cases = {
+            "checkcast": synthetic_class(b"\xc0\x00\x08\xb1", extra_pool=[b"\x07\x00\x02"]),
+            "ldc": synthetic_class(b"\x12\x08\x57\xb1", extra_pool=[b"\x07\x00\x02"]),
+            "catch-type": synthetic_class(catch_type=8, extra_pool=[b"\x07\x00\x02"]),
+            "annotation-type": synthetic_class(extra_pool=[utf8_entry("RuntimeVisibleAnnotations")], attributes=[(8, b"\x00\x01\x00\x02\x00\x00")]),
+            "attribute-name": synthetic_class(extra_pool=[b"\x07\x00\x02"], attributes=[(8, b"")]),
+            "annotation-nested-too-deep": synthetic_class(extra_pool=annotations, attributes=[(8, b"\x00\x01" + deep)]),
+        }
+        for label, data in cases.items():
+            with self.subTest(label=label):
+                path = os.path.join(self.tmp.name, f"pool-{label}.class")
+                with open(path, "wb") as f:
+                    f.write(data)
+                rc, out = run("--api-versions", self.api, "--min-sdk", "26", path)
+                self.assertEqual(rc, 2, out)
+                self.assertNotIn("Traceback", out)
 
     def test_a_minimal_synthetic_class_with_a_class_handler_passes(self):
         # ldc of the class constant #2 (Synth itself) then return: nothing above minSdk, so the walk above fails only for its own reason.
