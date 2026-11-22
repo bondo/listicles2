@@ -535,7 +535,7 @@ enforce the rules rather than goodwill.
    and focuses on the commits since the last round: it re-checks open findings, reviews the new code and how the fixes interact with the old code.
 6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and the orchestrator marks the PR READY. The merge agent squash-merges it, or an owner-only PR waits for the owner or the approver's record (`docs/ORCHESTRATION.md` §7.5).
    If round 4 of a batch still has open findings above nit (deferred minors do not count), one escalation reviewer per PR decides
-   fix, split or owner (`REVIEW.md`, Loop and cap); its ruling is final, so nothing it decides reaches you.
+   fix, split or owner (`REVIEW.md`, Loop and cap); its ruling is final; only a finding above nit still open after a `fix` ruling's round 5 reaches you.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 

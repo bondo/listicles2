@@ -1651,7 +1651,7 @@ DOC_RULES = (
             r"\*\*reviews start on push \(owner decision, #15 comment 7075952806\):\*\* the orchestrator spawns the reviewer as soon as the "
             r"implementer has pushed, without waiting for ci\. the implementer does not wait in a loop for ci after a fix push; it checks with "
             r"`scripts/verify\.sh`, pushes and ends its turn\. ci must be green on the head before the pr is marked ready \(§7\.5\) and before "
-            r"the merge request\. this bullet is the home of the rule",
+            r"the merge request; a red ci is diagnosed at once \(§7\.4\) and fixed in the next push\. this bullet is the home of the rule",
             r"\(4\) ci is green on the pr head \(§7\.1\)",
             r"marks a draft pr ready after clean review rounds and with ci green on the head \(§7\.1\)",
             r"wait for `scripts/verify\.sh` with a monitor/until-loop and do not end the turn while it runs; do not loop-wait for ci after a push "

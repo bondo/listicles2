@@ -1681,7 +1681,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         ("body from a file", r"-f body=@file"),
         ("scripts from a file", r"run a script that mentions a protected path from a file"),
         ("source_revision", r"`source_revision` is the pr branch name"),
-        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while waiting"),
+        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while it runs; do not loop-wait for ci after a push"),
         ("red green one push", r"a red/green pair may go up in one push \(say so in the pr body\)"),
         ("pr bodies by mcp", r"pr bodies only through the github mcp tools"),
         ("close after merge", r"comment on the completed issue, then close it with `state=closed`, `state_reason=completed`"),
