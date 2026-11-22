@@ -37,8 +37,11 @@ test("the suite probes every collection of PLAN section 3; the UNPLANNED ones ar
         "anything/{doc}",
         "users/{uid}/unplanned/{doc}",
         "households/{hid}/unplanned/{doc}",
+        "households/{hid}/members/{uid}/unplanned/{doc}",
+        "households/{hid}/removed/{uid}/unplanned/{doc}",
         "invites/{code}/unplanned/{doc}",
         "lists/{lid}/unplanned/{doc}",
+        "lists/{lid}/items/{iid}/unplanned/{doc}",
         "config/app/unplanned/{doc}",
     ]);
     const planned = h.TEMPLATES.map(h.collectionIdOf);

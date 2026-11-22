@@ -57,6 +57,7 @@ test("mutants: each audience, the collection group, and one method at a time", (
         "unverified",
         "verified",
         "others",
+        "self",
         "everyone",
     ]);
 });
@@ -80,6 +81,7 @@ test("mutate adds one block right under the documents match and changes nothing 
 });
 
 const others: h.Mutant = { ...exact, template: "users/{uid}", who: "others" };
+const self: h.Mutant = { ...others, who: "self" };
 const [first, second] = h.CLIENT_NAMES;
 const probe = (op: h.Op, client: h.Client = first, path = "lists/l1/items/i1"): h.Probe => ({
     client,
@@ -107,6 +109,11 @@ const cases: [string, h.Mutant, h.Probe, h.Outcome][] = [
     ],
     ["others, a signed-out caller", others, probe("get", "anonymous", "users/bob"), "denied"],
     ["others, a query", others, probe("list", "verified", "users/bob"), "denied"],
+    ["self, the caller's own document", self, probe("get", "verified", "users/alice"), "allowed"],
+    ["self, an unverified caller", self, probe("delete", "unverified", "users/alice"), "allowed"],
+    ["self, another user's document", self, probe("get", "verified", "users/bob"), "denied"],
+    ["self, a signed-out caller", self, probe("get", "anonymous", "users/alice"), "denied"],
+    ["self, a query", self, probe("list", "verified", "users/alice"), "denied"],
 ];
 
 test.each(cases)("expected: %s", (_name, mutant, p, want) => {

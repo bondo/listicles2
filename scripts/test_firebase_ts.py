@@ -480,9 +480,12 @@ class Config(unittest.TestCase):
         and the mutant check. npm test checks what they do; this also runs where that step is skipped (SKIP_FIREBASE)."""
         self.assertFalse(os.path.exists(os.path.join(FB, "test", "rules.test.js")))
         parts = {
+            # Own and other users' documents of each {uid} collection; the self and others mutants need one each (R2-02 of PR 301).
             "harness.ts": ('export const CLIENT_NAMES = ["anonymous", "unverified", "verified"] as const;',
                            'export const OPS = ["get", "list", "group", "create", "update", "delete"] as const;',
+                           "...TEMPLATES.map((t) => instantiate(t)),",
                            '...TEMPLATES.filter((t) => t.endsWith("/{uid}")).map((t) => instantiate(t, OTHER)),',
+                           'if (template.endsWith("/{uid}")) whos.push("others", "self");',
                            "...UNPLANNED.map((t) => instantiate(t)),"),
             # The deny suite runs exactly h.PROBES, the probes the mutant check runs: no filter of its own (review of PR 301).
             "rules.test.ts": ("expect(h.TEMPLATES).toEqual([", "expect(h.UNPLANNED).toEqual([",
