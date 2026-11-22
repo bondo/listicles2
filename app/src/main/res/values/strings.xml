@@ -9,4 +9,10 @@
     <string name="lists_empty_body">Make a list of what you collect or need, and tick off what you have. A new list is private until you share it.</string>
     <!-- SYNC-03: shown when an action needs the server and the phone is offline. -->
     <string name="needs_connection">This needs a connection</string>
+    <!-- Start-up gate steps (P10) until their screens exist: update M1-27, verify email M1-17, name M1-39 (AUTH-12), household notices M1-21 (HH-06, wireframe 40). -->
+    <string name="gate_update_title">Update required</string>
+    <string name="gate_verify_title">Verify your email</string>
+    <string name="gate_name_title">What should we call you?</string>
+    <string name="gate_notice_removed">You were removed from the household</string>
+    <string name="gate_notice_deleted">This household was deleted</string>
 </resources>

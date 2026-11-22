@@ -7,7 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
-import dk.bjarkebjarke.tally.start.StartRoute
+import dk.bjarkebjarke.tally.domain.start.StartStep
 import dk.bjarkebjarke.tally.start.StartUiState
 import org.junit.Rule
 import org.junit.Test
@@ -66,6 +66,6 @@ class TallyAppScreenshotTest {
     private companion object {
         const val DEVICE = "w360dp-h640dp-xhdpi"
         const val FONT_SCALE_200 = 2f
-        val HOME = StartUiState.Ready(StartRoute.Home)
+        val HOME = StartUiState.Ready(StartStep.Home)
     }
 }
