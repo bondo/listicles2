@@ -237,6 +237,12 @@ def tsconfig_problems(cfg):
     return problems
 
 
+def ts_const_list(text, name):
+    """The string items of a top-level `export const NAME = [...] as const;` in TypeScript source, or None."""
+    m = re.search(rf"(?m)^export const {re.escape(name)} = \[([^\]]*)\] as const;$", text)
+    return re.findall(r'"([^"]*)"', m.group(1)) if m else None
+
+
 def tool(name, *args, cwd=FB):
     done = subprocess.run([os.path.join(BIN, name), *args], cwd=cwd, capture_output=True, text=True, check=False)
     return done.returncode, done.stdout + done.stderr
@@ -287,6 +293,14 @@ class HelperNegativeCases(unittest.TestCase):
     def test_step_in_a_branch_is_not_top_level(self):
         self.assertFalse(top_level_step('if [ "$FAST" = 0 ]; then\n  step t python3 -I x.py\nfi\n', "python3 -I x.py"))
         self.assertTrue(top_level_step("step t python3 -I x.py\n", "python3 -I x.py"))
+
+    def test_ts_const_list_reads_only_the_named_top_level_const_array(self):
+        src = 'export const OPS = ["get", "list"] as const;\nexport const X = ["a"];\n// export const Y = ["b"] as const;\n'
+        self.assertEqual(ts_const_list(src, "OPS"), ["get", "list"])
+        self.assertIsNone(ts_const_list(src, "X"), "not as const")
+        self.assertIsNone(ts_const_list(src, "Y"), "commented out")
+        self.assertIsNone(ts_const_list(src, "OP"), "another name")
+        self.assertIsNone(ts_const_list("    export const OPS = [\"get\"] as const;\n", "OPS"), "not top level")
 
     def test_order_matters(self):
         self.assertTrue(ordered("step a one\nstep b two\n", ["one", "two"]))
@@ -456,16 +470,26 @@ class Config(unittest.TestCase):
         for word in ("testMatch", "testPathIgnorePatterns", "testRegex", "modulePathIgnorePatterns"):
             self.assertNotIn(word, text, word)
 
-    def test_javascript_rules_test_is_gone_and_the_typescript_one_keeps_every_case(self):
+    def test_javascript_rules_test_is_gone_and_the_typescript_suite_has_every_part(self):
+        """M1-52 (see #202): the harness tries every operation as each of the three clients, the deny suite asserts every
+        probe per client, and the PLAN check, the mutant check and the harness self-checks are in place. What they do is
+        tested by the emulator run (npm test); this catches a part that is gone even where that run is skipped."""
         self.assertFalse(os.path.exists(os.path.join(FB, "test", "rules.test.js")))
-        text = read("firebase", "test", "rules.test.ts")
-        for path in ("users/alice", "households/h1", "households/h1/members/alice", "households/h1/lists/l1",
-                     "households/h1/lists/l1/items/i1", "households/h1/invites/inv1", "anything/else"):
-            self.assertIn(f'"{path}"', text, path)
-        for case in ("anonymous", "signed-in", "default deny (%s)", "%s: get", "%s: create/overwrite",
-                     "%s: update and delete an existing doc", "list and add on a collection"):
-            self.assertIn(case, text, case)
-        self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
+        harness = read("firebase", "test", "harness.ts")
+        self.assertEqual(ts_const_list(harness, "CLIENT_NAMES"), ["anonymous", "unverified", "verified"])
+        self.assertEqual(ts_const_list(harness, "OPS"), ["get", "list", "group", "create", "update", "delete"])
+        parts = {
+            "rules.test.ts": ('describe.each(CLIENT_NAMES)("default deny (%s)"', "PROBES.filter((p) => p.client === client)",
+                              "await assertFails(attempt(", "pathProblems(planTemplates(PLAN), PLANNED, UNPLANNED)).toEqual([])"),
+            "mutants.test.ts": ("mutantsOf([...planTemplates(PLAN), UNPLANNED])", "methodMutants(UNPLANNED)", "mutate(RULES, mutant)",
+                                "expect(got).toEqual(want)"),
+            "harness.test.ts": ('describe("planTemplates"', 'describe("pathProblems"', 'describe("mutants"', 'describe("outcome"'),
+        }
+        for name, needles in parts.items():
+            text = read("firebase", "test", name)
+            for needle in needles:
+                with self.subTest(file=name, part=needle):
+                    self.assertIn(needle, text)
 
     def test_dependabot_ignores_only_the_major_updates_of_typescript_firebase_rules_unit_testing_and_types_node(self):
         self.assertEqual(dependabot_ignore_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
