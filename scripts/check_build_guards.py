@@ -111,9 +111,14 @@ def line_of(text, offset):
     return text.count("\n", 0, offset) + 1
 
 
-# -- 2. targetSdk floor ----------------------------------------------------------------------------------------------------------------
+# -- targetSdk floor ----------------------------------------------------------------------------------------------------------------
 
-TARGET_STATEMENT = re.compile(r"(?:^|[{;])[ \t]*(targetSdk(?:Version|Preview)?)\b(?=[ \t]*[=({]|[ \t]+[\w\"'])", re.M)
+# A statement that sets a target: `targetSdk = 36`, `targetSdk(36)`, `android.defaultConfig.targetSdk = 36`, `this.targetSdk = 36` and the
+# setters `setTargetSdk(36)`, `setTargetSdkVersion(36)` (R1-01). A read (`val x = android.defaultConfig.targetSdk`, `f(x.targetSdk)`) is not
+# at the start of a statement, so it never matches.
+TARGET_STATEMENT = re.compile(
+    r"(?:^|[{;])[ \t]*(?:\w+\??\.)*(setTargetSdk(?:Version)?|targetSdk(?:Version|Preview)?)\b(?=[ \t]*[=({]|[ \t]+[\w\"'])", re.M
+)
 TARGET_ASSIGN = re.compile(r"[ \t]*=[ \t]*(\d+)(?=[ \t]*(?:$|;|\}))", re.M)
 TARGET_CALL = re.compile(r"[ \t]*\([ \t]*(\d+)[ \t]*\)")
 TARGET_GROOVY = re.compile(r"[ \t]+(\d+)(?=[ \t]*(?:$|;|\}))", re.M)

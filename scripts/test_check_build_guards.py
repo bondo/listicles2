@@ -118,7 +118,12 @@ class TargetSdk(unittest.TestCase):
 
     def test_a_qualified_or_setter_value_that_cannot_be_read_fails_closed(self):
         plain = "android { defaultConfig { targetSdk = 37 } }\n"
-        for bad in ("android.defaultConfig.targetSdk = someVariable", "this.targetSdk = 36 - 1", "defaultConfig.setTargetSdkVersion(v)", "android.defaultConfig.targetSdkPreview = \"Z\""):
+        for bad in (
+            "android.defaultConfig.targetSdk = someVariable",
+            "this.targetSdk = 36 - 1",
+            "defaultConfig.setTargetSdkVersion(v)",
+            "android.defaultConfig.targetSdkPreview = \"Z\"",
+        ):
             with self.subTest(bad=bad):
                 self.assertEqual(len(self.problems(plain + bad + "\n")), 1, bad)
 
