@@ -536,7 +536,7 @@ total cost, incidents. Then refresh the PR description's review table from the r
 * Any commit after `reviewed_through` is **unreviewed** until the next round covers it. Handoff-only and docs-only commits still count. They are listed, not silently skipped.
 * **Delta review** (retro R4): a commit after the last round gets one delta review before the merge request: a fresh
   reviewer with the whole PR diff, focused on `reviewed_through..head_sha` (about $1-2). A delta review always runs; there is no owner-acceptance alternative, for any PR.
-  A small fix-only or docs-only commit gets the cheap re-check of §7.2.3. Record `reviewed_through` afterwards.
+  A small fix-only or docs-only commit that fixes the previous round's findings gets the cheap re-check of §7.2.3. Record `reviewed_through` afterwards.
 
 ### 7.2.1 Deferring findings
 
@@ -569,8 +569,8 @@ is refreshed at batch close and no later than when the PR is declared ready.
 The one home of these rules; `REVIEW.md`, `agents/roles.yaml` and the orchestrator prompt link here.
 
 1. **Nits are accepted without a round.** A review with verdict `ready_nits_only` goes to the merge request (§7.5). Its nits are recorded as accepted in the PR review table and the round row: no fix round, no re-review, no follow-up issue.
-2. **A small fix is re-checked cheaply.** A re-check of a small fix-only or docs-only commit (the fixes of the previous round's findings, each about 30 changed lines or fewer, or docs only) is the delta review of §7.2 done by a fresh Sonnet medium reviewer (`recheck-reviewer` in `agents/roles.yaml`), focused on those findings. Full rounds stay Opus at the effort `agents/roles.yaml` gives the reviewer.
-3. **Guard and prompt_rules hardening PRs stop early.** On a PR that hardens `scripts/guards.sh`, `scripts/hooks/pretooluse_guard.py` or `scripts/prompt_rules.py`, the second round that finds new bypass forms ends the PR. The forms are recorded as accepted residuals in the PR body (the hook is a tripwire, F18) and the PR goes to the merge request; any other finding above nit is still fixed.
+2. **A small fix is re-checked cheaply.** A re-check of a small fix-only or docs-only commit (the fixes of the previous round's findings, about 30 changed lines or fewer in total) is the delta review of §7.2, with its inputs, done by a fresh Sonnet medium reviewer (`recheck-reviewer` in `agents/roles.yaml`), focused on those findings. Full rounds stay Opus at the effort `agents/roles.yaml` gives the reviewer.
+3. **Guard and prompt_rules hardening PRs stop early.** On a PR that hardens `scripts/guards.sh`, `scripts/hooks/pretooluse_guard.py` or `scripts/prompt_rules.py`, the second round that finds new bypass forms ends the PR. The forms are recorded as accepted residuals in the PR body (the hook is a tripwire, F18) and the PR goes to the merge request.
 4. **Reviewer effort** is strictly per `agents/roles.yaml`, which owns the rule. The metrics row per archived session is §6.1.
 
 ### 7.3 Results
@@ -622,8 +622,8 @@ The orchestrator collects results in this order, from cheapest to most expensive
 ### 7.5 Pull requests and the merge request
 
 * **PR convention:** a **draft** PR is not ready. A **non-draft** PR is mergeable and carries a comment with checks run,
-  skips and decisions. Owner-only PRs wait in the owner's queue (`is:open is:pr draft:false`); every other READY PR goes to the merge agent.
-* **Before the merge request** (to the merge agent, or to the owner for an owner-only PR) the orchestrator checks (retro R2, R6): (1) the PR body is refreshed (scope, review
+  skips and decisions. READY PRs are `is:open is:pr draft:false`; owner-only PRs wait for the owner's batch approval (below), every other one goes to the merge agent.
+* **Before the merge request** (to the merge agent, or as a batch-approval request to the owner for an owner-only PR) the orchestrator checks (retro R2, R6): (1) the PR body is refreshed (scope, review
   table, test evidence; no "still to do" or "not yet reviewed"); (2) the request says **squash**.
   (3) **Closing keywords:** never write close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved directly
   before an issue number in a commit or PR body unless closing that issue is intended; write "gated on #N", "see #N" or
@@ -659,8 +659,8 @@ The orchestrator collects results in this order, from cheapest to most expensive
 * **Updating a branch (owner decision, #15 comment 7008033864):** The merge agent updates a PR's branch itself with `scripts/update-branch.sh <N> <expected head sha>` (owner decision, #15 comment 7008033864), then waits for the checks; the script is the one call besides `scripts/merge_ready.py` that the merge agent runs. `scripts/update-branch.sh` makes one fixed PUT to `pulls/N/update-branch` with `expected_head_sha` (GitHub refuses a moved head). Same pattern as `mark-ready.sh`: exactly two arguments (digits, no leading zero; 40 lowercase hex), `/bin/bash -p`, `gh` only from fixed directories, fixed PATH; GH_HOST/GH_REPO cannot redirect the call.
   `.claude/settings.json` pre-allows exactly one more rule for it, `Bash(scripts/update-branch.sh *)`; the PreToolUse guard treats every file named `update-branch.sh` as a process file, allows the command only as the whole command, exactly `scripts/update-branch.sh <PR number> <40-hex sha>` from the project root, and only while the script is a regular file whose SHA-256 equals its pin (`UPDATE_BRANCH_SHA256`); the residual risks are those of `mark-ready.sh`. Tests: `scripts/hooks/test_update_branch.py`, `test_guard_update_branch.py`, `test_settings_permissions.py`.
 * **Strict up-to-date merge procedure:** `main` requires branches to be up to date, so merge one PR at a time. After each
-  merge by the owner, the **orchestrator** updates the next ready owner-only PR with `update_pull_request_branch`, passing `expectedHeadSha`
-  set to its current head, waits about 4 minutes for CI, and only then tells the owner it is ready. This is the single
+  merge, the next ready PR is updated: by the merge agent itself with `scripts/update-branch.sh` (above) when it is in the merge agent's batch; otherwise the **orchestrator** updates it with `update_pull_request_branch`, passing `expectedHeadSha`
+  set to its current head, waits about 4 minutes for CI, and only then sends the merge request. This is the single
   documented exception to "the orchestrator never commits or pushes" (§1 role table): it is a server-side merge of `main`,
   not authored code. Do it only when no worker holds that branch (F6, two writers); otherwise the branch-holding worker
   merges `main` itself, or the orchestrator waits.
@@ -711,7 +711,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
    list (`pull_request_read get_commits`): the author or committer `login` is the owner's, or the author name/email is the agent identity `Claude <noreply@anthropic.com>`
    (the Co-Authored-By trailer is not the author; check the author field). Anything else (for example a web edit by someone else) is foreign. Never judge by `git log` names alone. Three cases: **agent** = author email `noreply@anthropic.com` (API login `claude`, a separate account); agent work done through the GitHub MCP or update-branch shows the owner login `bondo` (committer `web-flow`) and counts as the owner; a **collaborator's web edit** shows their login (committer `web-flow`) and is **foreign**. A hit: **stop spawning and pushing on the affected PR and ask the owner; this is not the §7.7 usage pause** (the 45-min check-in stays);
    **never self-revert** (a revert is a PR the owner merges; no force-push). Log a one-line `decision` comment.
-3. **Draft and ready** follow §7.5: agent PRs stay draft until the orchestrator marks one ready because it is mergeable; then the merge agent merges it, or the owner for an owner-only PR (§7.5). A collaborator is asked never to press Ready for review or Merge (COLLABORATING.md).
+3. **Draft and ready** follow §7.5: agent PRs stay draft until the orchestrator marks one ready because it is mergeable; then the merge agent merges it: a `general` PR under the standing authorization, an owner-only PR as kind `owner-batch` once the owner's batch approval lists it (§7.5). A collaborator is asked never to press Ready for review or Merge (COLLABORATING.md).
 
 ### 7.7 Usage limits: early warning, pause, resume
 
