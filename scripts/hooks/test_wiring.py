@@ -130,6 +130,12 @@ class TestsAreWired(unittest.TestCase):
     def test_ci_guards_job_runs_the_hook_tests(self):
         self.assertIn("scripts/hooks/run_hook_tests.py", ci_job("guards"))
 
+    def test_ci_guards_job_runs_the_full_hook_suite_in_eight_shards(self):
+        """Owner decision 7075952806 item 3 on #15. CI runs the whole suite on every PR: no scope script in the guards job."""
+        job = ci_job("guards")
+        self.assertIn("python3 -I scripts/hooks/run_hook_tests.py --jobs 8\n", job)
+        self.assertNotIn("prepush_scope.py", job)
+
     def test_verify_runs_the_hook_tests(self):
         self.assertIn("scripts/hooks/run_hook_tests.py", read("scripts", "verify.sh"))
 
