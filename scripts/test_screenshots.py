@@ -166,7 +166,8 @@ class Wiring(unittest.TestCase):
         self.assertEqual(got, ["ci.yml screenshot-diffs upload must have path: app/build/outputs/roborazzi"])
 
     def test_the_upload_action_must_be_pinned_to_a_commit(self):
-        got = self.mutated(".github/workflows/ci.yml", "if: failure()\n        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a", "if: failure()\n        uses: actions/upload-artifact@v7")
+        pinned = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+        got = self.mutated(".github/workflows/ci.yml", f"if: failure()\n        uses: {pinned}", "if: failure()\n        uses: actions/upload-artifact@v7")
         self.assertEqual(got, ["ci.yml upload-artifact must be pinned to a 40-character commit SHA"])
 
     def test_the_gate_step_must_not_be_allowed_to_fail(self):
