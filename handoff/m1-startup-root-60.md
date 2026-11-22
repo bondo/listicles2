@@ -1,4 +1,4 @@
-# Handoff: M1-60 start-up root (branch m1/startup-root-60)
+# Handoff: M1-60 start-up root (branch m1/startup-root-60, draft PR #311)
 
 Delete this file in the PR's final commit (squash merge keeps it off `main`).
 
