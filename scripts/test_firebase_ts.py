@@ -483,7 +483,9 @@ class Config(unittest.TestCase):
             "harness.ts": ('export const CLIENT_NAMES = ["anonymous", "unverified", "verified"] as const;',
                            'export const OPS = ["get", "list", "group", "create", "update", "delete"] as const;',
                            "export const PATHS = [...TEMPLATES.map(instantiate), UNPLANNED];"),
-            "rules.test.ts": ("expect(h.TEMPLATES).toEqual([", "await assertFails(h.attempt(admin.firestore(), dbs[client], probe));"),
+            # The deny suite runs exactly h.PROBES, the probes the mutant check runs: no filter of its own (review of PR 301).
+            "rules.test.ts": ("expect(h.TEMPLATES).toEqual([", 'test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {',
+                              "await assertFails(h.attempt(admin.firestore(), dbs[probe.client], probe));"),
             "mutants.test.ts": ("...h.methodMutants(h.UNPLANNED),", "h.mutate(h.RULES, mutant)", "expect(got).toEqual(want);"),
             "harness.test.ts": ("planTemplates throws on %s", "expected: %s", "a collection no probe touches"),
         }
