@@ -8,7 +8,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import javax.inject.Inject
 
-/** Online when the active network reaches the internet and Android has validated it (not a captive portal). */
+/**
+ * Online when the active network reaches the internet and Android has validated it. Unvalidated networks (a captive
+ * portal, the seconds before Wi-Fi validation ends) count as offline: a server call there would hang, not fail.
+ */
 class AndroidConnectivity
     @Inject
     constructor(

@@ -98,15 +98,19 @@ abstract class GoogleServicesStandIn : DefaultTask() {
 }
 
 if (googleServicesStandIn) {
-    val standIn =
-        tasks.register<GoogleServicesStandIn>("googleServicesStandIn") {
-            packageName.set(provider { checkNotNull(android.defaultConfig.applicationId) })
-            jsonFile.set(layout.buildDirectory.file("google-services-stand-in/google-services.json"))
-        }
     // The plugin registers process<Variant>GoogleServices in its own onVariants callback with the fixed search paths; this
     // callback runs after it, so this configure action runs after the plugin's and replaces the paths with the stand-in.
+    // One stand-in per variant, with that variant's application id: the plugin looks for a client with exactly that id.
     androidComponents.onVariants { variant ->
-        tasks.named<GoogleServicesTask>("process${variant.name.replaceFirstChar(Char::uppercase)}GoogleServices") {
+        val name = variant.name.replaceFirstChar(Char::uppercase)
+        val standIn =
+            tasks.register<GoogleServicesStandIn>("googleServicesStandIn$name") {
+                packageName.set(variant.applicationId)
+                jsonFile.set(
+                    layout.buildDirectory.file("google-services-stand-in/${variant.name}/google-services.json"),
+                )
+            }
+        tasks.named<GoogleServicesTask>("process${name}GoogleServices") {
             dependsOn(standIn)
             googleServicesJsonFiles.set(standIn.map { listOf(it.jsonFile.get().asFile) })
         }
@@ -256,8 +260,8 @@ kover {
                 // M1-30: Hilt's generated injectors, factories and aggregation markers; AppGraphTest checks the graph instead.
                 classes( // justified: Hilt-generated code holds no hand-written logic
                     "dk.bjarkebjarke.tally.Hilt_*",
-                    "*_Factory",
-                    "*_GeneratedInjector",
+                    "dk.bjarkebjarke.tally.*_Factory",
+                    "dk.bjarkebjarke.tally.*_GeneratedInjector",
                     "hilt_aggregated_deps.*",
                     "dagger.hilt.internal.aggregatedroot.codegen.*",
                 )

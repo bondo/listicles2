@@ -89,8 +89,8 @@ kover {
                 )
                 classes( // justified: Hilt-generated code holds no hand-written logic
                     "dk.bjarkebjarke.tally.Hilt_*",
-                    "*_Factory",
-                    "*_GeneratedInjector",
+                    "dk.bjarkebjarke.tally.*_Factory",
+                    "dk.bjarkebjarke.tally.*_GeneratedInjector",
                     "hilt_aggregated_deps.*",
                     "dagger.hilt.internal.aggregatedroot.codegen.*",
                 )
