@@ -33,13 +33,8 @@ class SignOut(
         val allSent =
             connectivity.isOnline() &&
                 withTimeoutOrNull(pendingWritesTimeoutMs) { userData.awaitPendingWrites() } == true
-        return if (allSent) {
-            discardingUnsentChanges()
-        } else {
-            SignOutResult.ConfirmUnsentChanges(
-                userData.unsentChangesSeen(),
-            )
-        }
+        if (allSent) return discardingUnsentChanges()
+        return SignOutResult.ConfirmUnsentChanges(userData.unsentChangesSeen())
     }
 
     /** "Sign out anyway": steps 2 to 6, whatever was not sent yet. */

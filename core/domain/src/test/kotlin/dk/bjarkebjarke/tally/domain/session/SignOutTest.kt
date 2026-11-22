@@ -50,15 +50,7 @@ private class Phone(
 @OptIn(ExperimentalCoroutinesApi::class)
 class SignOutTest :
     FunSpec({
-        test("online and every write acknowledged in time: signed out with no question, in the decided order") {
-            runTest {
-                val phone = Phone(backgroundScope)
-                phone.signOut() shouldBe SignOutResult.SignedOut
-                phone.steps shouldBe listOf(WAIT) + SIGNED_OUT
-            }
-        }
-
-        test("online: signed out exactly when the server acknowledges before the timeout (whole milliseconds)") {
+        test("online: signed out in the decided order exactly when acknowledged before the timeout (whole ms)") {
             checkAll(Arb.long(1L..60_000L), Arb.long(0L..120_000L)) { timeoutMs, acknowledgeAfterMs ->
                 runTest {
                     val phone = Phone(backgroundScope, acknowledgeAfterMs = acknowledgeAfterMs, timeoutMs = timeoutMs)
