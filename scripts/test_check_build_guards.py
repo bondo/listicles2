@@ -891,6 +891,13 @@ class Conventions(unittest.TestCase):
                 self.assertEqual([f"core/domain/build.gradle.kts: applies {n} listicles convention plugins; apply exactly one (build-logic/)"],
                                  self.problems({"core/domain/build.gradle.kts": text}))
 
+    def test_the_dependency_floors_plugin_is_not_a_module_convention(self):
+        # R1-03 (PR 320): a module with only listicles.dependency.floors gets none of the module conventions.
+        for text in ('plugins {\n    alias(libs.plugins.listicles.dependency.floors)\n}\n', 'plugins {\n    id("listicles.dependency.floors")\n}\n'):
+            with self.subTest(text=text):
+                self.assertEqual(["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"],
+                                 self.problems({"core/domain/build.gradle.kts": text}))
+
     def test_a_module_without_a_build_file_is_flagged(self):
         found = self.problems({"core/domain/build.gradle.kts": None})
         self.assertEqual(found, [":core:domain: no build file at core/domain/build.gradle.kts"])
