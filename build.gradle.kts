@@ -1,3 +1,4 @@
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import io.gitlab.arturbosch.detekt.Detekt
 import java.util.Properties
 
@@ -25,6 +26,7 @@ plugins {
     alias(libs.plugins.spotless)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee) apply false
+    alias(libs.plugins.roborazzi) apply false
 }
 
 spotless {
@@ -189,7 +191,7 @@ val jdkTestSupportModules = setOf(":core:testing")
 // on. minSdk is 26 and Android has java.util.List.removeFirst()/removeLast() only from API 35, so a call that
 // resolves to the JDK 21 member crashes on Android 8 to 14. Kotlin (-Xjdk-release) and Java (--release) must both
 // say 17. This closes the JDK 18 to 21 gap only: Java 9 to 17 APIs that are newer than API 26 (for example
-// Stream.toList) still compile and are not checked here. The task first runs its own negative cases on the
+// Stream.toList) are checked by checkJavaApiLevel below. The task first runs its own negative cases on the
 // predicate, then checks every real compile task.
 // Run: ./gradlew checkJdkRelease (wired into detekt, so verify.sh and CI run it).
 val checkJdkRelease =
@@ -293,6 +295,62 @@ val checkJdkRelease =
     }
 
 tasks.named("detekt") { dependsOn(checkJdkRelease) }
+
+// M1-37 (issue 228): checkJdkRelease closes the JDK 18 to 21 gap only. A Java 9 to 17 member that is newer than minSdk (Stream.toList is
+// API 34, Objects.requireNonNullElse is API 30) still compiles in a JVM module, and Android lint's NewApi skips pure JVM modules.
+// checkJavaApiLevel runs scripts/check_java_api_level.py over the main classes of every JVM module (the test-support modules excepted,
+// as in checkJdkRelease) against api-versions.xml of the compileSdk platform that :app uses, with the minSdk of :app. Both come from
+// :app's own configuration, so they cannot drift from the app. A missing or unreadable api-versions.xml fails the build.
+// Tested by scripts/test_check_java_api_level.py (checker) and scripts/test_java_api_level_gate.py (this task). Run: ./gradlew checkJavaApiLevel
+val javaApiVersions = objects.fileProperty()
+val javaApiMinSdk = objects.property<Int>()
+project(":app").pluginManager.withPlugin("com.android.application") {
+    val components = project(":app").extensions.getByType<ApplicationAndroidComponentsExtension>()
+    val androidJar =
+        components.sdkComponents.bootClasspath.map { jars ->
+            jars.first { it.asFile.name == "android.jar" }
+        }
+    javaApiVersions.set(layout.file(androidJar.map { it.asFile.resolveSibling("data/api-versions.xml") }))
+    components.onVariants(components.selector().withName("debug")) { variant ->
+        javaApiMinSdk.set(variant.minSdk.apiLevel)
+    }
+}
+
+val checkJavaApiLevel =
+    tasks.register<Exec>("checkJavaApiLevel") {
+        group = "verification"
+        description = "Fails if a JVM module's main classes use a java/ or android/ member above the app's minSdk."
+        val checker = layout.projectDirectory.file("scripts/check_java_api_level.py")
+        val classDirs =
+            files(
+                provider {
+                    allprojects
+                        .filter { p ->
+                            p.plugins.hasPlugin("org.jetbrains.kotlin.jvm") && p.path !in jdkTestSupportModules
+                        }.map {
+                            it.extensions
+                                .getByType<SourceSetContainer>()
+                                .getByName("main")
+                                .output.classesDirs
+                        }
+                },
+            )
+        val apiVersions = javaApiVersions
+        val minSdk = javaApiMinSdk
+        inputs.file(checker)
+        inputs.files(classDirs).withPropertyName("classDirs")
+        // A missing file is not an input error: the checker reports it and fails closed.
+        inputs.files(apiVersions).withPropertyName("apiVersions").optional()
+        executable = "python3"
+        argumentProviders.add(
+            CommandLineArgumentProvider {
+                val options =
+                    listOf("-I", checker.asFile.path, "--api-versions", apiVersions.get().asFile.path) +
+                        listOf("--min-sdk", minSdk.get().toString())
+                options + classDirs.files.filter { it.exists() }.map { it.path }
+            },
+        )
+    }
 
 // The shared setting that checkJdkRelease checks: every JVM module compiles against the JDK 17 API.
 subprojects {
