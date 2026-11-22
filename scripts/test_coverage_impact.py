@@ -40,41 +40,32 @@ def diff(path, *hunks):
 
 
 class ParseDiff(unittest.TestCase):
-    def test_added_lines_of_a_hunk(self):
-        self.assertEqual(ci.changed_lines(diff("a/B.kt", "-1,0 +5,3")), {"a/B.kt": {5, 6, 7}})
-
-    def test_hunk_without_count_is_one_line(self):
-        self.assertEqual(ci.changed_lines(diff("a/B.kt", "-3 +3")), {"a/B.kt": {3}})
-
-    def test_pure_deletion_has_no_changed_lines(self):
-        self.assertEqual(ci.changed_lines(diff("a/B.kt", "-4,2 +3,0")), {})
+    def test_hunks(self):
+        for hunk, want in [("-1,0 +5,3", {5, 6, 7}), ("-3 +3", {3}), ("-4,2 +3,0", set())]:
+            with self.subTest(hunk=hunk):
+                self.assertEqual(ci.changed_lines(diff("a/B.kt", hunk)), {"a/B.kt": want} if want else {})
 
     def test_several_hunks_and_files(self):
         text = diff("a/B.kt", "-1 +1", "-9,0 +10,2") + diff("c/D.kt", "-0,0 +1,1")
         self.assertEqual(ci.changed_lines(text), {"a/B.kt": {1, 10, 11}, "c/D.kt": {1}})
 
-    def test_deleted_file_is_ignored(self):
+    def test_deleted_file_and_empty_diff_have_no_changed_lines(self):
         text = "diff --git a/A.kt b/A.kt\ndeleted file mode 100644\n--- a/A.kt\n+++ /dev/null\n@@ -1,3 +0,0 @@\n-x\n"
-        self.assertEqual(ci.changed_lines(text), {})
+        self.assertEqual((ci.changed_lines(text), ci.changed_lines("")), ({}, {}))
 
     def test_added_line_that_looks_like_a_file_header_is_content(self):
         text = diff("a/B.kt", "-1,0 +5,2", "-9,0 +10,1").replace("+x\n", "+++ b/other/C.kt\n+y\n", 1)
         self.assertEqual(ci.changed_lines(text), {"a/B.kt": {5, 6, 10}})
 
-    def test_quoted_non_ascii_path_is_decoded(self):
-        text = diff("m/p/S\\303\\246t.kt", "-1,0 +2,1").replace("+++ b/m/p/S\\303\\246t.kt", '+++ "b/m/p/S\\303\\246t.kt"')
-        self.assertEqual(ci.changed_lines(text), {"m/p/S\u00e6t.kt": {2}})
-
-    def test_quoted_path_with_escapes(self):
-        text = diff("x", "-1,0 +2,1").replace("+++ b/x", '+++ "b/a\\tb\\"c\\\\d.kt"')
-        self.assertEqual(ci.changed_lines(text), {'a\tb"c\\d.kt': {2}})
-
-    def test_trailing_tab_after_a_path_with_a_space_is_dropped(self):
-        text = diff("m/p/A B.kt", "-1,0 +2,1").replace("+++ b/m/p/A B.kt", "+++ b/m/p/A B.kt\t")
-        self.assertEqual(ci.changed_lines(text), {"m/p/A B.kt": {2}})
-
-    def test_empty_diff(self):
-        self.assertEqual(ci.changed_lines(""), {})
+    def test_quoted_and_tab_terminated_paths_are_decoded(self):
+        cases = [  # (the text after `+++ `, the path)
+            ('"b/m/p/S\\303\\246t.kt"', "m/p/S\u00e6t.kt"),
+            ('"b/a\\tb\\"c\\\\d.kt"', 'a\tb"c\\d.kt'),
+            ("b/m/p/A B.kt\t", "m/p/A B.kt"),
+        ]
+        for header, path in cases:
+            with self.subTest(header=header):
+                self.assertEqual(ci.changed_lines(diff("x", "-1,0 +2,1").replace("+++ b/x", f"+++ {header}")), {path: {2}})
 
 
 class ParseCoverage(unittest.TestCase):
@@ -86,21 +77,10 @@ class ParseCoverage(unittest.TestCase):
         xml = report((DOMAIN_PKG, "Money.kt", [(3, 2, 1)]))
         self.assertEqual(ci.coverage_lines(xml), {f"{DOMAIN_PKG}/Money.kt": {3: True}})
 
-    def test_no_sources_is_an_error(self):
-        with self.assertRaises(ci.CoverageError):
-            ci.coverage_lines(report())
-
-    def test_report_with_only_a_counter_is_an_error(self):
-        with self.assertRaises(ci.CoverageError):
-            ci.coverage_lines(report(empty=True))
-
-    def test_malformed_xml_is_an_error(self):
-        with self.assertRaises(ci.CoverageError):
-            ci.coverage_lines("<report><package")
-
-    def test_not_a_coverage_report_is_an_error(self):
-        with self.assertRaises(ci.CoverageError):
-            ci.coverage_lines("<html/>")
+    def test_unusable_reports_are_errors(self):
+        for text in (report(), report(empty=True), "<report><package", "<html/>"):
+            with self.subTest(text=text[:20]), self.assertRaises(ci.CoverageError):
+                ci.coverage_lines(text)
 
 
 class Impact(unittest.TestCase):
@@ -108,23 +88,17 @@ class Impact(unittest.TestCase):
         self.cov = ci.coverage_lines(report((DOMAIN_PKG, "Money.kt", [(3, 0, 2), (4, 1, 0), (5, 1, 0), (9, 1, 0)])))
         self.path = f"{DOMAIN}/Money.kt"
 
-    def test_changed_uncovered_line_is_reported(self):
-        r = ci.impact({self.path: {4}}, self.cov)
-        self.assertEqual(r.uncovered, {self.path: [4]})
-        self.assertEqual(r.measured, 1)
-
-    def test_changed_covered_line_is_not_reported(self):
-        r = ci.impact({self.path: {3}}, self.cov)
-        self.assertEqual(r.uncovered, {})
-        self.assertEqual(r.measured, 1)
-
-    def test_unchanged_uncovered_line_is_not_reported(self):
-        r = ci.impact({self.path: {3, 1}}, self.cov)  # line 4, 5 and 9 are uncovered but not in the change
-        self.assertEqual((r.uncovered, r.measured), ({}, 1))
-
-    def test_changed_line_without_code_is_not_measured(self):
-        r = ci.impact({self.path: {1, 2}}, self.cov)
-        self.assertEqual((r.uncovered, r.measured), ({}, 0))
+    def test_only_changed_lines_with_code_are_measured_and_only_uncovered_ones_reported(self):
+        cases = [  # (changed lines, reported, measured); line 3 is covered, 4, 5 and 9 are not, 1 and 2 have no code
+            ({4}, {self.path: [4]}, 1),
+            ({3}, {}, 1),
+            ({3, 1}, {}, 1),
+            ({1, 2}, {}, 0),
+        ]
+        for changed, reported, measured in cases:
+            with self.subTest(changed=changed):
+                r = ci.impact({self.path: changed}, self.cov)
+                self.assertEqual((r.uncovered, r.measured), (reported, measured))
 
     def test_lines_come_back_sorted(self):
         self.assertEqual(ci.impact({self.path: {9, 4, 5}}, self.cov).uncovered, {self.path: [4, 5, 9]})
@@ -135,33 +109,28 @@ class Impact(unittest.TestCase):
         self.assertEqual(r.uncovered, {})
         self.assertEqual(r.unmeasured, [other])
 
-    def test_changed_main_kotlin_file_without_report_entry_is_unmeasured(self):
+    def test_only_changed_main_kotlin_files_without_a_report_entry_are_unmeasured(self):
         path = "app/src/main/kotlin/dk/bjarkebjarke/tally/Ui.kt"
-        self.assertEqual(ci.impact({path: {1}}, self.cov).unmeasured, [path])
-
-    def test_test_files_docs_and_scripts_are_not_unmeasured(self):
-        changed = {p: {1} for p in ("core/domain/src/test/kotlin/MoneyTest.kt", "docs/PLAN.md", "scripts/x.py", "app/src/main/res/values/strings.xml")}
-        self.assertEqual(ci.impact(changed, self.cov).unmeasured, [])
+        others = ("core/domain/src/test/kotlin/MoneyTest.kt", "docs/PLAN.md", "scripts/x.py", "app/src/main/res/values/strings.xml")
+        self.assertEqual(ci.impact({p: {1} for p in (path, *others)}, self.cov).unmeasured, [path])
 
 
 class Render(unittest.TestCase):
     def test_lines_are_collapsed_into_ranges(self):
         self.assertEqual(ci.ranges([1, 2, 3, 5, 7, 8]), "1-3, 5, 7-8")
 
-    def test_uncovered_lines_are_listed_per_file(self):
-        r = ci.Impact(uncovered={"a/B.kt": [4, 5, 9]}, measured=6, unmeasured=[])
-        text = ci.render(r)
-        self.assertIn("3 uncovered", text.splitlines()[0])
-        self.assertIn("`a/B.kt`: 4-5, 9", text)
-
-    def test_all_covered_says_how_many_were_measured(self):
-        text = ci.render(ci.Impact(uncovered={}, measured=6, unmeasured=[]))
-        self.assertIn("6 changed executable lines, all covered", text.splitlines()[0])
-
-    def test_zero_measured_lines_is_not_reported_as_covered(self):
-        first = ci.render(ci.Impact(uncovered={}, measured=0, unmeasured=[])).splitlines()[0]
-        self.assertIn("no changed executable lines", first)
-        self.assertNotIn("all covered", first)
+    def test_headline_and_listing(self):
+        cases = [  # (uncovered, measured, headline part, must not be in the headline)
+            ({"a/B.kt": [4, 5, 9]}, 6, "3 uncovered changed lines in 1 files", None),
+            ({}, 6, "6 changed executable lines, all covered", None),
+            ({}, 0, "no changed executable lines", "all covered"),
+        ]
+        for uncovered, measured, part, absent in cases:
+            with self.subTest(part=part):
+                text = ci.render(ci.Impact(uncovered, measured, []))
+                self.assertIn(part, text.splitlines()[0])
+                self.assertNotIn(absent or "\0", text.splitlines()[0])
+        self.assertIn("`a/B.kt`: 4-5, 9", ci.render(ci.Impact({"a/B.kt": [4, 5, 9]}, 6, [])))
 
     def test_unmeasured_files_are_listed(self):
         text = ci.render(ci.Impact(uncovered={}, measured=2, unmeasured=["app/src/main/kotlin/Ui.kt"]))
@@ -174,8 +143,6 @@ def git(cwd, *args):
 
 
 class Cli(unittest.TestCase):
-    """The command line against a real throwaway repository."""
-
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -192,31 +159,32 @@ class Cli(unittest.TestCase):
     def run_cli(self, *args):
         return subprocess.run([sys.executable, "-I", str(SCRIPT), *args], cwd=self.repo, capture_output=True, text=True)
 
+    def measure(self, *sources, base="main"):
+        """Write a report for `sources` and run the CLI against `base`."""
+        self.xml.write_text(report(*sources))
+        return self.run_cli("--xml", str(self.xml), "--base", base)
+
     def test_committed_uncovered_change_is_reported(self):
         self.src.write_text("package x\n\nfun a() = 1\nfun b() = 2\nfun c() = 3\n")
         git(self.repo, "commit", "-qam", "change")
-        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 0, 1), (5, 1, 0)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "HEAD~1")
+        r = self.measure((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 0, 1), (5, 1, 0)]), base="HEAD~1")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(f"`{DOMAIN}/Money.kt`: 5", r.stdout)
         self.assertIn("1 uncovered", r.stdout.splitlines()[0])
 
     def test_uncommitted_change_is_included(self):
         self.src.write_text("package x\n\nfun a() = 1\nfun b() = 22\n")
-        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 1, 0)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "main")
+        r = self.measure((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 1, 0)]), base="main")
         self.assertIn(f"`{DOMAIN}/Money.kt`: 4", r.stdout)
 
     def test_untracked_new_file_counts_as_all_changed(self):
         (self.src.parent / "New.kt").write_text("package x\n\nfun n() = 1\n")
-        self.xml.write_text(report((DOMAIN_PKG, "New.kt", [(3, 1, 0)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "main")
+        r = self.measure((DOMAIN_PKG, "New.kt", [(3, 1, 0)]), base="main")
         self.assertIn(f"`{DOMAIN}/New.kt`: 3", r.stdout)
 
     def test_covered_change_is_not_reported(self):
         self.src.write_text("package x\n\nfun a() = 1\nfun b() = 22\n")
-        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 0, 1)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "main")
+        r = self.measure((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 0, 1)]), base="main")
         self.assertEqual(r.returncode, 0)
         self.assertIn("1 changed executable lines, all covered", r.stdout)
         self.assertNotIn("`" + DOMAIN, r.stdout)
@@ -228,8 +196,7 @@ class Cli(unittest.TestCase):
         git(self.repo, "commit", "-qm", "names")
         for name in ("S\u00e6t.kt", "A B.kt"):
             (self.src.parent / name).write_text("package x\n\nfun n() = 1\nfun m() = 2\n")
-        self.xml.write_text(report((DOMAIN_PKG, "S\u00e6t.kt", [(3, 0, 1), (4, 1, 0)]), (DOMAIN_PKG, "A B.kt", [(3, 0, 1), (4, 1, 0)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "HEAD")
+        r = self.measure((DOMAIN_PKG, "S\u00e6t.kt", [(3, 0, 1), (4, 1, 0)]), (DOMAIN_PKG, "A B.kt", [(3, 0, 1), (4, 1, 0)]), base="HEAD")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(f"`{DOMAIN}/S\u00e6t.kt`: 4", r.stdout)
         self.assertIn(f"`{DOMAIN}/A B.kt`: 4", r.stdout)
@@ -239,8 +206,7 @@ class Cli(unittest.TestCase):
         nested.mkdir(parents=True)
         git(nested, "init", "-q")
         self.src.write_text("package x\n\nfun a() = 1\nfun b() = 22\n")
-        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 1, 0)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "main")
+        r = self.measure((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 1, 0)]), base="main")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(f"`{DOMAIN}/Money.kt`: 4", r.stdout)
 
@@ -251,8 +217,7 @@ class Cli(unittest.TestCase):
         built = self.repo / "app" / "build" / "generated" / "src" / "main" / "G.kt"
         built.parent.mkdir(parents=True)
         built.write_text("package x\n")
-        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "main")
+        r = self.measure((DOMAIN_PKG, "Money.kt", [(3, 0, 1)]), base="main")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertNotIn("G.kt", r.stdout)
 
@@ -273,24 +238,18 @@ class Cli(unittest.TestCase):
         self.assertIn(f"`{DOMAIN}/Money.kt`: 5", r.stdout)
         self.assertNotIn("README", r.stdout)
 
-    def test_missing_report_fails_clearly(self):
-        r = self.run_cli("--xml", str(self.xml.with_name("nope.xml")), "--base", "main")
-        self.assertEqual(r.returncode, 2)
-        self.assertIn("coverage_impact: cannot read", r.stderr)
-        self.assertEqual(r.stdout, "")
-
-    def test_empty_report_fails_clearly(self):
-        self.xml.write_text(report())
-        r = self.run_cli("--xml", str(self.xml), "--base", "main")
-        self.assertEqual(r.returncode, 2)
-        self.assertIn("no coverage data", r.stderr)
-        self.assertEqual(r.stdout, "")
-
-    def test_unknown_base_fails_clearly(self):
-        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1)])))
-        r = self.run_cli("--xml", str(self.xml), "--base", "no-such-ref")
-        self.assertEqual(r.returncode, 2)
-        self.assertIn("coverage_impact: cannot diff against no-such-ref", r.stderr)
+    def test_unusable_input_fails_clearly(self):
+        ok = (DOMAIN_PKG, "Money.kt", [(3, 0, 1)])
+        missing = self.run_cli("--xml", str(self.xml.with_name("nope.xml")), "--base", "main")
+        cases = [
+            (missing, "coverage_impact: cannot read"),
+            (self.measure(), "no coverage data"),
+            (self.measure(ok, base="no-such-ref"), "coverage_impact: cannot diff against no-such-ref"),
+        ]
+        for r, message in cases:
+            with self.subTest(message=message):
+                self.assertEqual((r.returncode, r.stdout), (2, ""))
+                self.assertIn(message, r.stderr)
 
     def test_usage_error(self):
         self.assertEqual(self.run_cli("--xml").returncode, 2)
@@ -324,8 +283,7 @@ def verify_problems(verify):
     for w in wanted:
         if idx[w] < 0:
             problems.append(f"verify.sh full-run block lacks `{w.strip()}`")
-    show = SHOW_LINE
-    if show not in block or (wanted[1] in block and block.index(show) < block.index(wanted[1])):
+    if SHOW_LINE not in block or (wanted[1] in block and block.index(SHOW_LINE) < block.index(wanted[1])):
         problems.append("verify.sh does not show the uncovered lines after the coverage impact step")
     coverage = "  step coverage gradle koverVerify -x :core:domain:pitest"
     if coverage in block and all(i >= 0 for i in idx.values()) and not (block.index(coverage) < idx[wanted[0]] < idx[wanted[1]]):
@@ -364,8 +322,6 @@ def ci_problems(text):
 
 
 class ShowLine(unittest.TestCase):
-    """The verify.sh line that prints the report (R1-02): run it against sample logs."""
-
     def shown(self, log_text):
         lines = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8").splitlines()
         line = next(ln for ln in lines if ln.lstrip().startswith("grep") and "uncovered changed lines" in ln)
@@ -374,14 +330,14 @@ class ShowLine(unittest.TestCase):
             r = subprocess.run(["bash", "-c", line], env={"LOG_DIR": tmp, "PATH": "/usr/bin:/bin"}, capture_output=True, text=True)
         return r.stdout
 
-    def test_uncovered_lines_are_shown(self):
-        out = self.shown(ci.render(ci.Impact({"a/B.kt": [4]}, 2, [])))
-        self.assertIn("1 uncovered changed lines", out)
-        self.assertIn("`a/B.kt`: 4", out)
+    def test_uncovered_lines_and_unmeasured_files_are_shown(self):
+        out = self.shown(ci.render(ci.Impact({"a/B.kt": [4]}, 2, ["m/src/main/kotlin/U.kt"])))
+        for part in ("1 uncovered changed lines", "`a/B.kt`: 4", "`m/src/main/kotlin/U.kt`"):
+            self.assertIn(part, out)
+        self.assertNotIn("more in", out)
 
     def test_unmeasured_files_are_shown_even_when_nothing_is_uncovered(self):
-        out = self.shown(ci.render(ci.Impact({}, 0, ["m/src/main/kotlin/U.kt"])))
-        self.assertIn("`m/src/main/kotlin/U.kt`", out)
+        self.assertIn("`m/src/main/kotlin/U.kt`", self.shown(ci.render(ci.Impact({}, 0, ["m/src/main/kotlin/U.kt"]))))
 
     def test_all_covered_prints_nothing(self):
         self.assertEqual(self.shown(ci.render(ci.Impact({}, 5, []))), "")
@@ -392,15 +348,10 @@ class ShowLine(unittest.TestCase):
         self.assertIn("more in", out)
         self.assertIn("coverage-impact.log", out)
 
-    def test_short_report_is_not_marked_as_cut(self):
-        self.assertNotIn("more in", self.shown(ci.render(ci.Impact({"a/B.kt": [4]}, 2, []))))
-
 
 class Wiring(unittest.TestCase):
-    def test_repo_verify_sh(self):
+    def test_repo_wiring_has_no_problems(self):
         self.assertEqual(verify_problems("\n".join(active_lines(ROOT / "scripts" / "verify.sh")) + "\n"), [])
-
-    def test_repo_ci_yml(self):
         self.assertEqual(ci_problems((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")), [])
 
     def test_verify_mutations_are_flagged(self):
@@ -416,14 +367,13 @@ class Wiring(unittest.TestCase):
             (impact, impact.replace("--base origin/main", "--base HEAD")),
             (xml + impact, impact + xml),
         ]
-        shown = [ln for ln in good.splitlines() if "uncovered changed lines" in ln]
-        self.assertEqual(len(shown), 1)
+        show = SHOW_LINE
         cases += [
-            (shown[0] + "\n", ""),
-            (shown[0], shown[0].replace("uncovered changed lines", "- ")),
-            (shown[0], shown[0].replace("|no coverage data", "")),
-            (shown[0], shown[0].replace("-le 12 ] || echo", "-le 12 ] && echo")),
-            (impact + shown[0] + "\n", shown[0] + "\n" + impact),
+            (show + "\n", ""),
+            (show, show.replace("uncovered changed lines", "- ")),
+            (show, show.replace("|no coverage data", "")),
+            (show, show.replace("-le 12 ] || echo", "-le 12 ] && echo")),
+            (impact + show + "\n", show + "\n" + impact),
         ]
         for old, new in cases:
             self.assertIn(old, good)

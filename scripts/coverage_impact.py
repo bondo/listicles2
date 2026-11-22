@@ -3,12 +3,11 @@
 
 Usage: python3 -I scripts/coverage_impact.py --xml <kover report.xml> --base <git ref>
 
-Reads the Kover XML report (JaCoCo format, `./gradlew koverXmlReport`) and the diff between the merge base of <ref> and HEAD and
-the working tree (committed, staged, unstaged and untracked changes), and prints a markdown summary on stdout: the changed lines
-that have code and ran no instruction, per file. It reports and exits 0; the coverage floors (koverVerify) are the gate.
-Two modules with the same package and file name would share one entry (not a case here).
-Missing, unreadable or empty coverage data, or a ref that cannot be diffed, is an error (exit 2, nothing on stdout): "nothing
-uncovered" only ever means "measured, and covered".
+Reads the Kover XML report (JaCoCo format, `./gradlew koverXmlReport`) and the diff between the merge base of <ref> and HEAD and the
+working tree (committed, staged, unstaged, untracked), and prints a markdown summary: the changed lines that have code and ran no
+instruction, per file. It reports and exits 0 (koverVerify is the gate). Two modules with the same package and file name would share
+one entry (not a case here). Missing, unreadable or empty coverage data, or a ref that cannot be diffed, exits 2 with nothing on
+stdout: "nothing uncovered" only ever means "measured, and covered".
 """
 
 import argparse
@@ -17,6 +16,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from itertools import groupby
 from pathlib import Path
 
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
@@ -24,6 +24,13 @@ HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 
 class CoverageError(Exception):
     """The coverage data or the diff cannot be used."""
+
+
+def unquote(text):
+    """Undo git's C-style quoting of a path (`"b/a\\tb.kt"`, octal bytes are UTF-8); an unquoted path is returned as it is."""
+    if len(text) < 2 or text[0] != '"' or text[-1] != '"':
+        return text
+    return text[1:-1].encode().decode("unicode_escape").encode("latin-1").decode("utf-8", "replace")
 
 
 def changed_lines(diff_text):
@@ -35,7 +42,7 @@ def changed_lines(diff_text):
         if line.startswith("diff --git "):
             in_header, path = True, None
         elif in_header and line.startswith("+++ "):
-            target = line[4:]
+            target = unquote(line[4:].removesuffix("\t"))  # git adds a tab after a name that contains a space
             path = None if target == "/dev/null" else target.removeprefix("b/")
         elif m := HUNK.match(line):
             in_header = False
@@ -93,14 +100,8 @@ def impact(changed, coverage):
 
 def ranges(lines):
     """[1, 2, 3, 5, 7, 8] -> '1-3, 5, 7-8'."""
-    parts, i = [], 0
-    while i < len(lines):
-        j = i
-        while j + 1 < len(lines) and lines[j + 1] == lines[j] + 1:
-            j += 1
-        parts.append(str(lines[i]) if i == j else f"{lines[i]}-{lines[j]}")
-        i = j + 1
-    return ", ".join(parts)
+    runs = ([n for _, n in g] for _, g in groupby(enumerate(lines), lambda t: t[1] - t[0]))
+    return ", ".join(str(r[0]) if len(r) == 1 else f"{r[0]}-{r[-1]}" for r in runs)
 
 
 def render(r):
@@ -133,7 +134,8 @@ def diff_since(base):
         top = git("rev-parse", "--show-toplevel").strip()
         merge_base = git("merge-base", base, "HEAD", top=top).strip()
         changed = changed_lines(
-            git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", "--src-prefix=a/", "--dst-prefix=b/", "--no-relative", merge_base, top=top)
+            git("-c", "core.quotePath=false", "diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", "--src-prefix=a/", "--dst-prefix=b/",
+                "--no-relative", merge_base, top=top)
         )
         for name in git("ls-files", "--others", "--exclude-standard", "-z", top=top).split("\0"):
             file = Path(top) / name

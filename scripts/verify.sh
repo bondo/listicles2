@@ -91,8 +91,8 @@ if [ "$FAST" = 0 ]; then
   step coverage gradle koverVerify -x :core:domain:pitest
   step coverage-xml gradle koverXmlReport
   step coverage-impact python3 -I scripts/coverage_impact.py --xml build/reports/kover/report.xml --base origin/main
-  # M1-07: the step passes with uncovered changed lines (koverVerify is the gate); show them (the one exception to "details only on failure").
-  grep -q 'uncovered changed lines' "$LOG_DIR/coverage-impact.log" 2>/dev/null && sed -n '1p;3,12p' "$LOG_DIR/coverage-impact.log" | sed 's/^/      /'
+  # M1-07: the step passes with uncovered changed lines (koverVerify is the gate); show them, and the files with no coverage data (the one exception to "details only on failure").
+  grep -qE 'uncovered changed lines|no coverage data' "$LOG_DIR/coverage-impact.log" 2>/dev/null && { sed -n '1,12p' "$LOG_DIR/coverage-impact.log" | sed 's/^/      /'; [ "$(wc -l <"$LOG_DIR/coverage-impact.log")" -le 12 ] || echo "      ... more in $LOG_DIR/coverage-impact.log"; }
   step mutation gradle :core:domain:pitest
   step screenshots ./scripts/screenshots.sh verify
 else
