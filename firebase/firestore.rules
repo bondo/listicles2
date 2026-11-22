@@ -25,8 +25,9 @@ service cloud.firestore {
       return /databases/$(database)/documents/households/$(hid)/members/$(uid);
     }
 
-    // A name (PLAN 3.1 field validation, P4): 1-50 code points, non-empty after trim. The regex
-    // counts them (`.` is one code point): size() counts UTF-16 units, 100 for 50 non-BMP characters.
+    // A name (PLAN 3.1 field validation, P4): 1-50 code points, non-empty after trim. The regex counts
+    // them (`.` is one code point; (?s) lets it match a line break too). Not size(): on the emulator it
+    // counts UTF-16 units, 100 for 50 non-BMP characters (option A, #15 comment 7083518706).
     function validName(name) {
       return name is string && name.matches('(?s).{1,50}') && name.trim().size() > 0;
     }
