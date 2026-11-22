@@ -128,6 +128,19 @@ class Wiring(unittest.TestCase):
         got = self.append(SCREENSHOTS, f"\n./gradlew {FLAG} :app:assembleRelease\n")
         self.assertEqual(got, [c.flag_problem("scripts/screenshots.sh")])
 
+    def test_the_flag_in_a_composite_action_is_reported(self):
+        # S1-01: a local composite action under .github/actions runs in whatever job uses it.
+        action = self.root / ".github/actions/build/action.yml"
+        action.parent.mkdir(parents=True, exist_ok=True)
+        action.write_text(f"runs:\n  using: composite\n  steps:\n    - run: ./gradlew {FLAG} :app:assembleRelease\n      shell: bash\n")
+        self.assertEqual(c.problems(self.root), [c.flag_problem(".github/actions/build/action.yml")])
+
+    def test_a_composite_action_without_the_flag_is_not_reported(self):
+        action = self.root / ".github/actions/build/action.yaml"
+        action.parent.mkdir(parents=True, exist_ok=True)
+        action.write_text("runs:\n  using: composite\n  steps:\n    - run: ./gradlew :app:assembleDebug\n      shell: bash\n")
+        self.assertEqual(c.problems(self.root), [])
+
     def test_the_flag_in_a_comment_of_another_shell_script_is_not_reported(self):
         self.assertEqual(self.append(SCREENSHOTS, f"\n# only the release-smoke job passes {FLAG}\n"), [])
 
