@@ -86,7 +86,7 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   (issue 174, R5-01) while `ruff format --diff .` passes.
 - actionlint: `-ignore`, an empty `-pyflakes=` or `-shellcheck=` and every unlisted flag fail; a non-empty `-shellcheck=<path>` passes
   (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`. The `ignore:`
-  entries of `.github/actionlint.yaml` (or `.yml`) are read by 2b: the `ignore:` line and every `- entry` of its block list need a reason.
+  entries of the actionlint config (`actionlint.yaml` or `actionlint.yml` in `.github/`) are read by 2b: the `ignore:` line and every `- entry` of its block list need a reason.
 - Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
 - YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`) is read as one logical line, a blank line in it as a line break (a
   more-indented line keeps its line break in YAML, so joining it is a false positive in the safe direction; `key: >` inside another

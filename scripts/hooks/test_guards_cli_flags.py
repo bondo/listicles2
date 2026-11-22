@@ -811,7 +811,7 @@ class Issue164RemainingTests(CliFlagCase):
     def test_a_folded_run_block_is_one_command(self):
         for ind in [">", ">-", ">+"]:
             with self.subTest(ind=ind):
-                self.write(".github/workflows/ci.yml", "      - run: %s\n          ruff check\n          --ignore E501 .\n" % ind)
+                self.write(".github/workflows/ci.yml", f"      - run: {ind}\n          ruff check\n          --ignore E501 .\n")
                 self.assertFails(MARK + ": .github/workflows/ci.yml:2:")
         self.write(".github/actions/lint/action.yml", "    - shell: bash\n      run: >\n        eslint\n        --quiet .\n")
         self.assertFails(MARK + ": .github/actions/lint/action.yml:3:")
@@ -839,7 +839,7 @@ class Issue164RemainingTests(CliFlagCase):
         for text, n in bad:
             with self.subTest(text=text):
                 self.write(".github/workflows/ci.yml", text)
-                self.assertFails(MARK + ": .github/workflows/ci.yml:%d:" % n)
+                self.assertFails(f"{MARK}: .github/workflows/ci.yml:{n}:")
 
     def test_allowed_action_args_other_actions_and_reasons_pass(self):
         for text in [
@@ -868,7 +868,7 @@ class Issue164RemainingTests(CliFlagCase):
         for text, n in bad:
             with self.subTest(text=text):
                 self.write(".pre-commit-config.yaml", text)
-                self.assertFails(MARK + ": .pre-commit-config.yaml:%d:" % n)
+                self.assertFails(f"{MARK}: .pre-commit-config.yaml:{n}:")
         for text in [
             head + "      - id: ruff-format\n        args: [--check]\n      - id: ruff\n        args: [--config, ruff.toml]\n",
             head + "      - id: mypy\n        args: [--strict]\n        additional_dependencies:\n          - types-requests\n",
@@ -909,7 +909,7 @@ class Issue164SelfReviewTests(CliFlagCase):
         for text, n in bad:
             with self.subTest(text=text):
                 self.write(path, text)
-                self.assertFails("%s: %s:%d:" % (MARK, path, n))
+                self.assertFails(f"{MARK}: {path}:{n}:")
         for text in good:
             with self.subTest(ok=text):
                 self.write(path, text)
@@ -938,7 +938,7 @@ class Issue164SelfReviewTests(CliFlagCase):
                         ("paths:\n  x.yml: {ignore: [SC2086]}\n", 2)]:
             with self.subTest(text=text):
                 self.write(".github/actionlint.yaml", text)
-                self.assertFails("guard: unjustified suppression: .github/actionlint.yaml:%d:" % n)
+                self.assertFails(f"guard: unjustified suppression: .github/actionlint.yaml:{n}:")
 
     def test_npm_option_values_and_disagreeing_scripts(self):
         self.write("firebase/package.json", '{\n  "scripts": {\n    "pkg": "jest",\n    "test": "jest",\n    "lint": "eslint ."\n  }\n}\n')
