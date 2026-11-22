@@ -1,5 +1,5 @@
-"""Build guards (M1-51 and M1-58, issue 257, checklist follow-ups 4 and 5 in docs/ANDROID-BEST-PRACTICES.md): the targetSdk floor and the
-manifest cleartext and backup rules.
+"""Build guards (M1-51, M1-58 and M1-59, issue 257, checklist follow-ups 3, 4 and 5 in docs/ANDROID-BEST-PRACTICES.md): the targetSdk
+floor, the manifest cleartext and backup rules, and catalog-only coordinates.
 
 1. targetSdk floor. Every `targetSdk` in a Gradle build file (`*.gradle.kts`, `*.gradle`) is a literal at or above TARGET_SDK_FLOOR, the Play minimum for new
 apps and updates (36 since 2026-08-31). A value this script cannot read (an expression, a variable, a preview) fails too, and so does any
@@ -16,7 +16,15 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    Auth emulator on 10.0.2.2 and is never shipped), and such a manifest without `allowBackup` needs no main manifest; every other source
    set is checked.
 
-The catalog-only coordinates guard (follow-up 3, M1-59) is added to this script by its own PR.
+3. Catalog-only coordinates (M1-59, follow-up 3). Libraries and plugins come from gradle/libs.versions.toml as `libs.<name>`. A Gradle file
+   fails on: a string literal that starts with a literal `group:artifact` anywhere inside a `dependencies { }` block (so any
+   configuration, Kotlin or Groovy, wrapped in `platform(...)` or not, in `constraints` too); group notation with a literal group and
+   the positional `(group, name, ...)` form there (`exclude` is not a declaration); outside such a block `add(<conf>, "g:a...")`,
+   `force`, `useModule`, `platform`, `enforcedPlatform`, `module` and `create` with a literal coordinate; a literal plugin version
+   (`id(...) version "1"`, `.version("1")`, `useVersion("1")`); and a version catalog declared in Gradle code (`versionCatalogs`).
+   A literal that has to stay says why in a comment on its line: `// justified: <at least 3 words>` (the rule of scripts/guards.sh).
+   No Gradle file, or no dependency declaration in any `dependencies { }` block, fails too. Known gaps (it reads text, not the build):
+   a coordinate held in a variable or with an interpolated group (`"$g:a:1"`), and a declaration made through a helper function.
 
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
@@ -51,9 +59,10 @@ def read(root, rel):
 
 # -- source text without comments --------------------------------------------------------------------------------------------------
 
-def strip(text, blank_strings=False):
+def strip(text, blank_strings=False, strings=None):
     """The text with every comment replaced by spaces (newlines kept, so offsets and lines stay); with blank_strings also the
-    contents of string literals. Reads Kotlin (`"..."` with `${...}`, `\"\"\"...\"\"\"`) and Groovy (`'...'`) strings."""
+    contents of string literals. Reads Kotlin (`"..."` with `${...}`, `\"\"\"...\"\"\"`) and Groovy (`'...'`) strings. A list passed
+    as strings receives the offset where the contents of each string literal start."""
     out = list(text)
     n = len(text)
 
@@ -95,6 +104,8 @@ def strip(text, blank_strings=False):
         q = text[i]
         triple = text.startswith(q * 3, i)
         i += 3 if triple else 1
+        if strings is not None:
+            strings.append(i)
         while i < n:
             c = text[i]
             if triple and text.startswith(q * 3, i):
@@ -314,17 +325,148 @@ def manifest_problems(root):
         problems.append("no manifest with an <application> element found (the manifest check would pass vacuously)")
     return problems
 
+# -- 3. catalog-only coordinates -----------------------------------------------------------------------------------------------------
+
+def justified(line):
+    """True when the line has `justified:` followed by a reason of at least 3 words (runs of 2 or more ASCII letters): just() of
+    scripts/guards.sh. The reason ends at `*/`, `-->` and a following comment opener."""
+    i = line.find("justified:")
+    if i < 0:
+        return False
+    reason = line[i + 10 :]
+    for end in ("*/", "-->"):
+        j = reason.find(end)
+        if j >= 0:
+            reason = reason[:j]
+    m = re.search(r"[ \t](#|//)[ \t]*[A-Za-z]", reason)
+    if m:
+        reason = reason[: m.start() + 1]
+    return len(re.findall(r"[A-Za-z][A-Za-z]+", reason)) >= 3
+
+
+COORD = re.compile(r"[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+(?=[:@\"']|$)", re.M)  # a literal group:artifact; the version may be anything
+DEPS_BLOCK = re.compile(r"(?<![\w$])dependencies(?:[ \t\r\n]*\.[ \t\r\n]*constraints)?[ \t\r\n]*\{")
+# A statement in a dependencies block that is a call: `implementation(x)`, `"implementation"(x)`, Groovy `implementation x`.
+STATEMENT = re.compile(r"""(?:^|[{;])[ \t]*("[ \t]*"|'[ \t]*'|[A-Za-z_]\w*)(?=[ \t]*\(|[ \t]+[\w"'\[])""", re.M)
+KEYWORDS = {"if", "else", "for", "while", "when", "return", "val", "var", "def", "try", "catch", "throw", "fun", "import", "in", "is", "as"}
+GROUP = re.compile(r"""(?<![\w$])group[ \t]*[:=][ \t]*["'][A-Za-z0-9_.-]""")
+POSITIONAL = re.compile(r"""(?<![\w$.])([A-Za-z_]\w*)[ \t]*\([ \t\r\n]*(["'])(?=[A-Za-z0-9_.-]+\2[ \t\r\n]*,[ \t\r\n]*["'])""")
+NOT_DECLARATIONS = {"exclude", "add", "because", "listOf", "setOf", "mapOf", "arrayOf"}
+OPEN = r"(?:[ \t]*\([ \t\r\n]*|[ \t]+)"
+ADD = re.compile(r"(?<![\w$])add" + OPEN + r"""(["'])[^"'\n]*\1[ \t\r\n]*,[ \t\r\n]*["'](?=""" + COORD.pattern + ")")
+ANYWHERE = re.compile(r"(?<![\w$])(?:force|useModule|platform|enforcedPlatform|module|create)" + OPEN + r"""["'](?=""" + COORD.pattern + ")")
+PLUGIN_VERSION = re.compile(r"""[)"'`](?:[ \t]+version[ \t]*\(?|[ \t\r\n]*\.[ \t\r\n]*version[ \t]*\()[ \t]*["']""")
+USE_VERSION = re.compile(r"(?<![\w$])useVersion" + OPEN + r"""["']""")
+CATALOG_IN_CODE = re.compile(r"(?<![\w$])versionCatalogs\b")
+
+
+def blocks(blank):
+    """The (start, end) offsets of every `dependencies { }` block body in text with comments and string contents blanked."""
+    found = []
+    for m in DEPS_BLOCK.finditer(blank):
+        depth, i = 1, m.end()
+        while i < len(blank) and depth:
+            depth += {"{": 1, "}": -1}.get(blank[i], 0)
+            i += 1
+        found.append((m.end(), i))
+    return found
+
+
+def enclosing_call(blank, pos):
+    """The name of the call whose argument list holds pos: the identifier before the first unmatched `(`, or for a Groovy call
+    without parentheses the first identifier on the line."""
+    depth, i = 0, pos
+    while i > 0:
+        i -= 1
+        c = blank[i]
+        if c in ")]":
+            depth += 1
+        elif c in "([":
+            if depth:
+                depth -= 1
+            elif c == "(":
+                m = re.search(r"([A-Za-z_]\w*)[ \t]*$", blank[:i])
+                return m.group(1) if m else ""
+        elif c in "{;" and not depth:
+            break
+    m = re.match(r"[ \t]*([A-Za-z_]\w*)", blank[blank.rfind("\n", 0, pos) + 1 :])
+    return m.group(1) if m else ""
+
+
+def scan_catalog(root):
+    """(problems, number of Gradle files, number of dependency declarations in dependencies blocks)."""
+    files = gradle_files(root)
+    problems, declarations = [], 0
+    for p in files:
+        raw, starts = read(root, p), []
+        code = strip(raw, strings=starts)
+        blank = strip(raw, blank_strings=True)
+        comments = "".join(" " if r == c and r != "\n" else r for r, c in zip(raw, code)).split("\n")
+        spans = blocks(blank)
+
+        def inside(i):
+            return any(a <= i < b for a, b in spans)
+
+        hits = {}  # offset -> what was found, so one literal found by two patterns is reported once
+        for s in starts:
+            m = COORD.match(code, s)
+            if m and inside(s):
+                hits.setdefault(s, f'dependency "{m.group()}"')
+        for m in STATEMENT.finditer(blank):
+            if inside(m.start(1)) and m.group(1) not in KEYWORDS:
+                declarations += 1
+        for m in GROUP.finditer(code):
+            if inside(m.start()) and enclosing_call(blank, m.start()) not in NOT_DECLARATIONS:
+                hits.setdefault(m.start(), "dependency in group notation")
+        for m in POSITIONAL.finditer(code):
+            if inside(m.start()) and m.group(1) not in NOT_DECLARATIONS:
+                hits.setdefault(m.end(), "dependency given as separate group, name and version literals")
+        for rx in (ADD, ANYWHERE):
+            for m in rx.finditer(code):
+                hits.setdefault(m.end(), f'dependency "{COORD.match(code, m.end()).group()}"')
+        for rx in (PLUGIN_VERSION, USE_VERSION):
+            for m in rx.finditer(blank):
+                hits.setdefault(m.end(), "literal version (plugin or catalog entry)")
+        for m in CATALOG_IN_CODE.finditer(blank):
+            hits.setdefault(m.start(), "version catalog declared in Gradle code (versionCatalogs)")
+        for offset, what in sorted(hits.items()):
+            line = line_of(raw, offset)
+            if not justified(comments[line - 1]):
+                problems.append(
+                    f"{p}:{line}: {what} bypasses the version catalog; declare it in gradle/libs.versions.toml and use libs.<name>, "
+                    "or say why in `// justified: <reason>` on this line"
+                )
+    return problems, len(files), declarations
+
+
+def catalog_stats(root):
+    _problems, files, declarations = scan_catalog(root)
+    return files, declarations
+
+
+def catalog_problems(root):
+    problems, files, declarations = scan_catalog(root)
+    if not files:
+        problems.append("no Gradle build files found (the catalog check would pass vacuously)")
+    elif not declarations and not problems:
+        problems.append("no dependency declaration found in a dependencies block of any Gradle file (the catalog check would pass vacuously)")
+    return problems
+
 
 def main(argv):
     root = os.path.abspath(argv[1]) if len(argv) > 1 else os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    problems = target_sdk_problems(root) + manifest_problems(root)
+    problems = catalog_problems(root) + target_sdk_problems(root) + manifest_problems(root)
     if problems:
         for p in problems:
             print(f"build-guards: {p}")
         return 1
     sdk = min(v for _p, _l, v in target_sdk_values(root))
     manifests = len(application_manifests(root))
-    print(f"build-guards: ok (targetSdk {sdk}, floor {TARGET_SDK_FLOOR}, {manifests} manifest)")
+    files, declarations = catalog_stats(root)
+    print(
+        f"build-guards: ok ({files} Gradle file{'s' * (files != 1)}, {declarations} dependency declarations, targetSdk {sdk}, "
+        f"floor {TARGET_SDK_FLOOR}, {manifests} manifest)"
+    )
     return 0
 
 

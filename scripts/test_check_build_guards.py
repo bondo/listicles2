@@ -157,11 +157,19 @@ class Coordinates(unittest.TestCase):
     def test_a_catalog_declared_in_gradle_code_is_flagged(self):
         for name in ("settings.gradle.kts", "settings.gradle"):
             with self.subTest(name=name):
-                self.assert_flagged(
-                    'dependencyResolutionManagement {\n    versionCatalogs {\n        create("tools") { library("x", "a.b", "c").version("1") }\n    }\n}\n',
+                found = self.assert_flagged(
+                    'dependencyResolutionManagement {\n    versionCatalogs {\n        create("tools") { from(files("tools.toml")) }\n    }\n}\n',
                     name=name,
                     extra={"app/build.gradle.kts": self.OK},
                 )
+                self.assertRegex(found[0], r"^settings\.gradle(\.kts)?:2: .*versionCatalogs")
+        found = self.assert_flagged(  # the literal version of a library declared in code is a second problem
+            'dependencyResolutionManagement { versionCatalogs {\n    create("tools") { library("x", "a.b", "c").version("1") }\n} }\n',
+            count=2,
+            name="settings.gradle.kts",
+            extra={"app/build.gradle.kts": self.OK},
+        )
+        self.assertIn("literal version", found[1])
         self.assert_clean('val s = "versionCatalogs"\n' + self.OK)
 
     def test_comments_do_not_count(self):
