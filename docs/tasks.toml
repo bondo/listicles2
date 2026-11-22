@@ -959,10 +959,10 @@ assignee = "implementer"
 risk = "high"
 depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
 pr = 319
-notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState(). Split 2026-11-22 (PR 319): the whole task measured about 780 changed lines before the app wiring (guard 600), and the wiring needs licences only the owner accepts. This is part 1 (the steps in core/domain, fakes in core/testing); M1-65 is the Firebase data layer with the emulator tests, M1-66 the Credential Manager wrapper and the :app wiring"
+notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState(). Split 2026-11-22 (PR 319): the whole task measured about 780 changed lines before the app wiring (guard 600), and the wiring needs licences only the owner accepts. This is part 1 (the steps in core/domain, fakes in core/testing); M1-67 is the Firebase data layer with the emulator tests, M1-66 the Credential Manager wrapper and the :app wiring"
 
 [[task]]
-id = "M1-65"
+id = "M1-67"
 title = "Auth data 2: Firebase session state, Google ID-token sign-in, per-session Firestore holder in :core:data (Auth and Firestore emulator tests)"
 milestone = "M1"
 status = "todo"
@@ -978,7 +978,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-65", "M1-O14"]
+depends_on = ["M1-67", "M1-O14"]
 notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule. Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14"
 
 [[task]]
@@ -988,7 +988,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-65", "M1-62"]
+depends_on = ["M1-67", "M1-62"]
 
 [[task]]
 id = "M1-16"
@@ -1442,7 +1442,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-65", "M1-66",
+  "M1-62", "M1-66", "M1-67",
 ]
 
 [[task]]

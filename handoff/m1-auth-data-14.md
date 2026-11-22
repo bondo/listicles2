@@ -7,8 +7,9 @@ M1-14 (`docs/milestones/M1.md` section 5), narrowed by the split in `docs/tasks.
 the OQ-13 sign-out steps in `core/domain`, with fakes in `core/testing`. PR #319 (draft).
 
 ## Done
-- Failing tests 4cad1ac, implementation 1e1b785, `main` merged a0d649e, split ddb9f08, verifier fixes 8bfeceb.
-- PR comments: licence list 7084644086 (owner task M1-O14), compiled never-run data-layer draft 7084644287 (M1-65).
+- Failing tests 4cad1ac, implementation 1e1b785, `main` merged a0d649e, split ddb9f08, verifier fixes 8bfeceb,
+  trim db6c3b2, data-layer task renumbered M1-65 to M1-67 (orchestrator #31).
+- PR comments: licence list 7084644086 (owner task M1-O14), compiled never-run data-layer draft 7084644287 (M1-67).
 
 ## Next (in order)
 1. Review rounds: fix findings above nit; `scripts/verify.sh --fast` before each push; diff guard 600 lines.
@@ -20,7 +21,7 @@ the OQ-13 sign-out steps in `core/domain`, with fakes in `core/testing`. PR #319
 
 ## Facts that save time
 - `advanceUntilIdle()` stops at `backgroundScope` work; `runCurrent()` and `advanceTimeBy()` run it.
-- Ids M1-63 and M1-64 are taken on other branches (#315, m1/build-logic-46), M1-O13 on `main`.
+- Task ids (orchestrator #31): M1-63 to M1-65, M1-68 and M1-69 belong to #315, #320 and #321; M1-O13 is on `main`.
 
 ## Waiting on the owner
 - M1-O14
