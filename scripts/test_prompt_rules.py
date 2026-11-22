@@ -1681,7 +1681,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         ("body from a file", r"-f body=@file"),
         ("scripts from a file", r"run a script that mentions a protected path from a file"),
         ("source_revision", r"`source_revision` is the pr branch name"),
-        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while it runs; do not loop-wait for ci after a push"),
+        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while it runs; do not loop-wait for ci after every fix push"),
         ("red green one push", r"a red/green pair may go up in one push \(say so in the pr body\)"),
         ("pr bodies by mcp", r"pr bodies only through the github mcp tools"),
         ("close after merge", r"comment on the completed issue, then close it with `state=closed`, `state_reason=completed`"),
@@ -2795,8 +2795,8 @@ class SpeedWordingTests(unittest.TestCase):
         self.assertIn(self.PUSH_BULLET.lower(), norm.lower())
         for old in (self.PUSH_BULLET, "(4) CI is green on the PR head (§7.1)",
                     "marks a draft PR ready after clean review rounds and with CI green on the head (§7.1)",
-                    "do not loop-wait for CI after a push (reviews start on push, §7.1)",
-                    "After a push do not wait in a loop for CI: the reviewer starts on your push (ORCHESTRATION §7.1)"):
+                    "do not loop-wait for CI after every fix push (reviews start on push, §7.1)",
+                    "After every fix push do not wait in a loop for CI: the reviewer starts on your push (ORCHESTRATION §7.1)"):
             with self.subTest(old=old):
                 self.assertIn("orch-reviews-on-push", self.doc_swap("docs/ORCHESTRATION.md", old, "nothing"))
 
@@ -2816,9 +2816,11 @@ class SpeedWordingTests(unittest.TestCase):
                  "Reviews start on push (§7.1, owner decision, #15 comment 7075952806): spawn the reviewer as soon as the implementer has "
                  "pushed, without waiting for CI"),
                 ("orchestrator", "orch-reviews-on-push", "CI must be green on the head before you mark the PR READY and before the merge request"),
-                ("orchestrator", "orch-reviews-on-push", "do not loop-wait for CI after a push (reviews start on push, §7.1)"),
+                ("orchestrator", "orch-reviews-on-push", "the implementer does not wait in a loop for CI after every fix push"),
+                ("orchestrator", "orch-reviews-on-push", "do not loop-wait for CI after every fix push (reviews start on push, §7.1)"),
                 ("implementer", "implementer-reviews-on-push",
-                 "Reviews start on push (`docs/ORCHESTRATION.md` §7.1, owner decision, #15 comment 7075952806): after a push do not wait in a loop for CI"),
+                 "Reviews start on push (`docs/ORCHESTRATION.md` §7.1, owner decision, #15 comment 7075952806): the orchestrator spawns the reviewer "
+                 "as soon as you have pushed; do not wait in a loop for CI after every fix push"),
                 ("implementer", "implementer-reviews-on-push", "end the turn with all work committed and pushed"),
                 ("implementer", "implementer-reviews-on-push", "CI must be green before READY and before the merge request")):
             with self.subTest(role=role, old=old):
@@ -2863,6 +2865,36 @@ class SpeedWordingTests(unittest.TestCase):
         self.assertIn("escalation-role", self.role_swap("escalation-reviewer", self.ESCALATION_FIX, ""))
         self.assertIn(self.ESCALATION_FIX_REVIEW.lower(), prompt_rules.normalize(self.doc("REVIEW.md")).lower())
         self.assertIn("review-escalation", self.doc_swap("REVIEW.md", self.ESCALATION_FIX_REVIEW, ""))
+
+    # PR #306 round 1, R1-02: the decision has two parts, each in its right place.
+    WIDENED = ("After a push do not wait in a loop for CI.", "do not loop-wait for CI after a push", "does not wait in a loop for CI after a fix push")
+
+    def test_the_decision_is_split_in_its_two_parts_and_the_widened_forms_are_forbidden(self):
+        home = prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md")).lower()
+        for part in ("spawns the reviewer as soon as the implementer has pushed, without waiting for ci",
+                     "does not wait in a loop for ci after every fix push"):
+            self.assertIn(part, home)
+        for role, rule in (("orchestrator", "orch-reviews-on-push"), ("implementer", "implementer-reviews-on-push")):
+            for widened in self.WIDENED:
+                with self.subTest(role=role, widened=widened):
+                    self.assertIn(rule, ids(prompt_rules.check_text(role, real(role) + "\n" + widened + "\n")))
+        for widened in self.WIDENED:
+            with self.subTest(doc="ORCHESTRATION", widened=widened):
+                self.assertIn("orch-reviews-on-push", ids(prompt_rules.check_doc_text(
+                    "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\n" + widened + "\n")))
+
+    def test_the_implementer_prompt_says_the_reviewer_starts_on_its_push_and_that_a_fix_push_is_not_waited_on(self):
+        norm = prompt_rules.normalize(real("implementer")).lower()
+        self.assertIn("the orchestrator spawns the reviewer as soon as you have pushed", norm)
+        self.assertIn("do not wait in a loop for ci after every fix push", norm)
+
+    # PR #306 round 1, R1-01: the round-5 clause of the `fix` bullet stays pinned although REVIEW.md item 4 repeats the words.
+    def test_the_round_5_clause_of_the_fix_bullet_is_pinned_apart_from_the_per_finding_sentence(self):
+        clause = "Anything above `nit` still open after it goes to the owner."
+        norm = prompt_rules.normalize(self.doc("REVIEW.md"))
+        self.assertGreaterEqual(len(re.findall(r"goes to the owner", norm)), 2)
+        self.assertIn("review-escalation", self.doc_swap("REVIEW.md", "and one more fresh round (round 5) reviews. " + clause,
+                                                         "and one more fresh round (round 5) reviews."))
 
 
 if __name__ == "__main__":

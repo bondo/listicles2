@@ -907,23 +907,26 @@ RULES = (
         (
             r"reviews start on push \(§7\.1, owner decision, #15 comment 7075952806\): spawn the reviewer as soon as the implementer has pushed, "
             r"without waiting for ci",
-            r"the implementer does not wait in a loop for ci after a fix push",
+            r"the implementer does not wait in a loop for ci after every fix push",
             r"ci must be green on the head before you mark the pr ready and before the merge request",
-            r"do not loop-wait for ci after a push \(reviews start on push, §7\.1\)",
+            r"do not loop-wait for ci after every fix push \(reviews start on push, §7\.1\)",
         ),
         "the orchestrator spawns the reviewer on the push, the implementer does not loop-wait for CI, CI must be green before READY and the merge request "
         "(owner decision, #15 comment 7075952806; ORCHESTRATION 7.1)",
-        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting"),
+        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
+                   r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
     ),
     Rule(
         "implementer-reviews-on-push", ("implementer",),
         (
-            r"reviews start on push \(`docs/orchestration\.md` §7\.1, owner decision, #15 comment 7075952806\): after a push do not wait in a loop for ci",
+            r"reviews start on push \(`docs/orchestration\.md` §7\.1, owner decision, #15 comment 7075952806\): the orchestrator spawns the reviewer "
+            r"as soon as you have pushed; do not wait in a loop for ci after every fix push",
             r"end the turn with all work committed and pushed",
             r"ci must be green before ready and before the merge request",
         ),
         "the implementer checks with verify.sh, pushes and ends the turn; it does not loop-wait for CI (owner decision, #15 comment 7075952806)",
-        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting"),
+        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
+                   r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
     ),
     Rule(
         "orch-model", ("orchestrator",),
@@ -1163,7 +1166,7 @@ DOC_RULES = (
         "review-escalation", "REVIEW.md",
         (
             r"one escalation reviewer per pr", r"agents/prompts/escalation-reviewer\.md", r"decides `fix`, `split` or `owner`",
-            r"one more fresh round \(round 5\)", r"goes to the owner", r"no second escalation", r"no commit lands unreviewed",
+            r"one more fresh round \(round 5\) reviews\. anything above `nit` still open after it goes to the owner", r"no second escalation", r"no commit lands unreviewed",
             r"the escalation reviewer rules with both arguments in front of it", r"a dropped finding becomes `withdrawn`",
             r"`owner`: taste or scope questions, which the escalation reviewer decides itself, per finding `fix` or `drop` "
             r"\(owner decision, #15 comment 7075812943\)", r"no finding is left open for the owner",
@@ -1649,18 +1652,19 @@ DOC_RULES = (
         "orch-reviews-on-push", ORCH,
         (
             r"\*\*reviews start on push \(owner decision, #15 comment 7075952806\):\*\* the orchestrator spawns the reviewer as soon as the "
-            r"implementer has pushed, without waiting for ci\. the implementer does not wait in a loop for ci after a fix push; it checks with "
+            r"implementer has pushed, without waiting for ci\. the implementer does not wait in a loop for ci after every fix push; it checks with "
             r"`scripts/verify\.sh`, pushes and ends its turn\. ci must be green on the head before the pr is marked ready \(§7\.5\) and before "
             r"the merge request; a red ci is diagnosed at once \(§7\.4\) and fixed in the next push\. this bullet is the home of the rule",
             r"\(4\) ci is green on the pr head \(§7\.1\)",
             r"marks a draft pr ready after clean review rounds and with ci green on the head \(§7\.1\)",
-            r"wait for `scripts/verify\.sh` with a monitor/until-loop and do not end the turn while it runs; do not loop-wait for ci after a push "
+            r"wait for `scripts/verify\.sh` with a monitor/until-loop and do not end the turn while it runs; do not loop-wait for ci after every fix push "
             r"\(reviews start on push, §7\.1\)",
-            r"after a push do not wait in a loop for ci: the reviewer starts on your push \(orchestration §7\.1\)",
+            r"after every fix push do not wait in a loop for ci: the reviewer starts on your push \(orchestration §7\.1\)",
         ),
         "ORCHESTRATION 7.1 (home), 7.5, 7.8 and 8.2: reviews start on push, no loop-wait for CI, CI green before READY and the merge request "
         "(owner decision, #15 comment 7075952806)",
-        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting"),
+        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
+                   r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
     ),
 )
 
