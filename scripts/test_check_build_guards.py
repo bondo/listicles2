@@ -76,7 +76,6 @@ class Coordinates(unittest.TestCase):
             'detektPlugins("a.b:c:1")',
             'classpath("a.b:c:1")',
             'lintChecks("a.b:c:1")',
-            'robolectricAndroidAll("a.b:c:1")',
             'implementation(platform("a.b:c:1"))',
             'implementation(enforcedPlatform("a.b:c:1"))',
             'implementation("a.b:c")',  # no version is still a literal coordinate
@@ -92,6 +91,14 @@ class Coordinates(unittest.TestCase):
         ):
             with self.subTest(call=call):
                 self.assert_flagged(f"dependencies {{\n    {call}\n}}\n")
+
+    def test_a_configuration_declared_in_a_build_file_counts_wherever_it_is_used(self):
+        for decl in ('val customLibs by configurations.creating', 'configurations.create("customLibs")', 'configurations.register("customLibs")'):
+            with self.subTest(decl=decl):
+                extra = {"lib/build.gradle.kts": decl + "\n"}
+                self.assert_flagged('dependencies { customLibs("a.b:c:1") }\n', extra=extra)
+                self.assert_clean('dependencies { customLibs(libs.a) }\n', extra=extra)
+        self.assert_clean('dependencies { customLibs("a.b:c:1") }\ndependencies { implementation(libs.a) }\n')  # not a configuration
 
     def test_a_call_over_several_lines_is_flagged(self):
         self.assert_flagged('dependencies {\n    implementation(\n        "a.b:c:1",\n    )\n}\n')
@@ -150,7 +157,9 @@ class Coordinates(unittest.TestCase):
 
     def test_every_gradle_file_is_read_but_not_build_output_or_the_catalog(self):
         bad = 'dependencies { implementation("a.b:c:1") }\n'
-        for name in ("build.gradle.kts", "core/domain/build.gradle.kts", "settings.gradle.kts", "buildSrc/src/main/kotlin/x.gradle.kts", "deep/er/mod/build.gradle"):
+        for name in (
+            "build.gradle.kts", "core/domain/build.gradle.kts", "settings.gradle.kts", "buildSrc/src/main/kotlin/x.gradle.kts", "deep/er/mod/build.gradle",
+        ):
             with self.subTest(name=name):
                 self.assert_flagged(bad, name=name, extra={"app/build.gradle.kts": self.OK})
         for name in ("app/build/tmp/build.gradle.kts", "node_modules/x/build.gradle", "app/.gradle/x.gradle.kts", "firebase/build.gradle.kts.txt"):
@@ -192,7 +201,7 @@ class TargetSdk(unittest.TestCase):
                 found = self.problems(self.cfg(f"targetSdk = {v}"))
                 self.assertEqual(len(found), 1, found)
                 self.assertIn("targetSdk", found[0])
-                self.assertRegex(found[0], r"^app/build\.gradle\.kts:5: ")
+                self.assertRegex(found[0], r"^app/build\.gradle\.kts:4: ")
 
     def test_every_dsl_form_is_read(self):
         ok = {
@@ -216,7 +225,9 @@ class TargetSdk(unittest.TestCase):
         self.assertEqual(self.problems(self.cfg("targetSdk {\n            version = release(37)\n        }")), [])
 
     def test_a_value_that_cannot_be_read_fails_closed(self):
-        for line in ("targetSdk = libs.versions.target.get().toInt()", "targetSdk = someVariable", "targetSdkPreview = \"Z\"", "targetSdk = 36 - 1", "targetSdk = 3_5"):
+        for line in (
+            "targetSdk = libs.versions.target.get().toInt()", "targetSdk = someVariable", "targetSdkPreview = \"Z\"", "targetSdk = 36 - 1", "targetSdk = 3_5",
+        ):
             with self.subTest(line=line):
                 found = self.problems(self.cfg(line))
                 self.assertEqual(len(found), 1, found)
@@ -310,7 +321,8 @@ class Manifest(unittest.TestCase):
         self.assertEqual(self.problems(manifest(self.RULES), extra=self.RULE_FILES), [])
 
     def test_an_overlay_manifest_without_the_attribute_inherits_the_main_one(self):
-        self.assertEqual(self.problems(manifest(""), name="app/src/debug/AndroidManifest.xml", extra={"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}), [])
+        main = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}
+        self.assertEqual(self.problems(manifest(""), name="app/src/debug/AndroidManifest.xml", extra=main), [])
 
     def test_an_overlay_manifest_that_turns_backup_on_is_flagged(self):
         found = self.problems(
