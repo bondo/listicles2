@@ -118,6 +118,14 @@ class Reader:
         return self.data[self.pos - n : self.pos]
 
 
+def utf8_at(pool, idx):
+    """The text of a Utf8 constant pool entry; an index that names anything else is a corrupt class file."""
+    entry = pool[idx]
+    if entry[0] != 1:
+        raise CheckError("class file is corrupt (a name index points at a constant that is not a Utf8 entry)")
+    return entry[1]
+
+
 def descriptor_class(desc):
     """The class a field descriptor names, looking through array types; None for a primitive."""
     desc = desc.lstrip("[")
@@ -191,7 +199,7 @@ def scan_attributes(r, pool, found, excluded):
     """Read an attribute table. Adds the classes that code and annotations name to `found` and the bootstrap Methodref indexes to `excluded`."""
 
     def utf8(idx):
-        return pool[idx][1]
+        return utf8_at(pool, idx)
 
     def class_entry(idx):
         if pool[idx][0] != 7:
@@ -256,7 +264,7 @@ def parse_class(data):
         i += 1
 
     def utf8(idx):
-        return pool[idx][1]
+        return utf8_at(pool, idx)
 
     def class_name(idx):
         return utf8(pool[idx][1]) if idx else None
