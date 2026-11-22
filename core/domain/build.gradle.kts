@@ -9,6 +9,8 @@ plugins {
 apply(from = rootProject.file("config/licensee/policy.gradle"))
 
 dependencies {
+    // M1-60: observable state (Flow) in domain interfaces, e.g. SessionState (checklist section 4).
+    api(libs.kotlinx.coroutines.core)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotest.runner)

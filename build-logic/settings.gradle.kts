@@ -23,9 +23,8 @@ dependencyResolutionManagement {
         gradlePluginPortal()
     }
     // The root build's catalog, so build-logic compiles against the plugin versions the build applies.
-    versionCatalogs {
-        create("libs") { from(files("../gradle/libs.versions.toml")) }
-    } // justified: shares the root catalog file
+    val rootCatalog = files("../gradle/libs.versions.toml")
+    versionCatalogs.create("libs") { from(rootCatalog) } // justified: an included build loads the root catalog file
 }
 
 rootProject.name = "build-logic"
