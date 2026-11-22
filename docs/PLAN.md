@@ -26,7 +26,7 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 | App Check | Play Integrity provider requiring **device integrity only**, not Play recognition or licensing (the default requires `PLAY_RECOGNIZED`, which a GitHub APK cannot meet[^pi]); debug provider in CI and the emulator; about two weeks of metrics before enforcing; set up before the first external tester (decided 2026-11-17) and enforced before it (owner, #204, #15 comment 7003828200) |
 | AI at runtime | No AI code and no LLM or cloud AI calls (on-device ML Kit only if barcode scanning returns after v1) |
 | Distribution | Signed APK on GitHub Releases on each `v*` tag, signed with an owner-held GitHub key (never committed). Play later, with its own Play App Signing key: **separate keys**, so moving from the GitHub APK to the Play build needs an uninstall (cloud data is kept; decided 2026-11-17). Play account type and the closed test are deferred until Play release is planned. Android developer verification: a free limited-distribution account when available in Denmark (owner task, issue #120) |
-| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then one escalation reviewer decides fix, split or owner) → the merge agent squash-merges every READY PR that is not owner-only; an owner-only PR waits for the owner's approval (`docs/ORCHESTRATION.md` §7.5) |
+| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then one escalation reviewer decides fix, split or owner) → the merge agent squash-merges every READY PR that is not owner-only; an owner-only PR waits for the owner's approval or the approver's record (`docs/ORCHESTRATION.md` §7.5) |
 | Repo | **Public** (unlimited free GitHub Actions minutes). No secrets in the repo; secrets live in GitHub secrets |
 
 [^gsi]: https://developer.android.com/identity/sign-in/legacy-gsi-migration
@@ -442,7 +442,9 @@ enforce the rules rather than goodwill.
 2. **Git hooks** (installed by `scripts/install-hooks.sh`, which a session-start hook
    runs automatically): pre-commit runs spotless and detekt on the changed modules,
    and pre-push runs the guards, the hook tests and the unit tests (it skips the Gradle unit tests for pushes that only touch
-   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build).
+   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build). It runs the hook tests (`--jobs 4`) only
+   when the push changes a file they read, run or import (`scripts/hooks/prepush_scope.py --hook-tests`; unknown ranges
+   run them); CI's `guards` job runs the full hook suite on every PR.
 3. **Claude Code hooks** in `.claude/settings.json`, which agents can't skip:
    * PreToolUse denies `git commit --no-verify`, `git push --force`, `git reset --hard`
      on shared branches, and pushes to `main`.
@@ -533,9 +535,9 @@ enforce the rules rather than goodwill.
    may be `deferred` to follow-up issues instead of another round.
 5. Each later round runs in a **new** reviewer session that gets the whole PR diff, the findings JSON of earlier rounds and `REVIEW.md`,
    and focuses on the commits since the last round: it re-checks open findings, reviews the new code and how the fixes interact with the old code.
-6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and the orchestrator marks the PR READY. The merge agent squash-merges it, or an owner-only PR waits for the owner (`docs/ORCHESTRATION.md` §7.5).
+6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and the orchestrator marks the PR READY. The merge agent squash-merges it, or an owner-only PR waits for the owner or the approver's record (`docs/ORCHESTRATION.md` §7.5).
    If round 4 of a batch still has open findings above nit (deferred minors do not count), one escalation reviewer per PR decides
-   fix, split or owner (`REVIEW.md`, Loop and cap); only what it sends to the owner reaches you.
+   fix, split or owner (`REVIEW.md`, Loop and cap); its ruling is final, so nothing it decides reaches you.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 

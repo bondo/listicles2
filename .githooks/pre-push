@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
-# Full guards, hook tests, and (unless the push cannot affect the Android build) unit tests before every push.
-# Docs/scripts/hooks/CI/firebase-only pushes skip Gradle (scripts/hooks/prepush_scope.py decides; unknown means build).
+# Full guards on every push; hook tests (with --jobs 4) and Android unit tests only when the push can affect them.
+# scripts/hooks/prepush_scope.py decides both from the pushed range: Gradle is skipped for docs/scripts/hooks/CI/firebase-only pushes,
+# the hook tests for pushes that change none of their inputs (--hook-tests). Unknown means run. CI runs the full hook suite on every PR.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 # Pushing from a linked worktree exports GIT_DIR and friends; the guards and tests below must not inherit them (R11-51).
 while read -r v; do unset "$v"; done < <(git rev-parse --local-env-vars)
-scope=$(python3 -I scripts/hooks/prepush_scope.py)  # reads the pre-push stdin
-echo "pre-push: scope=$scope"
+input=$(cat)  # git's pre-push stdin, read once for both questions
+scope=$(printf '%s\n' "$input" | python3 -I scripts/hooks/prepush_scope.py)
+hooks=$(printf '%s\n' "$input" | python3 -I scripts/hooks/prepush_scope.py --hook-tests)
+echo "pre-push: scope=$scope hook-tests=${hooks:-run}"
 ./scripts/guards.sh || exit 1
-python3 -I scripts/hooks/run_hook_tests.py 2>&1 | tail -15
-[ "${PIPESTATUS[0]}" = 0 ] || exit 1
+if [ "$hooks" = skip ]; then
+  echo "pre-push: no change to a hook-suite input, skipping the hook tests (CI runs them on every PR)"
+else
+  python3 -I scripts/hooks/run_hook_tests.py --jobs 4 2>&1 | tail -15
+  [ "${PIPESTATUS[0]}" = 0 ] || exit 1
+fi
 if [ "$scope" = skip ]; then
   echo "pre-push: no Android-affecting changes, skipping Gradle unit tests"
   exit 0

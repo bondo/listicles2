@@ -64,12 +64,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: unit tests and coverage
         run: ./gradlew -q --console=plain testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: coverage impact tests (M1-07)
+        run: python3 -I scripts/test_coverage_impact.py
+      - name: test impact, uncovered changed lines (M1-07)
+        run: |
+          ./gradlew -q --console=plain koverXmlReport
+          python3 -I scripts/coverage_impact.py --xml build/reports/kover/report.xml --base HEAD^1 >> "$GITHUB_STEP_SUMMARY"
       - name: test-results gate tests (PR 239 R2-02)
         run: python3 -I scripts/test_check_test_results.py
 
@@ -173,8 +180,8 @@ jobs:
           GOLDEN_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'golden-update') && '1' || '0' }}
           GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '1500' || '600' }}
         run: ./scripts/guards.sh
-      - name: hook tests (four shards in parallel)
-        run: python3 -I scripts/hooks/run_hook_tests.py --jobs 4
+      - name: hook tests (full suite on every PR, eight shards in parallel)
+        run: python3 -I scripts/hooks/run_hook_tests.py --jobs 8
 
   tasks:
     name: tasks
