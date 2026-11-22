@@ -1239,6 +1239,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 326
 notes = "Owner request, #15 comment 7086087003: open-task dependency graph under the status cards. Two PRs (split 2026-11-22, the 600-line CI limit): part A (#324) is scripts/status_graph.py with its tests; part B is the render and publish wiring, the README picture, docs/STATUS.md and the legibility fix"
 
 [[task]]
