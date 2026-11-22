@@ -4,7 +4,11 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import javax.inject.Inject
 
@@ -25,3 +29,10 @@ class AndroidConnectivity
                 capabilities.hasCapability(NET_CAPABILITY_VALIDATED)
         }
     }
+
+@Module
+@InstallIn(SingletonComponent::class)
+interface ConnectivityModule {
+    @Binds
+    fun connectivity(implementation: AndroidConnectivity): Connectivity
+}

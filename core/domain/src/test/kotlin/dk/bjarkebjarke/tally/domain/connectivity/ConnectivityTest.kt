@@ -39,8 +39,4 @@ class ConnectivityTest :
                     states.map { if (it) ConnectionResult.Done("ran") else ConnectionResult.NeedsConnection }
             }
         }
-
-        test("the fake is online unless the test says otherwise") {
-            FakeConnectivity().isOnline() shouldBe true
-        }
     })

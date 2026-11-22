@@ -72,10 +72,8 @@ android {
     }
 }
 
-// M1-30 (docs/milestones/M1.md section 1): the Google Services plugin reads google-services.json. The real file is never
-// committed (.gitignore); the owner keeps it at app/google-services.json (M1-O1). Without one (CI, a fresh clone) every
-// variant gets this stand-in for the demo-tally emulator project, generated under build/, with dummy values only.
-// GoogleServicesConfigTest checks which of the two the build used.
+// M1-30 (M1.md section 1): the real google-services.json is never committed; the owner keeps it at app/ (M1-O1). Without
+// it every variant gets a demo-tally stand-in with dummy values under build/ (GoogleServicesConfigTest checks which).
 val googleServicesStandIn =
     !file("google-services.json").exists() && fileTree("src") { include("*/google-services.json") }.isEmpty
 
@@ -97,9 +95,8 @@ abstract class GoogleServicesStandIn : DefaultTask() {
     }
 }
 
-// PR 304 R1-02: the stand-in is for CI only. Packaging a non-debug variant (APK or bundle) with it fails, unless the
-// build passes -Ptally.allowStandInRelease=true (only M1-33's CI release smoke build). Compiling release (Kover) still
-// works. scripts/test_google_services_release_gate.py checks the refusal, the opt-in and that debug is unaffected.
+// PR 304 R1-02: packaging a non-debug variant with the stand-in fails unless -Ptally.allowStandInRelease=true (M1-33's
+// CI smoke build); compiling release (Kover) still works. Tested by scripts/test_google_services_release_gate.py.
 val allowStandInRelease = providers.gradleProperty("tally.allowStandInRelease").orNull == "true"
 
 abstract class RefuseGoogleServicesStandIn : DefaultTask() {
@@ -115,9 +112,8 @@ abstract class RefuseGoogleServicesStandIn : DefaultTask() {
 }
 
 if (googleServicesStandIn) {
-    // The plugin registers process<Variant>GoogleServices in its own onVariants callback with the fixed search paths; this
-    // callback runs after it, so this configure action runs after the plugin's and replaces the paths with the stand-in.
-    // One stand-in per variant, with that variant's application id: the plugin looks for a client with exactly that id.
+    // Runs after the plugin's own onVariants callback, so this replaces its search paths. One stand-in per variant: the
+    // plugin looks for a client with exactly the variant's application id.
     androidComponents.onVariants { variant ->
         val name = variant.name.replaceFirstChar(Char::uppercase)
         val standIn =

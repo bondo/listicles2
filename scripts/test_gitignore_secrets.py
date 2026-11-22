@@ -107,14 +107,8 @@ def tracked_ignored() -> set[str]:
 
 def tracked_google_services(root: Path) -> list[str]:
     """Tracked files named google-services.json in any directory of the repo at `root`, sorted."""
-    out = subprocess.run(
-        ["git", "ls-files", "-z", "--", ":(glob)**/google-services.json"],
-        cwd=root,
-        env=clean_env(),
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+    cmd = ["git", "ls-files", "-z", "--", ":(glob)**/google-services.json"]
+    out = subprocess.run(cmd, cwd=root, env=clean_env(), capture_output=True, text=True, check=True).stdout
     return sorted(set(out.split("\0")) - {""})
 
 

@@ -7,11 +7,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * M1-30 (M1.md section 1): the Google Services plugin turns a google-services.json into string resources. The real
- * file is never committed, so without one (CI, a fresh clone) the build generates a stand-in for the `demo-tally`
- * emulator project under build/. Gradle tells this test which case the build is in (`tally.googleServicesStandIn`).
- */
+/** M1-30: without the real google-services.json the build carries the demo-tally stand-in; Gradle says which case. */
 @RunWith(RobolectricTestRunner::class)
 class GoogleServicesConfigTest {
     private fun resource(name: String): String {
