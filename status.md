@@ -492,7 +492,6 @@ flowchart LR
 - **owner to-do** [#285](https://github.com/bondo/listicles2/issues/285): &#91;owner&#93; M1-O12&#58; Decide #280 (who may list invites) before M1-12 starts
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
-- **PR to merge** [#292](https://github.com/bondo/listicles2/issues/292): merge_ready.py&#58; structural sign-off check, empty patch, status-matched retry, missing commit …
 - **PR to merge** [#296](https://github.com/bondo/listicles2/issues/296): M1-51&#58; build guard for the targetSdk floor (see #257)
 - **task** M1-06: waits on M1-10
 - **task** M1-08: waits on M1-52
