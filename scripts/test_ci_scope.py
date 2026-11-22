@@ -20,7 +20,7 @@ import ci_scope  # noqa: E402  # justified: must follow the sys.path insert abov
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "ci_scope.py"
-REQUIRED_JOBS = ("wrapper", "static", "unit", "firebase", "ui", "screenshots", "guards", "secrets", "tasks", "python-lint", "workflow-lint")
+REQUIRED_JOBS = ("wrapper", "static", "unit", "firebase", "ui", "screenshots", "release-smoke", "guards", "secrets", "tasks", "python-lint", "workflow-lint")
 
 
 class Classify(unittest.TestCase):
