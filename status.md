@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 29/74 (39%) | 45 |
+| M1 | Accounts and households | 28/74 (37%) | 46 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 29/74 done (39%), 45 open.
+**Progress:** 28/74 done (37%), 46 open.
 
 ### Tasks
 
@@ -191,7 +191,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-O9 | Turn off CodeQL default setup when the advanced workflow of M1-44 merges | owner to-do | M1-44 | owner |  |
 | M1-O10 | Ask the owner about the repo rename to Tally (right before M1-O1) | owner to-do | M1-29 | owner |  |
 | M1-O11 | Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… | owner to-do | M1-03 | owner |  |
-| M1-O12 | Decide #280 (who may list invites) before M1-12 starts | done | none | owner |  |
+| M1-O12 | Decide #280 (who may list invites) before M1-12 starts | owner to-do | none | owner |  |
 
 ### Open tasks and what blocks them
 
@@ -244,6 +244,7 @@ flowchart LR
     n42["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
     n43["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
     n44["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n45["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
     n3 --> n0
     n23 --> n1
     n1 --> n2
@@ -251,6 +252,7 @@ flowchart LR
     n25 --> n4
     n24 --> n4
     n3 --> n5
+    n45 --> n5
     n6 --> n7
     n7 --> n8
     n7 --> n9
@@ -464,6 +466,7 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
+- **owner to-do** [#285](https://github.com/bondo/listicles2/issues/285): &#91;owner&#93; M1-O12&#58; Decide #280 (who may list invites) before M1-12 starts
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **task** M1-06: waits on M1-10
@@ -471,7 +474,7 @@ flowchart LR
 - **task** M1-09: waits on M1-08
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
-- **task** M1-12: waits on M1-10
+- **task** M1-12: waits on M1-10, M1-O12
 - **task** M1-14: waits on M1-60
 - **task** M1-15: waits on M1-14
 - **task** M1-16: waits on M1-14
