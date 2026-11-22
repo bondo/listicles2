@@ -3,28 +3,14 @@ import {
     initializeTestEnvironment,
     type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import {
-    attempt,
-    CLIENT_NAMES,
-    connect,
-    type Client,
-    type Db,
-    PLAN,
-    PLANNED,
-    pathProblems,
-    planTemplates,
-    PROBES,
-    PROJECT,
-    RULES,
-    UNPLANNED,
-} from "./harness";
+import * as h from "./harness";
 
 let env: RulesTestEnvironment;
-let dbs: Record<Client, Db>;
+let dbs: Record<h.Client, h.Db>;
 
 beforeAll(async () => {
-    env = await initializeTestEnvironment({ projectId: PROJECT, firestore: { rules: RULES } });
-    dbs = connect(env);
+    env = await initializeTestEnvironment({ projectId: h.PROJECT, firestore: { rules: h.RULES } });
+    dbs = h.connect(env);
 });
 
 afterAll(async () => {
@@ -35,15 +21,26 @@ beforeEach(async () => {
     await env.clearFirestore();
 });
 
-test("PLANNED holds one document of every collection in PLAN section 3, UNPLANNED none", () => {
-    expect(pathProblems(planTemplates(PLAN), PLANNED, UNPLANNED)).toEqual([]);
+// The probed paths come from PLAN section 3; a collection added to or dropped from PLAN changes this list.
+test("the suite probes every collection of PLAN section 3, and UNPLANNED is none of them", () => {
+    expect(h.TEMPLATES).toEqual([
+        "users/{uid}",
+        "households/{hid}",
+        "households/{hid}/members/{uid}",
+        "households/{hid}/removed/{uid}",
+        "invites/{code}",
+        "lists/{lid}",
+        "lists/{lid}/items/{iid}",
+        "config/app",
+    ]);
+    expect(h.TEMPLATES.map(h.collectionIdOf)).not.toContain(h.collectionIdOf(h.UNPLANNED));
 });
 
 // Until the real rules land, every client is denied every operation on every path.
-describe.each(CLIENT_NAMES)("default deny (%s)", (client) => {
-    test.each(PROBES.filter((p) => p.client === client))("$op $path", async (probe) => {
+describe.each(h.CLIENT_NAMES)("default deny (%s)", (client) => {
+    test.each(h.PROBES.filter((p) => p.client === client))("$op $path", async (probe) => {
         await env.withSecurityRulesDisabled(async (admin) => {
-            await assertFails(attempt(admin.firestore(), dbs[client], probe));
+            await assertFails(h.attempt(admin.firestore(), dbs[client], probe));
         });
     });
 });
