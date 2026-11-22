@@ -92,6 +92,44 @@ class TargetSdk(unittest.TestCase):
         self.assertEqual(len(found), 1, found)
         self.assertRegex(found[0], r":4: ")
 
+    def test_a_qualified_or_setter_assignment_is_read_next_to_a_plain_one(self):
+        """R1-01: these forms used to be invisible, so another plain `targetSdk = 37` made the guard pass."""
+        plain = "android { defaultConfig { targetSdk = 37 } }\n"
+        for low in (
+            "android.defaultConfig.targetSdk = 30",
+            "defaultConfig.targetSdk = 30",
+            "android { productFlavors { create(\"old\") { this.targetSdk = 30 } } }",
+            "android { defaultConfig { setTargetSdkVersion(30) } }",
+            "android { defaultConfig { setTargetSdk(30) } }",
+            "android?.defaultConfig?.targetSdk = 30",
+            "android.defaultConfig.targetSdkVersion(30)",
+        ):
+            with self.subTest(low=low):
+                found = self.problems(plain + low + "\n")
+                self.assertEqual(len(found), 1, found)
+                self.assertIn("below the Play minimum", found[0])
+                self.assertRegex(found[0], r":2: ")
+
+    def test_a_qualified_or_setter_assignment_at_the_floor_passes_and_counts(self):
+        for ok in ("android.defaultConfig.targetSdk = 36", "this.targetSdk = 37", "defaultConfig { setTargetSdkVersion(37) }"):
+            with self.subTest(ok=ok):
+                self.assertEqual(self.problems(ok + "\n"), [])
+                self.assertEqual(len(cbg.target_sdk_values(tree({"app/build.gradle.kts": ok + "\n"}))), 1)
+
+    def test_a_qualified_or_setter_value_that_cannot_be_read_fails_closed(self):
+        plain = "android { defaultConfig { targetSdk = 37 } }\n"
+        for bad in ("android.defaultConfig.targetSdk = someVariable", "this.targetSdk = 36 - 1", "defaultConfig.setTargetSdkVersion(v)", "android.defaultConfig.targetSdkPreview = \"Z\""):
+            with self.subTest(bad=bad):
+                self.assertEqual(len(self.problems(plain + bad + "\n")), 1, bad)
+
+    def test_reads_of_a_qualified_target_sdk_do_not_count(self):
+        text = (
+            "android { defaultConfig { targetSdk = 37 } }\n"
+            "val a = android.defaultConfig.targetSdk\nval b = checkNotNull(android.defaultConfig.targetSdk)\n"
+            "println(android.defaultConfig.targetSdk)\nfoo(android.defaultConfig.targetSdk, 1)\nif (x == android.defaultConfig.targetSdk) {}\n"
+        )
+        self.assertEqual(self.problems(text), [])
+
     def test_comments_and_non_declarations_do_not_count(self):
         text = (
             "// targetSdk = 20\n/* targetSdk = 21 */\nandroid { defaultConfig { targetSdk = 37 } }\n"
