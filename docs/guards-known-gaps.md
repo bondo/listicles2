@@ -132,7 +132,8 @@ starts on the line after the key, R2-05), a single- or double-quoted scalar (unt
 chomping or indentation indicator, after an anchor or a tag; R2-04). A blank line is a line break, so it starts a new line; in a
 folded block so is a change of indentation (YAML keeps the breaks around a more-indented line). Double-quoted escapes are decoded
 (`\x2d`, `\u002d`, `\t`, `\"`; `\n` is a command separator; an escaped line break joins with no blank; other escapes are a character that is
-no blank), and the YAML quotes are dropped. A pre-commit `entry:` is split into words by pre-commit, so its whole value, a literal block
+no blank), also after a node property (`&a`, `!!str`) and in a JSON-style flow (`{"run":"..."}`). The YAML quotes are dropped in block
+context and kept in a flow collection, where an args list splits on commas outside quotes. A fold scan that cannot run fails the guard. A pre-commit `entry:` is split into words by pre-commit, so its whole value, a literal block
 (`entry: |`) too, is one line on the key line, and a `#` in its block is a word. A literal block (`run: |`) is not joined: its lines are
 shell lines.
 
@@ -143,6 +144,8 @@ or as a folded block with the reason on each line.
 **Not covered, or a new cost.**
 - A shell quote that spans a YAML line break (`ruff check '` and `' --ignore E501 .` around a blank line, in a folded block or a literal
   block) leaves the tool and the flag on two lines; the same holds in a shell script. The line scan has no shell parser.
+- A reason on one line of a folded block does not waive it, even when its `#` makes the shell drop the rest (`ruff check --ignore E501 .
+  # justified: ...` and then `&& echo ok`): a false positive the per-line check did not have; put the reason on each line.
 - A folded block whose lines are all more indented than its explicit indentation indicator (`run: >1` with the lines at +3) is joined
   although YAML keeps the breaks: a false positive, never a miss. A flow mapping joined over lines lets a flag in another entry count for
   the tool (`- {run: ruff check, name: x` and `--fix}`), as on one line.

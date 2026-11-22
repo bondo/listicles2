@@ -595,31 +595,34 @@ function hexc(h,   i, n, k) {
   for (i = 1; i <= length(h); i++) { k = index("0123456789abcdef", tolower(substr(h, i, 1))); if (!k) return "?"; n = n * 16 + k - 1 }
   return (n == 10 ? ";" : (n == 9 ? "\t" : (n >= 32 && n < 127 ? sprintf("%c", n) : "?")))
 }
-# yscan: the text of s as YAML reads it (a quoted scalar without its quotes), tracking an open quote (Q), the flow depth (D) and a node
-# start (NS) over lines; CM is set when a comment starts (its text is kept outside a flow), EB when s ends with an escaped line break.
-function yscan(s,   i, n, c, t, h) {
+# yscan: the text of s as YAML reads it, tracking an open quote (Q), the flow depth (D) and a node start (NS) over lines. A quoted
+# scalar loses its quotes in block context and keeps them in a flow, where 2c splits a list on commas outside quotes. A node property
+# (`&a`, `!!str`) keeps the node start; in a flow a `:` right after a closing quote is a value indicator (`{"run":"x"}`). CM is set when
+# a comment starts (its text is kept outside a flow), EB when s ends with an escaped line break.
+function yscan(s,   i, n, c, t, h, jq) {
   t = ""; CM = 0; EB = 0; n = length(s)
   for (i = 1; i <= n; i++) {
     c = substr(s, i, 1)
     if (Q == "\"") {
-      if (c == "\"") { Q = ""; continue }
+      if (c == "\"") { Q = ""; jq = 1; if (KQ) t = t c; continue }
       if (c == "\\") {
         if (i == n) { EB = 1; break }
         c = substr(s, ++i, 1)
         if (c == "x" || c == "u" || c == "U") { h = (c == "x" ? 2 : (c == "u" ? 4 : 8)); c = hexc(substr(s, i + 1, h)); i += h }
-        else if (c == "n") c = ";"; else if (c == "t") c = "\t"; else if (c !~ /[ \/"\\]/) c = "?"
+        else if (c == "n") c = ";"; else if (c == "t") c = "\t"; else if (c == "\"" || c == "\\") { if (KQ) c = "\\" c } else if (c !~ /[ \/]/) c = "?"
       }
       t = t c; continue
     }
-    if (Q == "\047") { if (c == "\047") { if (substr(s, i + 1, 1) != "\047") { Q = ""; continue } i++ } t = t c; continue }
+    if (Q == "\047") { if (c == "\047") { if (substr(s, i + 1, 1) != "\047") { Q = ""; jq = 1; if (KQ) t = t c; continue } i++; if (KQ) t = t c } t = t c; continue }
     if (c ~ /[ \t]/) { t = t c; continue }
     if (c == "#" && (i == 1 || substr(s, i - 1, 1) ~ /[ \t]/)) { CM = 1; return (D ? t : t substr(s, i)) }
-    if (NS && (c == "\"" || c == "\047")) { Q = c; NS = 0; continue }
+    if (NS && (c == "&" || c == "!")) { while (i < n && substr(s, i + 1, 1) !~ (D ? "[] \t,[{}]" : "[ \t]")) { t = t c; c = substr(s, ++i, 1) } t = t c; continue }
+    if (NS && (c == "\"" || c == "\047")) { Q = c; KQ = (D > 0); NS = 0; if (KQ) t = t c; continue }
     else if ((NS || D) && (c == "[" || c == "{")) { D++; NS = 1 }
     else if (D && (c == "]" || c == "}")) { D--; NS = 0 }
-    else if (D && (c == "," || (c == ":" && substr(s, i + 1, 1) ~ /^([ \t,\]}]|)$/))) NS = 1
+    else if (D && (c == "," || (c == ":" && (jq || substr(s, i + 1, 1) ~ /^[] \t,}]?$/)))) NS = 1
     else NS = 0
-    t = t c
+    jq = 0; t = t c
   }
   return t
 }
@@ -683,13 +686,14 @@ END {
   for (i = 1; i <= N; i++) print O[i]
 }'
 cliflags() { # cliflags <pathspec>...
-  local f
+  local f y
   while IFS= read -r f; do
     if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
     else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
-    case "$f" in *.yml | *.yaml) # the joined lines, in addition to the lines above
-      if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null; else cat -- "$f" 2>/dev/null; fi |
-        LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
+    case "$f" in *.yml | *.yaml) # the joined lines, in addition to the lines above; a fold scan that cannot run fails (no quiet gap)
+      if [ "$STAGED" = 1 ]; then y=$(git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK")
+      else y=$(LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" "$f"); fi || { echo "$f:0: the YAML fold scan failed"; continue; }
+      printf '%s\n' "$y" | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
     esac
   done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++' | sed 's/^/guard: unjustified CLI flag: /'
 }
