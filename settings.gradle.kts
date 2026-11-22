@@ -36,4 +36,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "listicles"
 
-include(":app", ":core:domain", ":core:testing")
+include(":app", ":core:data", ":core:domain", ":core:testing")

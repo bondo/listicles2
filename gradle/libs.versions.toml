@@ -27,6 +27,12 @@ kover = "0.9.11"
 licensee = "1.14.1"
 pitestPlugin = "1.19.0"
 pitest = "1.30.2"
+# Issue 254 / M1-02: the Firebase BoM pins Auth and Firestore. Dependabot bumps it; the Google Services plugin is M1-30.
+firebaseBom = "35.2.0"
+# M1-30: the Google Services plugin turns google-services.json (or the generated stand-in, app/build.gradle.kts) into resources.
+googleServices = "4.6.0"
+hilt = "2.60.1"
+ksp = "2.3.14"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm", version.ref = "kotlinxCoroutines" }
@@ -58,9 +64,16 @@ kotest-runner = { module = "io.kotest:kotest-runner-junit5", version.ref = "kote
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-auth = { module = "com.google.firebase:firebase-auth" }
+firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
@@ -69,3 +82,6 @@ kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 licensee = { id = "app.cash.licensee", version.ref = "licensee" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitestPlugin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

@@ -40,6 +40,9 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
 13. **Rules allow/deny matrix (R7)**: on a PR labelled `area:security-rules`, `area:sync-merge` or `risk:high`, check that the rules allow/deny matrix (D-2.6, `firebase/test`)
     covers each changed rule with an allow case and a deny case. A changed rule without both is a `major` finding (area `security-rules`), and a `blocker` when the missing case hides a real security hole
     (a non-member, or a member without the right, could read or write); name the rule and the missing case.
+14. **Dispatchers (`:core:data` and `:app` PRs)**: until detekt 2.0 is stable and gives the Android modules type resolution (#218, tracked on M6),
+    check by hand that dispatchers are injected and no `Dispatchers.IO`, `Dispatchers.Default` or `Dispatchers.Main` is hard-coded in a class
+    (`docs/ANDROID-BEST-PRACTICES.md` §5); a hard-coded dispatcher is a `minor` finding. When detekt 2.0 is on, this line is removed.
 
 ## Severity
 | Severity | Meaning | Author must |
@@ -99,7 +102,7 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
 1. The author (the same implementer session in every round) fixes everything above `nit` and every `minor` whose fix is small
    (about 30 changed lines or fewer), or disputes with a reason, and pushes every turn.
 2. A new reviewer session runs the next round, with the whole PR diff.
-3. When only nits or deferred minors remain the reviewer posts `ready_nits_only`; the orchestrator then marks the PR READY and the merge agent squash-merges it (an owner-only PR waits for the owner's approval; `docs/ORCHESTRATION.md` §7.5).
+3. When only nits or deferred minors remain the reviewer posts `ready_nits_only`; the orchestrator then marks the PR READY and the merge agent squash-merges it (an owner-only PR waits for the owner's approval or, for tooling, build, CI and gate PRs, the approver's record; `docs/ORCHESTRATION.md` §7.5).
    Deferral: once no blocker or major is open, a `minor` whose fix is larger than about 30 changed lines or outside the PR's scope, and any `nit`, may be deferred
    to follow-up issues instead of another round, by the rules and issue template of `docs/FOLLOW-UPS.md` (one issue per deferred finding: title, file:line, scenario; linked in the PR and its review table).
    Blockers are never deferred; majors and protected areas only with owner OK. If every finding above `nit` was deferred and no commit
@@ -109,8 +112,10 @@ Post one PR comment (or write one file for local reviews) containing a fenced `j
    `agents/prompts/escalation-reviewer.md`, started by the orchestrator) reads the whole thread and decides `fix`, `split` or `owner`:
    - `fix`: the author fixes, and one more fresh round (round 5) reviews. Anything above `nit` still open after it goes to the owner.
    - `split`: the work moves to a new PR from `main` that takes `main` in with merge commits, never a rebase or force-push.
-   - `owner`: taste or scope questions, which stay with the owner.
-   A dropped finding becomes `withdrawn` (ruling `drop`, citing the escalation comment) in the next round's JSON; an `owner` finding stays open for the owner.
+   - `owner`: taste or scope questions, which the escalation reviewer decides itself, per finding `fix` or `drop` (owner decision, #15 comment 7075812943).
+   A per-finding `fix` gets the same one fresh round 5 as a `fix` ruling (anything above nit still open after it goes to the owner).
+   A dropped finding becomes `withdrawn` (ruling `drop`, citing the escalation comment) in the next round's JSON. No finding is left open for the owner.
    There is no second escalation, and no commit lands unreviewed: a commit after a round gets a delta review.
 5. Disputes: the reviewer either withdraws or restates with new evidence. If it is still disputed, the escalation reviewer rules with both arguments in front of it
-   (this uses the PR's one escalation); taste or scope goes to the owner.
+   (this uses the PR's one escalation); taste or scope is decided by it too.
+6. **Token rules** (owner decision, #15 comment 7070278995; the rules are in `docs/ORCHESTRATION.md` §7.2.3): a `ready_nits_only` verdict is final, its nits are accepted with no fix round, no re-review and no follow-up issue; a re-check of a small fix-only or docs-only commit is a Sonnet medium reviewer (`recheck-reviewer`), not a full round; on guard and prompt_rules hardening PRs the second round that reports new bypass forms ends the PR.

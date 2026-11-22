@@ -19,7 +19,7 @@ import tasks
 ROOT = Path(__file__).resolve().parent.parent
 PROMPTS = ROOT / "agents" / "prompts"
 ROLES = ("orchestrator", "implementer", "reviewer", "planner", "design-reviewer", "second-reviewer", "verifier",
-         "escalation-reviewer")
+         "escalation-reviewer", "approver")
 
 TIER0 = {"feedback", "idea", "decision", "needs-collaborator", "needs-owner"}
 NEVER = {"golden-update", "big-pr", "owner-todo", "orchestrator-state", "follow-up", "severity:*", "target:*", "owner-ok", "area:*"}
@@ -194,7 +194,7 @@ class M011AlignmentTests(unittest.TestCase):
 
     def test_deleting_one_clause_fails_its_rule(self):
         for role, rule_id, old in (
-            ("orchestrator", "autonomy", "merges of owner-only PRs; "),
+            ("orchestrator", "autonomy", "merges of PRs that stay with the owner (below); "),
             ("orchestrator", "autonomy", "and a relayed approval is refused"),
             ("orchestrator", "handover", "From lineage depth 6 or more"),  # R1-01 of #179: the depth-6 clause is pinned
             ("orchestrator", "handover", "ask the owner to start the next orchestrator from a top-level session"),  # R1-04 of #179
@@ -591,7 +591,7 @@ class M015Tests(unittest.TestCase):
             ("resolve, resolves or resolved directly before an issue number", "resolve, resolves or resolved before an issue number"),
             ('write "gated on #n", "see #n" or "mark #n done"', "write nothing"),
             ("scan the body for them first", "skip the scan"),
-            ("before you ask the owner to merge", "after the owner merged"),
+            ("before you send it (to the merge agent, or as a batch-approval request to the owner for an owner-only pr)", "after the owner merged"),
         ):
             self.assert_fails("orchestrator", "orch-merge-request", old, new)
         # each closing word is pinned, so one dropped from the list fails the rule
@@ -1221,13 +1221,13 @@ class Pr3RuleTests(unittest.TestCase):
         self.assertIn("dr-rounds", ids(prompt_rules.check_text("design-reviewer", real("design-reviewer") + old)))
         self.assertIn("max 3 opus rounds per design pr", norm)
 
-    def test_an_escalation_drop_becomes_withdrawn_and_an_owner_finding_stays_open(self):  # R1-04 of #129
+    def test_an_escalation_drop_becomes_withdrawn_and_no_finding_stays_open_for_the_owner(self):  # R1-04 of #129; R1-02 of #299 (7075812943)
         prompt = prompt_rules.normalize(real("escalation-reviewer")).lower()
         self.assertIn("a `drop` sets the finding to `withdrawn`", prompt)
-        self.assertIn("an `owner` finding stays open for the owner", prompt)
+        self.assertIn("no finding stays open for the owner", prompt)
         self.assertIn("a dropped finding becomes `withdrawn`", prompt_rules.normalize(self.doc("REVIEW.md")).lower())
         for old, new in (("a `drop` sets the finding to `withdrawn`", "a `drop` closes the finding"),
-                         ("an `owner` finding stays open for the owner", "")):
+                         ("no finding stays open for the owner", "")):
             text = re.sub(re.escape(old), new, prompt_rules.normalize(real("escalation-reviewer")), flags=re.I)
             self.assertIn("escalation-role", ids(prompt_rules.check_text("escalation-reviewer", text)), old)
 
@@ -1681,7 +1681,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         ("body from a file", r"-f body=@file"),
         ("scripts from a file", r"run a script that mentions a protected path from a file"),
         ("source_revision", r"`source_revision` is the pr branch name"),
-        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while waiting"),
+        ("wait with monitor", r"monitor/until-loop.{0,80}do not end the turn while it runs; do not loop-wait for ci after every fix push"),
         ("red green one push", r"a red/green pair may go up in one push \(say so in the pr body\)"),
         ("pr bodies by mcp", r"pr bodies only through the github mcp tools"),
         ("close after merge", r"comment on the completed issue, then close it with `state=closed`, `state_reason=completed`"),
@@ -2313,6 +2313,601 @@ class Issue134ReviewerEffortTests(unittest.TestCase):
     def test_the_rule_applies_to_no_other_role(self):
         for role in ("implementer", "second-reviewer", "escalation-reviewer"):
             self.assertNotIn(self.RULE, ids(prompt_rules.check_text(role, "")), role)
+
+
+class TokenRulesAndOwnerMergeTests(unittest.TestCase):
+    """M1-40: the token rules (owner decision, #15 comment 7070278995) and the owner-merge exceptions (issue 147) in the process docs.
+    Each is pinned by a rule that fails when the wording is deleted, weakened or replaced by the old text."""
+
+    PROMPT_RULES = {
+        "orch-owner-merge-exceptions": ("orchestrator",),
+        "orch-token-rules": ("orchestrator",),
+        "reviewer-recheck": ("reviewer",),
+    }
+    DOC_RULES = {
+        "orch-token-rules": "docs/ORCHESTRATION.md",
+        "orch-owner-merge-exceptions": "docs/ORCHESTRATION.md",
+        "orch-labels-exist": "docs/ORCHESTRATION.md",
+        "review-token-rules": "REVIEW.md",
+        "review-dispatchers": "REVIEW.md",
+        "roles-recheck-reviewer": "agents/roles.yaml",
+        "followups-title-forms": "docs/FOLLOW-UPS.md",
+        "followups-burndown-alerts": "docs/FOLLOW-UPS.md",
+        "branch-protection-job-count": "docs/BRANCH-PROTECTION.md",
+    }
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def doc_ids(self, path, text):
+        return ids(prompt_rules.check_doc_text(path, text))
+
+    def doc_replace(self, path, old, new):
+        norm = prompt_rules.normalize(self.doc(path))
+        self.assertIn(old.lower(), norm.lower(), f"{path} lacks {old!r}")
+        return self.doc_ids(path, re.sub(re.escape(old), new, norm, count=1, flags=re.I))
+
+    def role_replace(self, role, old, new):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), norm.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), new, norm, count=1, flags=re.I)))
+
+    def test_the_rules_exist_for_the_right_roles_and_files_and_the_real_text_passes(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        for rid, roles in self.PROMPT_RULES.items():
+            self.assertEqual(by_id[rid].roles, roles, rid)
+            for role in roles:
+                self.assertNotIn(rid, ids(prompt_rules.check_text(role, real(role))), (rid, role))
+        by_doc = {(r.id, r.path) for r in prompt_rules.DOC_RULES}
+        for rid, path in self.DOC_RULES.items():
+            self.assertIn((rid, path), by_doc)
+            self.assertNotIn(rid, self.doc_ids(path, self.doc(path)), rid)
+
+    def test_the_wording_in_the_wrong_file_does_not_count(self):
+        self.assertIn("review-token-rules", self.doc_ids("REVIEW.md", self.doc("docs/ORCHESTRATION.md")))
+        self.assertIn("orch-token-rules", self.doc_ids("docs/ORCHESTRATION.md", self.doc("REVIEW.md")))
+        self.assertIn("roles-recheck-reviewer", self.doc_ids("agents/roles.yaml", ""))
+        self.assertIn("reviewer-recheck", ids(prompt_rules.check_text("reviewer", real("orchestrator"))))
+
+    # Rule 1: ready_nits_only accepts its nits.
+    def test_a_weakened_nits_rule_is_rejected_in_every_place_that_states_it(self):
+        for old, new in (
+            ("its nits are recorded as accepted in the pr review table and the round row: no fix round, no re-review, no follow-up issue",
+             "its nits go back to the implementer for one more round"),
+            ("a review with verdict `ready_nits_only` goes to the merge request", "a review with verdict `ready_nits_only` gets one more round"),
+        ):
+            with self.subTest(old=old):
+                self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", old, new))
+        self.assertIn("review-token-rules", self.doc_replace(
+            "REVIEW.md", "a `ready_nits_only` verdict is final, its nits are accepted with no fix round, no re-review and no follow-up issue",
+            "a `ready_nits_only` verdict is final, its nits are fixed in a last round"))
+        self.assertIn("orch-token-rules", self.role_replace(
+            "orchestrator", "a `ready_nits_only` review goes to the merge request with its nits accepted (no fix round, no re-review, no follow-up issue)",
+            "a `ready_nits_only` review goes to one more round"))
+
+    # Rule 2: a Sonnet medium re-check of a small fix-only or docs-only commit; full rounds stay Opus.
+    def test_a_weakened_recheck_rule_is_rejected(self):
+        self.assertIn("orch-token-rules", self.doc_replace(
+            "docs/ORCHESTRATION.md", "done by a fresh sonnet medium reviewer", "done by a fresh opus max reviewer"))
+        self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "full rounds stay opus", "full rounds are sonnet"))
+        self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "about 30 changed lines or fewer in total", "of any size"))
+        self.assertIn("orch-token-rules", self.doc_replace(
+            "docs/ORCHESTRATION.md", "a small fix-only or docs-only commit that fixes the previous round's findings gets the cheap re-check",
+            "a small fix-only or docs-only commit gets the cheap re-check"))
+        for stale in ("(the fixes of the previous round's findings, each about 30 changed lines or fewer, or docs only)",):  # R1-01
+            self.assertIn("orch-token-rules", self.doc_ids("docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\n" + stale + "\n"))
+        self.assertIn("orch-token-rules", self.role_replace("orchestrator", "goes to a sonnet medium `recheck-reviewer`; full rounds stay opus",
+                                                             "goes to a fresh opus round"))
+        self.assertIn("reviewer-recheck", self.role_replace(
+            "reviewer", "gets the same inputs as any delta review and focuses on the findings and the commit named in the spawn message",
+            "reviews everything again"))
+        self.assertIn("reviewer-recheck", self.role_replace("reviewer", "gets the same inputs as any delta review and focuses on",
+                                                            "checks only"))  # R1-04: one statement of the inputs
+
+    def test_the_recheck_role_is_sonnet_medium_and_the_reviewer_effort_is_not_max_for_consistency(self):
+        roles = self.doc("agents/roles.yaml")
+        old = "  recheck-reviewer:\n    model: sonnet"
+        self.assertIn(old, roles)
+        self.assertIn("roles-recheck-reviewer", self.doc_ids("agents/roles.yaml", roles.replace(old, "  recheck-reviewer:\n    model: opus", 1)))
+        self.assertIn("roles-recheck-reviewer", self.doc_ids("agents/roles.yaml", roles + "\n# Reviewers run at max for consistency.\n"))
+        self.assertIn("roles-recheck-reviewer", self.doc_ids("agents/roles.yaml", roles.replace("effort: medium\n    session: fresh, for the re-check",
+                                                                                                "effort: max\n    session: fresh, for the re-check", 1)))
+        self.assertNotIn("roles-recheck-reviewer", self.doc_ids("agents/roles.yaml", roles))
+
+    # Rule 3: hardening PRs stop at the second round with new bypass forms.
+    def test_a_weakened_hardening_stop_is_rejected(self):
+        for old, new in (
+            ("the second round that finds new bypass forms ends the pr", "every round that finds new bypass forms gets a fix round"),
+            ("the forms are recorded as accepted residuals in the pr body", "the forms are fixed before the merge request"),
+            ("on a pr that hardens `scripts/guards.sh`, `scripts/hooks/pretooluse_guard.py` or `scripts/prompt_rules.py`", "on any pr"),
+        ):
+            with self.subTest(old=old):
+                self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", old, new))
+        # R1-02: no clause beyond the owner text ("the PR stops there")
+        self.assertIn("orch-token-rules", self.doc_ids(
+            "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\nAny other finding above nit is still fixed.\n"))
+        self.assertIn("review-token-rules", self.doc_replace(
+            "REVIEW.md", "the second round that reports new bypass forms ends the pr", "the fourth round that reports new bypass forms ends the pr"))
+        self.assertIn("orch-token-rules", self.role_replace(
+            "orchestrator", "the second round that finds new bypass forms ends the pr", "a new bypass form always gets a fix round"))
+
+    # Metrics: one row per archived session.
+    def test_the_metrics_row_per_archived_session_is_pinned(self):
+        self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "(one per session, written as it is archived)", "(one per worker)"))
+        self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "for every role, reviewers included", "for implementers"))
+        self.assertIn("orch-token-rules", self.role_replace("orchestrator", "write each session's `metrics:session` row (§6.1) just before archiving it",
+                                                             "archive each session"))
+
+    # Issue 147: the owner merges owner-only PRs, not every PR.
+    def test_the_stale_owner_merges_every_pr_wording_is_rejected(self):
+        for path, stale in (
+            ("docs/ORCHESTRATION.md", "The owner's queue is `is:open is:pr draft:false`."),
+            ("docs/ORCHESTRATION.md", "**Before asking the owner to merge** the orchestrator checks"),
+            ("docs/ORCHESTRATION.md", "After each owner merge, the **orchestrator** updates the next ready PR."),
+            ("docs/ORCHESTRATION.md", "agent PRs stay draft until the orchestrator marks one ready because it is mergeable; the owner merges."),
+            ("docs/ORCHESTRATION.md", "then the merge agent merges it, or the owner for an owner-only PR (§7.5)."),  # R1-03
+            ("docs/ORCHESTRATION.md", "After each merge by the owner, the **orchestrator** updates the next ready owner-only PR."),
+            ("docs/ORCHESTRATION.md", "Owner-only PRs wait in the owner's queue."),
+        ):
+            with self.subTest(stale=stale):
+                self.assertIn("orch-owner-merge-exceptions", self.doc_ids(path, self.doc(path) + "\n" + stale + "\n"))
+        self.assertIn("orch-owner-merge-exceptions", ids(prompt_rules.check_text(
+            "orchestrator", real("orchestrator") + "\nAsk the owner for merges and decisions.\n")))
+
+    def test_each_owner_merge_exception_is_needed(self):
+        for old, new in (
+            ("owner-only prs wait for the owner's batch approval (below), every other one goes to the merge agent",
+             "every ready pr goes to the owner"),
+            ("to the merge agent, or as a batch-approval request to the owner for an owner-only pr) the orchestrator checks",
+             "to the owner) the orchestrator checks"),
+            ("then the merge agent merges it: a `general` pr under the standing authorization, an owner-only pr as kind `owner-batch` once the "
+             "owner's batch approval lists it (§7.5)", "then the owner merges it"),
+            ("by the merge agent itself with `scripts/update-branch.sh` (above) when it is in the merge agent's batch; otherwise",
+             "by the owner; otherwise"),
+        ):
+            with self.subTest(old=old):
+                self.assertIn("orch-owner-merge-exceptions", self.doc_replace("docs/ORCHESTRATION.md", old, new))
+        self.assertIn("orch-owner-merge-exceptions", self.role_replace(
+            "orchestrator", "(the merge agent merges them as `owner-batch` once approved, and every other ready pr, §7.5)", "(never the merge agent)"))
+        self.assertIn("orch-merge-request", self.role_replace(
+            "orchestrator", "before you send it (to the merge agent, or as a batch-approval request to the owner for an owner-only pr), check that",
+            "after the owner merged, check that"))
+
+    # Issue 218: the manual dispatcher line stays until detekt 2.0 is stable.
+    def test_the_dispatcher_review_line_needs_its_scope_and_its_severity(self):
+        for old, new in (
+            ("(`:core:data` and `:app` prs)", "(`:core:data` prs)"),
+            ("tracked on m6", "tracked on m1"),
+            ("a hard-coded dispatcher is a `minor` finding", "a hard-coded dispatcher is a `nit`"),
+            ("`dispatchers.io`, `dispatchers.default` or `dispatchers.main`", "`dispatchers.io`"),
+        ):
+            with self.subTest(old=old):
+                self.assertIn("review-dispatchers", self.doc_replace("REVIEW.md", old, new))
+
+    # #260 items 1, 9, 10, 11.
+    def test_the_nit_wording_of_issue_260_is_pinned(self):
+        for stale in ("eight", "ten", "eleven"):
+            self.assertIn("branch-protection-job-count", self.doc_ids(
+                "docs/BRANCH-PROTECTION.md", self.doc("docs/BRANCH-PROTECTION.md") + f"\n- Only the {stale} jobs above.\n"))
+        self.assertIn("orch-labels-exist", self.doc_ids(
+            "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\nThe `owner-todo` label is not created yet.\n"))
+        self.assertIn("followups-title-forms", self.doc_ids(
+            "docs/FOLLOW-UPS.md", self.doc("docs/FOLLOW-UPS.md") + "\nIssue title: `[follow-up] <finding title>`. Labels exist.\n"))
+        self.assertIn("followups-burndown-alerts", self.doc_replace(
+            "docs/FOLLOW-UPS.md", "it also reviews every open dependabot alert", "it also closes nothing"))
+
+
+class DelegatedDecisionsTests(unittest.TestCase):
+    """Owner decision, #15 comment 7075812943: four decision types go to agents (tooling PR approval, round-cap rulings, over-cap deferrals,
+    risk:high starts). Each clause is pinned in ORCHESTRATION, the orchestrator prompt and the approver prompt, and fails when deleted or weakened."""
+
+    RETAINED = (
+        "settings outside git (repository settings, rulesets, environments, collaborator access)",
+        "`.claude` permissions and settings", "network allowlists", "licence and permission acceptances", "guard thresholds (600/1500)",
+        "design and product sign-off",
+        "merges of PRs with security-rules or sync-merge content (firebase/ rules, sync and merge logic)",
+        "changes to the process files that define these authorities "
+        "(CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, agents/roles.yaml, agents/prompts/)",
+    )
+    # The shared block of ORCHESTRATION 1.1 and the orchestrator prompt: (rule's clause, a weakened form).
+    BLOCK = (
+        ("Delegated decisions (owner decision, #15 comment 7075812943, 2026-11-22): four decision types go to agents.", "Decisions stay with the owner."),
+        ("the orchestrator spawns a fresh Opus high approver session per PR (`agents/prompts/approver.md`)", "the orchestrator asks the owner per PR"),
+        ("and posts the anchored `batch approval: #N@sha` decision record on #15 with its session id", "and comments on the PR"),
+        ("the merge agent merges it as `owner-batch`", "the merge agent waits for the owner"),
+        ("the owner keeps a veto: a `veto #N` comment on #15 before the merge stops it", "the owner has no say"),
+        ("after round 4 (or a later capped round) the escalation reviewer's ruling (`fix`, `split`, or what would have been `owner`) is final, "
+         "and the orchestrator follows it without asking", "the escalation reviewer's ruling goes to the owner"),
+        ("the orchestrator may defer a minor finding past the 8-per-milestone follow-up cap when its fix is out of the PR's scope or the PR is "
+         "at the line guard, with the usual follow-up issue and `decision` comment; majors still need the owner",
+         "the orchestrator may defer any finding past the cap"),
+        ("the orchestrator starts `risk:high` tasks without asking; they still get max effort, a second reviewer every round and a clean "
+         "second-reviewer pass before READY", "the orchestrator asks before it starts `risk:high` tasks"),
+    )
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def doc_ids(self, path, text):
+        return ids(prompt_rules.check_doc_text(path, text))
+
+    def doc_replace(self, path, old, new):
+        norm = prompt_rules.normalize(self.doc(path))
+        self.assertIn(old.lower(), norm.lower(), f"{path} lacks {old!r}")
+        return self.doc_ids(path, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I))
+
+    def role_replace(self, role, old, new):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), norm.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    def test_the_rules_exist_for_the_right_roles_and_files_and_the_real_text_passes(self):
+        by_id = {r.id: r for r in prompt_rules.RULES}
+        for rid, role in (("delegated-decisions", "orchestrator"), ("approver-role", "approver")):
+            self.assertEqual(by_id[rid].roles, (role,), rid)
+            self.assertNotIn(rid, ids(prompt_rules.check_text(role, real(role))), rid)
+        by_doc = {(r.id, r.path) for r in prompt_rules.DOC_RULES}
+        for rid, path in (("orch-delegated-decisions", "docs/ORCHESTRATION.md"), ("roles-approver", "agents/roles.yaml")):
+            self.assertIn((rid, path), by_doc)
+            self.assertNotIn(rid, self.doc_ids(path, self.doc(path)), rid)
+
+    def test_the_wording_in_the_wrong_file_does_not_count(self):
+        self.assertIn("orch-delegated-decisions", self.doc_ids("docs/ORCHESTRATION.md", self.doc("REVIEW.md")))
+        self.assertIn("roles-approver", self.doc_ids("agents/roles.yaml", ""))
+        self.assertIn("approver-role", ids(prompt_rules.check_text("approver", real("orchestrator"))))
+        self.assertIn("delegated-decisions", ids(prompt_rules.check_text("orchestrator", real("approver"))))
+
+    def test_every_clause_of_the_shared_block_is_pinned_in_orchestration_and_the_orchestrator_prompt(self):
+        for old, new in self.BLOCK:
+            with self.subTest(old=old[:50]):
+                self.assertIn("orch-delegated-decisions", self.doc_replace("docs/ORCHESTRATION.md", old, new))
+                self.assertIn("delegated-decisions", self.role_replace("orchestrator", old, new))
+
+    def test_the_owner_retained_list_is_exact_in_all_three_texts(self):
+        lead = "Stays with the owner: "
+
+        def edited(norm, old, new):  # edit only inside the retained sentence: the ask list names some of the same items
+            if old == lead:
+                return norm.replace(lead, new, 1)
+            head, sep, tail = norm.partition(lead)
+            self.assertTrue(sep and old in tail, f"{old!r} is not in the retained sentence")
+            return head + sep + tail.replace(old, new, 1)
+
+        def failing(label, norm, old, new):
+            if label == "ORCHESTRATION":
+                return self.doc_ids("docs/ORCHESTRATION.md", edited(norm, old, new))
+            role = "orchestrator" if label == "orchestrator" else "approver"
+            return ids(prompt_rules.check_text(role, edited(norm, old, new)))
+
+        norms = {"ORCHESTRATION": prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md")),
+                 "orchestrator": prompt_rules.normalize(real("orchestrator")), "approver": prompt_rules.normalize(real("approver"))}
+        rule_of = {"ORCHESTRATION": "orch-delegated-decisions", "orchestrator": "delegated-decisions", "approver": "approver-role"}
+        for label, norm in norms.items():
+            edits = [(item, "") for item in self.RETAINED]
+            edits += [(lead, "Also with the owner: "), ("network allowlists, ", "network allowlists, branch names, ")]
+            for old, new in edits:
+                with self.subTest(text=label, old=old[:40]):
+                    self.assertIn(rule_of[label], failing(label, norm, old, new))
+
+    def test_the_ask_list_no_longer_sends_the_three_delegated_decisions_to_the_owner(self):
+        for stale in ("\n* the escalation reviewer's `owner` ruling, or anything above nit still open after round 5 (§6.2, §7.2.2);\n",
+                      "\n* `risk:high` work (before starting it);\n"):
+            self.assertIn("orch-autonomy", self.doc_ids("docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + stale))
+        for stale in ("Stop and ask the owner for: `risk:high` work before starting it.",
+                      "Stop and ask the owner for: the escalation reviewer's `owner` ruling."):
+            self.assertIn("autonomy", ids(prompt_rules.check_text("orchestrator", real("orchestrator") + "\n" + stale + "\n")))
+        self.assertIn("orch-autonomy", self.doc_replace(
+            "docs/ORCHESTRATION.md", "* merges of PRs that stay with the owner (below, §7.5);", "* merges of owner-only PRs (§7.5);"))
+        self.assertIn("autonomy", self.role_replace(
+            "orchestrator", "for: merges of PRs that stay with the owner (below);", "for: merges of owner-only PRs;"))
+
+    def test_orchestration_7_5_pins_the_approver_procedure(self):
+        for old, new in (
+            ("an approver agent's anchored `batch approval:` record on #15 counts as the owner's batch approval",
+             "an approver agent's comment is advice"),
+            ("(`agents/prompts/approver.md`, Opus high, `agents/roles.yaml`)", "(Sonnet)"),
+            ("with the PR number, the head SHA, the round history and the deferral records", "with the PR number"),
+            ("It checks `REVIEW.md`, the clean final round, CI, that no closing keyword precedes an issue number, the PR's changed paths against the "
+             "owner-retained list (§1.1) and the owner's veto", "It checks CI"),
+            ("it never merges, edits or pushes", "it may merge"),
+            ("The merge agent merges the listed PR as `owner-batch` with `--approval <comment-id>`", "The orchestrator merges the PR"),
+            ("the merge agent right before it runs `scripts/merge_ready.py`", "the merge agent after the merge"),
+            ("is refused by the approver and waits for the owner's own batch approval", "is approved as well"),
+        ):
+            with self.subTest(old=old[:50]):
+                self.assertIn("orch-delegated-decisions", self.doc_replace("docs/ORCHESTRATION.md", old, new))
+        self.assertIn("delegated-decisions", self.role_replace(
+            "orchestrator", "check for a `veto #N` comment on #15 before you send the merge request", "ignore vetoes"))
+
+    def test_the_cap_and_ruling_sections_carry_the_decision(self):
+        for old, new in (
+            ("Over the cap the orchestrator may still defer a minor finding whose fix is out of the PR's scope, or when the PR is at the line guard, "
+             "with the usual follow-up issue and `decision` comment, without asking; majors still need the owner",
+             "Over the cap the orchestrator asks the owner"),
+            ("Its ruling per PR is final (owner decision, #15 comment 7075812943) and the orchestrator follows it without asking",
+             "Its ruling per PR goes to the orchestrator"),
+        ):
+            with self.subTest(old=old[:50]):
+                self.assertIn("orch-delegated-decisions", self.doc_replace("docs/ORCHESTRATION.md", old, new))
+
+    def test_the_approver_record_is_the_one_exception_to_owner_only_batch_approvals(self):
+        self.assertIn("orch-delegated-decisions", self.doc_replace(
+            "docs/ORCHESTRATION.md", "The approver's record of the delegation below is the one exception.", ""))
+
+    # The approver prompt.
+    def test_each_approver_clause_is_pinned(self):
+        for old in (
+            "Fresh session, one per PR",
+            "Opus, high effort (`agents/roles.yaml`; you do not change your own effort)",
+            "Inputs (from the spawn message): the PR number, the head SHA, the round history and the deferral records",
+            "1. Head:", "2. Scope:", "3. REVIEW.md:", "4. Clean final round:", "5. CI:", "6. No closing keyword:", "7. Veto:",
+            "refuse if one fails",
+            "a design or product doc, is not yours to approve",
+            "whose first line is `batch approval: #N@<full head sha> (approver session <your session id>)`",
+            "post one PR comment `approval refused` with the failed items and their evidence",
+            "Then post the WORKER-RESULT block",
+            "NEVER merge, mark ready, label, review-approve, edit files, or push to the PR branch",
+            "Your last action: send_message to the orchestrator session named in the spawn message",
+        ):
+            with self.subTest(old=old[:40]):
+                self.assertIn("approver-role", self.role_replace("approver", old, "x"))
+
+    def test_an_approver_prompt_that_lets_it_merge_edit_or_push_is_rejected(self):
+        for stale in ("You may merge the PR when every check passes.", "You can push a fix to the PR branch.",
+                      "You should edit the files to fix small findings.", "You will mark the PR ready."):
+            with self.subTest(stale=stale):
+                self.assertIn("approver-role", ids(prompt_rules.check_text("approver", real("approver") + "\n" + stale + "\n")))
+
+    def test_the_approver_carries_the_common_rules_and_check_dir_needs_its_file(self):
+        got = ids(prompt_rules.check_text("approver", "report only"))
+        self.assertTrue({"data-fenced", "no-resolve-thread"} <= got)
+        with tempfile.TemporaryDirectory() as d:
+            for role in ROLES:
+                if role != "approver":
+                    shutil.copy(PROMPTS / f"{role}.md", d)
+            self.assertIn("approver.md: cannot read (No such file or directory)", prompt_rules.check_dir(d))
+
+    # roles.yaml.
+    def test_roles_yaml_has_the_approver_as_opus_high_one_per_pr(self):
+        for old, new in (
+            ("approver: model: opus effort: high", "approver: model: sonnet effort: medium"),
+            ("approver: model: opus effort: high", "approver: model: opus effort: max"),
+            ("session: fresh, one per PR (inputs: PR number, head SHA, round history, deferral records)", "session: long-lived"),
+            ("prompt: agents/prompts/approver.md", "prompt: agents/prompts/reviewer.md"),
+        ):
+            with self.subTest(old=old):
+                self.assertIn("roles-approver", self.doc_replace("agents/roles.yaml", old, new))
+
+    def test_the_approver_prompt_exists_and_roles_yaml_names_it(self):
+        self.assertTrue((PROMPTS / "approver.md").is_file())
+        self.assertIn("approver", prompt_rules.ROLES)
+
+
+class PrReviewRound1Tests(unittest.TestCase):
+    """PR #299, round 1 (R1-01 to R1-04): the autonomy pin bites, an `owner` ruling is decided by the escalation reviewer, the over-cap
+    exception and the approver record are stated where the old rule is, and the approver scope is the one of ORCHESTRATION 7.5."""
+
+    OWNER_RULING = ("`owner`: taste or scope: you decide it yourself, per finding `fix` or `drop`; "
+                    "your ruling is final (owner decision, #15 comment 7075812943).")
+    ORCH_OWNER = "an `owner` ruling decides the taste or scope question itself, per finding `fix` or `drop`, and is final"
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def doc_swap(self, path, old, new):
+        norm = prompt_rules.normalize(self.doc(path))
+        self.assertIn(old.lower(), norm.lower(), f"{path} lacks {old!r}")
+        return ids(prompt_rules.check_doc_text(path, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    def role_swap(self, role, old, new):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), norm.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    # R1-01: the pin must still bite when the same words are in the owner-retained sentence.
+    def test_the_ask_list_clauses_stay_pinned_although_the_retained_list_repeats_them(self):
+        for old in ("licence and permission acceptances (never accept them for the owner)", "repository settings and visibility"):
+            with self.subTest(old=old):
+                self.assertIn("autonomy", self.role_swap("orchestrator", old, ""))
+        self.assertTrue(len(re.findall(r"licence and permission acceptances", prompt_rules.normalize(real("orchestrator")))) >= 2)
+
+    # R1-02: what an `owner` ruling means.
+    def test_the_escalation_reviewer_decides_an_owner_ruling_itself(self):
+        norm = prompt_rules.normalize(real("escalation-reviewer"))
+        self.assertIn(self.OWNER_RULING, norm)
+        self.assertIn("escalation-role", self.role_swap("escalation-reviewer", self.OWNER_RULING, "`owner`: taste or scope goes to the owner."))
+        self.assertIn("escalation-role", ids(prompt_rules.check_text(
+            "escalation-reviewer", real("escalation-reviewer") + "\nAn `owner` finding stays open for the owner.\n")))
+
+    def test_the_orchestrator_and_orchestration_follow_the_owner_ruling_of_the_escalation_reviewer(self):
+        self.assertIn(self.ORCH_OWNER, prompt_rules.normalize(real("orchestrator")))
+        self.assertIn(self.ORCH_OWNER, prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md")))
+        self.assertIn("orch-spawn-checks", self.role_swap("orchestrator", self.ORCH_OWNER, "`owner` goes to the owner"))
+        self.assertIn("orch-spawn-checks", self.doc_swap("docs/ORCHESTRATION.md", self.ORCH_OWNER, "`owner` goes to the owner"))
+
+    def test_review_md_says_the_escalation_reviewer_decides_taste_or_scope(self):
+        for old, new in (("which the escalation reviewer decides itself, per finding `fix` or `drop`", "which stay with the owner"),
+                         ("No finding is left open for the owner.", "An `owner` finding stays open for the owner.")):
+            self.assertIn("review-escalation", self.doc_swap("REVIEW.md", old, new))
+
+    # R1-03: the stale ask wording.
+    def test_the_over_cap_exception_is_stated_where_the_stop_and_ask_rule_is(self):
+        clause = "The over-cap deferrals of the delegated decisions (3) are the exception."
+        self.assertIn(clause.lower(), prompt_rules.normalize(real("orchestrator")).lower())
+        self.assertIn("orch-deferral", self.role_swap("orchestrator", clause, ""))
+        follow = ("the orchestrator may still defer minors out of the PR's scope or at the line guard "
+                  "(owner decision, #15 comment 7075812943; an implementer in a manual loop still asks the owner)")
+        self.assertIn("followups-over-cap", self.doc_swap("docs/FOLLOW-UPS.md", follow, ""))
+
+    def test_risk_high_is_no_longer_listed_as_needing_an_owner_approval(self):
+        norm = prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))
+        self.assertNotIn("starting `risk:high` work", norm)
+        self.assertIn("orch-delegated-decisions", self.doc_swap(
+            "docs/ORCHESTRATION.md", "Approvals of orchestrator decisions (merges of PRs that stay with the owner)",
+            "Approvals of orchestrator decisions (merges, starting `risk:high` work)"))
+
+    def test_the_approver_record_is_named_where_owner_only_prs_wait_for_the_owner(self):
+        for path, rule in (("REVIEW.md", "review-approver-record"), ("docs/PLAN.md", "plan-approver-record")):
+            norm = prompt_rules.normalize(self.doc(path))
+            self.assertIn("the approver's record", norm, path)
+            self.assertIn(rule, self.doc_swap(path, "the approver's record", "nothing"))
+
+    # R1-04: one scope rule in both texts.
+    def test_the_approver_scope_is_that_of_section_7_5_and_matches_merge_ready(self):
+        clause = ("every owner-only changed path is tooling, build, CI or gate (`scripts/`, build files, `ci.yml` and other workflows, "
+                  "`verification-metadata`, architecture and gate tests, `merge_ready.py` and similar); a path that may merge as `general` "
+                  "(as `scripts/merge_ready.py` `owner_only` decides, e.g. `docs/tasks.toml`) does not count")
+        self.assertIn(clause.lower(), prompt_rules.normalize(real("approver")).lower())
+        self.assertIn("approver-role", self.role_swap(
+            "approver", "a path that may merge as `general` (as `scripts/merge_ready.py` `owner_only` decides, e.g. `docs/tasks.toml`) does not count", ""))
+        self.assertIn("approver-role", self.role_swap("approver", "every owner-only changed path is", "every changed path is"))
+        import merge_ready
+        self.assertFalse(merge_ready.owner_only("docs/tasks.toml"))  # the example of R1-04: a gate PR that marks its task done
+
+
+class SpeedWordingTests(unittest.TestCase):
+    """Owner decision, #15 comment 7075952806 item 2 (reviews start on push, no loop-wait for CI, CI green before READY and the merge request),
+    and the four accepted nits of PR #299 round 2 (R2-01 to R2-04). Each new wording is pinned and fails when removed or when the old form returns."""
+
+    PUSH_BULLET = ("**Reviews start on push (owner decision, #15 comment 7075952806):** the orchestrator spawns the reviewer as soon as the "
+                   "implementer has pushed, without waiting for CI.")
+    OLD_RECIPE = "Wait for CI and verify.sh with a Monitor/until-loop and do not end the turn while waiting."
+    ESCALATION_FIX = ("A per-finding `fix` gets the same one fresh round 5 as a `fix` ruling "
+                      "(anything above nit still open after it goes to the owner).")
+    ESCALATION_FIX_REVIEW = ("a per-finding `fix` gets the same one fresh round 5 as a `fix` ruling "
+                             "(anything above nit still open after it goes to the owner)")
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def doc_swap(self, path, old, new):
+        norm = prompt_rules.normalize(self.doc(path))
+        self.assertIn(old.lower(), norm.lower(), f"{path} lacks {old!r}")
+        return ids(prompt_rules.check_doc_text(path, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    def role_swap(self, role, old, new):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), norm.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    def test_orchestration_has_one_home_for_the_push_rule_and_the_other_sections_link_to_it(self):
+        norm = prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))
+        self.assertIn(self.PUSH_BULLET.lower(), norm.lower())
+        for old in (self.PUSH_BULLET, "(4) CI is green on the PR head (§7.1)",
+                    "marks a draft PR ready after clean review rounds and with CI green on the head (§7.1)",
+                    "do not loop-wait for CI after every fix push (reviews start on push, §7.1)",
+                    "After every fix push do not wait in a loop for CI: the reviewer starts on your push (ORCHESTRATION §7.1)"):
+            with self.subTest(old=old):
+                self.assertIn("orch-reviews-on-push", self.doc_swap("docs/ORCHESTRATION.md", old, "nothing"))
+
+    def test_the_old_loop_wait_recipe_is_forbidden_everywhere(self):
+        self.assertIn("orch-reviews-on-push", ids(prompt_rules.check_doc_text(
+            "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\n" + self.OLD_RECIPE + "\n")))
+        for role in ("orchestrator", "implementer"):
+            with self.subTest(role=role):
+                self.assertIn(f"{'orch' if role == 'orchestrator' else 'implementer'}-reviews-on-push",
+                              ids(prompt_rules.check_text(role, real(role) + "\n" + self.OLD_RECIPE + "\n")))
+                self.assertNotIn(self.OLD_RECIPE.lower(), prompt_rules.normalize(real(role)).lower())
+        self.assertNotIn(self.OLD_RECIPE.lower(), prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md")).lower())
+
+    def test_the_role_prompts_carry_the_push_rule(self):
+        for role, rule, old in (
+                ("orchestrator", "orch-reviews-on-push",
+                 "Reviews start on push (§7.1, owner decision, #15 comment 7075952806): spawn the reviewer as soon as the implementer has "
+                 "pushed, without waiting for CI"),
+                ("orchestrator", "orch-reviews-on-push", "CI must be green on the head before you mark the PR READY and before the merge request"),
+                ("orchestrator", "orch-reviews-on-push", "the implementer does not wait in a loop for CI after every fix push"),
+                ("orchestrator", "orch-reviews-on-push", "do not loop-wait for CI after every fix push (reviews start on push, §7.1)"),
+                ("implementer", "implementer-reviews-on-push",
+                 "Reviews start on push (`docs/ORCHESTRATION.md` §7.1, owner decision, #15 comment 7075952806): the orchestrator spawns the reviewer "
+                 "as soon as you have pushed; do not wait in a loop for CI after every fix push"),
+                ("implementer", "implementer-reviews-on-push", "end the turn with all work committed and pushed"),
+                ("implementer", "implementer-reviews-on-push", "CI must be green before READY and before the merge request")):
+            with self.subTest(role=role, old=old):
+                self.assertIn(old.lower(), prompt_rules.normalize(real(role)).lower())
+                self.assertIn(rule, self.role_swap(role, old, "nothing"))
+
+    # R2-01
+    def test_plan_says_what_still_reaches_the_owner_after_a_fix_ruling(self):
+        clause = "its ruling is final; only a finding above nit still open after a `fix` ruling's round 5 reaches you"
+        self.assertIn(clause.lower(), prompt_rules.normalize(self.doc("docs/PLAN.md")).lower())
+        self.assertIn("plan-escalation-final", self.doc_swap("docs/PLAN.md", clause, ""))
+        for stale in ("its ruling is final, so nothing it decides reaches you", "only what it sends to the owner reaches you"):
+            with self.subTest(stale=stale):
+                self.assertIn("plan-escalation-final", self.doc_swap("docs/PLAN.md", clause, stale))
+
+    # R2-02
+    def test_followups_names_who_may_defer_over_the_cap_and_the_summary_row_has_the_exception(self):
+        norm = prompt_rules.normalize(self.doc("docs/FOLLOW-UPS.md")).lower()
+        row = ("asks the owner which follow-ups to fix as small PRs (except the orchestrator's deferral of minors out of the PR's scope "
+               "or at the line guard, #15 comment 7075812943)")
+        self.assertIn(row.lower(), norm)
+        self.assertIn("followups-over-cap", self.doc_swap("docs/FOLLOW-UPS.md", row, "asks the owner which follow-ups to fix as small PRs"))
+        self.assertIn("followups-over-cap", self.doc_swap(
+            "docs/FOLLOW-UPS.md", "the orchestrator may still defer minors out of the PR's scope",
+            "minors out of the PR's scope"))
+        self.assertIn("followups-over-cap", self.doc_swap(
+            "docs/FOLLOW-UPS.md", "the orchestrator may still defer minors out of the PR's scope or at the line guard",
+            "minors out of the PR's scope or at the line guard may still be deferred"))
+
+    # R2-03: see PrReviewRound1Tests.test_the_approver_scope_is_that_of_section_7_5_and_matches_merge_ready for the pin and its negative cases.
+    def test_the_approver_parenthetical_names_the_deciding_script_not_an_example_of_a_general_path(self):
+        norm = prompt_rules.normalize(real("approver")).lower()
+        self.assertNotIn("(`scripts/merge_ready.py`) does not count", norm)
+        self.assertIn("approver-role", ids(prompt_rules.check_text(
+            "approver", real("approver").replace(
+                "(as `scripts/merge_ready.py` `owner_only` decides, e.g. `docs/tasks.toml`) does not count",
+                "(`scripts/merge_ready.py`) does not count"))))
+
+    # R2-04
+    def test_a_per_finding_fix_gets_the_round_5_of_a_fix_ruling(self):
+        self.assertIn(self.ESCALATION_FIX.lower(), prompt_rules.normalize(real("escalation-reviewer")).lower())
+        self.assertIn("escalation-role", self.role_swap("escalation-reviewer", self.ESCALATION_FIX, ""))
+        self.assertIn(self.ESCALATION_FIX_REVIEW.lower(), prompt_rules.normalize(self.doc("REVIEW.md")).lower())
+        self.assertIn("review-escalation", self.doc_swap("REVIEW.md", self.ESCALATION_FIX_REVIEW, ""))
+
+    # PR #306 round 1, R1-02: the decision has two parts, each in its right place.
+    WIDENED = ("After a push do not wait in a loop for CI.", "do not loop-wait for CI after a push", "does not wait in a loop for CI after a fix push")
+
+    def test_the_decision_is_split_in_its_two_parts_and_the_widened_forms_are_forbidden(self):
+        home = prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md")).lower()
+        for part in ("spawns the reviewer as soon as the implementer has pushed, without waiting for ci",
+                     "does not wait in a loop for ci after every fix push"):
+            self.assertIn(part, home)
+        for role, rule in (("orchestrator", "orch-reviews-on-push"), ("implementer", "implementer-reviews-on-push")):
+            for widened in self.WIDENED:
+                with self.subTest(role=role, widened=widened):
+                    self.assertIn(rule, ids(prompt_rules.check_text(role, real(role) + "\n" + widened + "\n")))
+        for widened in self.WIDENED:
+            with self.subTest(doc="ORCHESTRATION", widened=widened):
+                self.assertIn("orch-reviews-on-push", ids(prompt_rules.check_doc_text(
+                    "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\n" + widened + "\n")))
+
+    def test_the_implementer_prompt_says_the_reviewer_starts_on_its_push_and_that_a_fix_push_is_not_waited_on(self):
+        norm = prompt_rules.normalize(real("implementer")).lower()
+        self.assertIn("the orchestrator spawns the reviewer as soon as you have pushed", norm)
+        self.assertIn("do not wait in a loop for ci after every fix push", norm)
+
+    # PR #306 round 1, R1-01: the round-5 clause of the `fix` bullet stays pinned although REVIEW.md item 4 repeats the words.
+    def test_the_round_5_clause_of_the_fix_bullet_is_pinned_apart_from_the_per_finding_sentence(self):
+        clause = "Anything above `nit` still open after it goes to the owner."
+        norm = prompt_rules.normalize(self.doc("REVIEW.md"))
+        self.assertGreaterEqual(len(re.findall(r"goes to the owner", norm)), 2)
+        self.assertIn("review-escalation", self.doc_swap("REVIEW.md", "and one more fresh round (round 5) reviews. " + clause,
+                                                         "and one more fresh round (round 5) reviews."))
+
+    # PR #306 round 2, R2-02: PLAN section 6 item 2 followed the decision.
+    PLAN_REVIEW = ("A **fresh Claude session** (no shared context) reviews the diff against `REVIEW.md` as soon as the author has pushed, "
+                   "without waiting for CI (`docs/ORCHESTRATION.md` §7.1; CI must be green before the PR is marked READY and before the merge request)")
+
+    def test_plan_section_6_starts_the_review_on_the_push_and_keeps_ci_green_before_ready(self):
+        self.assertIn(self.PLAN_REVIEW.lower(), prompt_rules.normalize(self.doc("docs/PLAN.md")).lower())
+        self.assertIn("plan-review-loop", self.doc_swap(
+            "docs/PLAN.md", self.PLAN_REVIEW, "After CI is green, a **fresh Claude session** (no shared context) reviews the diff"))
+        for part in ("as soon as the author has pushed, without waiting for CI",
+                     "CI must be green before the PR is marked READY and before the merge request"):
+            with self.subTest(part=part):
+                self.assertIn("plan-review-loop", self.doc_swap("docs/PLAN.md", part, "after CI is green"))
 
 
 if __name__ == "__main__":

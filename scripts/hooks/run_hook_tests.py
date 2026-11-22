@@ -16,10 +16,18 @@ import fnmatch
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
-# Rough seconds of the slow files (measured, issue 229). Only balances the shards; a stale entry costs time, never coverage.
-WEIGHTS = {"test_gitenv_isolation.py": 100, "test_gitenv_hostile_config.py": 100, "test_guards_sh.py": 107, "test_guards_cli_flags.py": 36}
+# Rough seconds of the files over about 3 s, each run alone and serially on a 4-core machine (2026-11-22, owner decision 7075952806
+# item 3 on #15); unlisted files count 1. Only balances the shards: a stale entry costs time, never coverage (test_run_hook_tests).
+WEIGHTS = {
+    "test_gitenv_isolation.py": 171, "test_gitenv_hostile_config.py": 170, "test_guards_sh.py": 164, "test_guards_cli_flags.py": 77,
+    "test_guard_hardening4.py": 18, "test_guard_hardening.py": 15, "test_guard_mark_ready.py": 14, "test_guard_round2.py": 9,
+    "test_guard_hardening2.py": 8, "test_guard_hardening3.py": 8, "test_guard_round1.py": 8, "test_guard_forms.py": 8,
+    "test_guard_update_branch.py": 8, "test_guard_actionlint.py": 7, "test_guard_wrapper_forms.py": 6, "test_pretooluse_guard.py": 6,
+    "test_guard_linter_dir.py": 5, "test_run_hook_tests.py": 4, "test_context_guard.py": 3,
+}
 
 
 def partition(files, n):
@@ -38,6 +46,11 @@ def units(start):
     found = [n for n in os.listdir(start) if fnmatch.fnmatch(n, "test*.py") and os.path.isfile(os.path.join(start, n))]
     found += [n for n in os.listdir(start) if os.path.isfile(os.path.join(start, n, "__init__.py"))]
     return sorted(found)
+
+
+def stale_weights(start):
+    """WEIGHTS names that are not units of the suite at `start` (renamed or deleted files)."""
+    return sorted(set(WEIGHTS) - set(units(start)))
 
 
 def count_problem(start, total):
@@ -93,6 +106,18 @@ def main(argv):
         print("hook tests: --jobs needs a whole number of at least 1", file=sys.stderr)
         return 2
     start = os.path.abspath(args.start)
+    # R2-01 (PR 302): run from an empty temporary cwd, never the directory the runner was started in (the repo root for pre-push,
+    # verify.sh and CI), so a relative path, os.getcwd() or git without cwd= cannot read the repo past the pre-push input scope.
+    with tempfile.TemporaryDirectory(prefix="hook-tests-cwd-") as cwd:
+        os.chdir(cwd)
+        os.environ["PWD"] = cwd  # R3-01: chdir does not update PWD, which still named the start directory; shards inherit it
+        try:
+            return run(args, start)
+        finally:
+            os.chdir(os.path.dirname(cwd))
+
+
+def run(args, start):
     if args.jobs > 1 and args.only is None:
         return run_parallel(start, args.jobs)
     loader = unittest.TestLoader()

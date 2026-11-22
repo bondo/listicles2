@@ -19,7 +19,7 @@ Adjustments made while evaluating the first proposal:
 | A hand-written burn-down task goes stale: a planner adds a task and forgets to add it to the burn-down's `depends_on`, so the burn-down could run before the milestone's work is finished. | `scripts/tasks.py validate` enforces it: every milestone with non-owner tasks has exactly one `Mx-FU`, assigned to `implementer`, depending on **every** other non-owner task of that milestone. Later milestones depend on `milestone:Mx`, which includes `Mx-FU`, so the ready query cannot start them early. |
 | "Security-rules / sync-merge / release findings are never deferred" needs a machine-readable tag, or it depends on the orchestrator's memory. | Reviewers tag each finding with `area` (section 5). The follow-up issue carries `area:*` and, for anything protected, a mandatory `owner-ok` label. `tasks.py drift` flags violations (blocker; major or protected area without `owner-ok`; missing severity/target). |
 | A burn-down inside the last PR of a milestone is the PR being merged, so deferring into it defers nothing. | A finding is deferred to the earliest milestone that still has a **later feature PR** (section 3). Findings from PR #16 (M0's last PR, merged after #1) target `M1`. |
-| Deferral with no limit becomes a dumping ground. | Prefer fixing when the fix is small (section 2). More than 8 open deferral follow-ups for one milestone (repo-wide review findings do not count, section 2): the orchestrator stops deferring and asks the owner which follow-ups to fix as their own small PRs (as on #15 comment 6989510779); deferring resumes at 8 or fewer open (`Mx-FU` depends on every task of its milestone, so it cannot start early); re-deferral and majors still need the owner. |
+| Deferral with no limit becomes a dumping ground. | Prefer fixing when the fix is small (section 2). More than 8 open deferral follow-ups for one milestone (repo-wide review findings do not count, section 2): the orchestrator stops deferring and asks the owner which follow-ups to fix as their own small PRs (as on #15 comment 6989510779); deferring resumes at 8 or fewer open (`Mx-FU` depends on every task of its milestone, so it cannot start early); re-deferral and majors still need the owner; the orchestrator may still defer minors out of the PR's scope or at the line guard (owner decision, #15 comment 7075812943; an implementer in a manual loop still asks the owner). |
 | The reviewer's verdict (`ready_nits_only`) was computed before the deferral decision. | `deferred` is a finding status set by the decider (not the reviewer). The verdict counts only unresolved, non-deferred findings, and the next round re-checks every deferral (section 4). |
 
 ## 2. Eligibility (the rules)
@@ -132,7 +132,7 @@ When in doubt: `fix-now`.
 
 ## 7. The issue
 
-Issue title: `[follow-up] <finding title>`. Labels (created once by task M0-O10; the orchestrator
+Issue title: `Follow-up from PR #<n>: <finding title>` (the form in use) or `[follow-up] <finding title>`; a standing item is `Track: <what>`, a finding of a repo-wide review is `Repo review (<aspect>): <finding title>`. Labels (created once by task M0-O10; the orchestrator
 checks they exist before the first filing and creates a missing label with `gh api`. It files with all labels in the same call and on **every** filing checks that the returned issue carries every
 label (the API can drop labels silently, e.g. without push access). If any is still missing it closes that issue, keeps the finding
 `open` (fix-now, or ask the owner), stops deferring and asks the owner):
@@ -168,7 +168,7 @@ adds an `owner-ok` comment link; a follow-up older than one milestone is reporte
 **Burn-down task `Mx-FU`** (in `docs/tasks.toml`, enforced by `tasks.py validate`): an implementer task that
 runs after all of the milestone's work. Done means every issue labelled `target:Mx` is closed or has been
 re-targeted with owner OK. It is a normal PR (one concern, small), which may be empty when no follow-up exists:
-then it only sets `status = "done"`. The milestone's merge/close task depends on it.
+then it only sets `status = "done"`. It also reviews every open Dependabot alert (`docs/SECURITY.md` §1 item 2). The milestone's merge/close task depends on it.
 
 **Ready query** (`ORCHESTRATION.md` §4.3): add a third file and pass it as `--followups`:
 
@@ -201,7 +201,7 @@ with its milestone's own count. `tasks.py followups` lists them by severity; `dr
 
 | Failure | Mitigation |
 |---|---|
-| Deferral used to dodge a fix | Section 2 size and acceptance-criteria tests; reviewers re-check deferrals; more than 8 open deferrals per milestone (repo-wide review issues excluded) stops deferring and asks the owner which follow-ups to fix as small PRs; re-deferral and majors go to the owner |
+| Deferral used to dodge a fix | Section 2 size and acceptance-criteria tests; reviewers re-check deferrals; more than 8 open deferrals per milestone (repo-wide review issues excluded) stops deferring and asks the owner which follow-ups to fix as small PRs (except the orchestrator's deferral of minors out of the PR's scope or at the line guard, #15 comment 7075812943); re-deferral and majors go to the owner |
 | A follow-up is forgotten | `Mx-FU` is a dependency of everything later; `drift` flags open issues targeting a done or dropped burn-down |
 | Protected area slips through | Reviewer `area` tag, `owner-ok` label, `drift` check, PR task `risk = "high"` check by the orchestrator |
 | Labels missing, so issues are unqueryable | Owner task M0-O10; `drift` reports follow-ups lacking `severity:`/`target:` (only works for issues that carry the `follow-up` label, so the orchestrator creates them with all labels in one call) |

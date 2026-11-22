@@ -46,6 +46,13 @@ roles:
     effort: medium
     session: long-lived, started by the orchestrator; merges only under an owner authorization on #15 (7005366747 standing, 7007421567 batches)
     definition: docs/ORCHESTRATION.md section 7.5
+  # Owner decision, #15 comment 7075812943: approves owner-only tooling, build, CI and gate PRs in the owner's place (ORCHESTRATION 7.5); never merges, edits or pushes.
+  approver:
+    model: opus
+    effort: high
+    session: fresh, one per PR (inputs: PR number, head SHA, round history, deferral records)
+    prompt: agents/prompts/approver.md
+  # Reviewer effort is strictly per `max_effort_when`: never max for consistency (owner decision, #15 comment 7070278995; ORCHESTRATION 7.2.3).
   reviewer:
     model: opus
     effort: high
@@ -55,6 +62,12 @@ roles:
       - the PR is tagged risk:high in the milestone doc
       - the PR is labelled area:security-rules, even without the risk:high tag (owner decision, #134; R7 in docs/reviews/README.md)
       - the PR is labelled area:sync-merge, even without the risk:high tag (same decision)
+  # The delta review of a small fix-only or docs-only commit (ORCHESTRATION 7.2.3): the reviewer prompt, focused on the findings it is given.
+  recheck-reviewer:
+    model: sonnet
+    effort: medium
+    session: fresh, for the re-check of a small fix-only or docs-only commit; full rounds use `reviewer`
+    prompt: agents/prompts/reviewer.md
   second-reviewer:
     model: opus
     effort: high

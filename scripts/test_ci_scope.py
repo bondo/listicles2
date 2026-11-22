@@ -147,7 +147,8 @@ class Selftests(unittest.TestCase):
     def test_the_default_scripts_are_the_warnings_jdk_and_java_api_gate_tests(self):
         self.assertEqual(
             ci_scope.SELFTESTS,
-            ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/test_java_api_level_gate.py"),
+            ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/test_java_api_level_gate.py",
+             "scripts/test_google_services_release_gate.py"),
         )
         for p in ci_scope.SELFTESTS:
             self.assertTrue((ROOT / p).is_file(), p)
@@ -163,7 +164,7 @@ def job_in(text, name):
 
 
 # Steps that merged PRs could not add themselves (ci.yml is protected): (job, command, source finding).
-# Each also runs in verify.sh. Sources: PR 224 R1-02, PR 231, PR 235 R1-04, PR 239 R2-02.
+# Each also runs in verify.sh. Sources: PR 224 R1-02, PR 231, PR 235 R1-04, PR 239 R2-02, M1-51.
 CI_STEPS = [
     ("static", "python3 -I scripts/test_check_gradle_wrapper.py", "PR 231"),
     ("static", "python3 -I scripts/check_gradle_wrapper.py", "PR 231"),
@@ -171,6 +172,9 @@ CI_STEPS = [
     ("tasks", "python3 -I scripts/test_dependency_floors.py", "PR 224 R1-02"),
     ("tasks", "python3 -I scripts/dependency_floors.py", "PR 224 R1-02"),
     ("unit", "python3 -I scripts/test_check_test_results.py", "PR 239 R2-02"),
+    ("unit", "python3 -I scripts/test_coverage_impact.py", "M1-07"),
+    ("tasks", "python3 -I scripts/test_check_build_guards.py", "M1-51"),
+    ("tasks", "python3 -I scripts/check_build_guards.py", "M1-51"),
 ]
 
 
@@ -213,8 +217,8 @@ def wiring_problems(text):
     for script in ci_scope.SELFTESTS:
         if script in static:
             problems.append(f"static: calls {script} directly")
-    if "scripts/hooks/run_hook_tests.py --jobs 4" not in (job_in(text, "guards") or ""):
-        problems.append("guards: hook tests not run with --jobs 4")
+    if "scripts/hooks/run_hook_tests.py --jobs 8" not in (job_in(text, "guards") or ""):
+        problems.append("guards: hook tests not run with --jobs 8")
     if "python3 -I scripts/test_ci_scope.py" not in text:
         problems.append("ci.yml does not run test_ci_scope.py")
     return problems
@@ -252,7 +256,7 @@ class CiWiring(unittest.TestCase):
             ("static: gradle step does not use gradle-exclude", ':app:lintDebug "${exclude[@]}"', ":app:lintDebug"),
             ("static: no two-commit checkout", "fetch-depth: 2", "fetch-depth: 1"),
             ("static: calls scripts/test_warnings_gate.py directly", step, "      - run: python3 -I scripts/test_warnings_gate.py\n" + step),
-            ("guards: hook tests not run with --jobs 4", "run_hook_tests.py --jobs 4", "run_hook_tests.py"),
+            ("guards: hook tests not run with --jobs 8", "run_hook_tests.py --jobs 8", "run_hook_tests.py --jobs 4"),
             ("ci.yml does not run test_ci_scope.py", "python3 -I scripts/test_ci_scope.py", "python3 -I scripts/test_nothing.py"),
             ("static: does not run ci_scope.py selftests", "ci_scope.py selftests\n", "ci_scope.py selftests\n          || true\n"),
         ]
@@ -521,7 +525,8 @@ echo "SKIPPED $SKIPPED"
 """
 GATE_STEPS = ("step warnings-gate-tests python3 -I scripts/test_warnings_gate.py",
               "step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py",
-              "step java-api-level-gate-tests python3 -I scripts/test_java_api_level_gate.py")
+              "step java-api-level-gate-tests python3 -I scripts/test_java_api_level_gate.py",
+              "step google-services-release-gate-tests python3 -I scripts/test_google_services_release_gate.py")
 
 
 def gate_block(verify):
@@ -547,11 +552,13 @@ def verify_gate_problems(verify):
     if block is None:
         return ["verify.sh has no top-level ci_scope.py local-scope block"]
     problems = []
-    run_all = ["RAN warnings-gate-tests", "RAN jdk-release-gate-tests", "RAN java-api-level-gate-tests", "EXCLUDE ", "SKIPPED 0"]
+    run_all = ["RAN warnings-gate-tests", "RAN jdk-release-gate-tests", "RAN java-api-level-gate-tests", "RAN google-services-release-gate-tests",
+               "EXCLUDE ", "SKIPPED 0"]
     for stdout, code in (("run", 0), ("", 0), ("skip\nskip", 0), ("skip ", 0), ("Skip", 0), ("skip", 1), ("", 1)):
         if run_gate_block(block, stdout, code) != run_all:
             problems.append(f"does not run the self-tests for scope output {stdout!r}, exit {code}")
-    if run_gate_block(block, "skip") != ["skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, testLicenseeGate "
+    if run_gate_block(block, "skip") != ["skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, "
+                                         "google-services-release-gate-tests, testLicenseeGate "
                                          "(no gate input changed since the merge base with origin/main; scripts/ci_scope.py)",
                                          "EXCLUDE -x testLicenseeGate", "SKIPPED 1"]:
         problems.append("does not skip the self-tests and testLicenseeGate for `skip`")

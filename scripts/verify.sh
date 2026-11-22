@@ -35,13 +35,14 @@ step ci-scope-tests python3 -I scripts/test_ci_scope.py
 # merge base with origin/main; anything but a clean `skip` from scripts/ci_scope.py runs them. CI on main always runs them.
 gate_exclude=()
 if gate_scope=$(python3 -I scripts/ci_scope.py local-scope 2>/dev/null) && [ "$gate_scope" = skip ]; then
-  echo "skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, testLicenseeGate (no gate input changed since the merge base with origin/main; scripts/ci_scope.py)"
+  echo "skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, google-services-release-gate-tests, testLicenseeGate (no gate input changed since the merge base with origin/main; scripts/ci_scope.py)"
   SKIPPED=1
   gate_exclude=(-x testLicenseeGate)
 else
   step warnings-gate-tests python3 -I scripts/test_warnings_gate.py
   step jdk-release-gate-tests python3 -I scripts/test_jdk_release_gate.py
   step java-api-level-gate-tests python3 -I scripts/test_java_api_level_gate.py
+  step google-services-release-gate-tests python3 -I scripts/test_google_services_release_gate.py
 fi
 step java-api-level-tests python3 -I scripts/test_check_java_api_level.py
 step pit-config-tests python3 -I scripts/test_check_pit_config.py
@@ -70,13 +71,18 @@ step wireframes-safety python3 -I scripts/wireframes_safety.py
 step gradle-repos-tests python3 -I scripts/test_check_gradle_repos.py
 step gradle-repos python3 -I scripts/check_gradle_repos.py
 step test-results-gate-tests python3 -I scripts/test_check_test_results.py
+step coverage-impact-tests python3 -I scripts/test_coverage_impact.py
 step screenshots-tests python3 -I scripts/test_screenshots.py
 step screenshots-wiring python3 -I scripts/check_screenshots.py
+step ui-emulators-tests python3 -I scripts/test_check_ui_emulators.py
+step ui-emulators python3 -I scripts/check_ui_emulators.py
 step gitignore-secrets-tests python3 -I scripts/test_gitignore_secrets.py
 step wrapper-checksum-tests python3 -I scripts/test_check_gradle_wrapper.py
 step wrapper-checksum python3 -I scripts/check_gradle_wrapper.py
 step dependency-floors-tests python3 -I scripts/test_dependency_floors.py
 step dependency-floors python3 -I scripts/dependency_floors.py
+step build-guards-tests python3 -I scripts/test_check_build_guards.py
+step build-guards python3 -I scripts/check_build_guards.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
 step python-lint ./scripts/lint_python.sh
 step workflow-lint-tests python3 -I scripts/test_lint_workflows.py
@@ -88,12 +94,16 @@ step java-api-level gradle checkJavaApiLevel
 if [ "$FAST" = 0 ]; then
   step unit-tests gradle testDebugUnitTest :core:domain:test
   step coverage gradle koverVerify -x :core:domain:pitest
+  step coverage-xml gradle koverXmlReport
+  step coverage-impact python3 -I scripts/coverage_impact.py --xml build/reports/kover/report.xml --base origin/main
+  # M1-07: the step passes with uncovered changed lines (koverVerify is the gate); show them, and the files with no coverage data (the one exception to "details only on failure").
+  grep -qE 'uncovered changed lines|no coverage data' "$LOG_DIR/coverage-impact.log" 2>/dev/null && { sed -n '1,12p' "$LOG_DIR/coverage-impact.log" | sed 's/^/      /'; [ "$(wc -l <"$LOG_DIR/coverage-impact.log")" -le 12 ] || echo "      ... more in $LOG_DIR/coverage-impact.log"; }
   step mutation gradle :core:domain:pitest
   step screenshots ./scripts/screenshots.sh verify
 else
-  echo "skip  unit-tests, coverage, mutation, screenshots (--fast)"; SKIPPED=1
+  echo "skip  unit-tests, coverage, coverage-impact, mutation, screenshots (--fast)"; SKIPPED=1
 fi
-step build gradle :app:assembleDebug :app:assembleDebugAndroidTest
+step build gradle :app:assembleDebug :app:assembleDebugAndroidTest :core:data:assembleDebugAndroidTest
 step firebase-install bash -c 'cd firebase && npm ci --silent'
 step firebase-typecheck bash -c 'cd firebase && npm run typecheck --silent'
 step firebase-lint bash -c 'cd firebase && npm run lint --silent'

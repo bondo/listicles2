@@ -26,7 +26,7 @@ time between members. Packing lists, trips and barcodes move to after v1 (milest
 | App Check | Play Integrity provider requiring **device integrity only**, not Play recognition or licensing (the default requires `PLAY_RECOGNIZED`, which a GitHub APK cannot meet[^pi]); debug provider in CI and the emulator; about two weeks of metrics before enforcing; set up before the first external tester (decided 2026-11-17) and enforced before it (owner, #204, #15 comment 7003828200) |
 | AI at runtime | No AI code and no LLM or cloud AI calls (on-device ML Kit only if barcode scanning returns after v1) |
 | Distribution | Signed APK on GitHub Releases on each `v*` tag, signed with an owner-held GitHub key (never committed). Play later, with its own Play App Signing key: **separate keys**, so moving from the GitHub APK to the Play build needs an uninstall (cloud data is kept; decided 2026-11-17). Play account type and the closed test are deferred until Play release is planned. Android developer verification: a free limited-distribution account when available in Denmark (owner task, issue #120) |
-| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then one escalation reviewer decides fix, split or owner) → the merge agent squash-merges every READY PR that is not owner-only; an owner-only PR waits for the owner's approval (`docs/ORCHESTRATION.md` §7.5) |
+| Review | Every change is a PR → CI gates → a separate Claude session with no authoring context reviews it against `REVIEW.md` → fix and re-review until only nits or deferred minors remain (max 4 rounds per batch, then one escalation reviewer decides fix, split or owner) → the merge agent squash-merges every READY PR that is not owner-only; an owner-only PR waits for the owner's approval or the approver's record (`docs/ORCHESTRATION.md` §7.5) |
 | Repo | **Public** (unlimited free GitHub Actions minutes). No secrets in the repo; secrets live in GitHub secrets |
 
 [^gsi]: https://developer.android.com/identity/sign-in/legacy-gsi-migration
@@ -442,7 +442,9 @@ enforce the rules rather than goodwill.
 2. **Git hooks** (installed by `scripts/install-hooks.sh`, which a session-start hook
    runs automatically): pre-commit runs spotless and detekt on the changed modules,
    and pre-push runs the guards, the hook tests and the unit tests (it skips the Gradle unit tests for pushes that only touch
-   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build).
+   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build). It runs the hook tests (`--jobs 4`) only
+   when the push changes a file they read, run or import (`scripts/hooks/prepush_scope.py --hook-tests`; unknown ranges
+   run them); CI's `guards` job runs the full hook suite on every PR.
 3. **Claude Code hooks** in `.claude/settings.json`, which agents can't skip:
    * PreToolUse denies `git commit --no-verify`, `git push --force`, `git reset --hard`
      on shared branches, and pushes to `main`.
@@ -519,8 +521,9 @@ enforce the rules rather than goodwill.
 
 1. The author session opens a small PR (one concern, target under about 400 changed lines),
    using a PR template that covers scope, test evidence, and screenshots for UI changes.
-2. After CI is green, a **fresh Claude session** (no shared context) reviews the diff against
-   `REVIEW.md`: correctness, security rules, test adequacy (do the tests fail when the
+2. A **fresh Claude session** (no shared context) reviews the diff against `REVIEW.md` as soon as the author has pushed,
+   without waiting for CI (`docs/ORCHESTRATION.md` §7.1; CI must be green before the PR is marked READY and before the merge request):
+   correctness, security rules, test adequacy (do the tests fail when the
    code is wrong?), offline/sync behavior, i18n, accessibility, free-tier cost, and
    every `// justified:` suppression.
 3. Findings are posted as one PR comment containing a JSON block (format in
@@ -533,9 +536,9 @@ enforce the rules rather than goodwill.
    may be `deferred` to follow-up issues instead of another round.
 5. Each later round runs in a **new** reviewer session that gets the whole PR diff, the findings JSON of earlier rounds and `REVIEW.md`,
    and focuses on the commits since the last round: it re-checks open findings, reviews the new code and how the fixes interact with the old code.
-6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and the orchestrator marks the PR READY. The merge agent squash-merges it, or an owner-only PR waits for the owner (`docs/ORCHESTRATION.md` §7.5).
+6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and the orchestrator marks the PR READY. The merge agent squash-merges it, or an owner-only PR waits for the owner or the approver's record (`docs/ORCHESTRATION.md` §7.5).
    If round 4 of a batch still has open findings above nit (deferred minors do not count), one escalation reviewer per PR decides
-   fix, split or owner (`REVIEW.md`, Loop and cap); only what it sends to the owner reaches you.
+   fix, split or owner (`REVIEW.md`, Loop and cap); its ruling is final; only a finding above nit still open after a `fix` ruling's round 5 reaches you.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 
@@ -599,11 +602,12 @@ members' changes; a conflict keeps the losing side; so v1 sync design should lea
 
 | Role | Model / effort | Runs as | Gets | Produces |
 |---|---|---|---|---|
-| **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
+| **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for decisions and for batch approvals of owner-only merges (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR; the PR-sized tasks with dependencies in `docs/tasks.toml` |
 | **Implementer (Opus)** | Opus / high (max for `risk:high`) | Fresh session per PR, kept across its review rounds | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green. For the cases in the split below |
 | **Implementer (Sonnet)** | Sonnet / medium (high for tooling) | Same | Same | Same. For every other task |
 | **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
+| **Re-check reviewer** | Sonnet / medium | Fresh session for the re-check of a small fix-only or docs-only commit (the delta review) | The inputs of any delta review (whole PR diff, description, previous findings, `REVIEW.md`) | The same findings block, focused on the fixed findings (`docs/ORCHESTRATION.md` §7.2.3) |
 | **Second reviewer** | Opus / high | Fresh session in the same round, for `risk:high` and the protected areas | Diff, PR description, `REVIEW.md`; not the first reviewer's findings | Findings (`S<round>-<nn>`), merged with the reviewer's |
 | **Escalation reviewer** | Opus / max | Fresh session, once per PR after round 4 or on a dispute | The whole review thread | `fix`, `split` or `owner` (`REVIEW.md`, Loop and cap) |
 | **Design reviewer** | Opus / high | Fresh session per design-PR round, max 3 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |

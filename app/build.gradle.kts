@@ -1,3 +1,4 @@
+import com.google.gms.googleservices.GoogleServicesTask
 import org.gradle.process.CommandLineArgumentProvider
 
 plugins {
@@ -6,6 +7,9 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
     alias(libs.plugins.roborazzi)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.google.services)
 }
 
 // M0.5-10: shipped dependencies must be on the owner's licence allowlist.
@@ -68,6 +72,73 @@ android {
     }
 }
 
+// M1-30 (M1.md section 1): the real google-services.json is never committed; the owner keeps it at app/ (M1-O1). Without
+// it every variant gets a demo-tally stand-in with dummy values under build/ (GoogleServicesConfigTest checks which).
+val googleServicesStandIn =
+    !file("google-services.json").exists() && fileTree("src") { include("*/google-services.json") }.isEmpty
+
+abstract class GoogleServicesStandIn : DefaultTask() {
+    @get:Input abstract val packageName: Property<String>
+
+    @get:OutputFile abstract val jsonFile: RegularFileProperty
+
+    @TaskAction
+    fun write() {
+        val client =
+            """{"client_info": {"mobilesdk_app_id": "1:000000000000:android:0000000000000000", """ +
+                """"android_client_info": {"package_name": "${packageName.get()}"}}, """ +
+                """"oauth_client": [], "api_key": [{"current_key": "stand-in-not-a-key"}], "services": {}}"""
+        jsonFile.get().asFile.writeText(
+            """{"project_info": {"project_number": "000000000000", "project_id": "demo-tally"}, """ +
+                """"client": [$client], "configuration_version": "1"}""",
+        )
+    }
+}
+
+// PR 304 R1-02: packaging a non-debug variant with the stand-in fails unless -Ptally.allowStandInRelease=true (M1-33's
+// CI smoke build); compiling release (Kover) still works. Tested by scripts/test_google_services_release_gate.py.
+val allowStandInRelease = providers.gradleProperty("tally.allowStandInRelease").orNull == "true"
+
+abstract class RefuseGoogleServicesStandIn : DefaultTask() {
+    @get:Input abstract val variantName: Property<String>
+
+    @TaskAction
+    fun refuse(): Unit =
+        throw GradleException(
+            "The ${variantName.get()} build has no google-services.json and would ship the demo-tally stand-in. " +
+                "Add the real app/google-services.json (M1-O1), or pass -Ptally.allowStandInRelease=true " +
+                "for a CI smoke build (M1-33).",
+        )
+}
+
+if (googleServicesStandIn) {
+    // Runs after the plugin's own onVariants callback, so this replaces its search paths. One stand-in per variant: the
+    // plugin looks for a client with exactly the variant's application id.
+    androidComponents.onVariants { variant ->
+        val name = variant.name.replaceFirstChar(Char::uppercase)
+        val standIn =
+            tasks.register<GoogleServicesStandIn>("googleServicesStandIn$name") {
+                packageName.set(variant.applicationId)
+                jsonFile.set(
+                    layout.buildDirectory.file("google-services-stand-in/${variant.name}/google-services.json"),
+                )
+            }
+        tasks.named<GoogleServicesTask>("process${name}GoogleServices") {
+            dependsOn(standIn)
+            googleServicesJsonFiles.set(standIn.map { listOf(it.jsonFile.get().asFile) })
+        }
+        if (variant.buildType != "debug" && !allowStandInRelease) {
+            val refuse =
+                tasks.register<RefuseGoogleServicesStandIn>("refuseGoogleServicesStandIn$name") {
+                    variantName.set(variant.name)
+                }
+            tasks.matching { it.name == "package$name" || it.name == "package${name}Bundle" }.configureEach {
+                dependsOn(refuse)
+            }
+        }
+    }
+}
+
 // Issue 213: Robolectric downloads its android-all jar at test runtime unless it is told where the jar is, and the
 // test JVM blocks the network (core/testing). So Gradle resolves the jar (verified by gradle/verification-metadata.xml)
 // and copies it to a directory, and every test JVM runs Robolectric offline from there. A missing jar fails the test.
@@ -96,6 +167,13 @@ class RobolectricOfflineArgs(
         )
 }
 
+// The tokens file is an input by content (an edited token re-runs the test) and its absolute path stays out of the cache key.
+class TokensArgs(
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) val tokensFile: RegularFile,
+) : CommandLineArgumentProvider {
+    override fun asArguments() = listOf("-Dtally.tokensFile=${tokensFile.asFile.absolutePath}")
+}
+
 tasks.withType<Test>().configureEach {
     // M1-03: the goldens are an input, or a test task that is UP-TO-DATE (or cached) after a golden changed would let
     // `scripts/screenshots.sh verify` pass without comparing anything. A file tree, not dir(..): a missing directory
@@ -104,6 +182,10 @@ tasks.withType<Test>().configureEach {
         .files(fileTree("src/test/screenshots"))
         .withPropertyName("screenshotGoldens")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // M1-04: ThemeTokensTest reads design/tokens.json; see TokensArgs. scripts/check_screenshots.py checks this wiring.
+    jvmArgumentProviders.add(
+        TokensArgs(rootProject.layout.projectDirectory.file("design/tokens.json")),
+    )
     dependsOn(syncRobolectricAndroidAll)
     jvmArgumentProviders.add(
         RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),
@@ -134,6 +216,7 @@ val checkUnitTestResults by tasks.registering(Exec::class) {
 }
 
 tasks.withType<Test>().configureEach {
+    systemProperty("tally.googleServicesStandIn", googleServicesStandIn)
     // A test task that discovers zero tests is a failure, not a pass.
     failOnNoDiscoveredTests = true
     if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
@@ -155,6 +238,8 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
@@ -163,6 +248,8 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
     testImplementation(project(":core:testing"))
+    testImplementation(libs.hilt.android.testing)
+    kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.robolectric)
@@ -191,6 +278,14 @@ kover {
                     "dk.bjarkebjarke.tally.R",
                     "dk.bjarkebjarke.tally.R$*",
                     "*ComposableSingletons*",
+                )
+                // M1-30: Hilt's generated injectors, factories and aggregation markers; AppGraphTest checks the graph instead.
+                classes( // justified: Hilt-generated code holds no hand-written logic
+                    "dk.bjarkebjarke.tally.Hilt_*",
+                    "dk.bjarkebjarke.tally.*_Factory",
+                    "dk.bjarkebjarke.tally.*_GeneratedInjector",
+                    "hilt_aggregated_deps.*",
+                    "dagger.hilt.internal.aggregatedroot.codegen.*",
                 )
             }
         }
