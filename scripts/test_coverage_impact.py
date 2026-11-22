@@ -57,6 +57,10 @@ class ParseDiff(unittest.TestCase):
         text = "diff --git a/A.kt b/A.kt\ndeleted file mode 100644\n--- a/A.kt\n+++ /dev/null\n@@ -1,3 +0,0 @@\n-x\n"
         self.assertEqual(ci.changed_lines(text), {})
 
+    def test_added_line_that_looks_like_a_file_header_is_content(self):
+        text = diff("a/B.kt", "-1,0 +5,2", "-9,0 +10,1").replace("+x\n", "+++ b/other/C.kt\n+y\n", 1)
+        self.assertEqual(ci.changed_lines(text), {"a/B.kt": {5, 6, 10}})
+
     def test_empty_diff(self):
         self.assertEqual(ci.changed_lines(""), {})
 
@@ -103,8 +107,8 @@ class Impact(unittest.TestCase):
         self.assertEqual(r.measured, 1)
 
     def test_unchanged_uncovered_line_is_not_reported(self):
-        r = ci.impact({self.path: {3}}, self.cov)
-        self.assertNotIn(self.path, r.uncovered)
+        r = ci.impact({self.path: {3, 1}}, self.cov)  # line 4, 5 and 9 are uncovered but not in the change
+        self.assertEqual((r.uncovered, r.measured), ({}, 1))
 
     def test_changed_line_without_code_is_not_measured(self):
         r = ci.impact({self.path: {1, 2}}, self.cov)
@@ -205,6 +209,45 @@ class Cli(unittest.TestCase):
         self.assertIn("1 changed executable lines, all covered", r.stdout)
         self.assertNotIn("`" + DOMAIN, r.stdout)
 
+    def test_untracked_nested_repository_is_skipped(self):
+        nested = self.repo / ".claude" / "worktrees" / "w"
+        nested.mkdir(parents=True)
+        git(nested, "init", "-q")
+        self.src.write_text("package x\n\nfun a() = 1\nfun b() = 22\n")
+        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 1, 0)])))
+        r = self.run_cli("--xml", str(self.xml), "--base", "main")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"`{DOMAIN}/Money.kt`: 4", r.stdout)
+
+    def test_ignored_build_output_is_not_a_changed_file(self):
+        (self.repo / ".gitignore").write_text("build/\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "ignore")
+        built = self.repo / "app" / "build" / "generated" / "src" / "main" / "G.kt"
+        built.parent.mkdir(parents=True)
+        built.write_text("package x\n")
+        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1)])))
+        r = self.run_cli("--xml", str(self.xml), "--base", "main")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("G.kt", r.stdout)
+
+    def test_ci_merge_commit_in_a_depth_two_clone_with_head_parent_as_base(self):
+        git(self.repo, "checkout", "-q", "-b", "feature")
+        self.src.write_text("package x\n\nfun a() = 1\nfun b() = 2\nfun c() = 3\n")
+        git(self.repo, "commit", "-qam", "feature")
+        git(self.repo, "checkout", "-q", "main")
+        (self.repo / "README").write_text("main moved\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "main moves")
+        git(self.repo, "merge", "-q", "--no-ff", "-m", "pr merge commit", "feature")
+        clone = self.xml.parent / "clone"
+        git(self.xml.parent, "clone", "-q", "--depth", "2", f"file://{self.repo}", str(clone))
+        self.xml.write_text(report((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 0, 1), (5, 1, 0)])))
+        r = subprocess.run([sys.executable, "-I", str(SCRIPT), "--xml", str(self.xml), "--base", "HEAD^1"], cwd=clone, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"`{DOMAIN}/Money.kt`: 5", r.stdout)
+        self.assertNotIn("README", r.stdout)
+
     def test_missing_report_fails_clearly(self):
         r = self.run_cli("--xml", str(self.xml.with_name("nope.xml")), "--base", "main")
         self.assertEqual(r.returncode, 2)
@@ -249,12 +292,16 @@ def verify_problems(verify):
     for w in wanted:
         if idx[w] < 0:
             problems.append(f"verify.sh full-run block lacks `{w.strip()}`")
+    show = "  grep -q 'uncovered changed lines' \"$LOG_DIR/coverage-impact.log\" 2>/dev/null && sed -n '1p;3,12p' \"$LOG_DIR/coverage-impact.log\" | sed 's/^/      /'"
+    if show not in block or (wanted[1] in block and block.index(show) < block.index(wanted[1])):
+        problems.append("verify.sh does not show the uncovered lines after the coverage impact step")
     coverage = "  step coverage gradle koverVerify -x :core:domain:pitest"
     if coverage in block and all(i >= 0 for i in idx.values()) and not (block.index(coverage) < idx[wanted[0]] < idx[wanted[1]]):
         problems.append("verify.sh runs the coverage impact before the coverage step")
     return problems
 
 
+CI_TESTS_STEP = "      - name: coverage impact tests (M1-07)\n        run: python3 -I scripts/test_coverage_impact.py\n"
 CI_XML_STEP = (
     "      - name: test impact, uncovered changed lines (M1-07)\n"
     "        run: |\n"
@@ -275,6 +322,10 @@ def ci_problems(text):
         problems.append("unit: the coverage impact step is missing or changed")
     elif unit.index("koverVerify") > unit.index(CI_XML_STEP):
         problems.append("unit: the coverage impact step runs before the coverage step")
+    if CI_TESTS_STEP not in unit:
+        problems.append("unit: the coverage impact tests step is missing or changed")
+    elif CI_XML_STEP in unit and unit.index(CI_TESTS_STEP) > unit.index(CI_XML_STEP):
+        problems.append("unit: the coverage impact tests run after the report they test")
     if re.search(r"(?m)^\s*(?:-\s+)?if:", unit) or "continue-on-error" in unit:
         problems.append("unit: if or continue-on-error")
     return problems
@@ -300,6 +351,9 @@ class Wiring(unittest.TestCase):
             (impact, impact.replace("--base origin/main", "--base HEAD")),
             (xml + impact, impact + xml),
         ]
+        shown = [ln for ln in good.splitlines() if "uncovered changed lines" in ln]
+        self.assertEqual(len(shown), 1)
+        cases += [(shown[0] + "\n", ""), (shown[0], shown[0].replace("uncovered changed lines", "- ")), (impact + shown[0] + "\n", shown[0] + "\n" + impact)]
         for old, new in cases:
             self.assertIn(old, good)
             self.assertNotEqual(verify_problems(good.replace(old, new, 1)), [], f"not flagged: {old!r} -> {new!r}")
@@ -310,6 +364,8 @@ class Wiring(unittest.TestCase):
         cases = [
             ("fetch-depth: 2", "fetch-depth: 1"),
             (CI_XML_STEP, ""),
+            (CI_TESTS_STEP, ""),
+            (CI_TESTS_STEP + CI_XML_STEP, CI_XML_STEP + CI_TESTS_STEP),
             (CI_XML_STEP, CI_XML_STEP.replace(">> ", "> ")),
             (CI_XML_STEP, CI_XML_STEP.replace("HEAD^1", "origin/main")),
             (CI_XML_STEP, CI_XML_STEP.replace("      - name:", "      - if: false\n        name:")),
