@@ -81,6 +81,7 @@ describe("users/{uid}", () => {
         ["verified", "householdId null and a name", { householdId: null, name: "Alice" }],
         ["unverified", "a name of 50 characters", { householdId: null, name: fifty }],
         ["verified", "a name of 50 non-BMP code points", { householdId: null, name: nonBmp }],
+        ["verified", "a name with a line break", { householdId: null, name: "Ali\nce" }],
     ])("allowed: create by the %s client with %s", async (client, _what, data) => {
         await assertSucceeds(dbs[client].doc(user()).set(data));
     });
@@ -103,6 +104,7 @@ describe("users/{uid}", () => {
     test.each<[h.Outcome, h.Client, string, object]>([
         ["allowed", "unverified", "the name alone", { name: "Alice" }],
         ["allowed", "verified", "the name alone", { name: nonBmp }],
+        ["allowed", "verified", "a name with a line break", { name: "Ali\nce" }],
         ["denied", "verified", "an unknown field", { role: "owner" }],
         ["denied", "verified", "a name of 51 characters", { name: `${fifty}a` }],
         ["denied", "verified", "a name of spaces only", { name: "   " }],

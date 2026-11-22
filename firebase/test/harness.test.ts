@@ -136,8 +136,10 @@ test("outcome: allowed, denied for permission-denied only, and any other error t
 });
 
 // M1-08: a new rule cannot forget signedIn(). The rules below differ only in the statement under test.
+const DOCUMENTS = "/databases/{database}/documents";
+const SIGNED_IN = "    function signedIn() { return request.auth.token.email_verified == true; }";
 const rulesWith = (...blocks: string[]): string =>
-    `service cloud.firestore {\n  match /databases/{database}/documents {\n${blocks.join("\n")}\n  }\n}`;
+    `service cloud.firestore {\n  match ${DOCUMENTS} {\n${[SIGNED_IN, ...blocks].join("\n")}\n  }\n}`;
 const at = (path: string, statement: string): string => `    match ${path} { ${statement} }`;
 
 test("withoutSignedIn accepts signedIn() as a conjunct, and no sign-in on the users doc or config/app", () => {
@@ -166,11 +168,21 @@ test.each([
 test("withoutSignedIn reads nested matches past comments and strings, and throws on what it cannot read", () => {
     const nested =
         "    // a } and the caller's '\n    match /h/{x} {\n      match /m/{y} { allow get: if y == '}'; }\n    }";
-    expect(h.withoutSignedIn(rulesWith(nested))).toEqual([
-        "/databases/{database}/documents/h/{x}/m/{y}: y == ''",
-    ]);
+    expect(h.withoutSignedIn(rulesWith(nested))).toEqual([`${DOCUMENTS}/h/{x}/m/{y}: y == ''`]);
     expect(() => h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if x }")))).toThrow();
     expect(() =>
         h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if signedIn();") + " {")),
     ).toThrow();
+});
+
+// S1-01: a signedIn() redefined in a nested match would pass for the global one.
+test("withoutSignedIn names a signedIn() not declared exactly once, at the documents level", () => {
+    const found = (...at: string[]): string[] => [
+        `signedIn() must be declared once, at ${DOCUMENTS}; found: ${at.join(", ") || "none"}`,
+    ];
+    const weak = "function signedIn() { return request.auth != null; }";
+    const shadowed = rulesWith(at("/a/{b}", `${weak} allow get: if signedIn() && true;`));
+    expect(h.withoutSignedIn(shadowed)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
+    expect(h.withoutSignedIn(rulesWith(`    ${weak}`))).toEqual(found(DOCUMENTS, DOCUMENTS));
+    expect(h.withoutSignedIn(rulesWith().replace(SIGNED_IN, ""))).toEqual(found());
 });
