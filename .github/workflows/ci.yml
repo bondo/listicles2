@@ -133,7 +133,7 @@ jobs:
           arch: x86_64
           target: google_apis
           # Not -q: the names and messages of failing instrumented tests are otherwise only in the HTML report on the runner.
-          script: cd firebase && npx --no-install firebase emulators:exec --only auth,firestore --project demo-tally "cd .. && ./gradlew --info --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest"
+          script: cd firebase && npx --no-install firebase emulators:exec --only auth,firestore --project demo-tally "cd .. && ./gradlew --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest || (cat core/data/build/outputs/androidTest-results/connected/debug/*/*.xml | head -c 8000; false)"
 
   screenshots:
     name: screenshots
