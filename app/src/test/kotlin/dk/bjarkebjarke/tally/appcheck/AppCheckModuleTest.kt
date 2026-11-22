@@ -15,7 +15,7 @@ import javax.inject.Inject
 
 /**
  * M1-26 (R5): the debug build's graph provides the debug App Check provider, which needs no Play Integrity. The release
- * graph provides the Play Integrity one (a release-source-set module, checked by AppCheckReleaseWiringTest below).
+ * graph provides the Play Integrity one (a release-source-set module; unit tests run the debug variant only).
  * Enforcement stays off in the console (M1-O4), so neither provider changes what the app can reach today.
  */
 @HiltAndroidTest

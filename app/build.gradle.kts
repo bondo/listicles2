@@ -238,6 +238,11 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.appcheck)
+    // M1-26 (R5): Play Integrity in release, the debug provider in debug builds; neither is enforced yet (M1-O4).
+    releaseImplementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     debugImplementation(libs.compose.ui.tooling)
