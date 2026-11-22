@@ -127,11 +127,39 @@ class TargetSdk(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertEqual(len(self.problems(plain + bad + "\n")), 1, bad)
 
+    def test_any_other_assignment_or_call_of_target_sdk_fails_closed(self):
+        """R2-01: a qualifier the statement pattern cannot parse must not hide a low target next to a plain `targetSdk = 37`."""
+        plain = "android { defaultConfig { targetSdk = 37 } }\n"
+        for hidden in (
+            'getByName("x").targetSdk = 30',
+            'productFlavors["old"].targetSdk = 30',
+            "a!!.targetSdk = 30",
+            "defaultConfig .targetSdk = 30",
+            "defaultConfig\n    .targetSdk = 30",
+            "defaultConfig\n    .setTargetSdkVersion(30)",
+            "defaultConfig\n    .targetSdk\n    = 30",
+            'getByName("x").targetSdk { version = release(30) }',
+            "a.targetSdkVersion 30",
+            "a().targetSdk(30)",
+            "val targetSdk = 30",
+        ):
+            with self.subTest(hidden=hidden):
+                found = self.problems(plain + hidden + "\n")
+                self.assertEqual(len(found), 1, found)
+                self.assertIn("targetSdk", found[0].replace("TargetSdk", "targetSdk"))
+                self.assertRegex(found[0], r":[2-5]: ")
+
+    def test_a_target_sdk_that_only_a_loose_pattern_sees_is_not_a_vacuous_pass(self):
+        found = self.problems('getByName("x").targetSdk = 37\n')
+        self.assertEqual(len(found), 1, found)  # unreadable, so there is no value to count and the problem says so
+
     def test_reads_of_a_qualified_target_sdk_do_not_count(self):
         text = (
             "android { defaultConfig { targetSdk = 37 } }\n"
             "val a = android.defaultConfig.targetSdk\nval b = checkNotNull(android.defaultConfig.targetSdk)\n"
             "println(android.defaultConfig.targetSdk)\nfoo(android.defaultConfig.targetSdk, 1)\nif (x == android.defaultConfig.targetSdk) {}\n"
+            "if (android.defaultConfig.targetSdk == 36) {}\nval c = x.targetSdk\nval d = 1\nfun f(targetSdk: Int) = targetSdk\n"
+            "val e = a.targetSdk ?: 0\nval f = a.targetSdk > 3\n"
         )
         self.assertEqual(self.problems(text), [])
 
