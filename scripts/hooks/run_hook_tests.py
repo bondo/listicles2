@@ -110,6 +110,7 @@ def main(argv):
     # verify.sh and CI), so a relative path, os.getcwd() or git without cwd= cannot read the repo past the pre-push input scope.
     with tempfile.TemporaryDirectory(prefix="hook-tests-cwd-") as cwd:
         os.chdir(cwd)
+        os.environ["PWD"] = cwd  # R3-01: chdir does not update PWD, which still named the start directory; shards inherit it
         try:
             return run(args, start)
         finally:
