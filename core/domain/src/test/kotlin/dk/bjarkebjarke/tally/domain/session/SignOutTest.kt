@@ -51,12 +51,18 @@ private class Phone(
 class SignOutTest :
     FunSpec({
         test("online: signed out in the decided order exactly when acknowledged before the timeout (whole ms)") {
-            checkAll(Arb.long(1L..60_000L), Arb.long(0L..120_000L)) { timeoutMs, acknowledgeAfterMs ->
+            // What a listener saw picks only the question's wording, never whether to ask (AUTH-03, R1-01).
+            checkAll(
+                Arb.long(1L..60_000L),
+                Arb.long(0L..120_000L),
+                Arb.boolean(),
+            ) { timeoutMs, acknowledgeAfterMs, seen ->
                 runTest {
                     val phone = Phone(backgroundScope, acknowledgeAfterMs = acknowledgeAfterMs, timeoutMs = timeoutMs)
+                    phone.userData.unsentChangesSeen = seen
                     val sent = acknowledgeAfterMs < timeoutMs
                     phone.signOut() shouldBe
-                        if (sent) SignOutResult.SignedOut else SignOutResult.ConfirmUnsentChanges(false)
+                        if (sent) SignOutResult.SignedOut else SignOutResult.ConfirmUnsentChanges(seen)
                     phone.steps shouldBe if (sent) listOf(WAIT) + SIGNED_OUT else listOf(WAIT)
                 }
             }
@@ -152,18 +158,24 @@ class SignOutTest :
             }
         }
 
-        test("once started, the steps finish even when the asking screen goes away") {
-            runTest {
-                val phone = Phone(backgroundScope)
-                val clearing = CompletableDeferred<Unit>()
-                phone.userData.clearGate = clearing
-                val caller = launch { phone.signOut.discardingUnsentChanges() }
-                runCurrent()
-                caller.cancel()
-                clearing.complete(Unit)
-                runCurrent()
-                caller.isCancelled shouldBe true
-                phone.steps shouldBe SIGNED_OUT
+        test("once started, the steps finish even when the asking screen goes away, through either entry point") {
+            // "Sign out" with everything sent, and "Sign out anyway"; signing out itself closes the screen (R1-02).
+            listOf<Pair<suspend (SignOut) -> SignOutResult, List<String>>>(
+                Pair({ it() }, listOf(WAIT) + SIGNED_OUT),
+                Pair({ it.discardingUnsentChanges() }, SIGNED_OUT),
+            ).forEach { (signOut, expected) ->
+                runTest {
+                    val phone = Phone(backgroundScope)
+                    val clearing = CompletableDeferred<Unit>()
+                    phone.userData.clearGate = clearing
+                    val caller = launch { signOut(phone.signOut) }
+                    runCurrent()
+                    caller.cancel()
+                    clearing.complete(Unit)
+                    runCurrent()
+                    caller.isCancelled shouldBe true
+                    phone.steps shouldBe expected
+                }
             }
         }
     })
