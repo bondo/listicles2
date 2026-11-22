@@ -33,6 +33,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
+from functools import partial
 
 # Play: from 2026-08-31 new apps and updates must target API 36 or higher. Raise when the date changes; never lower.
 TARGET_SDK_FLOOR = 36
@@ -372,6 +373,10 @@ def blocks(blank):
     return found
 
 
+def within(spans, i):
+    return any(a <= i < b for a, b in spans)
+
+
 def enclosing_call(blank, pos):
     """The name of the call whose argument list holds pos: the identifier before the first unmatched `(`, or for a Groovy call
     without parentheses the first identifier on the line."""
@@ -401,12 +406,9 @@ def scan_catalog(root):
         raw, starts = read(root, p), []
         code = strip(raw, strings=starts)
         blank = strip(raw, blank_strings=True)
-        comments = "".join(" " if r == c and r != "\n" else r for r, c in zip(raw, code)).split("\n")
+        comments = "".join(" " if r == c and r != "\n" else r for r, c in zip(raw, code, strict=True)).split("\n")
         spans = blocks(blank)
-
-        def inside(i):
-            return any(a <= i < b for a, b in spans)
-
+        inside = partial(within, spans)
         hits = {}  # offset -> what was found, so one literal found by two patterns is reported once
         for s in starts:
             m = COORD.match(code, s)
