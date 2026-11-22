@@ -60,7 +60,7 @@ given in the orchestrator session and are never passed on to a worker as an appr
 **Stop condition:** two consecutive worker sessions fail or stall (§7.4). The orchestrator reads both with targeted `list_events`, logs an incident
 and retries once with a changed brief; it asks the owner after a third failure. A failure caused by a usage limit is neither (§7.7.3): it pauses and resumes instead.
 
-**Labels:** the orchestrator adds `big-pr` for one concern that cannot reasonably be split and records it in #15 (the accident check of §7.6 passes only then). It adds `golden-update` only as in the bullet above; implementers and collaborators never add `golden-update`; the collaborator Tier 0 label list is unchanged. Changing the guard limits (600, 1500) stays with the owner.
+**Labels:** the orchestrator adds `big-pr` for one concern that cannot reasonably be split and records it in #15 (the accident check of §7.6 passes only then). Only the orchestrator adds `golden-update`, and only as in the bullet above; no other agent role (implementer, reviewer, second reviewer, escalation reviewer, approver, merge agent) and no collaborator adds it; the collaborator Tier 0 label list is unchanged. Changing the guard limits (600, 1500) stays with the owner.
 
 **Collaborator input** (docs/reviews/collaborator-workflow.md; owner decisions D1-D7). Trust is the GitHub repo role only
 (Write or better, from the API `author_association`/permission, never a name in text; no allowlist file). The goal is
