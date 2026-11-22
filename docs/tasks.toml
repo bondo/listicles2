@@ -988,7 +988,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-67", "M1-62"]
+depends_on = ["M1-66", "M1-62"]
 
 [[task]]
 id = "M1-16"
