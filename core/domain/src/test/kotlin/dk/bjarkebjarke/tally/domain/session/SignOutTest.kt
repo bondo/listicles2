@@ -16,7 +16,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -44,9 +43,9 @@ private class Phone(
 }
 
 /**
- * M1-14: sign out in the order of OQ-13 (docs/milestones/M1.md), with fakes for every step. `runCurrent`,
- * `advanceTimeBy` and `advanceUntilIdle` drive the virtual clock; `advanceUntilIdle` stops at `backgroundScope`
- * work, so the steps in the external scope are run with `runCurrent`.
+ * M1-14: sign out in the order of OQ-13 (docs/milestones/M1.md), with fakes for every step. `advanceTimeBy` and
+ * `runCurrent` drive the virtual clock and also run `backgroundScope` work (the external scope), which
+ * `advanceUntilIdle` would leave waiting.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SignOutTest :
@@ -72,6 +71,8 @@ class SignOutTest :
         }
 
         test("the timeout boundary: one millisecond less signs out, the timeout itself asks") {
+            // The tie asks because kotlinx-coroutines-test runs the timeout, registered first, before the
+            // acknowledgement due at the same virtual instant: a scheduler detail, not a product rule.
             runTest {
                 val timeoutMs = SignOut.PENDING_WRITES_TIMEOUT_MS
                 Phone(backgroundScope, acknowledgeAfterMs = timeoutMs - 1).signOut() shouldBe SignOutResult.SignedOut
@@ -125,11 +126,13 @@ class SignOutTest :
 
         test("cancel: leaving during the wait keeps the session and the copy on the phone") {
             runTest {
-                val phone = Phone(backgroundScope, acknowledgeAfterMs = null)
+                // Acknowledged after the caller left: a wait that outlived its caller would go on to steps 2 to 5.
+                val phone = Phone(backgroundScope, acknowledgeAfterMs = 2_000)
                 val caller = launch { phone.signOut() }
                 advanceTimeBy(1_000)
                 caller.cancel()
-                advanceUntilIdle()
+                advanceTimeBy(2 * SignOut.PENDING_WRITES_TIMEOUT_MS)
+                runCurrent()
                 phone.steps shouldBe listOf(WAIT)
             }
         }

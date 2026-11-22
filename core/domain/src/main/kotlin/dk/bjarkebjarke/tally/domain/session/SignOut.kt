@@ -18,7 +18,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Steps 2 to 5 run in [externalScope], an application-wide scope with a `SupervisorJob`: once started they finish even
  * when the screen that asked goes away, which signing out itself causes. M1-32 ends account deletion through
- * [discardingUnsentChanges].
+ * [discardingUnsentChanges]. One sign-out at a time: the screen disables "Sign out" while one runs (M1-25).
  */
 class SignOut(
     private val connectivity: Connectivity,

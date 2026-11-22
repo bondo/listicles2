@@ -23,7 +23,10 @@ class GoogleSignIn(
     }
 }
 
-/** How "Continue with Google" ended. */
+/**
+ * How "Continue with Google" ended: one flat type, so the screen handles every outcome in one `when`. [NeedsConnection]
+ * shows the SYNC-03 message of `ConnectionResult.NeedsConnection`.
+ */
 sealed interface GoogleSignInResult {
     /** Signed in: [SessionState] turns true and the root leaves sign-in. */
     data object SignedIn : GoogleSignInResult
