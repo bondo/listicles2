@@ -2920,13 +2920,14 @@ class GoldenUpdateDelegationTests(unittest.TestCase):
     DOC_PHRASES = (
         "add the `golden-update` label to a PR " + CHECKED,
         "a one-line note on #15 naming the PR, the head SHA and the round",
-        "implementers and collaborators never add `golden-update`; the collaborator Tier 0 label list is unchanged",
+        "Only the orchestrator adds `golden-update`, and only as in the bullet above; no other agent role (implementer, reviewer, second reviewer, "
+        "escalation reviewer, approver, merge agent) and no collaborator adds it; the collaborator Tier 0 label list is unchanged",
         "(for `golden-update`, the orchestrator's one-line note naming the PR, the head SHA and the round)",
     )
     PROMPT_PHRASES = (
         "add the `golden-update` label to a PR " + CHECKED,
         "post a one-line note on #15 naming the PR, head SHA and round each time",
-        "implementers and collaborators never add it",
+        "only you add it; no other role and no collaborator does",
         "(for `golden-update` the note names the PR, head SHA and round)",
     )
     # Wording that gives the label to the wrong party, or back to the owner alone: rejected wherever it appears.
@@ -2935,6 +2936,15 @@ class GoldenUpdateDelegationTests(unittest.TestCase):
         " The `golden-update` label stays owner-only.",
         " Implementers may add the `golden-update` label.",
         " A collaborator can apply the `golden-update` label.",
+        " A reviewer may add the `golden-update` label once the goldens are intended.",
+        " The second reviewer adds the `golden-update` label.",
+        " The approver can set the `golden-update` label.",
+        " The merge agent adds the `golden-update` label.",
+    )
+    COLLAB = "docs/reviews/collaborator-workflow.md"
+    COLLAB_PHRASES = (
+        "(never a collaborator; only the orchestrator adds them, ORCHESTRATION §1.1)",
+        "CI-steering labels (the orchestrator under §1.1, never a collaborator)",
     )
 
     def swap_doc(self, old, new):
@@ -2980,6 +2990,24 @@ class GoldenUpdateDelegationTests(unittest.TestCase):
                 self.assertIn("orch-golden-update", ids(prompt_rules.check_doc_text(
                     self.ORCH, (ROOT / self.ORCH).read_text(encoding="utf-8") + "\n\n" + bad)))
                 self.assertIn("worker-golden-update", ids(prompt_rules.check_text("implementer", real("implementer") + "\n\n" + bad)))
+
+    def test_dropping_only_the_orchestrator_is_rejected(self):
+        self.assertIn("orch-golden-update", self.swap_doc("Only the orchestrator adds `golden-update`", "The orchestrator adds `golden-update`"))
+        self.assertIn("golden-update-delegation", self.swap_prompt("orchestrator", "only you add it; no other role and no collaborator does",
+                                                                    "implementers and collaborators never add it"))
+
+    def test_the_collaborator_workflow_doc_no_longer_calls_the_label_owner_only(self):
+        text = (ROOT / self.COLLAB).read_text(encoding="utf-8")
+        norm = prompt_rules.normalize(text).lower()
+        self.assertEqual(prompt_rules.check_doc_text(self.COLLAB, text), [])
+        for ph in self.COLLAB_PHRASES:
+            with self.subTest(phrase=ph):
+                self.assertIn(ph.lower(), norm)
+                mutated = re.sub(re.escape(ph), "", prompt_rules.normalize(text), count=1, flags=re.I)
+                self.assertIn("collab-golden-update", ids(prompt_rules.check_doc_text(self.COLLAB, mutated)))
+        for old in ("(owner-only, ORCHESTRATION §1.1)", "*Owner-only*: merges, settings, spend, `risk:high`, tooling, CI-steering labels."):
+            with self.subTest(old=old):
+                self.assertIn("collab-golden-update", ids(prompt_rules.check_doc_text(self.COLLAB, text + "\n\n" + old)))
 
     def test_the_implementer_prompt_says_the_orchestrator_adds_the_label(self):
         ph = "Never add the `golden-update` label yourself: the orchestrator adds it after a review round found the goldens intended."
