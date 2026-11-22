@@ -1,9 +1,9 @@
 """Build guards (M1-51, issue 257, checklist follow-up 4 in docs/ANDROID-BEST-PRACTICES.md): the targetSdk floor.
 
 Every `targetSdk` in a Gradle build file (`*.gradle.kts`, `*.gradle`) is a literal at or above TARGET_SDK_FLOOR, the Play minimum for new
-apps and updates (36 since 2026-08-31). A value this script cannot read (an expression, a variable, a preview) and any other way of setting it (a qualifier or chain it
-does not know) fail too, and so does a
-tree with no targetSdk at all, so a moved or renamed build file cannot make the check pass vacuously. Comments and strings are ignored.
+apps and updates (36 since 2026-08-31). A value this script cannot read (an expression, a variable, a preview) fails too, and so does any
+other way of setting it (a qualifier or call chain it does not know), and so does a tree with no targetSdk at all, so a moved or renamed
+build file cannot make the check pass vacuously. Comments and strings are ignored.
 
 The manifest guard (follow-up 5, M1-58) and the catalog-only coordinates guard (follow-up 3, M1-59) are added to this script by their own PRs.
 
