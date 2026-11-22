@@ -848,6 +848,7 @@ class Issue164RemainingTests(CliFlagCase):
             "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check\n      - uses: actions/upload-artifact@v4\n"
             "        with:\n          args: --fix\n",
             "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check --fix # justified: formatting job commits the result\n",
+            "      - id: ruff\n        uses: actions/upload-artifact@v4\n        with:\n          args: --fix\n",
         ]:
             with self.subTest(text=text):
                 self.write(".github/workflows/ci.yml", text)

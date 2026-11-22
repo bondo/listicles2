@@ -80,17 +80,20 @@ out=$(gg "$PAT" -- "${EXCL[@]}" | unjust)
 # The checks above are line by line, so a justification on a TOML table header or an array opener would waive every entry after it.
 # entrycheck therefore reads the config files itself and requires the justification on every entry line of a relaxing multi-line
 # table (per-file-ignores), array/object (ignore = [, exclude_lines = [, ignores: [) or INI continuation (ignore =<newline>  E501),
-# and on the first element of an ESLint rule array that sets off/warn/0/1.
+# and on the first element of an ESLint rule array that sets off/warn/0/1, and on every `- entry` of an actionlint `ignore:` block list.
 ENTRY_AWK='
 function strip(l) { sub(/[ \t]*(#|\/\/).*$/, "", l); return l }
 function blank(l) { gsub(/"[^"]*"/, "\"\"", l); gsub(/\047[^\047]*\047/, "\047\047", l); return l }
 function nest(l,   t, o) { t = l; gsub(/[^[({]/, "", t); o = length(t); t = l; gsub(/[^])}]/, "", t); return o - length(t) }
 function check() { if (!just(line)) printf "%s:%d:%s\n", F, NR, line }
-BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
+function ind(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/); yml = (F ~ /actionlint\.ya?ml$/) }
 {
   line = $0; nc = strip(line); c = blank(nc); lc = tolower(nc)
   if (c ~ /^[ \t]*$/) next
   closer = (c ~ /^[ \t]*[])},;]*[ \t]*$/)
+  if (mode == 4) { if (ind(line) > yi || (ind(line) == yi && c ~ /^[ \t]*-/)) { check(); next } mode = 0 }
+  if (yml && lc ~ /^[ \t]*-?[ \t]*ignore[ \t]*:[ \t]*$/) { mode = 4; yi = ind(line); next }  # a YAML block list: - entry per line
   if (mode == 1 && c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/) mode = 0
   if (mode == 3 && line !~ /^[ \t]/) mode = 0
   if (mode == 1 || mode == 3) { if (!closer) check(); next }
@@ -154,7 +157,9 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
   cfgcheck "$ESPAT" '*eslint.config.*' '*eslintrc*' '*biome.json*'
   cfgcheck "$COVPAT" '*vitest.config.*' '*jest.config.*' '*nycrc*' '*c8rc*'
   # prettier: requirePragma makes it skip every file without the pragma; ignorePath points it at another ignore file
-  cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
+  cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*'
+  # actionlint: `ignore:` patterns drop its errors (issue 164 item 1)
+  cfgcheck '(^|[[:space:]-])ignore[[:space:]]*:' '*.github/actionlint.yaml' '*.github/actionlint.yml')  # a leading * (git ls-files drops a literal path next to :!)
 [ -n "$out" ] && { echo "$out"; fail=1; }
 
 # 2c. Command-line flags on tool invocation lines (issues 45 and 177): ruff, mypy, tsc, ESLint, Prettier, shellcheck and actionlint, in shell
@@ -164,9 +169,11 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # every command on the line. A backslash continuation is one logical line; it loses its unquoted trailing ` # comment` and is split at ; & | so
 # a flag only counts for the tool in its own command; only the text after the tool name is read (`grep -i shellcheck` has no flag), and a bare
 # `--` ends the flags. A tool named as the thing being installed (`pip install ruff --upgrade`, `npm i -D eslint`, `cargo install`) is not run, so datacmd skips it.
-# For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
-# there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known, so `npm test -- -u` needs a `justified:`
-# too (issue 164 item 3). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
+# For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`).
+# npm appends that tail to the last command of the script, so the script is looked up in every package.json (issue 164 item 3): when its last
+# command runs eslint, prettier or tsc, the tail is checked for that tool; when it runs a test runner in NOTLINT (`npm test -- -u` with jest),
+# not at all; otherwise (an unknown script, npx or exec, a wrapper, an interpreter or a path) a flag passes only when ANY of the three lists
+# it. The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
 # tsc names are read case-insensitively (as tsc does), mypy and shellcheck accept unique prefixes of long options so a proper prefix of a
 # listed option counts as that option (a prefix that is ambiguous is an error in the tool itself), and SHELLCHECK_OPTS counts as
 # `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
@@ -178,7 +185,8 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # checked; a mypy `@argfile` fails; an empty quoted config (`--config-file ""`) disables the config, so it fails.
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
-# Not covered: action `with: args:` lines, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (2b does not read it), flags held in
+# In YAML a folded scalar (`run: >`) is one logical line, and the args-like keys of a step or hook (`with: args:`, `eslint_flags:`, pre-commit
+# `args:`) are flags of the tool its `uses:`, `id:` or `entry:` names (issue 164 item 2, yamlitem below). Not covered: flags held in
 # shell variables (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, tools run from Python (subprocess),
 # and yarn, pnpm and bun forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
 # is added only with a reason a reviewer can check, in scripts/hooks/test_guards_cli_flags.py too (docs/guards-known-gaps.md has the rationale).
@@ -447,8 +455,37 @@ function datacmd(p,   n, w, i, j, k, a, b, c, m) {
   if (a ~ /^python[0-9.]*$/ && w[i + 1] == "-m" && w[i + 2] ~ /^(pip|ensurepip|venv)$/) return 1
   return (a ~ /^(cargo|go)$/ && b == "install")
 }
-function relaxed(p,   dd, e, pr, t, ok, s) {
-  dd = ddseg(p)
+# ddscript: the package.json script a package manager runs with a `--` tail (`npm test`, `npm run x`, `yarn x`); "" when it runs none.
+function ddscript(p,   n, w, i, a, v) {
+  match(p, /(^|[ \t])--([ \t]|$)/); n = split(substr(p, 1, RSTART), w, /[ \t]+/)
+  for (i = 1; i <= n; i++) { a = w[i]; sub(/^["\047]+/, "", a); sub(/^.*\//, "", a); if (a ~ /^(npm|yarn|pnpm|bun)$/) break }
+  for (i++; i <= n && w[i] ~ /^-/; i++) ;
+  v = (i <= n ? w[i] : "")
+  if (v ~ /^(test|t|tst)$/ && a != "bun") return "test"
+  if (v ~ /^(start|stop|restart)$/) return v
+  if (v ~ /^(run|rum|urn|run-script)$/) { for (i++; i <= n && w[i] ~ /^-/; i++) ; v = (i <= n ? w[i] : "") }
+  else if (a ~ /^(npm|bun)$/ || v ~ /^(exec|dlx|x|node|add|install|i|remove|create)$/) return ""
+  gsub(/^["\047]+|["\047]+$/, "", v); return v
+}
+# progkind: what the last command of a script runs: eslint, prettier or tsc; "" for a runner in NOTLINT; "?" for anything else.
+function progkind(c,   n, w, i, a) {
+  n = split(c, w, /[;&|]+/); c = w[n]; n = split(c, w, /[ \t]+/); i = 1
+  while (i <= n && (w[i] == "" || w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[i] ~ /^(npx|-y|--yes)$/)) i++
+  a = (i <= n ? w[i] : ""); gsub(/^["\047\\]+|["\047\\]+$/, "", a)
+  return (a ~ /^(eslint|prettier|tsc)$/ ? a : (a ~ NOTLINT ? "" : "?"))
+}
+# ddtools: the JS tools an npm `--` tail reaches, over every package.json that defines the script; all three when that is not known.
+function ddtools(p,   nm, i, k, r) {
+  nm = ddscript(p); if (!(nm in NS)) return "eslint prettier tsc"
+  for (i = 1; i <= NS[nm]; i++) {
+    k = progkind(NC[nm, i]); if (k == "?") return "eslint prettier tsc"
+    if (k != "" && index(" " r " ", " " k " ") == 0) r = r (r == "" ? "" : " ") k
+  }
+  return r
+}
+function relaxed(p,   dd, dt, de, dp, dc, e, pr, t, ok, s) {
+  dd = ddseg(p); dt = (dd == "" ? "" : ddtools(p))
+  de = (index(dt, "eslint") ? dd : ""); dp = (index(dt, "prettier") ? dd : ""); dc = (index(dt, "tsc") ? dd : "")
   if (match(p, /SHELLCHECK_OPTS(\+?=|:[ \t])/) && scan(substr(p, RSTART + RLENGTH), "shellcheck", 0)) return 1
   if (datacmd(p)) return 0
   if (has(p, "ruff")) { s = after(p, "ruff"); if (scan(s, "ruff", 0) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$")) return 1 }
@@ -459,14 +496,52 @@ function relaxed(p,   dd, e, pr, t, ok, s) {
   if (has(p, "shellcheck") && scan(after(p, "shellcheck"), "shellcheck", 0)) return 1
   if (has(p, "actionlint") && scan(after(p, "actionlint"), "actionlint", 0)) return 1
   e = has(p, "eslint"); pr = has(p, "prettier"); t = has(p, "tsc")
-  if (dd != "" && scan(dd, "eslint prettier tsc", 0)) return 1
+  if (dt != "" && scan(dd, dt, 0)) return 1
   if (e) ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*)$)"
   else if (pr) ok = "((^|/)[^= \t]*(prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
   else ok = "((^|/)[^= \t]*(eslint\\.config\\.[A-Za-z]+|eslintrc[^/= \t]*|biome\\.json[^/= \t]*|prettierrc[^/= \t]*|prettier\\.config\\.[A-Za-z]+)$)"
-  if (t || dd != "") { s = (t ? after(p, "tsc") : "") " " dd; if ((t && scan(s, "tsc", 1)) || cfg(s, "-p|--project", TSOK) || tscbuild(s)) return 1 }
-  if (e || dd != "") { s = (e ? after(p, "eslint") : "") " " dd; if ((e && scan(s, "eslint", 0)) || eslintrule(s) || cfg(s, "-c|--config", ok)) return 1 }
-  if (pr || dd != "") { s = (pr ? after(p, "prettier") : "") " " dd; if ((pr && scan(s, "prettier", 0)) || cfg(s, "--config", ok)) return 1 }
+  if (t || dc != "") { s = (t ? after(p, "tsc") : "") " " dc; if ((t && scan(s, "tsc", 1)) || cfg(s, "-p|--project", TSOK) || tscbuild(s)) return 1 }
+  if (e || de != "") { s = (e ? after(p, "eslint") : "") " " de; if ((e && scan(s, "eslint", 0)) || eslintrule(s) || cfg(s, "-c|--config", ok)) return 1 }
+  if (pr || dp != "") { s = (pr ? after(p, "prettier") : "") " " dp; if ((pr && scan(s, "prettier", 0)) || cfg(s, "--config", ok)) return 1 }
   return 0
+}
+# yamlitem: one YAML sequence item is a workflow step or a pre-commit hook. Its `uses:` (an action named after the tool), or in pre-commit
+# config its `entry:` or `id:`, gives the command; its args-like keys (ARGKEY, at any depth, in any order: inline, a flow or block list,
+# a block scalar) are flags of that command, checked by itemend when the item ends. Lines inside another block scalar (`run: |`) are skipped.
+function keycol(l) { sub(/[^ \t-].*$/, "", l); return length(l) }
+function indent(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+function toolof(v,   i, n, tl) {
+  n = split("ruff mypy eslint prettier shellcheck actionlint tsc", tl, " ")
+  for (i = 1; i <= n; i++) if (v ~ ("(^|[^A-Za-z])" tl[i] "([^A-Za-z]|$)")) return tl[i]
+  return ""
+}
+function hookcmd(v) { v = unq(v); return (v ~ /^ruff(-check)?$/ ? "ruff check" : (v == "ruff-format" ? "ruff format" : toolof(v))) }
+function itemend(   a) {
+  a = IA; gsub(/[][]/, " ", a); gsub(/,([ \t]|$)/, " ", a)
+  if (IT != "" && a ~ /[^ \t]/ && !IJ && relaxed(IT " " a)) printf "%s:%d:%s\n", F, IL, ILN
+  IT = ""; IA = ""; IJ = 0; IE = 0; IK = -1; AM = 0; BS = -1
+}
+function yamlitem(l,   c, key, v) {
+  if (l ~ /^[ \t]*(#|$)/) return
+  if (AM) { if (indent(l) > AC || (indent(l) == AC && l ~ /^[ \t]*-([ \t]|$)/)) { v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); IA = IA " " stripc(v); IJ = IJ || just(l); return } AM = 0 }
+  if (BS >= 0) { if (indent(l) > BS) return; BS = -1 }
+  if (l ~ /^[ \t]*-[ \t]+([A-Za-z_][A-Za-z0-9_-]*[ \t]*:([ \t]|$)|\{)/) { itemend(); IK = keycol(l) }
+  else if (IK >= 0 && indent(l) < IK) itemend()
+  if (IK < 0) return
+  v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); c = length(l) - length(v)
+  if (v ~ /^\{/) {  # a flow mapping: - {id: ruff, args: [--fix]}
+    if (PC && match(v, /[{,][ \t]*id[ \t]*:[ \t]*[^,}]+/)) { key = substr(v, RSTART, RLENGTH); sub(/^[^:]*:[ \t]*/, "", key); IT = hookcmd(key) }
+    if (match(v, /[{,][ \t]*args[ \t]*:[ \t]*\[[^]]*\]/)) { IA = substr(v, RSTART, RLENGTH); sub(/^[^:]*:/, "", IA); IL = NR; ILN = l; IJ = just(l) }
+    return
+  }
+  if (!match(v, /^[A-Za-z_][A-Za-z0-9_-]*[ \t]*:([ \t]|$)/)) return
+  key = v; sub(/[ \t]*:.*$/, "", key); v = stripc(substr(v, RLENGTH + 1)); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
+  if (key ~ ARGKEY) { IA = (v ~ /^[|>][-+0-9]*$/ ? "" : v); IL = NR; ILN = l; IJ = just(l); AM = 1; AC = c; return }
+  if (v ~ /^[|>][-+0-9]*$/) { BS = c; return }
+  if (c != IK) return
+  if (key == "uses" && !PC) { v = unq(v); sub(/@.*$/, "", v); IT = toolof(v) }
+  else if (key == "entry" && PC) { IT = unq(v); IE = 1 }
+  else if (key == "id" && PC && !IE) IT = hookcmd(v)
 }
 function flush(   n, i, parts, j) {
   if (cur == "") return
@@ -480,6 +555,11 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0
   RUFFSUB = "^(check|format|rule|config|linter|clean|server|analyze|version|help|generate-shell-completion)$"
   SRCRE = "^[^-][^=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$"; SEVOK = "^(warning|info|style)$"; COLOROK = "^(always|never|auto)$"
+  # Test runners that are no linter and take the npm `--` tail as their own options (firebase: after the command emulators:exec runs).
+  NOTLINT = "^(jest|vitest|mocha|playwright|cypress|firebase)$"
+  ARGKEY = "^([A-Za-z0-9-]*_)?(args|flags|options|arguments)$"; YML = (F ~ /\.ya?ml$/); PC = (F ~ /pre-commit-config\.yaml$/); IK = -1; BS = -1
+  np = split(ENVIRON["NPMS"], P, "\n")
+  for (i = 1; i <= np; i++) if (j = index(P[i], "\t")) { nm = substr(P[i], 1, j - 1); NC[nm, ++NS[nm]] = substr(P[i], j + 1) }
   nl = split(ENVIRON["CLI_ALLOW"], L, "\n")
   for (i = 1; i <= nl; i++) {
     if (L[i] ~ /^[ \t]*$/) continue
@@ -491,6 +571,13 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   } }
 {
   line = $0; sub(/\r$/, "", line)
+  if (YML) yamlitem(line)
+  if (fold) {  # a YAML folded scalar (`run: >`) is one line; a blank line in it is a line break
+    if (line ~ /^[ \t]*$/) { flush(); next }
+    if (indent(line) > FI) { if (cur == "") start = NR; cur = (cur == "" ? "" : cur " ") line; next }
+    fold = 0; flush()
+  }
+  if (YML && !cont && line ~ /:[ \t]*>[-+0-9]*[ \t]*(#.*)?$/) { flush(); fold = 1; FI = keycol(line); next }
   if (!cont && line ~ /^[ \t]*#/) next
   if (!cont) start = NR
   cont = (line ~ /\\[ \t]*$/)
@@ -498,12 +585,25 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   cur = (cur == "" ? "" : cur " ") line
   if (!cont) flush()
 }
-END { flush() }'
+END { flush(); if (YML) itemend() }'
+# The scripts of every package.json, one `name<TAB>command` per line (one script per line, as npm writes them; any other layout is not read,
+# so the script counts as unknown).
+pkgscripts() {
+  local f
+  while IFS= read -r f; do
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null; else cat -- "$f" 2>/dev/null; fi
+  done < <(git ls-files -- '*package.json' "${EXCL[@]}") | LC_ALL=C awk '
+    /"scripts"[ \t]*:[ \t]*\{[ \t]*$/ { s = 1; next }
+    s && /^[ \t]*\}/ { s = 0 }
+    s && match($0, /^[ \t]*"[^"]+"[ \t]*:[ \t]*"/) { n = substr($0, RSTART, RLENGTH); v = substr($0, RSTART + RLENGTH)
+      sub(/^[ \t]*"/, "", n); sub(/"[ \t]*:[ \t]*"$/, "", n); sub(/"[ \t]*,?[ \t]*$/, "", v); print n "\t" v }'
+}
+NPMS=$(pkgscripts)
 cliflags() { # cliflags <pathspec>...
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
-    else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
+    else NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
   done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
 }
 out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*makefile' '*.mk' '*pre-commit-config.yaml')

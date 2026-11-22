@@ -85,20 +85,31 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
 - A bare `--` ends the flags of a tool. The ruff subcommand is found among the arguments, so `ruff --config ruff.toml check --diff .` fails
   (issue 174, R5-01) while `ruff format --diff .` passes.
 - actionlint: `-ignore`, an empty `-pyflakes=` or `-shellcheck=` and every unlisted flag fail; a non-empty `-shellcheck=<path>` passes
-  (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`.
-- Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2, the part a line scan can read: only the `entry:` and run lines are read, not `args:`; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
+  (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`. The `ignore:`
+  entries of `.github/actionlint.yaml` (or `.yml`) are read by 2b: the `ignore:` line and every `- entry` of its block list need a reason.
+- Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
+- YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`) is read as one logical line, a blank line in it as a line break. A
+  sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
+  the tool, such as `astral-sh/ruff-action` or `docker://rhysd/actionlint`), `entry:` or `id:` (`ruff` and `ruff-check` run
+  `ruff check`, `ruff-format` runs `ruff format`) gives the command, and its args-like keys (`args`, `*_args`, `*_flags`, `*_options`,
+  at any depth: `with: args:`, `eslint_flags:`) are that command's flags, inline, as a flow or block list, a flow mapping
+  (`- {id: ruff, args: [--fix]}`) or a block scalar. A reason on the args lines waives them. Other inputs of a lint action
+  (`severity:`, `ignore_paths:`, `fail_on_error:`) are not read.
+- npm `--` tail (issue 164 item 3): npm appends it to the last command of the script, so the script is looked up in every tracked
+  package.json (one `"name": "command"` per line). When that command runs eslint, prettier or tsc (after `VAR=x` and `npx`), the tail is
+  checked for that tool; when it runs a test runner that is no linter (jest, vitest, mocha, playwright, cypress, firebase), not at all,
+  so `npm test -- -u` passes; in every other case (an unknown script, `npm exec`/`npx`, a wrapper such as `node x.mjs`, `npm run y`, a
+  path, any other program, or two package.json files that disagree) it is checked against all three, as before.
 - False positives removed: `uvx mypy@1.15`, `tsc -b > build.log` (issue 164 item 5) and `tsc --outFile dist/out.js` (item 4), and tools that
   are being installed (`pip install ruff --upgrade`, `npm i -D eslint --save-exact`, `cargo install`, `go install`).
 
 **Still not covered, or a new cost.**
-- A flag after `--` of `npm`, `npx` and kin is always checked, also when the line names the tool (`npm run lint:eslint -- --quiet`), and passes
-  when any of eslint, prettier and tsc lists it (tsc names read case-insensitively), because the script that runs is not known.
-  So `npm test -- --coverage` or `npm run build -- --watch` now needs a `justified:` (issue 164 item 3 stays open, and is wider than under
-  the blocklist). Resolving the script name through `package.json` would narrow it; no such passthrough exists in the repo today.
-- `with: args:` of a lint action, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (its `ignore:` entries are not read by
-  2b), flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
+- An npm `--` tail whose script cannot be resolved (see above) passes only when any of eslint, prettier and tsc lists the flag, so
+  `npm run build -- --watch` with `build` running `node build.mjs`, or `npm --prefix firebase test -- -u` (the option value reads as the
+  verb), needs a `justified:`. A script whose last command is a test runner not on the list (`tap`) is checked the same way.
+- Flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
 - A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
-- pre-commit `args:` lines (block style under `- id: ruff`, and the flow form `- {id: ruff, args: [--ignore=E501]}`), a tool name held in a
+- A tool name held in a
   Make or shell variable (`$(RUFF) check --ignore E501 .`), and a flag hidden by shell escapes (`eslint \--quiet .`, `eslint $'--quiet' .`).
 - Installer commands are matched by their subcommand (`pipx install`, `conda install`, `apt-get install`); `pipx run` and `conda run`
   run the tool, so they are scanned. A tsc `@response-file` fails, because the options inside it cannot be read. Because the rule covers the
