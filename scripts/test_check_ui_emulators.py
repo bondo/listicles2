@@ -23,7 +23,6 @@ HELPER = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/FirebaseEm
 SMOKE = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/EmulatorSmokeTest.kt"
 BUILD = "core/data/build.gradle.kts"
 EXEC = "firebase emulators:exec --only auth,firestore --project demo-tally"
-SHAPE = c.SHAPE
 
 
 class Wiring(unittest.TestCase):
@@ -71,46 +70,42 @@ class Wiring(unittest.TestCase):
         got = self.mutated(HELPER, 'PROJECT_ID = "demo-tally"', 'PROJECT_ID = "listicles"')
         self.assertEqual(got, ["FirebaseEmulator.kt PROJECT_ID must be demo-tally (a demo- project never reaches the real Firebase)"])
 
-    def test_ci_must_run_the_ui_tests_inside_the_emulators(self):
-        got = self.mutated(CI, EXEC, "echo")
-        self.assertEqual(got, [f"ci.yml ui job does not run its tests inside `{EXEC}`"])
-
-    def test_ci_must_start_both_emulators(self):
-        got = self.mutated(CI, "--only auth,firestore", "--only firestore")
-        self.assertEqual(got, [f"ci.yml ui job does not run its tests inside `{EXEC}`"])
-
-    def test_ci_must_run_the_data_tests_in_the_ui_job(self):
-        got = self.mutated(CI, " :core:data:connectedDebugAndroidTest", "")
-        self.assertEqual(got, ["ci.yml ui job does not run :core:data:connectedDebugAndroidTest inside the emulators"])
-
-    def test_ci_must_still_run_the_app_tests_in_the_ui_job(self):
-        got = self.mutated(CI, ":app:connectedDebugAndroidTest ", "")
-        self.assertEqual(got, ["ci.yml ui job does not run :app:connectedDebugAndroidTest inside the emulators"])
+    def test_the_ui_script_is_exactly_the_expected_command(self):
+        # Fail closed (R1-01, R2-01, R2-02): any other command line is rejected, however harmless it looks, so no deny list can be bypassed.
+        tasks = ":core:data:connectedDebugAndroidTest"
+        mutations = {
+            "no emulators:exec": (EXEC, "echo"),
+            "only firestore": ("--only auth,firestore", "--only firestore"),
+            "another project": ("--project demo-tally", "--project listicles"),
+            "no data tests": (" " + tasks, ""),
+            "no app tests": (":app:connectedDebugAndroidTest ", ""),
+            "dry run": ("--console=plain", "--dry-run --console=plain"),
+            "short dry run": ("--console=plain", "-m --console=plain"),
+            "excluded task": ("--console=plain", f"--console=plain -x {tasks}"),
+            "extra task": (":app:connectedDebugAndroidTest", ":app:connectedDebugAndroidTest :app:assembleRelease"),
+            "echo for gradle": ("./gradlew --console=plain", "echo --console=plain"),
+            "semicolon for &&": ("cd .. && ./gradlew", "cd .. ; ./gradlew"),
+            "fallback exits 0": ("; false)", ")"),
+            "fallback exit 0 at the end": ("; false)", "; exit 0)"),
+            "fallback exit 0 first": ("(find core", "(exit 0; find core"),
+            "second fallback": ("; false)", "; false) || (true)"),
+            "|| true": (tasks, tasks + " || true"),
+            "trailing true": ('; false)"', '; false)" ; true'),
+            "trailing pipe": ('; false)"', '; false)" | tee /dev/null'),
+            "block scalar": ("script: cd firebase", "script: |\n            cd firebase"),
+        }
+        for name, (old, new) in mutations.items():
+            with self.subTest(name):
+                shutil.copy(ROOT / CI, self.root / CI)
+                self.assertEqual(self.mutated(CI, old, new), [c.SCRIPT_PROBLEM])
 
     def test_the_ui_job_must_install_the_firebase_cli(self):
         got = self.mutated(CI, "npm ci --silent", "npm install --silent", count=2)
         self.assertEqual(got, ["ci.yml ui job has no `npm ci` step in firebase/ (the emulators come from firebase-tools)"])
 
-    def test_ui_test_failures_must_not_be_swallowed(self):
-        got = self.mutated(CI, ":core:data:connectedDebugAndroidTest", ":core:data:connectedDebugAndroidTest || true")
-        self.assertEqual(got, [SHAPE, "ci.yml ui job swallows a test failure (`|| true`, `continue-on-error`)"])
-
-    def test_the_diagnostics_fallback_must_still_fail_the_job(self):
-        self.assertEqual(self.mutated(CI, "; false)", ")"), [SHAPE])
-
-    def test_a_fallback_that_exits_zero_is_not_accepted(self):
-        self.assertEqual(self.mutated(CI, "; false)", "; exit 0)"), [SHAPE])
-
-    def test_the_ui_job_must_run_gradle_and_not_echo_it(self):
-        self.assertEqual(self.mutated(CI, "./gradlew --console=plain", "echo --console=plain"), [SHAPE])
-
-    def test_the_tests_must_not_run_after_a_semicolon(self):
-        got = self.mutated(CI, "cd .. && ./gradlew", "cd .. ; ./gradlew")
-        self.assertEqual(got, [SHAPE])
-
-    def test_a_second_fallback_is_not_accepted(self):
-        got = self.mutated(CI, "; false)", "; false) || (true)")
-        self.assertEqual(got, [SHAPE])
+    def test_a_ui_step_must_not_continue_on_error(self):
+        got = self.mutated(CI, "      - name: enable KVM\n", "      - name: enable KVM\n        continue-on-error: true\n")
+        self.assertEqual(got, ["ci.yml ui job swallows a test failure (`continue-on-error`)"])
 
     def test_the_ui_job_must_not_be_skippable(self):
         got = self.mutated(CI, "      - name: enable KVM\n", "      - name: enable KVM\n        if: github.event_name == 'push'\n")
@@ -138,9 +133,12 @@ class Wiring(unittest.TestCase):
 
     def test_the_data_module_must_run_unit_tests_on_the_junit_platform(self):
         # R1-02: the :core:testing network block is a JUnit Platform listener; on Gradle's JUnit 4 runner it never installs.
-        got = self.mutated(BUILD, "useJUnitPlatform", "useJUnit")
-        self.assertEqual(len(got), 1)
-        self.assertIn("JUnit Platform", got[0])
+        for old, new in (("useJUnitPlatform", "useJUnit"), ("unitTests.all {", "// unitTests.all {")):
+            with self.subTest(new):
+                shutil.copy(ROOT / BUILD, self.root / BUILD)
+                got = self.mutated(BUILD, old, new)
+                self.assertEqual(len(got), 1)
+                self.assertIn("JUnit Platform", got[0])
 
     def test_the_smoke_test_must_exist_and_have_a_test(self):
         got = self.mutated(SMOKE, "@Test", "// not a test", count=3)
