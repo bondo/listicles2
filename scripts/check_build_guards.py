@@ -18,6 +18,14 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
 
 The catalog-only coordinates guard (follow-up 3, M1-59) is added to this script by its own PR.
 
+4. Convention plugins (M1-46, issues 217 and 48). No Gradle file and no Kotlin source under build-logic/ configures other projects: an
+   `allprojects`/`subprojects` block or call, `configure(allprojects ...)`, `gradle.allprojects`, `gradle.beforeProject`/`afterProject`
+   (with or without `lifecycle`). Every module in a settings.gradle.kts `include(...)` has a build file that applies exactly one
+   `listicles.*` convention plugin and does not set again what those plugins own (Java and Kotlin JVM target, `-Xjdk-release`,
+   `allWarningsAsErrors`, JUnit Platform, `failOnNoDiscoveredTests`, compileSdk, minSdk). build-logic/ sources set no targetSdk (check 1
+   reads Gradle files only). Without a settings.gradle.kts the module part is skipped; the real-repository test checks that it reads four.
+   Known gap: a read of other projects (`allprojects.flatMap { ... }`) is not configuration and is not caught (M1-63).
+
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
 
@@ -315,16 +323,70 @@ def manifest_problems(root):
     return problems
 
 
+# -- 4. convention plugins (M1-46) -------------------------------------------------------------------------------------------------------
+
+# Configuration of other projects: an `allprojects`/`subprojects` block or call, `configure(allprojects ...)`, and the Gradle-level hooks.
+CROSS_PROJECT = re.compile(
+    r"(?<![\w$])(?:allprojects|subprojects)\s*[{(]|(?<![\w$])configure\s*\(\s*(?:allprojects|subprojects)\b"
+    r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject)\b"
+)
+# What the convention plugins own; a module build file that sets one again makes a second copy that can drift.
+OWNED = re.compile(
+    r"(?<![\w$])(allWarningsAsErrors|jvmTarget|sourceCompatibility|targetCompatibility|jvmToolchain|useJUnitPlatform|"
+    r"failOnNoDiscoveredTests|compileSdk|minSdk)\b|(-Xjdk-release)"
+)
+CONVENTION = re.compile(r"\balias\s*\(\s*libs\.plugins\.listicles\.[\w.]+\s*\)|\bid\s*\(\s*\"listicles\.[\w.-]+\"\s*\)")
+INCLUDE_CALL = re.compile(r"\binclude\s*\(([^)]*)\)")
+
+
+def module_paths(root):
+    """The project paths in settings.gradle.kts `include(...)` calls, or None when there is no settings file."""
+    if not os.path.isfile(os.path.join(root, "settings.gradle.kts")):
+        return None
+    text = strip(read(root, "settings.gradle.kts"))
+    return [p for m in INCLUDE_CALL.finditer(text) for p in re.findall(r"\"(:[^\"]+)\"", m.group(1))]
+
+
+def convention_problems(root):
+    problems = []
+    for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
+        text = strip(read(root, p), blank_strings=True)
+        for m in CROSS_PROJECT.finditer(text):
+            problems.append(f"{p}:{line_of(text, m.start())}: configures other projects ({m.group().strip()}); move it into a convention plugin in build-logic/")
+        if p.endswith(".kt"):
+            for m in TARGET_TOKEN.finditer(text):
+                problems.append(f"{p}:{line_of(text, m.start())}: {m.group()} in build-logic; set it in the module build file, where the floor guard reads it")
+    modules = module_paths(root)
+    if modules is None:
+        return problems
+    if not modules:
+        problems.append("settings.gradle.kts includes no module (the convention plugin check would pass vacuously)")
+    for module in modules:
+        base = module.strip(":").replace(":", "/")
+        build = next((f"{base}/build.gradle{ext}" for ext in (".kts", "") if os.path.isfile(os.path.join(root, *base.split("/"), "build.gradle" + ext))), None)
+        if build is None:
+            problems.append(f"{module}: no build file at {base}/build.gradle.kts")
+            continue
+        text = strip(read(root, build))
+        applied = CONVENTION.findall(text)
+        if len(applied) != 1:
+            problems.append(f"{build}: applies {len(applied)} listicles convention plugins; apply exactly one (build-logic/)")
+        for m in OWNED.finditer(text):
+            problems.append(f"{build}:{line_of(text, m.start())}: {m.group()} is set by the convention plugins in build-logic/; do not set it again here")
+    return problems
+
+
 def main(argv):
     root = os.path.abspath(argv[1]) if len(argv) > 1 else os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    problems = target_sdk_problems(root) + manifest_problems(root)
+    problems = target_sdk_problems(root) + manifest_problems(root) + convention_problems(root)
     if problems:
         for p in problems:
             print(f"build-guards: {p}")
         return 1
     sdk = min(v for _p, _l, v in target_sdk_values(root))
     manifests = len(application_manifests(root))
-    print(f"build-guards: ok (targetSdk {sdk}, floor {TARGET_SDK_FLOOR}, {manifests} manifest)")
+    modules = len(module_paths(root) or [])
+    print(f"build-guards: ok (targetSdk {sdk}, floor {TARGET_SDK_FLOOR}, {manifests} manifest, {modules} modules on convention plugins)")
     return 0
 
 
