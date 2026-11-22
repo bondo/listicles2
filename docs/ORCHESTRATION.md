@@ -38,7 +38,7 @@ by the early warning and pause protocol of §7.7. It keeps one
 * close individual Dependabot PRs once the grouped Dependabot PR has merged (§7.5; §9 F6);
 * create issues for owner-only tasks (§4.5);
 * add the `golden-update` label to a PR only after that PR's review round has checked the new or changed screenshot goldens and found them intended (no reviewer finding open against them), and post a one-line note on #15 naming the PR, the head SHA and the round each time (owner decision, #15 comment 7082564807, 2026-11-22; §7.6 item 2(c));
-* mark a PR READY and send it to the merge agent (a `risk:high` PR only after the independent second-reviewer pass); the merge agent is described in §7.5;
+* mark a PR READY and send it to the merge agent (a `risk:high` PR only after the independent second-reviewer pass); the merge agent is described in §7.5; once the body of #15 names it as active it merges under the owner's standing authorization, with no authorization in its own session (owner decision, #15 comment 7085221356);
 * follow the escalation reviewer's ruling, spawn an approver for an owner-only tooling, build, CI or gate PR, defer a minor past the 8-per-milestone cap in the cases of §7.2.1 and start `risk:high` tasks (the delegated decisions below).
 
 **It must stop and ask the owner**, one question at a time with a recommendation, for:
@@ -55,7 +55,7 @@ Stays with the owner: settings outside git (repository settings, rulesets, envir
 owner approval. An approval a session needs (a licence, a permission, a risky action) must come from the owner in that
 session itself; a relayed approval is refused. A worker that needs one stops and reports; the orchestrator files an
 ask-owner that names the worker session. Approvals of orchestrator decisions (merges of PRs that stay with the owner) are
-given in the orchestrator session and are never passed on to a worker as an approval.
+given in the orchestrator session and are never passed on to a worker as an approval. The one standing exception: a merge agent's authorization is the owner's decision comment 7085221356, which it reads and verifies itself on #15 (§7.5); nothing is relayed.
 
 **Stop condition:** two consecutive worker sessions fail or stall (§7.4). The orchestrator reads both with targeted `list_events`, logs an incident
 and retries once with a changed brief; it asks the owner after a third failure. A failure caused by a usage limit is neither (§7.7.3): it pauses and resumes instead.
@@ -122,7 +122,7 @@ Every spawned session gets tags so metrics can be pulled later without reading t
 
 ```
 listicles:<milestone or task>   e.g. listicles:M0, listicles:process
-role:<role>                     orchestrator | implementer | reviewer | second-reviewer | escalation-reviewer | planner | retro
+role:<role>                     orchestrator | implementer | merge-agent | reviewer | second-reviewer | escalation-reviewer | planner | retro
 pr:<number>                     when the work belongs to a PR
 batch:<id>                      e.g. batch:M0-2
 task:<id>                       one per task worked on, e.g. task:M0-04
@@ -143,7 +143,7 @@ goes to comments, not the body.
 * `Tasks ref:` the git ref whose `docs/tasks.toml` is canonical (§4.2).
 * `Usage:` one line, `ok | near limit (5-hour[, forecast | rateLimitType unknown]) | near limit (7-day) | near limit (overage) | paused until HH:MM UTC`, with when it was read (§7.7.1). The owner reads this line first.
 * **Sessions**: one row per live worker: id, role, tags, branch, **task ids** (the claims), spawned-at,
-  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived | interrupted (usage)`; the last is set by §7.7.2 and cleared by §7.7.4).
+  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived | interrupted (usage)`; the last is set by §7.7.2 and cleared by §7.7.4). A `merge-agent` row is what names it as active (§7.5).
 * **Branches**: one row per active branch: holder (session id or `none`),
   **tasks awaiting review/merge** (committed, not yet `done` in the file),
   `reviewed_through` SHA, unreviewed commits since then and their disposition.
@@ -639,7 +639,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
   (4) CI is green on the PR head (§7.1).
 * **Merge agent:** the merge agent merges every READY PR that is not owner-only under the owner's standing authorization, one at a time, and an owner-only PR only as kind `owner-batch`. Owner-only: permissions and `.claude` settings, guard thresholds, branch protection, repository settings, network allowlists, licence acceptances, design and product sign-off, docs that are themselves a gate (a decision to approve before work relies on it), naming and protected process files.
   A `risk:high` PR is marked READY only after the independent second-reviewer pass is clean (owner decision B, 2026-11-17). Docs PRs whose owner approval can wait go to it too and carry the status line `working draft ...; not owner-approved (see issue #15)` until the owner approves them in a later PR.
-  A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, and then the merge agent merges under the owner's standing authorization (#15 comment 7005366747, replacing the per-window rule of comment 7002904192) until the owner revokes it there; the orchestrator never passes an approval on to it.
+  A merge agent the orchestrator spawns needs no owner authorization in its own session (owner decision, #15 comment 7085221356): when it carries the tag `role:merge-agent`, its `parent_session_id` is that orchestrator and the body of #15 names it as active, the merge agent merges under the owner's standing authorization (#15 comment 7005366747, replacing the per-window rule of comment 7002904192) until the owner revokes it on #15; before its first merge it reads comment 7085221356 itself on #15 and checks that it is the owner's account, unedited, and that its first line starts with `decision (owner` (the same check as for a batch approval; the check proves the account, not the person); the orchestrator never passes an approval on to it; owner-only PRs still need a batch approval, `veto #N` still stops a merge and `scripts/merge_ready.py` still runs every check.
   An owner-only PR is merged by the merge agent as kind `owner-batch` once the owner's batch approval lists it, every other READY PR as kind `general` (D3, #15 comment 7007421567). Owner's own hands: settings outside git (repository settings, branch protection and rulesets, network allowlists, environments, licence acceptances, collaborator access).
   Batch approval (D1): the owner posts one ordered list `batch approval: #N@sha, #M@sha` on #15 (or in the merge agent's session, recorded on #15); the merge agent merges the listed PRs in that order, one at a time, with update-branch and green CI between merges. The script reads that comment (`--approval <comment-id>`): its first non-empty line must be `batch approval:` followed only by `#N@sha` entries and (notes), it must be the owner's account, on #15 and unedited, and an edited list is posted again. An owner approval given in a decision comment or in the owner's chat is recorded as one anchored `batch approval: #N@sha` first line (#15 comment 7014222068); the check proves the account only, not the person. Only an owner approval starts with `batch approval:`; a proposed, requested, declined or quoted list never does, whatever its notes say. The approver's record of the delegation below is the one exception.
   A listed PR may be merged at a head that differs from its approved SHA only by update-branch merge commits of `main` whose tree equals git's automatic merge (`git merge-tree` without conflicts, D2); a hand-resolved conflict or any other change needs a new approval.

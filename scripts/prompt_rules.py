@@ -1490,7 +1490,7 @@ DOC_RULES = (
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent the orchestrator spawns needs no owner authorization in its own session \(owner decision, #15 comment 7085221356\): "
             r"when it carries the tag `role:merge-agent`, its `parent_session_id` is that orchestrator and the body of #15 names it as active, "
-            r"the merge agent " + STANDING + r"; " + VERIFY_DECISION + r"; the orchestrator never passes an approval on to it; "
+            + STANDING + r"; " + VERIFY_DECISION + r"; the orchestrator never passes an approval on to it; "
             r"owner-only prs still need a batch approval, `veto #n` still stops a merge and `scripts/merge_ready\.py` still runs every check",
             CLASSES, OWNER_HANDS, BATCH, APPROVAL_FORM, SAME_PATCH,
             r"merge order \(#15 comment 7005414860\): the orchestrator sends " + ORDER_TAIL,
@@ -1540,7 +1540,7 @@ DOC_RULES = (
         "orch-spawn-templates", ORCH,
         (
             r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, whole diff \{base_sha\}\.\.\{head_sha\}, focus since \{reviewed_through\}",
-            r"role:<role>\s+orchestrator \| implementer \| reviewer \| second-reviewer \| escalation-reviewer \| planner \| retro",
+            r"role:<role>\s+orchestrator \| implementer \| merge-agent \| reviewer \| second-reviewer \| escalation-reviewer \| planner \| retro",
         ),
         "ORCHESTRATION 2.1 and 8.3: the reviewer spawn carries the whole diff and a focus point; the role tags name the new reviewers",
         forbidden=(r"role: agents/prompts/reviewer\.md\. pr #\{pr\}, round \{round\}, range",),
