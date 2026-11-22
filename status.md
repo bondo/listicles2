@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 25/73 (34%) | 48 |
+| M1 | Accounts and households | 26/73 (35%) | 47 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 25/73 done (34%), 48 open.
+**Progress:** 26/73 done (35%), 47 open.
 
 ### Tasks
 
@@ -161,7 +161,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | done | M1-01 | implementer | [#290](https://github.com/bondo/listicles2/issues/290) |
 | M1-57 | Konsist&#58; no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI … | in progress | M1-50 | implementer | [#307](https://github.com/bondo/listicles2/issues/307) |
 | M1-51 | Build guards&#58; scripts/check_build_guards.py with the targetSdk floor (checklist follow-up 4; foll… | done | M1-01 | implementer | [#296](https://github.com/bondo/listicles2/issues/296) |
-| M1-58 | Build guard&#58; manifest cleartext and backup (checklist follow-up 5), in scripts/check_build_guards… | ready | M1-51 | implementer |  |
+| M1-58 | Build guard&#58; manifest cleartext and backup (checklist follow-up 5), in scripts/check_build_guards… | done | M1-51 | implementer | [#308](https://github.com/bondo/listicles2/issues/308) |
 | M1-59 | Build guard&#58; catalog-only coordinates (checklist follow-up 3), in scripts/check_build_guards.py | ready | M1-51 | implementer |  |
 | M1-35 | PLAN amendments from the follow-up triage (P1-P9 rules and users name, quota risk, PIT 80, ui … | done | M1-01 | planner | [#265](https://github.com/bondo/listicles2/issues/265) |
 | M1-36 | Product docs&#58; start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 … | done | M1-O7 | planner |  |
@@ -170,7 +170,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-39 | Your name (AUTH-12)&#58; users/{uid}.name, name step at first Google sign-in and at start, edit in A… | blocked | M1-08, M1-10, M1-18, M1-17, M1-25 | implementer |  |
 | M1-40 | Process docs wording&#58; owner-merge exceptions next to the merge-agent rule (issue 147), dispatch… | done | M1-01 | implementer | [#293](https://github.com/bondo/listicles2/issues/293) |
 | M1-41 | check_gradle_repos.py&#58; dotted repositories.google(), raw strings and nested templates (issues 226… | done | M1-01 | implementer |  |
-| M1-42 | guards check 2c&#58; actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174) | ready | M1-01 | implementer |  |
+| M1-42 | guards check 2c&#58; actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174) | in progress | M1-01 | implementer | [#309](https://github.com/bondo/listicles2/issues/309) |
 | M1-43 | prompt_rules.py&#58; sentence-level negation for the resolve-thread rule (issue 153) | done | M1-01 | implementer |  |
 | M1-44 | CI hardening nits&#58; job timeouts, pinned python and node, gitleaks download, npm install scripts,… | ready | M1-01 | implementer |  |
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/listicles2/issues/292) |
@@ -226,26 +226,25 @@ flowchart LR
     n25["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
     n26["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n27["M1-57 Konsist: no Context, Activity or Androi… (in progress)"]:::progress
-    n28["M1-58 Build guard: manifest cleartext and ba… (ready)"]:::ready
-    n29["M1-59 Build guard: catalog-only coordinates (… (ready)"]:::ready
-    n30["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n31["M1-42 guards check 2c: actionlint flags and r… (ready)"]:::ready
-    n32["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
-    n33["M1-46 build-logic convention plugins#59; no allp… (ready)"]:::ready
-    n34["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n35["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n36["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n37["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n38["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n39["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n40["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n41["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n42["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n43["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n44["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n45["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
-    n46["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n47["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
+    n28["M1-59 Build guard: catalog-only coordinates (… (ready)"]:::ready
+    n29["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
+    n30["M1-42 guards check 2c: actionlint flags and r… (in progress)"]:::progress
+    n31["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
+    n32["M1-46 build-logic convention plugins#59; no allp… (ready)"]:::ready
+    n33["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n34["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n35["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n36["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n37["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n38["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n39["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n40["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n41["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n42["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
+    n43["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
+    n44["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
+    n45["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n46["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
     n3 --> n0
     n23 --> n1
     n1 --> n2
@@ -253,7 +252,7 @@ flowchart LR
     n25 --> n4
     n24 --> n4
     n3 --> n5
-    n47 --> n5
+    n46 --> n5
     n6 --> n7
     n7 --> n8
     n7 --> n9
@@ -274,7 +273,7 @@ flowchart LR
     n16 --> n17
     n15 --> n17
     n17 --> n18
-    n39 --> n18
+    n38 --> n18
     n6 --> n19
     n7 --> n19
     n6 --> n20
@@ -283,22 +282,53 @@ flowchart LR
     n6 --> n22
     n3 --> n24
     n5 --> n25
-    n1 --> n30
-    n3 --> n30
-    n11 --> n30
-    n10 --> n30
-    n19 --> n30
+    n1 --> n29
+    n3 --> n29
+    n11 --> n29
+    n10 --> n29
+    n19 --> n29
+    n9 --> n33
+    n10 --> n33
+    n13 --> n33
+    n14 --> n33
+    n15 --> n33
+    n16 --> n33
+    n18 --> n33
+    n19 --> n33
+    n21 --> n33
+    n17 --> n33
+    n29 --> n33
+    n0 --> n34
+    n1 --> n34
+    n2 --> n34
+    n3 --> n34
+    n4 --> n34
+    n5 --> n34
+    n7 --> n34
+    n8 --> n34
     n9 --> n34
     n10 --> n34
+    n11 --> n34
     n13 --> n34
     n14 --> n34
     n15 --> n34
     n16 --> n34
     n18 --> n34
     n19 --> n34
+    n20 --> n34
     n21 --> n34
+    n6 --> n34
+    n12 --> n34
     n17 --> n34
+    n22 --> n34
+    n29 --> n34
     n30 --> n34
+    n31 --> n34
+    n32 --> n34
+    n33 --> n34
+    n23 --> n34
+    n24 --> n34
+    n25 --> n34
     n0 --> n35
     n1 --> n35
     n2 --> n35
@@ -322,6 +352,8 @@ flowchart LR
     n12 --> n35
     n17 --> n35
     n22 --> n35
+    n27 --> n35
+    n29 --> n35
     n30 --> n35
     n31 --> n35
     n32 --> n35
@@ -330,50 +362,16 @@ flowchart LR
     n23 --> n35
     n24 --> n35
     n25 --> n35
-    n0 --> n36
-    n1 --> n36
-    n2 --> n36
-    n3 --> n36
-    n4 --> n36
-    n5 --> n36
-    n7 --> n36
-    n8 --> n36
-    n9 --> n36
-    n10 --> n36
-    n11 --> n36
-    n13 --> n36
-    n14 --> n36
-    n15 --> n36
-    n16 --> n36
-    n18 --> n36
-    n19 --> n36
-    n20 --> n36
-    n21 --> n36
-    n6 --> n36
-    n12 --> n36
-    n17 --> n36
-    n22 --> n36
-    n27 --> n36
-    n30 --> n36
-    n31 --> n36
-    n32 --> n36
-    n33 --> n36
-    n34 --> n36
-    n35 --> n36
-    n23 --> n36
-    n24 --> n36
-    n25 --> n36
-    n28 --> n36
-    n29 --> n36
-    n26 --> n36
-    n45 --> n37
-    n37 --> n38
-    n37 --> n39
-    n37 --> n40
-    n20 --> n40
-    n37 --> n42
-    n4 --> n42
-    n32 --> n44
+    n28 --> n35
+    n26 --> n35
+    n44 --> n36
+    n36 --> n37
+    n36 --> n38
+    n36 --> n39
+    n20 --> n39
+    n36 --> n41
+    n4 --> n41
+    n31 --> n43
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -501,7 +499,7 @@ flowchart LR
 - **task** M1-39: waits on M1-08, M1-10, M1-18 +2
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +8
 - **task** M1-48: waits on M1-06, M1-08, M1-09 +28
-- **task** M1-FU: waits on M1-06, M1-08, M1-09 +33
+- **task** M1-FU: waits on M1-06, M1-08, M1-09 +32
 - **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
