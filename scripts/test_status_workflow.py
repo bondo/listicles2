@@ -12,7 +12,6 @@ IMAGE_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status.sv
 TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_status_page.py",
          "python3 -I scripts/test_status_publish.py", "python3 -I scripts/test_status_graph.py",
          "python3 -I scripts/test_status_workflow.py")
-GRAPH_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status-graph.svg"
 PAGE_URL = "https://github.com/bondo/listicles2/blob/status/status.md"
 JOB_PERMISSIONS = ["checks: read", "contents: write", "issues: read", "pull-requests: read"]
 USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)(?:\s+#\s*(\S.*))?$")
@@ -245,16 +244,6 @@ class Wiring(unittest.TestCase):
 
     def test_readme_links_the_detail_page_on_the_status_branch(self):
         self.assertIn(f"]({PAGE_URL})", read("README.md"))
-
-    def test_readme_embeds_the_graph_below_the_status_picture_with_alt_text(self):
-        readme = read("README.md")
-        m = re.search(rf"!\[([^\]]{{20,}})\]\({re.escape(GRAPH_URL)}\)", readme)
-        self.assertIsNotNone(m, "README must embed status-graph.svg with alt text")
-        self.assertIn("dependenc", m.group(1))
-        self.assertLess(readme.index(f"]({IMAGE_URL})"), m.start(), "the graph goes below the status picture")
-
-    def test_the_workflow_needs_no_change_for_the_graph(self):
-        self.assertNotIn("status-graph", read(".github", "workflows", "status.yml"))  # render writes it next to the svg, publish picks it up
 
     def test_the_workflow_needs_no_change_for_the_page(self):
         text = read(".github", "workflows", "status.yml")

@@ -372,7 +372,6 @@ def main(argv=None):
     r.add_argument("--svg", required=True)
     r.add_argument("--json", required=True)
     r.add_argument("--md", help="detail page path (default: status.md next to the SVG)")
-    r.add_argument("--graph", help="open-task dependency graph path (default: status-graph.svg next to the SVG)")
     r.add_argument("--repo", help="OWNER/NAME for links in the detail page (default: $GITHUB_REPOSITORY when valid)")
     s = sub.add_parser("same")
     s.add_argument("old")
@@ -390,15 +389,12 @@ def main(argv=None):
         if repo is None and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", os.environ.get("GITHUB_REPOSITORY", "")):
             repo = os.environ["GITHUB_REPOSITORY"]
         model = build_model(_read(args.tasks), data, now)
-        import status_graph  # noqa: PLC0415  # justified: status_graph imports this module, so it can only be loaded here
         import status_page  # noqa: PLC0415  # justified: status_page imports this module, so it can only be loaded here
         try:
             svg, js, page = render_svg(model), status_json(model), status_page.render_page(model, repo)
         except status_page.PageError as e:
             raise StatusError(str(e)) from None
         md_path = Path(args.md) if args.md else Path(args.svg).with_name("status.md")
-        graph_path = Path(args.graph) if args.graph else Path(args.svg).with_name("status-graph.svg")
-        graph_path.write_text(status_graph.render_graph_svg(model), encoding="utf-8")
         Path(args.svg).write_text(svg, encoding="utf-8")
         Path(args.json).write_text(js, encoding="utf-8")
         md_path.write_text(page, encoding="utf-8")
