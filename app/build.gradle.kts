@@ -97,6 +97,23 @@ abstract class GoogleServicesStandIn : DefaultTask() {
     }
 }
 
+// PR 304 R1-02: the stand-in is for CI only. Packaging a non-debug variant (APK or bundle) with it fails, unless the
+// build passes -Ptally.allowStandInRelease=true (only M1-33's CI release smoke build). Compiling release (Kover) still
+// works. scripts/test_google_services_release_gate.py checks the refusal, the opt-in and that debug is unaffected.
+val allowStandInRelease = providers.gradleProperty("tally.allowStandInRelease").orNull == "true"
+
+abstract class RefuseGoogleServicesStandIn : DefaultTask() {
+    @get:Input abstract val variantName: Property<String>
+
+    @TaskAction
+    fun refuse(): Unit =
+        throw GradleException(
+            "The ${variantName.get()} build has no google-services.json and would ship the demo-tally stand-in. " +
+                "Add the real app/google-services.json (M1-O1), or pass -Ptally.allowStandInRelease=true " +
+                "for a CI smoke build (M1-33).",
+        )
+}
+
 if (googleServicesStandIn) {
     // The plugin registers process<Variant>GoogleServices in its own onVariants callback with the fixed search paths; this
     // callback runs after it, so this configure action runs after the plugin's and replaces the paths with the stand-in.
@@ -113,6 +130,15 @@ if (googleServicesStandIn) {
         tasks.named<GoogleServicesTask>("process${name}GoogleServices") {
             dependsOn(standIn)
             googleServicesJsonFiles.set(standIn.map { listOf(it.jsonFile.get().asFile) })
+        }
+        if (variant.buildType != "debug" && !allowStandInRelease) {
+            val refuse =
+                tasks.register<RefuseGoogleServicesStandIn>("refuseGoogleServicesStandIn$name") {
+                    variantName.set(variant.name)
+                }
+            tasks.matching { it.name == "package$name" || it.name == "package${name}Bundle" }.configureEach {
+                dependsOn(refuse)
+            }
         }
     }
 }
