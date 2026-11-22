@@ -1,15 +1,13 @@
 """Checks that the Auth and Firestore emulators sit behind the `ui` job (M1-02, #254).
 
-  * firebase.json starts the `auth` and `firestore` emulators, on the host and ports FirebaseEmulator.kt (the :core:data
-    androidTest helper) connects to, and the helper's project is a `demo-` one,
-  * ci.yml `ui` job: installs the Firebase CLI (`npm ci` in firebase/) and runs `:app:connectedDebugAndroidTest` and
-    `:core:data:connectedDebugAndroidTest` inside `firebase emulators:exec --only auth,firestore --project demo-tally`;
-    the quoted command is exactly `cd .. && ./gradlew ...` with at most one `|| (...; false)` fallback (a fallback that exits 0, an
-    `echo` instead of gradle or a `;` would turn a failing run green), no step is skippable (`if:`, the job is a required check)
-    and nothing else swallows a failure (`|| true`, `continue-on-error`),
-  * verify.sh runs this check and its tests, and compiles the :core:data androidTest sources; ci.yml `tasks` runs both,
-  * :core:data has :core:testing on its unit-test classpath and runs unit tests on the JUnit Platform, where the network block
-    installs (#217 item 3), and a smoke test that talks to the emulators.
+  * firebase.json starts both emulators on the host and ports FirebaseEmulator.kt (the :core:data androidTest helper) uses, with a
+    `demo-` project,
+  * ci.yml `ui` job: installs the Firebase CLI and runs the `:app` and `:core:data` connectedDebugAndroidTest tasks inside
+    `firebase emulators:exec --only auth,firestore --project demo-tally`. The quoted command is `cd .. && ./gradlew ...` with at
+    most one `|| (...; false)` fallback (a fallback that exits 0, an `echo` or a `;` would turn a failing run green); no step has
+    `if:` (the job is a required check) and nothing else swallows a failure,
+  * verify.sh and the CI `tasks` job run this check and its tests; verify.sh compiles the :core:data androidTest sources,
+  * :core:data has :core:testing and the JUnit Platform on its unit tests (#217 item 3) and a smoke test using the emulators.
 Run: python3 -I scripts/check_ui_emulators.py  (exit 1 and one line per problem).
 """
 

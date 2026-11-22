@@ -23,10 +23,7 @@ HELPER = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/FirebaseEm
 SMOKE = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/EmulatorSmokeTest.kt"
 BUILD = "core/data/build.gradle.kts"
 EXEC = "firebase emulators:exec --only auth,firestore --project demo-tally"
-SHAPE = (
-    "ci.yml ui job: the emulators:exec command must be `cd .. && ./gradlew <options and both tasks>`, optionally followed by "
-    "one `|| (<diagnostics>; false)` fallback that still fails"
-)
+SHAPE = c.SHAPE
 
 
 class Wiring(unittest.TestCase):
@@ -99,15 +96,12 @@ class Wiring(unittest.TestCase):
         self.assertEqual(got, [SHAPE, "ci.yml ui job swallows a test failure (`|| true`, `continue-on-error`)"])
 
     def test_the_diagnostics_fallback_must_still_fail_the_job(self):
-        # R1-01 (a): without `; false` the fallback group exits with find's status, 0, so a failing Gradle run is a green job.
         self.assertEqual(self.mutated(CI, "; false)", ")"), [SHAPE])
 
     def test_a_fallback_that_exits_zero_is_not_accepted(self):
-        # R1-01 (b)
         self.assertEqual(self.mutated(CI, "; false)", "; exit 0)"), [SHAPE])
 
     def test_the_ui_job_must_run_gradle_and_not_echo_it(self):
-        # R1-01 (c): the task names are still in the text, but nothing runs them.
         self.assertEqual(self.mutated(CI, "./gradlew --console=plain", "echo --console=plain"), [SHAPE])
 
     def test_the_tests_must_not_run_after_a_semicolon(self):
@@ -145,13 +139,8 @@ class Wiring(unittest.TestCase):
     def test_the_data_module_must_run_unit_tests_on_the_junit_platform(self):
         # R1-02: the :core:testing network block is a JUnit Platform listener; on Gradle's JUnit 4 runner it never installs.
         got = self.mutated(BUILD, "useJUnitPlatform", "useJUnit")
-        self.assertEqual(
-            got,
-            [
-                ":core:data must run its unit tests on the JUnit Platform (unitTests.all { it.useJUnitPlatform() }), "
-                "or the :core:testing network block never installs (#217 item 3)"
-            ],
-        )
+        self.assertEqual(len(got), 1)
+        self.assertIn("JUnit Platform", got[0])
 
     def test_the_smoke_test_must_exist_and_have_a_test(self):
         got = self.mutated(SMOKE, "@Test", "// not a test", count=3)
