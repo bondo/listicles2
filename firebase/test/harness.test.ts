@@ -160,6 +160,7 @@ test.each([
     "allow get: if signedIn() && x || y;",
     "allow get: if signedIn() && x ? y : z;",
     "allow get: if signedInSoon();",
+    "allow get: if signedIn() == false;",
 ])("withoutSignedIn names %s", (statement) => {
     const rules = rulesWith(at("/a/{b}", statement), at("/users/{uid}/x/{y}", statement));
     expect(h.withoutSignedIn(rules)).toHaveLength(2);
@@ -189,6 +190,8 @@ test("withoutSignedIn names a signedIn() not declared exactly once, at the docum
     expect(h.withoutSignedIn(service)).toEqual(found("the service block"));
     const commented = rulesWith(at("/a/{b}", weak.replace(" ", "/**/"))); // R2-03
     expect(h.withoutSignedIn(commented)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
+    const split = rulesWith(at("/a/{b}", weak.replace(" ", "\n")));
+    expect(h.withoutSignedIn(split)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
 });
 
 // R2-01 to R2-03: an escaped quote in a string, `match` with no space, a comment between keywords.
@@ -203,6 +206,8 @@ test.each([
     ],
     ["match with no space", "    match /users/{uid} { match/a/{b} { allow get: if b == ''; } }"],
     ["a comment in allow/**/get", at("/a/{b}", "allow/**/get: if b == '';")],
+    ["a CR in a // comment", at("/a/{b}", "// x\r }\n allow get: if b == '';")],
+    ["two /* */ comments, one over lines", at("/a/{b}", "/* }\n */ allow get: if b == ''; /* */")],
 ])("withoutSignedIn reads %s", (_what, block) => {
     expect(h.withoutSignedIn(rulesWith(block))).toEqual([
         expect.stringMatching(/\/a\/\{b\}: b == ''$/),
@@ -222,6 +227,7 @@ test.each([
     ['an open " string', at("/a/{b}", 'allow get: if b == "x;')],
     ["an extra {", at("/a/{b}", "allow get: if signedIn();") + " {"],
     ["an extra }", at("/a/{b}", "allow get: if signedIn(); }")],
+    ["no ; and no condition", `    match /a/{b} { match /c/{d} { allow get } ${weak} }`],
 ])("withoutSignedIn throws on %s", (_what, block) => {
     expect(() => h.withoutSignedIn(rulesWith(block))).toThrow("rules:");
 });
