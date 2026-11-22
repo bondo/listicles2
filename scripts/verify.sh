@@ -72,6 +72,8 @@ step gradle-repos python3 -I scripts/check_gradle_repos.py
 step test-results-gate-tests python3 -I scripts/test_check_test_results.py
 step screenshots-tests python3 -I scripts/test_screenshots.py
 step screenshots-wiring python3 -I scripts/check_screenshots.py
+step ui-emulators-tests python3 -I scripts/test_check_ui_emulators.py
+step ui-emulators python3 -I scripts/check_ui_emulators.py
 step gitignore-secrets-tests python3 -I scripts/test_gitignore_secrets.py
 step wrapper-checksum-tests python3 -I scripts/test_check_gradle_wrapper.py
 step wrapper-checksum python3 -I scripts/check_gradle_wrapper.py
@@ -95,7 +97,7 @@ if [ "$FAST" = 0 ]; then
 else
   echo "skip  unit-tests, coverage, mutation, screenshots (--fast)"; SKIPPED=1
 fi
-step build gradle :app:assembleDebug :app:assembleDebugAndroidTest
+step build gradle :app:assembleDebug :app:assembleDebugAndroidTest :core:data:assembleDebugAndroidTest
 step firebase-install bash -c 'cd firebase && npm ci --silent'
 step firebase-typecheck bash -c 'cd firebase && npm run typecheck --silent'
 step firebase-lint bash -c 'cd firebase && npm run lint --silent'
