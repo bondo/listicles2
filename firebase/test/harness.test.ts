@@ -165,14 +165,10 @@ test.each([
     expect(h.withoutSignedIn(rules)).toHaveLength(2);
 });
 
-test("withoutSignedIn reads nested matches past comments and strings, and throws on what it cannot read", () => {
+test("withoutSignedIn reads nested matches past comments and strings", () => {
     const nested =
         "    // a } and the caller's '\n    match /h/{x} {\n      match /m/{y} { allow get: if y == '}'; }\n    }";
     expect(h.withoutSignedIn(rulesWith(nested))).toEqual([`${DOCUMENTS}/h/{x}/m/{y}: y == ''`]);
-    expect(() => h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if x }")))).toThrow();
-    expect(() =>
-        h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if signedIn();") + " {")),
-    ).toThrow();
 });
 
 // S1-01: a signedIn() redefined in a nested match would pass for the global one.
@@ -191,6 +187,8 @@ test("withoutSignedIn names a signedIn() not declared exactly once, at the docum
     expect(h.withoutSignedIn(nestedOnly)).toEqual(found(`${DOCUMENTS}/a/{b}`));
     const service = rulesWith().replace(SIGNED_IN, "").replace("{\n", `{\n${SIGNED_IN}\n`);
     expect(h.withoutSignedIn(service)).toEqual(found("the service block"));
+    const commented = rulesWith(at("/a/{b}", weak.replace(" ", "/**/"))); // R2-03
+    expect(h.withoutSignedIn(commented)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
 });
 
 // R2-01 to R2-03: an escaped quote in a string, `match` with no space, a comment between keywords.
@@ -211,13 +209,19 @@ test.each([
     ]);
 });
 
-test("withoutSignedIn sees function/**/signedIn, and throws on a string or match it cannot read", () => {
-    const shadowed = rulesWith(
-        at("/a/{b}", `${weak.replace(" ", "/**/")} allow get: if signedIn();`),
-    );
-    expect(h.withoutSignedIn(shadowed)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
-    expect(() => h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if b == 'x;")))).toThrow();
-    expect(() =>
-        h.withoutSignedIn(rulesWith("    match a/{b} { allow get: if signedIn(); }")),
-    ).toThrow();
+// Fail closed: text the rules compiler may read otherwise throws (R2-01 to R3-04).
+test.each([
+    ["no ; at the end (the allow count)", "    match /a/{b} { allow get: if x }"],
+    [
+        "no ; then a function",
+        `    match /a/{b} { match /c/{d} { allow get: if signedIn() } ${weak} }`,
+    ],
+    ["a space in a path", "    match /users/{uid} { match /x/ {y} { allow get: if true; } }"],
+    ["a match without a path", "    match a/{b} { allow get: if signedIn(); }"],
+    ["an open ' string", at("/a/{b}", "allow get: if b == 'x;")],
+    ['an open " string', at("/a/{b}", 'allow get: if b == "x;')],
+    ["an extra {", at("/a/{b}", "allow get: if signedIn();") + " {"],
+    ["an extra }", at("/a/{b}", "allow get: if signedIn(); }")],
+])("withoutSignedIn throws on %s", (_what, block) => {
+    expect(() => h.withoutSignedIn(rulesWith(block))).toThrow("rules:");
 });
