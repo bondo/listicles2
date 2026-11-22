@@ -46,7 +46,12 @@ IGNORE_POLICY = {"typescript": MAJOR, "firebase": MAJOR, "@firebase/rules-unit-t
 SDK_GROUP = "firebase-sdk"
 SDK_PATTERNS = ["firebase", "@firebase/rules-unit-testing"]
 # tsconfig compilerOptions allowlist: anything else (skipLibCheck, strict: false, a lone strict flag turned off) is a problem.
-TS_OPTIONS = {"target", "lib", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns"}
+# isolatedModules must be true (issue 210 item 7): with module nodenext ts-jest warns TS151002 on every run unless it compiles each file
+# on its own. ts-jest then only transpiles; tsc --noEmit, which verify.sh and CI run before Jest, stays the type check.
+TS_OPTIONS = {
+    "target", "lib", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns",
+    "isolatedModules",
+}
 # firebase 12.19 and later declarations reference the Temporal namespace, which TypeScript 6 provides only through lib esnext.temporal.
 # Setting lib replaces the default (lib.es2022.full: es2022, dom, dom.iterable, dom.asynciterable, webworker.importscripts, scripthost),
 # so the list is the subset of that default that firebase's types need (es2022, dom, dom.iterable), plus esnext.temporal.
@@ -223,6 +228,8 @@ def tsconfig_problems(cfg):
         problems.append("noEmit is not true")
     if opts.get("noUncheckedIndexedAccess") is not True:
         problems.append("noUncheckedIndexedAccess is not true")
+    if opts.get("isolatedModules") is not True:
+        problems.append("isolatedModules is not true")
     if opts.get("lib") != TS_LIB:
         problems.append(f"lib is {opts.get('lib')!r}, expected {TS_LIB!r}")
     extra = set(opts) - TS_OPTIONS
@@ -243,15 +250,16 @@ def tool(name, *args, cwd=FB):
 
 
 class Fixture:
-    """A throwaway directory inside firebase/ (so the project tsconfig, ESLint and Prettier configs apply) holding one TypeScript file."""
+    """A throwaway directory inside firebase/ (so the project tsconfig, ESLint and Prettier configs apply) holding one TypeScript file.
+    `options` are compilerOptions laid over the project's."""
 
-    def __init__(self, source):
+    def __init__(self, source, name="sample.ts", options=None):
         self.dir = tempfile.mkdtemp(prefix="fixture-tmp-", dir=FB)
-        self.file = os.path.join(self.dir, "sample.ts")
+        self.file = os.path.join(self.dir, name)
         with open(self.file, "w", encoding="utf-8") as f:
             f.write(source)
         with open(os.path.join(self.dir, "tsconfig.json"), "w", encoding="utf-8") as f:
-            json.dump({"extends": "../tsconfig.json", "include": ["./*.ts"], "exclude": []}, f)
+            json.dump({"extends": "../tsconfig.json", "include": ["./*.ts"], "exclude": [], "compilerOptions": options or {}}, f)
 
     def __enter__(self):
         return self
@@ -273,6 +281,13 @@ def eslint(source):
 def prettier(source):
     with Fixture(source) as fx:
         return tool("prettier", "--check", fx.file)
+
+
+def jest(options=None):
+    """Jest with the project's jest.config.cjs (preset ts-jest) on one passing test, as npm test runs it but without the emulator, and
+    without the cache, so ts-jest compiles (and would warn) on every run."""
+    with Fixture('export {};\n\ntest("adds", () => {\n    expect(1 + 1).toBe(2);\n});\n', "sample.test.ts", options) as fx:
+        return tool("jest", "--no-cache", "--rootDir", fx.dir)
 
 
 class HelperNegativeCases(unittest.TestCase):
@@ -389,7 +404,9 @@ class HelperNegativeCases(unittest.TestCase):
 
     def test_tsconfig_allowlist_rejects_every_weakening(self):
         good = {
-            "compilerOptions": {"strict": True, "noEmit": True, "noUncheckedIndexedAccess": True, "lib": TS_LIB, "types": ["jest"]},
+            "compilerOptions": {
+                "strict": True, "noEmit": True, "noUncheckedIndexedAccess": True, "isolatedModules": True, "lib": TS_LIB, "types": ["jest"],
+            },
             "include": ["**/*.ts"],
             "exclude": ["node_modules"],
         }
@@ -403,6 +420,8 @@ class HelperNegativeCases(unittest.TestCase):
             "allowJs": {**good, "compilerOptions": {**opts, "allowJs": True}},
             "noEmit off": {**good, "compilerOptions": {**opts, "noEmit": False}},
             "no unchecked access flag": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "noUncheckedIndexedAccess"}},
+            "isolatedModules off": {**good, "compilerOptions": {**opts, "isolatedModules": False}},
+            "isolatedModules missing": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "isolatedModules"}},
             "lib missing": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "lib"}},
             "lib without temporal": {**good, "compilerOptions": {**opts, "lib": ["es2022", "dom", "dom.iterable"]}},
             "lib without dom": {**good, "compilerOptions": {**opts, "lib": ["es2022", "esnext.temporal"]}},
@@ -456,16 +475,32 @@ class Config(unittest.TestCase):
         for word in ("testMatch", "testPathIgnorePatterns", "testRegex", "modulePathIgnorePatterns"):
             self.assertNotIn(word, text, word)
 
-    def test_javascript_rules_test_is_gone_and_the_typescript_one_keeps_every_case(self):
+    def test_javascript_rules_test_is_gone_and_the_typescript_suite_has_every_part(self):
+        """M1-52 (see #202): every operation as each of three clients on the PLAN section 3 paths, the deny suite, the PLAN pin
+        and the mutant check. npm test checks what they do; this also runs where that step is skipped (SKIP_FIREBASE)."""
         self.assertFalse(os.path.exists(os.path.join(FB, "test", "rules.test.js")))
-        text = read("firebase", "test", "rules.test.ts")
-        for path in ("users/alice", "households/h1", "households/h1/members/alice", "households/h1/lists/l1",
-                     "households/h1/lists/l1/items/i1", "households/h1/invites/inv1", "anything/else"):
-            self.assertIn(f'"{path}"', text, path)
-        for case in ("anonymous", "signed-in", "default deny (%s)", "%s: get", "%s: create/overwrite",
-                     "%s: update and delete an existing doc", "list and add on a collection"):
-            self.assertIn(case, text, case)
-        self.assertEqual(len(re.findall(r"assertFails\(", text)), 6)
+        parts = {
+            # Own and other users' documents of each {uid} collection; the self and others mutants need one each (R2-02 of PR 301).
+            "harness.ts": ('export const CLIENT_NAMES = ["anonymous", "unverified", "verified"] as const;',
+                           'export const OPS = ["get", "list", "group", "create", "update", "delete"] as const;',
+                           "...TEMPLATES.map((t) => instantiate(t)),",
+                           '...TEMPLATES.filter((t) => t.endsWith("/{uid}")).map((t) => instantiate(t, OTHER)),',
+                           'if (template.endsWith("/{uid}")) whos.push("others", "self");',
+                           "...UNPLANNED.map((t) => instantiate(t)),"),
+            # The deny suite runs exactly h.PROBES, the probes the mutant check runs: no filter of its own (review of PR 301).
+            "rules.test.ts": ("expect(h.TEMPLATES).toEqual([", "expect(h.UNPLANNED).toEqual([",
+                              'test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {',
+                              "await assertFails(h.attempt(admin.firestore(), dbs[probe.client], probe));"),
+            # Every mutant needs a probe that it allows, so none passes vacuously (R1-02 of PR 301).
+            "mutants.test.ts": ("...h.methodMutants(h.UNPLANNED_ROOT),", "h.mutate(h.RULES, mutant)", "expect(got).toEqual(want);",
+                                "expect(want).toContainEqual(expect.stringMatching(/: allowed$/));"),
+            "harness.test.ts": ("planTemplates throws on %s", "expected: %s", "a collection no probe touches"),
+        }
+        for name, needles in parts.items():
+            lines = [ln for ln in read("firebase", "test", name).splitlines() if not ln.strip().startswith("//")]
+            for needle in needles:
+                with self.subTest(file=name, part=needle):
+                    self.assertTrue(any(needle in ln for ln in lines), needle)
 
     def test_dependabot_ignores_only_the_major_updates_of_typescript_firebase_rules_unit_testing_and_types_node(self):
         self.assertEqual(dependabot_ignore_problems(yaml.safe_load(read(".github", "dependabot.yml"))), [])
@@ -601,6 +636,16 @@ class Behaviour(unittest.TestCase):
                 self.assertNotEqual(code, 0, out)
                 self.assertIn(rule, out)
         self.assertEqual(tsc(angle)[0], 0, "tsc alone accepts the angle-bracket assertion, so only ESLint can reject it")
+
+    def test_ts_jest_prints_no_hybrid_module_warning_with_the_project_tsconfig(self):
+        """Issue 210 item 7. The control without isolatedModules shows that the warning would be printed and seen."""
+        code, out = jest()
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 passed", out)
+        self.assertNotIn("TS151002", out)
+        code, out = jest(options={"isolatedModules": False})
+        self.assertEqual(code, 0, out)
+        self.assertIn("TS151002", out)
 
     def test_unformatted_code_fails_prettier(self):
         code, out = prettier(PRETTIER_BAD)

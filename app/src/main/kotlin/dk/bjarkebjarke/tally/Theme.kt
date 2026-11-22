@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 private const val RADIX_HEX = 16
 private const val OPAQUE = 0xFF000000L
@@ -128,6 +129,32 @@ fun colorSchemeFor(darkTheme: Boolean): ColorScheme = if (darkTheme) DarkScheme 
  * (display*, headlineLarge/Medium, titleSmall, labelSmall) is the Material 3 default too; ThemeTokensTest checks both.
  */
 fun colorSchemeTypography(): Typography = Typography()
+
+/** The spacing tokens of design/tokens.json in dp (ThemeTokensTest checks parity). */
+object Spacing {
+    val xxs = 2.dp
+    val xs = 4.dp
+    val s = 8.dp
+    val m = 12.dp
+    val l = 16.dp
+    val xl = 24.dp
+    val xxl = 32.dp
+}
+
+/** The size tokens of design/tokens.json in dp (ThemeTokensTest checks parity). */
+object Sizes {
+    val minTouchTarget = 48.dp
+    val topAppBar = 64.dp
+    val listRowMin = 56.dp
+    val fab = 56.dp
+    val icon = 24.dp
+    val offlineBar = 32.dp
+    val screenGutter = 16.dp
+}
+
+/** Wireframe 02's empty-state circle and its icon (`.bubble` in wireframes.html); not design tokens. */
+val EmptyStateBubble = 96.dp
+val EmptyStateIcon = 44.dp
 
 @Composable
 fun TallyTheme(

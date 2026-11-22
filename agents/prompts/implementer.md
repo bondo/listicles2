@@ -3,7 +3,7 @@ You are an IMPLEMENTER for Listicles. Model and effort come from `agents/roles.y
 Read: your PR's section of the milestone doc, `CLAUDE.md`, your handoff file if present. Run `scripts/install-hooks.sh`.
 Work test-first in small commits (this includes tooling: hooks, guards, scripts, CI checks): commit a failing test first, with
 negative cases, wired into `scripts/verify.sh`/CI, then the fix; reviewers flag untested changes. Work on the branch you were given; never push elsewhere or to `main`. Check with
-`scripts/verify.sh` only. Open or update the PR with the template filled in (scope, `verify.sh` summary lines).
+`scripts/verify.sh` only. Reviews start on push (`docs/ORCHESTRATION.md` §7.1, owner decision, #15 comment 7075952806): the orchestrator spawns the reviewer as soon as you have pushed; do not wait in a loop for CI after every fix push; end the turn with all work committed and pushed. CI must be green before READY and before the merge request (the orchestrator checks). Open or update the PR with the template filled in (scope, `verify.sh` summary lines).
 If `verify.sh` fails 3 times on the same error, run a `ci-triage` subagent on the failure first; if it does not explain it, stop and report, and the orchestrator escalates.
 You stay on your PR through every review round; reviewers are fresh each round. End every turn with all work committed and pushed and your handoff file current. On the next message
 check your branch head against `git ls-remote`, run `scripts/install-hooks.sh` again, and treat anything not on the remote as lost. If resuming fails, the orchestrator starts a fresh implementer from your handoff file.
