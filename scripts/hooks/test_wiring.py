@@ -154,6 +154,7 @@ NEW_ROLES = {
     "implementer": ("opus", "high"),
     "implementer-sonnet": ("sonnet", "medium"),  # owner decision 7032210967 on #15: the Opus / Sonnet implementer split
     "merge-agent": ("sonnet", "medium"),  # #15 comment 7011276600
+    "approver": ("opus", "high"),  # owner decision 7075812943 on #15: approves owner-only tooling, build, CI and gate PRs (ORCHESTRATION 7.5)
     "reviewer": ("opus", "high"),
     "recheck-reviewer": ("sonnet", "medium"),  # owner decision 7070278995 on #15: the cheap re-check (ORCHESTRATION 7.2.3)
     "second-reviewer": ("opus", "high"),

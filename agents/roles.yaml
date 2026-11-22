@@ -46,6 +46,12 @@ roles:
     effort: medium
     session: long-lived, started by the orchestrator; merges only under an owner authorization on #15 (7005366747 standing, 7007421567 batches)
     definition: docs/ORCHESTRATION.md section 7.5
+  # Owner decision, #15 comment 7075812943: approves owner-only tooling, build, CI and gate PRs in the owner's place (ORCHESTRATION 7.5); never merges, edits or pushes.
+  approver:
+    model: opus
+    effort: high
+    session: fresh, one per PR (inputs: PR number, head SHA, round history, deferral records)
+    prompt: agents/prompts/approver.md
   # Reviewer effort is strictly per `max_effort_when`: never max for consistency (owner decision, #15 comment 7070278995; ORCHESTRATION 7.2.3).
   reviewer:
     model: opus
