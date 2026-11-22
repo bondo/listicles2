@@ -161,11 +161,17 @@ class Coordinates(unittest.TestCase):
             ('dependencies.run {\n    testImplementation("a.b:c:1")\n}', "app/build.gradle.kts"),
             ('with(dependencies) { implementation("a.b:c:1") }', "app/build.gradle.kts"),
             ("dependencies.with { implementation 'a.b:c:1' }", "lib/build.gradle"),
+            ('dependencies.implementation(group = "a.b", name = "c", version = "1")', "app/build.gradle.kts"),  # R2-01
+            ('dependencies.implementation("a.b", "c", "1")', "app/build.gradle.kts"),
+            ('dependencies.implementation(mapOf("group" to "a.b", "name" to "c"))', "app/build.gradle.kts"),
+            ("dependencies.implementation group: 'a.b', name: 'c', version: '1'", "lib/build.gradle"),
+            ("dependencies.implementation([group: 'a.b', name: 'c'])", "lib/build.gradle"),
         ):
             with self.subTest(text=text):
                 self.assert_flagged(self.OK + text + "\n", name=name)
         self.assert_clean(
             'dependencies.implementation(libs.a)\ndependencies.apply { implementation(libs.b) }\nwith(other) { foo("a.b:c:1") }\n'
+            'dependencies.implementation(libs.c) { exclude(group = "org.x", module = "y") }\nval p = Pair("a.b", "c")\n'
             'val m = mutableMapOf<String, Int>().apply { put("a.b:c", 1) }\n'
         )
 
@@ -179,6 +185,8 @@ class Coordinates(unittest.TestCase):
                 "lib/build.gradle",
             ),
             ('configurations.all { resolutionStrategy.eachDependency { useTarget(mapOf("group" to "a.b", "name" to "c")) } }', "app/build.gradle.kts"),
+            ("configurations.all { resolutionStrategy.eachDependency { details -> details.useTarget group: 'a.b', name: 'c' } }", "lib/build.gradle"),
+            ("configurations.all { resolutionStrategy.eachDependency { DependencyResolveDetails d -> d.useTarget group: 'a.b' } }", "lib/build.gradle"),
             ('configurations.all { resolutionStrategy.forcedModules = setOf("a.b:c:1") }', "app/build.gradle.kts"),
             ("configurations.all { resolutionStrategy.forcedModules = ['a.b:c:1'] }", "lib/build.gradle"),
             ('configurations.all {\n    resolutionStrategy.setForcedModules(\n        "a.b:c:1",\n    )\n}', "app/build.gradle.kts"),
