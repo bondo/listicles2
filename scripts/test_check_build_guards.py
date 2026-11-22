@@ -151,6 +151,58 @@ class Coordinates(unittest.TestCase):
         self.assert_flagged('dependencies {\n    implementation(\n        group = "a.b",\n        name = "c",\n        version = "1",\n    )\n}\n')
         self.assert_flagged("dependencies {\n    implementation group: 'a.b', name: 'c', version: '1'\n}\n", name="lib/build.gradle")
 
+    def test_a_configuration_called_on_dependencies_or_in_a_scope_function_is_flagged(self):
+        """R1-01: `dependencies.<conf>(...)` and `dependencies.apply { }`-style blocks."""
+        for text, name in (
+            ('dependencies.implementation("a.b:c:1")', "app/build.gradle.kts"),
+            ('dependencies.testImplementation(\n    "a.b:c:1",\n)', "app/build.gradle.kts"),
+            ("dependencies.implementation 'a.b:c:1'", "lib/build.gradle"),
+            ('dependencies.apply { implementation("a.b:c:1") }', "app/build.gradle.kts"),
+            ('dependencies.run {\n    testImplementation("a.b:c:1")\n}', "app/build.gradle.kts"),
+            ('with(dependencies) { implementation("a.b:c:1") }', "app/build.gradle.kts"),
+            ("dependencies.with { implementation 'a.b:c:1' }", "lib/build.gradle"),
+        ):
+            with self.subTest(text=text):
+                self.assert_flagged(self.OK + text + "\n", name=name)
+        self.assert_clean(
+            'dependencies.implementation(libs.a)\ndependencies.apply { implementation(libs.b) }\nwith(other) { foo("a.b:c:1") }\n'
+            'val m = mutableMapOf<String, Int>().apply { put("a.b:c", 1) }\n'
+        )
+
+    def test_a_resolution_strategy_target_or_forced_module_is_flagged(self):
+        """R1-02: `useTarget` and `forcedModules` pin a version like `force` and `useModule`."""
+        for text, name in (
+            ('configurations.all { resolutionStrategy.eachDependency { useTarget("a.b:c:1") } }', "app/build.gradle.kts"),
+            ("configurations.all { resolutionStrategy.eachDependency { details -> details.useTarget 'a.b:c:1' } }", "lib/build.gradle"),
+            ("configurations.all { resolutionStrategy.eachDependency { details ->\n    details.useTarget group: 'a.b', name: 'c', version: '1'\n} }", "lib/build.gradle"),
+            ('configurations.all { resolutionStrategy.eachDependency { useTarget(mapOf("group" to "a.b", "name" to "c")) } }', "app/build.gradle.kts"),
+            ('configurations.all { resolutionStrategy.forcedModules = setOf("a.b:c:1") }', "app/build.gradle.kts"),
+            ("configurations.all { resolutionStrategy.forcedModules = ['a.b:c:1'] }", "lib/build.gradle"),
+            ('configurations.all {\n    resolutionStrategy.setForcedModules(\n        "a.b:c:1",\n    )\n}', "app/build.gradle.kts"),
+        ):
+            with self.subTest(text=text):
+                self.assert_flagged(self.OK + text + "\n", name=name)
+        self.assert_clean(
+            self.OK + "configurations.all {\n    resolutionStrategy.eachDependency { useTarget(libs.a) }\n"
+            "    resolutionStrategy.forcedModules = emptySet()\n}\nval allowed = \"a.b:c:1\"\n"
+        )
+
+    def test_kotlin_map_notation_and_a_wrapped_named_argument_are_flagged(self):
+        """R1-03: `mapOf("group" to ...)` like the Groovy map, and a line break after `=` or `:`."""
+        for call, name in (
+            ('implementation(mapOf("group" to "a.b", "name" to "c", "version" to "1"))', "app/build.gradle.kts"),
+            ('implementation(mapOf("name" to "c", "group" to "a.b"))', "app/build.gradle.kts"),
+            ('implementation(\n        group =\n            "a.b",\n        name = "c",\n    )', "app/build.gradle.kts"),
+            ('classpath(kotlin("gradle-plugin", version =\n        "2.0.0"))', "build.gradle.kts"),
+            ("implementation group:\n        'a.b', name: 'c'", "lib/build.gradle"),
+        ):
+            with self.subTest(call=call):
+                self.assert_flagged(f"dependencies {{\n    {call}\n}}\n", name=name)
+        self.assert_clean(
+            'dependencies {\n    implementation(libs.a) { exclude(mapOf("group" to "org.x")) }\n    implementation(project(mapOf("path" to ":core:testing")))\n}\n'
+            'val m = mapOf("group" to "x")\n'
+        )
+
     def test_a_call_over_several_lines_is_flagged(self):
         self.assert_flagged('dependencies {\n    implementation(\n        "a.b:c:1",\n    )\n}\n')
         self.assert_flagged('dependencies {\n    implementation(\n        platform(\n            "a.b:c:1"\n        )\n    )\n}\n')
@@ -268,6 +320,7 @@ class Coordinates(unittest.TestCase):
             "y/build.gradle": "// none\n",
         }
         self.assertEqual(cbg.catalog_stats(tree(files)), (3, 5))
+        self.assertEqual(cbg.catalog_stats(tree({"app/build.gradle.kts": "dependencies.implementation(libs.a)\n"})), (1, 1))
 
     def test_the_real_repository_passes_and_is_looked_at(self):
         self.assertEqual(cbg.catalog_problems(ROOT), [])
