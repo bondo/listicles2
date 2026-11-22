@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 29/74 (39%) | 45 |
+| M1 | Accounts and households | 30/75 (40%) | 45 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 29/74 done (39%), 45 open.
+**Progress:** 30/75 done (40%), 45 open.
 
 ### Tasks
 
@@ -126,20 +126,21 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-06 | Rules fuzzing&#58; fast-check against a TS reference model of PLAN 3.1 (P17) | blocked | M1-01, M0.5-08, M1-10 | implementer |  |
 | M1-07 | Test-impact summary&#58; uncovered changed lines to the step summary and verify.sh (P19) | done | M1-01 | implementer | [#298](https://github.com/bondo/listicles2/issues/298) |
 | M1-29 | Rename to Tally&#58; applicationId and namespace dk.bjarkebjarke.tally, packages, app label en/da | done | M1-01 | implementer | [#268](https://github.com/bondo/listicles2/issues/268) |
-| M1-08 | Rules base&#58; signedIn() with email_verified, users/{uid} householdId set/clear and name, tombsto… | ready | M1-52 | implementer |  |
+| M1-08 | Rules base&#58; signedIn() with email_verified, users/{uid} householdId set/clear and name, tombsto… | in progress | M1-52 | implementer | [#314](https://github.com/bondo/listicles2/issues/314) |
 | M1-09 | Rules spike&#58; PLAN 3.1 items a-e in the emulator, ADR 0002 with the results | blocked | M1-08 | implementer |  |
 | M1-10 | Rules&#58; create household and member display name, allow and deny tests (transfer is M1-53) | blocked | M1-09 | implementer |  |
 | M1-11 | Rules&#58; leave, remove member (removed marker), household soft delete and cleanup, allow and de… | blocked | M1-54, M1-53 | implementer |  |
 | M1-12 | Rules&#58; invites (create, get, list, revoke, cleanup), incl. unverified get denied (join is M1-54) | blocked | M1-10, M1-O12 | implementer |  |
 | M1-30 | App skeleton&#58; Hilt with KSP, Google Services plugin + generated stand-in config, Connectivity help… | done | M1-29, M1-02, M1-36, M1-49 | implementer | [#304](https://github.com/bondo/listicles2/issues/304) |
-| M1-60 | Start-up root&#58; Navigation 3, P10 gates (#195, Q2 A), M1 home (#194, Q1 A), one routing test with… | ready | M1-30, M1-36, M1-49 | implementer |  |
+| M1-60 | Start-up root&#58; Navigation 3, M1 home (#194, Q1 A), signed-in/out routing (P10 steps 2 and 6), sig… | done | M1-30, M1-36, M1-49 | implementer | [#311](https://github.com/bondo/listicles2/issues/311) |
+| M1-62 | Start-up gates (b2 of M1-60)&#58; update (START-01), email verified (#195, Q2 A), name saved (AUTH-1… | ready | M1-60 | implementer |  |
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/listicles2/issues/303) |
-| M1-14 | Auth data&#58; Google sign-in via Credential Manager, session state, sign out (Auth emulator) | blocked | M1-60, M1-13, M1-02, M1-50 | implementer |  |
-| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-14 | implementer |  |
+| M1-14 | Auth data&#58; Google sign-in via Credential Manager, session state, sign out (Auth emulator) | ready | M1-60, M1-13, M1-02, M1-50 | implementer |  |
+| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-14, M1-62 | implementer |  |
 | M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | blocked | M1-14, M1-03, M1-49 | implementer |  |
-| M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16 | implementer |  |
+| M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16, M1-62 | implementer |  |
 | M1-24 | LocaleConfig&#58; generateLocaleConfig and resources.properties (LANG-02) | done | M1-29 | implementer | [#287](https://github.com/bondo/listicles2/issues/287) |
-| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | blocked | M1-54, M1-14, M1-60, M1-02 | implementer |  |
+| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | blocked | M1-54, M1-14, M1-60, M1-62, M1-02 | implementer |  |
 | M1-31 | Household data 2&#58; leave, remove (marker, resumable), transfer, delete with cleanup resume (em… | blocked | M1-11, M1-18 | implementer |  |
 | M1-19 | Household UI&#58; create, members, invite share sheet, revoke (HH-01, HH-02, HH-04) | blocked | M1-18 | implementer |  |
 | M1-20 | Invite link and join screen (HH-03), incl. signed-out routing through sign-in | blocked | M1-19, M1-17 | implementer |  |
@@ -149,9 +150,9 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-23 | Optional TOTP two-step verification (AUTH-09) | blocked | M1-32, M1-O3 | implementer |  |
 | M1-25 | Account screen (wireframe 18) and navigation&#58; sign-out UI (AUTH-03), Crashlytics opt-in switch, … | blocked | M1-60, M1-14 | implementer |  |
 | M1-26 | App Check&#58; Play Integrity in release, debug provider in debug builds (not enforced) | ready | M1-30 | implementer |  |
-| M1-27 | Minimum app version&#58; config/app.minVersionCode, schemaVersion, update screen | blocked | M1-08, M1-60 | implementer |  |
+| M1-27 | Minimum app version&#58; config/app.minVersionCode, schemaVersion, update screen | blocked | M1-08, M1-60, M1-62 | implementer |  |
 | M1-28 | Privacy text draft in English and Danish (OQ-30) | done | M1-01 | planner | [#286](https://github.com/bondo/listicles2/issues/286) |
-| M1-33 | Release smoke build with R8 in CI (best-practices checklist follow-up 7) | ready | M1-30 | implementer |  |
+| M1-33 | Release smoke build with R8 in CI (best-practices checklist follow-up 7) | in progress | M1-30 | implementer | [#312](https://github.com/bondo/listicles2/issues/312) |
 | M1-52 | Rules test harness&#58; default-deny paths from PLAN section 3, list and collection-group queries, unv… | done | M1-35 | implementer | [#301](https://github.com/bondo/listicles2/issues/301) |
 | M1-53 | Rules&#58; transfer ownership, allow and deny tests (partial transfers, plain member, non-member) | blocked | M1-10 | implementer |  |
 | M1-54 | Rules&#58; the join batch with the one-household check, allow and deny tests | blocked | M1-12 | implementer |  |
@@ -168,7 +169,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-36 | Product docs&#58; start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 … | done | M1-O7 | planner |  |
 | M1-37 | JVM modules&#58; check Java API use against minSdk 26 with api-versions.xml (issue 228) | done | M1-01 | implementer | [#288](https://github.com/bondo/listicles2/issues/288) |
 | M1-38 | Run the licensee and warnings gate self-tests only when their inputs change; licensee version as … | done | M1-01 | implementer |  |
-| M1-39 | Your name (AUTH-12)&#58; users/{uid}.name, name step at first Google sign-in and at start, edit in A… | blocked | M1-08, M1-10, M1-18, M1-17, M1-25 | implementer |  |
+| M1-39 | Your name (AUTH-12)&#58; users/{uid}.name, name step at first Google sign-in and at start, edit in A… | blocked | M1-08, M1-10, M1-18, M1-17, M1-25, M1-62 | implementer |  |
 | M1-40 | Process docs wording&#58; owner-merge exceptions next to the merge-agent rule (issue 147), dispatch… | done | M1-01 | implementer | [#293](https://github.com/bondo/listicles2/issues/293) |
 | M1-41 | check_gradle_repos.py&#58; dotted repositories.google(), raw strings and nested templates (issues 226… | done | M1-01 | implementer |  |
 | M1-42 | guards check 2c&#58; actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174) | in progress | M1-01 | implementer | [#309](https://github.com/bondo/listicles2/issues/309) |
@@ -177,9 +178,9 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/listicles2/issues/292) |
 | M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issues 217 items 1-4,… | ready | M1-02 | implementer |  |
 | M1-47 | R12 screens vs wireframes for M1 (issue 65 review catalogue) | blocked | M1-16, M1-17, M1-19, M1-20, M1-21, M1-22, M1-23, M1-25, M1-27, M1-32, M1-39, M1-03, M1-04 | process |  |
-| M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54 | process |  |
+| M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-62, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54 | process |  |
 | M1-34 | guards.sh&#58; compare line length per tool across all style files, with ruff and flake8 defaults (is… | done | none | implementer |  |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -200,13 +201,13 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 ```mermaid
 flowchart LR
     n0["M1-06 Rules fuzzing: fast-check against a TS … (blocked)"]:::blocked
-    n1["M1-08 Rules base: signedIn() with email_ver… (ready)"]:::ready
+    n1["M1-08 Rules base: signedIn() with email_ver… (in progress)"]:::progress
     n2["M1-09 Rules spike: PLAN 3.1 items a-e in the… (blocked)"]:::blocked
     n3["M1-10 Rules: create household and member di… (blocked)"]:::blocked
     n4["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n5["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
-    n6["M1-60 Start-up root: Navigation 3, P10 gates … (ready)"]:::ready
-    n7["M1-14 Auth data: Google sign-in via Credentia… (blocked)"]:::blocked
+    n6["M1-62 Start-up gates (b2 of M1-60): update (… (ready)"]:::ready
+    n7["M1-14 Auth data: Google sign-in via Credentia… (ready)"]:::ready
     n8["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
     n9["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
     n10["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
@@ -221,7 +222,7 @@ flowchart LR
     n19["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
     n20["M1-26 App Check: Play Integrity in release, d… (ready)"]:::ready
     n21["M1-27 Minimum app version: config/app.min… (blocked)"]:::blocked
-    n22["M1-33 Release smoke build with R8 in CI (be… (ready)"]:::ready
+    n22["M1-33 Release smoke build with R8 in CI (be… (in progress)"]:::progress
     n23["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
     n24["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
     n25["M1-61 Java API level check: also look up clas… (ready)"]:::ready
@@ -251,11 +252,12 @@ flowchart LR
     n23 --> n4
     n3 --> n5
     n44 --> n5
-    n6 --> n7
     n7 --> n8
+    n6 --> n8
     n7 --> n9
     n8 --> n10
     n9 --> n10
+    n6 --> n10
     n24 --> n11
     n7 --> n11
     n6 --> n11
@@ -272,7 +274,6 @@ flowchart LR
     n15 --> n17
     n17 --> n18
     n36 --> n18
-    n6 --> n19
     n7 --> n19
     n1 --> n21
     n6 --> n21
@@ -283,6 +284,7 @@ flowchart LR
     n11 --> n27
     n10 --> n27
     n19 --> n27
+    n6 --> n27
     n9 --> n31
     n10 --> n31
     n13 --> n31
@@ -355,8 +357,8 @@ flowchart LR
     n23 --> n33
     n24 --> n33
     n26 --> n33
-    n6 --> n33
     n25 --> n33
+    n6 --> n33
     n42 --> n34
     n34 --> n35
     n34 --> n36
@@ -470,11 +472,10 @@ flowchart LR
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-12: waits on M1-10, M1-O12
-- **task** M1-14: waits on M1-60
-- **task** M1-15: waits on M1-14
+- **task** M1-15: waits on M1-14, M1-62
 - **task** M1-16: waits on M1-14
-- **task** M1-17: waits on M1-15, M1-16
-- **task** M1-18: waits on M1-54, M1-14, M1-60
+- **task** M1-17: waits on M1-15, M1-16, M1-62
+- **task** M1-18: waits on M1-54, M1-14, M1-62
 - **task** M1-31: waits on M1-11, M1-18
 - **task** M1-19: waits on M1-18
 - **task** M1-20: waits on M1-19, M1-17
@@ -482,11 +483,11 @@ flowchart LR
 - **task** M1-22: waits on M1-17, M1-25
 - **task** M1-32: waits on M1-22, M1-21
 - **task** M1-23: waits on M1-32, M1-O3
-- **task** M1-25: waits on M1-60, M1-14
-- **task** M1-27: waits on M1-08, M1-60
+- **task** M1-25: waits on M1-14
+- **task** M1-27: waits on M1-08, M1-62
 - **task** M1-53: waits on M1-10
 - **task** M1-54: waits on M1-12
-- **task** M1-39: waits on M1-08, M1-10, M1-18 +2
+- **task** M1-39: waits on M1-08, M1-10, M1-18 +3
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +8
 - **task** M1-48: waits on M1-06, M1-08, M1-09 +27
 - **task** M1-FU: waits on M1-06, M1-08, M1-09 +30
