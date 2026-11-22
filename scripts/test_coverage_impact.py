@@ -316,6 +316,8 @@ def ci_problems(text):
         problems.append("unit: the coverage impact tests step is missing or changed")
     elif CI_XML_STEP in unit and unit.index(CI_TESTS_STEP) > unit.index(CI_XML_STEP):
         problems.append("unit: the coverage impact tests run after the report they test")
+    # M1-63: the debug APK upload step has the one allowed `if:` (push to main only; scripts/check_debug_apk.py freezes the step).
+    unit = unit.replace("        if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n", "", 1)
     if re.search(r"(?m)^\s*(?:-\s+)?if:", unit) or "continue-on-error" in unit:
         problems.append("unit: if or continue-on-error")
     return problems

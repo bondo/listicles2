@@ -285,7 +285,8 @@ class CiWiring(unittest.TestCase):
         # M1-63: the debug APK upload runs on pushes to main only, so its step has the one allowed `if:`; every other `if:` stays flagged.
         step = f"      - name: upload\n        if: {DEBUG_APK_IF}\n        run: 'true'\n"
         before = "      - name: coverage impact tests (M1-07)"
-        text = ci_text().replace(before, step + before, 1)
+        text = ci_text()
+        self.assertEqual(text.count(f"        if: {DEBUG_APK_IF}\n"), 1, "ci.yml has the debug APK upload step")
         self.assertEqual(wiring_problems(text), [])
         twice = text.replace(before, step + before, 1)
         self.assertIn("unit: if or continue-on-error", wiring_problems(twice))
