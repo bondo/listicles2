@@ -952,5 +952,78 @@ class Issue164SelfReviewTests(CliFlagCase):
         self.assertPasses()
 
 
+class PrReviewRound1Tests(CliFlagCase):
+    """PR 309 review round 1: R1-01 a more-indented line of a folded block keeps its line break, R1-02 a package.json scripts layout that
+    is not read makes every npm `--` tail unknown, R1-03 anchors, tags and aliases on actionlint `ignore:`, R1-04 a bare `-` item and
+    args keys in other letter case, R1-05 multi-line plain and quoted scalars, R1-06 a reason waives only its own line of an args key."""
+
+    WF, STEP = ".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n"
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def fails(self, path, cases, mark=MARK):
+        for text, n in cases:
+            with self.subTest(text=text):
+                self.write(path, text)
+                self.assertFails(f"{mark}: {path}:{n}:")
+
+    def test_folds_and_multi_line_scalars(self):
+        s = self.STEP
+        self.fails(self.WF, [
+            (s + "      - run: >\n          ruff check --ignore E501 .\n            echo ok # justified: three words here\n", 5),
+            (s + "      - run: >\n          echo a\n            echo b # justified: three words here\n          ruff check --fix .\n", 7),
+            (s + "      - run: ruff check\n          --ignore E501 .\n", 4),
+            (s + '      - run: "ruff check\n          --ignore E501 ."\n', 4),
+            (s + "      - name: lint\n        run: ruff check\n          --fix .\n", 5),
+        ])
+        for text in [s + "      - run: >\n          ruff check\n          --config ruff.toml .\n        name: x\n",
+                     s + "      - name: ruff check\n        run: ruff check .\n        env:\n          X: --fix\n"]:
+            with self.subTest(ok=text):
+                self.write(self.WF, text)
+                self.assertPasses()
+
+    def test_an_unread_package_json_layout_makes_every_tail_unknown(self):
+        self.write("firebase/package.json", '{\n  "scripts": {\n    "test": "jest"\n  }\n}\n')
+        for tools, cmd in [('{"scripts": {"test": "eslint ."}}\n', "cd tools && npm test -- --quiet"),
+                           ('{"scripts": {"test": "eslint ."},\n  "x": {\n    "scripts": {\n      "test": "jest"\n    }\n  }\n}\n', "npm test -- --quiet"),
+                           ('{\n  "scripts": {\n    "test":\n      "eslint ."\n  }\n}\n', "npm test -- --quiet src")]:
+            with self.subTest(tools=tools):
+                self.write("tools/package.json", tools)
+                self.put("scripts/lint.sh", cmd)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+        self.write("tools/package.json", '{\n  "x": {\n    "scripts": {\n      "test": "eslint ."\n    }\n  }\n}\n')
+        self.put("scripts/lint.sh", "npm test -- -u")
+        self.assertPasses()
+
+    def test_actionlint_ignore_anchor_tag_and_alias(self):
+        r = " # justified: upstream false positive tracked\n"
+        self.fails(".github/actionlint.yaml", [
+            ("paths:\n  x.yml:\n    ignore: &a" + r + "      - SC2086\n      - SC2046\n", 4),
+            ("paths:\n  x.yml:\n    ignore: !!seq" + r + "      - SC2086\n", 4),
+            ("x: &l\n  - SC2086\npaths:\n  x.yml:\n    ignore: *l" + r, 5),
+        ], "guard: unjustified suppression")
+
+    def test_bare_dash_items_and_key_case(self):
+        s, w = self.STEP, "        with:\n"
+        self.fails(self.WF, [
+            (s + "      -\n        uses: astral-sh/ruff-action@v3\n" + w + "          args: check --fix\n", 7),
+            (s + "      - uses: astral-sh/ruff-action@v3\n" + w + "          ARGS: check --fix\n", 6),
+            (s + "      - uses: astral-sh/ruff-action@v3\n" + w + "          Args: check --fix\n", 6),
+        ])
+
+    def test_a_reason_waives_only_its_own_line_of_an_args_key(self):
+        h = "repos:\n  - repo: x\n    hooks:\n      - id: ruff\n"
+        r = " # justified: three words here\n"
+        self.fails(".pre-commit-config.yaml", [
+            (h + "        args:\n          - --ignore=E501\n          - --config=ruff.toml" + r, 5),
+            (h + "        args:" + r + "          - --fix\n", 5),
+            (h + "        args: [--config=ruff.toml," + r + "          --fix]\n", 5),
+        ])
+        self.write(".pre-commit-config.yaml", h + "        args:\n          - --fix" + r + "          - --config=ruff.toml\n")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
