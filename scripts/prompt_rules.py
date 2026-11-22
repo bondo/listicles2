@@ -889,13 +889,16 @@ RULES = (
         "escalation-role", ("escalation-reviewer",),
         (
             r"you are the escalation reviewer", r"opus, max effort", r"once per pr", r"no second escalation",
-            r"decide `fix`, `split` or `owner`", r"one more fresh round", r"taste or scope goes to the owner",
+            r"decide `fix`, `split` or `owner`", r"one more fresh round",
+            r"`owner`: taste or scope: you decide it yourself, per finding `fix` or `drop`; your ruling is final "
+            r"\(owner decision, #15 comment 7075812943\)\.",
             r"never edit or push the pr branch: report only", r"use up the pr's one escalation",
-            r"a `drop` sets the finding to `withdrawn`", r"an `owner` finding stays open for the owner",  # R1-04 of #129
+            r"a `drop` sets the finding to `withdrawn`", r"no finding stays open for the owner",  # R1-04 of #129; R1-02 of #299
             r"usage limit reset: re-read the pr head, the thread and your notes",  # R1-05 of #129
             r"post the one decision comment if it is not posted yet",
         ),
-        "the escalation reviewer decides fix, split or owner once per PR and never edits the branch (rev 46 row 4)",
+        "the escalation reviewer decides fix, split or owner once per PR, decides an owner question itself and never edits the branch (rev 46 row 4)",
+        forbidden=(r"taste or scope goes to the owner", r"an `owner` finding stays open for the owner"),
     ),
     Rule(
         "orch-model", ("orchestrator",),
@@ -935,8 +938,8 @@ RULES = (
             r"escalation reviewer \(§7\.2\.2\): when round 4 still has a confirmed finding above nit \(deferred minors do not count\) "
             r"or a dispute is still open, spawn one escalation reviewer per pr",
             r"every spawn in §7\.2\.2 uses the §8\.3 message \(.*?\) with its own role line",
-            r"a `fix` ruling gets one fresh round 5, a `split` opens a new pr from `main` with merge commits, `owner` goes to the owner; "
-            r"there is no second escalation",
+            r"a `fix` ruling gets one fresh round 5, a `split` opens a new pr from `main` with merge commits, an `owner` ruling decides "
+            r"the taste or scope question itself, per finding `fix` or `drop`, and is final; there is no second escalation",
             r"escaped defect: when a bug is found after merge, put a `caused by: #n` line in the bug issue and add one `escaped` row to the metrics csv",
         ),
         "the orchestrator spawns the plan review, the second reviewer and the one escalation reviewer, and records escaped defects (rev 46 checks)",
@@ -1016,6 +1019,7 @@ RULES = (
             r"to read #15 for one right before it runs `scripts/merge_ready\.py`",
             r"a pr with anything on the owner-retained list, or with an owner-only path outside tooling, build, ci and gate files, is not "
             r"approver work: ask the owner for the batch approval",
+            r"the over-cap deferrals of the delegated decisions \(3\) are the exception",
         ),
         "the orchestrator prompt carries the four delegated decisions, the exact owner-retained list and the approver and veto steps "
         "(owner decision, #15 comment 7075812943; ORCHESTRATION 1.1, 7.5)",
@@ -1029,8 +1033,9 @@ RULES = (
             r"inputs \(from the spawn message\): the pr number, the head sha, the round history and the deferral records",
             r"check every item and refuse if one fails; a pass on one item never offsets a failure of another",
             r"1\. head: the pr head is the head sha you were given\. a later commit needs a new approval",
-            r"2\. scope: every changed path is tooling, build, ci or gate \(`scripts/`, build files, `ci\.yml` and other workflows, "
-            r"`verification-metadata`, architecture and gate tests, `merge_ready\.py` and similar\) and none is on the owner-retained list below\. "
+            r"2\. scope: every owner-only changed path is tooling, build, ci or gate \(`scripts/`, build files, `ci\.yml` and other workflows, "
+            r"`verification-metadata`, architecture and gate tests, `merge_ready\.py` and similar\); a path that may merge as `general` "
+            r"\(`scripts/merge_ready\.py`\) does not count; and none is on the owner-retained list below\. "
             r"an owner-only path outside those classes, such as a design or product doc, is not yours to approve",
             r"3\. review\.md: the pr meets it: about 400 changed lines or fewer, a failing test committed first with negative cases and wired into "
             r"`scripts/verify\.sh` and ci, and no suppression, baseline, skipped test or lowered threshold without the owner's recorded decision",
@@ -1136,11 +1141,13 @@ DOC_RULES = (
             r"one escalation reviewer per pr", r"agents/prompts/escalation-reviewer\.md", r"decides `fix`, `split` or `owner`",
             r"one more fresh round \(round 5\)", r"goes to the owner", r"no second escalation", r"no commit lands unreviewed",
             r"the escalation reviewer rules with both arguments in front of it", r"a dropped finding becomes `withdrawn`",
-            r"an `owner` finding stays open for the owner",
+            r"`owner`: taste or scope questions, which the escalation reviewer decides itself, per finding `fix` or `drop` "
+            r"\(owner decision, #15 comment 7075812943\)", r"no finding is left open for the owner",
         ),
-        "REVIEW.md: after round 4 one escalation reviewer decides; a dispute uses the same single escalation (rev 46 row 4)",
-        forbidden=(r"fixes made after round 4 are not re-reviewed", r"the owner breaks ties", r"stop and report to the owner, who decides",
-                   r"a dropped finding stays open"),
+        "REVIEW.md: after round 4 one escalation reviewer decides; a dispute uses the same single escalation (rev 46 row 4); its owner ruling is final",
+        forbidden=(r"an `owner` finding stays open for the owner", r"taste or scope questions, which stay with the owner",
+                   r"fixes made after round 4 are not re-reviewed", r"the owner breaks ties",
+                   r"stop and report to the owner, who decides", r"a dropped finding stays open"),
     ),
     DocRule(
         "review-visual", "REVIEW.md",
@@ -1349,7 +1356,8 @@ DOC_RULES = (
             r"every spawn in §7\.2\.2 uses the §8\.3 message \(.*?\) with its own role line",
             r"its ruling per pr is final \(owner decision, #15 comment 7075812943\) and the orchestrator follows it without asking: `fix` gets one "
             r"fresh round 5 \(anything above nit still open after it goes to the owner, §1\.1\), `split` opens a new pr from `main` with merge "
-            r"commits, and what would have been an `owner` ruling is final too; there is no second escalation",
+            r"commits, and an `owner` ruling decides the taste or scope question itself, per finding `fix` or `drop`, and is final; "
+            r"there is no second escalation",
             r"\*\*escaped defects:\*\* a bug found after merge gets a `caused by: #n` line in its issue and one `escaped` row in the metrics csv",
         ),
         "ORCHESTRATION 7.2.2: spawn steps for the plan review, the second reviewer and the one escalation reviewer, and the Caused-by step",
@@ -1583,6 +1591,22 @@ DOC_RULES = (
         ),
         "roles.yaml: the approver is Opus high, one fresh session per PR (owner decision, #15 comment 7075812943)",
         forbidden=(r"approver: model: (?:sonnet|haiku)",),
+    ),
+    DocRule(
+        "followups-over-cap", "docs/FOLLOW-UPS.md",
+        (r"minors out of the pr's scope or at the line guard may still be deferred \(owner decision, #15 comment 7075812943\)",),
+        "FOLLOW-UPS section 1: the over-cap deferral exception of the owner decision stands next to the stop-and-ask rule",
+    ),
+    DocRule(
+        "review-approver-record", "REVIEW.md",
+        (r"an owner-only pr waits for the owner's approval or, for tooling, build, ci and gate prs, the approver's record",),
+        "REVIEW.md Loop and cap item 3: an owner-only PR waits for the owner or, for tooling, build, CI and gate PRs, the approver's record",
+    ),
+    DocRule(
+        "plan-approver-record", "docs/PLAN.md",
+        (r"an owner-only pr waits for the owner's approval or the approver's record",
+         r"or an owner-only pr waits for the owner or the approver's record"),
+        "PLAN section 6: an owner-only PR waits for the owner or the approver's record (#15 comment 7075812943)",
     ),
 )
 
