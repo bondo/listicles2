@@ -1151,14 +1151,35 @@ pr = 236
 notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owner merge. Test first: a 7-parameter composable passes, a 7-parameter plain function fails. Before M1-16"
 
 [[task]]
-id = "M1-50"
-title = "Konsist: no data source in composables or ViewModels, no GlobalScope (checklist proposed follow-up 1)"
+id = "M1-56"
+title = "Java API level check: also look up classes used only as class literals, annotations, checkcast, instanceof or catch targets (follow-up of M1-37)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
+depends_on = ["M1-37"]
+notes = "Tooling env. Gap recorded in scripts/check_java_api_level.py: a java/ or android/ class that is only a class literal (X.class), an annotation type, or a checkcast, instanceof or catch target has no member reference, so it is not looked up. Needs a bytecode walk or the constant pool Class entries minus the bootstrap ones. Low value until domain code uses newer exception or interface types; schedule only if M1 domain code needs it"
+
+[[task]]
+id = "M1-50"
+title = "Konsist: no data source in composables or ViewModels, no GlobalScope (checklist proposed follow-up 1)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
 depends_on = ["M1-01"]
+pr = 290
 notes = "Issue 257. Failing fixtures first. Before M1-14, the first repository"
+
+[[task]]
+id = "M1-57"
+title = "Konsist: no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI module (checklist proposed follow-up 1, rest)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-50"]
+notes = "Split from M1-50, which covers the data-source and GlobalScope halves. Failing fixtures first, in the architecture package next to DataSourceRules. The DI module and its path do not exist yet: decide the rule for `Dispatchers.` with the first DI module (M1-02 or later), and keep it inert until then only if a fixture proves it fires. Before M1-16, the first ViewModel"
 
 [[task]]
 id = "M1-51"
@@ -1195,11 +1216,12 @@ notes = "Owner merge (signed-off docs). Issues #194, #195, #196, #198 items 1 an
 id = "M1-37"
 title = "JVM modules: check Java API use against minSdk 26 with api-versions.xml (issue 228)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env. Test-first: Stream.toList and Objects.requireNonNullElse in :core:domain fail, an API 26 call passes, a missing api-versions.xml fails closed. Before M1-13"
+pr = 288
+notes = "Tooling env. Test-first: Stream.toList and Objects.requireNonNullElse in :core:domain fail, an API 26 call passes, a missing api-versions.xml fails closed. Before M1-13. Done: scripts/check_java_api_level.py scans the JVM modules' main classes against the compileSdk platform's api-versions.xml (task checkJavaApiLevel, minSdk from :app); known gaps (a class used only as a class literal, annotation, checkcast, instanceof or catch target) are in its docstring"
 
 [[task]]
 id = "M1-38"
@@ -1225,11 +1247,12 @@ notes = "P9 of docs/milestones/M1.md; wireframes 42, 43; implements the ProfileR
 id = "M1-40"
 title = "Process docs wording: owner-merge exceptions next to the merge-agent rule (issue 147), dispatcher review line (issue 218)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env (process docs and prompts), rule test first, owner merge; after the #255/#256 process-docs PR. Also #260 items 1, 9-11. Then the detekt 2.0 tracking of issue 218 moves to M6 (Q7)"
+pr = 293
+notes = "Tooling env (process docs and prompts), rule test first, owner merge; after the #255/#256 process-docs PR. Also #260 items 1, 9-11 and the token rules of #15 comment 7070278995 (ORCHESTRATION 7.2.3). Then the detekt 2.0 tracking of issue 218 moves to M6 (Q7): the orchestrator re-labels #218 target:M6 after the merge; no M6 task row (M6 has no agent task)"
 
 [[task]]
 id = "M1-41"
@@ -1275,10 +1298,11 @@ notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line. Q6
 id = "M1-45"
 title = "merge_ready.py nits still open after PRs 248 and 245 (issue 148)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
+pr = 292
 notes = "Tooling env, owner merge. Start only after PRs 248 and 245 have merged; first list the items they already fixed"
 
 [[task]]
@@ -1332,9 +1356,9 @@ risk = "normal"
 depends_on = [
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
-  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36",
+  "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56",
 ]
 
 [[task]]
