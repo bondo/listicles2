@@ -161,8 +161,8 @@ class PrePushHook(unittest.TestCase):
     def test_hook_inputs_run_the_hook_tests_in_four_jobs(self):
         with open(os.path.join(self.repo, "scripts", "hooks", "test_stub2.py"), "w") as f:
             f.write("import unittest\n\nclass T(unittest.TestCase):\n    def test_y(self):\n        pass\n")
-        for path in ("scripts/hooks/x.py", "scripts/guards.sh", ".githooks/pre-push", ".claude/settings.json", "scripts/verify.sh"):
-            with self.subTest(path):
+        for path in ("scripts/hooks/x.py", "scripts/verify.sh", ".githooks/pre-commit", ".claude/settings.json", "docs/PLAN.md"):
+            with self.subTest(path):  # .githooks/pre-push and scripts/guards.sh are the hook and stub under test, so not rewritten here
                 self.base = self.rev()
                 self.commit(path, "#" + path)
                 rc, out = self.push()
