@@ -947,7 +947,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
-notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
+notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState(). Also check and record which fields the Firebase Auth record keeps for Google sign-in: name, email, photo link (feeds privacy Q5)"
 
 [[task]]
 id = "M1-15"
@@ -1024,7 +1024,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-19", "M1-17"]
-notes = "Invite page and assetlinks.json on tally.bjarkebjarke.dk (OQ-21, decided 2026-11-17); this PR proposes the hosting. Unverified links open the browser on Android 12+, so the domain is a prerequisite for the first external tester, no paste-link field (OQ-40, decided). See docs/milestones/M1.md"
+notes = "Invite page and assetlinks.json on tally.bjarkebjarke.dk (OQ-21, decided 2026-11-17); this PR proposes the hosting. Unverified links open the browser on Android 12+, so the domain is a prerequisite for the first external tester, no paste-link field (OQ-40, decided). See docs/milestones/M1.md. Privacy Q2 and Q12: the web deletion page and the web host are named in the privacy text"
 
 [[task]]
 id = "M1-21"
@@ -1071,7 +1071,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60", "M1-14"]
-notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194)"
+notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, tested; the in-app privacy link is privacy Q10"
 
 [[task]]
 id = "M1-26"
