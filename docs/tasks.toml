@@ -952,13 +952,34 @@ notes = "Lengths as in docs/milestones/M1.md P4; property: a 50-code-point name 
 
 [[task]]
 id = "M1-14"
-title = "Auth data: Google sign-in via Credential Manager, session state, sign out (Auth emulator)"
+title = "Auth data 1: Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
+pr = 319
+notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState(). Split 2026-11-22 (PR 319): the whole task measured about 780 changed lines before the app wiring (guard 600), and the wiring needs licences only the owner accepts. This is part 1 (the steps in core/domain, fakes in core/testing); M1-65 is the Firebase data layer with the emulator tests, M1-66 the Credential Manager wrapper and the :app wiring"
+
+[[task]]
+id = "M1-65"
+title = "Auth data 2: Firebase session state, Google ID-token sign-in, per-session Firestore holder in :core:data (Auth and Firestore emulator tests)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
-notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
+depends_on = ["M1-14"]
+notes = "Split from M1-14 (PR 319). Implements the M1-14 domain interfaces: SessionState and Authentication over FirebaseAuth (signInWithCredential with GoogleAuthProvider), LocalUserData over a per-session Firestore holder (waitForPendingWrites; terminate, then clearPersistence; a new instance at the next use, step 6). Emulator tests from docs/milestones/M1.md (M1-14): a Google-style credential signs in and the token has email_verified; sign-out clears the session; Sign out anyway drops a write no listener saw; the holder makes a new instance. No licence question: :core:data has no licensee gate until M1-66. A compiled, never-run draft is on PR 319"
+
+[[task]]
+id = "M1-66"
+title = "Auth wiring: Credential Manager wrapper (Google ID option), :app on :core:data with licensee, Hilt bindings for session, sign-in and sign-out"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-65", "M1-O14"]
+notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule. Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14"
 
 [[task]]
 id = "M1-15"
@@ -967,7 +988,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-14", "M1-62"]
+depends_on = ["M1-65", "M1-62"]
 
 [[task]]
 id = "M1-16"
@@ -976,7 +997,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-14", "M1-03", "M1-49"]
+depends_on = ["M1-66", "M1-03", "M1-49"]
 
 [[task]]
 id = "M1-17"
@@ -1005,7 +1026,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-14", "M1-60", "M1-62", "M1-02"]
+depends_on = ["M1-54", "M1-66", "M1-60", "M1-62", "M1-02"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1082,7 +1103,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-60", "M1-14"]
+depends_on = ["M1-60", "M1-66"]
 notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists"
 
 [[task]]
@@ -1421,7 +1442,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62",
+  "M1-62", "M1-65", "M1-66",
 ]
 
 [[task]]
@@ -1551,6 +1572,16 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M1-33"]
 notes = "M1-33 runs the release build with R8 in its own CI job `release-smoke`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 12. Same sitting rule as M1-O11 (BRANCH-PROTECTION.md section 6): add it right after the M1-33 PR merges, never earlier, or every other open PR waits on `Expected, waiting for status` until it takes main in. Until then no ruleset rule requires `release-smoke`, so the M1-33 merge must confirm by hand that the job is green on the head"
+
+[[task]]
+id = "M1-O14"
+title = "Decide the licences of the 17 artifacts :app needs for Firebase Auth and Credential Manager (list on PR 319)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Found by M1-14 (PR 319), measured with licensee 1.14.1: 13 artifacts under the Android SDK terms (one config/licensee/google-sdk-terms.txt line each); com.google.android.play core-common and integrity under other Google terms, which google-sdk-terms.txt cannot list (a policy.gradle change); re2j and animal-sniffer-annotations, BSD-3-Clause and MIT texts at URLs licensee does not map (a policy.gradle change). Blocks M1-66, and with it every task that puts :core:data on the :app runtime classpath"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
