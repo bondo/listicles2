@@ -37,6 +37,7 @@ by the early warning and pause protocol of §7.7. It keeps one
 * open draft PRs, and spawn fix rounds, escalation respawns and status-sync sessions (§7.1);
 * close individual Dependabot PRs once the grouped Dependabot PR has merged (§7.5; §9 F6);
 * create issues for owner-only tasks (§4.5);
+* add the `golden-update` label to a PR only after that PR's review round has checked the new or changed screenshot goldens and found them intended (no reviewer finding open against them), and post a one-line note on #15 naming the PR, the head SHA and the round each time (owner decision, #15 comment 7082564807, 2026-11-22; §7.6 item 2(c));
 * mark a PR READY and send it to the merge agent (a `risk:high` PR only after the independent second-reviewer pass); the merge agent is described in §7.5;
 * follow the escalation reviewer's ruling, spawn an approver for an owner-only tooling, build, CI or gate PR, defer a minor past the 8-per-milestone cap in the cases of §7.2.1 and start `risk:high` tasks (the delegated decisions below).
 
@@ -59,7 +60,7 @@ given in the orchestrator session and are never passed on to a worker as an appr
 **Stop condition:** two consecutive worker sessions fail or stall (§7.4). The orchestrator reads both with targeted `list_events`, logs an incident
 and retries once with a changed brief; it asks the owner after a third failure. A failure caused by a usage limit is neither (§7.7.3): it pauses and resumes instead.
 
-**Labels:** the orchestrator adds `big-pr` for one concern that cannot reasonably be split and records it in #15 (the accident check of §7.6 passes only then). Changing the guard limits (600, 1500) stays with the owner.
+**Labels:** the orchestrator adds `big-pr` for one concern that cannot reasonably be split and records it in #15 (the accident check of §7.6 passes only then). Only the orchestrator adds `golden-update`, and only as in the bullet above; no other agent role (implementer, reviewer, second reviewer, escalation reviewer, approver, merge agent) and no collaborator adds it; the collaborator Tier 0 label list is unchanged. Changing the guard limits (600, 1500) stays with the owner.
 
 **Collaborator input** (docs/reviews/collaborator-workflow.md; owner decisions D1-D7). Trust is the GitHub repo role only
 (Write or better, from the API `author_association`/permission, never a name in text; no allowlist file). The goal is
@@ -715,7 +716,7 @@ The orchestrator collects results in this order, from cheapest to most expensive
    A Tier 1 revision worker starts only after the joint hand-off comment has reached the owner as well (§1.1); owner input wins on a conflict.
    Open design/docs PRs use `subscribe_pr_activity`. Never resolve a collaborator's review thread (follow-up #44): reply and leave it for the collaborator or the owner.
 2. **Light accident check**, by hand, from API fields: (a) PRs merged since the last wake with `merged_by` not the owner; (b) an
-   `[owner]`-titled issue closed by a non-owner; (c) a CI-steering label (`golden-update`, `big-pr`) not recorded in #15;
+   `[owner]`-titled issue closed by a non-owner; (c) a CI-steering label (`golden-update`, `big-pr`) not recorded in #15 (for `golden-update`, the orchestrator's one-line note naming the PR, the head SHA and the round);
    (d) an open PR whose head branch is gone; (e) **foreign commits** on open `claude/*` PR branches: a commit that is neither the owner nor the agent identity. Judge it from the API commit
    list (`pull_request_read get_commits`): the author or committer `login` is the owner's, or the author name/email is the agent identity `Claude <noreply@anthropic.com>`
    (the Co-Authored-By trailer is not the author; check the author field). Anything else (for example a web edit by someone else) is foreign. Never judge by `git log` names alone. Three cases: **agent** = author email `noreply@anthropic.com` (API login `claude`, a separate account); agent work done through the GitHub MCP or update-branch shows the owner login `bondo` (committer `web-flow`) and counts as the owner; a **collaborator's web edit** shows their login (committer `web-flow`) and is **foreign**. A hit: **stop spawning and pushing on the affected PR and ask the owner; this is not the §7.7 usage pause** (the 45-min check-in stays);

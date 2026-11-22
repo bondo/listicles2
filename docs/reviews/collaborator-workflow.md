@@ -31,7 +31,7 @@ bypass list**) stops a direct push to `main` and a merge with red checks, but no
 |---|---|---|
 | **Merge button** on a green PR, enable auto-merge | Merging an agent PR the owner has not reviewed | Working agreement; live test (section 6) |
 | Push to `claude/*` branches, add commits to agent PRs | Unreviewed content in a PR the owner then merges; collides with a worker's push | Working agreement |
-| Apply/remove labels, incl. `golden-update`, `big-pr` | CI-steering labels change what `guards` allows (owner-only, ORCHESTRATION §1.1) | Agreement; wake check |
+| Apply/remove labels, incl. `golden-update`, `big-pr` | CI-steering labels change what `guards` allows (never a collaborator; only the orchestrator adds them, ORCHESTRATION §1.1) | Agreement; wake check |
 | Close/reopen/edit others' issues, comments, PR bodies, #15 | Closing an `[owner]` issue marks an owner task done; editing #15 corrupts orchestrator state | Agreement; wake check |
 | **Ready-for-review toggle** on a draft PR | Marks unfinished work ready; a draft cannot be merged, so ready is the last gate | Agreement; **agent PRs stay draft until the owner marks them ready at merge time (R3-01)** |
 | **PR title** | It becomes the squash commit title on `main` | Owner reads it at merge |
@@ -55,7 +55,7 @@ GitHub Action (a second unsupervised agent that needs a key in repo secrets, whi
 permission shows Write or better (owner, collaborator); others are counted, never quoted. Open design/docs PRs use `subscribe_pr_activity` (minutes). The orchestrator
 replies with one line (understood as X, routed to Y); while none runs, nothing is picked up (the guide says so).
 
-**Who decides what:** *Owner-only*: merges, settings, spend, `risk:high`, tooling, CI-steering labels.
+**Who decides what:** *Owner-only*: merges, settings, spend, `risk:high`, tooling, CI-steering labels (the orchestrator under §1.1, never a collaborator).
 *Shared* (a `decision` issue; the owner records the result): stories, flow, wireframes, tokens, the app name (#17),
 Danish wording. *Collaborator-led* (owner may overrule): usability, copy, household use cases. *Agent-only*: code, tests.
 
