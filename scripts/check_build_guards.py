@@ -20,8 +20,9 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    fails on: a string literal that starts with a literal `group:artifact` anywhere inside a `dependencies { }` block (so any
    configuration, Kotlin or Groovy, wrapped in `platform(...)` or not, in `constraints` too); group notation with a literal group and
    the positional `(group, name, ...)` form there (`exclude` is not a declaration); outside such a block `add(<conf>, "g:a...")`,
-   `force`, `useModule`, `platform`, `enforcedPlatform`, `module` and `create` with a literal coordinate; a literal plugin version
-   (`id(...) version "1"`, `.version("1")`, `useVersion("1")`); and a version catalog declared in Gradle code (`versionCatalogs`).
+   `force`, `useModule`, `platform`, `enforcedPlatform`, `module` and `create` with a literal coordinate; a literal version
+   (`id(...) version "1"`, `.version("1")`, `useVersion("1")`, and `version = "1"` or `strictly("1")` in a dependencies block); and
+   a version catalog declared in Gradle code (`versionCatalogs`).
    A literal that has to stay says why in a comment on its line: `// justified: <at least 3 words>` (the rule of scripts/guards.sh).
    No Gradle file, or no dependency declaration in any `dependencies { }` block, fails too. Known gaps (it reads text, not the build):
    a coordinate held in a variable or with an interpolated group (`"$g:a:1"`), and a declaration made through a helper function.
@@ -350,7 +351,8 @@ DEPS_BLOCK = re.compile(r"(?<![\w$])dependencies(?:[ \t\r\n]*\.[ \t\r\n]*constra
 # A statement in a dependencies block that is a call: `implementation(x)`, `"implementation"(x)`, Groovy `implementation x`.
 STATEMENT = re.compile(r"""(?:^|[{;])[ \t]*("[ \t]*"|'[ \t]*'|[A-Za-z_]\w*)(?=[ \t]*\(|[ \t]+[\w"'\[])""", re.M)
 KEYWORDS = {"if", "else", "for", "while", "when", "return", "val", "var", "def", "try", "catch", "throw", "fun", "import", "in", "is", "as"}
-GROUP = re.compile(r"""(?<![\w$])group[ \t]*[:=][ \t]*["'][A-Za-z0-9_.-]""")
+NAMED = re.compile(r"""(?<![\w$])(?:group[ \t]*[:=][ \t]*["'](?=[A-Za-z0-9_.-])|(version)[ \t]*[:=][ \t]*["'])""")
+RICH = re.compile(r"(?<![\w$])(?:strictly|require|prefer)(?:[ \t]*\([ \t\r\n]*|[ \t]+)[\"']")  # `version { strictly("1.0") }`
 POSITIONAL = re.compile(r"""(?<![\w$.])([A-Za-z_]\w*)[ \t]*\([ \t\r\n]*(["'])(?=[A-Za-z0-9_.-]+\2[ \t\r\n]*,[ \t\r\n]*["'])""")
 NOT_DECLARATIONS = {"exclude", "add", "because", "listOf", "setOf", "mapOf", "arrayOf"}
 OPEN = r"(?:[ \t]*\([ \t\r\n]*|[ \t]+)"
@@ -378,7 +380,7 @@ def within(spans, i):
 
 
 def enclosing_call(blank, pos):
-    """The name of the call whose argument list holds pos: the identifier before the first unmatched `(`, or for a Groovy call
+    """(name, offset) of the call whose argument list holds pos: the identifier before the first unmatched `(`, or for a Groovy call
     without parentheses the first identifier on the line."""
     depth, i = 0, pos
     while i > 0:
@@ -391,11 +393,12 @@ def enclosing_call(blank, pos):
                 depth -= 1
             elif c == "(":
                 m = re.search(r"([A-Za-z_]\w*)[ \t]*$", blank[:i])
-                return m.group(1) if m else ""
+                return (m.group(1), m.start(1)) if m else ("", i)
         elif c in "{;" and not depth:
             break
-    m = re.match(r"[ \t]*([A-Za-z_]\w*)", blank[blank.rfind("\n", 0, pos) + 1 :])
-    return m.group(1) if m else ""
+    start = blank.rfind("\n", 0, pos) + 1
+    m = re.compile(r"[ \t]*([A-Za-z_]\w*)").match(blank, start)
+    return (m.group(1), m.start(1)) if m else ("", pos)
 
 
 def scan_catalog(root):
@@ -417,9 +420,13 @@ def scan_catalog(root):
         for m in STATEMENT.finditer(blank):
             if inside(m.start(1)) and m.group(1) not in KEYWORDS:
                 declarations += 1
-        for m in GROUP.finditer(code):
-            if inside(m.start()) and enclosing_call(blank, m.start()) not in NOT_DECLARATIONS:
-                hits.setdefault(m.start(), "dependency in group notation")
+        for m in NAMED.finditer(code):  # reported once per call, at its name
+            name, at = enclosing_call(blank, m.start())
+            if inside(m.start()) and name not in NOT_DECLARATIONS:
+                hits.setdefault(at, "literal version (plugin or catalog entry)" if m.group(1) else "dependency in group notation")
+        for m in RICH.finditer(blank):
+            if inside(m.start()):
+                hits.setdefault(m.end(), "literal version (plugin or catalog entry)")
         for m in POSITIONAL.finditer(code):
             if inside(m.start()) and m.group(1) not in NOT_DECLARATIONS:
                 hits.setdefault(m.end(), "dependency given as separate group, name and version literals")
