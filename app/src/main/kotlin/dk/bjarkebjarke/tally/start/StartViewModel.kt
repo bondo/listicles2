@@ -4,6 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dk.bjarkebjarke.tally.domain.session.SessionState
+import dk.bjarkebjarke.tally.domain.start.EmailVerification
+import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
+import dk.bjarkebjarke.tally.domain.start.NameState
+import dk.bjarkebjarke.tally.domain.start.StartStep
+import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -19,14 +24,22 @@ import javax.inject.Inject
 class StartViewModel
     @Inject
     constructor(
+        update: UpdateGate,
         session: SessionState,
+        email: EmailVerification,
+        name: NameState,
+        notices: HouseholdNotices,
     ) : ViewModel() {
+        init {
+            check(listOf(update, email, name, notices).isNotEmpty()) // stub until the gates route (next commit)
+        }
+
         val uiState: StateFlow<StartUiState> =
             session
                 .signedIn()
-                .map { signedIn -> StartUiState.Ready(if (signedIn) StartRoute.Home else StartRoute.SignIn) }
+                .map { signedIn -> StartUiState.Ready(if (signedIn) StartStep.Home else StartStep.SignIn) }
                 // Checklist section 4: a failing session source opens sign-in instead of crashing at start.
-                .catch { emit(StartUiState.Ready(StartRoute.SignIn)) }
+                .catch { emit(StartUiState.Ready(StartStep.SignIn)) }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), StartUiState.Loading)
 
         private companion object {
@@ -39,13 +52,6 @@ sealed interface StartUiState {
     data object Loading : StartUiState
 
     data class Ready(
-        val route: StartRoute,
+        val route: StartStep,
     ) : StartUiState
-}
-
-/** The root's Navigation 3 keys. The back stack is derived from the gate state at every start, so it is not saved. */
-sealed interface StartRoute {
-    data object SignIn : StartRoute
-
-    data object Home : StartRoute
 }

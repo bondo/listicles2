@@ -23,8 +23,8 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import dk.bjarkebjarke.tally.domain.start.StartStep
 import dk.bjarkebjarke.tally.home.HomeScreen
-import dk.bjarkebjarke.tally.start.StartRoute
 import dk.bjarkebjarke.tally.start.StartUiState
 import dk.bjarkebjarke.tally.start.StartViewModel
 
@@ -57,8 +57,8 @@ fun TallyApp(
                     onBack = {},
                     entryProvider =
                         entryProvider {
-                            entry<StartRoute.SignIn> { SignInPlaceholder() }
-                            entry<StartRoute.Home> { HomeScreen() }
+                            entry<StartStep.SignIn> { SignInPlaceholder() }
+                            entry<StartStep.Home> { HomeScreen() }
                         },
                 )
             }
@@ -87,5 +87,5 @@ private fun SignInPlaceholder(modifier: Modifier = Modifier) {
 @PreviewLightDark
 @Composable
 private fun SignInPreview() {
-    TallyApp(StartUiState.Ready(StartRoute.SignIn))
+    TallyApp(StartUiState.Ready(StartStep.SignIn))
 }
