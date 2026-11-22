@@ -119,7 +119,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | Task | Title | Status | Depends on | Who | PR |
 |---|---|---|---|---|---|
 | M1-01 | Plan M1&#58; docs/milestones/M1.md and PR-sized tasks in this file | done | all of M0.5 | planner | [#124](https://github.com/bondo/listicles2/issues/124) |
-| M1-02 | Create &#58;core&#58;data with an emulator smoke test; Auth and Firestore emulators in CI (firebase.jso… | ready | M1-29 | implementer |  |
+| M1-02 | Create &#58;core&#58;data with an emulator smoke test; Auth and Firestore emulators in CI (firebase.jso… | in progress | M1-29 | implementer | [#294](https://github.com/bondo/listicles2/issues/294) |
 | M1-03 | Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff artifact, ATF and enabl… | done | M1-01 | implementer |  |
 | M1-04 | Design tokens&#58; Theme.kt parity test against design/tokens.json and WCAG AA contrast test (P22) | ready | M0.5-03, M1-03 | implementer |  |
 | M1-05 | PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16) | done | M1-01 | implementer |  |
@@ -193,7 +193,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M1-02 Create :core:data with an emulator s… (ready)"]:::ready
+    n0["M1-02 Create :core:data with an emulator s… (in progress)"]:::progress
     n1["M1-04 Design tokens: Theme.kt parity test ag… (ready)"]:::ready
     n2["M1-06 Rules fuzzing: fast-check against a TS … (blocked)"]:::blocked
     n3["M1-07 Test-impact summary: uncovered chang… (ready)"]:::ready
