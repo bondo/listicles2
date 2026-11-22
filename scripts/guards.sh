@@ -512,6 +512,15 @@ function relaxed(p,   dd, dt, all, de, dp, dc, e, pr, t, ok, s) {
 # config its `entry:` or `id:`, gives the command; its args-like keys (ARGKEY, at any depth, in any order, quoted or not: inline, a flow or
 # block list, a flow mapping, a block scalar) are flags of that command, each checked by itemend when the item ends, when the key is a
 # generic one or starts with the tool name (`eslint_flags`, not `reviewdog_flags`). Lines inside another block scalar (`run: |`) are skipped.
+# qrest: the quote q (" or \047) when it is still open after s, "" when s closes it (\" escapes in double quotes, \047\047 in single).
+function qrest(q, s,   i, c) {
+  for (i = 1; i <= length(s); i++) {
+    c = substr(s, i, 1)
+    if (q == "\"" && c == "\\") i++
+    else if (c == q) { if (q == "\047" && substr(s, i + 1, 1) == q) i++; else return "" }
+  }
+  return q
+}
 function notag(v) { while (v ~ /^[&!][^ \t]*([ \t]|$)/) sub(/^[&!][^ \t]*[ \t]*/, "", v); return v }  # anchors, tags
 function keycol(l) { sub(/[^ \t-].*$/, "", l); return length(l) }
 function indent(l) { sub(/[^ \t].*$/, "", l); return length(l) }
@@ -597,8 +606,9 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   # line is a line break; in fold 1 so is the break before and after a line indented more than the first (YAML keeps them, R1-01).
   if (fold) {
     if (line ~ /^[ \t]*$/) { flush(); next }
-    if (fold == 2 && !FQ && line ~ /^[ \t]*#/) { fold = 0; flush(); next }  # a comment ends a plain value (R2-01)
+    if (fold == 2 && FQ == "" && line ~ /^[ \t]*#/) { fold = 0; flush(); next }  # a comment ends a value with no open quote (R2-01, R3-01)
     if (indent(line) > FI) {
+      if (FQ != "") FQ = qrest(FQ, line)
       if (fold == 1) { if (FB < 0) FB = indent(line); if (FM || indent(line) != FB) flush(); FM = (indent(line) != FB) }
       if (cur == "") start = NR
       cur = (cur == "" ? "" : cur " ") line; next
@@ -607,8 +617,8 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   }
   if (YML && !cont && !inb && line ~ /:[ \t]*([&!][^ \t]*[ \t]+)*>[-+0-9]*[ \t]*(#.*)?$/) { flush(); fold = 1; FI = keycol(line); FB = -1; FM = 0; next }
   if (YML && !cont && !inb && match(line, /^[ \t]*(-[ \t]+)?["\047]?[A-Za-z_][A-Za-z0-9_ -]*["\047]?[ \t]*:[ \t]+/) &&
-      (FQ = notag(substr(line, RLENGTH + 1))) !~ /^([|>#]|$)/) {
-    flush(); fold = 2; FQ = (FQ ~ /^["\047]/); FI = keycol(line); start = NR; cur = line; next
+      (FV = notag(substr(line, RLENGTH + 1))) !~ /^([|>#]|$)/) {
+    flush(); fold = 2; FQ = (FV ~ /^["\047]/ ? qrest(substr(FV, 1, 1), substr(FV, 2)) : ""); FI = keycol(line); start = NR; cur = line; next
   }
   if (!cont && line ~ /^[ \t]*#/) next
   if (!cont) start = NR
@@ -627,7 +637,7 @@ pkgscripts() {
     if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null; else cat -- "$f" 2>/dev/null; fi | LC_ALL=C awk '
       { t = $0; gsub(/\\./, "", t); gsub(/"[^"]*"/, "\"\"", t) }
       (s || d < 2) && /\\u/ { print "\t" }  # a JSON \u escape can spell any key (R2-03)
-      s { if (t ~ /^[ \t]*\}[ \t]*,?[ \t]*$/) s = 0
+      s { if (t ~ /^[ \t]*\}[ \t]*,?[ \t]*$/) { s = 0; d-- }
           else if (t ~ /^[ \t]*""[ \t]*:[ \t]*""[ \t]*,?[ \t]*$/ && match($0, /^[ \t]*"[^"]+"[ \t]*:[ \t]*"/)) {
             n = substr($0, RSTART, RLENGTH); v = substr($0, RSTART + RLENGTH)
             sub(/^[ \t]*"/, "", n); sub(/"[ \t]*:[ \t]*"$/, "", n); sub(/"[ \t]*,?[ \t]*$/, "", v); print n "\t" v }

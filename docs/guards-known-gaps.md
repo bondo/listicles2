@@ -91,8 +91,8 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
 - Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
 - YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`), and a plain or quoted value that goes on over more-indented lines
   (`run: ruff check` then `  --fix .`), is read as one logical line. A blank line is a line break, and in a folded scalar so are the
-  breaks before and after a line indented more than the first, as YAML keeps them (PR 309 R1-01, R1-05); a comment line ends an
-  unquoted value (R2-01); anchors and tags before `|` or `>` are skipped (R2-02); `key: >` inside another block scalar is text, not a fold. A sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
+  breaks before and after a line indented more than the first, as YAML keeps them (PR 309 R1-01, R1-05); a comment line ends a
+  value with no open quote (R2-01, R3-01); anchors and tags before `|` or `>` are skipped (R2-02); `key: >` inside another block scalar is text, not a fold. A sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
   the tool, such as `astral-sh/ruff-action` or `docker://rhysd/actionlint`), `entry:` or `id:` (`ruff` and `ruff-check` run
   `ruff check`, `ruff-format` runs `ruff format`) gives the command, and each of its args-like keys (`args`, `extra_args`, `flags`,
   `options`, or a key that starts with the tool name such as `eslint_flags`; not `reviewdog_flags`; at any depth, quoted or not, in
