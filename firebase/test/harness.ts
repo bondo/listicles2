@@ -1,6 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type RulesTestContext, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
+import {
+    type RulesTestContext,
+    type RulesTestEnvironment,
+    type TokenOptions,
+} from "@firebase/rules-unit-testing";
 
 // The default-deny harness (M1-52, see #202): every client tries every operation on one document of every
 // collection in PLAN section 3 and on one unplanned path. rules.test.ts expects each probe to be denied;
@@ -20,27 +24,40 @@ export const PLAN = read("..", "..", "docs", "PLAN.md");
 export const PROJECT = "demo-tally";
 
 const UID = "alice";
+// Ids of the planned shapes (PLAN 3.1, P3): a 20-character auto-id, `<householdId>_<22-character secret>`.
+const HID = "household00000000001";
+const CODE = `${HID}_${"s".repeat(22)}`;
 
-// Every planned top-level and nested path (rules.test.ts checks this against PLAN both ways), and one path that
-// no rule plans, which only the default deny covers.
+// One document of every collection in PLAN section 3 (rules.test.ts checks this against PLAN both ways),
+// and one path that no rule plans, which only the default deny covers.
 export const PLANNED = [
-    "users/alice",
-    "households/h1",
-    "households/h1/members/alice",
-    "households/h1/lists/l1",
-    "households/h1/lists/l1/items/i1",
-    "households/h1/invites/inv1",
+    `users/${UID}`,
+    `households/${HID}`,
+    `households/${HID}/members/${UID}`,
+    `households/${HID}/removed/${UID}`,
+    `invites/${CODE}`,
+    "lists/l1",
+    "lists/l1/items/i1",
+    "config/app",
 ];
 export const UNPLANNED = "anything/else";
 export const PATHS = [...PLANNED, UNPLANNED];
 
-export const CLIENT_NAMES = ["anonymous", "signed-in"] as const;
+const token = (emailVerified: boolean): TokenOptions => ({
+    email: `${UID}@example.com`,
+    email_verified: emailVerified,
+    firebase: { sign_in_provider: "password" },
+});
+
+// Signed out, signed in with an unverified email (PLAN 3.1 "Signed in"), and signed in and verified.
+export const CLIENT_NAMES = ["anonymous", "unverified", "verified"] as const;
 export type Client = (typeof CLIENT_NAMES)[number];
 
 export function connect(env: RulesTestEnvironment): Record<Client, Db> {
     return {
         anonymous: env.unauthenticatedContext().firestore(),
-        "signed-in": env.authenticatedContext(UID).firestore(),
+        unverified: env.authenticatedContext(UID, token(false)).firestore(),
+        verified: env.authenticatedContext(UID, token(true)).firestore(),
     };
 }
 
