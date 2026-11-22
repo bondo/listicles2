@@ -1117,7 +1117,7 @@ pr = 286
 id = "M1-33"
 title = "Release smoke build with R8 in CI (best-practices checklist follow-up 7)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30"]
@@ -1561,6 +1561,16 @@ assignee = "owner"
 risk = "normal"
 depends_on = []
 notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU)"
+
+[[task]]
+id = "M1-O13"
+title = "Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it as required)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-33"]
+notes = "M1-33 runs the release build with R8 in its own CI job `release-smoke`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 12. Same sitting rule as M1-O11 (BRANCH-PROTECTION.md section 6): add it right after the M1-33 PR merges, never earlier, or every other open PR waits on `Expected, waiting for status` until it takes main in. Until then no ruleset rule requires `release-smoke`, so the M1-33 merge must confirm by hand that the job is green on the head"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
