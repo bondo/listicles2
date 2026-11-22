@@ -176,13 +176,48 @@ test("withoutSignedIn reads nested matches past comments and strings, and throws
 });
 
 // S1-01: a signedIn() redefined in a nested match would pass for the global one.
+const found = (...at: string[]): string[] => [
+    `signedIn() must be declared once, at ${DOCUMENTS}; found: ${at.join(", ") || "none"}`,
+];
+const weak = "function signedIn() { return request.auth != null; }";
+
 test("withoutSignedIn names a signedIn() not declared exactly once, at the documents level", () => {
-    const found = (...at: string[]): string[] => [
-        `signedIn() must be declared once, at ${DOCUMENTS}; found: ${at.join(", ") || "none"}`,
-    ];
-    const weak = "function signedIn() { return request.auth != null; }";
     const shadowed = rulesWith(at("/a/{b}", `${weak} allow get: if signedIn() && true;`));
     expect(h.withoutSignedIn(shadowed)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
     expect(h.withoutSignedIn(rulesWith(`    ${weak}`))).toEqual(found(DOCUMENTS, DOCUMENTS));
     expect(h.withoutSignedIn(rulesWith().replace(SIGNED_IN, ""))).toEqual(found());
+    // S2-01 and R2-04: one declaration, but in a nested match or in the service block.
+    const nestedOnly = rulesWith(at("/a/{b}", weak)).replace(SIGNED_IN, "");
+    expect(h.withoutSignedIn(nestedOnly)).toEqual(found(`${DOCUMENTS}/a/{b}`));
+    const service = rulesWith().replace(SIGNED_IN, "").replace("{\n", `{\n${SIGNED_IN}\n`);
+    expect(h.withoutSignedIn(service)).toEqual(found("the service block"));
+});
+
+// R2-01 to R2-03: an escaped quote in a string, `match` with no space, a comment between keywords.
+test.each([
+    [
+        "an escaped ' in a string",
+        at("/a/{b}", "allow get: if signedIn() && f('\\'x'); allow get: if b == 'x';"),
+    ],
+    [
+        'an escaped " in a string',
+        at("/a/{b}", 'allow get: if signedIn() && f("\\"x"); allow get: if b == "x";'),
+    ],
+    ["match with no space", "    match /users/{uid} { match/a/{b} { allow get: if b == ''; } }"],
+    ["a comment in allow/**/get", at("/a/{b}", "allow/**/get: if b == '';")],
+])("withoutSignedIn reads %s", (_what, block) => {
+    expect(h.withoutSignedIn(rulesWith(block))).toEqual([
+        expect.stringMatching(/\/a\/\{b\}: b == ''$/),
+    ]);
+});
+
+test("withoutSignedIn sees function/**/signedIn, and throws on a string or match it cannot read", () => {
+    const shadowed = rulesWith(
+        at("/a/{b}", `${weak.replace(" ", "/**/")} allow get: if signedIn();`),
+    );
+    expect(h.withoutSignedIn(shadowed)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
+    expect(() => h.withoutSignedIn(rulesWith(at("/a/{b}", "allow get: if b == 'x;")))).toThrow();
+    expect(() =>
+        h.withoutSignedIn(rulesWith("    match a/{b} { allow get: if signedIn(); }")),
+    ).toThrow();
 });
