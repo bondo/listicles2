@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesTask
+import org.gradle.api.artifacts.result.ResolvedComponentResult
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.process.CommandLineArgumentProvider
 
 plugins {
@@ -138,6 +140,50 @@ if (googleServicesStandIn) {
         }
     }
 }
+
+// M1-26 (R5, PR 317 R1-03): the debug App Check provider must never ship. It is only a debugImplementation dependency;
+// this fails every release build when it is on the release runtime classpath anyway. The self-test property puts it
+// there to prove the check fails (scripts/test_google_services_release_gate.py).
+if (providers.gradleProperty("tally.selfTestDebugAppCheckInRelease").orNull == "true") {
+    dependencies.add("releaseImplementation", libs.firebase.appcheck.debug)
+}
+
+abstract class CheckNoDebugAppCheckInRelease : DefaultTask() {
+    @get:Input abstract val releaseModules: ListProperty<String>
+
+    @TaskAction
+    fun check() {
+        val found = releaseModules.get().filter { it == "com.google.firebase:firebase-appcheck-debug" }
+        if (found.isNotEmpty()) {
+            throw GradleException(
+                "com.google.firebase:firebase-appcheck-debug is on the release runtime classpath " +
+                    "(M1-26, R5).",
+            )
+        }
+    }
+}
+
+val checkNoDebugAppCheckInRelease by tasks.registering(CheckNoDebugAppCheckInRelease::class) {
+    releaseModules.set(
+        configurations
+            .named("releaseRuntimeClasspath")
+            .flatMap { it.incoming.resolutionResult.rootComponent }
+            .map { root ->
+                val seen = mutableSetOf<ResolvedComponentResult>()
+                val pending = ArrayDeque(listOf(root))
+                while (pending.isNotEmpty()) {
+                    val next = pending.removeFirst()
+                    if (seen.add(next)) {
+                        val dependencies = next.dependencies.filterIsInstance<ResolvedDependencyResult>()
+                        pending.addAll(dependencies.map { it.selected })
+                    }
+                }
+                seen.mapNotNull { it.moduleVersion?.let { id -> "${id.group}:${id.name}" } }
+            },
+    )
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkNoDebugAppCheckInRelease) }
 
 // Issue 213: Robolectric downloads its android-all jar at test runtime unless it is told where the jar is, and the
 // test JVM blocks the network (core/testing). So Gradle resolves the jar (verified by gradle/verification-metadata.xml)

@@ -1121,7 +1121,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30"]
-notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4). From M1-30 (PR 304, self-review minor): without app/google-services.json a release build also gets the demo-tally stand-in; allow that only for this CI smoke build and fail any other release build. From M1-26 (PR 317, R1-03): the release smoke build must compile the release Hilt graph (PlayIntegrityAppCheckProviderFactory bound), and a check must fail if com.google.firebase:firebase-appcheck-debug is on releaseRuntimeClasspath"
+notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4). From M1-30 (PR 304, self-review minor): without app/google-services.json a release build also gets the demo-tally stand-in; allow that only for this CI smoke build and fail any other release build"
 
 # Added by the M1 planning refresh (2026-11-21, docs/milestones/M1.md sections 5.1, 7 and 8).
 
