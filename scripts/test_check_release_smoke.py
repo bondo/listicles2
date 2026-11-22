@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CI = ".github/workflows/ci.yml"
 STATUS = ".github/workflows/status.yml"
 VERIFY = "scripts/verify.sh"
+SCREENSHOTS = "scripts/screenshots.sh"  # a second shell script that a CI job runs
 APP_BUILD = "app/build.gradle.kts"
 PROPERTIES = "gradle.properties"
 FLAG = "-Ptally.allowStandInRelease=true"
@@ -30,7 +31,7 @@ class Wiring(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, STATUS, VERIFY, APP_BUILD, PROPERTIES):
+        for name in (CI, STATUS, VERIFY, SCREENSHOTS, APP_BUILD, PROPERTIES):
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / name, self.root / name)
 
@@ -112,6 +113,29 @@ class Wiring(unittest.TestCase):
     def test_the_flag_in_another_workflow_is_reported(self):
         got = self.append(STATUS, f"# trailing\n      - run: ./gradlew {FLAG} :app:assembleRelease\n")
         self.assertEqual(got, [c.flag_problem("status.yml")])
+
+    def test_the_flag_in_the_workflow_level_env_is_reported(self):
+        # R1-01: a top-level env reaches every job, the smoke job's neighbours included.
+        opts = "  GRADLE_OPTS: -Dorg.gradle.daemon=false"
+        got = self.mutated(CI, opts + "\n", opts + " -Dorg.gradle.project.tally.allowStandInRelease=true\n")
+        self.assertEqual(got, [c.flag_problem("ci.yml workflow-level keys")])
+
+    def test_the_flag_as_a_workflow_level_gradle_env_variable_is_reported(self):
+        got = self.mutated(CI, "env:\n  GRADLE_OPTS:", "env:\n  ORG_GRADLE_PROJECT_tally.allowStandInRelease: 'true'\n  GRADLE_OPTS:")
+        self.assertEqual(got, [c.flag_problem("ci.yml workflow-level keys")])
+
+    def test_the_flag_in_another_shell_script_is_reported(self):
+        got = self.append(SCREENSHOTS, f"\n./gradlew {FLAG} :app:assembleRelease\n")
+        self.assertEqual(got, [c.flag_problem("scripts/screenshots.sh")])
+
+    def test_the_flag_in_a_comment_of_another_shell_script_is_not_reported(self):
+        self.assertEqual(self.append(SCREENSHOTS, f"\n# only the release-smoke job passes {FLAG}\n"), [])
+
+    def test_a_shell_script_in_a_subdirectory_is_scanned_too(self):
+        hook = self.root / "scripts/hooks/extra.sh"
+        hook.parent.mkdir(parents=True, exist_ok=True)
+        hook.write_text(f"gradlew {FLAG}\n")
+        self.assertEqual(c.problems(self.root), [c.flag_problem("scripts/hooks/extra.sh")])
 
     def test_the_flag_in_verify_sh_is_reported(self):
         got = self.append(VERIFY, f"step release gradle {FLAG} :app:assembleRelease\n")
