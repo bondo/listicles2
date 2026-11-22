@@ -46,7 +46,12 @@ IGNORE_POLICY = {"typescript": MAJOR, "firebase": MAJOR, "@firebase/rules-unit-t
 SDK_GROUP = "firebase-sdk"
 SDK_PATTERNS = ["firebase", "@firebase/rules-unit-testing"]
 # tsconfig compilerOptions allowlist: anything else (skipLibCheck, strict: false, a lone strict flag turned off) is a problem.
-TS_OPTIONS = {"target", "lib", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns"}
+# isolatedModules must be true (issue 210 item 7): with module nodenext ts-jest warns TS151002 on every run unless it compiles each file
+# on its own. ts-jest then only transpiles; tsc --noEmit, which verify.sh and CI run before Jest, stays the type check.
+TS_OPTIONS = {
+    "target", "lib", "module", "strict", "noEmit", "types", "noUncheckedIndexedAccess", "noImplicitOverride", "noImplicitReturns",
+    "isolatedModules",
+}
 # firebase 12.19 and later declarations reference the Temporal namespace, which TypeScript 6 provides only through lib esnext.temporal.
 # Setting lib replaces the default (lib.es2022.full: es2022, dom, dom.iterable, dom.asynciterable, webworker.importscripts, scripthost),
 # so the list is the subset of that default that firebase's types need (es2022, dom, dom.iterable), plus esnext.temporal.
@@ -223,6 +228,8 @@ def tsconfig_problems(cfg):
         problems.append("noEmit is not true")
     if opts.get("noUncheckedIndexedAccess") is not True:
         problems.append("noUncheckedIndexedAccess is not true")
+    if opts.get("isolatedModules") is not True:
+        problems.append("isolatedModules is not true")
     if opts.get("lib") != TS_LIB:
         problems.append(f"lib is {opts.get('lib')!r}, expected {TS_LIB!r}")
     extra = set(opts) - TS_OPTIONS
@@ -243,15 +250,16 @@ def tool(name, *args, cwd=FB):
 
 
 class Fixture:
-    """A throwaway directory inside firebase/ (so the project tsconfig, ESLint and Prettier configs apply) holding one TypeScript file."""
+    """A throwaway directory inside firebase/ (so the project tsconfig, ESLint and Prettier configs apply) holding one TypeScript file.
+    `options` are compilerOptions laid over the project's."""
 
-    def __init__(self, source):
+    def __init__(self, source, name="sample.ts", options=None):
         self.dir = tempfile.mkdtemp(prefix="fixture-tmp-", dir=FB)
-        self.file = os.path.join(self.dir, "sample.ts")
+        self.file = os.path.join(self.dir, name)
         with open(self.file, "w", encoding="utf-8") as f:
             f.write(source)
         with open(os.path.join(self.dir, "tsconfig.json"), "w", encoding="utf-8") as f:
-            json.dump({"extends": "../tsconfig.json", "include": ["./*.ts"], "exclude": []}, f)
+            json.dump({"extends": "../tsconfig.json", "include": ["./*.ts"], "exclude": [], "compilerOptions": options or {}}, f)
 
     def __enter__(self):
         return self
@@ -273,6 +281,13 @@ def eslint(source):
 def prettier(source):
     with Fixture(source) as fx:
         return tool("prettier", "--check", fx.file)
+
+
+def jest(options=None):
+    """Jest with the project's jest.config.cjs (preset ts-jest) on one passing test, as npm test runs it but without the emulator, and
+    without the cache, so ts-jest compiles (and would warn) on every run."""
+    with Fixture('export {};\n\ntest("adds", () => {\n    expect(1 + 1).toBe(2);\n});\n', "sample.test.ts", options) as fx:
+        return tool("jest", "--no-cache", "--rootDir", fx.dir)
 
 
 class HelperNegativeCases(unittest.TestCase):
@@ -389,7 +404,9 @@ class HelperNegativeCases(unittest.TestCase):
 
     def test_tsconfig_allowlist_rejects_every_weakening(self):
         good = {
-            "compilerOptions": {"strict": True, "noEmit": True, "noUncheckedIndexedAccess": True, "lib": TS_LIB, "types": ["jest"]},
+            "compilerOptions": {
+                "strict": True, "noEmit": True, "noUncheckedIndexedAccess": True, "isolatedModules": True, "lib": TS_LIB, "types": ["jest"],
+            },
             "include": ["**/*.ts"],
             "exclude": ["node_modules"],
         }
@@ -403,6 +420,8 @@ class HelperNegativeCases(unittest.TestCase):
             "allowJs": {**good, "compilerOptions": {**opts, "allowJs": True}},
             "noEmit off": {**good, "compilerOptions": {**opts, "noEmit": False}},
             "no unchecked access flag": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "noUncheckedIndexedAccess"}},
+            "isolatedModules off": {**good, "compilerOptions": {**opts, "isolatedModules": False}},
+            "isolatedModules missing": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "isolatedModules"}},
             "lib missing": {**good, "compilerOptions": {k: v for k, v in opts.items() if k != "lib"}},
             "lib without temporal": {**good, "compilerOptions": {**opts, "lib": ["es2022", "dom", "dom.iterable"]}},
             "lib without dom": {**good, "compilerOptions": {**opts, "lib": ["es2022", "esnext.temporal"]}},
@@ -608,6 +627,16 @@ class Behaviour(unittest.TestCase):
                 self.assertNotEqual(code, 0, out)
                 self.assertIn(rule, out)
         self.assertEqual(tsc(angle)[0], 0, "tsc alone accepts the angle-bracket assertion, so only ESLint can reject it")
+
+    def test_ts_jest_prints_no_hybrid_module_warning_with_the_project_tsconfig(self):
+        """Issue 210 item 7. The control without isolatedModules shows that the warning would be printed and seen."""
+        code, out = jest()
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 passed", out)
+        self.assertNotIn("TS151002", out)
+        code, out = jest(options={"isolatedModules": False})
+        self.assertEqual(code, 0, out)
+        self.assertIn("TS151002", out)
 
     def test_unformatted_code_fails_prettier(self):
         code, out = prettier(PRETTIER_BAD)
