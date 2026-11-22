@@ -435,24 +435,53 @@ val testLicenseeGate =
                     passes = false,
                     message = terms,
                 ),
-                // M1-26: the owner accepted the Play Integrity terms and the Play Core license (issue 15); no other URL is allowed.
+                // M1-26 (owner decisions, issue 15 comments 7083187223 and 7085175461): each Play terms URL is allowed for
+                // exactly its own artifact (integrity: Play Integrity terms; core-common: Play Core license), listed.
                 licenseeCase(
-                    "play integrity terms, listed",
-                    "fixture:play-tos:1.0",
-                    "approved-play-tos.txt",
+                    "play integrity terms on integrity, listed",
+                    "com.google.android.play:integrity:1.0",
+                    "approved-play-integrity.txt",
                     passes = true,
                 ),
                 licenseeCase(
-                    "play core license, listed",
-                    "fixture:play-core:1.0",
-                    "approved-play-core.txt",
+                    "play core license on core-common, listed",
+                    "com.google.android.play:core-common:1.0",
+                    "approved-play-core-common.txt",
                     passes = true,
                 ),
                 licenseeCase(
-                    "play terms, not listed",
-                    "fixture:play-tos:1.0",
+                    "play integrity terms on integrity, not listed",
+                    "com.google.android.play:integrity:1.0",
                     passes = false,
                     message = "integrity/overview#tos",
+                ),
+                licenseeCase(
+                    "play integrity terms on another artifact, listed",
+                    "fixture:play-tos:1.0",
+                    "approved-play-tos.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                licenseeCase(
+                    "play core license on another artifact, listed",
+                    "fixture:play-core:1.0",
+                    "approved-play-core.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                licenseeCase(
+                    "play integrity terms on core-common, listed",
+                    "com.google.android.play:core-common:2.0",
+                    "approved-core-common-tos.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
+                licenseeCase(
+                    "play core license on integrity, listed",
+                    "com.google.android.play:integrity:2.0",
+                    "approved-integrity-core.txt",
+                    passes = false,
+                    message = notGoogle,
                 ),
                 licenseeCase(
                     "unlisted google url, listed artifact",
