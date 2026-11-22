@@ -2,8 +2,9 @@ rules_version = '2';
 
 // The Firestore rules of docs/PLAN.md section 3.1. Anything no rule below allows is denied.
 // M1-08, the base: signedIn(), the users doc, config/app, the caller's own member path and the
-// tombstone read. Every later rule needs signedIn(); its allow tests go through verifiedOnly
-// (firebase/test/harness.ts), which fails unless an unverified token is denied.
+// tombstone read. Every later allow statement starts `if signedIn() && ...` (rules.test.ts checks
+// it), and its allow tests go through verifiedOnly (firebase/test/harness.ts), which fails unless an
+// unverified token is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
     // PLAN 3.1 "Signed in": a verified email. The own users doc and config/app are the two exceptions.
@@ -56,8 +57,9 @@ service cloud.firestore {
       allow update: if isCaller(uid) && validUser(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['householdId', 'name'])
         && householdIdChange(resource.data.householdId, request.resource.data.householdId);
-      // Only with householdId null, never with a value, live or stale (P5).
-      allow delete: if isCaller(uid) && resource.data.householdId == null;
+      // Only with householdId null, never with a value, live or stale (P5); a delete of no doc is
+      // allowed, so a resumed account deletion can repeat it (P7).
+      allow delete: if isCaller(uid) && (resource == null || resource.data.householdId == null);
     }
 
     match /households/{hid} {

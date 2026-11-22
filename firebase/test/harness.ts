@@ -158,6 +158,55 @@ export async function verifiedOnly(
     await assertSucceeds(request(clients.verified));
 }
 
+// The allow statements of a rules text, each with the path of the match blocks around it. Comments go
+// and string literals become '' first, so neither can hide a statement or unbalance the braces; a
+// statement or brace it cannot read throws.
+function allowStatements(rules: string): { path: string; condition: string }[] {
+    const code = rules.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|'[^'\n]*'|"[^"\n]*"/g, (m) =>
+        m.startsWith("/") ? "" : "''",
+    );
+    const stack: string[] = [];
+    const found: { path: string; condition: string }[] = [];
+    for (const m of code.matchAll(
+        /\bmatch\s+(\S+)\s*\{|\ballow\s[^:;]*(?::\s*if\s([^;]*))?;|[{}]/g,
+    )) {
+        if (m[1] !== undefined) stack.push(m[1]);
+        else if (m[0].startsWith("allow")) {
+            found.push({
+                path: stack.join(""),
+                condition: (m[2] ?? "").replace(/\s+/g, " ").trim(),
+            });
+        } else if (m[0] === "{") stack.push("");
+        else if (stack.pop() === undefined) throw new Error("rules: a } without its {");
+    }
+    if (stack.length > 0 || found.length !== (code.match(/\ballow\s/g) ?? []).length) {
+        throw new Error("rules: an allow statement or a brace that allowStatements cannot read");
+    }
+    return found;
+}
+
+// signedIn() is a conjunct of the whole condition: its first term, and no || or ?: outside
+// parentheses (both bind more loosely than &&).
+function requiresSignedIn(condition: string): boolean {
+    if (!/^signedIn\(\)\s*(&&|$)/.test(condition)) return false;
+    let depth = 0;
+    for (const ch of condition) {
+        if (ch === "(") depth += 1;
+        else if (ch === ")") depth -= 1;
+        else if (depth === 0 && (ch === "|" || ch === "?")) return false;
+    }
+    return true;
+}
+
+// M1-08, so a new rule cannot forget signedIn(): the allow statements that do not require it, outside
+// the two exceptions of PLAN 3.1 "Signed in" (the own users doc and config/app), as `path: condition`.
+const DOCUMENTS = "/databases/{database}/documents";
+const WITHOUT_SIGN_IN = [`${DOCUMENTS}/users/{uid}`, `${DOCUMENTS}/config/app`];
+export const withoutSignedIn = (rules: string): string[] =>
+    allowStatements(rules)
+        .filter((s) => !WITHOUT_SIGN_IN.includes(s.path) && !requiresSignedIn(s.condition))
+        .map((s) => `${s.path}: ${s.condition}`);
+
 // "denied" only for a permission-denied error; any other error is thrown, so a broken probe never
 // counts as denied.
 export async function outcome(request: Promise<unknown>): Promise<Outcome> {
