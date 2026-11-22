@@ -75,7 +75,7 @@ Source: [Coroutines best practices](https://developer.android.com/kotlin/corouti
 
 | Rule | Status |
 |---|---|
-| Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | review; detekt `InjectDispatcher` enabled but active only where detekt is type-resolved (core modules today, not `:app`) |
+| Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | Konsist: `Dispatchers` only in a file with a `@Module` annotation (M1-57); detekt `InjectDispatcher` enabled but active only where detekt is type-resolved (core modules today, not `:app`) |
 | Suspend functions are main-safe: the class doing blocking work moves it with `withContext` | review |
 | The ViewModel creates the coroutines; the data layer exposes `suspend` for one-shot calls and `Flow` for streams | review |
 | No `GlobalScope`; work that must outlive a screen uses an injected external scope | tooling: `NoGlobalScopeTest` (every source set); detekt `GlobalCoroutineUsage` enabled and fixture-gated (`testDetektRules`) |
@@ -203,7 +203,7 @@ Checksums only, no PGP signatures: most Android and Kotlin artifacts are not sig
 
 ## Proposed follow-ups (not implemented here)
 Each would be its own PR, test-first, per CLAUDE.md.
-1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); still open (M1-57): ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `Dispatchers.` outside the DI module.
+1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); ViewModels may not use `android.content.Context`, `Activity` or `AndroidViewModel`, and no `Dispatchers.` outside a file with a `@Module` annotation (done, M1-57).
 2. **detekt coroutines rules**: partly done (issue 38). `GlobalCoroutineUsage` is enabled and fixture-tested. `InjectDispatcher` is enabled and fixture-tested with a type-resolved fixture, but it only fires in type-resolved tasks (`detektMain`/`detektTest`), which today exist only for `:core:domain` and `:core:testing`. Still open: a type-resolved detekt run for `:app` and the planned `:core:data`, so the rule reaches code that will write `Dispatchers.IO`.
 3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog). Task M1-59.
 4. ~~Guard that `targetSdk` is at least the Play minimum~~ Done (M1-51, `scripts/check_build_guards.py`, see section 10); raise `TARGET_SDK_FLOOR` when the date changes.

@@ -1178,10 +1178,11 @@ notes = "Issue 257. Failing fixtures first. Before M1-14, the first repository"
 id = "M1-57"
 title = "Konsist: no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI module (checklist proposed follow-up 1, rest)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-50"]
+pr = 307
 notes = "Split from M1-50, which covers the data-source and GlobalScope halves. Failing fixtures first, in the architecture package next to DataSourceRules. The DI module and its path do not exist yet: decide the rule for `Dispatchers.` with the first DI module (M1-02 or later), and keep it inert until then only if a fixture proves it fires. Before M1-16, the first ViewModel"
 
 [[task]]
