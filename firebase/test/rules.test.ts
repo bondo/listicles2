@@ -36,11 +36,10 @@ test("the suite probes every collection of PLAN section 3, and UNPLANNED is none
     expect(h.TEMPLATES.map(h.collectionIdOf)).not.toContain(h.collectionIdOf(h.UNPLANNED));
 });
 
-// Until the real rules land, every client is denied every operation on every path.
-describe.each(h.CLIENT_NAMES)("default deny (%s)", (client) => {
-    test.each(h.PROBES.filter((p) => p.client === client))("$op $path", async (probe) => {
-        await env.withSecurityRulesDisabled(async (admin) => {
-            await assertFails(h.attempt(admin.firestore(), dbs[client], probe));
-        });
+// Until the real rules land, every client is denied every operation on every path. The suite runs
+// exactly h.PROBES, the probes of the mutant check, so each mutant that check kills turns it red.
+test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {
+    await env.withSecurityRulesDisabled(async (admin) => {
+        await assertFails(h.attempt(admin.firestore(), dbs[probe.client], probe));
     });
 });

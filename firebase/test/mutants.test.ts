@@ -10,6 +10,10 @@ const MUTANTS = [
     ...h.methodMutants(h.UNPLANNED),
 ].map((m) => ({ ...m, name: `allow ${m.methods.join(", ")} on ${h.matchOf(m)} to ${m.who}` }));
 
+// Each mutant loads its rules and runs 18 probes; the first also opens the connections (about 1.6 s here),
+// so the default 5 s per test is too close on a slow runner.
+jest.setTimeout(30_000);
+
 test.each(MUTANTS)("$name turns the deny suite red", async (mutant) => {
     const rules = h.mutate(h.RULES, mutant);
     const env = await initializeTestEnvironment({ projectId: h.PROJECT, firestore: { rules } });
