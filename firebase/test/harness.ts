@@ -1,6 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+    assertFails,
+    assertSucceeds,
     type RulesTestContext,
     type RulesTestEnvironment,
     type TokenOptions,
@@ -8,17 +10,15 @@ import {
 
 // The default-deny harness (M1-52, see #202): every client tries every operation on one document of
 // every collection in PLAN section 3 (two for a {uid} one: the caller's own and another user's) and on
-// the unplanned paths. rules.test.ts expects each probe to be denied; mutants.test.ts shows that
-// opening any one of those collections turns that suite red.
+// the unplanned paths. rules.test.ts expects each probe to be denied, except the few that ALLOWED
+// carves out (M1-08 on), which it expects allowed; mutants.test.ts shows that opening any one of those
+// collections turns that suite red.
 // Their limit: each probe seeds at most its own document (`{ name: "seed" }`), writes a fixed generic
 // payload and queries without a filter, so both catch only a path that is open whatever the stored
 // data, payload and query filter. A rule that reads stored data (resource, get, exists), the payload
 // or a query filter can be a hole and still pass both, denied by this setup and not by its
-// authorization logic: it needs its own allow and deny tests in a seeded world (M1-08 on). So does
-// M1-08's helper that asserts each collection denies an unverified token: it must make each request
-// twice in one seeded world, first assertFails with an unverified token (a denied request writes
-// nothing), then assertSucceeds with a verified one, or it cannot fail. Verified first is vacuous for
-// a create or delete: the unverified request then meets a changed world (an update, a missing doc).
+// authorization logic: it needs its own allow and deny tests in a seeded world (M1-08 on), and each
+// allow test of a rule that needs a verified email goes through verifiedOnly (below).
 // The contexts hand out the compat Firestore type, used as is (no type casts).
 export type Db = ReturnType<RulesTestContext["firestore"]>;
 
@@ -42,7 +42,7 @@ export function planTemplates(plan: string): string[] {
 }
 
 // Ids of the planned shapes (PLAN 3.1, P3): a 20-character auto-id, `<householdId>_<22-character secret>`.
-const UID = "alice";
+export const UID = "alice";
 const HID = "household00000000001";
 const CODE = `${HID}_${"s".repeat(22)}`;
 const IDS: Record<string, string> = {
@@ -106,9 +106,22 @@ export interface Probe {
     readonly path: string;
 }
 
-export const PROBES: readonly Probe[] = PATHS.flatMap((path) =>
+const PROBED: readonly Probe[] = PATHS.flatMap((path) =>
     OPS.flatMap((op) => CLIENT_NAMES.map((client) => ({ client, op, path }))),
 );
+
+// The probes the rules allow, carved out one by one, never a whole path (#301), so the self and
+// others mutants still find their probes: anyone's get of config/app; a get of the caller's own users
+// doc, verified or not (PLAN 3.1: the own-doc exception); a verified get of the own member path.
+export const ALLOWED: readonly Probe[] = [
+    ...CLIENT_NAMES.map((client): Probe => ({ client, op: "get", path: "config/app" })),
+    { client: "unverified", op: "get", path: instantiate("users/{uid}") },
+    { client: "verified", op: "get", path: instantiate("users/{uid}") },
+    { client: "verified", op: "get", path: instantiate("households/{hid}/members/{uid}") },
+];
+const named = (p: Probe): string => `${p.client} ${p.op} ${p.path}`;
+const allowed = new Set(ALLOWED.map(named));
+export const PROBES: readonly Probe[] = PROBED.filter((p) => !allowed.has(named(p)));
 
 const collectionOf = (path: string): string => path.slice(0, path.lastIndexOf("/"));
 export const collectionIdOf = (path: string): string => collectionOf(path).split("/").at(-1) ?? "";
@@ -131,6 +144,19 @@ export async function attempt(admin: Db, db: Db, probe: Probe): Promise<unknown>
 }
 
 export type Outcome = "allowed" | "denied";
+
+// M1-08 (PLAN 3.1 "Signed in"): every rule but those of the caller's own users doc and config/app
+// needs a verified email. The helper sends one request twice in the world the test seeded: first
+// unverified, which must be denied (a denied request writes nothing, so the world stays as seeded),
+// then verified, which must be allowed, so it cannot pass vacuously. Verified first would be vacuous
+// for a create or delete: the unverified request would meet a changed world (an update, no doc).
+export async function verifiedOnly(
+    clients: Record<Client, Db>,
+    request: (db: Db) => Promise<unknown>,
+): Promise<void> {
+    await assertFails(request(clients.unverified));
+    await assertSucceeds(request(clients.verified));
+}
 
 // "denied" only for a permission-denied error; any other error is thrown, so a broken probe never
 // counts as denied.
