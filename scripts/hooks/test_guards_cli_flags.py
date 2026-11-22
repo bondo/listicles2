@@ -1025,5 +1025,38 @@ class PrReviewRound1Tests(CliFlagCase):
         self.assertPasses()
 
 
+class PrReviewRound2Tests(CliFlagCase):
+    """PR 309 review round 2, the regressions from main: R2-01 a comment line ends a plain `run:` value, R2-02 an anchor or tag before
+    `|` or `>` keeps the block scalar, R2-03 a JSON unicode escape in package.json makes every npm `--` tail unknown."""
+
+    WF, STEP, R = ".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n", " # justified: three words here\n"
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def test_comments_anchors_and_tags_in_workflows(self):
+        s, r = self.STEP, self.R
+        for text, n in [(s + "      - run: ruff check --ignore E501 .\n          #" + r[2:], 4),
+                        (s + "      - name: x\n        run: ruff check --fix .\n          #" + r[2:] + "      - run: echo\n", 5),
+                        (s + "      - run: &r |\n          ruff check --ignore E501 .\n          echo ok" + r, 5),
+                        (s + "      - run: !!str |\n          ruff check --ignore E501 .\n          echo ok" + r, 5),
+                        (s + "      - run: !!str >\n          ruff check --ignore E501 .\n            echo ok" + r, 5)]:
+            with self.subTest(text=text):
+                self.write(self.WF, text)
+                self.assertFails(f"{MARK}: {self.WF}:{n}:")
+        self.write(self.WF, s + "      - run: ruff check --fix ." + r)
+        self.assertPasses()
+
+    def test_a_unicode_escape_in_package_json_makes_tails_unknown(self):
+        self.write("firebase/package.json", '{\n  "scripts": {\n    "test": "jest"\n  }\n}\n')
+        for tools, cmd in [('{\n  "scripts": {\n    "t\\u0065st": "eslint ."\n  }\n}\n', "cd tools && npm test -- --quiet"),
+                           ('{\n  "scr\\u0069pts": {\n    "test": "eslint ."\n  }\n}\n', "cd tools && npm test -- --quiet src")]:
+            with self.subTest(tools=tools):
+                self.write("tools/package.json", tools)
+                self.put("scripts/lint.sh", cmd)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+
 if __name__ == "__main__":
     unittest.main()
