@@ -3,9 +3,9 @@
   * ci.yml `release-smoke` job: the parsed job equals one frozen mapping (EXPECTED_JOB): it builds `:app:assembleRelease` with
     `-Ptally.allowStandInRelease=true` (no google-services.json in CI, so the demo-tally stand-in; M1-30), then checks that R8 wrote its
     mapping file and that the APK is unsigned. No signing key, no secret, no upload. Any other key, step, flag, `if` or `needs` fails,
-  * the opt-in flag appears in no other ci.yml job, no workflow-level key of ci.yml (env reaches every job), no other workflow, no
-    shell script under scripts/ (verify.sh, screenshots.sh, ...) and not in the root gradle.properties: any other release build must
-    still fail (tested by scripts/test_google_services_release_gate.py),
+  * the opt-in flag appears in no other ci.yml job, no workflow-level key of ci.yml (env reaches every job), no other workflow, no local
+    composite action (.github/actions), no shell script under scripts/ (verify.sh, screenshots.sh, ...) and not in the root
+    gradle.properties: any other release build must still fail (tested by scripts/test_google_services_release_gate.py),
   * the release build type keeps `isMinifyEnabled = true`, or the smoke build would not run R8,
   * verify.sh and the CI `tasks` job run this check and its tests.
 Run: python3 -I scripts/check_release_smoke.py  (exit 1 and one line per problem).
@@ -80,6 +80,9 @@ def flag_problems(root):
     for path in sorted((root / ".github/workflows").glob("*.y*ml")):
         if path.name != "ci.yml" and _has_flag(path.read_text()):
             found.append(path.name)
+    for path in sorted((root / ".github/actions").rglob("*.y*ml")):  # local composite actions run inside whichever job uses them
+        if _has_flag(path.read_text()):
+            found.append(path.relative_to(root).as_posix())
     files = sorted((root / "scripts").rglob("*.sh")) + [root / "gradle.properties"]
     for path in files:
         if path.is_file() and _has_flag(path.read_text()):
