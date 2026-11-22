@@ -8,7 +8,8 @@ enum class NameError { Empty, TooLong }
 
 /**
  * Input rules for sign-up and profile fields (M1-13). Lengths are counted in Unicode code points,
- * not UTF-16 chars, to match the Firestore rules' `size()` (docs/milestones/M1.md P4).
+ * not UTF-16 chars, as the Firestore rules count them: with a regex, because their `size()` counts
+ * UTF-16 units (docs/milestones/M1.md P4).
  * Callers show the matching field error; the texts live in resources, not here.
  */
 object Validation {

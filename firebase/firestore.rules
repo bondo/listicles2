@@ -1,10 +1,84 @@
 rules_version = '2';
 
-// Deny everything until the real rules land (see docs/PLAN.md section 3.1).
+// The Firestore rules of docs/PLAN.md section 3.1. Anything no rule below allows is denied.
+// M1-08, the base: signedIn(), the users doc, config/app, the caller's own member path and the
+// tombstone read. Every later allow statement starts `if signedIn() && ...` (rules.test.ts checks
+// it), and its allow tests go through verifiedOnly (firebase/test/harness.ts), which fails unless an
+// unverified token is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    // PLAN 3.1 "Signed in": a verified email. The own users doc and config/app are the two exceptions.
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // The caller is `uid`, verified email or not (the own users doc: AUTH-06, HH-03).
+    function isCaller(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function householdDoc(hid) {
+      return /databases/$(database)/documents/households/$(hid);
+    }
+
+    function memberDoc(hid, uid) {
+      return /databases/$(database)/documents/households/$(hid)/members/$(uid);
+    }
+
+    // A name (PLAN 3.1 field validation, P4): 1-50 code points, non-empty after trim. The regex counts
+    // them (`.` is one code point; (?s) lets it match a line break too). Not size(): on the emulator it
+    // counts UTF-16 units, 100 for 50 non-BMP characters (option A, #15 comment 7083518706).
+    function validName(name) {
+      return name is string && name.matches('(?s).{1,50}') && name.trim().size() > 0;
+    }
+
+    // The users doc (PLAN 3.1, P9): householdId, always present, and name, optional.
+    function validUser(data) {
+      return data.keys().hasAll(['householdId'])
+        && data.keys().hasOnly(['householdId', 'name'])
+        && (!('name' in data) || validName(data.name));
+    }
+
+    // householdId (PLAN 3.1, P5): unchanged; set (null -> hid) only with the caller's member doc in a
+    // live household after the write, as in the create-household and join batches; cleared
+    // (hid -> null) only once the caller's member doc is gone after the write. Never hid1 -> hid2.
+    function householdIdChange(before, after) {
+      return after == before
+        || (before == null && after is string
+          && existsAfter(memberDoc(after, request.auth.uid))
+          && getAfter(householdDoc(after)).data.deleted == false)
+        || (before != null && after == null
+          && !existsAfter(memberDoc(before, request.auth.uid)));
+    }
+
+    match /users/{uid} {
+      allow get: if isCaller(uid);
+      allow create: if isCaller(uid) && validUser(request.resource.data)
+        && request.resource.data.householdId == null;
+      allow update: if isCaller(uid) && validUser(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['householdId', 'name'])
+        && householdIdChange(resource.data.householdId, request.resource.data.householdId);
+      // Only with householdId null, never with a value, live or stale (P5); a delete of no doc is
+      // allowed, so a resumed account deletion can repeat it (P7).
+      allow delete: if isCaller(uid) && (resource == null || resource.data.householdId == null);
+    }
+
+    match /households/{hid} {
+      // The tombstone read: the household is deleted and the caller's householdId points at it
+      // (the HH-06 dialog, the self-heal, the owner's cleanup resume). Members' reads come later.
+      allow get: if signedIn() && resource.data.deleted == true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.householdId == hid;
+
+      // The caller's own member path in any household, live, a tombstone or none; it may not exist.
+      match /members/{uid} {
+        allow get: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // The app config document (PLAN 3, START-01): anyone reads it, even signed out, so an old app
+    // can ask for an update before sign-in. No client writes it; the owner edits it in the console.
+    match /config/app {
+      allow get: if true;
     }
   }
 }
