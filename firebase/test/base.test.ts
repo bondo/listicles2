@@ -3,6 +3,7 @@ import {
     assertSucceeds,
     initializeTestEnvironment,
     type RulesTestEnvironment,
+    type TokenOptions,
 } from "@firebase/rules-unit-testing";
 import * as h from "./harness";
 
@@ -22,11 +23,11 @@ const member = (hid: string, uid = h.UID): string => `households/${hid}/members/
 const T0 = new Date(0);
 const MEMBER = { role: "member", displayName: "Alice", joinedAt: T0 };
 const HOME = { name: "Home", createdBy: BOB, createdAt: T0, ownerUid: BOB, deleted: false };
+const GOOGLE: TokenOptions = { email_verified: true, firebase: { sign_in_provider: "google.com" } };
 
 async function seed(docs: Record<string, object>): Promise<void> {
     await env.withSecurityRulesDisabled(async (admin) => {
-        for (const [path, data] of Object.entries(docs))
-            await admin.firestore().doc(path).set(data);
+        for (const [p, data] of Object.entries(docs)) await admin.firestore().doc(p).set(data);
     });
 }
 
@@ -212,12 +213,8 @@ describe("the household doc", () => {
     const bobs = { [user(BOB)]: { householdId: TOMB } };
     test.each<[string, Record<string, object>, string]>([
         ["live, mine points at it, no member doc", { [user()]: { householdId: LIVE } }, LIVE],
-        [
-            "a tombstone bob's points at, mine elsewhere",
-            { ...bobs, [user()]: { householdId: OTHER } },
-            TOMB,
-        ],
-        ["a tombstone bob's points at, no users doc of mine", bobs, TOMB],
+        ["bob's tombstone, mine elsewhere", { ...bobs, [user()]: { householdId: OTHER } }, TOMB],
+        ["bob's tombstone, no users doc of mine", bobs, TOMB],
     ])("denied: get, %s", async (_what, docs, hid) => {
         await seed(docs);
         for (const client of h.CLIENT_NAMES) {
@@ -235,13 +232,7 @@ describe("the household doc", () => {
 
 // A Google sign-in (PLAN 3.1: email_verified true) passes every rule a verified password token does.
 test("a Google token is a verified caller", async () => {
-    const google = env
-        .authenticatedContext(h.UID, {
-            email: "alice@gmail.com",
-            email_verified: true,
-            firebase: { sign_in_provider: "google.com" },
-        })
-        .firestore();
+    const google = env.authenticatedContext(h.UID, GOOGLE).firestore();
     await mine(TOMB);
     await seed({ [CONFIG]: { minVersionCode: 1 }, [user(BOB)]: { householdId: null } });
     await assertSucceeds(google.doc(CONFIG).get());

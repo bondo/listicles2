@@ -55,9 +55,8 @@ test("every allow statement but the users doc's and config/app's requires signed
     expect(h.withoutSignedIn(h.RULES)).toEqual([]);
 });
 
-// Every client is denied every operation on every path, except the probes h.ALLOWED carves out. The
-// suite runs exactly h.PROBES, the probes of the mutant check, so each mutant that check kills turns it
-// red.
+// Every probe but those h.ALLOWED carves out is denied. The suite runs exactly h.PROBES, the probes of
+// the mutant check, so each mutant that check kills turns it red.
 test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {
     await env.withSecurityRulesDisabled(async (admin) => {
         await assertFails(h.attempt(admin.firestore(), dbs[probe.client], probe));

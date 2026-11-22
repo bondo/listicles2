@@ -145,11 +145,10 @@ export async function attempt(admin: Db, db: Db, probe: Probe): Promise<unknown>
 
 export type Outcome = "allowed" | "denied";
 
-// M1-08 (PLAN 3.1 "Signed in"): every rule but those of the caller's own users doc and config/app
-// needs a verified email. The helper sends one request twice in the world the test seeded: first
-// unverified, which must be denied (a denied request writes nothing, so the world stays as seeded),
-// then verified, which must be allowed, so it cannot pass vacuously. Verified first would be vacuous
-// for a create or delete: the unverified request would meet a changed world (an update, no doc).
+// M1-08 (PLAN 3.1 "Signed in"): every rule but the own users doc's and config/app's needs a verified
+// email. One request, twice, in the world the test seeded: unverified first, which must be denied (a
+// denied request writes nothing), then verified, which must be allowed, so it cannot pass vacuously.
+// Verified first would be vacuous for a create or delete: the second request would meet a new world.
 export async function verifiedOnly(
     clients: Record<Client, Db>,
     request: (db: Db) => Promise<unknown>,
@@ -158,10 +157,10 @@ export async function verifiedOnly(
     await assertSucceeds(request(clients.verified));
 }
 
-// The allow statements of a rules text, each with the path of the match blocks around it, and the
-// paths at which `function signedIn` is declared. First a comment becomes a space and a string
-// literal (escapes included) '', so neither can hide a statement or unbalance the braces. It fails
-// closed: a quote, `match`, `allow` or brace it cannot read throws (R2-01 to R2-03).
+// The allow statements of a rules text, each with the path of its match blocks, and the paths of each
+// `function signedIn`. A comment becomes a space and a string (escapes included) ''. It fails closed:
+// a quote, a brace, a match path of other than plain segments or an allow statement not ended by its
+// own ; before any brace is left unread, and then it throws (R2-01 to R3-04).
 function parseRules(rules: string): {
     allows: { path: string; condition: string }[];
     signedIn: string[];
@@ -175,7 +174,7 @@ function parseRules(rules: string): {
     const signedIn: string[] = [];
     let matches = 0;
     for (const m of code.matchAll(
-        /\bmatch\s*(\/\S*)\s*\{|\ballow\b[^:;]*(?::\s*if\b([^;]*))?;|\bfunction\s+signedIn\b|[{}]/g,
+        /\bmatch\s*((?:\/(?:\{\w+(?:=\*\*)?\}|[^\s/{}]+))+)\s*\{|\ballow\b[^:;{}]*(?::\s*if\b([^;{}]*))?;|\bfunction\s+signedIn\b|[{}]/g,
     )) {
         if (m[1] !== undefined) {
             stack.push(m[1]);
@@ -215,10 +214,9 @@ function requiresSignedIn(condition: string): boolean {
     return true;
 }
 
-// M1-08, so a new rule cannot forget signedIn(): the allow statements that do not require it, outside
-// the two exceptions of PLAN 3.1 "Signed in" (the own users doc and config/app), as `path: condition`;
-// and signedIn() itself unless it is declared exactly once, at the documents level, so that no match
-// can redefine it (S1-01).
+// M1-08, so a new rule cannot forget signedIn(): outside the own users doc and config/app (PLAN 3.1),
+// each allow statement that does not require it, as `path: condition`; and signedIn() itself unless it
+// is declared exactly once, at the documents level, so that no match can redefine it (S1-01).
 const DOCUMENTS = "/databases/{database}/documents";
 const WITHOUT_SIGN_IN = [`${DOCUMENTS}/users/{uid}`, `${DOCUMENTS}/config/app`];
 export function withoutSignedIn(rules: string): string[] {
