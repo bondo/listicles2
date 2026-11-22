@@ -74,6 +74,11 @@ class TargetSdk(unittest.TestCase):
                 low = re.sub(r"36", "35", line)
                 self.assertEqual(len(self.problems(self.cfg(low))), 1, low)
 
+    def test_a_groovy_build_file_is_read(self):
+        """R1-01: `*.gradle` files count, not only `*.gradle.kts`."""
+        self.assertEqual(len(self.problems("android { targetSdk 29 }\n", name="lib/build.gradle")), 1)
+        self.assertEqual(self.problems("android { targetSdk 36 }\n", name="lib/build.gradle"), [])
+
     def test_the_multi_line_block_form_is_read(self):
         text = self.cfg("targetSdk {\n            version = release(35)\n        }")
         self.assertEqual(len(self.problems(text)), 1)
@@ -268,6 +273,73 @@ class Manifest(unittest.TestCase):
         self.assertEqual(len(self.problems(manifest('android:allowBackup="TRUE"'))), 1)
         self.assertEqual(len(self.problems(manifest('android:allowBackup="false" android:usesCleartextTraffic="True"'))), 1)
 
+    def test_an_overlay_without_allow_backup_needs_a_main_application_that_sets_it(self):
+        """R1-02: the overlay inherits the main manifest's value only when that manifest has an <application> (and is checked itself)."""
+        overlay = manifest('android:label="x"')
+        lib = f"<manifest {MANIFEST_NS}><uses-permission android:name=\"x\"/></manifest>"
+        for main in ({}, {"app/src/main/AndroidManifest.xml": lib}):
+            with self.subTest(main=list(main)):
+                found = self.problems(overlay, name="app/src/release/AndroidManifest.xml", extra=main)
+                self.assertEqual(len(found), 1, found)
+                self.assertIn("allowBackup", found[0])
+                self.assertIn("src/release", found[0])
+        main = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}
+        self.assertEqual(self.problems(overlay, name="app/src/release/AndroidManifest.xml", extra=main), [])
+        main = {"app/src/main/AndroidManifest.xml": manifest(f'android:allowBackup="true" {self.RULES}')}
+        extra = dict(main, **self.RULE_FILES)
+        self.assertEqual(self.problems(overlay, name="app/src/release/AndroidManifest.xml", extra=extra), [])
+
+    def test_an_overlay_of_another_module_does_not_inherit_this_modules_main_manifest(self):
+        main = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}
+        found = self.problems(manifest(""), name="other/src/release/AndroidManifest.xml", extra=main)
+        self.assertEqual(len(found), 1, found)
+
+    def test_only_the_android_namespace_counts_in_a_manifest(self):
+        """R1-03: `tools:` (or any other prefix) with the same local name must not hide or replace the `android:` attribute."""
+        tools = 'xmlns:tools="http://schemas.android.com/tools"'
+
+        def tm(attrs):
+            return f"<manifest {MANIFEST_NS} {tools}><application {attrs}/></manifest>"
+        for bad in (
+            'android:allowBackup="false" android:usesCleartextTraffic="true" tools:usesCleartextTraffic="false"',
+            'tools:usesCleartextTraffic="false" android:allowBackup="false" android:usesCleartextTraffic="true"',
+            'android:allowBackup="true" tools:allowBackup="false"',
+            'tools:allowBackup="false" android:allowBackup="true"',
+            'android:allowBackup="true" tools:dataExtractionRules="@xml/data_extraction_rules" tools:fullBackupContent="@xml/backup_rules"',
+        ):
+            with self.subTest(bad=bad):
+                found = self.problems(tm(bad), extra=self.RULE_FILES)
+                self.assertEqual(len(found), 1, found)
+        for ok in (
+            'android:allowBackup="false" tools:usesCleartextTraffic="true"',
+            'android:allowBackup="false" tools:allowBackup="true"',
+            'tools:allowBackup="true" android:allowBackup="false"',
+        ):
+            with self.subTest(ok=ok):
+                self.assertEqual(self.problems(tm(ok)), [])
+
+    def test_only_the_android_namespace_counts_for_the_backup_rules(self):
+        tools = 'xmlns:tools="http://schemas.android.com/tools"'
+        text = f'<manifest {MANIFEST_NS} {tools}><application android:allowBackup="true" {self.RULES} tools:dataExtractionRules="@xml/other"/></manifest>'
+        self.assertEqual(self.problems(text, extra=self.RULE_FILES), [])
+
+    def test_network_security_config_attributes_are_not_namespaced(self):
+        """R1-03: a prefixed `cleartextTrafficPermitted` cannot hide the plain one, and a prefixed one alone is not the plain one."""
+        tools = 'xmlns:tools="http://schemas.android.com/tools"'
+        base = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}
+
+        def nsc(attrs):
+            return dict(base, **{"app/src/main/res/xml/nsc.xml": f"<network-security-config {tools}><base-config {attrs}/></network-security-config>"})
+
+        for bad in (
+            'cleartextTrafficPermitted="true" tools:cleartextTrafficPermitted="false"',
+            'tools:cleartextTrafficPermitted="false" cleartextTrafficPermitted="true"',
+        ):
+            with self.subTest(bad=bad):
+                found = cbg.manifest_problems(tree(nsc(bad)))
+                self.assertEqual(len(found), 1, found)
+        self.assertEqual(cbg.manifest_problems(tree(nsc('tools:cleartextTrafficPermitted="true"'))), [])
+
     def test_cleartext_traffic_is_flagged_and_false_passes(self):
         found = self.problems(manifest('android:allowBackup="false" android:usesCleartextTraffic="true"'))
         self.assertEqual(len(found), 1, found)
@@ -406,14 +478,15 @@ class CommandLine(unittest.TestCase):
         root = tree(
             {
                 "app/build.gradle.kts": "android { defaultConfig { targetSdk = 30 } }\n",
+                "lib/build.gradle": "android { targetSdk 29 }\n",
                 "app/src/main/AndroidManifest.xml": manifest('android:allowBackup="true" android:usesCleartextTraffic="true"'),
             }
         )
         r = self.run_cli(root)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         lines = [ln for ln in r.stdout.splitlines() if ln.startswith("build-guards: ")]
-        self.assertEqual(len(lines), 3, r.stdout)  # targetSdk, cleartext, allowBackup
-        self.assertTrue(any("targetSdk" in ln for ln in lines))
+        self.assertEqual(len(lines), 4, r.stdout)  # two targetSdk, cleartext, allowBackup
+        self.assertEqual(sum("targetSdk" in ln for ln in lines), 2, r.stdout)
         self.assertTrue(any("usesCleartextTraffic" in ln for ln in lines))
         self.assertTrue(any("allowBackup" in ln for ln in lines))
 
