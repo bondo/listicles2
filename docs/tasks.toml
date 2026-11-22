@@ -1232,6 +1232,16 @@ depends_on = ["M1-30"]
 notes = "Tooling env (.github/ is protected). Owner request, #15 comment 7081546814: the unit job uploads the debug APK it already builds as tally-debug-<short sha> (30 days) on push to main only, contents read only, no release, no new secrets or actions. The APK carries the demo-tally stand-in Firebase config (M1-30): own device only until M1-O5 (#291). scripts/check_debug_apk.py freezes the step"
 
 [[task]]
+id = "M1-70"
+title = "Status: dependency graph of the open tasks under the README status picture (status-graph.svg)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "Owner request, #15 comment 7086087003: open-task dependency graph under the status cards. Two PRs (split 2026-11-22, the 600-line CI limit): part A is scripts/status_graph.py with its tests (not called yet); part B is the render and publish wiring, the README picture, docs/STATUS.md and this task done"
+
+[[task]]
 id = "M1-50"
 title = "Konsist: no data source in composables or ViewModels, no GlobalScope (checklist proposed follow-up 1)"
 milestone = "M1"
@@ -1455,7 +1465,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-64", "M1-65",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-70",
 ]
 
 [[task]]
