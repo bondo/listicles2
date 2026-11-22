@@ -146,11 +146,20 @@ class ThemeTokensTest {
             style.lineHeight.value shouldBe spec.getValue(name).getValue("lineHeight").toFloat()
             style.fontWeight?.weight shouldBe spec.getValue(name).getValue("weight").toInt()
         }
-        // Every style not in tokens.json (T2: Material 3 type scale) is the Material 3 default, unchanged.
+        // Every style not in tokens.json (T2: Material 3 type scale) is the Material 3 default, unchanged (all 7).
         val d = Typography()
-        t.displayLarge shouldBe d.displayLarge
-        t.headlineLarge shouldBe d.headlineLarge
-        t.labelSmall shouldBe d.labelSmall
+        val unlisted =
+            listOf(
+                Triple("displayLarge", t.displayLarge, d.displayLarge),
+                Triple("displayMedium", t.displayMedium, d.displayMedium),
+                Triple("displaySmall", t.displaySmall, d.displaySmall),
+                Triple("headlineLarge", t.headlineLarge, d.headlineLarge),
+                Triple("headlineMedium", t.headlineMedium, d.headlineMedium),
+                Triple("titleSmall", t.titleSmall, d.titleSmall),
+                Triple("labelSmall", t.labelSmall, d.labelSmall),
+            )
+        unlisted.filter { (name, _, _) -> name in spec.keys }.shouldBeEmpty()
+        unlisted.filter { (_, actual, default) -> actual != default }.map { it.first }.shouldBeEmpty()
     }
 
     private fun contrast(
