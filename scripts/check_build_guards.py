@@ -381,8 +381,8 @@ def within(spans, i):
 
 def enclosing_call(blank, pos):
     """(name, offset) of the call whose argument list holds pos: the identifier before the first unmatched `(`, or for a Groovy call
-    without parentheses the first identifier on the line."""
-    depth, i = 0, pos
+    without parentheses the first identifier of its statement (after the line start, `{` or `;`)."""
+    depth, i, stop = 0, pos, 0
     while i > 0:
         i -= 1
         c = blank[i]
@@ -395,8 +395,9 @@ def enclosing_call(blank, pos):
                 m = re.search(r"([A-Za-z_]\w*)[ \t]*$", blank[:i])
                 return (m.group(1), m.start(1)) if m else ("", i)
         elif c in "{;" and not depth:
+            stop = i + 1
             break
-    start = blank.rfind("\n", 0, pos) + 1
+    start = max(stop, blank.rfind("\n", 0, pos) + 1)
     m = re.compile(r"[ \t]*([A-Za-z_]\w*)").match(blank, start)
     return (m.group(1), m.start(1)) if m else ("", pos)
 
