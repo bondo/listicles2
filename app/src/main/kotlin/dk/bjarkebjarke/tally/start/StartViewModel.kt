@@ -37,17 +37,25 @@ class StartViewModel
         notices: HouseholdNotices,
     ) : ViewModel() {
         val uiState: StateFlow<StartUiState> =
-            combine(update.updateRequired(), laterGates(session, email, name, notices)) { updateRequired, later ->
-                StartUiState.Ready(startStep(later.copy(updateRequired = updateRequired)))
-            }
-                // Checklist section 4: a failing gate source opens sign-in instead of crashing at start.
-                .catch<StartUiState> { emit(StartUiState.Ready(StartStep.SignIn)) }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), StartUiState.Loading)
+            combine(
+                update.updateRequired().orElse(false),
+                laterGates(session, email, name, notices),
+            ) { required, later ->
+                StartUiState.Ready(startStep(later.copy(updateRequired = required)))
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), StartUiState.Loading)
 
         private companion object {
             const val STOP_TIMEOUT_MS = 5_000L
         }
     }
+
+/**
+ * A failing source ends its own flow with [fallback] (checklist section 4: errors become state), so the other sources
+ * stay observed and the next signed-in start asks the source again. The fallback is the safe side of each gate: no
+ * update is blocked, email and name count as missing (their step), a missing notice is dropped, a failing session is
+ * signed out.
+ */
+private fun <T> Flow<T>.orElse(fallback: T): Flow<T> = catch { emit(fallback) }
 
 /** The gates after the update gate. Signed out stops at sign-in without asking the later gates (no account yet). */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -57,9 +65,13 @@ private fun laterGates(
     name: NameState,
     notices: HouseholdNotices,
 ): Flow<StartFacts> =
-    session.signedIn().flatMapLatest { signedIn ->
+    session.signedIn().orElse(false).flatMapLatest { signedIn ->
         if (signedIn) {
-            combine(email.verified(), name.saved(), notices.pending()) { verified, saved, notice ->
+            combine(
+                email.verified().orElse(false),
+                name.saved().orElse(false),
+                notices.pending().orElse(null),
+            ) { verified, saved, notice ->
                 StartFacts(false, signedIn = true, emailVerified = verified, nameSaved = saved, notice = notice)
             }
         } else {
