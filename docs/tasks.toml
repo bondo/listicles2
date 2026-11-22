@@ -866,6 +866,7 @@ status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-52"]
+pr = 314
 notes = "PLAN as amended by M1-35 (P4, P5, P9); the test harness rewrite is M1-52"
 
 [[task]]
