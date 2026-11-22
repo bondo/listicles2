@@ -4,9 +4,12 @@
     androidTest helper) connects to, and the helper's project is a `demo-` one,
   * ci.yml `ui` job: installs the Firebase CLI (`npm ci` in firebase/) and runs `:app:connectedDebugAndroidTest` and
     `:core:data:connectedDebugAndroidTest` inside `firebase emulators:exec --only auth,firestore --project demo-tally`;
-    no step is skippable (`if:`, the job is a required check) and no failure is swallowed (`|| true`, `continue-on-error`),
+    the quoted command is exactly `cd .. && ./gradlew ...` with at most one `|| (...; false)` fallback (a fallback that exits 0, an
+    `echo` instead of gradle or a `;` would turn a failing run green), no step is skippable (`if:`, the job is a required check)
+    and nothing else swallows a failure (`|| true`, `continue-on-error`),
   * verify.sh runs this check and its tests, and compiles the :core:data androidTest sources; ci.yml `tasks` runs both,
-  * :core:data has :core:testing on its unit-test classpath (#217 item 3) and a smoke test that talks to the emulators.
+  * :core:data has :core:testing on its unit-test classpath and runs unit tests on the JUnit Platform, where the network block
+    installs (#217 item 3), and a smoke test that talks to the emulators.
 Run: python3 -I scripts/check_ui_emulators.py  (exit 1 and one line per problem).
 """
 
@@ -26,6 +29,12 @@ UI_TASKS = (":app:connectedDebugAndroidTest", ":core:data:connectedDebugAndroidT
 DATA_COMPILE = ":core:data:assembleDebugAndroidTest"
 CLASSPATH = 'testImplementation(project(":core:testing"))'
 SWALLOWED = re.compile(r"\|\|\s*(?:true|:)|continue-on-error")
+# The command inside the emulators:exec quotes: gradle first (`&&`, not `;`), then at most one diagnostics fallback that ends in `false`.
+EXEC_COMMAND = re.compile(r"cd \.\. && \./gradlew [^;&|()]*(?: \|\| \([^()]*; false\))?")
+SHAPE = (
+    "ci.yml ui job: the emulators:exec command must be `cd .. && ./gradlew <options and both tasks>`, optionally followed by "
+    "one `|| (<diagnostics>; false)` fallback that still fails"
+)
 
 
 def _active_lines(text):
@@ -73,6 +82,8 @@ def ui_problems(root):
     if not inside:
         problems.append(f"ci.yml ui job does not run its tests inside `{EXEC}`")
     problems += [f"ci.yml ui job does not run {task} inside the emulators" for task in UI_TASKS if inside and not any(task in q for q in quoted)]
+    if inside and not all(EXEC_COMMAND.fullmatch(q) for q in quoted):
+        problems.append(SHAPE)
     if not any(re.search(r"working-directory:\s*firebase\b", s) and re.search(r"run:\s*npm ci\b", s) for s in steps):
         problems.append("ci.yml ui job has no `npm ci` step in firebase/ (the emulators come from firebase-tools)")
     if any(SWALLOWED.search(ln) for ln in _active_lines(ui)):
@@ -96,9 +107,15 @@ def wiring_problems(root):
 
 def data_module_problems(root):
     problems = []
-    if CLASSPATH not in (root / "core/data/build.gradle.kts").read_text():
+    build = (root / "core/data/build.gradle.kts").read_text()
+    if CLASSPATH not in build:
         problems.append(f":core:data must have {CLASSPATH} (#217 item 3)")
     smoke = (root / SMOKE).read_text() if (root / SMOKE).is_file() else ""
+    if "useJUnitPlatform" not in build:
+        problems.append(
+            ":core:data must run its unit tests on the JUnit Platform (unitTests.all { it.useJUnitPlatform() }), "
+            "or the :core:testing network block never installs (#217 item 3)"
+        )
     if "@Test" not in smoke or "FirebaseEmulator.requireRunning()" not in smoke:
         problems.append("core/data androidTest has no @Test that talks to the emulators (EmulatorSmokeTest)")
     return problems

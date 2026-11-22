@@ -26,6 +26,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    testOptions {
+        // The :core:testing network block is a JUnit Platform listener: it never installs on Gradle's JUnit 4 runner.
+        unitTests.all { it.useJUnitPlatform() }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
