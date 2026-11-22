@@ -43,8 +43,12 @@ private class Phone(
         )
 }
 
-/** M1-14: sign out in the order of OQ-13 (docs/milestones/M1.md), with fakes for every step. */
-@OptIn(ExperimentalCoroutinesApi::class) // runCurrent, advanceTimeBy and advanceUntilIdle drive the virtual clock
+/**
+ * M1-14: sign out in the order of OQ-13 (docs/milestones/M1.md), with fakes for every step. `runCurrent`,
+ * `advanceTimeBy` and `advanceUntilIdle` drive the virtual clock; `advanceUntilIdle` stops at `backgroundScope`
+ * work, so the steps in the external scope are run with `runCurrent`.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
 class SignOutTest :
     FunSpec({
         test("online and every write acknowledged in time: signed out with no question, in the decided order") {
@@ -91,7 +95,10 @@ class SignOutTest :
                 listOf(false, true).forEach { seen ->
                     val phone = Phone(backgroundScope, acknowledgeAfterMs = null)
                     phone.userData.unsentChangesSeen = seen
-                    phone.signOut() shouldBe SignOutResult.ConfirmUnsentChanges(seen)
+                    val question = phone.signOut()
+                    question shouldBe SignOutResult.ConfirmUnsentChanges(seen)
+                    // Reads the field too: equals() alone leaves its getter unexercised (PIT NO_COVERAGE mutant).
+                    (question as SignOutResult.ConfirmUnsentChanges).unsentChangesSeen shouldBe seen
                     phone.steps shouldBe listOf(WAIT)
                 }
             }
@@ -135,7 +142,7 @@ class SignOutTest :
                 runCurrent()
                 phone.steps shouldBe listOf("clear")
                 clearing.complete(Unit)
-                advanceUntilIdle()
+                runCurrent()
                 phone.steps shouldBe SIGNED_OUT
             }
         }
@@ -158,7 +165,8 @@ class SignOutTest :
                 runCurrent()
                 caller.cancel()
                 clearing.complete(Unit)
-                advanceUntilIdle()
+                runCurrent()
+                caller.isCancelled shouldBe true
                 phone.steps shouldBe SIGNED_OUT
             }
         }

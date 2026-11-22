@@ -2,8 +2,24 @@ package dk.bjarkebjarke.tally.domain.session
 
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
 
-/** Sign out (AUTH-03, OQ-13). Naive first draft (no wait, wrong order) so the tests compile and fail. */
+/**
+ * Sign out (AUTH-03; OQ-13, decided 2026-11-17; docs/milestones/M1.md, M1-14), in this order:
+ * 1. online ([Connectivity]), wait at most [pendingWritesTimeoutMs] for the server to acknowledge every pending write.
+ *    Whenever that wait does not complete (offline, timeout or a failed wait), ask first
+ *    ([SignOutResult.ConfirmUnsentChanges]): the write queue survives without any listener, so what listeners saw
+ *    picks only the wording;
+ * 2. and 3. [LocalUserData.clear]: Firestore `terminate`, then `clearPersistence`;
+ * 4. [Authentication.signOut], only after step 3 has finished, and never when it failed;
+ * 5. [GoogleCredentials.clearCredentialState], as Google asks at every sign-out;
+ * 6. the data layer makes a new Firestore instance at the next use (the next sign-in).
+ *
+ * Steps 2 to 5 run in [externalScope], an application-wide scope with a `SupervisorJob`: once started they finish even
+ * when the screen that asked goes away, which signing out itself causes. M1-32 ends account deletion through
+ * [discardingUnsentChanges].
+ */
 class SignOut(
     private val connectivity: Connectivity,
     private val userData: LocalUserData,
@@ -12,13 +28,29 @@ class SignOut(
     private val externalScope: CoroutineScope,
     private val pendingWritesTimeoutMs: Long = PENDING_WRITES_TIMEOUT_MS,
 ) {
-    suspend operator fun invoke(): SignOutResult = discardingUnsentChanges()
-
-    suspend fun discardingUnsentChanges(): SignOutResult {
-        authentication.signOut()
-        userData.clear()
-        return SignOutResult.SignedOut.also { listOf(connectivity, credentials, externalScope, pendingWritesTimeoutMs) }
+    /** "Sign out": steps 1 to 6, or the question when the pending writes were not all acknowledged in time. */
+    suspend operator fun invoke(): SignOutResult {
+        val allSent =
+            connectivity.isOnline() &&
+                withTimeoutOrNull(pendingWritesTimeoutMs) { userData.awaitPendingWrites() } == true
+        return if (allSent) {
+            discardingUnsentChanges()
+        } else {
+            SignOutResult.ConfirmUnsentChanges(
+                userData.unsentChangesSeen(),
+            )
+        }
     }
+
+    /** "Sign out anyway": steps 2 to 6, whatever was not sent yet. */
+    suspend fun discardingUnsentChanges(): SignOutResult =
+        externalScope
+            .async {
+                if (!userData.clear()) return@async SignOutResult.Failed
+                authentication.signOut()
+                credentials.clearCredentialState()
+                SignOutResult.SignedOut
+            }.await()
 
     companion object {
         /** How long sign-out waits, online, for the server to acknowledge the pending writes. */

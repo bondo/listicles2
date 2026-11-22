@@ -2,15 +2,25 @@ package dk.bjarkebjarke.tally.domain.session
 
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 
-/** "Continue with Google" (AUTH-01). Naive first draft so the tests compile and fail; the real steps follow. */
+/**
+ * "Continue with Google" (AUTH-01): the system account picker through [GoogleCredentials], then Firebase sign-in with
+ * the picked account's ID token. Offline the picker is not shown, because the first sign-in needs a connection; a
+ * closed picker is no error.
+ */
 class GoogleSignIn(
     private val connectivity: Connectivity,
     private val credentials: GoogleCredentials,
     private val authentication: Authentication,
 ) {
-    suspend operator fun invoke(): GoogleSignInResult =
-        (credentials.idToken() as? GoogleIdToken.Picked)?.let { authentication.signInWithGoogle(it.token) }
-            ?: GoogleSignInResult.Failed.also { connectivity.isOnline() }
+    suspend operator fun invoke(): GoogleSignInResult {
+        if (!connectivity.isOnline()) return GoogleSignInResult.NeedsConnection
+        return when (val answer = credentials.idToken()) {
+            is GoogleIdToken.Picked -> authentication.signInWithGoogle(answer.token)
+            GoogleIdToken.Cancelled -> GoogleSignInResult.Cancelled
+            GoogleIdToken.NoAccount -> GoogleSignInResult.NoAccount
+            GoogleIdToken.Failed -> GoogleSignInResult.Failed
+        }
+    }
 }
 
 /** How "Continue with Google" ended. */
