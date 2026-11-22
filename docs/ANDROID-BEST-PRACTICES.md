@@ -56,8 +56,8 @@ row of the architecture recommendations above. Single Activity is already in PLA
 
 | Rule | Status |
 |---|---|
-| Single Activity; screens are destinations; routes are serializable types (type safe) | later (M1) |
-| **Owner decision 2026-11-13: Navigation 3.** The architecture recommendations page names it for multi-screen apps (the Navigation page documents Navigation Compose 2.x, so the Navigation 3 docs must be read before M1 navigation work) | later (M1) |
+| Single Activity; screens are destinations; routes are serializable types (type safe) | review (since M1-60: typed keys of one `NavDisplay`; the start-up stack is rebuilt from the gate state at every start, so its keys are not saved; the first saved stack makes its keys `@Serializable`) |
+| **Owner decision 2026-11-13: Navigation 3.** The architecture recommendations page names it for multi-screen apps (the Navigation page documents Navigation Compose 2.x, so the Navigation 3 docs must be read before M1 navigation work) | review (Navigation 3 since M1-60) |
 | Handle back with `BackHandler` or `PredictiveBackHandler`, not `onBackPressed` or `KEYCODE_BACK`; state-driven enabled flag | review (M1) |
 
 ## 4. Data and offline-first
