@@ -43,6 +43,7 @@ const IDS: Record<string, string> = {
     iid: "i1",
     doc: "x",
 };
+const OTHER = { ...IDS, uid: "bob" };
 
 // A document of a template: each {variable} becomes the id of that name; an unknown name throws.
 export function instantiate(template: string, ids = IDS): string {
@@ -61,8 +62,12 @@ export const UNPLANNED = [
     UNPLANNED_ROOT,
     ...TEMPLATES.filter((t) => t.split("/").length === 2).map((t) => `${t}/unplanned/{doc}`),
 ];
-// The caller's own document of every template, and the unplanned root.
-export const PATHS = [...TEMPLATES.map((t) => instantiate(t)), instantiate(UNPLANNED_ROOT)];
+// The caller's own document of every template, another user's (bob) of each {uid} one, and the unplanned.
+export const PATHS = [
+    ...TEMPLATES.map((t) => instantiate(t)),
+    ...TEMPLATES.filter((t) => t.endsWith("/{uid}")).map((t) => instantiate(t, OTHER)),
+    ...UNPLANNED.map((t) => instantiate(t)),
+];
 
 const token = (emailVerified: boolean): TokenOptions => ({
     email: `${UID}@example.com`,
