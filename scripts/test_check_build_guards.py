@@ -1,4 +1,5 @@
-"""Tests for scripts/check_build_guards.py (M1-51, issue 257, checklist follow-up 4 in docs/ANDROID-BEST-PRACTICES.md): the targetSdk floor; M1-58, follow-up 5: manifest cleartext and backup.
+"""Tests for scripts/check_build_guards.py (M1-51 and M1-58, issue 257, checklist follow-ups 4 and 5 in docs/ANDROID-BEST-PRACTICES.md):
+the targetSdk floor, and manifest cleartext and backup.
 Failing fixtures (the guard must report them) and passing fixtures (it must not), and a check that it does not pass vacuously on the real
 repository (it must have read a targetSdk). The catalog-only coordinates guard (M1-59) adds its own tests.
 Run: python3 -I scripts/test_check_build_guards.py
@@ -315,17 +316,19 @@ class Manifest(unittest.TestCase):
 
     def test_every_other_source_set_stays_checked_for_cleartext(self):
         nsc = '<network-security-config><base-config cleartextTrafficPermitted="true"/></network-security-config>'
+        bad = 'android:allowBackup="false" android:usesCleartextTraffic="true"'
         for src in ("debug", "release", "main", "test", "androidTestFixtures", "androidTestDebug", "foo/androidTest", "androidTest2"):
             with self.subTest(src=src):
                 base = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}
-                self.assertEqual(
-                    len(cbg.manifest_problems(tree(dict(base, **{f"app/src/{src}/AndroidManifest.xml": manifest('android:usesCleartextTraffic="true"')})))),
-                    1,
-                )
+                in_manifest = dict(base, **{f"app/src/{src}/AndroidManifest.xml": manifest(bad)})
+                self.assertEqual(len(cbg.manifest_problems(tree(in_manifest))), 1)
                 self.assertEqual(len(cbg.manifest_problems(tree(dict(base, **{f"app/src/{src}/res/xml/nsc.xml": nsc})))), 1)
 
     def test_a_malformed_android_test_manifest_still_fails_closed(self):
-        files = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"'), "app/src/androidTest/AndroidManifest.xml": "<manifest><application"}
+        files = {
+            "app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"'),
+            "app/src/androidTest/AndroidManifest.xml": "<manifest><application",
+        }
         found = cbg.manifest_problems(tree(files))
         self.assertEqual(len(found), 1, found)
         self.assertIn("cannot parse", found[0])
@@ -355,6 +358,16 @@ class Manifest(unittest.TestCase):
     def test_malformed_xml_fails_closed(self):
         found = self.problems("<manifest><application")
         self.assertEqual(len(found), 1, found)
+        self.assertIn("cannot parse", found[0])
+
+    def test_a_malformed_xml_resource_fails_closed(self):
+        files = {
+            "app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"'),
+            "app/src/main/res/xml/nsc.xml": "<network-security-config><base-config",
+        }
+        found = cbg.manifest_problems(tree(files))
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("nsc.xml", found[0])
         self.assertIn("cannot parse", found[0])
 
     def test_build_output_is_not_read(self):
@@ -410,7 +423,11 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
 
     def test_the_summary_line_names_the_manifests_read(self):
-        root = tree({"app/build.gradle.kts": "android { defaultConfig { targetSdk = 36 } }\n", "app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')})
+        files = {
+            "app/build.gradle.kts": "android { defaultConfig { targetSdk = 36 } }\n",
+            "app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"'),
+        }
+        root = tree(files)
         r = self.run_cli(root)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("1 manifest", r.stdout)
