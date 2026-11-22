@@ -394,6 +394,15 @@ class Wiring(unittest.TestCase):
             (CI_XML_STEP, CI_XML_STEP.replace("      - name:", "      - if: false\n        name:")),
             ("      - name: test-results gate tests", "      - continue-on-error: true\n        name: test-results gate tests"),
         ]
+        # M1-63: the unit job may carry the push-to-main condition once (on the debug APK upload step) and nowhere else (R1-01).
+        run = "        run: python3 -I scripts/test_check_test_results.py\n"
+        cond = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        cases += [
+            (run, f"        if: {cond}\n" + run),
+            (run, f"        if: {cond} || true\n" + run),
+            (run, "        if: github.event_name == 'push'\n" + run),
+            (run, "        if: github.ref == 'refs/heads/main'\n" + run),
+        ]
         for old, new in cases:
             self.assertIn(old, unit, old)
             mutated = good.replace(unit, unit.replace(old, new, 1), 1)
