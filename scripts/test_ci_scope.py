@@ -163,7 +163,7 @@ def job_in(text, name):
 
 
 # Steps that merged PRs could not add themselves (ci.yml is protected): (job, command, source finding).
-# Each also runs in verify.sh. Sources: PR 224 R1-02, PR 231, PR 235 R1-04, PR 239 R2-02.
+# Each also runs in verify.sh. Sources: PR 224 R1-02, PR 231, PR 235 R1-04, PR 239 R2-02, M1-51.
 CI_STEPS = [
     ("static", "python3 -I scripts/test_check_gradle_wrapper.py", "PR 231"),
     ("static", "python3 -I scripts/check_gradle_wrapper.py", "PR 231"),
@@ -171,6 +171,8 @@ CI_STEPS = [
     ("tasks", "python3 -I scripts/test_dependency_floors.py", "PR 224 R1-02"),
     ("tasks", "python3 -I scripts/dependency_floors.py", "PR 224 R1-02"),
     ("unit", "python3 -I scripts/test_check_test_results.py", "PR 239 R2-02"),
+    ("tasks", "python3 -I scripts/test_check_build_guards.py", "M1-51"),
+    ("tasks", "python3 -I scripts/check_build_guards.py", "M1-51"),
 ]
 
 

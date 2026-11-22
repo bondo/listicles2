@@ -1184,13 +1184,34 @@ notes = "Split from M1-50, which covers the data-source and GlobalScope halves. 
 
 [[task]]
 id = "M1-51"
-title = "Build guards: catalog-only coordinates, targetSdk floor, manifest cleartext and backup (checklist follow-ups 3-5)"
+title = "Build guards: scripts/check_build_guards.py with the targetSdk floor (checklist follow-up 4; follow-ups 3 and 5 split off as M1-59 and M1-58)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+notes = "Issue 257. Tooling env where it touches guards; failing fixtures first. Split for PR size (the whole was about 900 changed lines): this PR has the script skeleton, comment and string stripping, the targetSdk floor, and the verify.sh and CI wiring. A working draft of the other two guards (and its tests) is in commit 98858a2 of this PR's branch (kept by the PR head ref); M1-58 and M1-59 rebuild them in smaller PRs"
+pr = 296
+
+[[task]]
+id = "M1-58"
+title = "Build guard: manifest cleartext and backup (checklist follow-up 5), in scripts/check_build_guards.py"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-01"]
-notes = "Issue 257. Tooling env where it touches guards; failing fixtures first"
+depends_on = ["M1-51"]
+notes = "Issue 257. Tooling env where it touches guards or CI; failing fixtures first. Fail on usesCleartextTraffic or cleartextTrafficPermitted other than false (manifests and every res/xml network security config), and on allowBackup other than false (or missing in the main manifest) without both dataExtractionRules and fullBackupContent as @xml resources that exist; fail closed on unreadable values and when no manifest with an application element is found. Update the section 9 rows of docs/ANDROID-BEST-PRACTICES.md and follow-up 5"
+
+[[task]]
+id = "M1-59"
+title = "Build guard: catalog-only coordinates (checklist follow-up 3), in scripts/check_build_guards.py"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-51"]
+notes = "Issue 257. Tooling env where it touches guards or CI; failing fixtures first. Fail on a literal group:artifact coordinate in a dependency declaration (any configuration, platform, add, force, group notation, Groovy forms), a literal plugin version and a catalog declared in Gradle code, with the justified escape hatch of scripts/guards.sh; do not pass vacuously (no Gradle files, no declarations). Update follow-up 3 of docs/ANDROID-BEST-PRACTICES.md"
 
 [[task]]
 id = "M1-35"
@@ -1359,7 +1380,7 @@ depends_on = [
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59",
 ]
 
 [[task]]
