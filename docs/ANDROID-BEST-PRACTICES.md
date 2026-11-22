@@ -162,6 +162,7 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 | Dependencies and plugins only through `gradle/libs.versions.toml`, kebab-case names, `alias(libs.plugins...)` | tooling in part: the catalog exists; nothing fails a hardcoded `"group:name:version"`, a guard is proposed |
 | Configuration cache and build cache on | tooling in part: set in `gradle.properties` |
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
+| JVM modules use only Java and Android API available at minSdk 26 (lint NewApi skips pure JVM modules; no desugaring is configured) | tooling: `checkJdkRelease` (JDK 17 API) and `checkJavaApiLevel` (`scripts/check_java_api_level.py` reads the main classes of every JVM module against `api-versions.xml` of the compileSdk platform; M1-37) |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
 | Dependency freshness | Dependabot (lint freshness checks are disabled on purpose with a `// justified:`) |
 | Dependency verification | tooling: `gradle/verification-metadata.xml` holds a sha256 for every resolved artifact (plugins, build tools, lint, test and Android configurations), enforced by Gradle in every build; `scripts/check_gradle_repos.py` fails when the file is missing, verification is switched off, or an artifact has no sha256 |
