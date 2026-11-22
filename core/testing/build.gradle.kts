@@ -22,6 +22,8 @@ kotlin {
 
 dependencies {
     detektPlugins(libs.compose.rules.detekt)
+    // M1-30: FakeConnectivity implements the domain's Connectivity.
+    api(project(":core:domain"))
     implementation(platform(libs.junit.bom))
     implementation(libs.junit.platform.launcher)
 

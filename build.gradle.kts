@@ -28,6 +28,9 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee) apply false
     alias(libs.plugins.roborazzi) apply false
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.ksp) apply false
 }
 
 spotless {
@@ -83,6 +86,13 @@ kover {
                     "dk.bjarkebjarke.tally.R",
                     "dk.bjarkebjarke.tally.R$*",
                     "*ComposableSingletons*",
+                )
+                classes( // justified: Hilt-generated code holds no hand-written logic
+                    "dk.bjarkebjarke.tally.Hilt_*",
+                    "dk.bjarkebjarke.tally.*_Factory",
+                    "dk.bjarkebjarke.tally.*_GeneratedInjector",
+                    "hilt_aggregated_deps.*",
+                    "dagger.hilt.internal.aggregatedroot.codegen.*",
                 )
             }
         }

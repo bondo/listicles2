@@ -909,13 +909,35 @@ notes = "Join includes the one-household check (PLAN 3.1): deny a join without t
 
 [[task]]
 id = "M1-30"
-title = "App skeleton: Hilt, Navigation 3, root with the start-up gates, M1 home, connectivity helper, Google Services plugin + stand-in config"
+title = "App skeleton: Hilt with KSP, Google Services plugin + generated stand-in config, Connectivity helper (SYNC-03)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-29", "M1-02", "M1-36", "M1-49"]
+pr = 304
+notes = "Split 2026-11-22 (orchestrator, the 400-line rule): the start-up root, gates and M1 home moved to M1-60. The stand-in config is generated under build/ only when no app/google-services.json exists; no google-services.json is tracked (scripts/test_gitignore_secrets.py)"
+
+[[task]]
+id = "M1-60"
+title = "Start-up root: Navigation 3, M1 home (#194, Q1 A), signed-in/out routing (P10 steps 2 and 6), signed-out start shows sign-in"
+milestone = "M1"
+status = "done"
+pr = 311
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30", "M1-36", "M1-49"]
+notes = "Second half of the M1-30 split. Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A. If it sizes over 450 lines: (b1) the Navigation 3 root, the home and signed-in/out routing, then (b2) the remaining gates and the household notice step, as a new task. Split 2026-11-22 (about 600 lines in full): this is b1; b2 is M1-62. The home top bar gets its household icon with M1-19 and its avatar with M1-25, each with its screen"
+
+[[task]]
+id = "M1-62"
+title = "Start-up gates (b2 of M1-60): update (START-01), email verified (#195, Q2 A), name saved (AUTH-12), household notices (HH-06); one routing test with fakes over all gates"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-29", "M1-02", "M1-36", "M1-49"]
-notes = "Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A; one routing test with fakes over all gates (#194, #195)"
+depends_on = ["M1-60"]
+notes = "Gate order P10 (docs/milestones/M1.md section 8) as a pure domain function with property tests, in front of the M1-60 home; each gate a domain interface with a stand-in binding until its task implements it (update M1-27, email verified M1-15, name M1-39, notices M1-18), and a placeholder step until its screen exists. Extends StartRoutingTest to update, signed out, unverified, no name, a notice, home"
 
 [[task]]
 id = "M1-13"
@@ -935,7 +957,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-30", "M1-13", "M1-02", "M1-50"]
+depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
 notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
 
 [[task]]
@@ -945,7 +967,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-14"]
+depends_on = ["M1-14", "M1-62"]
 
 [[task]]
 id = "M1-16"
@@ -963,7 +985,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-15", "M1-16"]
+depends_on = ["M1-15", "M1-16", "M1-62"]
 notes = "The name field calls a ProfileRepository interface with a fake (M1-39 implements it). Screen 24: one error under the form; show/hide password button en/da (P12, #198 item 6)"
 
 [[task]]
@@ -983,7 +1005,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-14", "M1-30", "M1-02"]
+depends_on = ["M1-54", "M1-14", "M1-60", "M1-62", "M1-02"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1004,6 +1026,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-18"]
+notes = "Adds the household icon to the M1 home top bar (Q1 A, see #194), leading to this screen; M1-60 left it out until the screen exists"
 
 [[task]]
 id = "M1-20"
@@ -1059,8 +1082,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-30", "M1-14"]
-notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194)"
+depends_on = ["M1-60", "M1-14"]
+notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists"
 
 [[task]]
 id = "M1-26"
@@ -1078,7 +1101,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-08", "M1-30"]
+depends_on = ["M1-08", "M1-60", "M1-62"]
 
 [[task]]
 id = "M1-28"
@@ -1098,7 +1121,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30"]
-notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4)"
+notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4). From M1-30 (PR 304, self-review minor): without app/google-services.json a release build also gets the demo-tally stand-in; allow that only for this CI smoke build and fail any other release build"
 
 # Added by the M1 planning refresh (2026-11-21, docs/milestones/M1.md sections 5.1, 7 and 8).
 
@@ -1106,10 +1129,11 @@ notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (doc
 id = "M1-52"
 title = "Rules test harness: default-deny paths from PLAN section 3, list and collection-group queries, unverified client, mutant check, ts-jest isolatedModules"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-35"]
+pr = 301
 notes = "Issues 202 and 210 item 7, area:security-rules; tooling env for the scripts/test_firebase_ts.py allowlist. Before M1-08"
 
 [[task]]
@@ -1189,11 +1213,12 @@ notes = "Issue 257. Failing fixtures first. Before M1-14, the first repository"
 id = "M1-57"
 title = "Konsist: no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI module (checklist proposed follow-up 1, rest)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-50"]
-notes = "Split from M1-50, which covers the data-source and GlobalScope halves. Failing fixtures first, in the architecture package next to DataSourceRules. The DI module and its path do not exist yet: decide the rule for `Dispatchers.` with the first DI module (M1-02 or later), and keep it inert until then only if a fixture proves it fires. Before M1-16, the first ViewModel"
+pr = 307
+notes = "Split from M1-50, which covers the data-source and GlobalScope halves. Failing fixtures first, in the architecture package next to DataSourceRules. The DI module and its path do not exist yet: decide the rule for `Dispatchers.` with the first DI module (M1-02 or later), and keep it inert until then only if a fixture proves it fires. Before M1-16, the first ViewModel. Decided in PR 307: the rule keys on a Dagger or Hilt `@Module` file, not a path, so it is active now (fixtures prove it fires)"
 
 [[task]]
 id = "M1-51"
@@ -1277,7 +1302,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-08", "M1-10", "M1-18", "M1-17", "M1-25"]
+depends_on = ["M1-08", "M1-10", "M1-18", "M1-17", "M1-25", "M1-62"]
 notes = "P9 of docs/milestones/M1.md; wireframes 42, 43; implements the ProfileRepository of M1-17"
 
 [[task]]
@@ -1369,7 +1394,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]
@@ -1395,7 +1420,8 @@ depends_on = [
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-61",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
+  "M1-62",
 ]
 
 [[task]]
