@@ -15,6 +15,7 @@ class ConnectivityTest :
             var runs = 0
             val result = FakeConnectivity(online = true).whenOnline { runs++ }
             result shouldBe ConnectionResult.Done(0)
+            (result as ConnectionResult.Done).value shouldBe 0
             runs shouldBe 1
         }
 

@@ -1,4 +1,4 @@
-"""Tests that .gitignore covers google-services.json and key files. Run: python3 -I scripts/test_gitignore_secrets.py
+"""Tests that .gitignore covers google-services.json and key files, and that none is tracked (M1-30). Run: python3 -I scripts/test_gitignore_secrets.py
 
 Uses `git check-ignore --no-index`, so the answer is about the patterns alone, not about what is tracked. Git runs
 without global or system config and without .git/info/exclude (see check_ignore), so the result is the same on every machine.
@@ -103,6 +103,19 @@ def tracked_ignored() -> set[str]:
         check=True,
     ).stdout
     return set(out.split("\n")) - {""}
+
+
+def tracked_google_services(root: Path) -> list[str]:
+    """Tracked files named google-services.json in any directory of the repo at `root`, sorted."""
+    out = subprocess.run(
+        ["git", "ls-files", "-z", "--", ":(glob)**/google-services.json"],
+        cwd=root,
+        env=clean_env(),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return sorted(set(out.split("\0")) - {""})
 
 
 class Ignored(unittest.TestCase):

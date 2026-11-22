@@ -15,5 +15,5 @@ sealed interface ConnectionResult<out T> {
 }
 
 /** Runs [action] only when online, checked at every call; offline it returns [ConnectionResult.NeedsConnection]. */
-inline fun <T> Connectivity.whenOnline(action: () -> T): ConnectionResult<T> =
-    ConnectionResult.Done(action()) // stub until the implementation commit: ignores the connection
+suspend fun <T> Connectivity.whenOnline(action: suspend () -> T): ConnectionResult<T> =
+    if (isOnline()) ConnectionResult.Done(action()) else ConnectionResult.NeedsConnection

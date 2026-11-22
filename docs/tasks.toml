@@ -908,13 +908,23 @@ notes = "Join includes the one-household check (PLAN 3.1): deny a join without t
 
 [[task]]
 id = "M1-30"
-title = "App skeleton: Hilt, Navigation 3, root with the start-up gates, M1 home, connectivity helper, Google Services plugin + stand-in config"
+title = "App skeleton: Hilt with KSP, Google Services plugin + generated stand-in config, Connectivity helper (SYNC-03)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-29", "M1-02", "M1-36", "M1-49"]
-notes = "Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A; one routing test with fakes over all gates (#194, #195)"
+notes = "Split 2026-11-22 (orchestrator, the 400-line rule): the start-up root, gates and M1 home moved to M1-60. The stand-in config is generated under build/ only when no app/google-services.json exists; no google-services.json is tracked (scripts/test_gitignore_secrets.py)"
+
+[[task]]
+id = "M1-60"
+title = "Start-up root: Navigation 3, P10 gates (#195, Q2 A), M1 home (#194, Q1 A), one routing test with fakes over all gates, signed-out start shows sign-in"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-30", "M1-36", "M1-49"]
+notes = "Second half of the M1-30 split. Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A. If it sizes over 450 lines: (b1) the Navigation 3 root, the home and signed-in/out routing, then (b2) the remaining gates and the household notice step, as a new task"
 
 [[task]]
 id = "M1-13"
@@ -933,7 +943,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-30", "M1-13", "M1-02", "M1-50"]
+depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
 notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
 
 [[task]]
@@ -981,7 +991,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-14", "M1-30", "M1-02"]
+depends_on = ["M1-54", "M1-14", "M1-60", "M1-02"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1057,7 +1067,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-30", "M1-14"]
+depends_on = ["M1-60", "M1-14"]
 notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194)"
 
 [[task]]
@@ -1076,7 +1086,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-08", "M1-30"]
+depends_on = ["M1-08", "M1-60"]
 
 [[task]]
 id = "M1-28"
@@ -1359,7 +1369,7 @@ depends_on = [
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-60",
 ]
 
 [[task]]

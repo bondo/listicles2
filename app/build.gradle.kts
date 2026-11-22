@@ -1,3 +1,4 @@
+import com.google.gms.googleservices.GoogleServicesTask
 import org.gradle.process.CommandLineArgumentProvider
 
 plugins {
@@ -6,6 +7,9 @@ plugins {
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
     alias(libs.plugins.roborazzi)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.google.services)
 }
 
 // M0.5-10: shipped dependencies must be on the owner's licence allowlist.
@@ -65,6 +69,47 @@ android {
                 "NewerVersionAvailable",
                 "AndroidGradlePluginVersion",
             )
+    }
+}
+
+// M1-30 (docs/milestones/M1.md section 1): the Google Services plugin reads google-services.json. The real file is never
+// committed (.gitignore); the owner keeps it at app/google-services.json (M1-O1). Without one (CI, a fresh clone) every
+// variant gets this stand-in for the demo-tally emulator project, generated under build/, with dummy values only.
+// GoogleServicesConfigTest checks which of the two the build used.
+val googleServicesStandIn =
+    !file("google-services.json").exists() && fileTree("src") { include("*/google-services.json") }.isEmpty
+
+abstract class GoogleServicesStandIn : DefaultTask() {
+    @get:Input abstract val packageName: Property<String>
+
+    @get:OutputFile abstract val jsonFile: RegularFileProperty
+
+    @TaskAction
+    fun write() {
+        val client =
+            """{"client_info": {"mobilesdk_app_id": "1:000000000000:android:0000000000000000", """ +
+                """"android_client_info": {"package_name": "${packageName.get()}"}}, """ +
+                """"oauth_client": [], "api_key": [{"current_key": "stand-in-not-a-key"}], "services": {}}"""
+        jsonFile.get().asFile.writeText(
+            """{"project_info": {"project_number": "000000000000", "project_id": "demo-tally"}, """ +
+                """"client": [$client], "configuration_version": "1"}""",
+        )
+    }
+}
+
+if (googleServicesStandIn) {
+    val standIn =
+        tasks.register<GoogleServicesStandIn>("googleServicesStandIn") {
+            packageName.set(provider { checkNotNull(android.defaultConfig.applicationId) })
+            jsonFile.set(layout.buildDirectory.file("google-services-stand-in/google-services.json"))
+        }
+    // The plugin registers process<Variant>GoogleServices in its own onVariants callback with the fixed search paths; this
+    // callback runs after it, so this configure action runs after the plugin's and replaces the paths with the stand-in.
+    androidComponents.onVariants { variant ->
+        tasks.named<GoogleServicesTask>("process${variant.name.replaceFirstChar(Char::uppercase)}GoogleServices") {
+            dependsOn(standIn)
+            googleServicesJsonFiles.set(standIn.map { listOf(it.jsonFile.get().asFile) })
+        }
     }
 }
 
@@ -145,6 +190,7 @@ val checkUnitTestResults by tasks.registering(Exec::class) {
 }
 
 tasks.withType<Test>().configureEach {
+    systemProperty("tally.googleServicesStandIn", googleServicesStandIn)
     // A test task that discovers zero tests is a failure, not a pass.
     failOnNoDiscoveredTests = true
     if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
@@ -166,6 +212,8 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
@@ -174,6 +222,8 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
     testImplementation(project(":core:testing"))
+    testImplementation(libs.hilt.android.testing)
+    kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.robolectric)
@@ -202,6 +252,14 @@ kover {
                     "dk.bjarkebjarke.tally.R",
                     "dk.bjarkebjarke.tally.R$*",
                     "*ComposableSingletons*",
+                )
+                // M1-30: Hilt's generated injectors, factories and aggregation markers; AppGraphTest checks the graph instead.
+                classes( // justified: Hilt-generated code holds no hand-written logic
+                    "dk.bjarkebjarke.tally.Hilt_*",
+                    "*_Factory",
+                    "*_GeneratedInjector",
+                    "hilt_aggregated_deps.*",
+                    "dagger.hilt.internal.aggregatedroot.codegen.*",
                 )
             }
         }

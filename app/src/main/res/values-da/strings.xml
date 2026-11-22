@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Tally</string>
     <string name="welcome">Delte lister til din husstand</string>
+    <!-- SYNC-03: shown when an action needs the server and the phone is offline. -->
+    <string name="needs_connection">Det kræver internetforbindelse</string>
 </resources>
