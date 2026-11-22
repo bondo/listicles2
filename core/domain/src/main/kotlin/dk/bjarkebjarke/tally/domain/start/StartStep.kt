@@ -27,4 +27,12 @@ sealed interface StartStep {
 }
 
 /** The gate order of P10 (docs/milestones/M1.md section 8): update, signed in, verified, name, notice, home. */
-fun startStep(facts: StartFacts): StartStep = facts.let { StartStep.Home }
+fun startStep(facts: StartFacts): StartStep =
+    when {
+        facts.updateRequired -> StartStep.Update
+        !facts.signedIn -> StartStep.SignIn
+        !facts.emailVerified -> StartStep.VerifyEmail
+        !facts.nameSaved -> StartStep.EnterName
+        facts.notice != null -> StartStep.Notice(facts.notice)
+        else -> StartStep.Home
+    }

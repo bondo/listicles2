@@ -1,5 +1,6 @@
 package dk.bjarkebjarke.tally
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import dk.bjarkebjarke.tally.domain.start.HouseholdNotice
 import dk.bjarkebjarke.tally.domain.start.StartStep
 import dk.bjarkebjarke.tally.home.HomeScreen
 import dk.bjarkebjarke.tally.start.StartUiState
@@ -57,7 +59,11 @@ fun TallyApp(
                     onBack = {},
                     entryProvider =
                         entryProvider {
+                            entry<StartStep.Update> { StepPlaceholder(R.string.gate_update_title) }
                             entry<StartStep.SignIn> { SignInPlaceholder() }
+                            entry<StartStep.VerifyEmail> { StepPlaceholder(R.string.gate_verify_title) }
+                            entry<StartStep.EnterName> { StepPlaceholder(R.string.gate_name_title) }
+                            entry<StartStep.Notice> { key -> StepPlaceholder(noticeTitle(key.notice)) }
                             entry<StartStep.Home> { HomeScreen() }
                         },
                 )
@@ -80,6 +86,33 @@ private fun SignInPlaceholder(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(stringResource(R.string.app_tag), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@StringRes
+private fun noticeTitle(notice: HouseholdNotice): Int =
+    when (notice) {
+        HouseholdNotice.Removed -> R.string.gate_notice_removed
+        HouseholdNotice.HouseholdDeleted -> R.string.gate_notice_deleted
+    }
+
+/** A gate step until its screen exists (M1-27 update, M1-17 verify, M1-39 name, M1-21 notices): its title only. */
+@Composable
+private fun StepPlaceholder(
+    @StringRes title: Int,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier.fillMaxSize().safeDrawingPadding().padding(Sizes.screenGutter),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            stringResource(title),
+            Modifier.semantics { heading() },
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.headlineSmall,
+        )
     }
 }
 

@@ -185,10 +185,13 @@ class StartRoutingTest {
         val viewModel = start()
         viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.VerifyEmail)
         email.isVerified = true
+        compose.waitForIdle()
         viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.EnterName)
         name.isSaved = true
+        compose.waitForIdle()
         viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Notice(HouseholdNotice.Removed))
         notices.notice = null
+        compose.waitForIdle()
         viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
         compose.onNodeWithText(home).assertExists()
     }
