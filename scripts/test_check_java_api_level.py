@@ -482,6 +482,22 @@ class CheckerTest(unittest.TestCase):
                 self.assertEqual(rc, 2, out)
                 self.assertNotIn("Traceback", out)
 
+    def test_an_instruction_or_catch_type_naming_a_constant_that_is_not_a_class_fails_closed(self):
+        # Constant pool #8 is a String entry (a Utf8 index, like a class name): reading it as a class would pass corrupt bytecode.
+        string_entry = b"\x08\x00\x01"
+        cases = {
+            "checkcast": synthetic_class(b"\xc0\x00\x08\xb1", extra_pool=[string_entry]),
+            "catch-type": synthetic_class(catch_type=8, extra_pool=[string_entry]),
+        }
+        for label, data in cases.items():
+            with self.subTest(label=label):
+                path = os.path.join(self.tmp.name, f"not-a-class-{label}.class")
+                with open(path, "wb") as f:
+                    f.write(data)
+                rc, out = run("--api-versions", self.api, "--min-sdk", "26", path)
+                self.assertEqual(rc, 2, out)
+                self.assertIn("not a class", out)
+
     def test_a_minimal_synthetic_class_with_a_class_handler_passes(self):
         # ldc of the class constant #2 (Synth itself) then return: nothing above minSdk, so the walk above fails only for its own reason.
         path = os.path.join(self.tmp.name, "minimal.class")
