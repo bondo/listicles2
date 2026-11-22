@@ -113,6 +113,11 @@ class Coordinates(unittest.TestCase):
                 self.assert_flagged(f"dependencies {{\n    {call}\n}}\n", name="lib/build.gradle")
         self.assert_flagged("dependencies {\n    implementation 'a.b:c:1', 'd.e:f:2'\n}\n", count=2, name="lib/build.gradle")
         self.assert_clean("dependencies {\n    implementation libs.a\n    testImplementation project(':core:testing')\n}\n", name="lib/build.gradle")
+        self.assert_clean(
+            "dependencies {\n    implementation(libs.a) { exclude group: 'org.x', module: 'y' }\n"
+            "    implementation libs.b, { exclude group: 'org.x' }\n    implementation(libs.c) {\n        exclude group: 'org.x'\n    }\n}\n",
+            name="lib/build.gradle",
+        )
 
     def test_a_declaration_outside_a_dependencies_block_is_flagged(self):
         for text in (
