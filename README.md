@@ -13,7 +13,7 @@ when issues change or `main` is pushed; how it works and what the markers mean: 
 
 ## Debug APK
 
-Every push to `main` uploads the debug APK that CI builds as an Actions artifact named `tally-debug-<short sha>`, kept for 30 days:
+Pushes to `main` (a newer push can cancel an older run) upload the debug APK that CI builds as an Actions artifact named `tally-debug-<short sha>`, kept for 30 days:
 open the CI run for the commit on the Actions tab and download it under Artifacts (the file is a zip with one `.apk`).
 It carries the `demo-tally` stand-in Firebase config (M1-30), so it installs and shows the UI but cannot reach the real Firebase project.
 Install it on your own device only: installs by anyone else wait for M1-O5 (#291). Pull requests do not publish an APK.
