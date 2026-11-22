@@ -192,15 +192,15 @@ same equality check, and its create rule has the same code check), with the Crea
   marker overwrite: `removedAt`). Keys, all required unless marked: `users` `householdId`, `name` (optional);
   `households` `name`, `createdBy`, `createdAt`, `ownerUid`, `deleted`; `members` `role`, `displayName`, `joinedAt`,
   `viaInvite` (Join only); `removed` `removedAt`; `invites` `householdId`, `householdName`, `createdBy`, `createdAt`,
-  `expiresAt`; lists and items as in section 3 (M2). **Lengths** in code points as the app counts them (`size()` in
-  the rules), non-empty after trim: household name, `displayName` and `users.name` 1-50 (`householdName` equals the
+  `expiresAt`; lists and items as in section 3 (M2). **Lengths** in code points as the app counts them (in the
+  rules `matches('(?s).{1,N}')`, because `size()` counts UTF-16 units; owner decision, #15 comment 7083518706), non-empty after trim: household name, `displayName` and `users.name` 1-50 (`householdName` equals the
   household's; a tombstone's empty name is the one exception, Delete household); M2 planning sets list and item names (proposal: 80 and 200). The same numbers drive the UI field errors
   (M1-13). Tests per collection (M1-08 users, M1-10 households and members, M1-12 invites, M1-54 the join member doc,
   M1-11 markers, M1-53 the transfer updates): an unknown field on create and an update that adds one (deny); a create without one required key (deny; at least
   the owner's member doc without `joinedAt`, M1-10); a transfer that adds `role` to the household doc (deny, M1-53); for each
   name exactly the maximum (allow), the maximum + 1 and spaces only (deny), and 50 code points with non-BMP characters
-  (allow; M1-13 has the matching property). If that last test shows `size()` counting other units, the task stops and
-  asks rather than changing a number;
+  (allow; M1-13 has the matching property). That test showed `size()` counting UTF-16 units (M1-08), so the task stopped
+  and asked, and the owner chose the regex above rather than a changed number;
 * years: whole numbers from 1900 to `request.time.year() + 50`, both optional, no rule between them (OQ-6, OQ-19);
 * on documents that have those fields (lists, items; P5, #210 item 6), `updatedBy == request.auth.uid` and
   `updatedAt == request.time`; a `removed` marker's `removedAt == request.time`;
