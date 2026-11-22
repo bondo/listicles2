@@ -93,6 +93,7 @@ BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/);
   if (c ~ /^[ \t]*$/) next
   closer = (c ~ /^[ \t]*[])},;]*[ \t]*$/)
   if (mode == 4) { if (ind(line) > yi || (ind(line) == yi && c ~ /^[ \t]*-/)) { check(); next } mode = 0 }
+  if (yml && line ~ /(^[ \t]*(-[ \t]+)?|[{,][ \t]*)"[^"]*\\[^"]*"[ \t]*:/) { printf "%s:%d:%s\n", F, NR, line; next }  # an escaped key may spell ignore
   if (yml && lc ~ /ignore["\047]?[ \t]*:[^#]*[][ \t,]\*[A-Za-z0-9_]/) { printf "%s:%d:%s\n", F, NR, line; next }  # an alias: 2b cannot follow it
   if (yml && lc ~ /^[ \t]*-?[ \t]*["\047]?ignore["\047]?[ \t]*:([ \t]+(&|!)[^ \t]*)*[ \t]*$/) { mode = 4; yi = ind(line); next }  # block list (anchor, tag)
   if (mode == 1 && c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/) mode = 0
@@ -489,11 +490,20 @@ function toolof(v,   i, n, tl) {
 }
 function hookcmd(v) { v = unq(v); return (v ~ /^ruff(-check)?$/ ? "ruff check" : (v == "ruff-format" ? "ruff format" : toolof(v))) }
 # AU: the text of the lines of an args key that have no reason; a reason waives its own line only (R1-06).
-function argadd(k, v, l) { NA++; AK[NA] = k; AU[NA] = (v ~ /^[|>][-+0-9]*$/ || just(l) ? "" : v); AL[NA] = NR; ALN[NA] = l }
+# flowsplit: a flow collection with every comma outside quotes made a blank, as YAML splits `[.,--fix]` into two items (R1-01).
+function flowsplit(a,   i, c, q, r) {
+  for (i = 1; i <= length(a); i++) {
+    c = substr(a, i, 1)
+    if (q != "") { if (c == q) q = "" } else if (c == "\"" || c == "\047") q = c; else if (c == ",") c = " "
+    r = r c
+  }
+  return r
+}
+function argadd(k, v, l) { NA++; AK[NA] = k; AF[NA] = (v ~ /^[[{]/); AU[NA] = (v ~ /^[|>][-+0-9]*$/ || just(l) ? "" : v); AL[NA] = NR; ALN[NA] = l }
 function itemend(   a, i, tool) {
   tool = toolof(IT)
   for (i = 1; i <= NA; i++) {
-    a = AU[i]; gsub(/[][{}]/, " ", a); gsub(/,([ \t]|$)/, " ", a)
+    a = (AF[i] ? flowsplit(AU[i]) : AU[i]); gsub(/[][{}]/, " ", a); gsub(/,([ \t]|$)/, " ", a)
     if (IT != "" && (AK[i] ~ /^(extra_)?(args|flags|options|arguments)$/ || index(AK[i], tool "_") == 1) && a ~ /[^ \t]/ && relaxed(IT " " a))
       printf "%s:%d:%s\n", F, AL[i], ALN[i]
   }
@@ -516,6 +526,7 @@ function yamlitem(l,   c, key, v) {
   if (l ~ /^[ \t]*(#|$)/) return
   if (AM) { if (indent(l) > AC || (indent(l) == AC && l ~ /^[ \t]*-([ \t]|$)/)) { v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); if (!just(l)) AU[NA] = AU[NA] " " stripc(v); return } AM = 0 }
   if (BS >= 0) { if (indent(l) > BS) return; BS = -1 }
+  if (l ~ /(^[ \t]*(-[ \t]+)?|[{,][ \t]*)"[^"]*\\[^"]*"[ \t]*:/ && !just(l)) printf "%s:%d:%s\n", F, NR, l  # an escaped key (R1-02)
   if (l ~ /^[ \t]*-[ \t]+(["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:([ \t]|$)|\{)/) { itemend(); IK = keycol(l) }
   else if (l ~ /^[ \t]*-[ \t]*(#.*)?$/) { itemend(); IKP = 1; return }  # a bare `-`: the keys of the item start on the next line
   else if (IKP) { IK = indent(l); IKP = 0 }
