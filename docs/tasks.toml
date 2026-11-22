@@ -1226,6 +1226,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-51"]
 notes = "Issue 257. Tooling env where it touches guards or CI; failing fixtures first. Fail on a literal group:artifact coordinate in a dependency declaration (any configuration, platform, add, force, group notation, Groovy forms), a literal plugin version and a catalog declared in Gradle code, with the justified escape hatch of scripts/guards.sh; do not pass vacuously (no Gradle files, no declarations). Update follow-up 3 of docs/ANDROID-BEST-PRACTICES.md"
+pr = 310
 
 [[task]]
 id = "M1-35"
