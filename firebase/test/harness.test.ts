@@ -27,6 +27,9 @@ test.each([
 test("instantiate gives each variable the id of its name and throws on an unknown name", () => {
     expect(h.instantiate("lists/{lid}/items/{iid}")).toBe("lists/l1/items/i1");
     expect(h.instantiate("config/app")).toBe("config/app");
+    expect(h.instantiate("users/{uid}/unplanned/{doc}", { uid: "bob", doc: "x" })).toBe(
+        "users/bob/unplanned/x",
+    );
     expect(() => h.instantiate("lists/{xid}")).toThrow("{xid}");
 });
 
@@ -48,6 +51,14 @@ test("mutants: each audience, the collection group, and one method at a time", (
         "delete /a/{d1} everyone",
         "list /{path=**}/a/{doc} everyone",
     ]);
+    expect(h.mutantsOf("a/{uid}").map((m) => m.who)).toEqual([
+        "everyone",
+        "anonymous",
+        "unverified",
+        "verified",
+        "others",
+        "everyone",
+    ]);
 });
 
 const exact: h.Mutant = {
@@ -68,6 +79,7 @@ test("mutate adds one block right under the documents match and changes nothing 
     expect(() => h.mutate(`${h.RULES}\n${anchor}`, exact)).toThrow();
 });
 
+const others: h.Mutant = { ...exact, template: "users/{uid}", who: "others" };
 const [first, second] = h.CLIENT_NAMES;
 const probe = (op: h.Op, client: h.Client = first, path = "lists/l1/items/i1"): h.Probe => ({
     client,
@@ -85,6 +97,16 @@ const cases: [string, h.Mutant, h.Probe, h.Outcome][] = [
     ["list only, a query", { ...exact, methods: ["list"] }, probe("list"), "allowed"],
     ["list only, a get", { ...exact, methods: ["list"] }, probe("get"), "denied"],
     ["create only, an update", { ...exact, methods: ["create"] }, probe("update"), "denied"],
+    ["others, another user's document", others, probe("get", "verified", "users/bob"), "allowed"],
+    ["others, an unverified caller", others, probe("create", "unverified", "users/bob"), "allowed"],
+    [
+        "others, the caller's own document",
+        others,
+        probe("get", "verified", "users/alice"),
+        "denied",
+    ],
+    ["others, a signed-out caller", others, probe("get", "anonymous", "users/bob"), "denied"],
+    ["others, a query", others, probe("list", "verified", "users/bob"), "denied"],
 ];
 
 test.each(cases)("expected: %s", (_name, mutant, p, want) => {

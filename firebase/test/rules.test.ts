@@ -22,7 +22,7 @@ beforeEach(async () => {
 });
 
 // The probed paths come from PLAN section 3; a collection added to or dropped from PLAN changes this list.
-test("the suite probes every collection of PLAN section 3, and UNPLANNED is none of them", () => {
+test("the suite probes every collection of PLAN section 3; the UNPLANNED ones are none of them", () => {
     expect(h.TEMPLATES).toEqual([
         "users/{uid}",
         "households/{hid}",
@@ -33,7 +33,16 @@ test("the suite probes every collection of PLAN section 3, and UNPLANNED is none
         "lists/{lid}/items/{iid}",
         "config/app",
     ]);
-    expect(h.TEMPLATES.map(h.collectionIdOf)).not.toContain(h.collectionIdOf(h.UNPLANNED));
+    expect(h.UNPLANNED).toEqual([
+        "anything/{doc}",
+        "users/{uid}/unplanned/{doc}",
+        "households/{hid}/unplanned/{doc}",
+        "invites/{code}/unplanned/{doc}",
+        "lists/{lid}/unplanned/{doc}",
+        "config/app/unplanned/{doc}",
+    ]);
+    const planned = h.TEMPLATES.map(h.collectionIdOf);
+    expect(h.UNPLANNED.filter((u) => planned.includes(h.collectionIdOf(u)))).toEqual([]);
 });
 
 // Until the real rules land, every client is denied every operation on every path. The suite runs

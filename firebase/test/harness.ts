@@ -35,21 +35,34 @@ export function planTemplates(plan: string): string[] {
 const UID = "alice";
 const HID = "household00000000001";
 const CODE = `${HID}_${"s".repeat(22)}`;
-const IDS: Record<string, string> = { uid: UID, hid: HID, code: CODE, lid: "l1", iid: "i1" };
+const IDS: Record<string, string> = {
+    uid: UID,
+    hid: HID,
+    code: CODE,
+    lid: "l1",
+    iid: "i1",
+    doc: "x",
+};
 
 // A document of a template: each {variable} becomes the id of that name; an unknown name throws.
-export function instantiate(template: string): string {
+export function instantiate(template: string, ids = IDS): string {
     return template.replace(/\{(\w+)\}/g, (_match, name: string) => {
-        const id = IDS[name];
+        const id = ids[name];
         if (id === undefined) throw new Error(`no id for {${name}} in ${template}`);
         return id;
     });
 }
 
 export const TEMPLATES = planTemplates(PLAN);
-// A path no rule plans: only the default deny covers it.
-export const UNPLANNED = "anything/else";
-export const PATHS = [...TEMPLATES.map(instantiate), UNPLANNED];
+// Paths no rule plans, so only the default deny covers them: a top-level collection, and a subcollection
+// of each top-level planned document, which a recursive or wildcard match there would open (#199).
+export const UNPLANNED_ROOT = "anything/{doc}";
+export const UNPLANNED = [
+    UNPLANNED_ROOT,
+    ...TEMPLATES.filter((t) => t.split("/").length === 2).map((t) => `${t}/unplanned/{doc}`),
+];
+// The caller's own document of every template, and the unplanned root.
+export const PATHS = [...TEMPLATES.map((t) => instantiate(t)), instantiate(UNPLANNED_ROOT)];
 
 const token = (emailVerified: boolean): TokenOptions => ({
     email: `${UID}@example.com`,
@@ -124,7 +137,8 @@ export const WHO: Record<"everyone" | Client, string> = {
     unverified: "request.auth != null && request.auth.token.email_verified == false",
     verified: "request.auth != null && request.auth.token.email_verified == true",
 };
-export type Who = keyof typeof WHO;
+// "others": signed-in callers, on documents of a {uid} collection that are not their own.
+export type Who = keyof typeof WHO | "others";
 export const METHODS = ["get", "list", "create", "update", "delete"] as const;
 export type Method = (typeof METHODS)[number];
 
@@ -138,9 +152,11 @@ export interface Mutant {
     readonly methods: readonly Method[];
 }
 
-// A collection opened to everyone and to each client alone, and its collection group to everyone.
+// A collection opened to everyone, to each client alone and (a {uid} collection) to others, and its
+// collection group to everyone.
 export function mutantsOf(template: string): Mutant[] {
     const whos: Who[] = ["everyone", ...CLIENT_NAMES];
+    if (template.endsWith("/{uid}")) whos.push("others");
     return [
         ...whos.map((who) => ({ template, group: false, who, methods: METHODS })),
         { template, group: true, who: "everyone", methods: METHODS },
@@ -155,7 +171,7 @@ export function methodMutants(template: string): Mutant[] {
     ];
 }
 
-const wholeCollection = (template: string): string =>
+export const wholeCollection = (template: string): string =>
     template
         .split("/")
         .map((s, i) => (i % 2 === 1 ? `{d${String(i)}}` : s))
@@ -171,17 +187,24 @@ export function mutate(rules: string, m: Mutant): string {
     const at = rules.indexOf(ANCHOR);
     if (at < 0 || rules.includes(ANCHOR, at + 1)) throw new Error(`need exactly one "${ANCHOR}"`);
     const end = at + ANCHOR.length;
-    const allow = `allow ${m.methods.join(", ")}: if ${WHO[m.who]};`;
+    const doc = `d${String(m.template.split("/").length - 1)}`;
+    const who =
+        m.who === "others" ? `request.auth != null && request.auth.uid != ${doc}` : WHO[m.who];
+    const allow = `allow ${m.methods.join(", ")}: if ${who};`;
     return `${rules.slice(0, end)}\n    match ${matchOf(m)} {\n      ${allow}\n    }${rules.slice(end)}`;
 }
 
 // What a probe gets under a mutant, as Firestore decides: an exact match opens the documents of its
 // collection and queries on it, not a collection-group query (a list); a group match opens all three.
+// A rule on the document id (others) opens no query, since it cannot hold for every result.
 export function expected(m: Mutant, p: Probe): Outcome {
     const opened = m.group
         ? collectionIdOf(p.path) === collectionIdOf(m.template)
         : p.op !== "group" && wholeCollection(p.path) === wholeCollection(m.template);
-    const lets = m.who === "everyone" || m.who === p.client;
+    const lets =
+        m.who === "others"
+            ? p.client !== "anonymous" && p.op !== "list" && p.path.split("/").at(-1) !== UID
+            : m.who === "everyone" || m.who === p.client;
     return opened && lets && m.methods.includes(p.op === "group" ? "list" : p.op)
         ? "allowed"
         : "denied";

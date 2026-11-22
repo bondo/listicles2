@@ -482,11 +482,15 @@ class Config(unittest.TestCase):
         parts = {
             "harness.ts": ('export const CLIENT_NAMES = ["anonymous", "unverified", "verified"] as const;',
                            'export const OPS = ["get", "list", "group", "create", "update", "delete"] as const;',
-                           "export const PATHS = [...TEMPLATES.map(instantiate), UNPLANNED];"),
+                           '...TEMPLATES.filter((t) => t.endsWith("/{uid}")).map((t) => instantiate(t, OTHER)),',
+                           "...UNPLANNED.map((t) => instantiate(t)),"),
             # The deny suite runs exactly h.PROBES, the probes the mutant check runs: no filter of its own (review of PR 301).
-            "rules.test.ts": ("expect(h.TEMPLATES).toEqual([", 'test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {',
+            "rules.test.ts": ("expect(h.TEMPLATES).toEqual([", "expect(h.UNPLANNED).toEqual([",
+                              'test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {',
                               "await assertFails(h.attempt(admin.firestore(), dbs[probe.client], probe));"),
-            "mutants.test.ts": ("...h.methodMutants(h.UNPLANNED),", "h.mutate(h.RULES, mutant)", "expect(got).toEqual(want);"),
+            # Every mutant needs a probe that it allows, so none passes vacuously (R1-02 of PR 301).
+            "mutants.test.ts": ("...h.methodMutants(h.UNPLANNED_ROOT),", "h.mutate(h.RULES, mutant)", "expect(got).toEqual(want);",
+                                "expect(want).toContainEqual(expect.stringMatching(/: allowed$/));"),
             "harness.test.ts": ("planTemplates throws on %s", "expected: %s", "a collection no probe touches"),
         }
         for name, needles in parts.items():
