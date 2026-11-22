@@ -56,8 +56,8 @@ row of the architecture recommendations above. Single Activity is already in PLA
 
 | Rule | Status |
 |---|---|
-| Single Activity; screens are destinations; routes are serializable types (type safe) | later (M1) |
-| **Owner decision 2026-11-13: Navigation 3.** The architecture recommendations page names it for multi-screen apps (the Navigation page documents Navigation Compose 2.x, so the Navigation 3 docs must be read before M1 navigation work) | later (M1) |
+| Single Activity; screens are destinations; routes are serializable types (type safe) | review (since M1-60: typed keys of one `NavDisplay`; the start-up stack is rebuilt from the gate state at every start, so its keys are not saved; the first saved stack makes its keys `@Serializable`) |
+| **Owner decision 2026-11-13: Navigation 3.** The architecture recommendations page names it for multi-screen apps (the Navigation page documents Navigation Compose 2.x, so the Navigation 3 docs must be read before M1 navigation work) | review (Navigation 3 since M1-60) |
 | Handle back with `BackHandler` or `PredictiveBackHandler`, not `onBackPressed` or `KEYCODE_BACK`; state-driven enabled flag | review (M1) |
 
 ## 4. Data and offline-first
@@ -159,7 +159,7 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 
 | Rule | Status |
 |---|---|
-| Dependencies and plugins only through `gradle/libs.versions.toml`, kebab-case names, `alias(libs.plugins...)` | tooling in part: the catalog exists; nothing fails a hardcoded `"group:name:version"`, a guard is proposed |
+| Dependencies and plugins only through `gradle/libs.versions.toml`, kebab-case names, `alias(libs.plugins...)` | tooling in part: `scripts/check_build_guards.py` fails on a literal `group:artifact` in a `dependencies` block of any `*.gradle.kts` or `*.gradle` file (any configuration, `platform`, `add`, group notation, Groovy forms), on `force`, `module` and similar calls with one, on a literal plugin or dependency version and on a catalog declared in Gradle code, unless the line says `// justified: <reason>`, and when it finds no declaration (M1-59); kebab-case names and `alias(libs.plugins...)` are review |
 | Configuration cache and build cache on | tooling in part: set in `gradle.properties` |
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
 | JVM modules use only Java and Android API available at minSdk 26 (lint NewApi skips pure JVM modules; no desugaring is configured) | tooling: `checkJdkRelease` (JDK 17 API) and `checkJavaApiLevel` (`scripts/check_java_api_level.py` reads the main classes of every JVM module against `api-versions.xml` of the compileSdk platform; M1-37) |
@@ -205,7 +205,7 @@ Checksums only, no PGP signatures: most Android and Kotlin artifacts are not sig
 Each would be its own PR, test-first, per CLAUDE.md.
 1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); ViewModels may not use `android.content.Context`, `Activity` or `AndroidViewModel`, and no `Dispatchers.` outside a Dagger or Hilt `@Module` file (done, M1-57).
 2. **detekt coroutines rules**: partly done (issue 38). `GlobalCoroutineUsage` is enabled and fixture-tested. `InjectDispatcher` is enabled and fixture-tested with a type-resolved fixture, but it only fires in type-resolved tasks (`detektMain`/`detektTest`), which today exist only for `:core:domain` and `:core:testing`. Still open: a type-resolved detekt run for `:app` and the planned `:core:data`, so the rule reaches code that will write `Dispatchers.IO`.
-3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog). Task M1-59.
+3. ~~Guard for hardcoded dependency coordinates in `*.gradle.kts` (everything must come from the catalog)~~ Done (M1-59, `scripts/check_build_guards.py`, see section 11); it reads text, so a coordinate held in a variable or declared through a helper function is review.
 4. ~~Guard that `targetSdk` is at least the Play minimum~~ Done (M1-51, `scripts/check_build_guards.py`, see section 10); raise `TARGET_SDK_FLOOR` when the date changes.
 5. ~~Manifest guard: fail on `usesCleartextTraffic="true"`, `cleartextTrafficPermitted="true"`, or `allowBackup="true"` without backup rules~~ Done (M1-58, `scripts/check_build_guards.py`, see section 9); the `src/androidTest/` source set is exempt from the cleartext rule.
 6. **Compose compiler stability report** as a CI artifact (no gate) once there are screens.

@@ -20,6 +20,8 @@ import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dk.bjarkebjarke.tally.start.StartRoute
+import dk.bjarkebjarke.tally.start.StartUiState
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -38,19 +40,19 @@ class TallyAppTest {
     }
 
     @Test
-    fun showsWelcomeText() {
-        val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
-        compose.setContent { TallyApp() }
-        compose.onNodeWithText(welcome).assertExists()
+    fun showsSignInWhenSignedOut() {
+        val signIn = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.app_tag)
+        compose.setContent { TallyApp(SIGN_IN) }
+        compose.onNodeWithText(signIn).assertExists()
         // Assertions run no accessibility check; only actions do, so run them on the whole screen (R1-03).
         compose.onAllNodes(isRoot()).tryPerformAccessibilityChecks()
     }
 
     @Test
-    fun showsWelcomeTextInDarkTheme() {
-        val welcome = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.welcome)
-        compose.setContent { TallyApp(darkTheme = true) }
-        compose.onNodeWithText(welcome).assertExists()
+    fun showsSignInInDarkTheme() {
+        val signIn = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.app_tag)
+        compose.setContent { TallyApp(SIGN_IN, darkTheme = true) }
+        compose.onNodeWithText(signIn).assertExists()
         // Assertions run no accessibility check; only actions do, so run them on the whole screen (R1-03).
         compose.onAllNodes(isRoot()).tryPerformAccessibilityChecks()
     }
@@ -59,7 +61,7 @@ class TallyAppTest {
     @Test
     fun darkThemeRendersADarkBackgroundAndLightThemeALightOne() {
         val dark = mutableStateOf(true)
-        compose.setContent { TallyApp(darkTheme = dark.value) }
+        compose.setContent { TallyApp(SIGN_IN, darkTheme = dark.value) }
 
         val darkLuminance = backgroundLuminance()
         dark.value = false
@@ -93,6 +95,7 @@ class TallyAppTest {
 
     private companion object {
         const val TAG = "tiny-target"
+        val SIGN_IN = StartUiState.Ready(StartRoute.SignIn)
         const val TINY_DP = 8
         const val CORNER_PX = 2
         const val DARK_MAX = 0.2f
