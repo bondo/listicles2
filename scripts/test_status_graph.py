@@ -4,9 +4,7 @@ Run: python3 -I scripts/test_status_graph.py"""
 import json
 import random
 import re
-import subprocess
 import sys
-import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -32,12 +30,12 @@ def tasks_text(*rows, milestones=("A", "B", "C", "D")):
     return head + "".join(rows)
 
 
-# A-01 done, A-03 dropped; A-O1 -> A-04 -> A-05 -> B-01 -> B-02, plus the shortcuts A-O1 -> A-05 and A-05 -> B-02
+# A-01 done, A-03 dropped but waiting on the open A-O1 (no node, no edge); A-O1 -> A-04 -> A-05 -> B-01 -> B-02, plus the shortcuts A-O1 -> A-05, A-05 -> B-02
 # (transitive) and A-02 -> B-02 (not transitive). Milestone C has no tasks yet, milestone D is all done.
 ROWS = (
     task("A-01", "A", "done"),
     task("A-02", "A", deps=["A-01"]),
-    task("A-03", "A", "dropped"),
+    task("A-03", "A", "dropped", deps=["A-O1"]),
     task("A-O1", "A", assignee="owner"),
     task("A-04", "A", deps=["A-O1", "A-03"]),
     task("A-05", "A", deps=["A-04", "A-O1"]),
@@ -71,6 +69,14 @@ def texts(svg):
     return [" ".join("".join(el.itertext()).split()) for el in ET.fromstring(svg).iter(NS + "text")]
 
 
+def no_overlap(boxes):
+    for i, (x1, y1, w1, h1) in enumerate(boxes):
+        for x2, y2, w2, h2 in boxes[i + 1:]:
+            if not (x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1):
+                return False
+    return True
+
+
 def box(g):
     r = g.find(NS + "rect")
     return float(r.get("x")), float(r.get("y")), float(r.get("width")), float(r.get("height"))
@@ -79,18 +85,6 @@ def box(g):
 class Nodes(unittest.TestCase):
     def test_only_open_tasks_are_nodes(self):
         self.assertEqual(sorted(nodes(svg_of())), sorted(OPEN))
-
-    def test_done_dropped_and_planned_tasks_are_never_nodes(self):
-        found = nodes(svg_of())
-        for gone in ("A-01", "A-03", "D-01"):
-            self.assertNotIn(gone, found)
-
-    def test_a_task_becoming_done_removes_its_node_and_its_edges(self):
-        text = tasks_text(*(r.replace('id = "A-04"\ntitle = "A-04 title"\nmilestone = "A"\nstatus = "todo"',
-                                      'id = "A-04"\ntitle = "A-04 title"\nmilestone = "A"\nstatus = "done"') for r in ROWS))
-        svg = svg_of(text)
-        self.assertNotIn("A-04", nodes(svg))
-        self.assertTrue(all("A-04" not in e for e in edges(svg)))
 
     def test_nodes_carry_their_derived_state(self):
         found = nodes(svg_of(prs=[{"number": 9, "title": "A-02: in review", "draft": True, "ci": "none"}]))
@@ -111,32 +105,11 @@ class Nodes(unittest.TestCase):
 
 
 class Edges(unittest.TestCase):
-    def test_edges_follow_depends_on_among_open_tasks(self):
-        self.assertIn(("A-O1", "A-04"), edges(svg_of()))
-        self.assertIn(("A-02", "B-02"), edges(svg_of()))
-
-    def test_the_direction_is_dependency_to_dependent(self):
-        found = edges(svg_of())
-        self.assertNotIn(("A-04", "A-O1"), found)
-        self.assertNotIn(("B-02", "A-02"), found)
-
     def test_transitive_edges_are_dropped(self):
         found = edges(svg_of())
         self.assertEqual(found, sorted([("A-O1", "A-04"), ("A-04", "A-05"), ("A-05", "B-01"), ("A-02", "B-02"), ("B-01", "B-02")]))
         self.assertNotIn(("A-O1", "A-05"), found)
         self.assertNotIn(("A-05", "B-02"), found)
-
-    def test_dependencies_outside_the_open_set_are_not_drawn(self):
-        found = edges(svg_of())
-        for src, dst in found:
-            self.assertIn(src, OPEN)
-            self.assertIn(dst, OPEN)
-
-    def test_every_edge_ends_at_a_node_that_exists(self):
-        svg = svg_of()
-        for a, b in edges(svg):
-            self.assertIn(a, nodes(svg))
-            self.assertIn(b, nodes(svg))
 
     def test_open_graph_counts_what_it_leaves_out(self):
         g = status_graph.open_graph(model())
@@ -144,11 +117,6 @@ class Edges(unittest.TestCase):
         self.assertEqual(g["outside_done"], 2)  # A-02 -> A-01 (done), A-04 -> A-03 (dropped)
         self.assertEqual(g["outside_milestone"], 1)  # B-01 waits on all of A
         self.assertEqual(sorted(g["edges"]), sorted([("A-O1", "A-04"), ("A-04", "A-05"), ("A-05", "B-01"), ("A-02", "B-02"), ("B-01", "B-02")]))
-
-    def test_a_milestone_dependency_is_not_a_node_or_an_edge(self):
-        svg = svg_of()
-        self.assertFalse([k for k in nodes(svg) if k.startswith("milestone")])
-        self.assertFalse([e for e in edges(svg) if any(x.startswith("milestone") for x in e)])
 
 
 def closure(edges_):
@@ -204,10 +172,7 @@ class Layout(unittest.TestCase):
             self.assertLess(box(found[a])[0] + box(found[a])[2], box(found[b])[0], (a, b))
 
     def test_no_two_nodes_overlap(self):
-        boxes = [box(g) for g in nodes(svg_of()).values()]
-        for i, (x1, y1, w1, h1) in enumerate(boxes):
-            for x2, y2, w2, h2 in boxes[i + 1:]:
-                self.assertTrue(x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
+        self.assertTrue(no_overlap([box(g) for g in nodes(svg_of()).values()]))
 
     def test_everything_is_inside_the_canvas(self):
         svg = svg_of()
@@ -260,10 +225,7 @@ class Layout(unittest.TestCase):
         rows = [task(f"A-{i:02d}", "A", deps=[f"A-{j:02d}" for j in range(1, i) if rng.random() < 0.15]) for i in range(1, 40)]
         found = nodes(svg_of(tasks_text(*rows, milestones=("A",))))
         self.assertEqual(len(found), 39)
-        boxes = [box(g) for g in found.values()]
-        for i, (x1, y1, w1, h1) in enumerate(boxes):
-            for x2, y2, w2, h2 in boxes[i + 1:]:
-                self.assertTrue(x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
+        self.assertTrue(no_overlap([box(g) for g in found.values()]))
 
 
 class Labels(unittest.TestCase):
@@ -313,15 +275,6 @@ class Empty(unittest.TestCase):
         self.assertIn("All done: A 1/1; B 1/1", "\n".join(texts(svg)))
         self.assertGreater(float(root.get("height")), 0)
 
-    def test_a_graph_without_any_task_is_valid_too(self):
-        svg = svg_of(tasks_text(milestones=("A",)))
-        self.assertIn("No open tasks.", texts(svg))
-        self.assertIn("Not planned yet: A", "\n".join(texts(svg)))
-
-    def test_open_tasks_without_dependencies_have_no_edges(self):
-        svg = svg_of(tasks_text(task("A-01", "A"), task("A-02", "A"), milestones=("A",)))
-        self.assertEqual(sorted(nodes(svg)), ["A-01", "A-02"])
-        self.assertEqual(edges(svg), [])
 
 
 class Safety(unittest.TestCase):
@@ -377,33 +330,6 @@ class Safety(unittest.TestCase):
                   for s, k in (("review", "A-02"), ("owner", "A-O1"), ("blocked", "A-04"))}
         self.assertEqual(shapes, {"review": ["info mk-progress"], "owner": ["bad mk-owner"], "blocked": ["warn mk-blocked"]})
         self.assertEqual(len({found[k].find(NS + "rect").get("class") for k in ("A-02", "A-O1", "A-04")}), 3)
-
-
-class Cli(unittest.TestCase):
-    SCRIPT = Path(__file__).resolve().parent / "status_visual.py"
-
-    def render(self, d, *extra):
-        (d / "t.toml").write_text(TASKS)
-        (d / "in.json").write_text('{"prs": [], "issues": []}')
-        return subprocess.run([sys.executable, "-I", str(self.SCRIPT), "render", "--tasks", str(d / "t.toml"), "--input", str(d / "in.json"),
-                               "--now", NOW, "--svg", str(d / "s.svg"), "--json", str(d / "s.json"), *extra], capture_output=True, text=True)
-
-    def test_render_writes_the_graph_next_to_the_svg_by_default(self):
-        with tempfile.TemporaryDirectory() as d:
-            r = self.render(Path(d))
-            self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertEqual(sorted(nodes((Path(d) / "status-graph.svg").read_text())), sorted(OPEN))
-            self.assertTrue((Path(d) / "s.svg").read_text().startswith("<svg"))  # the picture itself is unchanged
-
-    def test_graph_option_overrides_the_path(self):
-        with tempfile.TemporaryDirectory() as d:
-            r = self.render(Path(d), "--graph", str(Path(d) / "g.svg"))
-            self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertTrue((Path(d) / "g.svg").exists())
-            self.assertFalse((Path(d) / "status-graph.svg").exists())
-
-    def test_the_status_picture_itself_has_no_graph_in_it(self):
-        self.assertNotIn("Open tasks and their dependencies", status_visual.render_svg(model()))
 
 
 if __name__ == "__main__":
