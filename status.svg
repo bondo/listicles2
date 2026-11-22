@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1960" viewBox="0 0 880 1960" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 27/74; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 3 PRs waiting, 36 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1960" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1938" viewBox="0 0 880 1938" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 28/74; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 2 PRs waiting, 36 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1938" class="bg"/>
 <text x="24" y="36" class="fg t">Listicles status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-22 14:42 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-22 15:02 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 42. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -22,13 +22,13 @@
 <text x="60" y="308" class="ok">35 done</text>
 <rect x="24" y="332" width="832" height="512" rx="6" class="card"/>
 <text x="40" y="356" class="fg h">M1 Accounts and households</text>
-<text x="840" y="356" class="fg" text-anchor="end">36%  27/74</text>
+<text x="840" y="356" class="fg" text-anchor="end">37%  28/74</text>
 <text x="840" y="374" class="info s" text-anchor="end">current</text>
 <text x="40" y="374" class="muted s">Google and email sign-in, households, invite links, members and ownership, with rules tests.</text>
 <rect x="40" y="386" width="640" height="8" rx="3" class="track"/>
-<rect x="40" y="386" width="233" height="8" rx="3" class="bar"/>
+<rect x="40" y="386" width="242" height="8" rx="3" class="bar"/>
 <polyline points="40,414 43,417 48,410" class="tick mk-done"/>
-<text x="60" y="418" class="ok">27 done</text>
+<text x="60" y="418" class="ok">28 done</text>
 <rect x="40" y="430" width="8" height="8" class="warn mk-blocked"/>
 <text x="60" y="438" class="warn">blocked</text>
 <text x="180" y="438" class="fg h">M1-06</text>
@@ -88,7 +88,7 @@
 <text x="180" y="798" class="fg h">M1-18</text>
 <text x="262" y="798" class="fg">Household data 1: create, invite, revoke, join, start-up self-heal (emulator)</text>
 <text x="262" y="812" class="muted s">waits on M1-54, M1-14, M1-60</text>
-<text x="60" y="832" class="muted">+35 more open tasks</text>
+<text x="60" y="832" class="muted">+34 more open tasks</text>
 <rect x="24" y="856" width="832" height="146" rx="6" class="card"/>
 <text x="40" y="880" class="fg h">M2 Inventory lists</text>
 <text x="840" y="880" class="fg" text-anchor="end">0%  0/2</text>
@@ -149,57 +149,54 @@
 <text x="24" y="1536" class="fg h">#306</text>
 <text x="80" y="1536" class="fg">Process docs: reviews start on push, no loop-wait for CI;…</text>
 <text x="856" y="1536" class="warn" text-anchor="end">CI passing  behind main</text>
-<text x="24" y="1558" class="fg h">#307</text>
-<text x="80" y="1558" class="fg">M1-57: Konsist: no Context, Activity or AndroidViewModel…</text>
-<text x="856" y="1558" class="warn" text-anchor="end">CI passing  behind main</text>
-<text x="24" y="1592" class="fg h">BLOCKERS</text>
-<text x="856" y="1592" class="muted s" text-anchor="end">36 open</text>
-<line x1="24" y1="1600" x2="856" y2="1600" class="rule"/>
+<text x="24" y="1570" class="fg h">BLOCKERS</text>
+<text x="856" y="1570" class="muted s" text-anchor="end">36 open</text>
+<line x1="24" y1="1578" x2="856" y2="1578" class="rule"/>
+<text x="24" y="1602" class="bad">owner to-do</text>
+<text x="120" y="1602" class="fg h">#120</text>
+<text x="190" y="1602" class="fg">[owner] Register a free limited-distribution Android deve…</text>
+<text x="856" y="1602" class="muted" text-anchor="end">5d</text>
 <text x="24" y="1624" class="bad">owner to-do</text>
-<text x="120" y="1624" class="fg h">#120</text>
-<text x="190" y="1624" class="fg">[owner] Register a free limited-distribution Android deve…</text>
-<text x="856" y="1624" class="muted" text-anchor="end">5d</text>
+<text x="120" y="1624" class="fg h">#285</text>
+<text x="190" y="1624" class="fg">[owner] M1-O12: Decide #280 (who may list invites) befo…</text>
+<text x="856" y="1624" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1646" class="bad">owner to-do</text>
-<text x="120" y="1646" class="fg h">#285</text>
-<text x="190" y="1646" class="fg">[owner] M1-O12: Decide #280 (who may list invites) befo…</text>
+<text x="120" y="1646" class="fg h">#289</text>
+<text x="190" y="1646" class="fg">[owner] M1-O11: Add the screenshots check to the main ru…</text>
 <text x="856" y="1646" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1668" class="bad">owner to-do</text>
-<text x="120" y="1668" class="fg h">#289</text>
-<text x="190" y="1668" class="fg">[owner] M1-O11: Add the screenshots check to the main ru…</text>
+<text x="120" y="1668" class="fg h">#291</text>
+<text x="190" y="1668" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
 <text x="856" y="1668" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1690" class="bad">owner to-do</text>
-<text x="120" y="1690" class="fg h">#291</text>
-<text x="190" y="1690" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
-<text x="856" y="1690" class="muted" text-anchor="end">0d</text>
+<text x="24" y="1690" class="warn">task</text>
+<text x="120" y="1690" class="fg h">M1-06</text>
+<text x="190" y="1690" class="fg">waits on M1-10</text>
 <text x="24" y="1712" class="warn">task</text>
-<text x="120" y="1712" class="fg h">M1-06</text>
-<text x="190" y="1712" class="fg">waits on M1-10</text>
+<text x="120" y="1712" class="fg h">M1-08</text>
+<text x="190" y="1712" class="fg">waits on M1-52</text>
 <text x="24" y="1734" class="warn">task</text>
-<text x="120" y="1734" class="fg h">M1-08</text>
-<text x="190" y="1734" class="fg">waits on M1-52</text>
+<text x="120" y="1734" class="fg h">M1-09</text>
+<text x="190" y="1734" class="fg">waits on M1-08</text>
 <text x="24" y="1756" class="warn">task</text>
-<text x="120" y="1756" class="fg h">M1-09</text>
-<text x="190" y="1756" class="fg">waits on M1-08</text>
+<text x="120" y="1756" class="fg h">M1-10</text>
+<text x="190" y="1756" class="fg">waits on M1-09</text>
 <text x="24" y="1778" class="warn">task</text>
-<text x="120" y="1778" class="fg h">M1-10</text>
-<text x="190" y="1778" class="fg">waits on M1-09</text>
+<text x="120" y="1778" class="fg h">M1-11</text>
+<text x="190" y="1778" class="fg">waits on M1-54, M1-53</text>
 <text x="24" y="1800" class="warn">task</text>
-<text x="120" y="1800" class="fg h">M1-11</text>
-<text x="190" y="1800" class="fg">waits on M1-54, M1-53</text>
+<text x="120" y="1800" class="fg h">M1-12</text>
+<text x="190" y="1800" class="fg">waits on M1-10, M1-O12</text>
 <text x="24" y="1822" class="warn">task</text>
-<text x="120" y="1822" class="fg h">M1-12</text>
-<text x="190" y="1822" class="fg">waits on M1-10, M1-O12</text>
+<text x="120" y="1822" class="fg h">M1-14</text>
+<text x="190" y="1822" class="fg">waits on M1-60</text>
 <text x="24" y="1844" class="warn">task</text>
-<text x="120" y="1844" class="fg h">M1-14</text>
-<text x="190" y="1844" class="fg">waits on M1-60</text>
+<text x="120" y="1844" class="fg h">M1-15</text>
+<text x="190" y="1844" class="fg">waits on M1-14</text>
 <text x="24" y="1866" class="warn">task</text>
-<text x="120" y="1866" class="fg h">M1-15</text>
+<text x="120" y="1866" class="fg h">M1-16</text>
 <text x="190" y="1866" class="fg">waits on M1-14</text>
 <text x="24" y="1888" class="warn">task</text>
-<text x="120" y="1888" class="fg h">M1-16</text>
-<text x="190" y="1888" class="fg">waits on M1-14</text>
-<text x="24" y="1910" class="warn">task</text>
-<text x="120" y="1910" class="fg h">M1-17</text>
-<text x="190" y="1910" class="fg">waits on M1-15, M1-16</text>
-<text x="24" y="1932" class="muted">+22 more</text>
+<text x="120" y="1888" class="fg h">M1-17</text>
+<text x="190" y="1888" class="fg">waits on M1-15, M1-16</text>
+<text x="24" y="1910" class="muted">+22 more</text>
 </svg>
