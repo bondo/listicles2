@@ -101,7 +101,8 @@ class Wiring(unittest.TestCase):
         self.assertEqual(self.mutated(CI, old, old.replace("ubuntu-latest", "macos-latest")), [JOB_PROBLEM])
 
     def test_a_missing_timeout_is_reported(self):
-        self.assertEqual(self.mutated(CI, "    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0\n        with: { distribution: temurin, java-version: 21 }\n      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1\n      - name: release build with R8", "    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0\n        with: { distribution: temurin, java-version: 21 }\n      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1\n      - name: release build with R8"), [JOB_PROBLEM])
+        old = "  release-smoke:\n    name: release-smoke\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n"
+        self.assertEqual(self.mutated(CI, old, old.replace("    timeout-minutes: 30\n", "")), [JOB_PROBLEM])
 
     # The flag is for this one job only (M1-30: any other release build must still fail).
     def test_the_flag_in_another_ci_job_is_reported(self):
