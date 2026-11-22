@@ -127,6 +127,25 @@ class Coordinates(unittest.TestCase):
             with self.subTest(text=text):
                 self.assert_flagged(self.OK + text, count=2 if "substitute" in text else 1)
 
+    def test_a_literal_version_next_to_a_catalog_or_kotlin_module_is_flagged(self):
+        for call, name in (
+            ('classpath(kotlin("gradle-plugin", version = "2.0.0"))', "build.gradle.kts"),
+            ('implementation(libs.a) { version { strictly("1.0") } }', "app/build.gradle.kts"),
+            ('implementation(libs.a) {\n        version {\n            require("1.0")\n        }\n    }', "app/build.gradle.kts"),
+            ("implementation(libs.a) { version { prefer '1.0' } }", "lib/build.gradle"),
+            ('constraints { implementation(libs.a) { version { strictly("[1.0, 2.0[") } } }', "app/build.gradle.kts"),
+        ):
+            with self.subTest(call=call):
+                found = self.assert_flagged(f"dependencies {{\n    {call}\n}}\n", name=name)
+                self.assertIn("literal version", found[0])
+        self.assert_clean(
+            "dependencies {\n    implementation(libs.a) { version { strictly(libs.versions.a.get()) } }\n"
+            '    implementation(libs.b) { version { reject("1.0") } }\n    implementation(kotlin("test"))\n}\n'
+        )
+        # one declaration in group notation with a literal version is one problem, not one per argument
+        self.assert_flagged('dependencies {\n    implementation(\n        group = "a.b",\n        name = "c",\n        version = "1",\n    )\n}\n')
+        self.assert_flagged("dependencies {\n    implementation group: 'a.b', name: 'c', version: '1'\n}\n", name="lib/build.gradle")
+
     def test_a_call_over_several_lines_is_flagged(self):
         self.assert_flagged('dependencies {\n    implementation(\n        "a.b:c:1",\n    )\n}\n')
         self.assert_flagged('dependencies {\n    implementation(\n        platform(\n            "a.b:c:1"\n        )\n    )\n}\n')
