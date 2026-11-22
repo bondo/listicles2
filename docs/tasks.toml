@@ -1221,11 +1221,12 @@ pr = 296
 id = "M1-58"
 title = "Build guard: manifest cleartext and backup (checklist follow-up 5), in scripts/check_build_guards.py"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-51"]
 notes = "Issue 257. Tooling env where it touches guards or CI; failing fixtures first. Fail on usesCleartextTraffic or cleartextTrafficPermitted other than false (manifests and every res/xml network security config), and on allowBackup other than false (or missing in the main manifest) without both dataExtractionRules and fullBackupContent as @xml resources that exist; fail closed on unreadable values and when no manifest with an application element is found. Update the section 9 rows of docs/ANDROID-BEST-PRACTICES.md and follow-up 5"
+pr = 308
 
 [[task]]
 id = "M1-59"
