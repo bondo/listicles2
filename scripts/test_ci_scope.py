@@ -20,6 +20,7 @@ import ci_scope  # noqa: E402  # justified: must follow the sys.path insert abov
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "ci_scope.py"
+DEBUG_APK_IF = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 REQUIRED_JOBS = ("wrapper", "static", "unit", "firebase", "ui", "screenshots", "guards", "secrets", "tasks", "python-lint", "workflow-lint")
 
 
@@ -276,6 +277,28 @@ class CiWiring(unittest.TestCase):
             ]
         for problem, old, new in cases:
             self.assertIn(problem, self.mutated(old, new), problem)
+
+    def test_the_unit_job_may_carry_the_one_debug_apk_upload_condition(self):
+        # M1-63: the debug APK upload runs on pushes to main only, so its step has the one allowed `if:`; every other `if:` stays flagged.
+        step = f"      - name: upload\n        if: {DEBUG_APK_IF}\n        run: 'true'\n"
+        before = "      - name: coverage impact tests (M1-07)"
+        text = ci_text().replace(before, step + before, 1)
+        self.assertEqual(wiring_problems(text), [])
+        twice = text.replace(before, step + before, 1)
+        self.assertIn("unit: if or continue-on-error", wiring_problems(twice))
+
+    def test_the_debug_apk_condition_is_allowed_in_no_other_job_and_in_no_other_form(self):
+        step = f"      - name: upload\n        if: {DEBUG_APK_IF}\n        run: 'true'\n"
+        in_static = ci_text().replace("      - name: gradle wrapper checksum check tests", step + "      - name: gradle wrapper checksum check tests", 1)
+        self.assertIn("static: if or continue-on-error", wiring_problems(in_static))
+        before = "      - name: coverage impact tests (M1-07)"
+        for other in ("github.event_name == 'push'", "github.ref == 'refs/heads/main'", "always()", f"{DEBUG_APK_IF} || true",
+                      "github.event_name == 'push' && github.ref == 'refs/heads/dev'"):
+            with self.subTest(other):
+                text = ci_text().replace(before, step.replace(DEBUG_APK_IF, other) + before, 1)
+                self.assertIn("unit: if or continue-on-error", wiring_problems(text))
+        with_coe = ci_text().replace(before, step + "        continue-on-error: true\n" + before, 1)
+        self.assertIn("unit: if or continue-on-error", wiring_problems(with_coe))
 
     def test_an_if_in_a_job_is_reported_once(self):
         text = ci_text().replace("      - name: gradle wrapper checksum check tests", "      - if: false\n        name: gradle wrapper checksum check tests", 1)
