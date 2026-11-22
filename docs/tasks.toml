@@ -941,6 +941,28 @@ depends_on = ["M1-60"]
 notes = "Gate order P10 (docs/milestones/M1.md section 8) as a pure domain function with property tests, in front of the M1-60 home; each gate a domain interface with a stand-in binding until its task implements it (update M1-27, email verified M1-15, name M1-39, notices M1-18), and a placeholder step until its screen exists. Extends StartRoutingTest to update, signed out, unverified, no name, a notice, home"
 
 [[task]]
+id = "M1-64"
+title = "guards check 2c: YAML folded and multi-line values as one line, in addition to the per-line check (issue 164 item 2)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-42"]
+issue = 164
+notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py, docs/guards-known-gaps.md). Escalation ruling PR 309 comment 7084379032: check the joined line of a folded (run: >) or multi-line plain or quoted value IN ADDITION to the per-line check on main, never instead of it, so it cannot regress main (Y1, Y3, Y5 in the ruling as tests). PR 309 residuals R2-04 and R2-05 belong here. May reuse code from branch tooling/guards-2c-42. Test-first with negative cases. Owner merge: scripts/guards.sh"
+
+[[task]]
+id = "M1-65"
+title = "guards check 2c: npm `--` tail resolved through package.json scripts, fail closed by construction (issue 164 item 3)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-42"]
+issue = 164
+notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py, docs/guards-known-gaps.md). Escalation ruling PR 309 comment 7084379032: any \"scripts\" or \\u token in a package.json other than the one strict top-level layout makes every tail unknown; npm forms only; only a script whose last command is a plain [npx] <runner> <words> with no shell metacharacters is resolved. PR 309 R4-01 must be fixed here, with N1-N4 and C1-C2 from the ruling as failing tests; residual R3-03 belongs here. May reuse code from branch tooling/guards-2c-42. Owner merge: scripts/guards.sh"
+
+[[task]]
 id = "M1-13"
 title = "Domain: email, password and name validation (12+ code points, name 1-50), property tests"
 milestone = "M1"
@@ -1341,10 +1363,11 @@ notes = "Tooling env, failing tests first in scripts/test_check_gradle_repos.py,
 id = "M1-42"
 title = "guards check 2c: actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
+pr = 321
 notes = "Tooling env (process file), owner merge"
 
 [[task]]
@@ -1452,7 +1475,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-68", "M1-69",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69",
 ]
 
 [[task]]
