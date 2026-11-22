@@ -159,23 +159,28 @@ export async function verifiedOnly(
 }
 
 // The allow statements of a rules text, each with the path of the match blocks around it, and the
-// paths at which `function signedIn` is declared. Comments go and string literals become '' first, so
-// neither can hide a statement or unbalance the braces; a statement or brace it cannot read throws.
+// paths at which `function signedIn` is declared. First a comment becomes a space and a string
+// literal (escapes included) '', so neither can hide a statement or unbalance the braces. It fails
+// closed: a quote, `match`, `allow` or brace it cannot read throws (R2-01 to R2-03).
 function parseRules(rules: string): {
     allows: { path: string; condition: string }[];
     signedIn: string[];
 } {
-    const code = rules.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|'[^'\n]*'|"[^"\n]*"/g, (m) =>
-        m.startsWith("/") ? "" : "''",
+    const code = rules.replace(
+        /\/\/[^\n]*|\/\*[\s\S]*?\*\/|'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g,
+        (m) => (m.startsWith("/") ? " " : "''"),
     );
     const stack: string[] = [];
     const allows: { path: string; condition: string }[] = [];
     const signedIn: string[] = [];
+    let matches = 0;
     for (const m of code.matchAll(
-        /\bmatch\s+(\S+)\s*\{|\ballow\s[^:;]*(?::\s*if\s([^;]*))?;|\bfunction\s+signedIn\b|[{}]/g,
+        /\bmatch\s*(\/\S*)\s*\{|\ballow\b[^:;]*(?::\s*if\b([^;]*))?;|\bfunction\s+signedIn\b|[{}]/g,
     )) {
-        if (m[1] !== undefined) stack.push(m[1]);
-        else if (m[0].startsWith("allow")) {
+        if (m[1] !== undefined) {
+            stack.push(m[1]);
+            matches += 1;
+        } else if (m[0].startsWith("allow")) {
             allows.push({
                 path: stack.join(""),
                 condition: (m[2] ?? "").replace(/\s+/g, " ").trim(),
@@ -184,8 +189,15 @@ function parseRules(rules: string): {
         else if (m[0] === "{") stack.push("");
         else if (stack.pop() === undefined) throw new Error("rules: a } without its {");
     }
-    if (stack.length > 0 || allows.length !== (code.match(/\ballow\s/g) ?? []).length) {
-        throw new Error("rules: an allow statement or a brace that parseRules cannot read");
+    const words = (word: RegExp): number => (code.match(word) ?? []).length;
+    const unread =
+        allows.length !== words(/\ballow\b/g) ||
+        matches !== words(/\bmatch\b/g) ||
+        /['"]/.test(code.replaceAll("''", ""));
+    if (stack.length > 0 || unread) {
+        throw new Error(
+            "rules: a quote, match, allow statement or brace that parseRules cannot read",
+        );
     }
     return { allows, signedIn };
 }
@@ -215,7 +227,7 @@ export function withoutSignedIn(rules: string): string[] {
         .filter((s) => !WITHOUT_SIGN_IN.includes(s.path) && !requiresSignedIn(s.condition))
         .map((s) => `${s.path}: ${s.condition}`);
     if (signedIn.length === 1 && signedIn[0] === DOCUMENTS) return missing;
-    const found = signedIn.join(", ") || "none";
+    const found = signedIn.map((path) => path || "the service block").join(", ") || "none";
     return [...missing, `signedIn() must be declared once, at ${DOCUMENTS}; found: ${found}`];
 }
 
