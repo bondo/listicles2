@@ -920,13 +920,23 @@ notes = "Split 2026-11-22 (orchestrator, the 400-line rule): the start-up root, 
 
 [[task]]
 id = "M1-60"
-title = "Start-up root: Navigation 3, P10 gates (#195, Q2 A), M1 home (#194, Q1 A), one routing test with fakes over all gates, signed-out start shows sign-in"
+title = "Start-up root: Navigation 3, M1 home (#194, Q1 A), signed-in/out routing (P10 steps 2 and 6), signed-out start shows sign-in"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30", "M1-36", "M1-49"]
-notes = "Second half of the M1-30 split. Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A. If it sizes over 450 lines: (b1) the Navigation 3 root, the home and signed-in/out routing, then (b2) the remaining gates and the household notice step, as a new task"
+notes = "Second half of the M1-30 split. Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A. If it sizes over 450 lines: (b1) the Navigation 3 root, the home and signed-in/out routing, then (b2) the remaining gates and the household notice step, as a new task. Split 2026-11-22 (about 600 lines in full): this is b1; b2 is M1-62. The home top bar gets its household icon with M1-19 and its avatar with M1-25, each with its screen"
+
+[[task]]
+id = "M1-62"
+title = "Start-up gates (b2 of M1-60): update (START-01), email verified (#195, Q2 A), name saved (AUTH-12), household notices (HH-06); one routing test with fakes over all gates"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-60"]
+notes = "Gate order P10 (docs/milestones/M1.md section 8) as a pure domain function with property tests, in front of the M1-60 home; each gate a domain interface with a stand-in binding until its task (M1-27, M1-14/M1-15, M1-39, M1-18) implements it, and a placeholder step until its screen exists. Extends StartRoutingTest to update, signed out, unverified, no name, a notice, home"
 
 [[task]]
 id = "M1-13"
@@ -974,7 +984,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-15", "M1-16"]
+depends_on = ["M1-15", "M1-16", "M1-62"]
 notes = "The name field calls a ProfileRepository interface with a fake (M1-39 implements it). Screen 24: one error under the form; show/hide password button en/da (P12, #198 item 6)"
 
 [[task]]
@@ -994,7 +1004,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-14", "M1-60", "M1-02"]
+depends_on = ["M1-54", "M1-14", "M1-60", "M1-62", "M1-02"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1089,7 +1099,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-08", "M1-60"]
+depends_on = ["M1-08", "M1-60", "M1-62"]
 
 [[task]]
 id = "M1-28"
@@ -1287,7 +1297,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-08", "M1-10", "M1-18", "M1-17", "M1-25"]
+depends_on = ["M1-08", "M1-10", "M1-18", "M1-17", "M1-25", "M1-62"]
 notes = "P9 of docs/milestones/M1.md; wireframes 42, 43; implements the ProfileRepository of M1-17"
 
 [[task]]
@@ -1379,7 +1389,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]
@@ -1406,6 +1416,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
+  "M1-62",
 ]
 
 [[task]]
