@@ -369,7 +369,7 @@ NAMED = re.compile(
 MAPS = {"mapOf", "mutableMapOf", "hashMapOf", "linkedMapOf"}
 FORCED = re.compile(r"(?<![\w$])(?:forcedModules[ \t]*=[ \t]*|setForcedModules[ \t]*)")  # resolutionStrategy.forcedModules = setOf("g:a:1")
 RICH = re.compile(r"(?<![\w$])(?:strictly|require|prefer)(?:[ \t]*\([ \t\r\n]*|[ \t]+)[\"']")  # `version { strictly("1.0") }`
-POSITIONAL = re.compile(r"""(?<![\w$.])([A-Za-z_]\w*)[ \t]*\([ \t\r\n]*(["'])(?=[A-Za-z0-9_.-]+\2[ \t\r\n]*,[ \t\r\n]*["'])""")
+POSITIONAL = re.compile(r"""(?<![\w$])([A-Za-z_]\w*)[ \t]*\([ \t\r\n]*(["'])(?=[A-Za-z0-9_.-]+\2[ \t\r\n]*,[ \t\r\n]*["'])""")
 NOT_DECLARATIONS = {"exclude", "add", "because", "listOf", "setOf", "arrayOf"}
 OPEN = r"(?:[ \t]*\([ \t\r\n]*|[ \t]+)"
 ADD = re.compile(r"(?<![\w$])add" + OPEN + r"""(["'])[^"'\n]*\1[ \t\r\n]*,[ \t\r\n]*["'](?=""" + COORD.pattern + ")")
@@ -414,7 +414,8 @@ def enclosing_call(blank, pos):
             stop = i + 1
             break
     start = max(stop, blank.rfind("\n", 0, pos) + 1)
-    m = re.compile(r"[ \t]*(?:[A-Za-z_]\w*[ \t]*\.[ \t]*)*([A-Za-z_]\w*)").match(blank, start)  # `details.useTarget group: ...`
+    # `details.useTarget group: ...`, also after a closure parameter list on the same line (`{ details -> ...`)
+    m = re.compile(r"[ \t]*(?:[\w \t,]*->)?[ \t]*(?:[A-Za-z_]\w*[ \t]*\.[ \t]*)*([A-Za-z_]\w*)").match(blank, start)
     return (m.group(1), m.start(1)) if m else ("", pos)
 
 
@@ -444,7 +445,7 @@ def scan_catalog(root):
         code = strip(raw, strings=starts)
         blank = strip(raw, blank_strings=True)
         comments = "".join(" " if r == c and r != "\n" else r for r, c in zip(raw, code, strict=True)).split("\n")
-        spans = blocks(blank)
+        spans = blocks(blank) + [(m.end(), statement_end(blank, m.end())) for m in DEPS_CALL.finditer(blank)]  # R2-01: its arguments too
         inside = partial(within, spans)
         hits = {}  # offset -> what was found, so one literal found by two patterns is reported once
         for s in starts:
@@ -474,7 +475,7 @@ def scan_catalog(root):
             if inside(m.start()):
                 hits.setdefault(m.end(), "literal version (plugin or catalog entry)")
         for m in POSITIONAL.finditer(code):
-            if inside(m.start()) and m.group(1) not in NOT_DECLARATIONS:
+            if inside(m.end()) and m.group(1) not in NOT_DECLARATIONS:  # the end: a DEPS_CALL span starts after the name
                 hits.setdefault(m.end(), "dependency given as separate group, name and version literals")
         for rx in (ADD, ANYWHERE):
             for m in rx.finditer(code):
