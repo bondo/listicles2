@@ -2910,5 +2910,117 @@ class SpeedWordingTests(unittest.TestCase):
                 self.assertIn("plan-review-loop", self.doc_swap("docs/PLAN.md", part, "after CI is green"))
 
 
+class GoldenUpdateDelegationTests(unittest.TestCase):
+    """Owner decision, #15 comment 7082564807: the orchestrator may add `golden-update` after a review round found the goldens
+    intended, with a one-line note on #15 each time; implementers and collaborators still never add it; Tier 0 is unchanged."""
+
+    ORCH = "docs/ORCHESTRATION.md"
+    CHECKED = ("only after that PR's review round has checked the new or changed screenshot goldens and found them intended "
+               "(no reviewer finding open against them)")
+    DOC_PHRASES = (
+        "add the `golden-update` label to a PR " + CHECKED,
+        "a one-line note on #15 naming the PR, the head SHA and the round",
+        "Only the orchestrator adds `golden-update`, and only as in the bullet above; no other agent role (implementer, reviewer, second reviewer, "
+        "escalation reviewer, approver, merge agent) and no collaborator adds it; the collaborator Tier 0 label list is unchanged",
+        "(for `golden-update`, the orchestrator's one-line note naming the PR, the head SHA and the round)",
+    )
+    PROMPT_PHRASES = (
+        "add the `golden-update` label to a PR " + CHECKED,
+        "post a one-line note on #15 naming the PR, head SHA and round each time",
+        "only you add it; no other role and no collaborator does",
+        "(for `golden-update` the note names the PR, head SHA and round)",
+    )
+    # Wording that gives the label to the wrong party, or back to the owner alone: rejected wherever it appears.
+    BAD = (
+        " Only the owner may add the `golden-update` label.",
+        " The `golden-update` label stays owner-only.",
+        " Implementers may add the `golden-update` label.",
+        " A collaborator can apply the `golden-update` label.",
+        " A reviewer may add the `golden-update` label once the goldens are intended.",
+        " The second reviewer adds the `golden-update` label.",
+        " The approver can set the `golden-update` label.",
+        " The merge agent adds the `golden-update` label.",
+    )
+    COLLAB = "docs/reviews/collaborator-workflow.md"
+    COLLAB_PHRASES = (
+        "(never a collaborator; only the orchestrator adds them, ORCHESTRATION §1.1)",
+        "CI-steering labels (the orchestrator under §1.1, never a collaborator)",
+    )
+
+    def swap_doc(self, old, new):
+        norm = prompt_rules.normalize((ROOT / self.ORCH).read_text(encoding="utf-8"))
+        self.assertIn(old.lower(), norm.lower(), f"{self.ORCH} lacks {old!r}")
+        return ids(prompt_rules.check_doc_text(self.ORCH, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    def swap_prompt(self, role, old, new):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), norm.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    def test_the_real_text_passes(self):
+        self.assertEqual(prompt_rules.check_text("orchestrator", real("orchestrator")), [])
+        self.assertEqual(prompt_rules.check_text("implementer", real("implementer")), [])
+        self.assertEqual(prompt_rules.check_doc_text(self.ORCH, (ROOT / self.ORCH).read_text(encoding="utf-8")), [])
+
+    def test_orchestration_says_it_in_1_1_the_labels_paragraph_and_the_accident_check(self):
+        norm = prompt_rules.normalize((ROOT / self.ORCH).read_text(encoding="utf-8")).lower()
+        for ph in self.DOC_PHRASES:
+            with self.subTest(phrase=ph):
+                self.assertIn(ph.lower(), norm)
+                self.assertIn("orch-golden-update", self.swap_doc(ph, ""))
+
+    def test_the_orchestrator_prompt_says_it_and_each_part_is_pinned(self):
+        norm = prompt_rules.normalize(real("orchestrator")).lower()
+        for ph in self.PROMPT_PHRASES:
+            with self.subTest(phrase=ph):
+                self.assertIn(ph.lower(), norm)
+                self.assertIn("golden-update-delegation", self.swap_prompt("orchestrator", ph, ""))
+
+    def test_weakening_the_review_gate_is_rejected(self):
+        for old, new in (("only after that PR's review round", "after a review round"),
+                         ("found them intended (no reviewer finding open against them)", "found them intended")):
+            with self.subTest(old=old):
+                self.assertIn("golden-update-delegation", self.swap_prompt("orchestrator", old, new))
+                self.assertIn("orch-golden-update", self.swap_doc(old, new))
+
+    def test_wording_that_gives_the_label_to_the_wrong_party_is_rejected(self):
+        for bad in self.BAD:
+            with self.subTest(bad=bad):
+                self.assertIn("golden-update-delegation", ids(prompt_rules.check_text("orchestrator", real("orchestrator") + "\n\n" + bad)))
+                self.assertIn("orch-golden-update", ids(prompt_rules.check_doc_text(
+                    self.ORCH, (ROOT / self.ORCH).read_text(encoding="utf-8") + "\n\n" + bad)))
+                self.assertIn("worker-golden-update", ids(prompt_rules.check_text("implementer", real("implementer") + "\n\n" + bad)))
+
+    def test_dropping_only_the_orchestrator_is_rejected(self):
+        self.assertIn("orch-golden-update", self.swap_doc("Only the orchestrator adds `golden-update`", "The orchestrator adds `golden-update`"))
+        self.assertIn("golden-update-delegation", self.swap_prompt("orchestrator", "only you add it; no other role and no collaborator does",
+                                                                    "implementers and collaborators never add it"))
+
+    def test_the_collaborator_workflow_doc_no_longer_calls_the_label_owner_only(self):
+        text = (ROOT / self.COLLAB).read_text(encoding="utf-8")
+        norm = prompt_rules.normalize(text).lower()
+        self.assertEqual(prompt_rules.check_doc_text(self.COLLAB, text), [])
+        for ph in self.COLLAB_PHRASES:
+            with self.subTest(phrase=ph):
+                self.assertIn(ph.lower(), norm)
+                mutated = re.sub(re.escape(ph), "", prompt_rules.normalize(text), count=1, flags=re.I)
+                self.assertIn("collab-golden-update", ids(prompt_rules.check_doc_text(self.COLLAB, mutated)))
+        for old in ("(owner-only, ORCHESTRATION §1.1)", "*Owner-only*: merges, settings, spend, `risk:high`, tooling, CI-steering labels."):
+            with self.subTest(old=old):
+                self.assertIn("collab-golden-update", ids(prompt_rules.check_doc_text(self.COLLAB, text + "\n\n" + old)))
+
+    def test_the_implementer_prompt_says_the_orchestrator_adds_the_label(self):
+        ph = "Never add the `golden-update` label yourself: the orchestrator adds it after a review round found the goldens intended."
+        self.assertIn(ph.lower(), prompt_rules.normalize(real("implementer")).lower())
+        self.assertIn("worker-golden-update", self.swap_prompt("implementer", ph, ""))
+
+    def test_tier_0_and_the_never_list_still_name_it(self):
+        text = prompt_rules.normalize(real("orchestrator"))
+        self.assertIn("tier0-labels", ids(prompt_rules.check_text("orchestrator", text.replace("needs-owner.", "needs-owner, golden-update.", 1))))
+        self.assertIn("never-labels", ids(prompt_rules.check_text("orchestrator", text.replace("golden-update, big-pr,", "big-pr,", 1))))
+        self.assertIn("tier-bullets-labels", ids(prompt_rules.check_text(
+            "orchestrator", text.replace("Tier 0, no ask: reply;", "Tier 0, no ask: reply; apply golden-update;", 1))))
+
+
 if __name__ == "__main__":
     unittest.main()
