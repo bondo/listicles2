@@ -152,6 +152,14 @@ class Check(unittest.TestCase):
         pairs = {(p["fg"], p["bg"]): p["min"] for p in REAL["contrastPairs"]}
         self.assertEqual(pairs[("outline", "surface")], 3.0)
 
+    def test_outline_is_gated_on_the_low_and_high_surface_containers(self):
+        # #198 item 2: the outline also sits on list rows (surfaceContainerLow) and cards (surfaceContainerHigh).
+        pairs = {(p["fg"], p["bg"]): p["min"] for p in REAL["contrastPairs"]}
+        for bg in ("surfaceContainerLow", "surfaceContainerHigh"):
+            self.assertEqual(pairs[("outline", bg)], 3.0)
+            self.assertIn(("outline", bg), dt.REQUIRED_PAIRS)
+            self.assertIn(("outline", bg), dt.NON_TEXT_PAIRS)
+
     def test_an_empty_pair_list_fails_the_gate(self):
         bad = copy.deepcopy(REAL)
         bad["contrastPairs"] = []
