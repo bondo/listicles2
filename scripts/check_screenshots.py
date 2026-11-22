@@ -38,6 +38,10 @@ MAX_GOLDEN_BYTES = 300 * 1024  # the guards.sh limit for a PNG
 EXACT_OPTIONS = ("ThresholdValidator(0f)", "maxDistance = 0f", "hShift = 0", "vShift = 0")
 TOLERANCE = re.compile(r"changeThreshold|ThresholdValidator\(|SimpleImageComparator\(|(?:resultValidator|imageComparator)\s*=")
 INPUT_PROBLEM = "app/build.gradle.kts must declare src/test/screenshots as an input of the test tasks (else verify skips when only goldens changed)"
+TOKENS_PROBLEM = (
+    "app/build.gradle.kts must pass design/tokens.json to the test tasks as a TokensArgs argument provider with an @get:InputFile "
+    "(a plain systemProperty tracks no content and puts the absolute path into the cache key)"
+)
 OPTIONS_FILE = "app/src/test/kotlin/dk/bjarkebjarke/tally/ScreenshotOptions.kt"
 COMPOSE_TEST = re.compile(r"create\w*ComposeRule|run\w*ComposeUiTest")
 CAPTURE_CALL = re.compile(r"\bcapture\w*Robo\w*\(|\bRoborazziRule\(")
@@ -157,6 +161,13 @@ def build_problems(root):
     # files(fileTree(..)), not dir(..): a directory input must exist, a file tree may be empty (R1-07).
     if not re.search(r'inputs\s*\.files\(\s*fileTree\("src/test/screenshots"\)', (root / "app/build.gradle.kts").read_text()):
         problems.append(INPUT_PROBLEM)
+    gradle = (root / "app/build.gradle.kts").read_text()
+    if not (
+        re.search(r"@get:InputFile[^)]*\)?[^)]*\bval tokensFile\b", gradle)
+        and "-Dtally.tokensFile=" in gradle
+        and re.search(r"jvmArgumentProviders\.add\(\s*TokensArgs\(", gradle)
+    ) or re.search(r"systemProperty\(\s*\"tally\.tokensFile\"", gradle):
+        problems.append(TOKENS_PROBLEM)
     options = root / OPTIONS_FILE
     text = options.read_text() if options.is_file() else ""
     if not all(want in text for want in EXACT_OPTIONS) or len(re.findall(r"ThresholdValidator\(", text)) != 1:
