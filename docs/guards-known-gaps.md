@@ -91,8 +91,8 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
 - Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
 - YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`), and a plain or quoted value that goes on over more-indented lines
   (`run: ruff check` then `  --fix .`), is read as one logical line. A blank line is a line break, and in a folded scalar so are the
-  breaks before and after a line indented more than the first, as YAML keeps them (PR 309 R1-01, R1-05); `key: >` inside another
-  block scalar is text, not a fold. A sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
+  breaks before and after a line indented more than the first, as YAML keeps them (PR 309 R1-01, R1-05); a comment line ends an
+  unquoted value (R2-01); anchors and tags before `|` or `>` are skipped (R2-02); `key: >` inside another block scalar is text, not a fold. A sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
   the tool, such as `astral-sh/ruff-action` or `docker://rhysd/actionlint`), `entry:` or `id:` (`ruff` and `ruff-check` run
   `ruff check`, `ruff-format` runs `ruff format`) gives the command, and each of its args-like keys (`args`, `extra_args`, `flags`,
   `options`, or a key that starts with the tool name such as `eslint_flags`; not `reviewdog_flags`; at any depth, quoted or not, in
@@ -101,7 +101,7 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   block scalar. A reason waives its own line only: the lines of a key that have no reason are checked together (R1-06).
 - npm `--` tail (issue 164 item 3): npm appends it to the last command of the script, so the script is looked up in every tracked
   package.json (only the top-level `"scripts"` object, as npm writes it: `"scripts": {` alone, then one `"name": "command",` per
-  line; any other layout of a top-level `"scripts"` key makes every tail unknown, R1-02). When that command runs eslint, prettier or tsc (after `VAR=x` and `npx`), the tail is
+  line; any other layout of a top-level `"scripts"` key, or a JSON `\u` escape there, makes every tail unknown, R1-02, R2-03). When that command runs eslint, prettier or tsc (after `VAR=x` and `npx`), the tail is
   checked for that tool; when it runs a test runner that is no linter (jest, vitest, mocha, playwright, cypress, firebase), not at all,
   so `npm test -- -u` passes. When package.json files run different tools for the script, each of them must accept the flag. In every
   other case (an unknown script, `npm exec`/`npx`, a wrapper such as `node x.mjs`, `npm run y`, a path, any other program, or an npm
