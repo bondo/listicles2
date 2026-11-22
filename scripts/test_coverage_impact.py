@@ -292,7 +292,8 @@ def verify_problems(verify):
     for w in wanted:
         if idx[w] < 0:
             problems.append(f"verify.sh full-run block lacks `{w.strip()}`")
-    show = "  grep -q 'uncovered changed lines' \"$LOG_DIR/coverage-impact.log\" 2>/dev/null && sed -n '1p;3,12p' \"$LOG_DIR/coverage-impact.log\" | sed 's/^/      /'"
+    log = '"$LOG_DIR/coverage-impact.log"'
+    show = f"  grep -q 'uncovered changed lines' {log} 2>/dev/null && sed -n '1p;3,12p' {log} | sed 's/^/      /'"
     if show not in block or (wanted[1] in block and block.index(show) < block.index(wanted[1])):
         problems.append("verify.sh does not show the uncovered lines after the coverage impact step")
     coverage = "  step coverage gradle koverVerify -x :core:domain:pitest"

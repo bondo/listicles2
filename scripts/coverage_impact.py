@@ -6,6 +6,7 @@ Usage: python3 -I scripts/coverage_impact.py --xml <kover report.xml> --base <gi
 Reads the Kover XML report (JaCoCo format, `./gradlew koverXmlReport`) and the diff between the merge base of <ref> and HEAD and
 the working tree (committed, staged, unstaged and untracked changes), and prints a markdown summary on stdout: the changed lines
 that have code and ran no instruction, per file. It reports and exits 0; the coverage floors (koverVerify) are the gate.
+Two modules with the same package and file name would share one entry (not a case here).
 Missing, unreadable or empty coverage data, or a ref that cannot be diffed, is an error (exit 2, nothing on stdout): "nothing
 uncovered" only ever means "measured, and covered".
 """
@@ -29,13 +30,17 @@ def changed_lines(diff_text):
     """{path: {line numbers}} of the added or changed lines of a `git diff -U0` text (new-file numbering)."""
     out = {}
     path = None
+    in_header = False  # between `diff --git` and the first hunk: only there is `+++ ` a file name, not added content
     for line in diff_text.splitlines():
-        if line.startswith("+++ "):
+        if line.startswith("diff --git "):
+            in_header, path = True, None
+        elif in_header and line.startswith("+++ "):
             target = line[4:]
             path = None if target == "/dev/null" else target.removeprefix("b/")
-        elif path and (m := HUNK.match(line)):
+        elif m := HUNK.match(line):
+            in_header = False
             start, count = int(m.group(1)), 1 if m.group(2) is None else int(m.group(2))
-            if count:
+            if path and count:
                 out.setdefault(path, set()).update(range(start, start + count))
     return out
 
@@ -127,11 +132,13 @@ def diff_since(base):
     try:
         top = git("rev-parse", "--show-toplevel").strip()
         merge_base = git("merge-base", base, "HEAD", top=top).strip()
-        changed = changed_lines(git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", merge_base, top=top))
+        changed = changed_lines(
+            git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", "--src-prefix=a/", "--dst-prefix=b/", "--no-relative", merge_base, top=top)
+        )
         for name in git("ls-files", "--others", "--exclude-standard", "-z", top=top).split("\0"):
-            if name:
-                count = len((Path(top) / name).read_text(encoding="utf-8", errors="replace").splitlines())
-                changed[name] = set(range(1, count + 1))
+            file = Path(top) / name
+            if name and file.is_file():  # not a nested repository (`dir/`) or a broken link
+                changed[name] = set(range(1, len(file.read_text(encoding="utf-8", errors="replace").splitlines()) + 1))
     except (CoverageError, OSError) as e:
         raise CoverageError(f"cannot diff against {base}: {e}") from e
     return changed
