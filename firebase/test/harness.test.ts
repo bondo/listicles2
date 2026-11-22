@@ -134,3 +134,100 @@ test("outcome: allowed, denied for permission-denied only, and any other error t
     await expect(h.outcome(Promise.reject(error("not-found")))).rejects.toThrow("not-found");
     await expect(h.outcome(Promise.reject(new Error("permission-denied")))).rejects.toThrow();
 });
+
+// M1-08: a new rule cannot forget signedIn(). The rules below differ only in the statement under test.
+const DOCUMENTS = "/databases/{database}/documents";
+const SIGNED_IN = "    function signedIn() { return request.auth.token.email_verified == true; }";
+const rulesWith = (...blocks: string[]): string =>
+    `service cloud.firestore {\n  match ${DOCUMENTS} {\n${[SIGNED_IN, ...blocks].join("\n")}\n  }\n}`;
+const at = (path: string, statement: string): string => `    match ${path} { ${statement} }`;
+
+test("withoutSignedIn accepts signedIn() as a conjunct, and no sign-in on the users doc or config/app", () => {
+    const rules = rulesWith(
+        at("/a/{b}", "allow get: if signedIn();"),
+        at("/a/{b}", "allow create: if signedIn()\n && (x || y) && f(z ? 1 : 2);"),
+        at("/users/{uid}", "allow get: if isCaller(uid);"),
+        at("/config/app", "allow get: if true;"),
+    );
+    expect(h.withoutSignedIn(rules)).toEqual([]);
+});
+
+test.each([
+    "allow get: if x;",
+    "allow get;",
+    "allow get: if x && signedIn();",
+    "allow get: if signedIn() || x;",
+    "allow get: if signedIn() && x || y;",
+    "allow get: if signedIn() && x ? y : z;",
+    "allow get: if signedInSoon();",
+    "allow get: if signedIn() == false;",
+])("withoutSignedIn names %s", (statement) => {
+    const rules = rulesWith(at("/a/{b}", statement), at("/users/{uid}/x/{y}", statement));
+    expect(h.withoutSignedIn(rules)).toHaveLength(2);
+});
+
+test("withoutSignedIn reads nested matches past comments and strings", () => {
+    const nested =
+        "    // a } and the caller's '\n    match /h/{x} {\n      match /m/{y} { allow get: if y == '}'; }\n    }";
+    expect(h.withoutSignedIn(rulesWith(nested))).toEqual([`${DOCUMENTS}/h/{x}/m/{y}: y == ''`]);
+});
+
+// S1-01: a signedIn() redefined in a nested match would pass for the global one.
+const found = (...at: string[]): string[] => [
+    `signedIn() must be declared once, at ${DOCUMENTS}; found: ${at.join(", ") || "none"}`,
+];
+const weak = "function signedIn() { return request.auth != null; }";
+
+test("withoutSignedIn names a signedIn() not declared exactly once, at the documents level", () => {
+    const shadowed = rulesWith(at("/a/{b}", `${weak} allow get: if signedIn() && true;`));
+    expect(h.withoutSignedIn(shadowed)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
+    expect(h.withoutSignedIn(rulesWith(`    ${weak}`))).toEqual(found(DOCUMENTS, DOCUMENTS));
+    expect(h.withoutSignedIn(rulesWith().replace(SIGNED_IN, ""))).toEqual(found());
+    // S2-01 and R2-04: one declaration, but in a nested match or in the service block.
+    const nestedOnly = rulesWith(at("/a/{b}", weak)).replace(SIGNED_IN, "");
+    expect(h.withoutSignedIn(nestedOnly)).toEqual(found(`${DOCUMENTS}/a/{b}`));
+    const service = rulesWith().replace(SIGNED_IN, "").replace("{\n", `{\n${SIGNED_IN}\n`);
+    expect(h.withoutSignedIn(service)).toEqual(found("the service block"));
+    const commented = rulesWith(at("/a/{b}", weak.replace(" ", "/**/"))); // R2-03
+    expect(h.withoutSignedIn(commented)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
+    const split = rulesWith(at("/a/{b}", weak.replace(" ", "\n")));
+    expect(h.withoutSignedIn(split)).toEqual(found(DOCUMENTS, `${DOCUMENTS}/a/{b}`));
+});
+
+// R2-01 to R2-03: an escaped quote in a string, `match` with no space, a comment between keywords.
+test.each([
+    [
+        "an escaped ' in a string",
+        at("/a/{b}", "allow get: if signedIn() && f('\\'x'); allow get: if b == 'x';"),
+    ],
+    [
+        'an escaped " in a string',
+        at("/a/{b}", 'allow get: if signedIn() && f("\\"x"); allow get: if b == "x";'),
+    ],
+    ["match with no space", "    match /users/{uid} { match/a/{b} { allow get: if b == ''; } }"],
+    ["a comment in allow/**/get", at("/a/{b}", "allow/**/get: if b == '';")],
+    ["a CR in a // comment", at("/a/{b}", "// x\r }\n allow get: if b == '';")],
+    ["two /* */ comments, one over lines", at("/a/{b}", "/* }\n */ allow get: if b == ''; /* */")],
+])("withoutSignedIn reads %s", (_what, block) => {
+    expect(h.withoutSignedIn(rulesWith(block))).toEqual([
+        expect.stringMatching(/\/a\/\{b\}: b == ''$/),
+    ]);
+});
+
+// Fail closed: text the rules compiler may read otherwise throws (R2-01 to R3-04).
+test.each([
+    ["no ; at the end (the allow count)", "    match /a/{b} { allow get: if x }"],
+    [
+        "no ; then a function",
+        `    match /a/{b} { match /c/{d} { allow get: if signedIn() } ${weak} }`,
+    ],
+    ["a space in a path", "    match /users/{uid} { match /x/ {y} { allow get: if true; } }"],
+    ["a match without a path", "    match a/{b} { allow get: if signedIn(); }"],
+    ["an open ' string", at("/a/{b}", "allow get: if b == 'x;")],
+    ['an open " string', at("/a/{b}", 'allow get: if b == "x;')],
+    ["an extra {", at("/a/{b}", "allow get: if signedIn();") + " {"],
+    ["an extra }", at("/a/{b}", "allow get: if signedIn(); }")],
+    ["no ; and no condition", `    match /a/{b} { match /c/{d} { allow get } ${weak} }`],
+])("withoutSignedIn throws on %s", (_what, block) => {
+    expect(() => h.withoutSignedIn(rulesWith(block))).toThrow("rules:");
+});
