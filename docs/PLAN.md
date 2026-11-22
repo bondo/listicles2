@@ -521,8 +521,9 @@ enforce the rules rather than goodwill.
 
 1. The author session opens a small PR (one concern, target under about 400 changed lines),
    using a PR template that covers scope, test evidence, and screenshots for UI changes.
-2. After CI is green, a **fresh Claude session** (no shared context) reviews the diff against
-   `REVIEW.md`: correctness, security rules, test adequacy (do the tests fail when the
+2. A **fresh Claude session** (no shared context) reviews the diff against `REVIEW.md` as soon as the author has pushed,
+   without waiting for CI (`docs/ORCHESTRATION.md` §7.1; CI must be green before the PR is marked READY and before the merge request):
+   correctness, security rules, test adequacy (do the tests fail when the
    code is wrong?), offline/sync behavior, i18n, accessibility, free-tier cost, and
    every `// justified:` suppression.
 3. Findings are posted as one PR comment containing a JSON block (format in
@@ -537,7 +538,7 @@ enforce the rules rather than goodwill.
    and focuses on the commits since the last round: it re-checks open findings, reviews the new code and how the fixes interact with the old code.
 6. When only nits or deferred minors remain, the reviewer posts "ready (nits only)" and the orchestrator marks the PR READY. The merge agent squash-merges it, or an owner-only PR waits for the owner or the approver's record (`docs/ORCHESTRATION.md` §7.5).
    If round 4 of a batch still has open findings above nit (deferred minors do not count), one escalation reviewer per PR decides
-   fix, split or owner (`REVIEW.md`, Loop and cap); its ruling is final, so nothing it decides reaches you.
+   fix, split or owner (`REVIEW.md`, Loop and cap); its ruling is final; only a finding above nit still open after a `fix` ruling's round 5 reaches you.
 
 ## 7. Milestones (each one is one or more PRs, each reviewed)
 

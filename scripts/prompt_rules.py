@@ -308,6 +308,13 @@ def resolve_permissions(text):
     return found
 
 
+# Stale or widened forms of the push decision (#15 comment 7075952806 item 2): the old loop-wait recipe, and "after a push" for "after every fix push".
+PUSH_WORDING_STALE = (
+    r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
+    r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push",
+    r"loop for ci after a fix push",
+)
+
 RULES = (
     Rule(
         "data-fenced", ALL,
@@ -892,7 +899,8 @@ RULES = (
             r"you are the escalation reviewer", r"opus, max effort", r"once per pr", r"no second escalation",
             r"decide `fix`, `split` or `owner`", r"one more fresh round",
             r"`owner`: taste or scope: you decide it yourself, per finding `fix` or `drop`; your ruling is final "
-            r"\(owner decision, #15 comment 7075812943\)\.",
+            r"\(owner decision, #15 comment 7075812943\)\. a per-finding `fix` gets the same one fresh round 5 as a `fix` ruling "
+            r"\(anything above nit still open after it goes to the owner\)\.",
             r"never edit or push the pr branch: report only", r"use up the pr's one escalation",
             r"a `drop` sets the finding to `withdrawn`", r"no finding stays open for the owner",  # R1-04 of #129; R1-02 of #299
             r"usage limit reset: re-read the pr head, the thread and your notes",  # R1-05 of #129
@@ -900,6 +908,30 @@ RULES = (
         ),
         "the escalation reviewer decides fix, split or owner once per PR, decides an owner question itself and never edits the branch (rev 46 row 4)",
         forbidden=(r"taste or scope goes to the owner", r"an `owner` finding stays open for the owner"),
+    ),
+    Rule(
+        "orch-reviews-on-push", ("orchestrator",),
+        (
+            r"reviews start on push \(§7\.1, owner decision, #15 comment 7075952806\): spawn the reviewer as soon as the implementer has pushed, "
+            r"without waiting for ci",
+            r"the implementer does not wait in a loop for ci after every fix push",
+            r"ci must be green on the head before you mark the pr ready and before the merge request",
+            r"do not loop-wait for ci after every fix push \(reviews start on push, §7\.1\)",
+        ),
+        "the orchestrator spawns the reviewer on the push, the implementer does not loop-wait for CI, CI must be green before READY and the merge request "
+        "(owner decision, #15 comment 7075952806; ORCHESTRATION 7.1)",
+        forbidden=PUSH_WORDING_STALE,
+    ),
+    Rule(
+        "implementer-reviews-on-push", ("implementer",),
+        (
+            r"reviews start on push \(`docs/orchestration\.md` §7\.1, owner decision, #15 comment 7075952806\): the orchestrator spawns the reviewer "
+            r"as soon as you have pushed; do not wait in a loop for ci after every fix push",
+            r"end the turn with all work committed and pushed",
+            r"ci must be green before ready and before the merge request",
+        ),
+        "the implementer checks with verify.sh, pushes and ends the turn; it does not loop-wait for CI (owner decision, #15 comment 7075952806)",
+        forbidden=PUSH_WORDING_STALE,
     ),
     Rule(
         "orch-model", ("orchestrator",),
@@ -1035,7 +1067,7 @@ RULES = (
             r"1\. head: the pr head is the head sha you were given\. a later commit needs a new approval",
             r"2\. scope: every owner-only changed path is tooling, build, ci or gate \(`scripts/`, build files, `ci\.yml` and other workflows, "
             r"`verification-metadata`, architecture and gate tests, `merge_ready\.py` and similar\); a path that may merge as `general` "
-            r"\(`scripts/merge_ready\.py`\) does not count; and none is on the owner-retained list below\. "
+            r"\(as `scripts/merge_ready\.py` `owner_only` decides, e\.g\. `docs/tasks\.toml`\) does not count; and none is on the owner-retained list below\. "
             r"an owner-only path outside those classes, such as a design or product doc, is not yours to approve",
             r"3\. review\.md: the pr meets it: about 400 changed lines or fewer, a failing test committed first with negative cases and wired into "
             r"`scripts/verify\.sh` and ci, and no suppression, baseline, skipped test or lowered threshold without the owner's recorded decision",
@@ -1139,10 +1171,12 @@ DOC_RULES = (
         "review-escalation", "REVIEW.md",
         (
             r"one escalation reviewer per pr", r"agents/prompts/escalation-reviewer\.md", r"decides `fix`, `split` or `owner`",
-            r"one more fresh round \(round 5\)", r"goes to the owner", r"no second escalation", r"no commit lands unreviewed",
+            r"one more fresh round \(round 5\) reviews\. anything above `nit` still open after it goes to the owner",
+            r"no second escalation", r"no commit lands unreviewed",
             r"the escalation reviewer rules with both arguments in front of it", r"a dropped finding becomes `withdrawn`",
             r"`owner`: taste or scope questions, which the escalation reviewer decides itself, per finding `fix` or `drop` "
             r"\(owner decision, #15 comment 7075812943\)", r"no finding is left open for the owner",
+            r"a per-finding `fix` gets the same one fresh round 5 as a `fix` ruling \(anything above nit still open after it goes to the owner\)",
         ),
         "REVIEW.md: after round 4 one escalation reviewer decides; a dispute uses the same single escalation (rev 46 row 4); its owner ruling is final",
         forbidden=(r"an `owner` finding stays open for the owner", r"taste or scope questions, which stay with the owner",
@@ -1176,9 +1210,13 @@ DOC_RULES = (
             r"the same implementer session in every round", r"about 30 changed lines or fewer", r"the whole pr diff",
             r"how the fixes interact with the old code", r"one escalation reviewer per pr decides fix, split or owner",
             r"only nits or deferred minors remain", r"deferred minors do not count",
+            r"2\. a \*\*fresh claude session\*\* \(no shared context\) reviews the diff against `review\.md` as soon as the author has pushed, "
+            r"without waiting for ci \(`docs/orchestration\.md` §7\.1; ci must be green before the pr is marked ready and before the merge request\)",
         ),
-        "PLAN section 6 follows REVIEW.md: whole-diff rounds, minors fixed by default, the single escalation (#129 R1-02)",
-        forbidden=(r"sees only the commits since the last", r"doesn't re-review unchanged code", r"the loop stops and you decide"),
+        "PLAN section 6 follows REVIEW.md: whole-diff rounds, minors fixed by default, the single escalation (#129 R1-02); the review starts on "
+        "the push, CI green before READY (#15 comment 7075952806)",
+        forbidden=(r"sees only the commits since the last", r"doesn't re-review unchanged code", r"the loop stops and you decide",
+                   r"after ci is green, a \*\*fresh claude session\*\*"),
     ),
     DocRule(
         "plan-working-rules", "docs/PLAN.md",
@@ -1595,8 +1633,13 @@ DOC_RULES = (
     ),
     DocRule(
         "followups-over-cap", "docs/FOLLOW-UPS.md",
-        (r"minors out of the pr's scope or at the line guard may still be deferred \(owner decision, #15 comment 7075812943\)",),
-        "FOLLOW-UPS section 1: the over-cap deferral exception of the owner decision stands next to the stop-and-ask rule",
+        (r"the orchestrator may still defer minors out of the pr's scope or at the line guard \(owner decision, #15 comment 7075812943; "
+         r"an implementer in a manual loop still asks the owner\)",
+         r"asks the owner which follow-ups to fix as small prs \(except the orchestrator's deferral of minors out of the pr's scope or at the "
+         r"line guard, #15 comment 7075812943\)"),
+        "FOLLOW-UPS section 1 and the risk table: the over-cap deferral exception of the owner decision is the orchestrator's alone and stands "
+        "next to the stop-and-ask rule",
+        forbidden=(r"minors out of the pr's scope or at the line guard may still be deferred",),
     ),
     DocRule(
         "review-approver-record", "REVIEW.md",
@@ -1608,6 +1651,29 @@ DOC_RULES = (
         (r"an owner-only pr waits for the owner's approval or the approver's record",
          r"or an owner-only pr waits for the owner or the approver's record"),
         "PLAN section 6: an owner-only PR waits for the owner or the approver's record (#15 comment 7075812943)",
+    ),
+    DocRule(
+        "plan-escalation-final", "docs/PLAN.md",
+        (r"its ruling is final; only a finding above nit still open after a `fix` ruling's round 5 reaches you",),
+        "PLAN section 6: the escalation ruling is final, and only what is still open above nit after a `fix` ruling's round 5 reaches the owner",
+        forbidden=(r"so nothing it decides reaches you", r"only what it sends to the owner reaches you"),
+    ),
+    DocRule(
+        "orch-reviews-on-push", ORCH,
+        (
+            r"\*\*reviews start on push \(owner decision, #15 comment 7075952806\):\*\* the orchestrator spawns the reviewer as soon as the "
+            r"implementer has pushed, without waiting for ci\. the implementer does not wait in a loop for ci after every fix push; it checks with "
+            r"`scripts/verify\.sh`, pushes and ends its turn\. ci must be green on the head before the pr is marked ready \(§7\.5\) and before "
+            r"the merge request; a red ci is diagnosed at once \(§7\.4\) and fixed in the next push\. this bullet is the home of the rule",
+            r"\(4\) ci is green on the pr head \(§7\.1\)",
+            r"marks a draft pr ready after clean review rounds and with ci green on the head \(§7\.1\)",
+            r"wait for `scripts/verify\.sh` with a monitor/until-loop and do not end the turn while it runs; do not loop-wait for ci after every fix push "
+            r"\(reviews start on push, §7\.1\)",
+            r"after every fix push do not wait in a loop for ci: the reviewer starts on your push \(orchestration §7\.1\)",
+        ),
+        "ORCHESTRATION 7.1 (home), 7.5, 7.8 and 8.2: reviews start on push, no loop-wait for CI, CI green before READY and the merge request "
+        "(owner decision, #15 comment 7075952806)",
+        forbidden=PUSH_WORDING_STALE,
     ),
 )
 
