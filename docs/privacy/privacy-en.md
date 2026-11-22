@@ -18,7 +18,9 @@ what data the app collects and is responsible for it. Questions go to the contac
 - your email address;
 - your password, if you sign up with email and password (only Google stores it; Tally's own database never holds
   it);
-- if you sign in with Google: your Google account's identifier and the name Google shares at sign-in;
+- if you sign in with Google: your Google account's identifier and the profile data Google shares at sign-in: your
+  name, your email address and a link to your profile photo. The app does not show or use the photo.
+  `[To confirm with M1-14: which of these fields the sign-in record keeps.]`
 - if you turn on two-step verification: what is needed to check your authenticator app's codes;
 - technical data that Google logs when you sign in, such as your IP address and the type of device or browser.
 
@@ -32,7 +34,8 @@ what data the app collects and is responsible for it. Questions go to the contac
 
 **On your phone:** a copy of your lists so the app also works offline, and the name of your household. Both are
 removed when you sign out or delete your account. The phone also keeps when you last opened each list on it, to
-sort your lists; this never leaves the phone. `[To confirm (M2): whether it is removed at sign-out.]`
+sort your lists; this never leaves the phone and is removed too when you sign out (signing out clears all of
+Tally's data on the phone for your account).
 
 Tally has no ads and **no analytics**: the app does not measure how you use it.
 
@@ -55,7 +58,7 @@ Tally has no ads and **no analytics**: the app does not measure how you use it.
 - **Sign-in (Firebase Authentication)** is processed **in the USA**: Google runs this service only from data
   centres there.
 - **Your lists and household (Cloud Firestore)** are stored **in the EU**, in Google's `eur3` location
-  (Belgium and the Netherlands).
+  (Belgium and the Netherlands). Google may process the data outside the EU under its own terms.
 
 ## 5. Crash reports (only if you turn them on)
 
@@ -64,8 +67,8 @@ Crash reports are **off** until you turn on "Send crash reports" in Account. You
 When they are on and the app crashes, a report goes to Google's Firebase Crashlytics. It holds, for example, what
 went wrong in the app's code (the crash trace), the app version, the phone model and Android version, technical
 details such as free memory and disk space and whether the phone is rooted, and random identifiers for the app
-installation so that crashes from the same phone can be grouped. `[To confirm (M1-25): the report holds no name,
-email address or list contents.]` Google keeps crash reports for 90 days.
+installation so that crashes from the same phone can be grouped. The app never sets a user id or custom keys in
+the report, so it holds no name, email address or list contents. Google keeps crash reports for 90 days.
 
 ## 6. Checking the device (App Check)
 
@@ -99,9 +102,19 @@ Google deletes the remaining sign-in data on its side within 180 days and logged
 
 ## 8. Changes
 
-If this text changes in a way that matters to you, the new version will say so at the top, with its date.
+This text may change. The current version is the one on this page.
 
-## 9. Contact
+## 9. Your rights and contact
+
+*Not legal advice.* You can ask the person responsible for:
+
+- **access**: to see what Tally holds about you;
+- **correction**: to fix what is wrong (your name you can change yourself in Account);
+- **deletion**: in the app or without it (section 7);
+- and you can **complain** to the Danish data protection authority, Datatilsynet.
+
+Why Tally handles your data: to provide the app you asked for (a contract), and, for crash reports, your consent
+(the switch in Account, section 5).
 
 Questions about your data or this text: `[contact]`.
 
