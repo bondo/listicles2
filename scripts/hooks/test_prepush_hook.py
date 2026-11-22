@@ -121,8 +121,10 @@ class PrePushHook(unittest.TestCase):
         """R11-51: git exports GIT_DIR when pushing from a linked worktree; the guards and tests the hook runs must not inherit it."""
         sentinel = tempfile.mkdtemp()
         subprocess.run(["git", "init", "-q", sentinel], check=True)
-        probe = ("import subprocess, unittest\n\nclass T(unittest.TestCase):\n    def test_x(self):\n"
-                 "        subprocess.run(['git', 'config', 'leak.probe', '1'], check=True)\n")
+        # The runner starts the tests in an empty cwd (R2-01), so the probe names its own throwaway repo as cwd: without a leaked
+        # GIT_DIR it writes there, with one it writes to the sentinel.
+        probe = ("import os, subprocess, unittest\n\nclass T(unittest.TestCase):\n    def test_x(self):\n"
+                 "        subprocess.run(['git', 'config', 'leak.probe', '1'], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))\n")
         with open(os.path.join(self.repo, "scripts", "hooks", "test_stub.py"), "w") as f:
             f.write(probe)
         self.commit(".githooks/note.md", "x")
