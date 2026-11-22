@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 31/75 (41%) | 44 |
+| M1 | Accounts and households | 32/76 (42%) | 44 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 31/75 done (41%), 44 open.
+**Progress:** 32/76 done (42%), 44 open.
 
 ### Tasks
 
@@ -149,10 +149,10 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-32 | Account&#58; delete account (AUTH-04) with recent sign-in, resumable | blocked | M1-22, M1-21 | implementer |  |
 | M1-23 | Optional TOTP two-step verification (AUTH-09) | blocked | M1-32, M1-O3 | implementer |  |
 | M1-25 | Account screen (wireframe 18) and navigation&#58; sign-out UI (AUTH-03), Crashlytics opt-in switch, … | blocked | M1-60, M1-14 | implementer |  |
-| M1-26 | App Check&#58; Play Integrity in release, debug provider in debug builds (not enforced) | ready | M1-30 | implementer |  |
+| M1-26 | App Check&#58; Play Integrity in release, debug provider in debug builds (not enforced) | in progress | M1-30 | implementer | [#317](https://github.com/bondo/listicles2/issues/317) |
 | M1-27 | Minimum app version&#58; config/app.minVersionCode, schemaVersion, update screen | blocked | M1-08, M1-60, M1-62 | implementer |  |
 | M1-28 | Privacy text draft in English and Danish (OQ-30) | done | M1-01 | planner | [#286](https://github.com/bondo/listicles2/issues/286) |
-| M1-33 | Release smoke build with R8 in CI (best-practices checklist follow-up 7) | in progress | M1-30 | implementer | [#312](https://github.com/bondo/listicles2/issues/312) |
+| M1-33 | Release smoke build with R8 in CI (best-practices checklist follow-up 7) | done | M1-30 | implementer |  |
 | M1-52 | Rules test harness&#58; default-deny paths from PLAN section 3, list and collection-group queries, unv… | done | M1-35 | implementer | [#301](https://github.com/bondo/listicles2/issues/301) |
 | M1-53 | Rules&#58; transfer ownership, allow and deny tests (partial transfers, plain member, non-member) | blocked | M1-10 | implementer |  |
 | M1-54 | Rules&#58; the join batch with the one-household check, allow and deny tests | blocked | M1-12 | implementer |  |
@@ -193,6 +193,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-O10 | Ask the owner about the repo rename to Tally (right before M1-O1) | owner to-do | M1-29 | owner |  |
 | M1-O11 | Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… | owner to-do | M1-03 | owner |  |
 | M1-O12 | Decide #280 (who may list invites) before M1-12 starts | owner to-do | none | owner |  |
+| M1-O13 | Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… | owner to-do | M1-33 | owner |  |
 
 ### Open tasks and what blocks them
 
@@ -220,44 +221,44 @@ flowchart LR
     n17["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
     n18["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
     n19["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
-    n20["M1-26 App Check: Play Integrity in release, d… (ready)"]:::ready
+    n20["M1-26 App Check: Play Integrity in release, d… (in progress)"]:::progress
     n21["M1-27 Minimum app version: config/app.min… (blocked)"]:::blocked
-    n22["M1-33 Release smoke build with R8 in CI (be… (in progress)"]:::progress
-    n23["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
-    n24["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
-    n25["M1-61 Java API level check: also look up clas… (ready)"]:::ready
-    n26["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n27["M1-42 guards check 2c: actionlint flags and r… (in progress)"]:::progress
-    n28["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
-    n29["M1-46 build-logic convention plugins#59; no allp… (ready)"]:::ready
-    n30["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n31["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n32["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n33["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n34["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n35["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n36["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n37["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n38["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n39["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n40["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n41["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
-    n42["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n43["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
+    n22["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
+    n23["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
+    n24["M1-61 Java API level check: also look up clas… (ready)"]:::ready
+    n25["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
+    n26["M1-42 guards check 2c: actionlint flags and r… (in progress)"]:::progress
+    n27["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
+    n28["M1-46 build-logic convention plugins#59; no allp… (ready)"]:::ready
+    n29["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n30["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n31["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n32["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n33["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n34["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n35["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n36["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n37["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n38["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
+    n39["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
+    n40["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
+    n41["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n42["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
+    n43["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
     n3 --> n0
     n1 --> n2
     n2 --> n3
-    n24 --> n4
     n23 --> n4
+    n22 --> n4
     n3 --> n5
-    n43 --> n5
+    n42 --> n5
     n7 --> n8
     n6 --> n8
     n7 --> n9
     n8 --> n10
     n9 --> n10
     n6 --> n10
-    n24 --> n11
+    n23 --> n11
     n7 --> n11
     n6 --> n11
     n4 --> n12
@@ -272,29 +273,58 @@ flowchart LR
     n16 --> n17
     n15 --> n17
     n17 --> n18
-    n35 --> n18
+    n34 --> n18
     n7 --> n19
     n1 --> n21
     n6 --> n21
-    n3 --> n23
-    n5 --> n24
-    n1 --> n26
-    n3 --> n26
-    n11 --> n26
-    n10 --> n26
-    n19 --> n26
-    n6 --> n26
+    n3 --> n22
+    n5 --> n23
+    n1 --> n25
+    n3 --> n25
+    n11 --> n25
+    n10 --> n25
+    n19 --> n25
+    n6 --> n25
+    n9 --> n29
+    n10 --> n29
+    n13 --> n29
+    n14 --> n29
+    n15 --> n29
+    n16 --> n29
+    n18 --> n29
+    n19 --> n29
+    n21 --> n29
+    n17 --> n29
+    n25 --> n29
+    n0 --> n30
+    n1 --> n30
+    n2 --> n30
+    n3 --> n30
+    n4 --> n30
+    n5 --> n30
+    n7 --> n30
+    n8 --> n30
     n9 --> n30
     n10 --> n30
+    n11 --> n30
     n13 --> n30
     n14 --> n30
     n15 --> n30
     n16 --> n30
     n18 --> n30
     n19 --> n30
+    n20 --> n30
     n21 --> n30
+    n6 --> n30
+    n12 --> n30
     n17 --> n30
+    n25 --> n30
     n26 --> n30
+    n27 --> n30
+    n28 --> n30
+    n29 --> n30
+    n22 --> n30
+    n23 --> n30
     n0 --> n31
     n1 --> n31
     n2 --> n31
@@ -314,57 +344,26 @@ flowchart LR
     n19 --> n31
     n20 --> n31
     n21 --> n31
-    n6 --> n31
     n12 --> n31
     n17 --> n31
-    n22 --> n31
+    n25 --> n31
     n26 --> n31
     n27 --> n31
     n28 --> n31
     n29 --> n31
     n30 --> n31
+    n22 --> n31
     n23 --> n31
     n24 --> n31
-    n0 --> n32
-    n1 --> n32
-    n2 --> n32
-    n3 --> n32
-    n4 --> n32
-    n5 --> n32
-    n7 --> n32
-    n8 --> n32
-    n9 --> n32
-    n10 --> n32
-    n11 --> n32
-    n13 --> n32
-    n14 --> n32
-    n15 --> n32
-    n16 --> n32
-    n18 --> n32
-    n19 --> n32
-    n20 --> n32
-    n21 --> n32
-    n12 --> n32
-    n17 --> n32
-    n22 --> n32
-    n26 --> n32
-    n27 --> n32
-    n28 --> n32
-    n29 --> n32
-    n30 --> n32
-    n31 --> n32
-    n23 --> n32
-    n24 --> n32
-    n25 --> n32
-    n6 --> n32
-    n41 --> n33
-    n33 --> n34
-    n33 --> n35
-    n33 --> n36
-    n20 --> n36
-    n33 --> n38
-    n4 --> n38
-    n28 --> n40
+    n6 --> n31
+    n40 --> n32
+    n32 --> n33
+    n32 --> n34
+    n32 --> n35
+    n20 --> n35
+    n32 --> n37
+    n4 --> n37
+    n27 --> n39
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -465,6 +464,7 @@ flowchart LR
 - **owner to-do** [#285](https://github.com/bondo/listicles2/issues/285): &#91;owner&#93; M1-O12&#58; Decide #280 (who may list invites) before M1-12 starts
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
+- **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
 - **task** M1-06: waits on M1-10
 - **task** M1-09: waits on M1-08
 - **task** M1-10: waits on M1-09
@@ -487,8 +487,8 @@ flowchart LR
 - **task** M1-54: waits on M1-12
 - **task** M1-39: waits on M1-08, M1-10, M1-18 +3
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +8
-- **task** M1-48: waits on M1-06, M1-08, M1-09 +27
-- **task** M1-FU: waits on M1-06, M1-08, M1-09 +29
+- **task** M1-48: waits on M1-06, M1-08, M1-09 +26
+- **task** M1-FU: waits on M1-06, M1-08, M1-09 +28
 - **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
