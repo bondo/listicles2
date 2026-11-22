@@ -435,6 +435,32 @@ val testLicenseeGate =
                     passes = false,
                     message = terms,
                 ),
+                // M1-26: the owner accepted the Play Integrity terms and the Play Core license (issue 15); no other URL is allowed.
+                licenseeCase(
+                    "play integrity terms, listed",
+                    "fixture:play-tos:1.0",
+                    "approved-play-tos.txt",
+                    passes = true,
+                ),
+                licenseeCase(
+                    "play core license, listed",
+                    "fixture:play-core:1.0",
+                    "approved-play-core.txt",
+                    passes = true,
+                ),
+                licenseeCase(
+                    "play terms, not listed",
+                    "fixture:play-tos:1.0",
+                    passes = false,
+                    message = "integrity/overview#tos",
+                ),
+                licenseeCase(
+                    "unlisted google url, listed artifact",
+                    "fixture:play-other:1.0",
+                    "approved-play-other.txt",
+                    passes = false,
+                    message = notGoogle,
+                ),
                 licenseeCase(
                     "entry without reason",
                     "fixture:google-a:1.0",
