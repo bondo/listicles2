@@ -26,10 +26,13 @@ import java.io.File
  * packages, or `AndroidViewModel` is a violation: a ViewModel gets what it needs from injected domain types. Not
  * covered (review catches it): a `Context` reached through a type alias or a class from another module that wraps one.
  *
- * **No `Dispatchers.` outside a DI module** ([dispatchersOutsideDiViolations], M1-57). A DI module is a file with a
- * `@Module` annotation (Dagger or Hilt), wherever it lives: the rule keys on the annotation, not on a path, so it is
- * active before the first module exists and needs no path decision. In any other production file `Dispatchers` is a
- * violation, import included; the dispatcher is injected. Tests are not scanned (`Dispatchers.setMain` is legitimate).
+ * **No `Dispatchers.` outside a DI module** ([dispatchersOutsideDiViolations], M1-57). A DI module is a file with
+ * `@dagger.Module`, or `@Module` plus an `import dagger.Module` (or `dagger.*`), wherever it lives: the rule keys on
+ * the annotation, not on a path, so it is active before the first module exists and needs no path decision. The
+ * exemption covers the whole file; a `@Module` from another library does not count. In any other production file
+ * `Dispatchers` is a violation, import included; the dispatcher is injected. Test code is not scanned
+ * ([productionSourceDirs]: no `test`, `androidTest`, `testFixtures` or variant test source set, and not the
+ * `core/testing` support module), because `Dispatchers.setMain` is legitimate there.
  *
  * Which directories are scanned is [uiSourceDirs] (every production source set of each module) and [allSourceDirs]
  * (every source set). Assumes the data layer's package is `dk.bjarkebjarke.tally.data`; a module that picks another
@@ -64,13 +67,22 @@ object DataSourceRules {
     // `Dispatchers.IO`, `import kotlinx.coroutines.Dispatchers`, a qualified use; `AppDispatchers` does not match.
     private val dispatchers = Regex("""(?<!\w)Dispatchers(?!\w)""")
 
-    // A Dagger or Hilt module: `@Module`, `@dagger.Module`.
-    private val diModuleAnnotation = Regex("""(?<!\w)@(?:\w+:)?(?:\w+\.)*Module(?!\w)""")
+    // A Dagger or Hilt module: `@dagger.Module`, or `@Module` in a file that imports `dagger.Module` (or `dagger.*`).
+    // A `@Module` from another library (Koin, JPMS-style) does not make a file a DI module.
+    private val daggerModuleQualified = Regex("""(?<!\w)@(?:\w+:)?dagger\.Module(?!\w)""")
+    private val moduleAnnotation = Regex("""(?<!\w)@(?:\w+:)?Module(?!\w)""")
+    private val daggerModuleImport = Regex("""(?m)^\s*import\s+dagger\.(?:Module(?!\w)|\*)""")
 
     private val globalScope = Regex("""(?<![\w])GlobalScope(?!\w)""")
 
     // Source sets that are not production code; a UI file in one of them may use a fake or an emulator client.
     private val testSourceSets = setOf("test", "androidTest", "testFixtures")
+
+    // `testDebug`, `testFlavorDebug`, `androidTestRelease`: variant test source sets.
+    private val variantTestSourceSet = Regex("""(?:test|androidTest)[A-Z]\w*""")
+
+    // Modules that only hold test support code; their source sets are named `main`.
+    private val testSupportModules = setOf("core/testing/src/main")
 
     // Directories that hold no module: build output, dependency caches and hidden directories.
     private val skippedDirs = setOf("build", "node_modules")
@@ -91,15 +103,26 @@ object DataSourceRules {
             .filter { isViewModelFile(it) }
             .flatMap { matches(it, platformInViewModel) }
 
-    /** `Dispatchers.` in a file that is not a DI module, that is a file without a `@Module` annotation (M1-57). */
+    /** `Dispatchers.` in a file that is not a Dagger or Hilt module (M1-57). */
     fun dispatchersOutsideDiViolations(dir: File): List<String> =
         ArchitectureRules
             .codeFiles(dir)
-            .filterNot { diModuleAnnotation.containsMatchIn(it.text) }
+            .filterNot { isDiModule(it) }
             .flatMap { matches(it, dispatchers) }
 
     /** Every production source set (all but test, androidTest and testFixtures) of every module. */
     fun uiSourceDirs(projectRoot: File): List<File> = sourceSets(projectRoot).filter { it.name !in testSourceSets }
+
+    /**
+     * Production source sets for the `Dispatchers` rule: [uiSourceDirs] minus every variant test source set (a name
+     * that starts with `test` or `androidTest` followed by a capital: `testDebug`, `androidTestRelease`) and minus the
+     * `core/testing` module, which is test support although its source set is named `main`.
+     */
+    fun productionSourceDirs(projectRoot: File): List<File> =
+        uiSourceDirs(projectRoot).filter { dir ->
+            !variantTestSourceSet.matches(dir.name) &&
+                dir.relativeTo(projectRoot).path.replace(File.separatorChar, '/') !in testSupportModules
+        }
 
     /** Every source set (`main`, `test`, `androidTest`, ...) of every module. Build output is never scanned. */
     fun allSourceDirs(projectRoot: File): List<File> = sourceSets(projectRoot)
@@ -120,6 +143,10 @@ object DataSourceRules {
 
     private fun isUiFile(file: ArchitectureRules.CodeFile): Boolean =
         composable.containsMatchIn(file.text) || isViewModelFile(file)
+
+    private fun isDiModule(file: ArchitectureRules.CodeFile): Boolean =
+        daggerModuleQualified.containsMatchIn(file.text) ||
+            (moduleAnnotation.containsMatchIn(file.text) && daggerModuleImport.containsMatchIn(file.text))
 
     private fun isViewModelFile(file: ArchitectureRules.CodeFile): Boolean =
         file.name.endsWith("ViewModel.kt") ||

@@ -70,6 +70,14 @@ class NoPlatformInViewModelTest {
     }
 
     @Test
+    fun rejectsWildcardImportsOfTheActivityPackagesAndOtherActivityClasses() {
+        violationsOf("import androidx.activity.*\n\nclass A : ViewModel()", "ui/A.kt").shouldNotBeEmpty()
+        violationsOf("import androidx.appcompat.app.*\n\nclass B : ViewModel()", "ui/B.kt").shouldNotBeEmpty()
+        violationsOf("import androidx.fragment.app.*\n\nclass C : ViewModel()", "ui/C.kt").shouldNotBeEmpty()
+        violationsOf("import android.app.ListActivity\n\nclass D : ViewModel()", "ui/D.kt").shouldNotBeEmpty()
+    }
+
+    @Test
     fun rejectsViewModelThatImportsApplication() {
         violationsOf(
             "import android.app.Application\n\nclass ListsViewModel(val app: Application) : ViewModel()",
@@ -144,6 +152,12 @@ class NoPlatformInViewModelTest {
                 "import androidx.lifecycle.AndroidViewModelFactory\n\n" +
                 "class ListsViewModel(val c: CoroutineContext, val e: ActivityEntry) : ViewModel()",
         ).shouldBeEmpty()
+    }
+
+    @Test
+    fun acceptsActivityLikeNamesInThePlatformPackages() {
+        violationsOf("import android.app.ActivityManager\nimport android.app.Applications\n\nclass A : ViewModel()")
+            .shouldBeEmpty()
     }
 
     @Test
