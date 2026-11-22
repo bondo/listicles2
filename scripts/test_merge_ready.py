@@ -650,7 +650,8 @@ class GhApiTests(unittest.TestCase):
 
     def test_a_flake_status_is_retried_and_the_second_answer_counts(self):
         for status in (429, 500, 502, 503, 504):
-            for form, err in (("json message", f"gh: Server Error (HTTP {status})"), ("html or empty body", f"gh: HTTP {status}"),  # R1-01: gh prints both forms
+            for form, err in (("json message", f"gh: Server Error (HTTP {status})"),
+                              ("html or empty body", f"gh: HTTP {status}"),  # R1-01: gh prints both forms
                               ("after a note line", f"note: retry later\ngh: HTTP {status}\n")):
                 with self.subTest(status=status, form=form):
                     value, argv, sleeps = self.call((1, "<html>Bad Gateway</html>", err), (0, '{"ok": 1}', ""))

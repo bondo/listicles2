@@ -47,6 +47,8 @@ BASE = "main"
 RETRIES = 5
 # Rate limit and server flakes, the merge PUT included: a retry after a lost answer fails because the PR is merged already, it never merges twice.
 RETRY_STATUSES = {"429", "500", "502", "503", "504"}
+# gh prints `gh: <message> (HTTP 502)` for a JSON error body and a line of its own, `gh: HTTP 502`, for an HTML or empty one (R1-01).
+GH_STATUS_RE = re.compile(r"\(HTTP (\d{3})\)|^gh: HTTP (\d{3})$", re.M)
 STATE_ISSUE = 15  # the issue that holds owner decisions and batch approvals
 WAIT_SECONDS, WAIT_POLL = 900, 30  # --wait: how long to wait for required checks, and the poll interval
 MERGE_TREE_TIMEOUT = 120  # seconds for one git fetch or merge-tree
@@ -190,8 +192,8 @@ class GhApi:
             if res.returncode == 0:
                 return res.stdout
             last = (res.stderr or res.stdout).strip()
-            status = re.search(r"\(HTTP (\d{3})\)", last)  # what `gh api` reports; a number in a message is not a status (R1-09)
-            if not (status and status.group(1) in RETRY_STATUSES) or attempt == RETRIES - 1:
+            status = GH_STATUS_RE.search(last)  # what `gh api` reports; a number in a message is not a status (R1-09)
+            if not (status and (status.group(1) or status.group(2)) in RETRY_STATUSES) or attempt == RETRIES - 1:
                 break
             time.sleep(2**attempt)
         raise ApiError(f"gh api {args[-1]}: {last[:200] or 'failed'}")
@@ -298,7 +300,8 @@ def sign_off_problems(api, repo, base, sha, kind, files):
     problems = []
     for f in files:
         name, old = f["filename"], f.get("previous_filename") or f["filename"]
-        if kind not in ("working-draft-docs", "general") or f.get("status") == "removed" or not name.endswith(".md"):
+        markdown = name.casefold().endswith(".md") or old.casefold().endswith(".md")  # either name, any case (R1-02)
+        if kind not in ("working-draft-docs", "general") or f.get("status") == "removed" or not markdown:
             continue
         if not (_draft_path(kind, name) or _draft_path(kind, old)):
             continue
