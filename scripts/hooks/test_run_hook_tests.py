@@ -192,13 +192,20 @@ class TestsRunOutsideTheRepo(unittest.TestCase):
     """R2-01 (PR 302): the tests run in an empty temporary cwd, so a relative path, os.getcwd() or git without cwd= cannot reach
     the repository the runner was started in (pre-push, verify.sh and CI all start it in the repo root)."""
 
-    PROBE = case("def test_cwd(self):\n        import os\n        self.assertFalse(os.path.exists('marker.txt'), os.getcwd())\n")
+    PROBE = case("def test_cwd(self):\n        import os\n        self.assertFalse(os.path.exists('marker.txt'), os.getcwd())\n"
+                 "        self.assertFalse(os.path.exists(os.path.join(os.environ.get('PWD', ''), 'marker.txt')), 'PWD')\n")  # R3-01
 
     def test_serial_and_sharded_runs_do_not_see_the_start_directory(self):
         for jobs in (None, 2):
-            with self.subTest(jobs=jobs):
-                rc, out = run_tree({"test_a.py": self.PROBE, "test_b.py": case(PASSING), "marker.txt": "x"}, jobs=jobs)
-                self.assertEqual(rc, 0, out)
+            with self.subTest(jobs=jobs), tempfile.TemporaryDirectory(prefix="hook-runner-cwd-") as d:
+                for rel, src in (("test_a.py", self.PROBE), ("test_b.py", case(PASSING)), ("marker.txt", "x")):
+                    with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                        f.write(src)
+                extra = ["--jobs", str(jobs)] if jobs else []
+                # A shell `cd` (pre-push, verify.sh, CI) also sets PWD to the start directory.
+                r = subprocess.run([sys.executable, "-I", RUNNER, *extra, d], capture_output=True, text=True, cwd=d,
+                                   env=dict(os.environ, PWD=d))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_the_probe_fails_when_the_cwd_is_the_start_directory(self):
         """Negative case: plain unittest in the same tree keeps the start directory as cwd, and the probe sees the marker."""
