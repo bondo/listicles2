@@ -2915,7 +2915,8 @@ class GoldenUpdateDelegationTests(unittest.TestCase):
     intended, with a one-line note on #15 each time; implementers and collaborators still never add it; Tier 0 is unchanged."""
 
     ORCH = "docs/ORCHESTRATION.md"
-    CHECKED = "only after that PR's review round has checked the new or changed screenshot goldens and found them intended (no reviewer finding open against them)"
+    CHECKED = ("only after that PR's review round has checked the new or changed screenshot goldens and found them intended "
+               "(no reviewer finding open against them)")
     DOC_PHRASES = (
         "add the `golden-update` label to a PR " + CHECKED,
         "a one-line note on #15 naming the PR, the head SHA and the round",
