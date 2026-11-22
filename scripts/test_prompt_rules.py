@@ -2565,23 +2565,29 @@ class DelegatedDecisionsTests(unittest.TestCase):
 
     def test_the_owner_retained_list_is_exact_in_all_three_texts(self):
         lead = "Stays with the owner: "
-        for item in self.RETAINED:
-            for label, got in (
-                ("ORCHESTRATION", self.doc_replace("docs/ORCHESTRATION.md", item, "")),
-                ("orchestrator", self.role_replace("orchestrator", item, "")),
-                ("approver", self.role_replace("approver", item, "")),
-            ):
-                with self.subTest(item=item[:40], text=label):
-                    self.assertTrue(got & {"orch-delegated-decisions", "delegated-decisions", "approver-role"})
-        for label, got in (
-            ("ORCHESTRATION", self.doc_replace("docs/ORCHESTRATION.md", lead, "Also with the owner: ")),
-            ("orchestrator", self.role_replace("orchestrator", lead, "Also with the owner: ")),
-            ("approver", self.role_replace("approver", lead, "Also with the owner: ")),
-        ):
-            with self.subTest(text=label):
-                self.assertTrue(got & {"orch-delegated-decisions", "delegated-decisions", "approver-role"})
-        # an item added to the list is a change of the list: it must fail too
-        self.assertIn("orch-delegated-decisions", self.doc_replace("docs/ORCHESTRATION.md", "network allowlists, ", "network allowlists, branch names, "))
+
+        def edited(norm, old, new):  # edit only inside the retained sentence: the ask list names some of the same items
+            if old == lead:
+                return norm.replace(lead, new, 1)
+            head, sep, tail = norm.partition(lead)
+            self.assertTrue(sep and old in tail, f"{old!r} is not in the retained sentence")
+            return head + sep + tail.replace(old, new, 1)
+
+        def failing(label, norm, old, new):
+            if label == "ORCHESTRATION":
+                return self.doc_ids("docs/ORCHESTRATION.md", edited(norm, old, new))
+            role = "orchestrator" if label == "orchestrator" else "approver"
+            return ids(prompt_rules.check_text(role, edited(norm, old, new)))
+
+        norms = {"ORCHESTRATION": prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md")),
+                 "orchestrator": prompt_rules.normalize(real("orchestrator")), "approver": prompt_rules.normalize(real("approver"))}
+        rule_of = {"ORCHESTRATION": "orch-delegated-decisions", "orchestrator": "delegated-decisions", "approver": "approver-role"}
+        for label, norm in norms.items():
+            edits = [(item, "") for item in self.RETAINED]
+            edits += [(lead, "Also with the owner: "), ("network allowlists, ", "network allowlists, branch names, ")]
+            for old, new in edits:
+                with self.subTest(text=label, old=old[:40]):
+                    self.assertIn(rule_of[label], failing(label, norm, old, new))
 
     def test_the_ask_list_no_longer_sends_the_three_delegated_decisions_to_the_owner(self):
         for stale in ("\n* the escalation reviewer's `owner` ruling, or anything above nit still open after round 5 (§6.2, §7.2.2);\n",
