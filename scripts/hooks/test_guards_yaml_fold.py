@@ -93,7 +93,17 @@ class JoinedValueTests(FoldCase):
             (WF, STEPS + '      - run: "ruff check\\t--fix ."\n', 4),
             (WF, STEPS + '      - run: "pip install ruff\\nruff check --fix ."\n', 4),
             (WF, STEPS + '      - run: "ruff check\n          \\x2d-ignore E501 ."\n', 4),
+            (WF, STEPS + '      - run: "ruff check \\"--fix\\" ."\n', 4),
         ])
+
+    def test_a_pre_commit_entry_block_is_one_word_list(self):
+        self.fails_at([
+            (PC, HOOKS + "      - id: x\n        entry: >\n          ruff check\n        args: [--fix]\n", 7),
+            (PC, HOOKS + "      - id: x\n        entry: |\n          ruff check\n          --fix\n", 5),
+            (PC, HOOKS + "      - id: x\n        entry: |\n          ruff check\n          # x\n          --fix\n", 5),
+            (PC, HOOKS + "      - id: x\n        entry:\n          >-\n            ruff check\n            --fix\n", 5),
+        ])
+        self.passes([(PC, HOOKS + "      - id: x\n        entry: |\n          ruff check\n          --no-cache\n")])
 
     def test_flow_collections_and_args_keys(self):
         self.fails_at([
