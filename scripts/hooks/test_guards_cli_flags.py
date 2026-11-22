@@ -896,5 +896,61 @@ class Issue164RemainingTests(CliFlagCase):
         self.assertPasses()
 
 
+class Issue164SelfReviewTests(CliFlagCase):
+    """M1-42 self-review: a second args-like key must not hide the first, only generic and tool-named keys count, quoted keys and flow
+    mappings are read, an npm option value is not a script name, disagreeing package.json files check each tool, and `key: >` inside
+    another block scalar is text."""
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def check(self, path, bad, good):
+        for text, n in bad:
+            with self.subTest(text=text):
+                self.write(path, text)
+                self.assertFails("%s: %s:%d:" % (MARK, path, n))
+        for text in good:
+            with self.subTest(ok=text):
+                self.write(path, text)
+                self.assertPasses()
+
+    def test_workflow_args_keys(self):
+        ruff, rd = "      - uses: astral-sh/ruff-action@v3\n        with:\n", "      - uses: reviewdog/action-eslint@v1\n        with:\n"
+        self.check(".github/workflows/ci.yml", [
+            (ruff + "          args: check --ignore E501\n          x_args: ok\n", 3),
+            (rd + "          eslint_flags: --quiet\n          reviewdog_flags: ''\n", 3),
+            (ruff + '          "args": check --ignore E501\n', 3),
+            ("      - uses: astral-sh/ruff-action@v3\n        with: {args: check --ignore E501}\n", 2),
+            ('      - "uses": astral-sh/ruff-action@v3\n        with:\n          args: check --fix\n', 3),
+            ("      - run: |\n          note: >\n            ruff check --fix .\n            echo # justified: three words here\n", 3),
+        ], [rd + "          reviewdog_flags: -fail-level=error\n          eslint_flags: --max-warnings 0\n"])
+
+    def test_pre_commit_args_keys(self):
+        head = "repos:\n  - repo: local\n    hooks:\n"
+        self.check(".pre-commit-config.yaml", [
+            (head + "      - id: ruff\n        args: [--ignore, E501]\n        verbose_args: []\n", 5),
+            (head + '      - "id": ruff\n        args: [--fix]\n', 5),
+        ], [])
+
+    def test_actionlint_config_quoted_and_flow_ignore(self):
+        for text, n in [('paths:\n  x.yml:\n    "ignore":\n      - SC2086\n', 3), ("paths:\n  x.yml:\n    'ignore': [SC2086]\n", 3),
+                        ("paths:\n  x.yml: {ignore: [SC2086]}\n", 2)]:
+            with self.subTest(text=text):
+                self.write(".github/actionlint.yaml", text)
+                self.assertFails("guard: unjustified suppression: .github/actionlint.yaml:%d:" % n)
+
+    def test_npm_option_values_and_disagreeing_scripts(self):
+        self.write("firebase/package.json", '{\n  "scripts": {\n    "pkg": "jest",\n    "test": "jest",\n    "lint": "eslint ."\n  }\n}\n')
+        self.write("tools/package.json", '{\n  "scripts": {\n    "test": "eslint .",\n    "lint": "prettier --check ."\n  }\n}\n')
+        for line in ["npm run -w pkg lint -- --quiet", "pnpm --filter pkg lint -- --quiet", "npm run lint -- --max-warnings 0",
+                     "npm test -- -u"]:
+            with self.subTest(line=line):
+                self.put("scripts/lint.sh", line)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+        self.put("scripts/lint.sh", "npm test -- --max-warnings 0")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
