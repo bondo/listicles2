@@ -317,20 +317,49 @@ def is_file_dir(node):
 
 
 def base_of(node, roots):
-    """The repo-relative directory an expression names when it is a root (a root name, a hook file's directory, a normalising
-    wrapper or a literal os.path.join on one of those), else None."""
+    """The repo-relative path an expression names when it is built from a root (a root or path-constant name, a hook file's
+    directory, a normalising wrapper, os.path.dirname or a literal os.path.join on one of those), else None."""
     if isinstance(node, ast.Name) and node.id in roots:
         return roots[node.id]
     if is_file_dir(node):
         return "scripts/hooks"
     if isinstance(node, ast.Call) and ast.unparse(node.func) in PATH_WRAPPERS and len(node.args) == 1:
         return base_of(node.args[0], roots)
+    if isinstance(node, ast.Call) and ast.unparse(node.func) == "os.path.dirname" and len(node.args) == 1:
+        inner = base_of(node.args[0], roots)
+        return None if inner is None else posixpath.normpath(posixpath.dirname(inner) or ".")
     if isinstance(node, ast.Call) and ast.unparse(node.func) == "os.path.join" and node.args:
         base = base_of(node.args[0], roots)
         rest = node.args[1:]
         if base is not None and all(isinstance(a, ast.Constant) and isinstance(a.value, str) for a in rest):
             return posixpath.normpath("/".join([base] + [a.value for a in rest]))
     return None
+
+
+def module_paths(tree, roots):
+    """Module-level names defined as a path built from a root, in order: {name: path}, and the ids of the nodes of the root
+    definitions (to the repo root or scripts/hooks), which are exempt from the root-use count."""
+    found, defined = {}, set()
+    for n in tree.body:
+        if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+            base = base_of(n.value, {**roots, **found})
+            if base is not None:
+                found[n.targets[0].id] = base
+                if base in (".", "scripts/hooks"):
+                    defined |= {id(c) for c in ast.walk(n.value)}
+    return found, defined
+
+
+def is_implicit_root(node, up, root_names):
+    """A use that reaches a hook file's location without a root name of this file: another module's ROOT or __file__, __spec__,
+    sys.path[i] or sys.argv[i], or the string '__file__' as a key or argument (globals()['__file__'], getattr(m, '__file__'))."""
+    if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load) and node.attr in root_names | {"__file__"}:
+        return True
+    if isinstance(node, ast.Name) and node.id == "__spec__":
+        return True
+    if isinstance(node, ast.Subscript) and ast.unparse(node.value) in ("sys.path", "sys.argv") and not isinstance(node.slice, ast.Slice):
+        return True
+    return isinstance(node, ast.Constant) and node.value == "__file__" and isinstance(up, (ast.Subscript, ast.Call))
 
 
 def hook_code_reads(sources):
@@ -340,18 +369,23 @@ def hook_code_reads(sources):
     of its *parts is exempt. Every other use of a root (f-string, pathlib, cwd=ROOT, a bare __file__, a join that names the whole
     repo) is a root use (R1-02). Returns (paths as {path: [file]}, unreadable as [file:line], root uses as {file: [line]})."""
     paths, unreadable, root_uses = {}, [], {}
-    for name, src in sorted(sources.items()):
-        tree = ast.parse(src)
+    trees = {name: ast.parse(src) for name, src in sources.items()}
+    root_bases = dict(DEFAULT_ROOTS)  # root names defined anywhere, for imports and attributes in other files
+    for tree in trees.values():
+        for k, v in module_paths(tree, DEFAULT_ROOTS)[0].items():
+            if v in (".", "scripts/hooks"):
+                root_bases.setdefault(k, v)
+    for name, tree in sorted(trees.items()):
         parent = {id(c): n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
         names = {t.id: n.value.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
                  and isinstance(n.value.value, str) for t in n.targets if isinstance(t, ast.Name)}
-        roots, defined = dict(DEFAULT_ROOTS), set()
-        for n in tree.body:  # module-level root definitions, in order (ROOT may be defined from HERE)
-            if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
-                base = base_of(n.value, roots)
-                if base in (".", "scripts/hooks"):
-                    roots[n.targets[0].id] = base
-                    defined |= {id(c) for c in ast.walk(n.value)}
+        roots = dict(DEFAULT_ROOTS)
+        for node in ast.walk(tree):  # `from m import ROOT as R` makes R a root here
+            if isinstance(node, ast.ImportFrom):
+                roots.update({a.asname or a.name: root_bases[a.name] for a in node.names if a.name in root_bases})
+        consts, defined = module_paths(tree, roots)
+        roots.update(consts)
+        own_roots = {k for k, v in roots.items() if v in (".", "scripts/hooks")}
         helper_args = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "read" and node.args.vararg:
@@ -364,8 +398,10 @@ def hook_code_reads(sources):
             up1 = parent.get(id(node))
             up2 = parent.get(id(up1)) if up1 is not None else None
             bare_file = isinstance(node, ast.Name) and node.id == "__file__" and not is_file_dir(up1) and not is_file_dir(up2)
-            rootish = (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in roots) or is_file_dir(node) or bare_file
-            is_base = isinstance(up1, ast.Call) and ast.unparse(up1.func) == "os.path.join" and up1.args and up1.args[0] is node
+            rootish = ((isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in own_roots) or is_file_dir(node)
+                       or bare_file or is_implicit_root(node, up1, set(root_bases)))
+            is_base = (isinstance(up1, ast.Call) and ast.unparse(up1.func) == "os.path.join" and up1.args and up1.args[0] is node
+                       and base_of(node, roots) is not None)
             if rootish and not is_base:
                 root_uses.setdefault(name, []).append(node.lineno)
             if not isinstance(node, ast.Call) or id(node) in helper_args:
@@ -418,7 +454,9 @@ LISTED_DIRS = {"core": "core/X/build.gradle.kts", "scripts/hooks": "scripts/hook
 
 class HookSuiteInputs(unittest.TestCase):
     """The hook_tests_scope set is derived from the hook code: every repo path it reads, runs or copies must make the suite run.
-    Any other use of a root (cwd=ROOT, f-string or pathlib paths, a bare __file__) fails until ROOT_USES lists it with a reason.
+    Any other use of a root (cwd=ROOT, f-string or pathlib paths, a bare __file__, an imported root alias, another module's ROOT
+    or __file__, __spec__, sys.path[i], sys.argv[i]) fails until ROOT_USES lists it with a reason. Relative paths, os.getcwd() and
+    git without cwd= cannot reach the repo at all: run_hook_tests.py runs the tests from an empty temporary cwd (R2-01).
     Not seen by this parse: what a run script reads in turn (scripts/ is a prefix for that reason) and guards.sh on the whole repo
     (test_guards_sh's self-check), which pre-push runs on every push anyway. CI runs the full suite on every PR as the backstop."""
 

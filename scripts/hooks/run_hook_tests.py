@@ -16,6 +16,7 @@ import fnmatch
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 # Rough seconds of the files over about 3 s, each run alone and serially on a 4-core machine (2026-11-22, owner decision 7075952806
@@ -105,6 +106,17 @@ def main(argv):
         print("hook tests: --jobs needs a whole number of at least 1", file=sys.stderr)
         return 2
     start = os.path.abspath(args.start)
+    # R2-01 (PR 302): run from an empty temporary cwd, never the directory the runner was started in (the repo root for pre-push,
+    # verify.sh and CI), so a relative path, os.getcwd() or git without cwd= cannot read the repo past the pre-push input scope.
+    with tempfile.TemporaryDirectory(prefix="hook-tests-cwd-") as cwd:
+        os.chdir(cwd)
+        try:
+            return run(args, start)
+        finally:
+            os.chdir(os.path.dirname(cwd))
+
+
+def run(args, start):
     if args.jobs > 1 and args.only is None:
         return run_parallel(start, args.jobs)
     loader = unittest.TestLoader()
