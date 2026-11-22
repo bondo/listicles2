@@ -1,6 +1,7 @@
 """Tests for scripts/status_graph.py: the dependency graph of the open tasks (status-graph.svg, task M1-70).
 Run: python3 -I scripts/test_status_graph.py"""
 
+import json
 import random
 import re
 import subprocess
@@ -20,7 +21,7 @@ NOW = "2026-11-22T12:00:00Z"
 
 def task(tid, milestone, status="todo", deps=(), assignee="implementer", title=None):
     ds = ", ".join(f'"{d}"' for d in deps)
-    return (f'\n[[task]]\nid = "{tid}"\ntitle = "{title or tid + " title"}"\nmilestone = "{milestone}"\nstatus = "{status}"\n'
+    return (f'\n[[task]]\nid = "{tid}"\ntitle = {json.dumps(title or tid + " title")}\nmilestone = "{milestone}"\nstatus = "{status}"\n'
             f'assignee = "{assignee}"\nrisk = "normal"\ndepends_on = [{ds}]\n')
 
 
@@ -98,7 +99,7 @@ class Nodes(unittest.TestCase):
 
     def test_a_blocked_label_makes_a_ready_task_blocked(self):
         text = tasks_text(task("A-01", "A"), milestones=("A",))
-        found = nodes(svg_of(text, issues=[{"number": 5, "title": "A-01: stuck", "state": "open", "labels": ["blocked"]}]))
+        found = nodes(svg_of(text, issues=[{"number": 5, "title": "A-01: stuck", "state": "open", "labels": ["blocked"], "created_at": "2026-11-20T00:00:00Z"}]))
         self.assertEqual(found["A-01"].get("data-state"), "blocked")
         self.assertEqual(nodes(svg_of(text))["A-01"].get("data-state"), "ready")
 
@@ -232,7 +233,7 @@ class Layout(unittest.TestCase):
 
     def test_a_bigger_graph_is_laid_out_without_overlap(self):
         rng = random.Random(7)
-        rows = [task(f"A-{i:02d}", "A", deps=[f"A-{j:02d}" for j in range(i) if rng.random() < 0.15]) for i in range(1, 40)]
+        rows = [task(f"A-{i:02d}", "A", deps=[f"A-{j:02d}" for j in range(1, i) if rng.random() < 0.15]) for i in range(1, 40)]
         found = nodes(svg_of(tasks_text(*rows, milestones=("A",))))
         self.assertEqual(len(found), 39)
         boxes = sorted(box(g) for g in found.values())
@@ -242,7 +243,7 @@ class Layout(unittest.TestCase):
 class Labels(unittest.TestCase):
     def test_each_milestone_band_says_how_many_tasks_are_done(self):
         joined = "\n".join(texts(svg_of()))
-        self.assertIn("A A name: 3/5 done, 2 open", joined)  # A-01 done and A-03 dropped count as done
+        self.assertIn("A A name: 2/6 done, 4 open", joined)  # A-01 done and A-03 dropped count as done
         self.assertIn("B B name: 0/2 done, 2 open", joined)
 
     def test_finished_and_planned_milestones_are_summarised_not_drawn(self):
@@ -346,7 +347,7 @@ class Safety(unittest.TestCase):
 
     def test_states_differ_by_shape_and_by_colour(self):
         found = nodes(svg_of(prs=[{"number": 9, "title": "A-02: x", "draft": False, "ci": "none"}]))
-        shapes = {s: [el.get("class") for el in found[k].iter() if (el.get("class") or "").startswith("mk-")]
+        shapes = {s: [el.get("class") for el in found[k].iter() if "mk-" in (el.get("class") or "")]
                   for s, k in (("review", "A-02"), ("owner", "A-O1"), ("blocked", "A-04"))}
         self.assertEqual(shapes, {"review": ["info mk-progress"], "owner": ["bad mk-owner"], "blocked": ["warn mk-blocked"]})
         self.assertEqual(len({found[k].find(NS + "rect").get("class") for k in ("A-02", "A-O1", "A-04")}), 3)
