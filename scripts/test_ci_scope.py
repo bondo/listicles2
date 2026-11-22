@@ -189,6 +189,9 @@ def wiring_problems(text):
             problems.append(f"{job}: does not run {cmd}")
     for job in dict.fromkeys(job for job, _cmd, _source in CI_STEPS):
         body = job_in(text, job) or ""
+        # M1-63: the unit job's debug APK upload step has the one allowed `if:` (push to main only; scripts/check_debug_apk.py freezes the step).
+        if job == "unit":
+            body = body.replace(f"        if: {DEBUG_APK_IF}\n", "", 1)
         if re.search(r"(?m)^\s*(?:-\s+)?if:", body) or "continue-on-error" in body:
             problems.append(f"{job}: if or continue-on-error")
     if re.search(r"^\s+paths(-ignore)?:", text, re.M):

@@ -76,6 +76,8 @@ step screenshots-tests python3 -I scripts/test_screenshots.py
 step screenshots-wiring python3 -I scripts/check_screenshots.py
 step ui-emulators-tests python3 -I scripts/test_check_ui_emulators.py
 step ui-emulators python3 -I scripts/check_ui_emulators.py
+step debug-apk-tests python3 -I scripts/test_check_debug_apk.py
+step debug-apk python3 -I scripts/check_debug_apk.py
 step gitignore-secrets-tests python3 -I scripts/test_gitignore_secrets.py
 step wrapper-checksum-tests python3 -I scripts/test_check_gradle_wrapper.py
 step wrapper-checksum python3 -I scripts/check_gradle_wrapper.py
