@@ -180,8 +180,8 @@ jobs:
           GOLDEN_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'golden-update') && '1' || '0' }}
           GUARD_MAX_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'big-pr') && '1500' || '600' }}
         run: ./scripts/guards.sh
-      - name: hook tests (four shards in parallel)
-        run: python3 -I scripts/hooks/run_hook_tests.py --jobs 4
+      - name: hook tests (full suite on every PR, eight shards in parallel)
+        run: python3 -I scripts/hooks/run_hook_tests.py --jobs 8
 
   tasks:
     name: tasks
