@@ -12,7 +12,7 @@ const named = [
 ].map((m) => ({ ...m, name: `allow ${m.methods.join(", ")} on ${h.matchOf(m)} to ${m.who}` }));
 const MUTANTS = [...new Map(named.map((m) => [m.name, m])).values()];
 
-// Each mutant loads its rules and runs the probes on its collection (18 to 162); the first also opens
+// Each mutant loads its rules and runs the probes on its collection (18 to 144); the first also opens
 // the connections (about 1.6 s here), so the default 5 s per test is too close on a slow runner.
 jest.setTimeout(30_000);
 

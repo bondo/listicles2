@@ -6,17 +6,18 @@ import {
     type TokenOptions,
 } from "@firebase/rules-unit-testing";
 
-// The default-deny harness (M1-52, see #202): every client tries every operation on the caller's own
-// document of every collection in PLAN section 3, on another user's of each {uid} one, and on the
-// unplanned paths. rules.test.ts expects each probe to be denied; mutants.test.ts shows that opening
-// any one of those collections turns that suite red.
-// Their limit: each probe seeds at most its own document (`{ name: "seed" }`), writes one generic
+// The default-deny harness (M1-52, see #202): every client tries every operation on one document of
+// every collection in PLAN section 3 (two for a {uid} one: the caller's own and another user's) and on
+// the unplanned paths. rules.test.ts expects each probe to be denied; mutants.test.ts shows that
+// opening any one of those collections turns that suite red.
+// Their limit: each probe seeds at most its own document (`{ name: "seed" }`), writes a fixed generic
 // payload and queries without a filter, so both catch only a path that is open whatever the stored
 // data, payload and query filter. A rule that reads stored data (resource, get, exists), the payload
 // or a query filter can be a hole and still pass both, denied by this setup and not by its
 // authorization logic: it needs its own allow and deny tests in a seeded world (M1-08 on). So does
-// M1-08's helper that asserts each collection denies an unverified token: it must seed a world in
-// which the verified caller is allowed (live household, own member doc, own list), or it cannot fail.
+// M1-08's helper that asserts each collection denies an unverified token: it must make each request
+// twice in one seeded world, assertSucceeds with a verified token and assertFails with an unverified
+// one, or it cannot fail.
 // The contexts hand out the compat Firestore type, used as is (no type casts).
 export type Db = ReturnType<RulesTestContext["firestore"]>;
 
@@ -68,7 +69,8 @@ export const TEMPLATES = planTemplates(PLAN);
 // condition reads stored data, as the cleanup match of #199 does: see the limit at the top.
 export const UNPLANNED_ROOT = "anything/{doc}";
 export const UNPLANNED = [UNPLANNED_ROOT, ...TEMPLATES.map((t) => `${t}/unplanned/{doc}`)];
-// The caller's own document of every template, another user's (bob) of each {uid} one, and the unplanned.
+// One document of every template (the caller's own for a {uid} one), another user's (bob) of each
+// {uid} one, and the unplanned paths.
 export const PATHS = [
     ...TEMPLATES.map((t) => instantiate(t)),
     ...TEMPLATES.filter((t) => t.endsWith("/{uid}")).map((t) => instantiate(t, OTHER)),
