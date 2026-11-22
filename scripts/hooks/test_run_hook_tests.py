@@ -207,6 +207,25 @@ class Partition(unittest.TestCase):
         for shard in shards:
             self.assertLessEqual(sum(f in run_hook_tests.WEIGHTS for f in shard), 1, shards)
 
+    def test_the_heavy_files_each_get_their_own_shard_at_eight_jobs(self):
+        """Owner decision 7075952806 item 3 on #15: CI runs 8 shards; the four slow files must not share one."""
+        import run_hook_tests
+
+        heavy = sorted(run_hook_tests.WEIGHTS, key=lambda f: -run_hook_tests.WEIGHTS[f])[:4]
+        shards = run_hook_tests.partition(run_hook_tests.units(HERE), 8)
+        for f in heavy:
+            self.assertEqual([s for s in shards if f in s], [[f]], shards)
+
+    def test_every_weighted_name_is_a_unit_of_the_real_suite(self):
+        """A renamed or deleted file left in WEIGHTS silently unbalances the shards."""
+        import run_hook_tests
+
+        self.assertEqual(run_hook_tests.stale_weights(HERE), [])
+        with tempfile.TemporaryDirectory(prefix="hook-runner-weights-") as d:
+            with open(os.path.join(d, "test_guards_sh.py"), "w", encoding="utf-8") as f:
+                f.write(case(PASSING))
+            self.assertEqual(run_hook_tests.stale_weights(d), sorted(set(run_hook_tests.WEIGHTS) - {"test_guards_sh.py"}))
+
 
 if __name__ == "__main__":
     unittest.main()
