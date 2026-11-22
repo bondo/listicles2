@@ -353,14 +353,14 @@ def module_paths(tree, roots):
 
 def is_implicit_root(node, up, root_names):
     """A use that reaches a hook file's location without a root name of this file: another module's ROOT or __file__, __spec__,
-    sys.path[i] or sys.argv[i], or the string '__file__' as a key or argument (globals()['__file__'], getattr(m, '__file__'))."""
+    sys.path[i] or sys.argv[i], or a root name or '__file__' as a string key or argument (globals()['HERE'], getattr(m, 'ROOT'))."""
     if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load) and node.attr in root_names | {"__file__"}:
         return True
     if isinstance(node, ast.Name) and node.id in ("__spec__", "__loader__", "__cached__"):
         return True
     if isinstance(node, ast.Subscript) and ast.unparse(node.value) in ("sys.path", "sys.argv") and not isinstance(node.slice, ast.Slice):
         return True
-    return isinstance(node, ast.Constant) and node.value == "__file__" and isinstance(up, (ast.Subscript, ast.Call))
+    return isinstance(node, ast.Constant) and node.value in root_names | {"__file__"} and isinstance(up, (ast.Subscript, ast.Call))
 
 
 def hook_code_reads(sources):
@@ -427,6 +427,8 @@ def hook_code_reads(sources):
             for p in found:
                 if p != ".":  # a join naming the whole repo is counted as a derived root above
                     paths.setdefault(p, []).append(name)
+            if base_of(node, roots) is None and any(p in DIRS for p in found):  # R4-01: a root only path_of resolves
+                root_uses.setdefault(name, []).append(node.lineno)
     return paths, unreadable, {f: sorted(lines) for f, lines in root_uses.items()}
 
 
@@ -460,10 +462,14 @@ LISTED_DIRS = {"core": "core/X/build.gradle.kts", "scripts/hooks": "scripts/hook
 class HookSuiteInputs(unittest.TestCase):
     """The hook_tests_scope set is derived from the hook code: every repo path it reads, runs or copies must make the suite run.
     Any other use of a root (cwd=ROOT, f-string or pathlib paths, a bare __file__, an imported root alias, another module's ROOT
-    or __file__, __spec__, sys.path[i], sys.argv[i]) fails until ROOT_USES lists it with a reason. Relative paths, os.getcwd() and
-    git without cwd= cannot reach the repo at all: run_hook_tests.py runs the tests from an empty temporary cwd (R2-01).
+    or __file__ by attribute or string key, __spec__, sys.path[i], sys.argv[i]) fails until ROOT_USES lists it with a reason.
+    Relative paths, os.getcwd(), PWD and git without cwd= cannot reach the repo at all: run_hook_tests.py runs the tests from an
+    empty temporary cwd with PWD set to it (R2-01, R3-01).
     Not seen by this parse: what a run script reads in turn (scripts/ is a prefix for that reason) and guards.sh on the whole repo
-    (test_guards_sh's self-check), which pre-push runs on every push anyway. CI runs the full suite on every PR as the backstop."""
+    (test_guards_sh's self-check), which pre-push runs on every push anyway. Nor reads that reach the repo other than through a root
+    name, __file__, the cwd or PWD, such as OLDPWD, getattr(m, name) with a computed name, inspect.getfile(m),
+    importlib.util.find_spec(...).origin or a frame's co_filename; no hook file uses one (escalation 7079064229). CI runs the full
+    suite on every PR as the backstop."""
 
     def test_every_repo_path_the_hook_code_reads_runs_the_suite(self):
         paths, unreadable, root_uses = hook_code_reads(hook_sources())
