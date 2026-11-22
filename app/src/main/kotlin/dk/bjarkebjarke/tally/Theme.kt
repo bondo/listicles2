@@ -141,6 +141,17 @@ object Spacing {
     val xxl = 32.dp
 }
 
+/** The size tokens of design/tokens.json in dp (ThemeTokensTest checks parity). */
+object Sizes {
+    val minTouchTarget = 48.dp
+    val topAppBar = 64.dp
+    val listRowMin = 56.dp
+    val fab = 56.dp
+    val icon = 24.dp
+    val offlineBar = 32.dp
+    val screenGutter = 16.dp
+}
+
 /** Wireframe 02's empty-state circle and its icon (`.bubble` in wireframes.html); not design tokens. */
 val EmptyStateBubble = 96.dp
 val EmptyStateIcon = 44.dp

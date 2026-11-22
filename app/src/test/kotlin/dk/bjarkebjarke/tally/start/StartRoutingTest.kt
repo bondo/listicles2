@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * M1-60: the start-up root routes on the session (P10 steps 2 and 3: signed in, then the M1 home of Q1 A). M1-62 adds
+ * M1-60: the start-up root routes on the session (P10 step 2, signed in, and step 6, the M1 home of Q1 A). M1-62 adds
  * the other gates to this test. The real [StartViewModel] runs against a [FakeSessionState].
  */
 @RunWith(RobolectricTestRunner::class)

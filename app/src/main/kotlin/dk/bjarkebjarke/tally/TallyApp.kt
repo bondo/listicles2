@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,7 +28,7 @@ import dk.bjarkebjarke.tally.start.StartRoute
 import dk.bjarkebjarke.tally.start.StartUiState
 import dk.bjarkebjarke.tally.start.StartViewModel
 
-/** The app root: collects the start-up state of [viewModel] (checklist sections 1 and 2: state down, events up). */
+/** The app root: collects the start-up state of [viewModel] (checklist sections 1 and 2: state hoisted to the root). */
 @Composable
 fun TallyApp(
     viewModel: StartViewModel,
@@ -49,8 +51,9 @@ fun TallyApp(
     TallyTheme(darkTheme) {
         Surface(modifier.fillMaxSize()) {
             if (state is StartUiState.Ready) {
+                val backStack = remember(state.route) { listOf(state.route) }
                 NavDisplay(
-                    backStack = listOf(state.route),
+                    backStack = backStack,
                     onBack = {},
                     entryProvider =
                         entryProvider {
@@ -67,7 +70,7 @@ fun TallyApp(
 @Composable
 private fun SignInPlaceholder(modifier: Modifier = Modifier) {
     Column(
-        modifier.fillMaxSize().padding(Spacing.l),
+        modifier.fillMaxSize().safeDrawingPadding().padding(Sizes.screenGutter),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

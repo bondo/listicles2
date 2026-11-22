@@ -20,7 +20,7 @@ b1; the other P10 gates (see #195, Q2 A) and the routing test over all gates are
 
 ## Decisions made
 - Back stack derived from the gate state (`listOf(route)`), not saved, so keys are not `@Serializable` (checklist 3 row).
-- Home top bar: title only; household icon with M1-19, avatar with M1-25 (no button that leads nowhere).
+- Home top bar: title only; household icon with M1-19, avatar with M1-25 (no button that leads nowhere); both tasks' notes say so.
 - `SessionState` (domain, Flow) with a signed-out stand-in binding (`SessionModule`) until M1-14.
 
 ## Open findings
