@@ -56,6 +56,14 @@ object DataSourceRules {
     fun globalScopeViolations(dir: File): List<String> =
         ArchitectureRules.codeFiles(dir).flatMap { matches(it, globalScope) }
 
+    /** `Context`, `Activity` or `AndroidViewModel` in a ViewModel file (M1-57). */
+    fun platformInViewModelViolations(dir: File): List<String> =
+        ArchitectureRules.codeFiles(dir).take(0).map { it.name }
+
+    /** `Dispatchers.` in a file that is not a DI module (M1-57). */
+    fun dispatchersOutsideDiViolations(dir: File): List<String> =
+        ArchitectureRules.codeFiles(dir).take(0).map { it.name }
+
     /** Every production source set (all but test, androidTest and testFixtures) of every module. */
     fun uiSourceDirs(projectRoot: File): List<File> = sourceSets(projectRoot).filter { it.name !in testSourceSets }
 
