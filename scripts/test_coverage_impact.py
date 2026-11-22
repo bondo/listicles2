@@ -173,7 +173,7 @@ class Cli(unittest.TestCase):
         self.assertIn("1 uncovered", r.stdout.splitlines()[0])
 
     def test_uncommitted_change_is_included(self):
-        self.src.write_text("package x\n\nfun a() = 1\nfun b() = 22\n")
+        self.src.write_bytes(b"package x\n\nfun a() = 1\nfun b() = 22 // caf\xe9\n")  # a Latin-1 byte: git still diffs it as text
         r = self.measure((DOMAIN_PKG, "Money.kt", [(3, 0, 1), (4, 1, 0)]), base="main")
         self.assertIn(f"`{DOMAIN}/Money.kt`: 4", r.stdout)
 
