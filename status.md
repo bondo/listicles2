@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 19/70 (27%) | 51 |
+| M1 | Accounts and households | 20/70 (28%) | 50 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 19/70 done (27%), 51 open.
+**Progress:** 20/70 done (28%), 50 open.
 
 ### Tasks
 
@@ -121,10 +121,10 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-01 | Plan M1&#58; docs/milestones/M1.md and PR-sized tasks in this file | done | all of M0.5 | planner | [#124](https://github.com/bondo/listicles2/issues/124) |
 | M1-02 | Create &#58;core&#58;data with an emulator smoke test; Auth and Firestore emulators in CI (firebase.jso… | in progress | M1-29 | implementer | [#294](https://github.com/bondo/listicles2/issues/294) |
 | M1-03 | Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff artifact, ATF and enabl… | done | M1-01 | implementer |  |
-| M1-04 | Design tokens&#58; Theme.kt parity test against design/tokens.json and WCAG AA contrast test (P22) | in progress | M0.5-03, M1-03 | implementer | [#295](https://github.com/bondo/listicles2/issues/295) |
+| M1-04 | Design tokens&#58; Theme.kt parity test against design/tokens.json and WCAG AA contrast test (P22) | done | M0.5-03, M1-03 | implementer | [#295](https://github.com/bondo/listicles2/issues/295) |
 | M1-05 | PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16) | done | M1-01 | implementer |  |
 | M1-06 | Rules fuzzing&#58; fast-check against a TS reference model of PLAN 3.1 (P17) | blocked | M1-01, M0.5-08, M1-10 | implementer |  |
-| M1-07 | Test-impact summary&#58; uncovered changed lines to the step summary and verify.sh (P19) | ready | M1-01 | implementer |  |
+| M1-07 | Test-impact summary&#58; uncovered changed lines to the step summary and verify.sh (P19) | in progress | M1-01 | implementer | [#298](https://github.com/bondo/listicles2/issues/298) |
 | M1-29 | Rename to Tally&#58; applicationId and namespace dk.bjarkebjarke.tally, packages, app label en/da | done | M1-01 | implementer | [#268](https://github.com/bondo/listicles2/issues/268) |
 | M1-08 | Rules base&#58; signedIn() with email_verified, users/{uid} householdId set/clear and name, tombsto… | blocked | M1-52 | implementer |  |
 | M1-09 | Rules spike&#58; PLAN 3.1 items a-e in the emulator, ADR 0002 with the results | blocked | M1-08 | implementer |  |
@@ -196,115 +196,148 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 ```mermaid
 flowchart LR
     n0["M1-02 Create :core:data with an emulator s… (in progress)"]:::progress
-    n1["M1-04 Design tokens: Theme.kt parity test ag… (in progress)"]:::progress
-    n2["M1-06 Rules fuzzing: fast-check against a TS … (blocked)"]:::blocked
-    n3["M1-07 Test-impact summary: uncovered chang… (ready)"]:::ready
-    n4["M1-08 Rules base: signedIn() with email_ver… (blocked)"]:::blocked
-    n5["M1-09 Rules spike: PLAN 3.1 items a-e in the… (blocked)"]:::blocked
-    n6["M1-10 Rules: create household and member di… (blocked)"]:::blocked
-    n7["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
-    n8["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
-    n9["M1-30 App skeleton: Hilt, Navigation 3, root … (blocked)"]:::blocked
-    n10["M1-13 Domain: email, password and name va… (ready)"]:::ready
-    n11["M1-14 Auth data: Google sign-in via Credentia… (blocked)"]:::blocked
-    n12["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
-    n13["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
-    n14["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
-    n15["M1-18 Household data 1: create, invite, revok… (blocked)"]:::blocked
-    n16["M1-31 Household data 2: leave, remove (mark… (blocked)"]:::blocked
-    n17["M1-19 Household UI: create, members, invite… (blocked)"]:::blocked
-    n18["M1-20 Invite link and join screen (HH-03), in… (blocked)"]:::blocked
-    n19["M1-21 Leave, remove, transfer and delete hou… (blocked)"]:::blocked
-    n20["M1-22 Account: change password with recent … (blocked)"]:::blocked
-    n21["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
-    n22["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
-    n23["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
-    n24["M1-26 App Check: Play Integrity in release, d… (blocked)"]:::blocked
-    n25["M1-27 Minimum app version: config/app.min… (blocked)"]:::blocked
-    n26["M1-33 Release smoke build with R8 in CI (be… (blocked)"]:::blocked
-    n27["M1-52 Rules test harness: default-deny paths … (ready)"]:::ready
-    n28["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
-    n29["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
-    n30["M1-56 Java API level check: also look up clas… (ready)"]:::ready
-    n31["M1-57 Konsist: no Context, Activity or Androi… (ready)"]:::ready
-    n32["M1-51 Build guards: catalog-only coordinates,… (in progress)"]:::progress
-    n33["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n34["M1-42 guards check 2c: actionlint flags and r… (ready)"]:::ready
-    n35["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
-    n36["M1-46 build-logic convention plugins#59; no allp… (blocked)"]:::blocked
-    n37["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n38["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n39["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n40["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n41["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n42["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n43["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n44["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n45["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n46["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n47["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n48["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
-    n49["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n50["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
-    n6 --> n2
-    n27 --> n4
+    n1["M1-06 Rules fuzzing: fast-check against a TS … (blocked)"]:::blocked
+    n2["M1-07 Test-impact summary: uncovered chang… (in progress)"]:::progress
+    n3["M1-08 Rules base: signedIn() with email_ver… (blocked)"]:::blocked
+    n4["M1-09 Rules spike: PLAN 3.1 items a-e in the… (blocked)"]:::blocked
+    n5["M1-10 Rules: create household and member di… (blocked)"]:::blocked
+    n6["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
+    n7["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
+    n8["M1-30 App skeleton: Hilt, Navigation 3, root … (blocked)"]:::blocked
+    n9["M1-13 Domain: email, password and name va… (ready)"]:::ready
+    n10["M1-14 Auth data: Google sign-in via Credentia… (blocked)"]:::blocked
+    n11["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
+    n12["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
+    n13["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
+    n14["M1-18 Household data 1: create, invite, revok… (blocked)"]:::blocked
+    n15["M1-31 Household data 2: leave, remove (mark… (blocked)"]:::blocked
+    n16["M1-19 Household UI: create, members, invite… (blocked)"]:::blocked
+    n17["M1-20 Invite link and join screen (HH-03), in… (blocked)"]:::blocked
+    n18["M1-21 Leave, remove, transfer and delete hou… (blocked)"]:::blocked
+    n19["M1-22 Account: change password with recent … (blocked)"]:::blocked
+    n20["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
+    n21["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
+    n22["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
+    n23["M1-26 App Check: Play Integrity in release, d… (blocked)"]:::blocked
+    n24["M1-27 Minimum app version: config/app.min… (blocked)"]:::blocked
+    n25["M1-33 Release smoke build with R8 in CI (be… (blocked)"]:::blocked
+    n26["M1-52 Rules test harness: default-deny paths … (ready)"]:::ready
+    n27["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
+    n28["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
+    n29["M1-56 Java API level check: also look up clas… (ready)"]:::ready
+    n30["M1-57 Konsist: no Context, Activity or Androi… (ready)"]:::ready
+    n31["M1-51 Build guards: catalog-only coordinates,… (in progress)"]:::progress
+    n32["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
+    n33["M1-42 guards check 2c: actionlint flags and r… (ready)"]:::ready
+    n34["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
+    n35["M1-46 build-logic convention plugins#59; no allp… (blocked)"]:::blocked
+    n36["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n37["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n38["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n39["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n40["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n41["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n42["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n43["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n44["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n45["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
+    n46["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
+    n47["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
+    n48["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n49["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
+    n5 --> n1
+    n26 --> n3
+    n3 --> n4
     n4 --> n5
-    n5 --> n6
-    n29 --> n7
-    n28 --> n7
-    n6 --> n8
-    n50 --> n8
-    n0 --> n9
-    n9 --> n11
+    n28 --> n6
+    n27 --> n6
+    n5 --> n7
+    n49 --> n7
+    n0 --> n8
+    n8 --> n10
+    n9 --> n10
+    n0 --> n10
     n10 --> n11
-    n0 --> n11
-    n11 --> n12
+    n10 --> n12
     n11 --> n13
-    n12 --> n14
-    n13 --> n14
-    n29 --> n15
-    n11 --> n15
-    n9 --> n15
-    n0 --> n15
-    n7 --> n16
-    n15 --> n16
-    n15 --> n17
-    n17 --> n18
-    n14 --> n18
-    n17 --> n19
-    n16 --> n19
-    n14 --> n20
-    n23 --> n20
+    n12 --> n13
+    n28 --> n14
+    n10 --> n14
+    n8 --> n14
+    n0 --> n14
+    n6 --> n15
+    n14 --> n15
+    n14 --> n16
+    n16 --> n17
+    n13 --> n17
+    n16 --> n18
+    n15 --> n18
+    n13 --> n19
+    n22 --> n19
+    n19 --> n20
+    n18 --> n20
     n20 --> n21
-    n19 --> n21
-    n21 --> n22
-    n42 --> n22
-    n9 --> n23
-    n11 --> n23
-    n9 --> n24
-    n4 --> n25
-    n9 --> n25
-    n9 --> n26
-    n6 --> n28
-    n8 --> n29
-    n4 --> n33
-    n6 --> n33
-    n15 --> n33
-    n14 --> n33
-    n23 --> n33
-    n0 --> n36
+    n41 --> n21
+    n8 --> n22
+    n10 --> n22
+    n8 --> n23
+    n3 --> n24
+    n8 --> n24
+    n8 --> n25
+    n5 --> n27
+    n7 --> n28
+    n3 --> n32
+    n5 --> n32
+    n14 --> n32
+    n13 --> n32
+    n22 --> n32
+    n0 --> n35
+    n12 --> n36
+    n13 --> n36
+    n16 --> n36
+    n17 --> n36
+    n18 --> n36
+    n19 --> n36
+    n21 --> n36
+    n22 --> n36
+    n24 --> n36
+    n20 --> n36
+    n32 --> n36
+    n0 --> n37
+    n1 --> n37
+    n2 --> n37
+    n3 --> n37
+    n4 --> n37
+    n5 --> n37
+    n6 --> n37
+    n7 --> n37
+    n9 --> n37
+    n10 --> n37
+    n11 --> n37
+    n12 --> n37
     n13 --> n37
     n14 --> n37
+    n16 --> n37
     n17 --> n37
     n18 --> n37
     n19 --> n37
-    n20 --> n37
+    n21 --> n37
     n22 --> n37
     n23 --> n37
+    n24 --> n37
+    n8 --> n37
+    n15 --> n37
+    n20 --> n37
     n25 --> n37
-    n21 --> n37
+    n32 --> n37
     n33 --> n37
-    n1 --> n37
+    n34 --> n37
+    n35 --> n37
+    n36 --> n37
+    n31 --> n37
+    n26 --> n37
+    n27 --> n37
+    n28 --> n37
     n0 --> n38
     n1 --> n38
     n2 --> n38
@@ -313,81 +346,44 @@ flowchart LR
     n5 --> n38
     n6 --> n38
     n7 --> n38
-    n8 --> n38
+    n9 --> n38
     n10 --> n38
     n11 --> n38
     n12 --> n38
     n13 --> n38
     n14 --> n38
-    n15 --> n38
+    n16 --> n38
     n17 --> n38
     n18 --> n38
     n19 --> n38
-    n20 --> n38
+    n21 --> n38
     n22 --> n38
     n23 --> n38
     n24 --> n38
+    n8 --> n38
+    n15 --> n38
+    n20 --> n38
     n25 --> n38
-    n9 --> n38
-    n16 --> n38
-    n21 --> n38
-    n26 --> n38
+    n30 --> n38
+    n32 --> n38
     n33 --> n38
     n34 --> n38
     n35 --> n38
     n36 --> n38
     n37 --> n38
-    n32 --> n38
+    n31 --> n38
+    n26 --> n38
     n27 --> n38
     n28 --> n38
     n29 --> n38
-    n0 --> n39
-    n1 --> n39
-    n2 --> n39
-    n3 --> n39
-    n4 --> n39
-    n5 --> n39
-    n6 --> n39
-    n7 --> n39
-    n8 --> n39
-    n10 --> n39
-    n11 --> n39
-    n12 --> n39
-    n13 --> n39
-    n14 --> n39
-    n15 --> n39
-    n17 --> n39
-    n18 --> n39
-    n19 --> n39
-    n20 --> n39
-    n22 --> n39
-    n23 --> n39
-    n24 --> n39
-    n25 --> n39
-    n9 --> n39
-    n16 --> n39
-    n21 --> n39
-    n26 --> n39
-    n31 --> n39
-    n33 --> n39
-    n34 --> n39
-    n35 --> n39
-    n36 --> n39
-    n37 --> n39
-    n38 --> n39
-    n32 --> n39
-    n27 --> n39
-    n28 --> n39
-    n29 --> n39
-    n30 --> n39
-    n48 --> n40
-    n40 --> n41
-    n40 --> n42
-    n40 --> n43
-    n24 --> n43
-    n40 --> n45
-    n7 --> n45
-    n35 --> n47
+    n47 --> n39
+    n39 --> n40
+    n39 --> n41
+    n39 --> n42
+    n23 --> n42
+    n39 --> n44
+    n6 --> n44
+    n34 --> n46
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -516,9 +512,9 @@ flowchart LR
 - **task** M1-54: waits on M1-12
 - **task** M1-39: waits on M1-08, M1-10, M1-18 +2
 - **task** M1-46: waits on M1-02
-- **task** M1-47: waits on M1-16, M1-17, M1-19 +9
-- **task** M1-48: waits on M1-02, M1-04, M1-06 +33
-- **task** M1-FU: waits on M1-02, M1-04, M1-06 +36
+- **task** M1-47: waits on M1-16, M1-17, M1-19 +8
+- **task** M1-48: waits on M1-02, M1-06, M1-07 +32
+- **task** M1-FU: waits on M1-02, M1-06, M1-07 +35
 - **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
