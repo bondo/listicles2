@@ -158,31 +158,36 @@ export async function verifiedOnly(
     await assertSucceeds(request(clients.verified));
 }
 
-// The allow statements of a rules text, each with the path of the match blocks around it. Comments go
-// and string literals become '' first, so neither can hide a statement or unbalance the braces; a
-// statement or brace it cannot read throws.
-function allowStatements(rules: string): { path: string; condition: string }[] {
+// The allow statements of a rules text, each with the path of the match blocks around it, and the
+// paths at which `function signedIn` is declared. Comments go and string literals become '' first, so
+// neither can hide a statement or unbalance the braces; a statement or brace it cannot read throws.
+function parseRules(rules: string): {
+    allows: { path: string; condition: string }[];
+    signedIn: string[];
+} {
     const code = rules.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|'[^'\n]*'|"[^"\n]*"/g, (m) =>
         m.startsWith("/") ? "" : "''",
     );
     const stack: string[] = [];
-    const found: { path: string; condition: string }[] = [];
+    const allows: { path: string; condition: string }[] = [];
+    const signedIn: string[] = [];
     for (const m of code.matchAll(
-        /\bmatch\s+(\S+)\s*\{|\ballow\s[^:;]*(?::\s*if\s([^;]*))?;|[{}]/g,
+        /\bmatch\s+(\S+)\s*\{|\ballow\s[^:;]*(?::\s*if\s([^;]*))?;|\bfunction\s+signedIn\b|[{}]/g,
     )) {
         if (m[1] !== undefined) stack.push(m[1]);
         else if (m[0].startsWith("allow")) {
-            found.push({
+            allows.push({
                 path: stack.join(""),
                 condition: (m[2] ?? "").replace(/\s+/g, " ").trim(),
             });
-        } else if (m[0] === "{") stack.push("");
+        } else if (m[0].startsWith("function")) signedIn.push(stack.join(""));
+        else if (m[0] === "{") stack.push("");
         else if (stack.pop() === undefined) throw new Error("rules: a } without its {");
     }
-    if (stack.length > 0 || found.length !== (code.match(/\ballow\s/g) ?? []).length) {
-        throw new Error("rules: an allow statement or a brace that allowStatements cannot read");
+    if (stack.length > 0 || allows.length !== (code.match(/\ballow\s/g) ?? []).length) {
+        throw new Error("rules: an allow statement or a brace that parseRules cannot read");
     }
-    return found;
+    return { allows, signedIn };
 }
 
 // signedIn() is a conjunct of the whole condition: its first term, and no || or ?: outside
@@ -199,13 +204,20 @@ function requiresSignedIn(condition: string): boolean {
 }
 
 // M1-08, so a new rule cannot forget signedIn(): the allow statements that do not require it, outside
-// the two exceptions of PLAN 3.1 "Signed in" (the own users doc and config/app), as `path: condition`.
+// the two exceptions of PLAN 3.1 "Signed in" (the own users doc and config/app), as `path: condition`;
+// and signedIn() itself unless it is declared exactly once, at the documents level, so that no match
+// can redefine it (S1-01).
 const DOCUMENTS = "/databases/{database}/documents";
 const WITHOUT_SIGN_IN = [`${DOCUMENTS}/users/{uid}`, `${DOCUMENTS}/config/app`];
-export const withoutSignedIn = (rules: string): string[] =>
-    allowStatements(rules)
+export function withoutSignedIn(rules: string): string[] {
+    const { allows, signedIn } = parseRules(rules);
+    const missing = allows
         .filter((s) => !WITHOUT_SIGN_IN.includes(s.path) && !requiresSignedIn(s.condition))
         .map((s) => `${s.path}: ${s.condition}`);
+    if (signedIn.length === 1 && signedIn[0] === DOCUMENTS) return missing;
+    const found = signedIn.join(", ") || "none";
+    return [...missing, `signedIn() must be declared once, at ${DOCUMENTS}; found: ${found}`];
+}
 
 // "denied" only for a permission-denied error; any other error is thrown, so a broken probe never
 // counts as denied.
