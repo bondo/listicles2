@@ -13,8 +13,10 @@ b1; the other P10 gates (see #195, Q2 A) and the routing test over all gates are
 - tasks.toml: M1-60 narrowed, M1-62 added (depends on M1-60); M1-17, M1-18, M1-27, M1-39, M1-48, M1-FU depend on M1-62.
 
 ## Next (in order)
-1. Green `scripts/verify.sh --fast`; record goldens (`scripts/screenshots.sh record`, TallyApp_* now show the home).
-2. Push, open the draft PR, verifier subagent, M1-60 status done in the final commit with this file's deletion.
+1. BLOCKED on the owner: the five TallyApp_* goldens must be re-recorded (they now show the home), and the guard
+   refuses that push without the `golden-update` label (owner-only). Once labelled: `scripts/screenshots.sh record`,
+   commit the PNGs, push. Until then CI's screenshots step fails on this branch.
+2. Verifier subagent, then M1-60 status done (`pr = <n>`) in the final commit with this file's deletion.
 
 ## Decisions made
 - Back stack derived from the gate state (`listOf(route)`), not saved, so keys are not `@Serializable` (checklist 3 row).
@@ -32,5 +34,6 @@ scripts/verify.sh --fast
 ```
 
 ## Facts that save time
+- Full `scripts/verify.sh` passed with the goldens recorded (GOLDEN_UPDATE=1 for the guard step only).
 - Pre-commit runs `:core:testing:detektMain` (type-resolved), so a test double must compile against main code.
 - New dependencies: verification metadata via `--write-verification-metadata sha256` over the CI task list (checklist 11).
