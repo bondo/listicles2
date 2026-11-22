@@ -132,7 +132,7 @@ When in doubt: `fix-now`.
 
 ## 7. The issue
 
-Issue title: `[follow-up] <finding title>`. Labels (created once by task M0-O10; the orchestrator
+Issue title: `Follow-up from PR #<n>: <finding title>` (the form in use) or `[follow-up] <finding title>`; a standing item is `Track: <what>`, a finding of a repo-wide review is `Repo review (<aspect>): <finding title>`. Labels (created once by task M0-O10; the orchestrator
 checks they exist before the first filing and creates a missing label with `gh api`. It files with all labels in the same call and on **every** filing checks that the returned issue carries every
 label (the API can drop labels silently, e.g. without push access). If any is still missing it closes that issue, keeps the finding
 `open` (fix-now, or ask the owner), stops deferring and asks the owner):
@@ -168,7 +168,7 @@ adds an `owner-ok` comment link; a follow-up older than one milestone is reporte
 **Burn-down task `Mx-FU`** (in `docs/tasks.toml`, enforced by `tasks.py validate`): an implementer task that
 runs after all of the milestone's work. Done means every issue labelled `target:Mx` is closed or has been
 re-targeted with owner OK. It is a normal PR (one concern, small), which may be empty when no follow-up exists:
-then it only sets `status = "done"`. The milestone's merge/close task depends on it.
+then it only sets `status = "done"`. It also reviews every open Dependabot alert (`docs/SECURITY.md` §1 item 2). The milestone's merge/close task depends on it.
 
 **Ready query** (`ORCHESTRATION.md` §4.3): add a third file and pass it as `--followups`:
 

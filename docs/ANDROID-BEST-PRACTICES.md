@@ -15,7 +15,7 @@ section ("strongly recommended" and so on) are Google's own labels. Google says 
 
 Facts about this repo were read from `build.gradle.kts`, `app/build.gradle.kts`, `gradle.properties`,
 `config/detekt/detekt.yml`, `scripts/verify.sh`, `docs/PLAN.md` and `REVIEW.md` on `main` at `ed6ec5b`.
-The architecture rules (M0.5-11) are on main: plain JUnit tests in `core/domain/src/test/kotlin/dk/bjarkebjarke/tally/architecture/` (`ArchitectureRules.kt`, `DomainNoFloatingPointTest.kt`, `UiNoRawValuesTest.kt`) run in `verify.sh` unit tests. They are JUnit tests that use Konsist to collect the files and regex rules to check their text: no floating point in domain code, and no raw colours, `dp`, `sp` or `em` in UI outside the theme.
+The architecture rules (M0.5-11) are on main: plain JUnit tests in `core/domain/src/test/kotlin/dk/bjarkebjarke/tally/architecture/` (`ArchitectureRules.kt`, `DataSourceRules.kt`, `DomainNoFloatingPointTest.kt`, `UiNoRawValuesTest.kt`, `NoDataSourceInUiTest.kt`, `NoGlobalScopeTest.kt` and others) run in `verify.sh` unit tests. They are JUnit tests that use Konsist to collect the files and regex rules to check their text: no floating point in domain code, no raw colours, `dp`, `sp` or `em` in UI outside the theme, no Firebase, DataStore, Room or data-layer type in a composable or ViewModel file (`DataSourceRules`, M1-50), and no `GlobalScope` in any source set.
 
 ## 1. Architecture
 Sources: [Guide to app architecture](https://developer.android.com/topic/architecture) and
@@ -24,7 +24,7 @@ Sources: [Guide to app architecture](https://developer.android.com/topic/archite
 | Rule | Status |
 |---|---|
 | UI layer (Compose + ViewModel state holders) and data layer (repositories over data sources); domain layer only when logic is shared or complex ("recommended in big apps") | review (M1) |
-| Composables and ViewModels never touch a data source (Firestore, DataStore, ...) directly; only repositories do | review (M1); Konsist rule proposed, see follow-ups |
+| Composables and ViewModels never touch a data source (Firestore, DataStore, ...) directly; only repositories do | tooling: `NoDataSourceInUiTest` (imports and qualified names of `com.google.firebase`, `androidx.datastore`, `androidx.room` and `dk.bjarkebjarke.tally.data` in a file with a composable or a ViewModel); review for the rest |
 | Single source of truth per data type: the owner exposes immutable types and takes events or function calls to change them | review (M1) |
 | Unidirectional data flow: state down, events up | review (M1) |
 | ViewModel at screen level only; no `Context`, `Activity`, `Resources` or `AndroidViewModel` in it; `ViewModel` instances are not passed down to child composables (State hoisting page) | review (M1) |
@@ -78,7 +78,7 @@ Source: [Coroutines best practices](https://developer.android.com/kotlin/corouti
 | Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | review; detekt `InjectDispatcher` enabled but active only where detekt is type-resolved (core modules today, not `:app`) |
 | Suspend functions are main-safe: the class doing blocking work moves it with `withContext` | review |
 | The ViewModel creates the coroutines; the data layer exposes `suspend` for one-shot calls and `Flow` for streams | review |
-| No `GlobalScope`; work that must outlive a screen uses an injected external scope | review; detekt `GlobalCoroutineUsage` enabled and fixture-gated (`testDetektRules`) |
+| No `GlobalScope`; work that must outlive a screen uses an injected external scope | tooling: `NoGlobalScopeTest` (every source set); detekt `GlobalCoroutineUsage` enabled and fixture-gated (`testDetektRules`) |
 | Structured concurrency (`coroutineScope` or `supervisorScope`); never swallow `CancellationException`; catch specific exceptions | review |
 
 ## 6. Testing
@@ -162,6 +162,7 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 | Dependencies and plugins only through `gradle/libs.versions.toml`, kebab-case names, `alias(libs.plugins...)` | tooling in part: the catalog exists; nothing fails a hardcoded `"group:name:version"`, a guard is proposed |
 | Configuration cache and build cache on | tooling in part: set in `gradle.properties` |
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
+| JVM modules use only Java and Android API available at minSdk 26 (lint NewApi skips pure JVM modules; no desugaring is configured) | tooling: `checkJdkRelease` (JDK 17 API) and `checkJavaApiLevel` (`scripts/check_java_api_level.py` reads the main classes of every JVM module against `api-versions.xml` of the compileSdk platform; M1-37) |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
 | Dependency freshness | Dependabot (lint freshness checks are disabled on purpose with a `// justified:`) |
 | Dependency verification | tooling: `gradle/verification-metadata.xml` holds a sha256 for every resolved artifact (plugins, build tools, lint, test and Android configurations), enforced by Gradle in every build; `scripts/check_gradle_repos.py` fails when the file is missing, verification is switched off, or an artifact has no sha256 |
@@ -202,7 +203,7 @@ Checksums only, no PGP signatures: most Android and Kotlin artifacts are not sig
 
 ## Proposed follow-ups (not implemented here)
 Each would be its own PR, test-first, per CLAUDE.md.
-1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types; ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `GlobalScope`; no `Dispatchers.` outside the DI module.
+1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); still open (M1-57): ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `Dispatchers.` outside the DI module.
 2. **detekt coroutines rules**: partly done (issue 38). `GlobalCoroutineUsage` is enabled and fixture-tested. `InjectDispatcher` is enabled and fixture-tested with a type-resolved fixture, but it only fires in type-resolved tasks (`detektMain`/`detektTest`), which today exist only for `:core:domain` and `:core:testing`. Still open: a type-resolved detekt run for `:app` and the planned `:core:data`, so the rule reaches code that will write `Dispatchers.IO`.
 3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog). Task M1-59.
 4. ~~Guard that `targetSdk` is at least the Play minimum~~ Done (M1-51, `scripts/check_build_guards.py`, see section 10); raise `TARGET_SDK_FLOOR` when the date changes.
