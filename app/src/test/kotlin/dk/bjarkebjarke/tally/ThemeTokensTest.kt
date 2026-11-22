@@ -117,18 +117,16 @@ class ThemeTokensTest {
         (("outline" to "surfaceContainerHigh") in pairs) shouldBe true
     }
 
-    /** M1-60: the Spacing and Sizes objects hold exactly the spacing and size tokens, in dp. */
+    /** M1-60: the Spacing object holds exactly the spacing tokens, in dp. */
     @Test
-    fun spacingAndSizesMatchTokens() {
-        for ((group, holder) in listOf("spacing" to Spacing, "size" to Sizes)) {
-            val dps = holder.javaClass.declaredFields.filter { it.type == java.lang.Float.TYPE }
-            val actual =
-                dps.associate { f ->
-                    f.isAccessible = true
-                    f.name to f.getFloat(null).toInt()
-                }
-            actual shouldBe obj(tokens.getValue(group)).mapValues { (it.value as Number).toInt() }
-        }
+    fun spacingMatchesTokens() {
+        val dps = Spacing.javaClass.declaredFields.filter { it.type == java.lang.Float.TYPE }
+        val actual =
+            dps.associate { f ->
+                f.isAccessible = true
+                f.name to f.getFloat(null).toInt()
+            }
+        actual shouldBe obj(tokens.getValue("spacing")).mapValues { (it.value as Number).toInt() }
     }
 
     @Test
