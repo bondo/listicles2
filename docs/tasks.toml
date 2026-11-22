@@ -922,7 +922,8 @@ notes = "Split 2026-11-22 (orchestrator, the 400-line rule): the start-up root, 
 id = "M1-60"
 title = "Start-up root: Navigation 3, M1 home (#194, Q1 A), signed-in/out routing (P10 steps 2 and 6), signed-out start shows sign-in"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 311
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30", "M1-36", "M1-49"]
@@ -936,7 +937,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60"]
-notes = "Gate order P10 (docs/milestones/M1.md section 8) as a pure domain function with property tests, in front of the M1-60 home; each gate a domain interface with a stand-in binding until its task (M1-27, M1-14/M1-15, M1-39, M1-18) implements it, and a placeholder step until its screen exists. Extends StartRoutingTest to update, signed out, unverified, no name, a notice, home"
+notes = "Gate order P10 (docs/milestones/M1.md section 8) as a pure domain function with property tests, in front of the M1-60 home; each gate a domain interface with a stand-in binding until its task implements it (update M1-27, email verified M1-15, name M1-39, notices M1-18), and a placeholder step until its screen exists. Extends StartRoutingTest to update, signed out, unverified, no name, a notice, home"
 
 [[task]]
 id = "M1-13"
@@ -966,7 +967,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-14"]
+depends_on = ["M1-14", "M1-62"]
 
 [[task]]
 id = "M1-16"
