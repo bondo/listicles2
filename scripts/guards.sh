@@ -93,7 +93,8 @@ BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/);
   if (c ~ /^[ \t]*$/) next
   closer = (c ~ /^[ \t]*[])},;]*[ \t]*$/)
   if (mode == 4) { if (ind(line) > yi || (ind(line) == yi && c ~ /^[ \t]*-/)) { check(); next } mode = 0 }
-  if (yml && lc ~ /^[ \t]*-?[ \t]*["\047]?ignore["\047]?[ \t]*:[ \t]*$/) { mode = 4; yi = ind(line); next }  # a YAML block list: - entry per line
+  if (yml && lc ~ /ignore["\047]?[ \t]*:[^#]*[][ \t,]\*[A-Za-z0-9_]/) { printf "%s:%d:%s\n", F, NR, line; next }  # an alias: 2b cannot follow it
+  if (yml && lc ~ /^[ \t]*-?[ \t]*["\047]?ignore["\047]?[ \t]*:([ \t]+(&|!)[^ \t]*)*[ \t]*$/) { mode = 4; yi = ind(line); next }  # block list (anchor, tag)
   if (mode == 1 && c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/) mode = 0
   if (mode == 3 && line !~ /^[ \t]/) mode = 0
   if (mode == 1 || mode == 3) { if (!closer) check(); next }
@@ -185,7 +186,7 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # checked; a mypy `@argfile` fails; an empty quoted config (`--config-file ""`) disables the config, so it fails.
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
-# In YAML a folded scalar (`run: >`) is one logical line, and the args-like keys of a step or hook (`with: args:`, `eslint_flags:`, pre-commit
+# In YAML a folded scalar (`run: >`) or a multi-line plain or quoted value is one logical line, and the args-like keys of a step or hook (`with: args:`, `eslint_flags:`, pre-commit
 # `args:`) are flags of the tool its `uses:`, `id:` or `entry:` names (issue 164 item 2, yamlitem below). Not covered: flags held in
 # shell variables (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, tools run from Python (subprocess),
 # and yarn, pnpm and bun forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
@@ -476,7 +477,7 @@ function progkind(c,   n, w, i, a) {
 }
 # ddtools: the JS tools an npm `--` tail reaches, over every package.json that defines the script; "*" when that is not known.
 function ddtools(p,   nm, i, k, r) {
-  nm = ddscript(p); if (!(nm in NS)) return "*"
+  nm = ddscript(p); if (!(nm in NS) || ("" in NS)) return "*"
   for (i = 1; i <= NS[nm]; i++) {
     k = progkind(NC[nm, i]); if (k == "?") return "*"
     if (k != "" && index(" " r " ", " " k " ") == 0) r = r (r == "" ? "" : " ") k
@@ -519,15 +520,16 @@ function toolof(v,   i, n, tl) {
   return ""
 }
 function hookcmd(v) { v = unq(v); return (v ~ /^ruff(-check)?$/ ? "ruff check" : (v == "ruff-format" ? "ruff format" : toolof(v))) }
-function argadd(k, v, l) { NA++; AK[NA] = k; AT[NA] = (v ~ /^[|>][-+0-9]*$/ ? "" : v); AL[NA] = NR; ALN[NA] = l; AJ[NA] = just(l) }
+# AU: the text of the lines of an args key that have no reason; a reason waives its own line only (R1-06).
+function argadd(k, v, l) { NA++; AK[NA] = k; AU[NA] = (v ~ /^[|>][-+0-9]*$/ || just(l) ? "" : v); AL[NA] = NR; ALN[NA] = l }
 function itemend(   a, i, tool) {
   tool = toolof(IT)
   for (i = 1; i <= NA; i++) {
-    a = AT[i]; gsub(/[][{}]/, " ", a); gsub(/,([ \t]|$)/, " ", a)
-    if (IT != "" && (AK[i] ~ /^(extra_)?(args|flags|options|arguments)$/ || index(AK[i], tool "_") == 1) && a ~ /[^ \t]/ && !AJ[i] && relaxed(IT " " a))
+    a = AU[i]; gsub(/[][{}]/, " ", a); gsub(/,([ \t]|$)/, " ", a)
+    if (IT != "" && (AK[i] ~ /^(extra_)?(args|flags|options|arguments)$/ || index(AK[i], tool "_") == 1) && a ~ /[^ \t]/ && relaxed(IT " " a))
       printf "%s:%d:%s\n", F, AL[i], ALN[i]
   }
-  IT = ""; NA = 0; IE = 0; IK = -1; AM = 0; BS = -1
+  IT = ""; NA = 0; IE = 0; IK = -1; IKP = 0; AM = 0; BS = -1
 }
 function ykey(k, v) {
   if (k == "uses" && !PC) { v = unq(v); sub(/@.*$/, "", v); IT = toolof(v) }
@@ -538,21 +540,23 @@ function ykey(k, v) {
 function flowmap(v, l,   m, k, x) {
   while (match(v, /[{,][ \t]*["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:[ \t]*(\[[^]]*\]|[^]{},]*)/)) {
     m = substr(v, RSTART + 1, RLENGTH - 1); v = substr(v, RSTART + RLENGTH)
-    k = m; sub(/[ \t]*:.*$/, "", k); gsub(/["\047 \t]/, "", k); x = m; sub(/^[^:]*:[ \t]*/, "", x); sub(/[ \t]+$/, "", x)
+    k = m; sub(/[ \t]*:.*$/, "", k); gsub(/["\047 \t]/, "", k); k = tolower(k); x = m; sub(/^[^:]*:[ \t]*/, "", x); sub(/[ \t]+$/, "", x)
     if (k ~ ARGKEY) argadd(k, x, l); else ykey(k, x)
   }
 }
 function yamlitem(l,   c, key, v) {
   if (l ~ /^[ \t]*(#|$)/) return
-  if (AM) { if (indent(l) > AC || (indent(l) == AC && l ~ /^[ \t]*-([ \t]|$)/)) { v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); AT[NA] = AT[NA] " " stripc(v); AJ[NA] = AJ[NA] || just(l); return } AM = 0 }
+  if (AM) { if (indent(l) > AC || (indent(l) == AC && l ~ /^[ \t]*-([ \t]|$)/)) { v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); if (!just(l)) AU[NA] = AU[NA] " " stripc(v); return } AM = 0 }
   if (BS >= 0) { if (indent(l) > BS) return; BS = -1 }
   if (l ~ /^[ \t]*-[ \t]+(["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:([ \t]|$)|\{)/) { itemend(); IK = keycol(l) }
+  else if (l ~ /^[ \t]*-[ \t]*(#.*)?$/) { itemend(); IKP = 1; return }  # a bare `-`: the keys of the item start on the next line
+  else if (IKP) { IK = indent(l); IKP = 0 }
   else if (IK >= 0 && indent(l) < IK) itemend()
   if (IK < 0) return
   v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); c = length(l) - length(v)
   if (v ~ /^\{/) { flowmap(v, l); return }
   if (!match(v, /^["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:([ \t]|$)/)) return
-  key = v; sub(/[ \t]*:.*$/, "", key); gsub(/["\047]/, "", key); v = stripc(substr(v, RLENGTH + 1)); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
+  key = v; sub(/[ \t]*:.*$/, "", key); gsub(/["\047]/, "", key); key = tolower(key); v = stripc(substr(v, RLENGTH + 1)); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v)
   if (v ~ /^\{/) { flowmap(v, l); return }
   if (key ~ ARGKEY) { argadd(key, v, l); AM = 1; AC = c; return }
   if (v ~ /^[|>][-+0-9]*$/) { BS = c; return }
@@ -588,12 +592,21 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   line = $0; sub(/\r$/, "", line)
   inb = (BS >= 0 && indent(line) > BS)  # inside another block scalar (`run: |`), where `key: >` is text
   if (YML) yamlitem(line)
-  if (fold) {  # a YAML folded scalar (`run: >`) is one line; a blank line in it is a line break
+  # A folded scalar (fold 1, `run: >`) or a plain or quoted scalar that goes on over more-indented lines (fold 2) is one line. A blank
+  # line is a line break; in fold 1 so is the break before and after a line indented more than the first (YAML keeps them, R1-01).
+  if (fold) {
     if (line ~ /^[ \t]*$/) { flush(); next }
-    if (indent(line) > FI) { if (cur == "") start = NR; cur = (cur == "" ? "" : cur " ") line; next }
+    if (indent(line) > FI) {
+      if (fold == 1) { if (FB < 0) FB = indent(line); if (FM || indent(line) != FB) flush(); FM = (indent(line) != FB) }
+      if (cur == "") start = NR
+      cur = (cur == "" ? "" : cur " ") line; next
+    }
     fold = 0; flush()
   }
-  if (YML && !cont && !inb && line ~ /:[ \t]*>[-+0-9]*[ \t]*(#.*)?$/) { flush(); fold = 1; FI = keycol(line); next }
+  if (YML && !cont && !inb && line ~ /:[ \t]*>[-+0-9]*[ \t]*(#.*)?$/) { flush(); fold = 1; FI = keycol(line); FB = -1; FM = 0; next }
+  if (YML && !cont && !inb && line ~ /^[ \t]*(-[ \t]+)?["\047]?[A-Za-z_][A-Za-z0-9_ -]*["\047]?[ \t]*:[ \t]+[^ \t#|>]/) {
+    flush(); fold = 2; FI = keycol(line); start = NR; cur = line; next
+  }
   if (!cont && line ~ /^[ \t]*#/) next
   if (!cont) start = NR
   cont = (line ~ /\\[ \t]*$/)
@@ -602,17 +615,22 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   if (!cont) flush()
 }
 END { flush(); if (YML) itemend() }'
-# The scripts of every package.json, one `name<TAB>command` per line (one script per line, as npm writes them; any other layout is not read,
-# so the script counts as unknown).
+# The scripts of every package.json, one `name<TAB>command` per line, read from the top-level "scripts" object when it is written as npm
+# writes it (`"scripts": {` alone, then one `"name": "command",` per line). Any other layout of a top-level "scripts" key prints a bare
+# TAB, which makes every npm `--` tail unknown (fail closed); a "scripts" key nested deeper is not npm's and is skipped.
 pkgscripts() {
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null; else cat -- "$f" 2>/dev/null; fi
-  done < <(git ls-files -- '*package.json' "${EXCL[@]}") | LC_ALL=C awk '
-    /"scripts"[ \t]*:[ \t]*\{[ \t]*$/ { s = 1; next }
-    s && /^[ \t]*\}/ { s = 0 }
-    s && match($0, /^[ \t]*"[^"]+"[ \t]*:[ \t]*"/) { n = substr($0, RSTART, RLENGTH); v = substr($0, RSTART + RLENGTH)
-      sub(/^[ \t]*"/, "", n); sub(/"[ \t]*:[ \t]*"$/, "", n); sub(/"[ \t]*,?[ \t]*$/, "", v); print n "\t" v }'
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null; else cat -- "$f" 2>/dev/null; fi | LC_ALL=C awk '
+      { t = $0; gsub(/\\./, "", t); gsub(/"[^"]*"/, "\"\"", t) }
+      s { if (t ~ /^[ \t]*\}[ \t]*,?[ \t]*$/) s = 0
+          else if (t ~ /^[ \t]*""[ \t]*:[ \t]*""[ \t]*,?[ \t]*$/ && match($0, /^[ \t]*"[^"]+"[ \t]*:[ \t]*"/)) {
+            n = substr($0, RSTART, RLENGTH); v = substr($0, RSTART + RLENGTH)
+            sub(/^[ \t]*"/, "", n); sub(/"[ \t]*:[ \t]*"$/, "", n); sub(/"[ \t]*,?[ \t]*$/, "", v); print n "\t" v }
+          else print "\t"; next }
+      /"scripts"[ \t]*:/ && d < 2 { if (d == 1 && t ~ /^[ \t]*""[ \t]*:[ \t]*\{[ \t]*$/) s = 1; else print "\t" }
+      { o = t; d += gsub(/\{/, "", o); o = t; d -= gsub(/\}/, "", o) }'
+  done < <(git ls-files -- '*package.json' "${EXCL[@]}")
 }
 NPMS=$(pkgscripts)
 cliflags() { # cliflags <pathspec>...

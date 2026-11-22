@@ -86,19 +86,22 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   (issue 174, R5-01) while `ruff format --diff .` passes.
 - actionlint: `-ignore`, an empty `-pyflakes=` or `-shellcheck=` and every unlisted flag fail; a non-empty `-shellcheck=<path>` passes
   (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`. The `ignore:`
-  entries of the actionlint config (`actionlint.yaml` or `actionlint.yml` in `.github/`) are read by 2b: the `ignore:` line and every `- entry` of its block list need a reason.
+  entries of the actionlint config (`actionlint.yaml` or `actionlint.yml` in `.github/`) are read by 2b: the `ignore:` line and every `- entry` of its block list need a reason, also after an anchor or a tag
+  (`ignore: &a`, `ignore: !!seq`); an `ignore:` whose value is an alias (`*name`) fails with no escape hatch, because 2b cannot follow it.
 - Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
-- YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`) is read as one logical line, a blank line in it as a line break (a
-  more-indented line keeps its line break in YAML, so joining it is a false positive in the safe direction; `key: >` inside another
-  block scalar is text, not a fold). A
-  sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
+- YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`), and a plain or quoted value that goes on over more-indented lines
+  (`run: ruff check` then `  --fix .`), is read as one logical line. A blank line is a line break, and in a folded scalar so are the
+  breaks before and after a line indented more than the first, as YAML keeps them (PR 309 R1-01, R1-05); `key: >` inside another
+  block scalar is text, not a fold. A sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
   the tool, such as `astral-sh/ruff-action` or `docker://rhysd/actionlint`), `entry:` or `id:` (`ruff` and `ruff-check` run
   `ruff check`, `ruff-format` runs `ruff format`) gives the command, and each of its args-like keys (`args`, `extra_args`, `flags`,
-  `options`, or a key that starts with the tool name such as `eslint_flags`; not `reviewdog_flags`; at any depth, quoted or not) holds
+  `options`, or a key that starts with the tool name such as `eslint_flags`; not `reviewdog_flags`; at any depth, quoted or not, in
+  any letter case, as Actions passes inputs upper-cased; also after a bare `-` line) holds
   that command's flags, inline, as a flow or block list, in a flow mapping (`- {id: ruff, args: [--fix]}`, `with: {args: check}`) or a
-  block scalar. A reason on the lines of one key waives that key only.
+  block scalar. A reason waives its own line only: the lines of a key that have no reason are checked together (R1-06).
 - npm `--` tail (issue 164 item 3): npm appends it to the last command of the script, so the script is looked up in every tracked
-  package.json (one `"name": "command"` per line). When that command runs eslint, prettier or tsc (after `VAR=x` and `npx`), the tail is
+  package.json (only the top-level `"scripts"` object, as npm writes it: `"scripts": {` alone, then one `"name": "command",` per
+  line; any other layout of a top-level `"scripts"` key makes every tail unknown, R1-02). When that command runs eslint, prettier or tsc (after `VAR=x` and `npx`), the tail is
   checked for that tool; when it runs a test runner that is no linter (jest, vitest, mocha, playwright, cypress, firebase), not at all,
   so `npm test -- -u` passes. When package.json files run different tools for the script, each of them must accept the flag. In every
   other case (an unknown script, `npm exec`/`npx`, a wrapper such as `node x.mjs`, `npm run y`, a path, any other program, or an npm
@@ -112,7 +115,8 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   verb), needs a `justified:`. A script whose last command is a test runner not on the list (`tap`) is checked the same way.
 - Flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
 - A job-level reusable workflow (`uses: org/x/.github/workflows/ruff.yml@v1` with `with: args:`) is not a sequence item and is not read,
-  and other inputs of a lint action (`severity:`, `ignore_paths:`, `fail_on_error:`, `reviewdog_flags:`) are not read.
+  and other inputs of a lint action (`severity:`, `ignore_paths:`, `fail_on_error:`, `reviewdog_flags:`) are not read. An args value
+  that is a `${{ }}` expression or a YAML alias (`args: *a`) is not followed (R1-07), like a shell variable.
 - A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
 - A tool name held in a
   Make or shell variable (`$(RUFF) check --ignore E501 .`), and a flag hidden by shell escapes (`eslint \--quiet .`, `eslint $'--quiet' .`).
