@@ -122,6 +122,23 @@ class NotIgnored(unittest.TestCase):
         self.assertEqual(tracked_ignored(), set())
 
 
+class NoTrackedFirebaseConfig(unittest.TestCase):
+    """M1-30 (M1.md section 1): no google-services.json is ever committed; the build generates a stand-in instead."""
+
+    def test_no_google_services_json_is_tracked(self):
+        self.assertEqual(tracked_google_services(ROOT), [])
+
+    def test_a_force_added_one_is_found_and_look_alikes_are_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = clean_env()
+            subprocess.run(["git", "init", "-q", "--template=", tmp], env=env, capture_output=True, check=True)
+            for name in ["app/google-services.json", "app/src/debug/google-services.json", "docs/google-services.json.md"]:
+                (Path(tmp) / name).parent.mkdir(parents=True, exist_ok=True)
+                (Path(tmp) / name).write_text("{}")
+            subprocess.run(["git", "add", "-f", "."], cwd=tmp, env=env, capture_output=True, check=True)
+            self.assertEqual(tracked_google_services(Path(tmp)), ["app/google-services.json", "app/src/debug/google-services.json"])
+
+
 class IndependentOfDeveloperMachine(unittest.TestCase):
     """A global excludes file must not change the answers: one set by core.excludesFile and the default one in XDG_CONFIG_HOME/git/ignore."""
 
