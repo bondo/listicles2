@@ -200,6 +200,10 @@ jobs:
         run: python3 -I scripts/test_dependency_floors.py
       - name: no vulnerable dependency version in package-lock.json or verification-metadata.xml (PR 224 R1-02)
         run: python3 -I scripts/dependency_floors.py
+      - name: build guards tests (M1-51)
+        run: python3 -I scripts/test_check_build_guards.py
+      - name: targetSdk floor (M1-51)
+        run: python3 -I scripts/check_build_guards.py
       - name: java api level checker tests (M1-37)
         run: python3 -I scripts/test_check_java_api_level.py
       - name: PIT config tests (M1-05)

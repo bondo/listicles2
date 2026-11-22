@@ -128,8 +128,8 @@ Sources: [Security checklist](https://developer.android.com/privacy-and-security
 | Rule | Status |
 |---|---|
 | Never commit API keys; keep them out of the source repository | tooling in part: the `secrets` (gitleaks) CI job and GitHub push protection catch a key inside a committed file; `.gitignore` keeps `google-services.json` (in any directory) and key and credential files out of `git add -A`, tested by `scripts/test_gitignore_secrets.py`; no guard blocks such a file by name once it is force-added, so the `google-services.json` rule in CLAUDE.md is also a review item |
-| Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding) |
-| Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change) |
+| Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding); manifest guard planned as M1-58 |
+| Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change); manifest guard planned as M1-58 |
 | Deep links and intents: App Links use `android:autoVerify="true"` plus a hosted `assetlinks.json`; treat data from an incoming link or intent (invite code) as untrusted input and validate it; set `android:exported` explicitly and keep components unexported unless needed ([Verify App Links](https://developer.android.com/training/app-links/verify-applinks), [Security checklist](https://developer.android.com/privacy-and-security/security-tips)) | review (M1-20) |
 | Sign-in uses Credential Manager (`androidx.credentials`), not legacy `GoogleSignIn`; on sign-out call `clearCredentialState()` ([About Credential Manager](https://developer.android.com/identity/credential-manager), [Implement Sign in with Google](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation)) | review (M1-14) |
 | Request the fewest permissions; validate input; keep data minimal (also Firestore rules, covered in REVIEW.md item 2) | review |
@@ -144,7 +144,7 @@ Sources: [Target API requirement](https://developer.android.com/google/play/requ
 
 | Rule | Status |
 |---|---|
-| From 2026-08-31 new apps and updates must target API 36 or higher. `targetSdk` is 37 | review (nothing fails if someone lowers it; guard proposed) |
+| From 2026-08-31 new apps and updates must target API 36 or higher. `targetSdk` is 37 | tooling: `scripts/check_build_guards.py` fails on a `targetSdk` below 36 or one it cannot read (M1-51) |
 | Edge-to-edge: handle `WindowInsets` (a `Scaffold` helps); it is enforced when targeting SDK 35+ | review |
 | Predictive back: do not intercept back with `onBackPressed` or `KEYCODE_BACK`; do not opt out | review |
 | Adaptive layouts by window size class (compact under 600dp, medium 600 to 840dp, expanded 840 to 1200dp, large 1200 to 1600dp, extra-large from 1600dp; large and extra-large need the `supportLargeAndXLargeWidth` opt-in); do not use "is tablet" logic; state survives configuration changes | review (M1+) |
@@ -205,9 +205,9 @@ Checksums only, no PGP signatures: most Android and Kotlin artifacts are not sig
 Each would be its own PR, test-first, per CLAUDE.md.
 1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); still open (M1-57): ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `Dispatchers.` outside the DI module.
 2. **detekt coroutines rules**: partly done (issue 38). `GlobalCoroutineUsage` is enabled and fixture-tested. `InjectDispatcher` is enabled and fixture-tested with a type-resolved fixture, but it only fires in type-resolved tasks (`detektMain`/`detektTest`), which today exist only for `:core:domain` and `:core:testing`. Still open: a type-resolved detekt run for `:app` and the planned `:core:data`, so the rule reaches code that will write `Dispatchers.IO`.
-3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog).
-4. **Guard that `targetSdk` is at least the Play minimum** (36 until the date changes).
-5. **Manifest guard**: fail on `usesCleartextTraffic="true"`, `cleartextTrafficPermitted="true"`, or `allowBackup="true"` without backup rules.
+3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog). Task M1-59.
+4. ~~Guard that `targetSdk` is at least the Play minimum~~ Done (M1-51, `scripts/check_build_guards.py`, see section 10); raise `TARGET_SDK_FLOOR` when the date changes.
+5. **Manifest guard**: fail on `usesCleartextTraffic="true"`, `cleartextTrafficPermitted="true"`, or `allowBackup="true"` without backup rules. Task M1-58.
 6. **Compose compiler stability report** as a CI artifact (no gate) once there are screens.
 7. **Release smoke build** with R8 on, run in CI, once M1 has a release variant.
 8. **Roborazzi and accessibility checks** are already in PLAN section 5; make sure their tasks cite sections 6 and 7 above.
