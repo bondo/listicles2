@@ -56,9 +56,9 @@ Tick these rules:
 | - Allowed merge methods | **Squash** only |
 | Require status checks to pass | on |
 | - Require branches to be up to date before merging | on |
-| - Status checks that are required | the 10 checks below, each with its source set to **GitHub Actions** |
+| - Status checks that are required | the 11 checks below, each with its source set to **GitHub Actions** |
 
-Required checks (10): `wrapper`, `static`, `unit`, `firebase`, `ui`, `guards`, `secrets`, `tasks`,
+Required checks (11): `wrapper`, `static`, `unit`, `firebase`, `ui`, `screenshots`, `guards`, `secrets`, `tasks`,
 `python-lint`, `workflow-lint`. These are all the jobs in `ci.yml`; `scripts/test_firebase_ts.py` fails when the
 jobs, this list and the list in `docs/PLAN.md` differ.
 
@@ -81,7 +81,7 @@ The repo hooks also block agent pushes to `main`, but the server-side rule is th
 
 ## 4. What NOT to require (and the stuck-run lesson)
 Required checks block a merge until they report. If a check never reports, the PR hangs forever.
-- Only the eight jobs above. Do **not** require the `CI` workflow name, `Dependabot`, or any check
+- Only the jobs listed above (every job in `ci.yml`). Do **not** require the `CI` workflow name, `Dependabot`, or any check
   that only runs on some PRs.
 - `ui` is the riskiest: it boots an Android emulator on a GitHub runner (45 min timeout) and can stall
   or queue when runners are busy. If it is stuck, see the escape hatch below rather than removing it.

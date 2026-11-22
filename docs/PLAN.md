@@ -470,8 +470,11 @@ enforce the rules rather than goodwill.
    * `ui`: Compose UI tests and the Kotlin data-layer integration tests (`connectedDebugAndroidTest` of `:app` and
      `:core:data` inside `firebase emulators:exec --only auth,firestore`; M1-02, #254) on an API 34 emulator against the Firebase emulator,
      with accessibility checks turned on (`enableAccessibilityChecks`: touch target
-     size, contrast, content descriptions). Roborazzi screenshot tests (JVM) in
-     light/dark × en/da.
+     size, contrast, content descriptions).
+   * `screenshots` (`scripts/screenshots.sh verify`, M1-03): Roborazzi screenshot tests (JVM), exact-match goldens in
+     light/dark × en/da plus one 200 % font-scale Danish light golden per screen; a failing run uploads the diffs as the
+     `screenshot-diffs` artifact. Its own job because the artifact step needs `if: failure()`, which the required jobs
+     that `scripts/test_ci_scope.py` guards may not have
    * `guards` (`scripts/guards.sh`) fails on:
      * `@Ignore`, `@Disabled`, `xit`, `.only`
      * `@Suppress`, `tools:ignore`, `ktlint-disable`, `detekt:` suppressions, or
@@ -500,8 +503,8 @@ enforce the rules rather than goodwill.
    reference images. CODEOWNERS marks these files and requests the owner's review; it is
    not an enforced approval (see item 6). Labels that agents could set themselves are not
    trusted on their own; the review is the reviewer rounds and the merge under the owner's authorization.
-6. **Branch protection** on `main`: PR required, all 10 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
-   `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
+6. **Branch protection** on `main`: PR required, all 11 checks green (`wrapper`, `static`, `unit`, `firebase`, `ui`,
+   `screenshots`, `guards`, `secrets`, `tasks`, `python-lint`, `workflow-lint`; source: GitHub Actions),
    **squash merge only**, no force-push, no deletion, branch up to date. **0 required
    approvals and Code Owners review off**: agents act as the owner's GitHub identity and
    GitHub does not let an author approve their own PR, so a required approval could never
@@ -596,11 +599,12 @@ members' changes; a conflict keeps the losing side; so v1 sync design should lea
 
 | Role | Model / effort | Runs as | Gets | Produces |
 |---|---|---|---|---|
-| **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for merges and decisions (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
+| **Orchestrator** | Opus / medium | One long-lived session | `PLAN.md`, `docs/ORCHESTRATION.md`, the state issue, `WORKER-RESULT` blocks | Spawns sessions, updates the state issue, asks the owner for decisions and for batch approvals of owner-only merges (autonomy rules: `docs/ORCHESTRATION.md` §1.1); never commits |
 | **Planner** | Opus / high | Fresh session, once per milestone | `PLAN.md`, the milestone, the relevant code | `docs/milestones/Mx.md`: PR breakdown, acceptance tests per PR; the PR-sized tasks with dependencies in `docs/tasks.toml` |
 | **Implementer (Opus)** | Opus / high (max for `risk:high`) | Fresh session per PR, kept across its review rounds | Its PR's section of `Mx.md`, `CLAUDE.md` | Branch + PR; tests written first; `verify.sh` green. For the cases in the split below |
 | **Implementer (Sonnet)** | Sonnet / medium (high for tooling) | Same | Same | Same. For every other task |
 | **Reviewer** | Opus / high (max for `risk:high`, `area:security-rules` and `area:sync-merge`) | Fresh session per review round | Diff, PR description, `REVIEW.md`, previous findings | Findings labeled `blocker / major / minor / nit`, with the file and line; never edits or pushes to the PR branch (`docs/ORCHESTRATION.md` §7.2) |
+| **Re-check reviewer** | Sonnet / medium | Fresh session for the re-check of a small fix-only or docs-only commit (the delta review) | The inputs of any delta review (whole PR diff, description, previous findings, `REVIEW.md`) | The same findings block, focused on the fixed findings (`docs/ORCHESTRATION.md` §7.2.3) |
 | **Second reviewer** | Opus / high | Fresh session in the same round, for `risk:high` and the protected areas | Diff, PR description, `REVIEW.md`; not the first reviewer's findings | Findings (`S<round>-<nn>`), merged with the reviewer's |
 | **Escalation reviewer** | Opus / max | Fresh session, once per PR after round 4 or on a dispute | The whole review thread | `fix`, `split` or `owner` (`REVIEW.md`, Loop and cap) |
 | **Design reviewer** | Opus / high | Fresh session per design-PR round, max 3 rounds | Design PR, review sheet, `design/tokens.json`, wireframes, rubric (`docs/reviews/README.md` §4) | Rubric scores and findings (`D<round>-<nn>`); one joint hand-off comment to the owner and the collaborator; never edits or pushes to the PR branch |

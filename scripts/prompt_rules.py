@@ -2,7 +2,8 @@
 Agent Usage Redesign PR 2: plan review, self-review, finding verification, second reviewer; PR 3: reading rules,
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
-docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/reviews/README.md and handoff/TEMPLATE.md).
+docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md, agents/roles.yaml
+and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -18,6 +19,7 @@ wording, not behaviour; reviewers read the prompts.
 import argparse
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -50,7 +52,8 @@ class Rule:
     patterns: tuple  # regexes, all must match (case-insensitive) in the normalized text
     message: str
     forbidden: tuple = ()  # regexes, none may match (case-insensitive): stale instructions the prompt must not carry
-    forbidden_lines: tuple = ()  # like forbidden, but matched on normalize_sentences(text): headings, blank lines and bullets end a sentence
+    # callable(text) -> patterns found per sentence, negation-aware (resolve_permissions); headings, blank lines and bullets end a sentence
+    forbidden_sentences: Callable[[str], list] | None = None
 
 
 @dataclass(frozen=True)
@@ -61,7 +64,7 @@ class DocRule:
     patterns: tuple
     message: str
     forbidden: tuple = ()
-    forbidden_lines: tuple = ()
+    forbidden_sentences: Callable[[str], list] | None = None
 
 
 # The merge agent's owner-only list (#15 comments 6941366090 and 6943342158); the same wording in the prompt and ORCHESTRATION 7.5.
@@ -79,10 +82,18 @@ STANDING = (
     r"the merge agent merges under the owner's standing authorization \(#15 comment 7005366747, replacing the per-window rule of comment 7002904192\) "
     r"until the owner revokes it there"
 )
-CLASSES = r"a ready pr that is not owner-only is merged by the merge agent as kind `general` \(d3, #15 comment 7007421567\)"
+CLASSES = (r"an owner-only pr is merged by the merge agent as kind `owner-batch` once the owner's batch approval lists it, every other ready pr as kind "
+           r"`general` \(d3, #15 comment 7007421567\)")
+BATCH = (r"batch approval \(d1\): the owner posts one ordered list `batch approval: #n@sha, #m@sha` on #15 \(or in the merge agent's session, "
+         r"recorded on #15\); the merge agent merges the listed prs in that order, one at a time, with update-branch and green ci between merges")
+SAME_PATCH = (r"a listed pr may be merged at a head that differs from its approved sha only by update-branch merge commits of `main` whose tree equals "
+              r"git's automatic merge \(`git merge-tree` without conflicts, d2\); a hand-resolved conflict or any other change needs a new approval")
+APPROVAL_FORM = (r"an owner approval given in a decision comment or in the owner's chat is recorded as one anchored `batch approval: #n@sha` first line "
+                 r"\(#15 comment 7014222068\); the check proves the account only, not the person\. only an owner approval starts with `batch approval:`; "
+                 r"a proposed, requested, declined or quoted list never does, whatever its notes say")
 ORDER_TAIL = (
-    r"every ready `general` pr to the merge agent first, and brings? owner-only prs to the owner only once no `general` pr is ready to go; "
-    r"an exception needs a stated reason in the merge request \(e\.g\. a dependency between prs or a blocker fix\)"
+    r"every ready `general` pr to the merge agent first, and asks? the owner for a batch approval of owner-only prs "
+    r"only once no `general` pr is ready to go; an exception needs a stated reason in the merge request"
 )
 ALL = ROLES
 
@@ -93,27 +104,186 @@ SCORE_BLOCKS_MERGE = r"below 3 (?:blocks|must block) the merge"
 MATRIX_WRONG_SEVERITY = (
     r"(?:(?:a |the |such a )?(?:matrix )?gaps? (?:in the matrix )?|without both )(?:is|are) (?:always |only |just )?(?:a |an )?`?(?:minor|nit|blocker)"
 )
-# Wording that would allow an agent to resolve a thread (follow-up #44; R1-01, R1-02 of #150, R2-01 to R2-03). The ban itself is pinned by
-# the patterns of the rules; this keeps a later edit from adding permission next to it. Subject patterns need an agent or "you" and no
-# negating word in front ("no agent may", "neither ... nor ... may"); imperatives are matched per sentence (normalize_sentences), so
-# "never/do not/must not resolve ..." and "only the owner may resolve ..." do not match. Wording pins are not exhaustive.
-_NOT_NEGATED = r"(?<!\bno )(?<!\bnor )(?<!\bnor the )(?<!\bneither )(?<!\bneither the )"
-_AGENT = _NOT_NEGATED + r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
+# Wording that would allow an agent to resolve a thread (follow-up #44; R1-01, R1-02 of #150, R2-01 to R2-03, R3-01 to R3-04 of #150, #153).
+# The ban itself is pinned by the patterns of the rules; this keeps a later edit from adding permission next to it. The check is per
+# sentence (resolve_permissions) and fails closed: a match is permission, as it always was, unless a negation provably governs it in one of the
+# few simple shapes of _negated. A structure the check does not know (parentheses, dashes, a slash, "and" before a new subject, a lead
+# clause with "only") keeps the match. Wording pins are not exhaustive.
+# Accepted false positives (fail closed; nothing in the text tells them from a permission of the same shape, such as the table row
+# "| Orchestrator | Resolve threads after replying |"): a Never cell that starts "Resolve threads, ...", a definition of the button
+# ("**Resolve conversation**: only the owner presses it."), and a condition with an agent subject ("If an agent calls
+# `mcp__github__resolve_review_thread`, the PreToolUse hook denies the call.", as the check flags "If an agent resolves a thread, ..."),
+# and a button note that names an agent ("* **Resolve conversation** (only the owner, never an agent)").
+_AGENT_NOUN = r"\b(?:(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
+_AGENT = r"\b(?:you|(?:the )?agents?|(?:the )?(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
 _NOUN = r"(?:[\w'`-]+\s+){0,3}(?:threads?|conversations?)\b"
 _THREAD = rf"(?:(?:the|a|an|any|their|all)\s+)?{_NOUN}"
+_CLOSE_OBJECT = r"(?:(?:the|a|an|any|their|all|each|every)\s+)?(?:[\w'`-]+\s+)?(?:threads?|conversations?)\b"
 _ADVERB = r"(?:(?:also|then|now|still|just)\s+)?"
-RESOLVE_PERMISSION = (
-    rf"{_AGENT}\s+(?:may|can|could|should|must|will)\s+{_ADVERB}resolve\s+{_THREAD}",
-    rf"\b(?:feel free|(?:is|are) (?:allowed|permitted|free)) to resolve\s+{_THREAD}",
-    rf"{_AGENT}\s+{_ADVERB}resolves?\s+{_THREAD}",
-    rf"(?<!\bnot )(?<!\bnever )(?<!n't )\breply\s+(?:and|then)\s+resolve\s+{_THREAD}",
-)
-# Imperatives, per sentence: "Resolve the thread ...", "Then resolve ...", "Once answered, resolve the thread". The article stays required after
-# a comma, so the never-cell "delete branches, resolve threads, labels" does not match; article-free plurals only start a sentence or bullet.
-RESOLVE_IMPERATIVE = (
-    rf"(?:^|[.:;,]\s+|[-*]\s+|\bthen\s+)resolve\s+(?:the|a|an|any|their|all)\s+{_NOUN}",
-    rf"(?:^|[.:;]\s+|[-*]\s+)resolve\s+{_NOUN}",
-)
+_MODAL = r"(?:may|can|could|should|must|will)"
+_TOOL = r"`?(?:mcp__\w+__)?(?:resolve_?review_?threads?|resolveReviewThread)\b"
+_LEAD = r"(?:^|[.:;,|]\s+|[-*]\s+|\b(?:e\.g|i\.e),?\s+)"
+# Pattern kinds decide which negation shape can suppress a match: "subject" starts with its own subject or "is allowed to", "conj" is
+# "and/then <act>", "lead" is an imperative after a sentence start, a bullet, a table cell, a colon, a comma or "e.g.".
+
+
+def _acts(sfx):
+    """The actions, each as (regex, needs a thread word): resolve or close a thread, resolve it, mark it or a thread as resolved, call the tool."""
+    return (
+        (rf"(?:resolve{sfx}\s+{_THREAD}|close{sfx}\s+{_CLOSE_OBJECT})", False),
+        (rf"resolve{sfx}\s+(?:it|them)\b", True),
+        (rf"mark{sfx}\s+(?:it|them|{_NOUN})\s+(?:as\s+)?resolved\b", True),
+        (rf"(?:use|call|invoke){sfx}\s+(?:the\s+)?{_TOOL}(?!`?\s+(?:test|hook|check|case|rule|deny)s?\b)", False),
+    )
+
+
+def _resolve_patterns():
+    out = []
+    for i, (act, ctx) in enumerate(_acts("")):
+        out += [
+            (rf"{_AGENT}\s+{_MODAL}\s+{_ADVERB}{act}", "subject", ctx),
+            (rf"\b(?:feel free|(?:is|are) (?:allowed|permitted|free)) to {act}", "subject", ctx),
+            (rf"\b(?:and|then)\s+{act}", "conj", ctx),
+        ]
+        if i:  # the thread imperatives below keep the article rule
+            out.append((rf"{_LEAD}{act}", "lead", ctx))
+    for act, ctx in _acts("s?"):
+        out.append((rf"{_AGENT}\s+{_ADVERB}{act}", "subject", ctx))
+    # Imperatives. The article stays required after a comma, so the never-cell "delete branches, resolve threads, labels" does not match;
+    # an article-free plural only starts a sentence or bullet.
+    out.append((rf"{_LEAD}resolve\s+(?:the|a|an|any|their|all)\s+{_NOUN}", "lead", False))
+    out.append((rf"{_LEAD}close\s+(?:the|a|an|any|their|all|each|every)\s+(?:[\w'`-]+\s+)?(?:threads?|conversations?)\b", "lead", False))
+    out.append((r"(?:^|[.:;|]\s+|[-*]\s+|\b(?:e\.g|i\.e),?\s+)(?:resolve\s+" + _NOUN + r"|close\s+(?:[\w'`-]+\s+)?(?:threads?|conversations?)\b)",
+                "lead", False))
+    return tuple(out)
+
+
+RESOLVE_PATTERNS = _resolve_patterns()
+_THREAD_WORD = re.compile(r"\b(?:threads?|conversations?)\b", re.I)
+_FOLLOW_ON = re.compile(r"\b(?:then|next|after that)\b[\s,]*(?:\S+\s+){0,2}$", re.I)
+_LIST_ITEM = re.compile(r"\s*(?:[-*]|\d+\.)\s")
+_SENTENCE_END = re.compile(r"(?<=[.!?;])(?<!\. \d\.)(?<!\. \d\d\.)\s+")  # a list number stays with its item
+_ABBREVIATION = re.compile(r"\b(e\.g|i\.e)\.", re.I)
+_LIST_MARKER = re.compile(r"^\s*(?:[-*|]|\d+\.)\s+")  # a bullet, table cell or list number in front of the sentence
+_BOUNDARY = re.compile(r"[:;()–—/]|\s-{1,2}\s")  # the scope of a negation never crosses these
+_SUBJECT_WORD = r"(?:the|or|nor|of|you|agents?|(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?|escalation|design|second)"
+_OPENER = r"(?:no|not even|neither|none of|nobody)"
+_LEAD_WORDS = r"(?:if|when|whenever|once|after|before|unless|until|because|since|while|although|though)"
+_STOP = r"(?:and|but|so|or|nor|then|only|just|merely|simply|if|when|whenever|while|because|unless|once|after|before|until|since)"
+_WORD = rf"(?!{_STOP}\b)[\w'`-]+\s+"
+_LEAD_CLAUSE = re.compile(rf"^\s*{_LEAD_WORDS}\b[^,]*,\s*", re.I)  # "If asked, ...": a conditional lead clause does not change the shape
+_NEGATOR = r"(?:(?:do|does|did)\s+not|(?:must|should|may|can|could|will|shall)\s+not|cannot|\w*n't|never|not)"
+_NP = r"(?:the\s+)?(?:(?:escalation|design|second)[\s-]+)?(?:you|agents?|(?:orchestrator|implementer|reviewer|planner|worker|verifier)s?)"
+_CHAIN = rf"{_NP}(?:\s+(?:or|nor)\s+{_NP})*"
+_SKIP_LEAD = rf"\s*(?:{_LEAD_WORDS}\b\s+(?:[^,]*,\s*|[\w'-]+(?:\s+[\w'-]+)*?\s+))?"
+# Agent-led match: the prefix is the opener itself or a coordination the match's agent continues ("No orchestrator or", "Neither the
+# orchestrator nor the"); a lead clause is skipped ("When asked no agent may ..."), but its own "no <noun>" is not the opener.
+_NEGATED_SUBJECT = re.compile(
+    rf"{_SKIP_LEAD}(?:no|not even|neither|none of)(?:\s+{_CHAIN}\s+(?:or|nor))?(?:\s+the)?(?:\s+(?:escalation|design|second))?\s*$", re.I)
+# "is allowed to": the opener and exactly one coordinated noun phrase ("No agent is allowed", "Nobody is allowed")
+_NEGATED_NP = re.compile(rf"{_SKIP_LEAD}(?:nobody|(?:no|not even|neither|none of)\s+{_CHAIN})\s*$", re.I)
+_NO_PHRASE = r"(?:at no (?:point|time)|under no circumstances?|in no case|on no account|by no means|in no way)"
+_FRONTED = re.compile(rf"\s*{_NO_PHRASE}\s+(?:may|can|could|should|must|will)\s+(?:the\s+)?$", re.I)
+# A negator counts only at the start of its clause, in a closed template: at most "please", a determiner, the agent subject and a modal
+# before it. No open word window ("Need the owner? Of course not, resolve ...", "Reviewers that do not find issues reply and resolve ...").
+_DETERMINER = r"(?:(?:an?|any|each|every)\s+)?"
+_CLAUSE_START = rf"\s*(?:please\s+)?{_DETERMINER}(?:{_NP}\s+(?:{_MODAL}\s+)?)?"
+# "Do not reply and resolve ...", "Agents must never approve and resolve ...": an imperative ban or a negated agent subject (a bare "Not"
+# starts no ban: "Not all agents ..."), then a few plain words (no comma, no conjunction, no "to": an infinitive means the negator governs
+# another verb, "Don't hesitate to reply and resolve ...")
+_CONJ_NEGATOR = rf"(?:(?:please\s+)?(?:do\s+not|don't|never)|{_DETERMINER}{_NP}\s+(?:{_MODAL}\s+)?{_NEGATOR})"
+# an adverb after the negator takes the negation off the act ("Do not immediately reply and resolve ...", "Don't always ..."): no ban
+# (also a phrase: "Agents do not by default reply and resolve ..."; not "again": "Never again reply and resolve ..." is a ban)
+_ADVERB_WORD = (r"(?:(?!(?:re|ap|com|sup)ply\b)\w+ly|always|first|yet|still|also|often"
+                r"|by\s+default|in\s+general|(?:right|straight)\s+away|(?:for|right)\s+now)")
+_NEGATED_CONJUNCTION = re.compile(rf"\s*{_CONJ_NEGATOR}\s+(?:ever\s+)?(?:(?!(?:to|{_ADVERB_WORD})\b){_WORD}){{0,3}}$", re.I)
+# "Agents must never, not even with the API, resolve ...": the first comma segment ends with the negation, the others are asides
+_NEGATION_SEGMENT = re.compile(
+    rf"\s*(?:{_CLAUSE_START}{_NEGATOR}(?:\s+ever|\s+at any (?:time|point))?"
+    rf"|(?:nobody|{_OPENER}\s+{_CHAIN})\s+{_MODAL}(?:\s+ever)?|{_NO_PHRASE})\s*$", re.I)
+_ASIDE = re.compile(r"\s*(?:not even|even|for any reason|under any circumstances|in any case|at any time|at any point|no matter)\b", re.I)
+
+
+def _negated(kind, sentence, match):
+    """True if a negation provably governs this match, in one of the simple shapes above. Everything else is not negated (fail closed).
+    Accepted false negatives (each also reads as a ban): a lead clause without its comma that ends in the opener ("Unless the owner says no
+    agents are allowed to resolve the thread."), a bare answer before a comma ("Need the owner? Never, resolve the thread.", "Wait for
+    approval? You don't, resolve the thread."), a run-on with no comma ("Do not wait reply and resolve the thread.") and a phrase after the
+    negator outside the adverb class ("Do not both reply and resolve the thread.", "Do not without asking reply and resolve the thread.").
+    Accepted false positives: a ban whose subject has a relative clause ("Implementers who disagree must not reply and resolve the
+    thread."), an adverb or a subject outside the closed template ("Agents also must not ...", "Absolutely do not ...", "Claude must not
+    ...") and the cases named above _resolve_patterns."""
+    if sentence.rstrip().endswith("?"):  # "Why don't you reply and resolve ...?" suggests; a question bans nothing
+        return False
+    prefix = _LEAD_CLAUSE.sub("", _LIST_MARKER.sub("", _BOUNDARY.split(sentence[: match.start()])[-1]))
+    matched = match.group()
+    if kind == "subject":
+        if matched.lower().startswith("feel"):  # an imperative: there is no subject to negate
+            return False
+        if re.match(_AGENT, matched, re.I):  # "no" is a determiner only before a bare noun ("no agent", not "no the", "no you")
+            bare = not re.match(r"(?:the|you)\b", matched, re.I) or not re.search(r"\bno\s*$", prefix, re.I)
+            return bool(bare and _NEGATED_SUBJECT.match(prefix) or _FRONTED.match(prefix))
+        return bool(_NEGATED_NP.match(prefix))
+    if kind == "conj":  # "then <act>" is a next step: a negation of the step before it does not reach it (as on main)
+        return not matched.lower().startswith("then") and bool(_NEGATED_CONJUNCTION.match(prefix))
+    if matched[:1] != ",":  # a sentence, bullet, colon or dash starts a clause of its own
+        return False
+    segments = prefix.split(",")
+    return bool(_NEGATION_SEGMENT.match(segments[0])) and all(_ASIDE.match(x) for x in segments[1:])
+
+
+def _blocks(text):
+    """The runs of lines between blank lines and headings (a heading is a block of its own): a thread named in an earlier sentence of the
+    block can be the one a later "then resolve it" means."""
+    block = []
+    for line in _HTML_COMMENT.sub(" ", text).splitlines():
+        if line.strip() and not line.strip().startswith("#"):
+            block.append(line)
+            continue
+        if block:
+            yield "\n".join(block)
+            block = []
+        if line.strip():
+            yield line
+    if block:
+        yield "\n".join(block)
+
+
+def _has_thread(earlier, sentence, match):
+    """A pronoun or "mark it as resolved" needs a thread: named in its own sentence, or in an earlier sentence of the block when the match
+    continues it ("then resolve it", "after that ...", a list item). Accepted: "If a review thread points at a merge conflict, merge main and
+    resolve it." is flagged, because the sentence names a thread."""
+    if _THREAD_WORD.search(sentence):
+        return True
+    verb = list(re.finditer(r"\b(?:resolves?|marks?)\b", sentence[: match.end()], re.I))[-1].start()
+    led = _FOLLOW_ON.search(sentence[:verb])  # the follow-on word leads the act: at most two words between it and the verb
+    return bool(_THREAD_WORD.search(earlier) and (led or _LIST_ITEM.match(sentence)))
+
+
+_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_EMPHASIS = re.compile(r"(?<![\w*])(\*\*|\*|__|_)(?=\S)(.+?)(?<=\S)\1(?![\w*])")  # not inside a word: the __ of a tool name stays
+# a button name (COLLABORATING's do-not-press list): a bold label of at most two words that starts a bullet or table cell and ends it or
+# comes before a parenthetical, on a line that names no agent ("| **Resolve threads** | Orchestrator |" stays a permission; "you" is
+# COLLABORATING's reader, not an agent); it becomes a neutral word, and no line is ever deleted
+_BUTTON = re.compile(rf"^(\s*(?:[-*]|\|)\s+)\*\*\w+(?:[ /-]\w+)?\*\*(?=\s*(?:\(|\||$))(?![^\n]*{_AGENT_NOUN}\b)", re.M | re.I)
+
+
+def resolve_permissions(text):
+    """The RESOLVE_PATTERNS that match somewhere in the text outside a negation, per sentence (normalize_sentences breaks)."""
+    found = []
+    for block in _blocks(text):
+        earlier = ""
+        plain = _EMPHASIS.sub(r"\2", _LINK.sub(r"\1", normalize_sentences(_BUTTON.sub(r"\1button", block))))
+        for sentence in _SENTENCE_END.split(_ABBREVIATION.sub(r"\1", plain)):
+            for pattern, kind, needs_thread in RESOLVE_PATTERNS:
+                for m in re.finditer(pattern, sentence, re.I) if pattern not in found else ():
+                    if (not needs_thread or _has_thread(earlier, sentence, m)) and not _negated(kind, sentence, m):
+                        found.append(pattern)
+                        break
+            earlier += " " + sentence
+    return found
+
+
 RULES = (
     Rule(
         "data-fenced", ALL,
@@ -124,7 +294,7 @@ RULES = (
         "no-resolve-thread", ALL,
         (r"never resolve a collaborator's review thread", r"resolve_review_thread", r"#44"),
         "agents never resolve a collaborator's review thread (follow-up #44)",
-        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
+        forbidden_sentences=resolve_permissions,
     ),
     Rule(
         "no-resolve-thread-reply", ("implementer", "orchestrator"),
@@ -473,7 +643,8 @@ RULES = (
     Rule(
         "orch-merge-request", ("orchestrator",),
         (
-            r"merge request \(§7\.5, retro r2, r6\)", r"before you ask the owner to merge, check that",
+            r"merge request \(§7\.5, retro r2, r6\)",
+            r"before you send it \(to the merge agent, or as a batch-approval request to the owner for an owner-only pr\), check that",
             r"\(1\) the pr body is refreshed \(scope, review table, test evidence; no \"still to do\" or \"not yet reviewed\"\)",
             r"\(2\) the request says squash",
             r"\(3\) no commit message or pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
@@ -758,10 +929,10 @@ RULES = (
             r"a merge agent you create has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and you never pass an approval on to it",
             r"the owner-only exception above means not under the standing authorization",
-            STANDING, CLASSES, OWNER_HANDS,
+            STANDING, CLASSES, OWNER_HANDS, BATCH, APPROVAL_FORM, SAME_PATCH,
             r"merge order \(#15 comment 7005414860\): send " + ORDER_TAIL,
         ),
-        "the merge agent merges general PRs under the standing authorization; owner-only PRs stay with the owner (D3 of #229)",
+        "the merge agent merges general PRs under the standing authorization and owner-only PRs from the owner's batch approval (D1-D3 of #229)",
     ),
     Rule(
         "orch-update-branch", ("orchestrator",),
@@ -781,6 +952,37 @@ RULES = (
         ),
         "worker sessions are archived as soon as done; the new orchestrator sweeps after every handover (owner decisions of 2026-11-17)",
     ),
+    Rule(
+        "orch-owner-merge-exceptions", ("orchestrator",),
+        (
+            r"ask the owner for decisions and for batch approvals of owner-only prs \(the merge agent merges them as `owner-batch` once approved, "
+            r"and every other ready pr, §7\.5\)",
+        ),
+        "the orchestrator asks the owner for batch approvals of owner-only PRs; the merge agent merges them as owner-batch, and every other READY PR "
+        "(§7.5; issue 147)",
+        forbidden=(r"ask the owner for merges and decisions",),
+    ),
+    Rule(
+        "orch-token-rules", ("orchestrator",),
+        (
+            r"token rules \(§7\.2\.3, owner decision #15 comment 7070278995\)",
+            r"a `ready_nits_only` review goes to the merge request with its nits accepted \(no fix round, no re-review, no follow-up issue\)",
+            r"a re-check of a small fix-only or docs-only commit goes to a sonnet medium `recheck-reviewer`; full rounds stay opus",
+            r"on guard and prompt_rules hardening prs the second round that finds new bypass forms ends the pr "
+            r"\(accepted residuals, f18\)",
+            r"reviewer effort strictly per `agents/roles\.yaml`",
+            r"write each session's `metrics:session` row \(§6\.1\) just before archiving it",
+        ),
+        "the orchestrator carries the token rules of §7.2.3 (owner decision, #15 comment 7070278995) and logs a metrics:session row per archived session",
+    ),
+    Rule(
+        "reviewer-recheck", ("reviewer",),
+        (
+            r"a re-check reviewer \(sonnet, medium effort, role `recheck-reviewer` in `agents/roles\.yaml`, orchestration §7\.2\.3\) "
+            r"gets the same inputs as any delta review and focuses on the findings and the commit named in the spawn message",
+        ),
+        "the reviewer prompt covers the Sonnet medium re-check of a small fix-only or docs-only commit (§7.2.3)",
+    ),
 )
 
 
@@ -793,13 +995,13 @@ DOC_RULES = (
             r"never resolve a collaborator's review thread \(follow-up #44\): reply and leave it for the collaborator or the owner",
         ),
         "ORCHESTRATION: the collaborator row lists resolving threads as never, and 7.6 says agents reply and leave the thread (follow-up #44)",
-        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
+        forbidden_sentences=resolve_permissions,
     ),
     DocRule(
         "collab-no-resolve", "docs/COLLABORATING.md",
         (r"## please do not press", r"\*\*resolve conversation\*\*"),
         "COLLABORATING: Resolve conversation is on the collaborator's do-not-press list (follow-up #44)",
-        forbidden=RESOLVE_PERMISSION, forbidden_lines=RESOLVE_IMPERATIVE,
+        forbidden_sentences=resolve_permissions,
     ),
     DocRule(
         "claude-reading", "CLAUDE.md",
@@ -1106,17 +1308,18 @@ DOC_RULES = (
     DocRule(
         "orch-merge-agent", ORCH,
         (
-            r"\* \*\*merge agent:\*\* the merge agent merges every ready pr that is not owner-only under the owner's standing authorization, one at a time",
+            r"\* \*\*merge agent:\*\* the merge agent merges every ready pr that is not owner-only under the owner's standing authorization, one at a time, "
+            r"and an owner-only pr only as kind `owner-batch`",
             OWNER_ONLY,
             r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its first merge, "
             r"and then " + STANDING + r"; the orchestrator never passes an approval on to it",
-            CLASSES, OWNER_HANDS,
+            CLASSES, OWNER_HANDS, BATCH, APPROVAL_FORM, SAME_PATCH,
             r"merge order \(#15 comment 7005414860\): the orchestrator sends " + ORDER_TAIL,
         ),
-        "ORCHESTRATION 7.5: the merge agent merges general PRs under the standing authorization; owner-only PRs stay with the owner (D3 of #229)",
+        "ORCHESTRATION 7.5: the merge agent merges general PRs under the standing authorization and owner-only PRs from the batch approval (D1-D3 of #229)",
     ),
     DocRule(
         "orch-update-branch", ORCH,
@@ -1172,6 +1375,107 @@ DOC_RULES = (
         ),
         "ORCHESTRATION 8.5: 3 design rounds, as roles.yaml, design-reviewer.md and orchestrator.md (rev 46 row 5)",
         forbidden=(r"round \{round\} of max 2", r"max 2 rounds per design pr"),
+    ),
+    DocRule(
+        "orch-token-rules", ORCH,
+        (
+            r"### 7\.2\.3 token rules \(owner decision, #15 comment 7070278995, 2026-11-21\)",
+            r"the one home of these rules; `review\.md`, `agents/roles\.yaml` and the orchestrator prompt link here",
+            r"\*\*nits are accepted without a round\.\*\* a review with verdict `ready_nits_only` goes to the merge request \(§7\.5\)\. "
+            r"its nits are recorded as accepted in the pr review table and the round row: no fix round, no re-review, no follow-up issue",
+            r"\*\*a small fix is re-checked cheaply\.\*\* a re-check of a small fix-only or docs-only commit \(the fixes of the previous round's "
+            r"findings, about 30 changed lines or fewer in total\) is the delta review of §7\.2, with its inputs, done by a fresh sonnet medium "
+            r"reviewer \(`recheck-reviewer` in `agents/roles\.yaml`\), focused on those findings\. full rounds stay opus at the effort "
+            r"`agents/roles\.yaml` gives the reviewer",
+            r"\*\*guard and prompt_rules hardening prs stop early\.\*\* on a pr that hardens `scripts/guards\.sh`, "
+            r"`scripts/hooks/pretooluse_guard\.py` or `scripts/prompt_rules\.py`, the second round that finds new bypass forms ends the pr\. "
+            r"the forms are recorded as accepted residuals in the pr body \(the hook is a tripwire, f18\) and the pr goes to the merge request\.",
+            r"\*\*reviewer effort\*\* is strictly per `agents/roles\.yaml`, which owns the rule",
+            r"### 6\.1 session row \(one per session, written as it is archived\)",
+            r"write it just before `archive_session` \(§7\.4\), for every role, reviewers included",
+            r"\*\*archive\*\* \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it \(result read, "
+            r"no follow-up planned\) and its `metrics:session` row \(§6\.1\) is written",
+            r"a small fix-only or docs-only commit that fixes the previous round's findings gets the cheap re-check of §7\.2\.3",
+        ),
+        "ORCHESTRATION 7.2.3: ready_nits_only accepts its nits, cheap Sonnet re-check, hardening-PR stop, one metrics:session row per archived session "
+        "(owner decision, #15 comment 7070278995)",
+        forbidden=(r"a delta review always runs; there is no owner-acceptance alternative, for any pr\. record",
+                   r"each about 30 changed lines or fewer, or docs only", r"any other finding above nit is still fixed"),
+    ),
+    DocRule(
+        "orch-owner-merge-exceptions", ORCH,
+        (
+            r"ready prs are `is:open is:pr draft:false`; owner-only prs wait for the owner's batch approval \(below\), every other one goes to the merge agent",
+            r"\*\*before the merge request\*\* \(to the merge agent, or as a batch-approval request to the owner for an owner-only pr\) "
+            r"the orchestrator checks",
+            r"scan the pr body for them before the merge request",
+            r"after each merge, the next ready pr is updated: by the merge agent itself with `scripts/update-branch\.sh` \(above\) when it is in "
+            r"the merge agent's batch; otherwise the \*\*orchestrator\*\* updates it with `update_pull_request_branch`",
+            r"then the merge agent merges it: a `general` pr under the standing authorization, an owner-only pr as kind `owner-batch` once the "
+            r"owner's batch approval lists it \(§7\.5\)",
+        ),
+        "ORCHESTRATION 7.5, 7.6: the merge agent merges every READY PR, an owner-only one as owner-batch once the owner's batch approval lists it (issue 147)",
+        forbidden=(
+            r"the owner's queue is `is:open is:pr draft:false`", r"before asking the owner to merge", r"after each owner merge, the \*\*orchestrator\*\*",
+            r"because it is mergeable; the owner merges\.", r"after each merge by the owner, the \*\*orchestrator\*\*",
+            r"or the owner for an owner-only pr \(§7\.5\)",
+            r"owner-only prs wait in the owner's queue",
+        ),
+    ),
+    DocRule(
+        "orch-labels-exist", ORCH,
+        (r"\*\*labels exist\.\*\* `orchestrator-state` and `owner-todo` were created by task m0-o9 and are in use",),
+        "ORCHESTRATION 4.5: the orchestrator-state and owner-todo labels exist (M0-O9 is done; #260 item 11)",
+        forbidden=(r"\b(?:are|is) not created yet", r"opens issues without the label"),
+    ),
+    DocRule(
+        "review-token-rules", "REVIEW.md",
+        (
+            r"6\. \*\*token rules\*\* \(owner decision, #15 comment 7070278995; the rules are in `docs/orchestration\.md` §7\.2\.3\): "
+            r"a `ready_nits_only` verdict is final, its nits are accepted with no fix round, no re-review and no follow-up issue; "
+            r"a re-check of a small fix-only or docs-only commit is a sonnet medium reviewer \(`recheck-reviewer`\), not a full round; "
+            r"on guard and prompt_rules hardening prs the second round that reports new bypass forms ends the pr",
+        ),
+        "REVIEW.md Loop and cap item 6 links the token rules of ORCHESTRATION 7.2.3 (owner decision, #15 comment 7070278995)",
+    ),
+    DocRule(
+        "review-dispatchers", "REVIEW.md",
+        (
+            r"14\. \*\*dispatchers \(`:core:data` and `:app` prs\)\*\*: until detekt 2\.0 is stable and gives the android modules type resolution "
+            r"\(#218, tracked on m6\), check by hand that dispatchers are injected and no `dispatchers\.io`, `dispatchers\.default` or "
+            r"`dispatchers\.main` is hard-coded in a class \(`docs/android-best-practices\.md` §5\); a hard-coded dispatcher is a `minor` finding",
+        ),
+        "REVIEW.md What to check item 14: manual dispatcher-injection check on :core:data and :app PRs until detekt 2.0 is stable (#218)",
+    ),
+    DocRule(
+        "roles-recheck-reviewer", "agents/roles.yaml",
+        (
+            r"recheck-reviewer: model: sonnet effort: medium session: fresh, for the re-check of a small fix-only or docs-only commit",
+            r"prompt: agents/prompts/reviewer\.md",
+            r"reviewer effort is strictly per `max_effort_when`: never max for consistency",
+        ),
+        "roles.yaml: the Sonnet medium recheck-reviewer, and reviewer effort strictly per max_effort_when (owner decision, #15 comment 7070278995)",
+        forbidden=(r"(?<!never )max for consistency", r"recheck-reviewer: model: opus"),
+    ),
+    DocRule(
+        "followups-title-forms", "docs/FOLLOW-UPS.md",
+        (
+            r"issue title: `follow-up from pr #<n>: <finding title>` \(the form in use\) or `\[follow-up\] <finding title>`; a standing item is "
+            r"`track: <what>`, a finding of a repo-wide review is `repo review \(<aspect>\): <finding title>`",
+        ),
+        "FOLLOW-UPS section 7: the issue title forms in use are allowed (#260 item 10)",
+        forbidden=(r"issue title: `\[follow-up\] <finding title>`\. labels",),
+    ),
+    DocRule(
+        "followups-burndown-alerts", "docs/FOLLOW-UPS.md",
+        (r"it also reviews every open dependabot alert \(`docs/security\.md` §1 item 2\)",),
+        "FOLLOW-UPS section 8: the Mx-FU burn-down includes the Dependabot alert review of SECURITY.md (#260 item 9)",
+    ),
+    DocRule(
+        "branch-protection-job-count", "docs/BRANCH-PROTECTION.md",
+        (r"only the jobs listed above \(every job in `ci\.yml`\)",),
+        "BRANCH-PROTECTION section 4: no hard-coded job count that can go stale, as the ruleset and section 2 (#260 item 1)",
+        forbidden=(r"only the (?:eight|ten|eleven) jobs above",),
     ),
 )
 
@@ -1248,9 +1552,8 @@ def check_text(role, text):
             for pattern in rule.forbidden:
                 if re.search(pattern, norm, re.I):
                     problems.append(f"{rule.id}: {rule.message} (found /{pattern}/)")
-            if rule.forbidden_lines:
-                sentences = normalize_sentences(text)
-                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_lines if re.search(p, sentences, re.I))
+            if rule.forbidden_sentences:
+                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_sentences(text))
             if rule.id in ("tier0-labels", "never-labels"):
                 line, want = (TIER0_LINE, TIER0_LABELS) if rule.id == "tier0-labels" else (NEVER_LINE, NEVER_LABELS)
                 got = parse_label_lists(norm, line)
@@ -1276,9 +1579,8 @@ def check_doc_text(path, text):
                 break
         else:
             problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden if re.search(p, norm, re.I))
-            if rule.forbidden_lines:
-                sentences = normalize_sentences(text)
-                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_lines if re.search(p, sentences, re.I))
+            if rule.forbidden_sentences:
+                problems.extend(f"{rule.id}: {rule.message} (found /{p}/)" for p in rule.forbidden_sentences(text))
     return problems
 
 

