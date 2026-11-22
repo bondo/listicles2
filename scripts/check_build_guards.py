@@ -33,7 +33,7 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    blocks or calls, `configure(allprojects ...)`, `gradle.allprojects`/`beforeProject`/`afterProject`). Every module in settings.gradle.kts
    `include(...)` applies exactly one `listicles.*` convention plugin and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
-   Known gap: a read of other projects (`allprojects.flatMap { ... }`) is not caught (issue 48, M1-63).
+   Known gap: a read of other projects (`allprojects.flatMap { ... }`) is not caught (issue 48, M1-68).
 
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
@@ -523,7 +523,7 @@ CROSS_PROJECT = re.compile(
     r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject)\b"
 )
 # What the convention plugins own; a module build file that sets one again makes a second copy that can drift. JUnit Platform and
-# failOnNoDiscoveredTests stay in the modules for now: the guards script reads a check setting moved to another file as removed (M1-63).
+# failOnNoDiscoveredTests stay in the modules for now: the guards script reads a check setting moved to another file as removed (M1-68).
 OWNED = re.compile(
     r"(?<![\w$])(allWarningsAsErrors|jvmTarget|sourceCompatibility|targetCompatibility|jvmToolchain|compileSdk|minSdk)\b"
     r"|(-Xjdk-release)"
