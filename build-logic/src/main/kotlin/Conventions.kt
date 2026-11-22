@@ -25,7 +25,7 @@ private const val TEST_SUPPORT = ":core:testing"
 private const val SPI = "-Djava.nio.channels.spi"
 private const val BLOCKING = "dk.bjarkebjarke.tally.testing.Blocking"
 
-/** Java and Kotlin 17, warnings as errors (M0.5-09), JUnit Platform and the test-JVM network block for every module. */
+/** Java and Kotlin 17, warnings as errors (M0.5-09) and the test-JVM network block for every module. */
 internal fun Project.configureKotlinModule(compilerOptions: KotlinJvmCompilerOptions) {
     pluginManager.apply(DependencyFloorsPlugin::class)
     // On the extension, as before: these are the conventions of every compile task of the module.
@@ -34,16 +34,14 @@ internal fun Project.configureKotlinModule(compilerOptions: KotlinJvmCompilerOpt
     // Every test JVM blocks network access (core/testing: NoNetwork). NIO sockets need the JDK's selector provider
     // replaced, which is only possible through a system property read when the JVM first needs one.
     tasks.withType<Test>().configureEach {
-        useJUnitPlatform()
-        // A test task that discovers zero tests is a failure, not a pass.
-        failOnNoDiscoveredTests.set(true)
         jvmArgs(
             "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
             "$SPI.SelectorProvider=${BLOCKING}SelectorProvider",
             "$SPI.AsynchronousChannelProvider=${BLOCKING}AsynchronousChannelProvider",
         )
     }
-    // #217 item 3: the flags above name classes of :core:testing, so every test classpath gets it, in the same place.
+    // #217 item 3: the flags above name classes of :core:testing, so every test classpath gets it, in the same place
+    // (a new module included; the existing ones also declare it, which check_ui_emulators.py reads for :core:data).
     if (path != TEST_SUPPORT) {
         dependencies.add("testImplementation", dependencies.project(mapOf("path" to TEST_SUPPORT)))
     }

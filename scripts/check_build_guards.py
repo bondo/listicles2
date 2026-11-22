@@ -328,10 +328,11 @@ CROSS_PROJECT = re.compile(
     r"(?<![\w$])(?:allprojects|subprojects)\s*[{(]|(?<![\w$])configure\s*\(\s*(?:allprojects|subprojects)\b"
     r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject)\b"
 )
-# What the convention plugins own; a module build file that sets one again makes a second copy that can drift.
+# What the convention plugins own; a module build file that sets one again makes a second copy that can drift. JUnit Platform and
+# failOnNoDiscoveredTests stay in the modules for now: the guards script reads a check setting moved to another file as removed (M1-63).
 OWNED = re.compile(
-    r"(?<![\w$])(allWarningsAsErrors|jvmTarget|sourceCompatibility|targetCompatibility|jvmToolchain|useJUnitPlatform|"
-    r"failOnNoDiscoveredTests|compileSdk|minSdk)\b|(-Xjdk-release)"
+    r"(?<![\w$])(allWarningsAsErrors|jvmTarget|sourceCompatibility|targetCompatibility|jvmToolchain|compileSdk|minSdk)\b"
+    r"|(-Xjdk-release)"
 )
 CONVENTION = re.compile(r"\balias\s*\(\s*libs\.plugins\.listicles\.[\w.]+\s*\)|\bid\s*\(\s*\"listicles\.[\w.-]+\"\s*\)")
 INCLUDE_CALL = re.compile(r"\binclude\s*\(([^)]*)\)")

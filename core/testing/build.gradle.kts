@@ -12,3 +12,8 @@ dependencies {
     testImplementation(libs.kotest.assertions)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+tasks.test {
+    useJUnitPlatform()
+    failOnNoDiscoveredTests = true
+}

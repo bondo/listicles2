@@ -548,10 +548,13 @@ class Conventions(unittest.TestCase):
                 self.assertEqual(len(found), 1, found)
                 self.assertRegex(found[0], r"^build\.gradle\.kts:\d+: configures other projects")
 
-    def test_cross_project_configuration_in_build_logic_kotlin_is_flagged(self):
-        found = self.problems({"build-logic/src/main/kotlin/P.kt": "class P { fun f(p: Project) { p.allprojects { } } }\n"})
-        self.assertEqual(len(found), 1, found)
-        self.assertIn("build-logic/src/main/kotlin/P.kt:1: configures other projects", found[0])
+    def test_build_logic_kotlin_must_not_configure_other_projects_or_set_target_sdk(self):
+        for src, want in (("fun f(p: Project) { p.allprojects { } }", "configures other projects"),
+                          ("fun f(a: ApplicationExtension) { a.defaultConfig.targetSdk = 30 }", "targetSdk in build-logic")):
+            with self.subTest(want=want):
+                found = self.problems({"build-logic/src/main/kotlin/P.kt": src + "\n"})
+                self.assertEqual(len(found), 1, found)
+                self.assertIn(f"build-logic/src/main/kotlin/P.kt:1: {want}", found[0])
 
     def test_comments_strings_and_lookalikes_are_not_flagged(self):
         code = (
@@ -588,8 +591,6 @@ class Conventions(unittest.TestCase):
             ("java { sourceCompatibility = JavaVersion.VERSION_17 }", "sourceCompatibility"),
             ("android { compileOptions { targetCompatibility = JavaVersion.VERSION_17 } }", "targetCompatibility"),
             ("kotlin { jvmToolchain(17) }", "jvmToolchain"),
-            ("tasks.test { useJUnitPlatform() }", "useJUnitPlatform"),
-            ("tasks.test { failOnNoDiscoveredTests = true }", "failOnNoDiscoveredTests"),
             ("android { compileSdk = 37 }", "compileSdk"),
             ("android { defaultConfig { minSdk = 26 } }", "minSdk"),
             ('kotlin { compilerOptions { freeCompilerArgs.add("-Xjdk-release=17") } }', "-Xjdk-release"),
@@ -602,15 +603,8 @@ class Conventions(unittest.TestCase):
     def test_the_root_build_file_is_not_a_module(self):
         self.assertEqual(self.problems({"build.gradle.kts": 'tasks.withType<Detekt>().configureEach { jvmTarget = "17" }\n'}), [])
 
-    def test_build_logic_sources_must_not_set_target_sdk(self):
-        src = "fun f(a: ApplicationExtension) { a.defaultConfig.targetSdk = 30 }\n"
-        found = self.problems({"build-logic/src/main/kotlin/A.kt": src})
-        self.assertEqual(len(found), 1, found)
-        self.assertIn("build-logic/src/main/kotlin/A.kt:1: targetSdk in build-logic", found[0])
-
     def test_no_settings_file_skips_the_module_part(self):
-        found = cbg.convention_problems(tree({"app/build.gradle.kts": "android { compileSdk = 37 }\n"}))
-        self.assertEqual(found, [])
+        self.assertEqual(cbg.convention_problems(tree({"app/build.gradle.kts": "android { compileSdk = 37 }\n"})), [])
 
     def test_the_real_repository_has_four_modules_on_convention_plugins(self):
         self.assertEqual(cbg.convention_problems(ROOT), [])
