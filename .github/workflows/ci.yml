@@ -55,6 +55,8 @@ jobs:
         run: |
           read -ra exclude <<< "$(python3 -I scripts/ci_scope.py gradle-exclude)"
           ./gradlew -q --console=plain spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest :app:lintDebug "${exclude[@]}"
+      - name: JVM modules use only API 26 or older (M1-37, issue 228)
+        run: ./gradlew -q --console=plain checkJavaApiLevel
 
   unit:
     name: unit
@@ -189,6 +191,8 @@ jobs:
         run: python3 -I scripts/test_dependency_floors.py
       - name: no vulnerable dependency version in package-lock.json or verification-metadata.xml (PR 224 R1-02)
         run: python3 -I scripts/dependency_floors.py
+      - name: java api level checker tests (M1-37)
+        run: python3 -I scripts/test_check_java_api_level.py
       - name: PIT config tests (M1-05)
         run: python3 -I scripts/test_check_pit_config.py
       - name: PIT stays wired on core/domain (M1-05)
