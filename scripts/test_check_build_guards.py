@@ -289,6 +289,15 @@ class Manifest(unittest.TestCase):
         extra = dict(main, **self.RULE_FILES)
         self.assertEqual(self.problems(overlay, name="app/src/release/AndroidManifest.xml", extra=extra), [])
 
+    def test_an_android_test_manifest_without_allow_backup_needs_no_main_manifest(self):
+        """A library module has only the test APK's manifest (`core/data/src/androidTest`); that APK is never shipped. Setting it on still needs rules."""
+        main = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}
+        name = "lib/src/androidTest/AndroidManifest.xml"
+        self.assertEqual(cbg.manifest_problems(tree(dict(main, **{name: manifest("")}))), [])
+        found = cbg.manifest_problems(tree(dict(main, **{name: manifest('android:allowBackup="true"')})))
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("allowBackup", found[0])
+
     def test_an_overlay_of_another_module_does_not_inherit_this_modules_main_manifest(self):
         main = {"app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')}
         found = self.problems(manifest(""), name="other/src/release/AndroidManifest.xml", extra=main)

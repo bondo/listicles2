@@ -10,8 +10,11 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    config under `res/xml*`), and an `<application>` whose `allowBackup` is not "false" (a missing one counts as true in the main manifest;
    an overlay manifest inherits it) must have both `android:dataExtractionRules` and `android:fullBackupContent`, each `@xml/<name>` with
    that file present. A value that is not a literal, an unreadable file, and a tree with no manifest that has an `<application>` fail too.
+   Attributes are read by namespace (`android:` in a manifest, none in a network security config), so a `tools:` attribute cannot hide one.
+   An overlay manifest (`src/<set>/`) without `allowBackup` is skipped only when its module has a main manifest with an `<application>`.
    The one scope exception: files of a `src/androidTest/` source set are not checked for cleartext (the test APK talks plain HTTP to the
-   Auth emulator on 10.0.2.2 and is never shipped); every other source set is.
+   Auth emulator on 10.0.2.2 and is never shipped), and such a manifest without `allowBackup` needs no main manifest; every other source
+   set is checked.
 
 The catalog-only coordinates guard (follow-up 3, M1-59) is added to this script by its own PR.
 
@@ -188,8 +191,17 @@ def local(name):
     return name.rsplit("}", 1)[-1]
 
 
-def attrs(element):
-    return {local(k): v for k, v in element.attrib.items()}
+ANDROID_NS = "{http://schemas.android.com/apk/res/android}"
+
+
+def android_attrs(element):
+    """The `android:` attributes of a manifest element by local name; `tools:` and other namespaces with the same local name are not read."""
+    return {k[len(ANDROID_NS):]: v for k, v in element.attrib.items() if k.startswith(ANDROID_NS)}
+
+
+def plain_attrs(element):
+    """The attributes without a namespace (those of a network security config) by name."""
+    return {k: v for k, v in element.attrib.items() if not k.startswith("{")}
 
 
 def xml_resource_dirs(p):
@@ -257,23 +269,22 @@ def manifest_problems(root):
     apps, problems, seen = load_manifests(root)
     for p, top in sorted(apps.items()):
         app = next(c for c in top if local(c.tag) == "application")
-        a = attrs(app)
+        a = android_attrs(app)
         for element in () if is_android_test(p) else top.iter():
-            v = attrs(element).get("usesCleartextTraffic")
+            v = android_attrs(element).get("usesCleartextTraffic")
             if v is not None and v.lower() != "false":
                 problems.append(f'{p}: android:usesCleartextTraffic="{v}"; cleartext traffic must stay off')
         backup = a.get("allowBackup")
-        if backup is None and is_overlay(p):
-            continue  # inherits the value of the main manifest, which is checked itself
+        mod = module_of(p)
+        main = apps.get((mod + "/" if mod else "") + "src/main/AndroidManifest.xml")
+        if backup is None and is_overlay(p) and (main is not None or is_android_test(p)):
+            continue  # inherits the value of the module's main manifest, which has an <application> and is checked itself; a test APK is not shipped
         if backup is not None and backup.lower() == "false":
             continue
         rules = {k: a.get(k) for k in ("dataExtractionRules", "fullBackupContent")}
-        if is_overlay(p):  # a rule attribute the overlay lacks comes from the main manifest of the module
-            mod = module_of(p)
-            main = apps.get((mod + "/" if mod else "") + "src/main/AndroidManifest.xml")
-            if main is not None:
-                ma = attrs(next(c for c in main if local(c.tag) == "application"))
-                rules = {k: v if v is not None else ma.get(k) for k, v in rules.items()}
+        if is_overlay(p) and main is not None:  # a rule attribute the overlay lacks comes from the main manifest of the module
+            ma = android_attrs(next(c for c in main if local(c.tag) == "application"))
+            rules = {k: v if v is not None else ma.get(k) for k, v in rules.items()}
         state = "missing, which means true" if backup is None else f'"{backup}"'
         absent = [f"android:{k}" for k, v in rules.items() if v is None]
         if absent:
@@ -296,7 +307,7 @@ def manifest_problems(root):
         if local(top.tag) != "network-security-config":
             continue
         for element in top.iter():
-            v = attrs(element).get("cleartextTrafficPermitted")
+            v = plain_attrs(element).get("cleartextTrafficPermitted")
             if v is not None and v.lower() != "false":
                 problems.append(f'{p}: cleartextTrafficPermitted="{v}" on <{local(element.tag)}>; cleartext traffic must stay off')
     if not apps and not any("cannot parse" in x for x in problems):
