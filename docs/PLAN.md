@@ -519,8 +519,9 @@ enforce the rules rather than goodwill.
 
 1. The author session opens a small PR (one concern, target under about 400 changed lines),
    using a PR template that covers scope, test evidence, and screenshots for UI changes.
-2. After CI is green, a **fresh Claude session** (no shared context) reviews the diff against
-   `REVIEW.md`: correctness, security rules, test adequacy (do the tests fail when the
+2. A **fresh Claude session** (no shared context) reviews the diff against `REVIEW.md` as soon as the author has pushed,
+   without waiting for CI (`docs/ORCHESTRATION.md` §7.1; CI must be green before the PR is marked READY and before the merge request):
+   correctness, security rules, test adequacy (do the tests fail when the
    code is wrong?), offline/sync behavior, i18n, accessibility, free-tier cost, and
    every `// justified:` suppression.
 3. Findings are posted as one PR comment containing a JSON block (format in
