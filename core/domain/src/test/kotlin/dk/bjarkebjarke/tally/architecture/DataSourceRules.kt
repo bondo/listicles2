@@ -3,8 +3,8 @@ package dk.bjarkebjarke.tally.architecture
 import java.io.File
 
 /**
- * Two architecture rules (ANDROID-BEST-PRACTICES follow-up 1, M1-50). Like [ArchitectureRules], they run on each file's
- * text with comments and string text blanked, so prose never matches; a violation is `path:line: text`.
+ * Four architecture rules (ANDROID-BEST-PRACTICES follow-up 1, M1-50 and M1-57). Like [ArchitectureRules], they run on
+ * each file's text with comments and string text blanked, so prose never matches; a violation is `path:line: text`.
  *
  * **No data source in composables or ViewModels** ([dataSourceInUiViolations]). A UI file is a file that contains a
  * `@Composable` annotation, declares a class that extends `ViewModel` or `AndroidViewModel` (also by qualified name or
@@ -18,6 +18,18 @@ import java.io.File
  *
  * **No `GlobalScope`** ([globalScopeViolations]), in every source set: work that must outlive a screen uses an
  * injected external scope.
+ *
+ * **No platform types in ViewModels** ([platformInViewModelViolations], M1-57). In a ViewModel file (the ViewModel
+ * half of the UI-file definition above) every mention of `android.content.Context`, `android.app.Application` (a
+ * `Context`), an Activity class (`android.app.Activity`, `androidx.activity.ComponentActivity`,
+ * `androidx.appcompat.app.AppCompatActivity`, `androidx.fragment.app.FragmentActivity`), a wildcard import of those
+ * packages, or `AndroidViewModel` is a violation: a ViewModel gets what it needs from injected domain types. Not
+ * covered (review catches it): a `Context` reached through a type alias or a class from another module that wraps one.
+ *
+ * **No `Dispatchers.` outside a DI module** ([dispatchersOutsideDiViolations], M1-57). A DI module is a file with a
+ * `@Module` annotation (Dagger or Hilt), wherever it lives: the rule keys on the annotation, not on a path, so it is
+ * active before the first module exists and needs no path decision. In any other production file `Dispatchers` is a
+ * violation, import included; the dispatcher is injected. Tests are not scanned (`Dispatchers.setMain` is legitimate).
  *
  * Which directories are scanned is [uiSourceDirs] (every production source set of each module) and [allSourceDirs]
  * (every source set). Assumes the data layer's package is `dk.bjarkebjarke.tally.data`; a module that picks another
@@ -39,6 +51,22 @@ object DataSourceRules {
     private val viewModelLaterSupertype =
         Regex("""(?<![:\w.])(?:class|object)\s[^{;]*?,\s*(?:\w+\.)*(?:Android)?ViewModel\s*\(""")
 
+    // `Context` (and `Application`, which is one), the Activity classes and the wildcard imports that bring them in.
+    // `AndroidViewModel` is any mention, which covers the import and the supertype.
+    private val platformInViewModel =
+        Regex(
+            """(?<![\w.])(?:android\.content\.(?:Context(?!\w)|\*)""" +
+                """|android\.app\.(?:\w*Activity(?!\w)|Application(?!\w)|\*)""" +
+                """|androidx\.(?:activity|appcompat\.app|fragment\.app)\.(?:\w*Activity(?!\w)|\*))""" +
+                """|(?<!\w)AndroidViewModel(?!\w)""",
+        )
+
+    // `Dispatchers.IO`, `import kotlinx.coroutines.Dispatchers`, a qualified use; `AppDispatchers` does not match.
+    private val dispatchers = Regex("""(?<!\w)Dispatchers(?!\w)""")
+
+    // A Dagger or Hilt module: `@Module`, `@dagger.Module`.
+    private val diModuleAnnotation = Regex("""(?<!\w)@(?:\w+:)?(?:\w+\.)*Module(?!\w)""")
+
     private val globalScope = Regex("""(?<![\w])GlobalScope(?!\w)""")
 
     // Source sets that are not production code; a UI file in one of them may use a fake or an emulator client.
@@ -56,13 +84,19 @@ object DataSourceRules {
     fun globalScopeViolations(dir: File): List<String> =
         ArchitectureRules.codeFiles(dir).flatMap { matches(it, globalScope) }
 
-    /** `Context`, `Activity` or `AndroidViewModel` in a ViewModel file (M1-57). */
+    /** Android `Context` or `Activity`, or `AndroidViewModel`, in a ViewModel file (M1-57). */
     fun platformInViewModelViolations(dir: File): List<String> =
-        ArchitectureRules.codeFiles(dir).take(0).map { it.name }
+        ArchitectureRules
+            .codeFiles(dir)
+            .filter { isViewModelFile(it) }
+            .flatMap { matches(it, platformInViewModel) }
 
-    /** `Dispatchers.` in a file that is not a DI module (M1-57). */
+    /** `Dispatchers.` in a file that is not a DI module, that is a file without a `@Module` annotation (M1-57). */
     fun dispatchersOutsideDiViolations(dir: File): List<String> =
-        ArchitectureRules.codeFiles(dir).take(0).map { it.name }
+        ArchitectureRules
+            .codeFiles(dir)
+            .filterNot { diModuleAnnotation.containsMatchIn(it.text) }
+            .flatMap { matches(it, dispatchers) }
 
     /** Every production source set (all but test, androidTest and testFixtures) of every module. */
     fun uiSourceDirs(projectRoot: File): List<File> = sourceSets(projectRoot).filter { it.name !in testSourceSets }
@@ -85,8 +119,10 @@ object DataSourceRules {
     fun uiFileNames(dir: File): List<String> = ArchitectureRules.codeFiles(dir).filter { isUiFile(it) }.map { it.name }
 
     private fun isUiFile(file: ArchitectureRules.CodeFile): Boolean =
+        composable.containsMatchIn(file.text) || isViewModelFile(file)
+
+    private fun isViewModelFile(file: ArchitectureRules.CodeFile): Boolean =
         file.name.endsWith("ViewModel.kt") ||
-            composable.containsMatchIn(file.text) ||
             viewModelSupertype.containsMatchIn(file.text) ||
             viewModelLaterSupertype.containsMatchIn(file.text)
 
