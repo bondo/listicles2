@@ -168,6 +168,7 @@ CI_STEPS = [
     ("tasks", "python3 -I scripts/test_dependency_floors.py", "PR 224 R1-02"),
     ("tasks", "python3 -I scripts/dependency_floors.py", "PR 224 R1-02"),
     ("unit", "python3 -I scripts/test_check_test_results.py", "PR 239 R2-02"),
+    ("unit", "python3 -I scripts/test_coverage_impact.py", "M1-07"),
 ]
 
 

@@ -22,7 +22,8 @@ DOMAIN_PKG = "dk/bjarkebjarke/tally/domain"
 
 def report(*sources, empty=False):
     """A Kover (JaCoCo format) XML report. sources: (package, file, [(line, missed, covered), ...])."""
-    out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', '<!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">', '<report name="Kover">']
+    doctype = '<!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">'
+    out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', doctype, '<report name="Kover">']
     for pkg, name, lines in sources:
         out.append(f'<package name="{pkg}"><sourcefile name="{name}">')
         out += [f'<line nr="{n}" mi="{mi}" ci="{cv}" mb="0" cb="0"/>' for n, mi, cv in lines]
@@ -316,7 +317,8 @@ class Wiring(unittest.TestCase):
         ]
         for old, new in cases:
             self.assertIn(old, unit, old)
-            self.assertNotEqual(ci_problems(good.replace(old, new, 1)), [], f"not flagged: {old!r} -> {new!r}")
+            mutated = good.replace(unit, unit.replace(old, new, 1), 1)
+            self.assertNotEqual(ci_problems(mutated), [], f"not flagged: {old!r} -> {new!r}")
 
 
 if __name__ == "__main__":
