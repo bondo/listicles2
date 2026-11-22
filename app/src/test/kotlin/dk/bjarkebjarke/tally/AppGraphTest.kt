@@ -41,7 +41,7 @@ class AppGraphTest {
         connectivity.shouldBeInstanceOf<AndroidConnectivity>()
     }
 
-    /** M1-60: until M1-14 binds the Firebase Auth session, nobody is signed in, so the app opens on sign-in. */
+    /** M1-60: until M1-66 binds the Firebase Auth session, nobody is signed in, so the app opens on sign-in. */
     @Test
     fun sessionIsSignedOutUntilAuthExists() {
         hilt.inject()

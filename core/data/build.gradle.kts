@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
-// M0.5-10: no licensee gate here yet. Nothing ships from this module until :app depends on it (M1-14); that PR applies
+// M0.5-10: no licensee gate here yet. Nothing ships from this module until :app depends on it (M1-66); that PR applies
 // config/licensee/policy.gradle, and the owner approves the Google SDK terms lines for the Firebase artifacts there.
 
 val firestoreRulesAssetDir = layout.buildDirectory.dir("generated/firestoreRules")
