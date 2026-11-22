@@ -14,6 +14,7 @@ import groovy.json.JsonSlurper
 class GoogleTermsCheck implements Action<Task>, Serializable {
     List<String> approved       // group:artifact:version of every listed artifact
     List<String> termsUrls      // the Google/Android SDK terms URLs
+    Map<String, String> artifactUrls // terms URL -> the one group:artifact it is allowed for
     List<String> spdxIds        // the allowed SPDX ids
     String listName
 
@@ -32,7 +33,8 @@ class GoogleTermsCheck implements Action<Task>, Serializable {
             def spdx = (artifact.spdxLicenses ?: []).collect { it.identifier }
             def unknown = (artifact.unknownLicenses ?: []).collect { it.url }
             def ok = !(spdx.isEmpty() && unknown.isEmpty()) &&
-                    spdx.every { spdxIds.contains(it) } && unknown.every { termsUrls.contains(it) }
+                    spdx.every { spdxIds.contains(it) } &&
+                    unknown.every { termsUrls.contains(it) || artifactUrls[it] == "${artifact.groupId}:${artifact.artifactId}".toString() }
             if (!ok) {
                 problems << "${coordinates} is listed in ${listName} but its licence is not the Google/Android SDK terms: " +
                         (spdx + unknown).join(', ')
@@ -49,12 +51,12 @@ def googleTermsFile = project.ext.has('licenseeGoogleTermsFile') ?
         rootProject.file('config/licensee/google-sdk-terms.txt')
 
 def allowedSpdxIds = ['Apache-2.0', 'MIT', 'BSD-2-Clause', 'BSD-3-Clause']
-// M1-26 (owner decision, issue 15 comment 7083187223): the Play Integrity terms and the Play Core license also count.
-def googleTermsUrls = [
-        'https://developer.android.com/studio/terms.html',
-        'https://developer.android.com/studio/terms',
-        'https://developer.android.com/google/play/integrity/overview#tos',
-        'https://developer.android.com/guide/playcore/license',
+// M1-26 (owner decisions, issue 15 comments 7083187223 and 7085175461, group B): these two terms are each allowed for
+// exactly one artifact, not pooled: the Play Integrity terms for integrity, the Play Core license for core-common.
+def googleTermsUrls = ['https://developer.android.com/studio/terms.html', 'https://developer.android.com/studio/terms']
+def artifactTermsUrls = [
+        'https://developer.android.com/google/play/integrity/overview#tos': 'com.google.android.play:integrity',
+        'https://developer.android.com/guide/playcore/license'            : 'com.google.android.play:core-common',
 ]
 def approvedCoordinates = []
 
@@ -80,6 +82,6 @@ licensee {
 tasks.configureEach { licenseeTask ->
     if (licenseeTask.class.name.startsWith('app.cash.licensee.LicenseeTask')) {
         licenseeTask.doLast(new GoogleTermsCheck(
-                approved: approvedCoordinates, termsUrls: googleTermsUrls, spdxIds: allowedSpdxIds, listName: googleTermsFile.name))
+                approved: approvedCoordinates, termsUrls: googleTermsUrls, artifactUrls: artifactTermsUrls, spdxIds: allowedSpdxIds, listName: googleTermsFile.name))
     }
 }
