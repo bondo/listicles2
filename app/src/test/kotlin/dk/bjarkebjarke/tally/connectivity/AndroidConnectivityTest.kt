@@ -35,13 +35,9 @@ class AndroidConnectivityTest {
     }
 
     @Test
-    fun offlineWhenTheNetworkIsNotValidated() {
+    fun offlineWhenTheNetworkIsNotValidatedOrHasNoInternet() {
         activeNetworkWith(NET_CAPABILITY_INTERNET)
         connectivity.isOnline() shouldBe false
-    }
-
-    @Test
-    fun offlineWhenTheNetworkHasNoInternet() {
         activeNetworkWith(NET_CAPABILITY_VALIDATED)
         connectivity.isOnline() shouldBe false
     }

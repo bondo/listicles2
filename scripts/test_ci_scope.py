@@ -556,7 +556,8 @@ def verify_gate_problems(verify):
     for stdout, code in (("run", 0), ("", 0), ("skip\nskip", 0), ("skip ", 0), ("Skip", 0), ("skip", 1), ("", 1)):
         if run_gate_block(block, stdout, code) != run_all:
             problems.append(f"does not run the self-tests for scope output {stdout!r}, exit {code}")
-    if run_gate_block(block, "skip") != ["skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, google-services-release-gate-tests, testLicenseeGate "
+    if run_gate_block(block, "skip") != ["skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, "
+                                         "google-services-release-gate-tests, testLicenseeGate "
                                          "(no gate input changed since the merge base with origin/main; scripts/ci_scope.py)",
                                          "EXCLUDE -x testLicenseeGate", "SKIPPED 1"]:
         problems.append("does not skip the self-tests and testLicenseeGate for `skip`")

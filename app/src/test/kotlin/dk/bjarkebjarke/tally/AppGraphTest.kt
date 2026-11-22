@@ -33,20 +33,16 @@ class AppGraphTest {
         hilt.inject()
         connectivity.shouldBeInstanceOf<AndroidConnectivity>()
     }
-
-    @Test
-    fun mainActivityIsAHiltEntryPoint() {
-        GeneratedComponentManagerHolder::class.java.isAssignableFrom(MainActivity::class.java).shouldBeTrue()
-    }
 }
 
-/** Without the test application: the manifest's application is the app's own Hilt application. */
+/** Without the test application: the manifest's application and MainActivity are the app's own Hilt entry points. */
 @RunWith(RobolectricTestRunner::class)
 class TallyApplicationTest {
     @Test
-    fun manifestApplicationIsTheHiltApplication() {
+    fun manifestApplicationAndMainActivityAreHiltEntryPoints() {
         val app = RuntimeEnvironment.getApplication()
         app.shouldBeInstanceOf<TallyApplication>()
         app.shouldBeInstanceOf<GeneratedComponentManager<*>>()
+        GeneratedComponentManagerHolder::class.java.isAssignableFrom(MainActivity::class.java).shouldBeTrue()
     }
 }
