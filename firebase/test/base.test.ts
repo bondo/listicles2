@@ -19,14 +19,9 @@ const TOMB = "household00000000003";
 const CONFIG = "config/app";
 const user = (uid = h.UID): string => `users/${uid}`;
 const member = (hid: string, uid = h.UID): string => `households/${hid}/members/${uid}`;
-const MEMBER = { role: "member", displayName: "Alice", joinedAt: new Date(0) };
-const HOME = {
-    name: "Home",
-    createdBy: BOB,
-    createdAt: new Date(0),
-    ownerUid: BOB,
-    deleted: false,
-};
+const T0 = new Date(0);
+const MEMBER = { role: "member", displayName: "Alice", joinedAt: T0 };
+const HOME = { name: "Home", createdBy: BOB, createdAt: T0, ownerUid: BOB, deleted: false };
 
 async function seed(docs: Record<string, object>): Promise<void> {
     await env.withSecurityRulesDisabled(async (admin) => {
@@ -212,22 +207,15 @@ describe("the household doc", () => {
         await h.verifiedOnly(dbs, (db) => db.doc(`households/${TOMB}`).get());
     });
 
+    const bobs = { [user(BOB)]: { householdId: TOMB } };
     test.each<[string, Record<string, object>, string]>([
+        ["live, mine points at it, no member doc", { [user()]: { householdId: LIVE } }, LIVE],
         [
-            "live, the own householdId on it, not a member",
-            { [user()]: { householdId: LIVE } },
-            LIVE,
-        ],
-        [
-            "a tombstone another user's householdId is on, not the caller's",
-            { [user()]: { householdId: OTHER }, [user(BOB)]: { householdId: TOMB } },
+            "a tombstone bob's points at, mine elsewhere",
+            { ...bobs, [user()]: { householdId: OTHER } },
             TOMB,
         ],
-        [
-            "a tombstone, the caller without a users doc",
-            { [user(BOB)]: { householdId: TOMB } },
-            TOMB,
-        ],
+        ["a tombstone bob's points at, no users doc of mine", bobs, TOMB],
     ])("denied: get, %s", async (_what, docs, hid) => {
         await seed(docs);
         for (const client of h.CLIENT_NAMES) {
