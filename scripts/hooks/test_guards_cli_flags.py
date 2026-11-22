@@ -900,5 +900,35 @@ class YamlArgsAndActionlintConfigTests(CliFlagCase):
         self.assertPasses()
 
 
+class PrReviewRound1SplitTests(CliFlagCase):
+    """PR 321 review round 1: R1-01 a flow list splits on every comma outside quotes, R1-02 a double-quoted YAML key written with an
+    escape fails closed in the actionlint config and in a workflow step or pre-commit hook."""
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def test_flow_lists_and_escaped_keys(self):
+        pc, h = ".pre-commit-config.yaml", "repos:\n  - repo: local\n    hooks:\n"
+        wf, step = ".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - uses: astral-sh/ruff-action@v3\n        with:\n"
+        for path, text, n, mark in [
+            (pc, h + "      - id: ruff\n        args: [.,--fix]\n", 5, MARK),
+            (pc, h + "      - id: lint\n        entry: eslint\n        args: [src,--quiet]\n", 6, MARK),
+            (pc, h + "      - {id: ruff, args: [.,--fix]}\n", 4, MARK),
+            (pc, h + '      - id: ruff\n        "ar\\x67s": [--fix]\n', 5, MARK),
+            (wf, step + '          "ar\\u0067s": check --fix\n', 6, MARK),
+            (".github/actionlint.yaml", 'paths:\n  x.yml:\n    "ign\\x6Fre":\n      - SC2086\n', 3, "guard: unjustified suppression"),
+        ]:
+            with self.subTest(text=text):
+                self.write(path, text)
+                self.assertFails(f"{mark}: {path}:{n}:")
+                self.repo.git("rm", "-q", path)
+                self.repo.commit()
+        for text in [h + "      - id: ruff\n        args: [--config,ruff.toml]\n", h + "      - id: ruff\n        args: ['--output-format=a,--b']\n"]:
+            with self.subTest(ok=text):
+                self.write(pc, text)
+                self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
