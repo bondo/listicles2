@@ -644,7 +644,7 @@ RULES = (
         "orch-merge-request", ("orchestrator",),
         (
             r"merge request \(§7\.5, retro r2, r6\)",
-            r"before you send it \(to the merge agent, or to the owner for an owner-only pr\), check that",
+            r"before you send it \(to the merge agent, or as a batch-approval request to the owner for an owner-only pr\), check that",
             r"\(1\) the pr body is refreshed \(scope, review table, test evidence; no \"still to do\" or \"not yet reviewed\"\)",
             r"\(2\) the request says squash",
             r"\(3\) no commit message or pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
@@ -955,9 +955,11 @@ RULES = (
     Rule(
         "orch-owner-merge-exceptions", ("orchestrator",),
         (
-            r"ask the owner for decisions and for the merges of owner-only prs \(the merge agent merges every other ready pr, §7\.5\)",
+            r"ask the owner for decisions and for batch approvals of owner-only prs \(the merge agent merges them as `owner-batch` once approved, "
+            r"and every other ready pr, §7\.5\)",
         ),
-        "the orchestrator asks the owner for owner-only merges only; the merge agent merges every other READY PR (§7.5; issue 147)",
+        "the orchestrator asks the owner for batch approvals of owner-only PRs; the merge agent merges them as owner-batch, and every other READY PR "
+        "(§7.5; issue 147)",
         forbidden=(r"ask the owner for merges and decisions",),
     ),
     Rule(
@@ -977,7 +979,7 @@ RULES = (
         "reviewer-recheck", ("reviewer",),
         (
             r"a re-check reviewer \(sonnet, medium effort, role `recheck-reviewer` in `agents/roles\.yaml`, orchestration §7\.2\.3\) "
-            r"checks only the findings and the commit named in the spawn message",
+            r"gets the same inputs as any delta review and focuses on the findings and the commit named in the spawn message",
         ),
         "the reviewer prompt covers the Sonnet medium re-check of a small fix-only or docs-only commit (§7.2.3)",
     ),
@@ -1382,37 +1384,42 @@ DOC_RULES = (
             r"\*\*nits are accepted without a round\.\*\* a review with verdict `ready_nits_only` goes to the merge request \(§7\.5\)\. "
             r"its nits are recorded as accepted in the pr review table and the round row: no fix round, no re-review, no follow-up issue",
             r"\*\*a small fix is re-checked cheaply\.\*\* a re-check of a small fix-only or docs-only commit \(the fixes of the previous round's "
-            r"findings, each about 30 changed lines or fewer, or docs only\) is the delta review of §7\.2 done by a fresh sonnet medium reviewer "
-            r"\(`recheck-reviewer` in `agents/roles\.yaml`\), focused on those findings\. full rounds stay opus at the effort `agents/roles\.yaml` "
-            r"gives the reviewer",
+            r"findings, about 30 changed lines or fewer in total\) is the delta review of §7\.2, with its inputs, done by a fresh sonnet medium "
+            r"reviewer \(`recheck-reviewer` in `agents/roles\.yaml`\), focused on those findings\. full rounds stay opus at the effort "
+            r"`agents/roles\.yaml` gives the reviewer",
             r"\*\*guard and prompt_rules hardening prs stop early\.\*\* on a pr that hardens `scripts/guards\.sh`, "
             r"`scripts/hooks/pretooluse_guard\.py` or `scripts/prompt_rules\.py`, the second round that finds new bypass forms ends the pr\. "
-            r"the forms are recorded as accepted residuals in the pr body \(the hook is a tripwire, f18\) and the pr goes to the merge request; "
-            r"any other finding above nit is still fixed",
+            r"the forms are recorded as accepted residuals in the pr body \(the hook is a tripwire, f18\) and the pr goes to the merge request\.",
             r"\*\*reviewer effort\*\* is strictly per `agents/roles\.yaml`, which owns the rule",
             r"### 6\.1 session row \(one per session, written as it is archived\)",
             r"write it just before `archive_session` \(§7\.4\), for every role, reviewers included",
             r"\*\*archive\*\* \(`archive_session`\) each worker, reviewer and planner session as soon as you are done with it \(result read, "
             r"no follow-up planned\) and its `metrics:session` row \(§6\.1\) is written",
-            r"a small fix-only or docs-only commit gets the cheap re-check of §7\.2\.3",
+            r"a small fix-only or docs-only commit that fixes the previous round's findings gets the cheap re-check of §7\.2\.3",
         ),
         "ORCHESTRATION 7.2.3: ready_nits_only accepts its nits, cheap Sonnet re-check, hardening-PR stop, one metrics:session row per archived session "
         "(owner decision, #15 comment 7070278995)",
-        forbidden=(r"a delta review always runs; there is no owner-acceptance alternative, for any pr\. record",),
+        forbidden=(r"a delta review always runs; there is no owner-acceptance alternative, for any pr\. record",
+                   r"each about 30 changed lines or fewer, or docs only", r"any other finding above nit is still fixed"),
     ),
     DocRule(
         "orch-owner-merge-exceptions", ORCH,
         (
-            r"owner-only prs wait in the owner's queue \(`is:open is:pr draft:false`\); every other ready pr goes to the merge agent",
-            r"\*\*before the merge request\*\* \(to the merge agent, or to the owner for an owner-only pr\) the orchestrator checks",
+            r"ready prs are `is:open is:pr draft:false`; owner-only prs wait for the owner's batch approval \(below\), every other one goes to the merge agent",
+            r"\*\*before the merge request\*\* \(to the merge agent, or as a batch-approval request to the owner for an owner-only pr\) "
+            r"the orchestrator checks",
             r"scan the pr body for them before the merge request",
-            r"after each merge by the owner, the \*\*orchestrator\*\* updates the next ready owner-only pr",
-            r"the merge agent merges it, or the owner for an owner-only pr \(§7\.5\)",
+            r"after each merge, the next ready pr is updated: by the merge agent itself with `scripts/update-branch\.sh` \(above\) when it is in "
+            r"the merge agent's batch; otherwise the \*\*orchestrator\*\* updates it with `update_pull_request_branch`",
+            r"then the merge agent merges it: a `general` pr under the standing authorization, an owner-only pr as kind `owner-batch` once the "
+            r"owner's batch approval lists it \(§7\.5\)",
         ),
-        "ORCHESTRATION 7.2, 7.5, 7.6: the owner merges owner-only PRs only; the merge agent merges every other READY PR (issue 147)",
+        "ORCHESTRATION 7.5, 7.6: the merge agent merges every READY PR, an owner-only one as owner-batch once the owner's batch approval lists it (issue 147)",
         forbidden=(
             r"the owner's queue is `is:open is:pr draft:false`", r"before asking the owner to merge", r"after each owner merge, the \*\*orchestrator\*\*",
-            r"because it is mergeable; the owner merges\.",
+            r"because it is mergeable; the owner merges\.", r"after each merge by the owner, the \*\*orchestrator\*\*",
+            r"or the owner for an owner-only pr \(§7\.5\)",
+            r"owner-only prs wait in the owner's queue",
         ),
     ),
     DocRule(

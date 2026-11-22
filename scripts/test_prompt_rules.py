@@ -591,7 +591,7 @@ class M015Tests(unittest.TestCase):
             ("resolve, resolves or resolved directly before an issue number", "resolve, resolves or resolved before an issue number"),
             ('write "gated on #n", "see #n" or "mark #n done"', "write nothing"),
             ("scan the body for them first", "skip the scan"),
-            ("before you send it (to the merge agent, or to the owner for an owner-only pr)", "after the owner merged"),
+            ("before you send it (to the merge agent, or as a batch-approval request to the owner for an owner-only pr)", "after the owner merged"),
         ):
             self.assert_fails("orchestrator", "orch-merge-request", old, new)
         # each closing word is pinned, so one dropped from the list fails the rule
@@ -2390,11 +2390,19 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
         self.assertIn("orch-token-rules", self.doc_replace(
             "docs/ORCHESTRATION.md", "done by a fresh sonnet medium reviewer", "done by a fresh opus max reviewer"))
         self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "full rounds stay opus", "full rounds are sonnet"))
-        self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "each about 30 changed lines or fewer, or docs only", "of any size"))
+        self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", "about 30 changed lines or fewer in total", "of any size"))
+        self.assertIn("orch-token-rules", self.doc_replace(
+            "docs/ORCHESTRATION.md", "a small fix-only or docs-only commit that fixes the previous round's findings gets the cheap re-check",
+            "a small fix-only or docs-only commit gets the cheap re-check"))
+        for stale in ("(the fixes of the previous round's findings, each about 30 changed lines or fewer, or docs only)",):  # R1-01
+            self.assertIn("orch-token-rules", self.doc_ids("docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\n" + stale + "\n"))
         self.assertIn("orch-token-rules", self.role_replace("orchestrator", "goes to a sonnet medium `recheck-reviewer`; full rounds stay opus",
                                                              "goes to a fresh opus round"))
-        self.assertIn("reviewer-recheck", self.role_replace("reviewer", "checks only the findings and the commit named in the spawn message",
-                                                            "reviews everything again"))
+        self.assertIn("reviewer-recheck", self.role_replace(
+            "reviewer", "gets the same inputs as any delta review and focuses on the findings and the commit named in the spawn message",
+            "reviews everything again"))
+        self.assertIn("reviewer-recheck", self.role_replace("reviewer", "gets the same inputs as any delta review and focuses on",
+                                                            "checks only"))  # R1-04: one statement of the inputs
 
     def test_the_recheck_role_is_sonnet_medium_and_the_reviewer_effort_is_not_max_for_consistency(self):
         roles = self.doc("agents/roles.yaml")
@@ -2411,11 +2419,13 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
         for old, new in (
             ("the second round that finds new bypass forms ends the pr", "every round that finds new bypass forms gets a fix round"),
             ("the forms are recorded as accepted residuals in the pr body", "the forms are fixed before the merge request"),
-            ("any other finding above nit is still fixed", "no other finding is fixed"),
             ("on a pr that hardens `scripts/guards.sh`, `scripts/hooks/pretooluse_guard.py` or `scripts/prompt_rules.py`", "on any pr"),
         ):
             with self.subTest(old=old):
                 self.assertIn("orch-token-rules", self.doc_replace("docs/ORCHESTRATION.md", old, new))
+        # R1-02: no clause beyond the owner text ("the PR stops there")
+        self.assertIn("orch-token-rules", self.doc_ids(
+            "docs/ORCHESTRATION.md", self.doc("docs/ORCHESTRATION.md") + "\nAny other finding above nit is still fixed.\n"))
         self.assertIn("review-token-rules", self.doc_replace(
             "REVIEW.md", "the second round that reports new bypass forms ends the pr", "the fourth round that reports new bypass forms ends the pr"))
         self.assertIn("orch-token-rules", self.role_replace(
@@ -2435,6 +2445,9 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
             ("docs/ORCHESTRATION.md", "**Before asking the owner to merge** the orchestrator checks"),
             ("docs/ORCHESTRATION.md", "After each owner merge, the **orchestrator** updates the next ready PR."),
             ("docs/ORCHESTRATION.md", "agent PRs stay draft until the orchestrator marks one ready because it is mergeable; the owner merges."),
+            ("docs/ORCHESTRATION.md", "then the merge agent merges it, or the owner for an owner-only PR (§7.5)."),  # R1-03
+            ("docs/ORCHESTRATION.md", "After each merge by the owner, the **orchestrator** updates the next ready owner-only PR."),
+            ("docs/ORCHESTRATION.md", "Owner-only PRs wait in the owner's queue."),
         ):
             with self.subTest(stale=stale):
                 self.assertIn("orch-owner-merge-exceptions", self.doc_ids(path, self.doc(path) + "\n" + stale + "\n"))
@@ -2443,16 +2456,22 @@ class TokenRulesAndOwnerMergeTests(unittest.TestCase):
 
     def test_each_owner_merge_exception_is_needed(self):
         for old, new in (
-            ("every other ready pr goes to the merge agent", "every ready pr goes to the owner"),
-            ("to the merge agent, or to the owner for an owner-only pr) the orchestrator checks", "to the owner) the orchestrator checks"),
-            ("the merge agent merges it, or the owner for an owner-only pr (§7.5)", "the owner merges"),
+            ("owner-only prs wait for the owner's batch approval (below), every other one goes to the merge agent",
+             "every ready pr goes to the owner"),
+            ("to the merge agent, or as a batch-approval request to the owner for an owner-only pr) the orchestrator checks",
+             "to the owner) the orchestrator checks"),
+            ("then the merge agent merges it: a `general` pr under the standing authorization, an owner-only pr as kind `owner-batch` once the "
+             "owner's batch approval lists it (§7.5)", "then the owner merges it"),
+            ("by the merge agent itself with `scripts/update-branch.sh` (above) when it is in the merge agent's batch; otherwise",
+             "by the owner; otherwise"),
         ):
             with self.subTest(old=old):
                 self.assertIn("orch-owner-merge-exceptions", self.doc_replace("docs/ORCHESTRATION.md", old, new))
         self.assertIn("orch-owner-merge-exceptions", self.role_replace(
-            "orchestrator", "(the merge agent merges every other ready pr, §7.5)", "(never the merge agent)"))
+            "orchestrator", "(the merge agent merges them as `owner-batch` once approved, and every other ready pr, §7.5)", "(never the merge agent)"))
         self.assertIn("orch-merge-request", self.role_replace(
-            "orchestrator", "before you send it (to the merge agent, or to the owner for an owner-only pr), check that", "after the owner merged, check that"))
+            "orchestrator", "before you send it (to the merge agent, or as a batch-approval request to the owner for an owner-only pr), check that",
+            "after the owner merged, check that"))
 
     # Issue 218: the manual dispatcher line stays until detekt 2.0 is stable.
     def test_the_dispatcher_review_line_needs_its_scope_and_its_severity(self):
