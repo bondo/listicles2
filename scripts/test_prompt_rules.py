@@ -2734,7 +2734,7 @@ class PrReviewRound1Tests(unittest.TestCase):
     def test_the_over_cap_exception_is_stated_where_the_stop_and_ask_rule_is(self):
         clause = "The over-cap deferrals of the delegated decisions (3) are the exception."
         self.assertIn(clause.lower(), prompt_rules.normalize(real("orchestrator")).lower())
-        self.assertIn("delegated-decisions", self.role_swap("orchestrator", clause, ""))
+        self.assertIn("orch-deferral", self.role_swap("orchestrator", clause, ""))
         follow = "minors out of the PR's scope or at the line guard may still be deferred (owner decision, #15 comment 7075812943)"
         self.assertIn("followups-over-cap", self.doc_swap("docs/FOLLOW-UPS.md", follow, ""))
 

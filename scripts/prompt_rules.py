@@ -606,6 +606,7 @@ RULES = (
             r"with more than 8 open deferral follow-ups for one milestone \(findings of repo-wide reviews do not count, owner decision 7003661679\): "
             r"stop deferring and ask the owner which follow-ups to fix as their own small prs \(as on #15 comment 6989510779\); "
             r"deferring resumes at 8 or fewer open \(re-deferral and majors still need the owner\)",
+            r"the over-cap deferrals of the delegated decisions \(3\) are the exception",
             r"if everything above nit was deferred and no commit followed the reviewed range, "
             r"post `accepted: all findings above nit deferred \(#a, #b\)` \(verdict `ready_deferred`\)",
         ),
@@ -1019,7 +1020,6 @@ RULES = (
             r"to read #15 for one right before it runs `scripts/merge_ready\.py`",
             r"a pr with anything on the owner-retained list, or with an owner-only path outside tooling, build, ci and gate files, is not "
             r"approver work: ask the owner for the batch approval",
-            r"the over-cap deferrals of the delegated decisions \(3\) are the exception",
         ),
         "the orchestrator prompt carries the four delegated decisions, the exact owner-retained list and the approver and veto steps "
         "(owner decision, #15 comment 7075812943; ORCHESTRATION 1.1, 7.5)",
@@ -1568,6 +1568,7 @@ DOC_RULES = (
             r"asking; majors still need the owner, and the stop-and-ask rule above still applies to every other deferral",
             r"its ruling per pr is final \(owner decision, #15 comment 7075812943\) and the orchestrator follows it without asking",
             r"the approver's record of the delegation below is the one exception",
+            r"approvals of orchestrator decisions \(merges of prs that stay with the owner\)",
             r"an approver agent's anchored `batch approval:` record on #15 counts as the owner's batch approval",
             r"\(`agents/prompts/approver\.md`, opus high, `agents/roles\.yaml`\)",
             r"with the pr number, the head sha, the round history and the deferral records, and the §8\.3 closing message",
