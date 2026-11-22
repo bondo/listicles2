@@ -1216,6 +1216,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 324
 notes = "Owner request, #31 orchestrator chat 2026-11-22: open-task dependency graph under the status cards"
 
 [[task]]
@@ -1414,7 +1415,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-70", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]

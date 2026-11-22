@@ -217,6 +217,31 @@ class Layout(unittest.TestCase):
         for x, y, w, h in (box(g) for g in nodes(svg).values()):
             self.assertTrue(x >= 0 and x + w <= width and y >= 0 and y + h <= height)
 
+    def test_every_node_sits_inside_a_milestone_band(self):
+        svg = svg_of()
+        bands = [(float(r.get("x")), float(r.get("y")), float(r.get("width")), float(r.get("height")))
+                 for r in ET.fromstring(svg).iter(NS + "rect") if r.get("class") == "card"]
+        self.assertEqual(len(bands), 2)
+        for tid, g in nodes(svg).items():
+            x, y, w, h = box(g)
+            self.assertTrue(any(bx <= x and x + w <= bx + bw and by <= y and y + h <= by + bh for bx, by, bw, bh in bands), tid)
+
+    def test_a_deep_graph_still_fits_its_bands(self):
+        rows = [task(f"A-{i:02d}", "A", deps=[f"A-{i - 1:02d}"] if i > 1 else []) for i in range(1, 14)]
+        svg = svg_of(tasks_text(*rows, milestones=("A",)))
+        band = next(r for r in ET.fromstring(svg).iter(NS + "rect") if r.get("class") == "card")
+        right = float(band.get("x")) + float(band.get("width"))
+        for g in nodes(svg).values():
+            self.assertLessEqual(box(g)[0] + box(g)[2], right)
+
+    def test_the_text_fits_the_canvas_even_for_a_one_column_graph(self):
+        svg = svg_of(tasks_text(task("A-01", "A"), milestones=("A",)))
+        root = ET.fromstring(svg)
+        width = float(root.get("width"))
+        for el in root.iter(NS + "text"):
+            content = "".join(el.itertext())
+            self.assertLessEqual(float(el.get("x")) + status_visual.text_width(content) * 6.6, width, content)
+
     def test_nodes_are_grouped_into_one_band_per_milestone(self):
         found = nodes(svg_of())
         a = [box(found[k]) for k in ("A-02", "A-O1", "A-04", "A-05")]
@@ -229,16 +254,16 @@ class Layout(unittest.TestCase):
 
     def test_is_deterministic(self):
         self.assertEqual(svg_of(), svg_of())
-        shuffled = model()
-        self.assertEqual(status_graph.render_graph_svg(shuffled), status_graph.render_graph_svg(model()))
 
     def test_a_bigger_graph_is_laid_out_without_overlap(self):
         rng = random.Random(7)
         rows = [task(f"A-{i:02d}", "A", deps=[f"A-{j:02d}" for j in range(1, i) if rng.random() < 0.15]) for i in range(1, 40)]
         found = nodes(svg_of(tasks_text(*rows, milestones=("A",))))
         self.assertEqual(len(found), 39)
-        boxes = sorted(box(g) for g in found.values())
-        self.assertEqual(len(set((x, y) for x, y, _, _ in boxes)), 39)
+        boxes = [box(g) for g in found.values()]
+        for i, (x1, y1, w1, h1) in enumerate(boxes):
+            for x2, y2, w2, h2 in boxes[i + 1:]:
+                self.assertTrue(x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
 
 
 class Labels(unittest.TestCase):
@@ -259,7 +284,7 @@ class Labels(unittest.TestCase):
             self.assertIn(word, joined)
         self.assertIn("transitive", joined)
         self.assertIn("2 transitive arrows hidden", joined)
-        self.assertIn("2 dependencies on done tasks", joined)
+        self.assertIn("2 dependencies on done or dropped tasks", joined)
         self.assertIn("1 on a whole milestone", joined)
         self.assertIn("dependency to dependent", joined)
 
