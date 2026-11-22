@@ -177,6 +177,27 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # M1-33: the release variant with R8 on must still build. No google-services.json in CI, so it gets the demo-tally stand-in, which
+  # only this job may allow (-Ptally.allowStandInRelease=true, M1-30). Unsigned, nothing published or uploaded. Frozen by
+  # scripts/check_release_smoke.py (EXPECTED_JOB); Baseline and Startup Profiles are M6.
+  release-smoke:
+    name: release-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: release build with R8 (demo-tally stand-in config, unsigned; the one build that may pass the stand-in flag, M1-33)
+        run: ./gradlew -q --console=plain -Ptally.allowStandInRelease=true :app:assembleRelease
+      - name: R8 ran (mapping file) and the APK is unsigned (nothing is signed, published or uploaded)
+        run: |
+          test -s app/build/outputs/mapping/release/mapping.txt
+          ls app/build/outputs/apk/release/*-release-unsigned.apk
+
   guards:
     name: guards
     runs-on: ubuntu-latest
@@ -275,6 +296,10 @@ jobs:
         run: python3 -I scripts/test_check_debug_apk.py
       - name: debug APK artifact is uploaded on push to main only, with contents read (M1-63)
         run: python3 -I scripts/check_debug_apk.py
+      - name: release smoke build wiring tests (M1-33)
+        run: python3 -I scripts/test_check_release_smoke.py
+      - name: release smoke build with R8 stays wired, and the stand-in flag stays in that job only (M1-33)
+        run: python3 -I scripts/check_release_smoke.py
       - name: agent_metrics.py tests
         run: python3 -I scripts/test_agent_metrics.py
       - name: docs/agent-metrics.csv is up to date
