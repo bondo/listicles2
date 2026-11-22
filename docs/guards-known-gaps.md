@@ -88,18 +88,21 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`. The `ignore:`
   entries of `.github/actionlint.yaml` (or `.yml`) are read by 2b: the `ignore:` line and every `- entry` of its block list need a reason.
 - Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
-- YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`) is read as one logical line, a blank line in it as a line break. A
+- YAML (issue 164 item 2): a folded scalar (`run: >`, `>-`, `>+`) is read as one logical line, a blank line in it as a line break (a
+  more-indented line keeps its line break in YAML, so joining it is a false positive in the safe direction; `key: >` inside another
+  block scalar is text, not a fold). A
   sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order: its `uses:` (an action whose name contains
   the tool, such as `astral-sh/ruff-action` or `docker://rhysd/actionlint`), `entry:` or `id:` (`ruff` and `ruff-check` run
-  `ruff check`, `ruff-format` runs `ruff format`) gives the command, and its args-like keys (`args`, `*_args`, `*_flags`, `*_options`,
-  at any depth: `with: args:`, `eslint_flags:`) are that command's flags, inline, as a flow or block list, a flow mapping
-  (`- {id: ruff, args: [--fix]}`) or a block scalar. A reason on the args lines waives them. Other inputs of a lint action
-  (`severity:`, `ignore_paths:`, `fail_on_error:`) are not read.
+  `ruff check`, `ruff-format` runs `ruff format`) gives the command, and each of its args-like keys (`args`, `extra_args`, `flags`,
+  `options`, or a key that starts with the tool name such as `eslint_flags`; not `reviewdog_flags`; at any depth, quoted or not) holds
+  that command's flags, inline, as a flow or block list, in a flow mapping (`- {id: ruff, args: [--fix]}`, `with: {args: check}`) or a
+  block scalar. A reason on the lines of one key waives that key only.
 - npm `--` tail (issue 164 item 3): npm appends it to the last command of the script, so the script is looked up in every tracked
   package.json (one `"name": "command"` per line). When that command runs eslint, prettier or tsc (after `VAR=x` and `npx`), the tail is
   checked for that tool; when it runs a test runner that is no linter (jest, vitest, mocha, playwright, cypress, firebase), not at all,
-  so `npm test -- -u` passes; in every other case (an unknown script, `npm exec`/`npx`, a wrapper such as `node x.mjs`, `npm run y`, a
-  path, any other program, or two package.json files that disagree) it is checked against all three, as before.
+  so `npm test -- -u` passes. When package.json files run different tools for the script, each of them must accept the flag. In every
+  other case (an unknown script, `npm exec`/`npx`, a wrapper such as `node x.mjs`, `npm run y`, a path, any other program, or an npm
+  option before the script name that may take a value, such as `-w pkg`) a flag passes when any of the three lists it, as before.
 - False positives removed: `uvx mypy@1.15`, `tsc -b > build.log` (issue 164 item 5) and `tsc --outFile dist/out.js` (item 4), and tools that
   are being installed (`pip install ruff --upgrade`, `npm i -D eslint --save-exact`, `cargo install`, `go install`).
 
@@ -108,6 +111,8 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   `npm run build -- --watch` with `build` running `node build.mjs`, or `npm --prefix firebase test -- -u` (the option value reads as the
   verb), needs a `justified:`. A script whose last command is a test runner not on the list (`tap`) is checked the same way.
 - Flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
+- A job-level reusable workflow (`uses: org/x/.github/workflows/ruff.yml@v1` with `with: args:`) is not a sequence item and is not read,
+  and other inputs of a lint action (`severity:`, `ignore_paths:`, `fail_on_error:`, `reviewdog_flags:`) are not read.
 - A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
 - A tool name held in a
   Make or shell variable (`$(RUFF) check --ignore E501 .`), and a flag hidden by shell escapes (`eslint \--quiet .`, `eslint $'--quiet' .`).
