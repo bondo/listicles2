@@ -490,6 +490,32 @@ class HookSuiteInputs(unittest.TestCase):
         self.assertEqual(sorted(paths), ["docs/a.md", "scripts/hooks/tool.py"])
         self.assertEqual(unreadable, [])
 
+    def test_imported_attribute_and_derived_roots_are_reported_or_resolved(self):
+        """R2-01: an imported root alias, a module's ROOT or __file__, a dirname of a path constant, __spec__, sys.path[0],
+        sys.argv[0] and globals()['__file__'] reach the repo too: resolved into a path where possible, else a root use."""
+        src = "\n".join([
+            "from test_guard_wrapper_forms import ROOT as R",
+            "import test_guard_wrapper_forms as w",
+            "import os, sys, prepush_scope",
+            "HERE = os.path.dirname(os.path.abspath(__file__))",
+            "GUARDS = os.path.join(HERE, '..', 'guards.sh')",
+            "os.path.join(R, 'docs', 'FOLLOW-UPS.md')",
+            "os.path.join(w.ROOT, 'docs', 'FOLLOW-UPS.md')",
+            "os.path.dirname(prepush_scope.__file__)",
+            "os.path.join(os.path.dirname(GUARDS), '..', 'docs', 'a.md')",
+            "globals()['__file__']",
+            "__spec__.origin",
+            "sys.path[0]",
+            "os.path.dirname(sys.argv[0])",
+            "print(R)",
+        ])
+        paths, unreadable, root_uses = hook_code_reads({"test_new.py": src})
+        self.assertEqual(sorted(paths), ["docs/FOLLOW-UPS.md", "docs/a.md", "scripts/guards.sh"])
+        self.assertEqual(root_uses, {"test_new.py": [7, 8, 10, 11, 12, 13, 14]})
+        self.assertEqual(unreadable, [])
+        for p in ("docs/FOLLOW-UPS.md", "docs/a.md"):
+            self.assertEqual(prepush_scope.hook_tests_scope([p]), "skip", p)  # so HookSuiteInputs would fail on them
+
     def test_only_the_read_helper_itself_passes_its_parts_through_unreported(self):
         """Self-review: any *parts helper hid its joins, and calls to it other than `read` were never collected."""
         src = "\n".join([

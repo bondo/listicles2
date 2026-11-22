@@ -188,6 +188,28 @@ class ParallelRunnerKeepsEveryGate(unittest.TestCase):
             self.assertIn("2 test", run_hook_tests.count_problem(d, 3))
 
 
+class TestsRunOutsideTheRepo(unittest.TestCase):
+    """R2-01 (PR 302): the tests run in an empty temporary cwd, so a relative path, os.getcwd() or git without cwd= cannot reach
+    the repository the runner was started in (pre-push, verify.sh and CI all start it in the repo root)."""
+
+    PROBE = case("def test_cwd(self):\n        import os\n        self.assertFalse(os.path.exists('marker.txt'), os.getcwd())\n")
+
+    def test_serial_and_sharded_runs_do_not_see_the_start_directory(self):
+        for jobs in (None, 2):
+            with self.subTest(jobs=jobs):
+                rc, out = run_tree({"test_a.py": self.PROBE, "test_b.py": case(PASSING), "marker.txt": "x"}, jobs=jobs)
+                self.assertEqual(rc, 0, out)
+
+    def test_the_probe_fails_when_the_cwd_is_the_start_directory(self):
+        """Negative case: plain unittest in the same tree keeps the start directory as cwd, and the probe sees the marker."""
+        with tempfile.TemporaryDirectory(prefix="hook-runner-cwd-") as d:
+            for rel, src in (("test_a.py", self.PROBE), ("marker.txt", "x")):
+                with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                    f.write(src)
+            r = subprocess.run([sys.executable, "-I", "-m", "unittest", "discover", "-s", d], capture_output=True, text=True, cwd=d)
+            self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+
+
 class Partition(unittest.TestCase):
     def test_every_file_lands_in_exactly_one_shard(self):
         import run_hook_tests
