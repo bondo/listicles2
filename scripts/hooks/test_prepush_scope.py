@@ -446,6 +446,7 @@ ROOT_USES = {
     "test_mark_ready.py": (3, "imports from scripts/hooks; cwd=ROOT runs the scripts/mark-ready.sh wrapper and git ls-files on it"),
     "test_update_branch.py": (4, "imports from scripts/hooks; cwd=ROOT runs the scripts/update-branch.sh wrapper and git ls-files on it"),
     "test_prepush_scope.py": (2, "imports from and lists scripts/hooks (HERE): scripts/ prefix"),
+    "test_wiring.py": (2, "imports from and lists scripts/hooks (joins that name scripts/hooks itself)"),
     "test_run_hook_tests.py": (2, "units and stale_weights of scripts/hooks (HERE): scripts/ prefix"),
 }
 # Directories the hook code lists rather than reads; each maps to a representative path it then reads.
@@ -546,13 +547,24 @@ class HookSuiteInputs(unittest.TestCase):
             "sys.path[0]",
             "os.path.dirname(sys.argv[0])",
             "print(R)",
+            "os.path.dirname(__loader__.path)",
+            "subprocess.run(['git', 'ls-files'], cwd=os.path.dirname(os.path.dirname(os.path.abspath(GUARDS))))",
         ])
         paths, unreadable, root_uses = hook_code_reads({"test_new.py": src})
-        self.assertEqual(sorted(paths), ["docs/FOLLOW-UPS.md", "docs/a.md", "scripts/guards.sh"])
-        self.assertEqual(root_uses, {"test_new.py": [7, 8, 10, 11, 12, 13, 14]})
+        self.assertEqual(sorted(paths), ["docs/a.md", "scripts/guards.sh"])  # R's module is not a source: unknown, so counted
+        self.assertEqual(root_uses, {"test_new.py": [6, 7, 8, 10, 11, 12, 13, 14, 15, 16]})
         self.assertEqual(unreadable, [])
-        for p in ("docs/FOLLOW-UPS.md", "docs/a.md"):
+        for p in ("docs/a.md",):
             self.assertEqual(prepush_scope.hook_tests_scope([p]), "skip", p)  # so HookSuiteInputs would fail on them
+
+    def test_an_imported_root_resolves_through_its_own_module(self):
+        """R3-02: two modules define TOP differently; the import takes the named module's, and a root name from elsewhere counts."""
+        m = "import os\nTOP = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))\n"
+        h = "import os\nTOP = os.path.dirname(os.path.abspath(__file__))\n"
+        u = "import os\nfrom m import TOP as T\nfrom elsewhere import ROOT\nos.path.join(T, 'docs', 'a.md')\nos.path.join(ROOT, 'x')\n"
+        paths, _, root_uses = hook_code_reads({"h.py": h, "m.py": m, "u.py": u})
+        self.assertEqual(sorted(paths), ["docs/a.md"])
+        self.assertEqual(root_uses, {"u.py": [5]})
 
     def test_only_the_read_helper_itself_passes_its_parts_through_unreported(self):
         """Self-review: any *parts helper hid its joins, and calls to it other than `read` were never collected."""
