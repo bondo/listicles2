@@ -45,11 +45,15 @@ def a_real_config():
     if real_configs():
         yield False
         return
+    made_dir = not TEMP_CONFIG.parent.is_dir()
+    TEMP_CONFIG.parent.mkdir(exist_ok=True)
     TEMP_CONFIG.write_text('{"project_info": {"project_number": "1", "project_id": "release-test"}, "client": []}')
     try:
         yield True
     finally:
         TEMP_CONFIG.unlink()
+        if made_dir:
+            TEMP_CONFIG.parent.rmdir()
 
 
 class ReleaseGate(unittest.TestCase):
