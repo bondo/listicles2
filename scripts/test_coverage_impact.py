@@ -316,6 +316,8 @@ def ci_problems(text):
         problems.append("unit: the coverage impact tests step is missing or changed")
     elif CI_XML_STEP in unit and unit.index(CI_TESTS_STEP) > unit.index(CI_XML_STEP):
         problems.append("unit: the coverage impact tests run after the report they test")
+    # M1-63: the debug APK upload step has the one allowed `if:` (push to main only; scripts/check_debug_apk.py freezes the step).
+    unit = unit.replace("        if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n", "", 1)
     if re.search(r"(?m)^\s*(?:-\s+)?if:", unit) or "continue-on-error" in unit:
         problems.append("unit: if or continue-on-error")
     return problems
@@ -391,6 +393,15 @@ class Wiring(unittest.TestCase):
             (CI_XML_STEP, CI_XML_STEP.replace("HEAD^1", "origin/main")),
             (CI_XML_STEP, CI_XML_STEP.replace("      - name:", "      - if: false\n        name:")),
             ("      - name: test-results gate tests", "      - continue-on-error: true\n        name: test-results gate tests"),
+        ]
+        # M1-63: the unit job may carry the push-to-main condition once (on the debug APK upload step) and nowhere else (R1-01).
+        run = "        run: python3 -I scripts/test_check_test_results.py\n"
+        cond = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        cases += [
+            (run, f"        if: {cond}\n" + run),
+            (run, f"        if: {cond} || true\n" + run),
+            (run, "        if: github.event_name == 'push'\n" + run),
+            (run, "        if: github.ref == 'refs/heads/main'\n" + run),
         ]
         for old, new in cases:
             self.assertIn(old, unit, old)
