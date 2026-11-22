@@ -41,7 +41,9 @@ import dk.bjarkebjarke.tally.TallyTheme
 fun HomeScreen(modifier: Modifier = Modifier) {
     Scaffold(
         modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.lists_title)) }) },
+        topBar = {
+            TopAppBar(title = { Text(stringResource(R.string.lists_title), Modifier.semantics { heading() }) })
+        },
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = Spacing.xxl, vertical = Spacing.xl),

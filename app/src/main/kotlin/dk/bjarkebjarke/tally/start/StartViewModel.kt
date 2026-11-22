@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -24,6 +25,8 @@ class StartViewModel
             session
                 .signedIn()
                 .map { signedIn -> StartUiState.Ready(if (signedIn) StartRoute.Home else StartRoute.SignIn) }
+                // Checklist section 4: a failing session source opens sign-in instead of crashing at start.
+                .catch { emit(StartUiState.Ready(StartRoute.SignIn)) }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), StartUiState.Loading)
 
         private companion object {
