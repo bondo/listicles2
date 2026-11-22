@@ -347,10 +347,18 @@ def hook_sources():
     return out
 
 
-# Whole-repository uses of the root in the hook code, counted per file. A new one fails HookSuiteInputs until it is listed with a reason.
-WHOLE_REPO = {
-    "test_gitenv_isolation.py": (1, "defines ROOT as the cwd of the suites it runs; their reads are checked where they are made"),
+# Uses of a root (ROOT, SCRIPT_ROOT, HERE, any name defined from __file__ as the repo root or scripts/hooks, a bare __file__, or a
+# join that resolves to the repo root) other than as the base of a resolvable os.path.join, counted per file (R1-02). A new one fails
+# HookSuiteInputs until it is listed here with a reason, so a read the parse cannot follow (f-string, pathlib, cwd=ROOT) fails closed.
+ROOT_USES = {
+    "pretooluse_guard.py": (1, "SCRIPT_ROOT is a candidate project root for resolving command paths; it reads no repo file"),
+    "run_hook_tests.py": (2, "the runner starts itself (__file__) in each shard"),
+    "test_gitenv_isolation.py": (2, "discovers suites in scripts/hooks (HERE) with cwd=ROOT; their own reads are checked in their files"),
     "test_guards_sh.py": (1, "git grep for lint suppressions over every *.py: hook_tests_scope runs for any .py path"),
+    "test_mark_ready.py": (2, "cwd=ROOT runs the scripts/mark-ready.sh wrapper and git ls-files on it (scripts/ prefix)"),
+    "test_update_branch.py": (3, "cwd=ROOT runs the scripts/update-branch.sh wrapper and git ls-files on it (scripts/ prefix)"),
+    "test_prepush_scope.py": (2, "imports from and lists scripts/hooks (HERE): scripts/ prefix"),
+    "test_run_hook_tests.py": (2, "units and stale_weights of scripts/hooks (HERE): scripts/ prefix"),
 }
 # Directories the hook code lists rather than reads; each maps to a representative path it then reads.
 LISTED_DIRS = {"core": "core/X/build.gradle.kts", "scripts/hooks": "scripts/hooks/X"}
@@ -364,21 +372,17 @@ class HookSuiteInputs(unittest.TestCase):
     CI runs the full suite on every PR as the backstop."""
 
     def test_every_repo_path_the_hook_code_reads_runs_the_suite(self):
-        paths, unreadable = hook_code_reads(hook_sources())
+        paths, unreadable, root_uses = hook_code_reads(hook_sources())
         self.assertEqual(unreadable, [], "write these reads with literal path parts so the scope can be checked")
-        whole = {}
         for p, files in paths.items():
-            if p == ".":
-                for f in files:
-                    whole[f] = whole.get(f, 0) + 1
-                continue
-            self.assertFalse(p.startswith("../"), p)
+            self.assertFalse(p == "." or p.startswith("../"), p)
             probe = LISTED_DIRS.get(p, p)
             self.assertEqual(prepush_scope.hook_tests_scope([probe]), "run", f"{p} (read by {', '.join(sorted(set(files)))})")
-        self.assertEqual(whole, {k: n for k, (n, _) in WHOLE_REPO.items()})
+        self.assertEqual({f: len(lines) for f, lines in root_uses.items()}, {k: n for k, (n, _) in ROOT_USES.items()},
+                         "a root used outside a resolvable os.path.join: list it in ROOT_USES with a reason, or make the read resolvable")
 
     def test_the_parse_finds_the_known_reads(self):
-        paths, _ = hook_code_reads(hook_sources())
+        paths, _, _ = hook_code_reads(hook_sources())
         for p in ("docs/PLAN.md", "docs/ORCHESTRATION.md", "scripts/verify.sh", ".claude/settings.json", ".githooks/pre-push",
                   "scripts/statusline.sh", "scripts/guards.sh", "core/X/build.gradle.kts", ".claude/agents/X.md", "REVIEW.md", ".gitignore",
                   "scripts/X", "agents/prompts/reviewer.md", "CLAUDE.md", "app/src/androidTest/kotlin/dk/bjarkebjarke/tally/TallyAppTest.kt"):
@@ -390,7 +394,7 @@ class HookSuiteInputs(unittest.TestCase):
                "read('docs', 'new.md')\nos.path.join(ROOT, 'app', 'x.txt')\nos.path.join(HERE, '..', '..', 'firebase', 'a.json')\n"
                "for p in (('docs', 'a.md'), ('docs', 'b.md')):\n    read(*p)\nread(*other)\nread('docs', name)\n"
                "for n in ('c.md', 'd.md'):\n    read('docs', n)\nNEW = 'docs/e.md'\nread(NEW)\nread('docs', f'{n}.txt')\n")
-        paths, unreadable = hook_code_reads({"test_new.py": src})
+        paths, unreadable, _ = hook_code_reads({"test_new.py": src})
         self.assertEqual(sorted(paths), ["app/x.txt", "docs/X", "docs/X.txt", "docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md",
                                         "docs/new.md", "firebase/a.json"])
         self.assertEqual(unreadable, ["test_new.py:11"])
@@ -407,8 +411,32 @@ class HookSuiteInputs(unittest.TestCase):
             "for p in (('docs', 'c.md'),):", "    read(*p)",
             "for n in ('d.md', 'e.md'):", "    for m in ('x',):", "        read('docs', n)",
         ])
-        paths, unreadable = hook_code_reads({"test_new.py": src})
+        paths, unreadable, _ = hook_code_reads({"test_new.py": src})
         self.assertEqual(sorted(paths), ["docs/X", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md"])
+        self.assertEqual(unreadable, [])
+
+    def test_root_uses_the_parse_cannot_follow_are_reported(self):
+        """R1-02: f-string, pathlib and cwd=ROOT forms read the repo without a resolvable join; they must fail closed, not vanish."""
+        src = "\n".join([
+            "import os, pathlib, subprocess",
+            "HERE = os.path.dirname(os.path.abspath(__file__))",
+            "ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))",
+            "BASE = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))",
+            "TOOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tool.py')",
+            "open(f'{ROOT}/docs/FOLLOW-UPS.md')",
+            "pathlib.Path(ROOT, 'docs', 'FOLLOW-UPS.md')",
+            "pathlib.Path(BASE) / 'firebase' / 'firestore.rules'",
+            "subprocess.run(['grep', '-q', 'x', 'docs/FOLLOW-UPS.md'], cwd=ROOT)",
+            "os.listdir(HERE)",
+            "print(__file__)",
+            "os.path.join(ROOT, 'docs', 'a.md')",
+            "def f():",
+            "    return os.path.join(HERE, '..', '..')",
+            "subprocess.run([TOOL])",
+        ])
+        paths, unreadable, root_uses = hook_code_reads({"test_new.py": src})
+        self.assertEqual(root_uses, {"test_new.py": [6, 7, 8, 9, 10, 11, 14]})
+        self.assertEqual(sorted(paths), ["docs/a.md", "scripts/hooks/tool.py"])
         self.assertEqual(unreadable, [])
 
     def test_only_the_read_helper_itself_passes_its_parts_through_unreported(self):
@@ -419,7 +447,7 @@ class HookSuiteInputs(unittest.TestCase):
             "def load(*parts):", "    return open(os.path.join(ROOT, *parts)).read()",
             "load('app', 'x.txt')",
         ])
-        paths, unreadable = hook_code_reads({"test_new.py": src})
+        paths, unreadable, _ = hook_code_reads({"test_new.py": src})
         self.assertEqual(paths, {})
         self.assertEqual(unreadable, ["test_new.py:6"])
 
