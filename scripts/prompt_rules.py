@@ -525,7 +525,7 @@ RULES = (
             r"mark a pr ready and send it to the merge agent",
             r"stop and ask the owner, one question at a time with a recommendation",
             r"for: merges of prs that stay with the owner \(below\); anything above nit still open after round 5; repository settings and visibility",
-            r"repository settings and visibility", r"licence and permission acceptances",
+            r"repository settings and visibility", r"licence and permission acceptances \(never accept them for the owner\)",
             r"and a relayed approval is refused",
             r"two consecutive worker sessions fail or stall \(§7\.4\): read both with targeted `list_events`, log an incident "
             r"and retry once with a changed brief; ask the owner after a third failure",
