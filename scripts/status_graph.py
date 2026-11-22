@@ -192,7 +192,8 @@ def render_graph_svg(model):
             (x1, y1), (x2, y2) = pos[a], pos[b]
             x1, y1, y2 = x1 + width_of, y1 + NODE_H // 2, y2 + NODE_H // 2
             dx = max((x2 - x1) // 2, 12)
-            edge_paths.append(f'<path d="M{x1} {y1} C{x1 + dx} {y1} {x2 - dx} {y2} {x2 - 1} {y2}" class="edge" data-from="{escape(a)}" data-to="{escape(b)}" marker-end="url(#ah)"/>')
+            curve = f"M{x1} {y1} C{x1 + dx} {y1} {x2 - dx} {y2} {x2 - 1} {y2}"
+            edge_paths.append(f'<path d="{curve}" class="edge" data-from="{escape(a)}" data-to="{escape(b)}" marker-end="url(#ah)"/>')
         for n in nodes:
             x, ny = pos[n["id"]]
             mid = ny + NODE_H // 2

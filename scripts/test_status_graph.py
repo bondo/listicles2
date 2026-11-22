@@ -99,7 +99,8 @@ class Nodes(unittest.TestCase):
 
     def test_a_blocked_label_makes_a_ready_task_blocked(self):
         text = tasks_text(task("A-01", "A"), milestones=("A",))
-        found = nodes(svg_of(text, issues=[{"number": 5, "title": "A-01: stuck", "state": "open", "labels": ["blocked"], "created_at": "2026-11-20T00:00:00Z"}]))
+        stuck = {"number": 5, "title": "A-01: stuck", "state": "open", "labels": ["blocked"], "created_at": "2026-11-20T00:00:00Z"}
+        found = nodes(svg_of(text, issues=[stuck]))
         self.assertEqual(found["A-01"].get("data-state"), "blocked")
         self.assertEqual(nodes(svg_of(text))["A-01"].get("data-state"), "ready")
 
@@ -214,7 +215,7 @@ class Layout(unittest.TestCase):
         width, height = float(root.get("width")), float(root.get("height"))
         self.assertEqual(root.get("viewBox"), f"0 0 {root.get('width')} {root.get('height')}")
         for x, y, w, h in (box(g) for g in nodes(svg).values()):
-            self.assertTrue(0 <= x and x + w <= width and 0 <= y and y + h <= height)
+            self.assertTrue(x >= 0 and x + w <= width and y >= 0 and y + h <= height)
 
     def test_nodes_are_grouped_into_one_band_per_milestone(self):
         found = nodes(svg_of())
