@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.Codepoint
+import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.map
@@ -16,6 +17,43 @@ private const val NON_BMP_NAME_LENGTH = 50
 // Mixes BMP and non-BMP code points; never surrogates on their own.
 private val anyCodePoints =
     Arb.int(0x20..ASTRAL_END).filter { it !in 0xD800..0xDFFF }.map { Codepoint(it) }
+
+// Every char Kotlin's trim() and the spec count as whitespace: controls, Unicode spaces, line and paragraph separators.
+private val whitespaceChars =
+    listOf(
+        '\t',
+        '\n',
+        '\u000B',
+        '\u000C',
+        '\r',
+        '\u001C',
+        '\u001D',
+        '\u001E',
+        '\u001F',
+        ' ',
+        '\u00A0',
+        '\u1680',
+        '\u2000',
+        '\u2001',
+        '\u2002',
+        '\u2003',
+        '\u2004',
+        '\u2005',
+        '\u2006',
+        '\u2007',
+        '\u2008',
+        '\u2009',
+        '\u200A',
+        '\u2028',
+        '\u2029',
+        '\u202F',
+        '\u205F',
+        '\u3000',
+    )
+
+private val whitespaceRuns = Arb.string(0..20, Arb.element(whitespaceChars).map { Codepoint(it.code) })
+
+private val visibleCores = Arb.string(1..50, anyCodePoints).filter { it.isNotBlank() && it == it.trim() }
 
 private fun codePoints(s: String) = s.codePointCount(0, s.length)
 
@@ -50,12 +88,19 @@ class ValidationTest :
 
         test("email: blank or empty fails") {
             Validation.email("") shouldBe EmailError.Empty
-            Validation.email(" \t\n ") shouldBe EmailError.Empty
+            Validation.email(" \t\n\u00A0") shouldBe EmailError.Empty
         }
 
-        test("email: whitespace-only strings always fail") {
-            checkAll(Arb.string(0..20, Arb.int(0..0).map { Codepoint(0x20) })) { e ->
+        test("email: whitespace-only strings of any Unicode kind always fail") {
+            checkAll(whitespaceRuns) { e ->
                 Validation.email(e) shouldBe EmailError.Empty
+            }
+        }
+
+        test("email: whitespace around a visible address is trimmed away") {
+            checkAll(whitespaceRuns, whitespaceRuns) { l, r ->
+                Validation.email("${l}me@example.com$r") shouldBe null
+                Validation.normalizedEmail("${l}me@example.com$r") shouldBe "me@example.com"
             }
         }
 
@@ -90,7 +135,32 @@ class ValidationTest :
 
         test("name: empty or spaces only fails") {
             Validation.name("") shouldBe NameError.Empty
-            Validation.name("     ") shouldBe NameError.Empty
+            Validation.name("   \u00A0 ") shouldBe NameError.Empty
+        }
+
+        test("name: whitespace-only of any Unicode kind fails") {
+            checkAll(whitespaceRuns) { n -> Validation.name(n) shouldBe NameError.Empty }
+        }
+
+        test("name: whitespace padding around 1 to 50 code points passes, 51 or more fails") {
+            checkAll(whitespaceRuns, visibleCores, whitespaceRuns) { l, core, r ->
+                Validation.name(l + core + r) shouldBe null
+                Validation.name(l + core + astral(51 - codePoints(core)) + r) shouldBe NameError.TooLong
+            }
+        }
+
+        test("name: the normalized value is exactly what was validated") {
+            Validation.normalizedName("  \u3000Åse\t ") shouldBe "Åse"
+            checkAll(whitespaceRuns, visibleCores, whitespaceRuns) { l, core, r ->
+                val raw = l + core + r
+                Validation.name(raw) shouldBe null
+                Validation.normalizedName(raw) shouldBe core
+            }
+            checkAll(Arb.string(0..80, anyCodePoints)) { raw ->
+                if (Validation.name(raw) == null) {
+                    (codePoints(Validation.normalizedName(raw)) in 1..Validation.MAX_NAME_CODE_POINTS) shouldBe true
+                }
+            }
         }
 
         test("name: surrounding spaces are not counted") {

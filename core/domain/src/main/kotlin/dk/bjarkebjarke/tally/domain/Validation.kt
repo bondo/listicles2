@@ -35,5 +35,8 @@ object Validation {
         }
     }
 
+    /** The value to save: exactly what [name] validated. */
+    fun normalizedName(raw: String): String = raw
+
     private fun codePoints(s: String): Int = s.codePointCount(0, s.length)
 }
