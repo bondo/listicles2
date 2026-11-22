@@ -149,7 +149,7 @@ class HookTestsScope(unittest.TestCase):
                   "scripts/statusline.sh", "scripts/mark-ready.sh", "scripts/update-branch.sh", "scripts/linters.pins",
                   ".github/workflows/ci.yml", ".github/CODEOWNERS", "agents/roles.yaml", "agents/prompts/reviewer.md", "CLAUDE.md",
                   "REVIEW.md", "docs/PLAN.md", "docs/ORCHESTRATION.md", "docs/tasks.toml", "handoff/TEMPLATE.md", ".gitignore",
-                  "core/domain/build.gradle.kts", "core/newmodule/build.gradle.kts",
+                  "core/domain/build.gradle.kts", "core/newmodule/build.gradle.kts", ".gitattributes", ".gitmodules",
                   "app/src/androidTest/kotlin/dk/bjarkebjarke/tally/TallyAppTest.kt"):
             self.assertEqual(prepush_scope.hook_tests_scope([p]), "run", p)
 
@@ -216,6 +216,15 @@ class HookTestsCli(RepoCase):
 
     def test_an_empty_range_runs(self):
         self.assertEqual(self.hooks(self.push_line(self.base, self.base)), "run")
+
+    def test_a_non_ascii_hook_file_runs(self):
+        """Self-review major: git quotes such paths in --name-only output, so the quoted name matched no input and skipped."""
+        for path in ("scripts/hooks/test_\u00e9.py", "scripts/hooks/n\u00f8te.md", "docs/a b\tc.md"):
+            with self.subTest(path):
+                base = self.rev()
+                self.commit(path, "x")
+                expected = "skip" if path.startswith("docs/") else "run"
+                self.assertEqual(self.hooks(self.push_line(self.rev(), base)), expected)
 
     def test_a_branch_delete_runs(self):
         self.assertEqual(self.hooks(self.push_line(ZERO, self.base)), "run")
@@ -363,6 +372,32 @@ class HookSuiteInputs(unittest.TestCase):
         self.assertEqual(unreadable, ["test_new.py:11"])
         for p in paths:
             self.assertEqual(prepush_scope.hook_tests_scope([p]), "skip", p)
+
+    def test_a_name_resolves_only_through_its_own_enclosing_loop(self):
+        """Self-review: a parameter or listdir name took the rows of an unrelated loop, and a second loop on the same name hid the first."""
+        src = "\n".join([
+            "def read(*parts):", "    return parts",
+            "for n in ('a.md',):", "    pass",
+            "def f(n):", "    return read('docs', n)",
+            "for p in (('docs', 'b.md'),):", "    read(*p)",
+            "for p in (('docs', 'c.md'),):", "    read(*p)",
+            "for n in ('d.md', 'e.md'):", "    for m in ('x',):", "        read('docs', n)",
+        ])
+        paths, unreadable = hook_code_reads({"test_new.py": src})
+        self.assertEqual(sorted(paths), ["docs/X", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md"])
+        self.assertEqual(unreadable, [])
+
+    def test_only_the_read_helper_itself_passes_its_parts_through_unreported(self):
+        """Self-review: any *parts helper hid its joins, and calls to it other than `read` were never collected."""
+        src = "\n".join([
+            "import os", "ROOT = '.'",
+            "def read(*parts):", "    return open(os.path.join(ROOT, *parts)).read()",
+            "def load(*parts):", "    return open(os.path.join(ROOT, *parts)).read()",
+            "load('app', 'x.txt')",
+        ])
+        paths, unreadable = hook_code_reads({"test_new.py": src})
+        self.assertEqual(paths, {})
+        self.assertEqual(unreadable, ["test_new.py:6"])
 
 
 class PathsMode(unittest.TestCase):

@@ -93,7 +93,7 @@ class PrePushHook(unittest.TestCase):
 
     def test_a_skipped_hook_test_blocks_the_push_and_skips_gradle(self):
         """R12-04 (#28): the pre-push hook runs the skip gate, not a bare discover."""
-        self.commit("scripts/guards.sh", "exit 0")
+        self.commit("scripts/hooks/note.md", "x")
         with open(os.path.join(self.repo, "scripts", "hooks", "test_stub.py"), "w") as f:
             f.write("import unittest as ut\n\nclass T(ut.TestCase):\n    @ut.sk" + "ip('later')\n    def test_x(self):\n        pass\n")
         rc, out = self.push()
@@ -159,15 +159,16 @@ class PrePushHook(unittest.TestCase):
         self.assertFalse(self.gradle_called())
 
     def test_hook_inputs_run_the_hook_tests_in_four_jobs(self):
-        with open(os.path.join(self.repo, "scripts", "hooks", "test_stub2.py"), "w") as f:
-            f.write("import unittest\n\nclass T(unittest.TestCase):\n    def test_y(self):\n        pass\n")
+        for i in range(2, 6):  # five units, so the shard count shows the job count
+            with open(os.path.join(self.repo, "scripts", "hooks", f"test_stub{i}.py"), "w") as f:
+                f.write("import unittest\n\nclass T(unittest.TestCase):\n    def test_y(self):\n        pass\n")
         for path in ("scripts/hooks/x.py", "scripts/verify.sh", ".githooks/pre-commit", ".claude/settings.json", "docs/PLAN.md"):
             with self.subTest(path):  # .githooks/pre-push and scripts/guards.sh are the hook and stub under test, so not rewritten here
                 self.base = self.rev()
                 self.commit(path, "#" + path)
                 rc, out = self.push()
                 self.assertEqual(rc, 0, out)
-                self.assertIn("hook tests: ran 2 tests in 2 shards", out)  # serial mode prints no shard line
+                self.assertIn("hook tests: ran 5 tests in 4 shards", out)  # serial mode prints no shard line
 
     def test_a_deleted_hook_file_runs_the_hook_tests(self):
         self.commit("scripts/hooks/old_helper.py", "x")
