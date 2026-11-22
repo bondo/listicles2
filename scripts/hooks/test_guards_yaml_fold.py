@@ -6,6 +6,8 @@ PR 309, comment 7084379032): every input that fails on main still fails (Y1, Y3,
 value only when every line of it has one.
 """
 
+import os
+import stat
 import unittest
 
 import test_guards_sh as base
@@ -143,13 +145,11 @@ class SelfReviewTests(FoldCase):
                         "runs:\n  using: composite\n  steps:\n    - run: >\n        ruff check\n        --ignore E501 .\n      shell: bash\n", 5)])
 
     def test_a_fold_scan_that_fails_fails_the_guard(self):
-        import os
-        import stat
         d = os.path.join(self.repo.dir, ".fakebin")
         os.makedirs(d)
         real = base.shutil.which("awk")
         with open(os.path.join(d, "awk"), "w") as f:
-            f.write('#!/bin/sh\ncase "$*" in *"function yent"*) exit 2 ;; esac\nexec "%s" "$@"\n' % real)
+            f.write(f'#!/bin/sh\ncase "$*" in *"function yent"*) exit 2 ;; esac\nexec "{real}" "$@"\n')
         os.chmod(os.path.join(d, "awk"), stat.S_IRWXU)
         self.write(WF, STEPS + "      - run: echo ok\n")
         self.assertFails(f"{MARK}: {WF}:0: the YAML fold scan failed", PATH=d + os.pathsep + os.environ["PATH"])
