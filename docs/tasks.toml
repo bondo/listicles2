@@ -1157,11 +1157,22 @@ notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owne
 id = "M1-56"
 title = "Java API level check: also look up classes used only as class literals, annotations, checkcast, instanceof or catch targets (follow-up of M1-37)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-37"]
-notes = "Tooling env. Gap recorded in scripts/check_java_api_level.py: a java/ or android/ class that is only a class literal (X.class), an annotation type, or a checkcast, instanceof or catch target has no member reference, so it is not looked up. Needs a bytecode walk or the constant pool Class entries minus the bootstrap ones. Low value until domain code uses newer exception or interface types; schedule only if M1 domain code needs it"
+pr = 305
+notes = "Tooling env. Done: scripts/check_java_api_level.py walks the Code attributes (new, anewarray, multianewarray, checkcast, instanceof, ldc class, catch types) and the annotation attributes (types, enum types, class values, nested annotations, defaults) and looks each class up. Remaining gaps are M1-61"
+
+[[task]]
+id = "M1-61"
+title = "Java API level check: also look up classes named only in descriptors, Signature attributes, throws clauses, stack map frames and type annotations (follow-up of M1-56)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-56"]
+notes = "Tooling env. Gaps left by M1-56 (listed in the docstring of scripts/check_java_api_level.py): a java/ or android/ type that appears only in a field or method descriptor, a Signature, an Exceptions attribute, a StackMapTable frame or a RuntimeVisibleTypeAnnotations attribute. Low value: the JVM and ART load these lazily or not at all, and Kotlin emits type annotations only with -Xemit-jvm-type-annotations. Schedule only if M1 domain code needs it. Failing fixtures first, parse each attribute with the bounds-checked Reader and fail closed"
 
 [[task]]
 id = "M1-50"
@@ -1383,7 +1394,7 @@ depends_on = [
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-61",
 ]
 
 [[task]]
