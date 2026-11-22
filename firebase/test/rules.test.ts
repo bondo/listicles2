@@ -1,26 +1,16 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
 import {
     assertFails,
     initializeTestEnvironment,
-    type RulesTestContext,
     type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-
-// The rules-unit-testing contexts hand out the compat Firestore type, so the tests use the compat
-// calls (doc().get(), set(), update(), delete(), collection().get(), add()): the same operations
-// as the modular getDoc, setDoc, updateDoc, deleteDoc, getDocs and addDoc, with no type casts.
-type Db = ReturnType<RulesTestContext["firestore"]>;
+import * as h from "./harness";
 
 let env: RulesTestEnvironment;
+let dbs: Record<h.Client, h.Db>;
 
 beforeAll(async () => {
-    env = await initializeTestEnvironment({
-        projectId: "demo-tally",
-        firestore: {
-            rules: fs.readFileSync(path.join(__dirname, "..", "firestore.rules"), "utf8"),
-        },
-    });
+    env = await initializeTestEnvironment({ projectId: h.PROJECT, firestore: { rules: h.RULES } });
+    dbs = h.connect(env);
 });
 
 afterAll(async () => {
@@ -31,43 +21,37 @@ beforeEach(async () => {
     await env.clearFirestore();
 });
 
-// Every planned top-level and nested path. Each must deny all operations for
-// anonymous and signed-in clients until the real rules land.
-const PATHS = [
-    "users/alice",
-    "households/h1",
-    "households/h1/members/alice",
-    "households/h1/lists/l1",
-    "households/h1/lists/l1/items/i1",
-    "households/h1/invites/inv1",
-    "anything/else",
-];
+// The probed paths come from PLAN section 3; a collection added to or dropped from PLAN changes this list.
+test("the suite probes every collection of PLAN section 3; the UNPLANNED ones are none of them", () => {
+    expect(h.TEMPLATES).toEqual([
+        "users/{uid}",
+        "households/{hid}",
+        "households/{hid}/members/{uid}",
+        "households/{hid}/removed/{uid}",
+        "invites/{code}",
+        "lists/{lid}",
+        "lists/{lid}/items/{iid}",
+        "config/app",
+    ]);
+    expect(h.UNPLANNED).toEqual([
+        "anything/{doc}",
+        "users/{uid}/unplanned/{doc}",
+        "households/{hid}/unplanned/{doc}",
+        "households/{hid}/members/{uid}/unplanned/{doc}",
+        "households/{hid}/removed/{uid}/unplanned/{doc}",
+        "invites/{code}/unplanned/{doc}",
+        "lists/{lid}/unplanned/{doc}",
+        "lists/{lid}/items/{iid}/unplanned/{doc}",
+        "config/app/unplanned/{doc}",
+    ]);
+    const planned = h.TEMPLATES.map(h.collectionIdOf);
+    expect(h.UNPLANNED.filter((u) => planned.includes(h.collectionIdOf(u)))).toEqual([]);
+});
 
-const CLIENTS = {
-    anonymous: (): Db => env.unauthenticatedContext().firestore(),
-    "signed-in": (): Db => env.authenticatedContext("alice").firestore(),
-};
-
-describe.each(Object.entries(CLIENTS))("default deny (%s)", (_who, client) => {
-    test.each(PATHS)("%s: get", async (p) => {
-        await assertFails(client().doc(p).get());
-    });
-
-    test.each(PATHS)("%s: create/overwrite", async (p) => {
-        await assertFails(client().doc(p).set({ name: "y", ownerUid: "alice", deleted: false }));
-    });
-
-    test.each(PATHS)("%s: update and delete an existing doc", async (p) => {
-        await env.withSecurityRulesDisabled(async (ctx) => {
-            await ctx.firestore().doc(p).set({ name: "seed" });
-        });
-        await assertFails(client().doc(p).update({ name: "z" }));
-        await assertFails(client().doc(p).delete());
-    });
-
-    test("list and add on a collection", async () => {
-        const db = client();
-        await assertFails(db.collection("households").get());
-        await assertFails(db.collection("households/h1/lists").add({ name: "n" }));
+// Until the real rules land, every client is denied every operation on every path. The suite runs
+// exactly h.PROBES, the probes of the mutant check, so each mutant that check kills turns it red.
+test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {
+    await env.withSecurityRulesDisabled(async (admin) => {
+        await assertFails(h.attempt(admin.firestore(), dbs[probe.client], probe));
     });
 });

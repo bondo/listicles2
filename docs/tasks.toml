@@ -1117,10 +1117,11 @@ notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (doc
 id = "M1-52"
 title = "Rules test harness: default-deny paths from PLAN section 3, list and collection-group queries, unverified client, mutant check, ts-jest isolatedModules"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-35"]
+pr = 301
 notes = "Issues 202 and 210 item 7, area:security-rules; tooling env for the scripts/test_firebase_ts.py allowlist. Before M1-08"
 
 [[task]]
