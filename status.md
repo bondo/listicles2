@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 32/76 (42%) | 44 |
+| M1 | Accounts and households | 34/77 (44%) | 43 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 32/76 done (42%), 44 open.
+**Progress:** 34/77 done (44%), 43 open.
 
 ### Tasks
 
@@ -160,6 +160,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-49 | detekt LongParameterList&#58; ignoreAnnotated &#91;Composable&#93; for that rule only (issue 217 item 5) | done | M1-01 | implementer | [#236](https://github.com/bondo/listicles2/issues/236) |
 | M1-56 | Java API level check&#58; also look up classes used only as class literals, annotations, checkcast, ins… | done | M1-37 | implementer | [#305](https://github.com/bondo/listicles2/issues/305) |
 | M1-61 | Java API level check&#58; also look up classes named only in descriptors, Signature attributes, throw… | ready | M1-56 | implementer |  |
+| M1-63 | Debug APK as a CI artifact on every push to main | done | M1-30 | implementer |  |
 | M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | done | M1-01 | implementer | [#290](https://github.com/bondo/listicles2/issues/290) |
 | M1-57 | Konsist&#58; no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI … | done | M1-50 | implementer | [#307](https://github.com/bondo/listicles2/issues/307) |
 | M1-51 | Build guards&#58; scripts/check_build_guards.py with the targetSdk floor (checklist follow-up 4; foll… | done | M1-01 | implementer | [#296](https://github.com/bondo/listicles2/issues/296) |
@@ -180,7 +181,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-47 | R12 screens vs wireframes for M1 (issue 65 review catalogue) | blocked | M1-16, M1-17, M1-19, M1-20, M1-21, M1-22, M1-23, M1-25, M1-27, M1-32, M1-39, M1-03, M1-04 | process |  |
 | M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-62, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54 | process |  |
 | M1-34 | guards.sh&#58; compare line length per tool across all style files, with ruff and flake8 defaults (is… | done | none | implementer |  |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -192,7 +193,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-O9 | Turn off CodeQL default setup when the advanced workflow of M1-44 merges | owner to-do | M1-44 | owner |  |
 | M1-O10 | Ask the owner about the repo rename to Tally (right before M1-O1) | owner to-do | M1-29 | owner |  |
 | M1-O11 | Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… | owner to-do | M1-03 | owner |  |
-| M1-O12 | Decide #280 (who may list invites) before M1-12 starts | owner to-do | none | owner |  |
+| M1-O12 | Decide #280 (who may list invites) before M1-12 starts | done | none | owner |  |
 | M1-O13 | Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… | owner to-do | M1-33 | owner |  |
 
 ### Open tasks and what blocks them
@@ -243,15 +244,13 @@ flowchart LR
     n39["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
     n40["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
     n41["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n42["M1-O12 Decide #35;280 (who may list invites) be… (owner to-do)"]:::owner
-    n43["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
+    n42["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
     n3 --> n0
     n1 --> n2
     n2 --> n3
     n23 --> n4
     n22 --> n4
     n3 --> n5
-    n42 --> n5
     n7 --> n8
     n6 --> n8
     n7 --> n9
@@ -461,16 +460,15 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **owner to-do** [#285](https://github.com/bondo/listicles2/issues/285): &#91;owner&#93; M1-O12&#58; Decide #280 (who may list invites) before M1-12 starts
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
-- **PR to merge** [#315](https://github.com/bondo/listicles2/issues/315): M1-63&#58; debug APK as a CI artifact on every push to main (tooling)
+- **PR to merge** [#321](https://github.com/bondo/listicles2/issues/321): M1-42&#58; guards 2c reads YAML args keys of a step or hook; 2b reads the actionlint config ignore en…
 - **task** M1-06: waits on M1-10
 - **task** M1-09: waits on M1-08
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
-- **task** M1-12: waits on M1-10, M1-O12
+- **task** M1-12: waits on M1-10
 - **task** M1-15: waits on M1-14, M1-62
 - **task** M1-16: waits on M1-14
 - **task** M1-17: waits on M1-15, M1-16, M1-62
