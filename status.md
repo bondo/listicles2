@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 18/69 (26%) | 51 |
+| M1 | Accounts and households | 19/70 (27%) | 51 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 18/69 done (26%), 51 open.
+**Progress:** 19/70 done (27%), 51 open.
 
 ### Tasks
 
@@ -157,7 +157,8 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-55 | Tooling&#58; move the androidTest ListiclesAppTest into the tally package as TallyAppTest and update t… | done | M1-29 | implementer |  |
 | M1-49 | detekt LongParameterList&#58; ignoreAnnotated &#91;Composable&#93; for that rule only (issue 217 item 5) | done | M1-01 | implementer | [#236](https://github.com/bondo/listicles2/issues/236) |
 | M1-56 | Java API level check&#58; also look up classes used only as class literals, annotations, checkcast, ins… | ready | M1-37 | implementer |  |
-| M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | ready | M1-01 | implementer |  |
+| M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | done | M1-01 | implementer | [#290](https://github.com/bondo/listicles2/issues/290) |
+| M1-57 | Konsist&#58; no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI … | ready | M1-50 | implementer |  |
 | M1-51 | Build guards&#58; catalog-only coordinates, targetSdk floor, manifest cleartext and backup (checklist … | in progress | M1-01 | implementer | [#296](https://github.com/bondo/listicles2/issues/296) |
 | M1-35 | PLAN amendments from the follow-up triage (P1-P9 rules and users name, quota risk, PIT 80, ui … | done | M1-01 | planner | [#265](https://github.com/bondo/listicles2/issues/265) |
 | M1-36 | Product docs&#58; start-up gates, M1 home, AUTH-06 wording, design status (owner answers Q1 A, Q2 … | done | M1-O7 | planner |  |
@@ -174,7 +175,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-47 | R12 screens vs wireframes for M1 (issue 65 review catalogue) | blocked | M1-16, M1-17, M1-19, M1-20, M1-21, M1-22, M1-23, M1-25, M1-27, M1-32, M1-39, M1-03, M1-04 | process |  |
 | M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54 | process |  |
 | M1-34 | guards.sh&#58; compare line length per tool across all style files, with ruff and flake8 defaults (is… | done | none | implementer |  |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -225,7 +226,7 @@ flowchart LR
     n28["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
     n29["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
     n30["M1-56 Java API level check: also look up clas… (ready)"]:::ready
-    n31["M1-50 Konsist: no data source in composables… (ready)"]:::ready
+    n31["M1-57 Konsist: no Context, Activity or Androi… (ready)"]:::ready
     n32["M1-51 Build guards: catalog-only coordinates,… (in progress)"]:::progress
     n33["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
     n34["M1-42 guards check 2c: actionlint flags and r… (ready)"]:::ready
@@ -257,7 +258,6 @@ flowchart LR
     n9 --> n11
     n10 --> n11
     n0 --> n11
-    n31 --> n11
     n11 --> n12
     n11 --> n13
     n12 --> n14
@@ -337,7 +337,6 @@ flowchart LR
     n35 --> n38
     n36 --> n38
     n37 --> n38
-    n31 --> n38
     n32 --> n38
     n27 --> n38
     n28 --> n38
@@ -369,13 +368,13 @@ flowchart LR
     n16 --> n39
     n21 --> n39
     n26 --> n39
+    n31 --> n39
     n33 --> n39
     n34 --> n39
     n35 --> n39
     n36 --> n39
     n37 --> n39
     n38 --> n39
-    n31 --> n39
     n32 --> n39
     n27 --> n39
     n28 --> n39
@@ -497,7 +496,7 @@ flowchart LR
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-12: waits on M1-10, M1-O12
 - **task** M1-30: waits on M1-02
-- **task** M1-14: waits on M1-30, M1-13, M1-02 +1
+- **task** M1-14: waits on M1-30, M1-13, M1-02
 - **task** M1-15: waits on M1-14
 - **task** M1-16: waits on M1-14
 - **task** M1-17: waits on M1-15, M1-16
@@ -518,7 +517,7 @@ flowchart LR
 - **task** M1-39: waits on M1-08, M1-10, M1-18 +2
 - **task** M1-46: waits on M1-02
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +9
-- **task** M1-48: waits on M1-02, M1-04, M1-06 +34
+- **task** M1-48: waits on M1-02, M1-04, M1-06 +33
 - **task** M1-FU: waits on M1-02, M1-04, M1-06 +36
 - **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
