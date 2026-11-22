@@ -202,7 +202,7 @@ Checksums only, no PGP signatures: most Android and Kotlin artifacts are not sig
 
 ## Proposed follow-ups (not implemented here)
 Each would be its own PR, test-first, per CLAUDE.md.
-1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); still open (M1-56): ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `Dispatchers.` outside the DI module.
+1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); still open (M1-57): ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `Dispatchers.` outside the DI module.
 2. **detekt coroutines rules**: partly done (issue 38). `GlobalCoroutineUsage` is enabled and fixture-tested. `InjectDispatcher` is enabled and fixture-tested with a type-resolved fixture, but it only fires in type-resolved tasks (`detektMain`/`detektTest`), which today exist only for `:core:domain` and `:core:testing`. Still open: a type-resolved detekt run for `:app` and the planned `:core:data`, so the rule reaches code that will write `Dispatchers.IO`.
 3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog).
 4. **Guard that `targetSdk` is at least the Play minimum** (36 until the date changes).
