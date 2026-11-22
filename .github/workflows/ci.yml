@@ -132,7 +132,8 @@ jobs:
           api-level: 34
           arch: x86_64
           target: google_apis
-          script: cd firebase && npx --no-install firebase emulators:exec --only auth,firestore --project demo-tally "cd .. && ./gradlew -q --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest"
+          # Not -q: the names and messages of failing instrumented tests are otherwise only in the HTML report on the runner.
+          script: cd firebase && npx --no-install firebase emulators:exec --only auth,firestore --project demo-tally "cd .. && ./gradlew --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest"
 
   screenshots:
     name: screenshots
