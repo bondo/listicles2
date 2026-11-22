@@ -61,6 +61,18 @@ class ParseDiff(unittest.TestCase):
         text = diff("a/B.kt", "-1,0 +5,2", "-9,0 +10,1").replace("+x\n", "+++ b/other/C.kt\n+y\n", 1)
         self.assertEqual(ci.changed_lines(text), {"a/B.kt": {5, 6, 10}})
 
+    def test_quoted_non_ascii_path_is_decoded(self):
+        text = diff("m/p/S\\303\\246t.kt", "-1,0 +2,1").replace("+++ b/m/p/S\\303\\246t.kt", '+++ "b/m/p/S\\303\\246t.kt"')
+        self.assertEqual(ci.changed_lines(text), {"m/p/S\u00e6t.kt": {2}})
+
+    def test_quoted_path_with_escapes(self):
+        text = diff("x", "-1,0 +2,1").replace("+++ b/x", '+++ "b/a\\tb\\"c\\\\d.kt"')
+        self.assertEqual(ci.changed_lines(text), {'a\tb"c\\d.kt': {2}})
+
+    def test_trailing_tab_after_a_path_with_a_space_is_dropped(self):
+        text = diff("m/p/A B.kt", "-1,0 +2,1").replace("+++ b/m/p/A B.kt", "+++ b/m/p/A B.kt\t")
+        self.assertEqual(ci.changed_lines(text), {"m/p/A B.kt": {2}})
+
     def test_empty_diff(self):
         self.assertEqual(ci.changed_lines(""), {})
 
@@ -209,6 +221,19 @@ class Cli(unittest.TestCase):
         self.assertIn("1 changed executable lines, all covered", r.stdout)
         self.assertNotIn("`" + DOMAIN, r.stdout)
 
+    def test_non_ascii_and_spaced_file_names_are_reported(self):
+        for name in ("S\u00e6t.kt", "A B.kt"):
+            (self.src.parent / name).write_text("package x\n\nfun n() = 1\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "names")
+        for name in ("S\u00e6t.kt", "A B.kt"):
+            (self.src.parent / name).write_text("package x\n\nfun n() = 1\nfun m() = 2\n")
+        self.xml.write_text(report((DOMAIN_PKG, "S\u00e6t.kt", [(3, 0, 1), (4, 1, 0)]), (DOMAIN_PKG, "A B.kt", [(3, 0, 1), (4, 1, 0)])))
+        r = self.run_cli("--xml", str(self.xml), "--base", "HEAD")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"`{DOMAIN}/S\u00e6t.kt`: 4", r.stdout)
+        self.assertIn(f"`{DOMAIN}/A B.kt`: 4", r.stdout)
+
     def test_untracked_nested_repository_is_skipped(self):
         nested = self.repo / ".claude" / "worktrees" / "w"
         nested.mkdir(parents=True)
@@ -276,6 +301,13 @@ def active_lines(path):
     return [ln for ln in path.read_text(encoding="utf-8").splitlines() if not ln.lstrip().startswith("#")]
 
 
+LOG = '"$LOG_DIR/coverage-impact.log"'
+SHOW_LINE = (
+    f"  grep -qE 'uncovered changed lines|no coverage data' {LOG} 2>/dev/null && "
+    f"{{ sed -n '1,12p' {LOG} | sed 's/^/      /'; [ \"$(wc -l <{LOG})\" -le 12 ] || echo \"      ... more in {LOG[1:-1]}\"; }}"
+)
+
+
 def verify_problems(verify):
     """verify.sh must run the tests always (also with --fast) and the real report after the coverage step, outside --fast."""
     problems = []
@@ -292,8 +324,7 @@ def verify_problems(verify):
     for w in wanted:
         if idx[w] < 0:
             problems.append(f"verify.sh full-run block lacks `{w.strip()}`")
-    log = '"$LOG_DIR/coverage-impact.log"'
-    show = f"  grep -q 'uncovered changed lines' {log} 2>/dev/null && sed -n '1p;3,12p' {log} | sed 's/^/      /'"
+    show = SHOW_LINE
     if show not in block or (wanted[1] in block and block.index(show) < block.index(wanted[1])):
         problems.append("verify.sh does not show the uncovered lines after the coverage impact step")
     coverage = "  step coverage gradle koverVerify -x :core:domain:pitest"
@@ -332,6 +363,39 @@ def ci_problems(text):
     return problems
 
 
+class ShowLine(unittest.TestCase):
+    """The verify.sh line that prints the report (R1-02): run it against sample logs."""
+
+    def shown(self, log_text):
+        lines = (ROOT / "scripts" / "verify.sh").read_text(encoding="utf-8").splitlines()
+        line = next(ln for ln in lines if ln.lstrip().startswith("grep") and "uncovered changed lines" in ln)
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "coverage-impact.log").write_text(log_text)
+            r = subprocess.run(["bash", "-c", line], env={"LOG_DIR": tmp, "PATH": "/usr/bin:/bin"}, capture_output=True, text=True)
+        return r.stdout
+
+    def test_uncovered_lines_are_shown(self):
+        out = self.shown(ci.render(ci.Impact({"a/B.kt": [4]}, 2, [])))
+        self.assertIn("1 uncovered changed lines", out)
+        self.assertIn("`a/B.kt`: 4", out)
+
+    def test_unmeasured_files_are_shown_even_when_nothing_is_uncovered(self):
+        out = self.shown(ci.render(ci.Impact({}, 0, ["m/src/main/kotlin/U.kt"])))
+        self.assertIn("`m/src/main/kotlin/U.kt`", out)
+
+    def test_all_covered_prints_nothing(self):
+        self.assertEqual(self.shown(ci.render(ci.Impact({}, 5, []))), "")
+
+    def test_long_report_is_cut_and_names_the_log(self):
+        out = self.shown(ci.render(ci.Impact({f"f{i}.kt": [1] for i in range(30)}, 30, [])))
+        self.assertLessEqual(len(out.splitlines()), 13)
+        self.assertIn("more in", out)
+        self.assertIn("coverage-impact.log", out)
+
+    def test_short_report_is_not_marked_as_cut(self):
+        self.assertNotIn("more in", self.shown(ci.render(ci.Impact({"a/B.kt": [4]}, 2, []))))
+
+
 class Wiring(unittest.TestCase):
     def test_repo_verify_sh(self):
         self.assertEqual(verify_problems("\n".join(active_lines(ROOT / "scripts" / "verify.sh")) + "\n"), [])
@@ -354,7 +418,13 @@ class Wiring(unittest.TestCase):
         ]
         shown = [ln for ln in good.splitlines() if "uncovered changed lines" in ln]
         self.assertEqual(len(shown), 1)
-        cases += [(shown[0] + "\n", ""), (shown[0], shown[0].replace("uncovered changed lines", "- ")), (impact + shown[0] + "\n", shown[0] + "\n" + impact)]
+        cases += [
+            (shown[0] + "\n", ""),
+            (shown[0], shown[0].replace("uncovered changed lines", "- ")),
+            (shown[0], shown[0].replace("|no coverage data", "")),
+            (shown[0], shown[0].replace("-le 12 ] || echo", "-le 12 ] && echo")),
+            (impact + shown[0] + "\n", shown[0] + "\n" + impact),
+        ]
         for old, new in cases:
             self.assertIn(old, good)
             self.assertNotEqual(verify_problems(good.replace(old, new, 1)), [], f"not flagged: {old!r} -> {new!r}")
