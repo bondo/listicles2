@@ -36,8 +36,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // The emulator tests restore the project's Firestore rules after a test that loads its own, so the rules file travels
-    // in the test APK's assets (read by FirebaseEmulator). Synced from firebase/, never copied by hand.
+    // The tests restore the project's Firestore rules (FirebaseEmulator): they travel in the test APK's assets, synced from firebase/.
     sourceSets.getByName("androidTest").assets.srcDir(firestoreRulesAssetDir.get().asFile)
 }
 

@@ -15,9 +15,8 @@ import java.net.Socket
 import java.net.URL
 
 /**
- * Where the Firebase emulators are for tests in the `ui` job: `firebase emulators:exec --only auth,firestore`, project
- * `demo-tally`, on the host machine, which an Android emulator reaches as 10.0.2.2. No Google Services plugin and no
- * `google-services.json`: every test builds its own [FirebaseApp] by hand.
+ * The Firebase emulators of the `ui` job (`firebase emulators:exec --only auth,firestore`, project `demo-tally`) on the
+ * host, which an Android emulator reaches as 10.0.2.2. No Google Services plugin: tests build their own [FirebaseApp].
  */
 object FirebaseEmulator {
     const val HOST = "10.0.2.2"

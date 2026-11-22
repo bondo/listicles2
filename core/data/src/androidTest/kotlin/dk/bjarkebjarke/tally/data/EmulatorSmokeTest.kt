@@ -6,6 +6,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -17,9 +18,8 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
- * M1-02: the data layer's integration tests run against the Auth and Firestore emulators (`ui` job, project
- * `demo-tally`). These tests prove the plumbing: a user signs in on the Auth emulator, and a document is written and
- * read back on the Firestore emulator. They fail when the emulators are not running.
+ * M1-02: plumbing tests against the Auth and Firestore emulators (`ui` job, `demo-tally`): a user signs in, and a
+ * document is written and read back. They fail when the emulators are not running.
  */
 @RunWith(AndroidJUnit4::class)
 class EmulatorSmokeTest {
@@ -63,12 +63,7 @@ class EmulatorSmokeTest {
         val document = FirebaseFirestore.getInstance(app).collection("smoke").document(UUID.randomUUID().toString())
 
         Tasks.await(document.set(mapOf("greeting" to "hello")), TIMEOUT_S, TimeUnit.SECONDS)
-        val snapshot =
-            Tasks.await(
-                document.get(com.google.firebase.firestore.Source.SERVER),
-                TIMEOUT_S,
-                TimeUnit.SECONDS,
-            )
+        val snapshot = Tasks.await(document.get(Source.SERVER), TIMEOUT_S, TimeUnit.SECONDS)
 
         assertEquals("hello", snapshot.getString("greeting"))
     }

@@ -1,11 +1,8 @@
 """Checks that the Auth and Firestore emulators sit behind the `ui` job (M1-02, #254).
 
-  * firebase.json starts both emulators on the host and ports FirebaseEmulator.kt (the :core:data androidTest helper) uses, with a
-    `demo-` project,
-  * ci.yml `ui` job: installs the Firebase CLI; its android-emulator-runner `script:` equals one fixed command (EXPECTED_SCRIPT: the
-    `:app` and `:core:data` connectedDebugAndroidTest tasks inside `firebase emulators:exec --only auth,firestore --project
-    demo-tally`), so no flag, task exclusion, `; true`, pipe or exit-0 fallback can make a failing run green; no step has `if:` (the
-    job is a required check) or `continue-on-error`,
+  * firebase.json starts both emulators on the ports FirebaseEmulator.kt (the :core:data androidTest helper) uses, for a `demo-` project,
+  * ci.yml `ui` job: the parsed job equals one frozen mapping (EXPECTED_UI), which runs the `:app` and `:core:data` connected tests inside
+    `firebase emulators:exec --only auth,firestore --project demo-tally`. Any other key, step, flag, `if`, `needs` or fallback fails,
   * verify.sh and the CI `tasks` job run this check and its tests; verify.sh compiles the :core:data androidTest sources,
   * :core:data has :core:testing and the JUnit Platform on its unit tests (#217 item 3) and a smoke test using the emulators.
 Run: python3 -I scripts/check_ui_emulators.py  (exit 1 and one line per problem).
@@ -16,20 +13,53 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 HELPER = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/FirebaseEmulator.kt"
 SMOKE = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/EmulatorSmokeTest.kt"
 TESTS_CMD = "python3 -I scripts/test_check_ui_emulators.py"
 CHECK_CMD = "python3 -I scripts/check_ui_emulators.py"
 VERIFY_STEPS = (f"step ui-emulators-tests {TESTS_CMD}", f"step ui-emulators {CHECK_CMD}")
-# The one command the ui job may run, compared as a whole (R1-01, R2-01, R2-02): an allowlist fails closed, where a deny list for
-# --dry-run, -x, `; true`, pipes and exit-0 fallbacks can always be bypassed. The fallback prints the result XML, which Gradle's log lacks.
-INNER = (
-    "cd .. && ./gradlew --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest "
-    "|| (find core/data/build/outputs -name '*.xml' -print -exec head -c 7000 {} \\\\; ; false)"
-)
-EXPECTED_SCRIPT = f'cd firebase && npx --no-install firebase emulators:exec --only auth,firestore --project demo-tally "{INNER}"'
-SCRIPT_PROBLEM = "ci.yml ui job: the android-emulator-runner `script:` must be exactly EXPECTED_SCRIPT of check_ui_emulators.py (one line)"
+# The whole ui job, frozen (R1-01, R2-01, R2-02, R3-01): an allowlist fails closed where a deny list (--dry-run, -x, `; true`, pipes,
+# other actions, extra steps, a quoted `"if": false`, `needs`) can always be bypassed. Changing the ui job changes this mapping, in the
+# same PR. The fallback after gradle prints the result XML, which Gradle's log lacks.
+EXPECTED_UI = {
+    "name": "ui",
+    "runs-on": "ubuntu-latest",
+    "timeout-minutes": 45,
+    "steps": [
+        {"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "with": {"persist-credentials": False}},
+        {"uses": "actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880", "with": {"distribution": "temurin", "java-version": 21}},
+        {"uses": "gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c"},
+        {
+            "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+            "with": {"node-version": 22, "cache": "npm", "cache-dependency-path": "firebase/package-lock.json"},
+        },
+        {
+            "name": "install the Firebase CLI (the Auth and Firestore emulators the data-layer tests run against)",
+            "working-directory": "firebase",
+            "run": "npm ci --silent",
+        },
+        {
+            "name": "enable KVM",
+            "run": "echo 'KERNEL==\"kvm\", GROUP=\"kvm\", MODE=\"0666\", OPTIONS+=\"static_node=kvm\"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules\n"
+            "sudo udevadm control --reload-rules\nsudo udevadm trigger --name-match=kvm\n",
+        },
+        {
+            "uses": "reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d",
+            "with": {
+                "api-level": 34,
+                "arch": "x86_64",
+                "target": "google_apis",
+                "script": "cd firebase && npx --no-install firebase emulators:exec --only auth,firestore --project demo-tally "
+                '"cd .. && ./gradlew --console=plain :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest '
+                "|| (find core/data/build/outputs -name '*.xml' -print -exec head -c 7000 {} \\\\; ; false)\"",
+            },
+        },
+    ],
+}
+UI_PROBLEM = "ci.yml jobs.ui (parsed) is not equal to EXPECTED_UI in check_ui_emulators.py"
 DATA_COMPILE = ":core:data:assembleDebugAndroidTest"
 CLASSPATH = 'testImplementation(project(":core:testing"))'
 
@@ -71,17 +101,8 @@ def firebase_problems(root):
 
 
 def ui_problems(root):
-    ui = _job((root / ".github/workflows/ci.yml").read_text(), "ui")
-    steps = _steps(ui)
-    scripts = [" ".join(ln.removeprefix("script:").split()) for ln in _active_lines(ui) if ln.startswith("script:")]
-    problems = [] if scripts == [" ".join(EXPECTED_SCRIPT.split())] else [SCRIPT_PROBLEM]
-    if not any(re.search(r"working-directory:\s*firebase\b", s) and re.search(r"run:\s*npm ci\b", s) for s in steps):
-        problems.append("ci.yml ui job has no `npm ci` step in firebase/ (the emulators come from firebase-tools)")
-    if any("continue-on-error" in ln for ln in _active_lines(ui)):
-        problems.append("ci.yml ui job swallows a test failure (`continue-on-error`)")
-    if any(ln.startswith(("if:", "- if:")) for ln in _active_lines(ui)):
-        problems.append("ci.yml ui job has a step with `if:` (the job is a required check)")
-    return problems
+    jobs = (yaml.safe_load((root / ".github/workflows/ci.yml").read_text()) or {}).get("jobs") or {}
+    return [] if jobs.get("ui") == EXPECTED_UI else [UI_PROBLEM]
 
 
 def wiring_problems(root):

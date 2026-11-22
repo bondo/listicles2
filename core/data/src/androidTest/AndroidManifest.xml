@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
     <!-- The Auth emulator speaks plain HTTP on 10.0.2.2. Only the test APK allows it. -->
     <application android:usesCleartextTraffic="true" />
 </manifest>
