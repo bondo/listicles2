@@ -93,7 +93,7 @@ Sources: [Testing fundamentals](https://developer.android.com/training/testing/f
 | Prefer fakes to mocks (fakes live in the test source set, named `Fake*`); assert on `StateFlow.value` | review (already REVIEW.md item 3) |
 | Compose UI tests with `createComposeRule`, run against fake state (hermetic) | later (M1) |
 | JUnit 4 tests (Robolectric, Roborazzi, `createComposeRule`) really run in `:app` unit tests | tooling: `junit-vintage-engine` is on the `:app` test runtime, `failOnNoDiscoveredTests` is on, and `scripts/check_test_results.py` (run after `testDebugUnitTest`) fails when a test class has no result XML |
-| Screenshot tests and accessibility checks in UI tests | later: PLAN section 5 plans Roborazzi and `enableAccessibilityChecks`. Correction (2026-11-17, contradiction C7 of the best-practices investigation on issue #15): Google does have a tool, [Compose Preview Screenshot Testing](https://developer.android.com/studio/preview/compose-screenshot-testing), still experimental; its page says the standalone plugin is no longer maintained and recommends AGP test suites on AGP 9.5+ (this repo is on AGP 9.5.1). M1-03 compares it with Roborazzi before choosing; a switch needs a recorded decision. Correction accepted by the owner on 2026-11-17 (issue #15 comment 6947871526) |
+| Screenshot tests and accessibility checks in UI tests | tooling (M1-03): Roborazzi goldens, light/dark x en/da, and `enableAccessibilityChecks`; before M1-03, PLAN section 5 planned both. Correction (2026-11-17, contradiction C7 of the best-practices investigation on issue #15): Google does have a tool, [Compose Preview Screenshot Testing](https://developer.android.com/studio/preview/compose-screenshot-testing), still experimental; its page says the standalone plugin is no longer maintained and recommends AGP test suites on AGP 9.5+ (this repo is on AGP 9.5.1). M1-03 chose Roborazzi (JVM, exact-match goldens, `scripts/screenshots.sh`, runs in the `screenshots` CI job) and `enableAccessibilityChecks` in `androidTest`; the Google tool stays experimental, and a switch needs a recorded decision. Correction accepted by the owner on 2026-11-17 (issue #15 comment 6947871526) |
 
 ## 7. Accessibility
 Sources: [Make apps more accessible](https://developer.android.com/guide/topics/ui/accessibility/apps),
@@ -162,6 +162,7 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 | Dependencies and plugins only through `gradle/libs.versions.toml`, kebab-case names, `alias(libs.plugins...)` | tooling in part: the catalog exists; nothing fails a hardcoded `"group:name:version"`, a guard is proposed |
 | Configuration cache and build cache on | tooling in part: set in `gradle.properties` |
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
+| JVM modules use only Java and Android API available at minSdk 26 (lint NewApi skips pure JVM modules; no desugaring is configured) | tooling: `checkJdkRelease` (JDK 17 API) and `checkJavaApiLevel` (`scripts/check_java_api_level.py` reads the main classes of every JVM module against `api-versions.xml` of the compileSdk platform; M1-37) |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
 | Dependency freshness | Dependabot (lint freshness checks are disabled on purpose with a `// justified:`) |
 | Dependency verification | tooling: `gradle/verification-metadata.xml` holds a sha256 for every resolved artifact (plugins, build tools, lint, test and Android configurations), enforced by Gradle in every build; `scripts/check_gradle_repos.py` fails when the file is missing, verification is switched off, or an artifact has no sha256 |
@@ -173,7 +174,7 @@ After any dependency, plugin or Gradle wrapper bump (including a Dependabot PR),
 rm gradle/verification-metadata.xml
 ./gradlew --no-configuration-cache --refresh-dependencies --write-verification-metadata sha256 \
   spotlessCheck detekt :core:domain:detektMain :core:domain:detektTest :core:testing:detektMain :core:testing:detektTest \
-  :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:assembleDebug :app:assembleDebugAndroidTest
+  :app:lintDebug testDebugUnitTest :core:domain:test koverVerify :app:verifyRoborazziDebug :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
 The file must be generated on Linux (CI's platform), and then given the other two operating systems' `aapt2` jars. AGP resolves `com.android.tools.build:aapt2:<version>:<os>` for the build host's OS only, so a Linux run records only the `linux` jar and a macOS or Windows build fails verification. Regenerating on macOS or Windows instead would drop the `linux` jar and break CI. After the command above, add the other two from a throwaway project (`<version>` is the `aapt2` version in the file; the write mode only adds entries):
