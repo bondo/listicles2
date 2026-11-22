@@ -1058,5 +1058,47 @@ class PrReviewRound2Tests(CliFlagCase):
                 self.assertFails(MARK + ": scripts/lint.sh:1:")
 
 
+class PrReviewRound3Tests(CliFlagCase):
+    """PR 309 review round 3, regressions from main: R3-01 a comment line after a quoted value that is closed ends the value, R3-02 the
+    depth drops after the scripts object, so a later or repeated top-level "scripts" key is read."""
+
+    R = "# justified: upstream false positive tracked\n"
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def test_a_comment_after_a_closed_quote_ends_the_value(self):
+        s, r = "jobs:\n  a:\n    steps:\n", self.R
+        for path, text, n in [
+            (".github/workflows/ci.yml", s + '      - run: "ruff check --ignore E501 ."\n          ' + r, 4),
+            (".github/workflows/ci.yml", s + "      - run: 'ruff check --ignore E501 .'\n          " + r, 4),
+            (".github/workflows/ci.yml", s + '      - run: !!str "ruff check --ignore E501 ."\n          ' + r, 4),
+            (".github/workflows/ci.yml", s + '      - run: "ruff \\"a\\" check\n          --ignore E501 ."\n          ' + r, 4),
+            (".github/workflows/ci.yml", s + "      - run: 'it''s ruff check\n          --fix .'\n          " + r, 4),
+            (".github/workflows/ci.yml", s + '      - name: x\n        run: "ruff check --fix ."\n          ' + r + "      - run: echo\n", 5),
+            (".pre-commit-config.yaml", 'repos:\n  - repo: local\n    hooks:\n      - id: x\n        entry: "ruff check --ignore E501"\n          ' + r, 5),
+        ]:
+            with self.subTest(text=text):
+                self.write(path, text)
+                self.assertFails(f"{MARK}: {path}:{n}:")
+        self.repo.git("rm", "-q", ".pre-commit-config.yaml")
+        self.write(".github/workflows/ci.yml", s + '      - run: "ruff check --fix ." ' + r)
+        self.assertPasses()
+
+    def test_a_later_or_repeated_scripts_key_is_read(self):
+        self.write("firebase/package.json", '{\n  "scripts": {\n    "test": "jest"\n  }\n}\n')
+        first = '{\n  "scripts": {\n    "test": "jest"\n  },\n  "name": "t",\n'
+        for i, second in enumerate(['  "scr\\u0069pts": {\n    "test": "eslint ."\n  }\n}\n', '  "scripts": {\n    "test": "eslint ."\n  }\n}\n',
+                                    '  "scripts": {"test": "eslint ."}\n}\n', '  "scripts":\n  {\n    "test": "eslint ."\n  }\n}\n']):
+            with self.subTest(second=second):
+                self.write("tools/package.json", first + second)
+                self.put("scripts/lint.sh", "cd tools && npm test -- --quiet" + " ." * i)
+                self.assertFails(MARK + ": scripts/lint.sh:1:")
+        self.write("tools/package.json", first + '  "version": "1.0.0"\n}\n')
+        self.put("scripts/lint.sh", "cd tools && npm test -- -u")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
