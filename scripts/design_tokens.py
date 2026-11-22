@@ -22,7 +22,7 @@ TOKENS = Path(__file__).resolve().parent.parent / "design" / "tokens.json"
 HEX = re.compile(r"#[0-9A-F]{6}")
 AA_TEXT = 4.5
 AA_NON_TEXT = 3.0
-NON_TEXT_PAIRS = {("outline", "surface")}
+NON_TEXT_PAIRS = {("outline", "surface"), ("outline", "surfaceContainerLow"), ("outline", "surfaceContainerHigh")}
 # Every Material 3 ColorScheme color role (issue #190): a theme that lacks one makes Theme.kt fall back to the purple Material baseline.
 REQUIRED_ROLES = (
     "primary", "onPrimary", "primaryContainer", "onPrimaryContainer", "inversePrimary",
@@ -67,6 +67,8 @@ REQUIRED_PAIRS = (
     ("inverseOnSurface", "inverseSurface"),
     ("inversePrimary", "inverseSurface"),
     ("outline", "surface"),
+    ("outline", "surfaceContainerLow"),
+    ("outline", "surfaceContainerHigh"),
     ("onBackground", "background"),
     ("onSurface", "surfaceDim"),
     ("onSurface", "surfaceBright"),

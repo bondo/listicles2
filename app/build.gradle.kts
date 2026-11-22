@@ -96,6 +96,13 @@ class RobolectricOfflineArgs(
         )
 }
 
+// The tokens file is an input by content (an edited token re-runs the test) and its absolute path stays out of the cache key.
+class TokensArgs(
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) val tokensFile: RegularFile,
+) : CommandLineArgumentProvider {
+    override fun asArguments() = listOf("-Dtally.tokensFile=${tokensFile.asFile.absolutePath}")
+}
+
 tasks.withType<Test>().configureEach {
     // M1-03: the goldens are an input, or a test task that is UP-TO-DATE (or cached) after a golden changed would let
     // `scripts/screenshots.sh verify` pass without comparing anything. A file tree, not dir(..): a missing directory
@@ -104,6 +111,10 @@ tasks.withType<Test>().configureEach {
         .files(fileTree("src/test/screenshots"))
         .withPropertyName("screenshotGoldens")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // M1-04: ThemeTokensTest reads design/tokens.json; see TokensArgs. scripts/check_screenshots.py checks this wiring.
+    jvmArgumentProviders.add(
+        TokensArgs(rootProject.layout.projectDirectory.file("design/tokens.json")),
+    )
     dependsOn(syncRobolectricAndroidAll)
     jvmArgumentProviders.add(
         RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),

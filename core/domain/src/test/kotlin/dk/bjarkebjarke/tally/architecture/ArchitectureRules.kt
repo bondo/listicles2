@@ -54,6 +54,17 @@ object ArchitectureRules {
 
     fun scannedFileCount(dir: File): Int = files(dir).size
 
+    /** A scanned Kotlin file: its path below the scanned directory and its text with comments and strings blanked. */
+    internal class CodeFile(
+        val name: String,
+        val text: String,
+    )
+
+    internal fun codeFiles(dir: File): List<CodeFile> =
+        files(dir).map {
+            CodeFile(File(it.path).canonicalFile.relativeTo(dir.canonicalFile).path, blankCommentsAndStrings(it.text))
+        }
+
     fun floatingPointViolations(dir: File): List<String> =
         violations(dir, floatingPatterns, skipImports = false) { true }
 
@@ -109,7 +120,7 @@ object ArchitectureRules {
         }
 
     // Zero-based line of a character offset; matches run over the whole text so a call may span several lines.
-    private fun lineIndex(
+    internal fun lineIndex(
         text: String,
         offset: Int,
     ): Int = text.take(offset).count { it == '\n' }
