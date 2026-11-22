@@ -4,7 +4,7 @@ import * as h from "./harness";
 // The mutant check (see #202): the real rules plus one block that opens a collection of PLAN section 3,
 // or an unplanned one. The deny suite's own probes on that collection must then be allowed exactly for
 // the clients and methods let in (so at least one assertFails of rules.test.ts fails), denied for the
-// rest. The method mutants use the unplanned collection, which no rule will open.
+// rest. The method mutants use the unplanned root collection, which no rule will open.
 // The unplanned subcollections share one collection group, so its mutant is kept once (by name).
 const named = [
     ...[...h.TEMPLATES, ...h.UNPLANNED].flatMap((t) => h.mutantsOf(t)),
@@ -12,8 +12,8 @@ const named = [
 ].map((m) => ({ ...m, name: `allow ${m.methods.join(", ")} on ${h.matchOf(m)} to ${m.who}` }));
 const MUTANTS = [...new Map(named.map((m) => [m.name, m])).values()];
 
-// Each mutant loads its rules and runs 18 probes; the first also opens the connections (about 1.6 s here),
-// so the default 5 s per test is too close on a slow runner.
+// Each mutant loads its rules and runs the probes on its collection (18 to 162); the first also opens
+// the connections (about 1.6 s here), so the default 5 s per test is too close on a slow runner.
 jest.setTimeout(30_000);
 
 test.each(MUTANTS)("$name turns the deny suite red", async (mutant) => {

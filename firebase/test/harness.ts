@@ -6,9 +6,10 @@ import {
     type TokenOptions,
 } from "@firebase/rules-unit-testing";
 
-// The default-deny harness (M1-52, see #202): every client tries every operation on one document of
-// every collection in PLAN section 3 and on an unplanned path. rules.test.ts expects each probe to be
-// denied; mutants.test.ts shows that opening any one of those collections turns that suite red.
+// The default-deny harness (M1-52, see #202): every client tries every operation on the caller's own
+// document of every collection in PLAN section 3, on another user's of each {uid} one, and on the
+// unplanned paths. rules.test.ts expects each probe to be denied; mutants.test.ts shows that opening
+// any one of those collections turns that suite red.
 // The contexts hand out the compat Firestore type, used as is (no type casts).
 export type Db = ReturnType<RulesTestContext["firestore"]>;
 
@@ -56,12 +57,9 @@ export function instantiate(template: string, ids = IDS): string {
 
 export const TEMPLATES = planTemplates(PLAN);
 // Paths no rule plans, so only the default deny covers them: a top-level collection, and a subcollection
-// of each top-level planned document, which a recursive or wildcard match there would open (#199).
+// of every planned document, which a recursive or wildcard match there would open (#199).
 export const UNPLANNED_ROOT = "anything/{doc}";
-export const UNPLANNED = [
-    UNPLANNED_ROOT,
-    ...TEMPLATES.filter((t) => t.split("/").length === 2).map((t) => `${t}/unplanned/{doc}`),
-];
+export const UNPLANNED = [UNPLANNED_ROOT, ...TEMPLATES.map((t) => `${t}/unplanned/{doc}`)];
 // The caller's own document of every template, another user's (bob) of each {uid} one, and the unplanned.
 export const PATHS = [
     ...TEMPLATES.map((t) => instantiate(t)),
@@ -142,8 +140,8 @@ export const WHO: Record<"everyone" | Client, string> = {
     unverified: "request.auth != null && request.auth.token.email_verified == false",
     verified: "request.auth != null && request.auth.token.email_verified == true",
 };
-// "others": signed-in callers, on documents of a {uid} collection that are not their own.
-export type Who = keyof typeof WHO | "others";
+// "others" and "self": signed-in callers on other users' documents of a {uid} collection, or their own.
+export type Who = keyof typeof WHO | "others" | "self";
 export const METHODS = ["get", "list", "create", "update", "delete"] as const;
 export type Method = (typeof METHODS)[number];
 
@@ -157,11 +155,11 @@ export interface Mutant {
     readonly methods: readonly Method[];
 }
 
-// A collection opened to everyone, to each client alone and (a {uid} collection) to others, and its
-// collection group to everyone.
+// A collection opened to everyone, to each client alone and (a {uid} collection) to others and to self,
+// and its collection group to everyone.
 export function mutantsOf(template: string): Mutant[] {
     const whos: Who[] = ["everyone", ...CLIENT_NAMES];
-    if (template.endsWith("/{uid}")) whos.push("others");
+    if (template.endsWith("/{uid}")) whos.push("others", "self");
     return [
         ...whos.map((who) => ({ template, group: false, who, methods: METHODS })),
         { template, group: true, who: "everyone", methods: METHODS },
@@ -194,21 +192,24 @@ export function mutate(rules: string, m: Mutant): string {
     const end = at + ANCHOR.length;
     const doc = `d${String(m.template.split("/").length - 1)}`;
     const who =
-        m.who === "others" ? `request.auth != null && request.auth.uid != ${doc}` : WHO[m.who];
+        m.who === "others" || m.who === "self"
+            ? `request.auth != null && request.auth.uid ${m.who === "self" ? "==" : "!="} ${doc}`
+            : WHO[m.who];
     const allow = `allow ${m.methods.join(", ")}: if ${who};`;
     return `${rules.slice(0, end)}\n    match ${matchOf(m)} {\n      ${allow}\n    }${rules.slice(end)}`;
 }
 
 // What a probe gets under a mutant, as Firestore decides: an exact match opens the documents of its
 // collection and queries on it, not a collection-group query (a list); a group match opens all three.
-// A rule on the document id (others) opens no query, since it cannot hold for every result.
+// A rule on the document id (others, self) opens no query, since it cannot hold for every result.
 export function expected(m: Mutant, p: Probe): Outcome {
     const opened = m.group
         ? collectionIdOf(p.path) === collectionIdOf(m.template)
         : p.op !== "group" && wholeCollection(p.path) === wholeCollection(m.template);
+    const own = p.path.split("/").at(-1) === UID;
     const lets =
-        m.who === "others"
-            ? p.client !== "anonymous" && p.op !== "list" && p.path.split("/").at(-1) !== UID
+        m.who === "others" || m.who === "self"
+            ? p.client !== "anonymous" && p.op !== "list" && own === (m.who === "self")
             : m.who === "everyone" || m.who === p.client;
     return opened && lets && m.methods.includes(p.op === "group" ? "list" : p.op)
         ? "allowed"
