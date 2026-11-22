@@ -313,6 +313,21 @@ class Build(unittest.TestCase):
         got = self.mutated("app/build.gradle.kts", 'fileTree("src/test/screenshots")', 'fileTree("src/test/other")')
         self.assertEqual(got, [c.INPUT_PROBLEM])
 
+    def test_the_tokens_file_must_be_a_tracked_input_passed_without_its_absolute_path(self):
+        # M1-04 R1-02: ThemeTokensTest reads design/tokens.json. As an @InputFile argument provider the content is the cache key and
+        # the checkout path is not; a plain systemProperty puts the absolute path into the key and tracks nothing by itself.
+        self.assertEqual(c.build_problems(ROOT), [])
+        got = self.mutated("app/build.gradle.kts", "@get:InputFile", "@get:Internal")
+        self.assertEqual(got, [c.TOKENS_PROBLEM])
+
+    def test_a_plain_system_property_for_the_tokens_file_is_reported(self):
+        got = self.mutated("app/build.gradle.kts", "TokensArgs(", 'systemProperty("tally.tokensFile", "x"); TokensArgs(')
+        self.assertEqual(got, [c.TOKENS_PROBLEM])
+
+    def test_the_tokens_provider_must_be_added_to_the_test_tasks(self):
+        got = self.mutated("app/build.gradle.kts", "jvmArgumentProviders.add(\n        TokensArgs(", "jvmArgumentProviders.add(\n        Other(")
+        self.assertEqual(got, [c.TOKENS_PROBLEM])
+
     def test_the_comparison_must_be_exact(self):
         want = ["ScreenshotOptions.kt must compare exactly: ThresholdValidator(0f), maxDistance = 0f, hShift = 0, vShift = 0"]
         for old, new in (
