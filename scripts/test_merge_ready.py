@@ -559,6 +559,27 @@ class SignOffTests(unittest.TestCase):
         self.assertNotEqual(code, 0, text)
         self.assertRegex(text, r"status paragraph")
 
+    def test_a_rename_to_another_extension_or_an_upper_case_md_is_still_judged(self):  # R1-02: the extension of either name, casefolded
+        approved = doc_text("Status: approved by the owner, 2026-11-22 (was: not owner-approved (see issue #15)).")
+        bad = {"draft renamed to .txt": ("docs/milestones/M1.txt", approved, "renamed", "docs/milestones/M1.md"),
+               "draft renamed to .MD": ("docs/milestones/M1.MD", approved, "renamed", "docs/milestones/M1.md"),
+               "draft renamed from .MD to .txt": ("docs/milestones/M1.txt", approved, "renamed", "docs/milestones/M1.MD"),
+               "new .MD without a status": ("docs/milestones/M2.MD", "# M2\n\nNo status.\n", "added", None),
+               "new .Md without a status": ("docs/milestones/M2.Md", "# M2\n\nNo status.\n", "added", None)}
+        for why, (name, head, status, previous) in bad.items():
+            with self.subTest(why=why):
+                code, text, api = self.attempt("working-draft-docs", name, head, status=status, previous=previous)
+                self.assertNotEqual(code, 0, text)
+                self.assertRegex(text, r"status paragraph")
+                self.assertEqual(api.merged, [])
+        for why, (name, status, previous) in {"rename that keeps the status": ("docs/milestones/M1.txt", "renamed", "docs/milestones/M1.md"),
+                                              "new .MD with a status": ("docs/milestones/M2.MD", "added", None)}.items():
+            with self.subTest(why=why):
+                self.assertEqual(self.attempt("working-draft-docs", name, doc_text(), status=status, previous=previous)[0], 0)
+        for name in ("docs/product/wireframes/01-sign-in-dark.png", "docs/milestones/notes.txt"):  # never a draft in either name: not held to it
+            with self.subTest(name=name):
+                self.assertEqual(go(make_api(files=[file_entry(name)]))[0], 0)
+
     def test_a_doc_that_was_never_a_draft_is_not_held_to_the_status(self):  # approved docs and ordinary docs keep merging
         approved = "# Stories\n\nStatus: owner-approved 2026-11-18 (issue #15 comment 6991804241).\n"
         self.assertEqual(self.attempt("working-draft-docs", "docs/product/stories.md", approved, base=approved)[0], 0)
@@ -629,11 +650,13 @@ class GhApiTests(unittest.TestCase):
 
     def test_a_flake_status_is_retried_and_the_second_answer_counts(self):
         for status in (429, 500, 502, 503, 504):
-            with self.subTest(status=status):
-                value, argv, sleeps = self.call((1, "", f"gh: Server Error (HTTP {status})"), (0, '{"ok": 1}', ""))
-                self.assertEqual(value, {"ok": 1})
-                self.assertEqual(len(argv), 2)
-                self.assertEqual(sleeps, [1])
+            for form, err in (("json message", f"gh: Server Error (HTTP {status})"), ("html or empty body", f"gh: HTTP {status}"),  # R1-01: gh prints both forms
+                              ("after a note line", f"note: retry later\ngh: HTTP {status}\n")):
+                with self.subTest(status=status, form=form):
+                    value, argv, sleeps = self.call((1, "<html>Bad Gateway</html>", err), (0, '{"ok": 1}', ""))
+                    self.assertEqual(value, {"ok": 1})
+                    self.assertEqual(len(argv), 2)
+                    self.assertEqual(sleeps, [1])
 
     def test_the_merge_put_is_retried_with_the_same_arguments(self):
         value, argv, sleeps = self.call((1, "", "gh: Bad Gateway (HTTP 502)"), (0, '{"merged": true}', ""), method="put")
@@ -646,7 +669,9 @@ class GhApiTests(unittest.TestCase):
         errors = {"not mergeable": "gh: Pull Request is not mergeable (HTTP 405)", "head moved": "gh: Head branch was modified (HTTP 409)",
                   "validation": "gh: Validation Failed (HTTP 422)", "not found": "gh: Not Found (HTTP 404)", "forbidden": "gh: Forbidden (HTTP 403)",
                   "no status": "gh: error connecting to api.github.com",
-                  "502 in the message": "gh: PR 502 is not mergeable, 429 files changed, sha 5030a (HTTP 405)"}
+                  "502 in the message": "gh: PR 502 is not mergeable, 429 files changed, sha 5030a (HTTP 405)",
+                  "bare form of another status": "gh: HTTP 404", "bare form with text after it": "gh: HTTP 502 was expected here",
+                  "bare form quoted in a message": "gh: PR text says gh: HTTP 502 (HTTP 409)", "bare form inside a line": "see gh: HTTP 502"}
         for why, err in errors.items():
             for method in ("get", "put"):
                 with self.subTest(why=why, method=method):
