@@ -119,6 +119,42 @@ class JoinedValueTests(FoldCase):
         self.assertFails(f"{MARK}: {WF}:5:", "--staged")
 
 
+class SelfReviewTests(FoldCase):
+    """Self-review (verifier): a node property or a JSON-style `"key":"value"` before a quoted value in a flow collection, a composite
+    action, and a fold scan that cannot run (it must fail, not go quiet)."""
+
+    def test_properties_and_json_style_keys_in_a_flow(self):
+        ent = "      - {id: x, name: x, language: system, entry: &e \"ruff check \\x2d-fix\"}\n"
+        self.fails_at([
+            (WF, STEPS + '      - {run: &a "ruff check \\x2d-fix ."}\n', 4),
+            (WF, STEPS + '      - {run: !!str "ruff check \\x2d-fix ."}\n', 4),
+            (WF, STEPS + '      - {run: &a "echo }; ruff check\n          --ignore E501 ."}\n', 4),
+            (WF, STEPS + '      - {run: &a "echo ]; ruff check\n          --ignore E501 ."}\n', 4),
+            (WF, STEPS + '      - {"run":"echo }; ruff check\n          --ignore E501 ."}\n', 4),
+            (WF, STEPS + '      - {"run":"ruff check \\x2d-fix ."}\n', 4),
+            (WF, STEPS + '      - {run: !!str &a\n          "ruff check \\x2d-fix ."}\n', 4),
+            (WF, STEPS + '      - uses: astral-sh/ruff-action@v3\n        with: {args: &a "check \\x2d-fix"}\n', 5),
+            (PC, HOOKS + ent, 4),
+            (PC, HOOKS + '      - {"id":"x","name":"x","language":"system","entry":"ruff check \\x2d-fix"}\n', 4),
+        ])
+
+    def test_a_composite_action_is_joined_too(self):
+        self.fails_at([(".github/actions/lint/action.yml",
+                        "runs:\n  using: composite\n  steps:\n    - run: >\n        ruff check\n        --ignore E501 .\n      shell: bash\n", 5)])
+
+    def test_a_fold_scan_that_fails_fails_the_guard(self):
+        import os
+        import stat
+        d = os.path.join(self.repo.dir, ".fakebin")
+        os.makedirs(d)
+        real = base.shutil.which("awk")
+        with open(os.path.join(d, "awk"), "w") as f:
+            f.write('#!/bin/sh\ncase "$*" in *"function yent"*) exit 2 ;; esac\nexec "%s" "$@"\n' % real)
+        os.chmod(os.path.join(d, "awk"), stat.S_IRWXU)
+        self.write(WF, STEPS + "      - run: echo ok\n")
+        self.assertFails(f"{MARK}: {WF}:0: the YAML fold scan failed", PATH=d + os.pathsep + os.environ["PATH"])
+
+
 class NeighbourTests(FoldCase):
     def test_allowed_or_separate_lines_pass(self):
         self.passes([
