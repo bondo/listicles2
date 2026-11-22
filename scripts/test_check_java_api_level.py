@@ -56,7 +56,8 @@ SOURCES = {
     "AnnotationArray": "@Holder(types = { String.class, java.util.HexFormat.class }) class AnnotationArray { }",
     "AnnotationDefault": "@interface AnnotationDefault { Class<?> type() default java.util.HexFormat.class; }",
     "AnnotationOldTypes": (
-        "@Holder(type = String.class, types = { Object.class }, name = \"n\", count = 3, flag = true, ratio = 1.5, big = 5L, ch = 'c', state = Thread.State.NEW)"
+        "@Holder(type = String.class, types = { Object.class }, name = \"n\", count = 3, flag = true, ratio = 1.5, big = 5L, ch = 'c',"
+        " state = Thread.State.NEW)"
         " class AnnotationOldTypes { }"
     ),
     # Passing cases: old classes in every position, a primitive class literal and arrays, a try/finally (catch type 0), lambda, string concat.
@@ -71,7 +72,10 @@ SOURCES = {
 # The bytecode walk must step over every instruction length: a switch (padding to 4 bytes at each alignment), `wide`, and ldc_w
 # (a class constant above pool index 255), each followed by a class literal that has to be reached.
 for pad in range(4):
-    for kind, cases in (("Table", "case 1: return 1; case 2: return 2; case 3: return 3;"), ("Lookup", "case 1: return 1; case 100: return 2; case 10000: return 3;")):
+    for kind, cases in (
+        ("Table", "case 1: return 1; case 2: return 2; case 3: return 3;"),
+        ("Lookup", "case 1: return 1; case 100: return 2; case 10000: return 3;"),
+    ):
         SOURCES[f"Switch{kind}{pad}"] = (
             f"class Switch{kind}{pad} {{ static Object f(int x) {{ {'x++; ' * pad}switch (x) {{ {cases} default: break; }}"
             f" return java.util.HexFormat.class; }} }}"
@@ -85,7 +89,8 @@ SOURCES["LdcWide"] = (
 )
 SOURCES["Holder"] = (
     "@interface Holder { Class<?> type() default Object.class; Class<?>[] types() default { }; Thread.State state() default Thread.State.NEW;"
-    " Inner nested() default @Inner; Inner[] more() default { }; String name() default \"\"; int count() default 0; boolean flag() default false; double ratio() default 0;"
+    " Inner nested() default @Inner; Inner[] more() default { }; String name() default \"\"; int count() default 0; boolean flag() default false;"
+    " double ratio() default 0;"
     " long big() default 0; char ch() default 'a'; }"
 )
 SOURCES["Inner"] = (
@@ -150,7 +155,10 @@ def run(*args):
 
 def synthetic_class(code, catch_type=0):
     """A minimal class file `Synth` whose static method f()V has the given bytecode (and one catch handler of catch_type over it)."""
-    utf8 = lambda text: b"\x01" + len(text).to_bytes(2, "big") + text.encode()
+
+    def utf8(text):
+        return b"\x01" + len(text).to_bytes(2, "big") + text.encode()
+
     pool = [utf8("Synth"), b"\x07\x00\x01", utf8("java/lang/Object"), b"\x07\x00\x03", utf8("f"), utf8("()V"), utf8("Code")]
     table = b"\x00\x01" + (0).to_bytes(2, "big") + len(code).to_bytes(2, "big") + (0).to_bytes(2, "big") + catch_type.to_bytes(2, "big")
     body = b"\x00\x01\x00\x01" + len(code).to_bytes(4, "big") + code + table + b"\x00\x00"
@@ -375,7 +383,8 @@ class CheckerTest(unittest.TestCase):
 
     def test_class_values_inside_annotations_fail_in_every_position(self):
         # Holder has class retention (RuntimeInvisibleAnnotations); the class value is a descriptor, not a constant pool Class entry.
-        for name in ("AnnotationOnClass", "AnnotationOnField", "AnnotationOnMethod", "AnnotationOnParameter", "AnnotationNested", "AnnotationArray", "AnnotationDefault"):
+        names = ("AnnotationOnClass", "AnnotationOnField", "AnnotationOnMethod", "AnnotationOnParameter", "AnnotationNested", "AnnotationArray")
+        for name in (*names, "AnnotationDefault"):
             with self.subTest(name=name):
                 self.assert_class_violation(name)
 
@@ -394,7 +403,8 @@ class CheckerTest(unittest.TestCase):
                 self.assertEqual(rc, 0, out)
 
     def test_class_references_pass_when_min_sdk_is_high_enough(self):
-        for name in ("ClassLiteralNew", "CheckcastNew", "InstanceofNew", "CatchNew", "AnewarrayNew", "CheckcastArrayNew", "AnnotationNew", "AnnotationOnParameter"):
+        names = ("ClassLiteralNew", "CheckcastNew", "InstanceofNew", "CatchNew", "AnewarrayNew", "CheckcastArrayNew")
+        for name in (*names, "AnnotationNew", "AnnotationOnParameter"):
             with self.subTest(name=name):
                 self.assertEqual(self.check(name, min_sdk="34")[0], 0)
 

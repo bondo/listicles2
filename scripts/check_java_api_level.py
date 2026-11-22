@@ -217,9 +217,7 @@ def scan_attributes(r, pool, found, excluded):
         elif attr == "Code":
             body.advance(4)  # max_stack, max_locals
             for op, idx in walk_code(body.raw(body.take(">I"))):
-                if op in CLASS_OPCODES:
-                    found.add(class_entry(idx))
-                elif pool[idx][0] == 7:  # ldc of a class literal
+                if op in CLASS_OPCODES or pool[idx][0] == 7:  # an ldc names a class literal when its entry is a Class entry
                     found.add(class_entry(idx))
             for _ in range(body.take(">H")):  # exception table: a catch type of 0 is a finally
                 body.advance(6)
