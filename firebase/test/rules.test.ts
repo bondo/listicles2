@@ -1,5 +1,6 @@
 import {
     assertFails,
+    assertSucceeds,
     initializeTestEnvironment,
     type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
@@ -48,10 +49,23 @@ test("the suite probes every collection of PLAN section 3; the UNPLANNED ones ar
     expect(h.UNPLANNED.filter((u) => planned.includes(h.collectionIdOf(u)))).toEqual([]);
 });
 
-// Until the real rules land, every client is denied every operation on every path. The suite runs
-// exactly h.PROBES, the probes of the mutant check, so each mutant that check kills turns it red.
+// A new rule cannot forget signedIn() (M1-08): every allow statement but those of the users doc and
+// config/app (PLAN 3.1 "Signed in") makes it a conjunct of its whole condition.
+test("every allow statement but the users doc's and config/app's requires signedIn()", () => {
+    expect(h.withoutSignedIn(h.RULES)).toEqual([]);
+});
+
+// Every probe but those h.ALLOWED carves out is denied. The suite runs exactly h.PROBES, the probes of
+// the mutant check, so each mutant that check kills turns it red.
 test.each(h.PROBES)("default deny: $client $op $path", async (probe) => {
     await env.withSecurityRulesDisabled(async (admin) => {
         await assertFails(h.attempt(admin.firestore(), dbs[probe.client], probe));
+    });
+});
+
+// The carved-out probes: allowed, each on the seeded document as the deny suite would have asked.
+test.each(h.ALLOWED)("allowed: $client $op $path", async (probe) => {
+    await env.withSecurityRulesDisabled(async (admin) => {
+        await assertSucceeds(h.attempt(admin.firestore(), dbs[probe.client], probe));
     });
 });

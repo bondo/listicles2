@@ -862,10 +862,11 @@ notes = "Normal env. Must merge before M1-O1 registers the Android app in Fireba
 id = "M1-08"
 title = "Rules base: signedIn() with email_verified, users/{uid} householdId set/clear and name, tombstone read, config/app"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-52"]
+pr = 314
 notes = "PLAN as amended by M1-35 (P4, P5, P9); the test harness rewrite is M1-52"
 
 [[task]]
