@@ -7,8 +7,12 @@ import dagger.hilt.internal.GeneratedComponentManager
 import dagger.hilt.internal.GeneratedComponentManagerHolder
 import dk.bjarkebjarke.tally.connectivity.AndroidConnectivity
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
+import dk.bjarkebjarke.tally.domain.session.SessionState
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,10 +32,20 @@ class AppGraphTest {
     @Inject
     lateinit var connectivity: Connectivity
 
+    @Inject
+    lateinit var session: SessionState
+
     @Test
     fun connectivityIsTheAndroidImplementation() {
         hilt.inject()
         connectivity.shouldBeInstanceOf<AndroidConnectivity>()
+    }
+
+    /** M1-60: until M1-14 binds the Firebase Auth session, nobody is signed in, so the app opens on sign-in. */
+    @Test
+    fun sessionIsSignedOutUntilAuthExists() {
+        hilt.inject()
+        runBlocking { session.signedIn().first() } shouldBe false
     }
 }
 
