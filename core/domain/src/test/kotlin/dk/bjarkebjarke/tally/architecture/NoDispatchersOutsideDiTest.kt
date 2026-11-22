@@ -17,15 +17,25 @@ class NoDispatchersOutsideDiTest {
     @TempDir
     lateinit var dir: File
 
+    // Every call scans a fresh directory: a file written by an earlier call in the same test must not keep a later
+    // violating fixture green.
+    private var cases = 0
+
+    private fun violationsOfFiles(files: Map<String, String>): List<String> {
+        val root = File(dir, "case${cases++}")
+        files.forEach { (path, code) ->
+            val file = File(root, path)
+            file.parentFile.mkdirs()
+            file.writeText("package sample\n\n$code\n")
+        }
+        root.mkdirs()
+        return DataSourceRules.dispatchersOutsideDiViolations(root)
+    }
+
     private fun violationsOf(
         code: String,
         path: String = "data/Repo.kt",
-    ): List<String> {
-        val file = File(dir, path)
-        file.parentFile.mkdirs()
-        file.writeText("package sample\n\n$code\n")
-        return DataSourceRules.dispatchersOutsideDiViolations(dir)
-    }
+    ): List<String> = violationsOfFiles(mapOf(path to code))
 
     @Test
     fun realProductionSourcesNameNoDispatcherOutsideADiModule() {
@@ -129,10 +139,12 @@ class NoDispatchersOutsideDiTest {
 
     @Test
     fun aModuleFileDoesNotExemptOtherFiles() {
-        File(dir, "di").mkdirs()
-        File(dir, "di/Module.kt")
-            .writeText("package sample\n\nimport dagger.Module\n\n@Module\nobject M { val d = Dispatchers.IO }\n")
-        violationsOf("val d = Dispatchers.IO").single().shouldContain("data/Repo.kt")
+        violationsOfFiles(
+            mapOf(
+                "di/Module.kt" to "import dagger.Module\n\n@Module\nobject M { val d = Dispatchers.IO }",
+                "data/Repo.kt" to "val d = Dispatchers.IO",
+            ),
+        ).single().shouldContain("data/Repo.kt")
     }
 
     @Test

@@ -16,15 +16,25 @@ class NoPlatformInViewModelTest {
     @TempDir
     lateinit var dir: File
 
+    // Every call scans a fresh directory: a file written by an earlier call in the same test must not keep a later
+    // violating fixture green.
+    private var cases = 0
+
+    private fun violationsOfFiles(files: Map<String, String>): List<String> {
+        val root = File(dir, "case${cases++}")
+        files.forEach { (path, code) ->
+            val file = File(root, path)
+            file.parentFile.mkdirs()
+            file.writeText("package sample\n\n$code\n")
+        }
+        root.mkdirs()
+        return DataSourceRules.platformInViewModelViolations(root)
+    }
+
     private fun violationsOf(
         code: String,
         path: String = "ui/ListsViewModel.kt",
-    ): List<String> {
-        val file = File(dir, path)
-        file.parentFile.mkdirs()
-        file.writeText("package sample\n\n$code\n")
-        return DataSourceRules.platformInViewModelViolations(dir)
-    }
+    ): List<String> = violationsOfFiles(mapOf(path to code))
 
     @Test
     fun realViewModelsHoldNoContextOrActivity() {
