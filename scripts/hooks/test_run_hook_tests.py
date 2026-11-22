@@ -188,6 +188,35 @@ class ParallelRunnerKeepsEveryGate(unittest.TestCase):
             self.assertIn("2 test", run_hook_tests.count_problem(d, 3))
 
 
+class TestsRunOutsideTheRepo(unittest.TestCase):
+    """R2-01 (PR 302): the tests run in an empty temporary cwd, so a relative path, os.getcwd() or git without cwd= cannot reach
+    the repository the runner was started in (pre-push, verify.sh and CI all start it in the repo root)."""
+
+    PROBE = case("def test_cwd(self):\n        import os\n        self.assertFalse(os.path.exists('marker.txt'), os.getcwd())\n"
+                 "        self.assertFalse(os.path.exists(os.path.join(os.environ.get('PWD', ''), 'marker.txt')), 'PWD')\n")  # R3-01
+
+    def test_serial_and_sharded_runs_do_not_see_the_start_directory(self):
+        for jobs in (None, 2):
+            with self.subTest(jobs=jobs), tempfile.TemporaryDirectory(prefix="hook-runner-cwd-") as d:
+                for rel, src in (("test_a.py", self.PROBE), ("test_b.py", case(PASSING)), ("marker.txt", "x")):
+                    with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                        f.write(src)
+                extra = ["--jobs", str(jobs)] if jobs else []
+                # A shell `cd` (pre-push, verify.sh, CI) also sets PWD to the start directory.
+                r = subprocess.run([sys.executable, "-I", RUNNER, *extra, d], capture_output=True, text=True, cwd=d,
+                                   env=dict(os.environ, PWD=d))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_the_probe_fails_when_the_cwd_is_the_start_directory(self):
+        """Negative case: plain unittest in the same tree keeps the start directory as cwd, and the probe sees the marker."""
+        with tempfile.TemporaryDirectory(prefix="hook-runner-cwd-") as d:
+            for rel, src in (("test_a.py", self.PROBE), ("marker.txt", "x")):
+                with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                    f.write(src)
+            r = subprocess.run([sys.executable, "-I", "-m", "unittest", "discover", "-s", d], capture_output=True, text=True, cwd=d)
+            self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+
+
 class Partition(unittest.TestCase):
     def test_every_file_lands_in_exactly_one_shard(self):
         import run_hook_tests
@@ -206,6 +235,25 @@ class Partition(unittest.TestCase):
         shards = run_hook_tests.partition(["test_a.py", "test_gitenv_isolation.py", "test_gitenv_hostile_config.py", "test_guards_sh.py"], 3)
         for shard in shards:
             self.assertLessEqual(sum(f in run_hook_tests.WEIGHTS for f in shard), 1, shards)
+
+    def test_the_heavy_files_each_get_their_own_shard_at_eight_jobs(self):
+        """Owner decision 7075952806 item 3 on #15: CI runs 8 shards; the four slow files must not share one."""
+        import run_hook_tests
+
+        heavy = sorted(run_hook_tests.WEIGHTS, key=lambda f: -run_hook_tests.WEIGHTS[f])[:4]
+        shards = run_hook_tests.partition(run_hook_tests.units(HERE), 8)
+        for f in heavy:
+            self.assertEqual([s for s in shards if f in s], [[f]], shards)
+
+    def test_every_weighted_name_is_a_unit_of_the_real_suite(self):
+        """A renamed or deleted file left in WEIGHTS silently unbalances the shards."""
+        import run_hook_tests
+
+        self.assertEqual(run_hook_tests.stale_weights(HERE), [])
+        with tempfile.TemporaryDirectory(prefix="hook-runner-weights-") as d:
+            with open(os.path.join(d, "test_guards_sh.py"), "w", encoding="utf-8") as f:
+                f.write(case(PASSING))
+            self.assertEqual(run_hook_tests.stale_weights(d), sorted(set(run_hook_tests.WEIGHTS) - {"test_guards_sh.py"}))
 
 
 if __name__ == "__main__":

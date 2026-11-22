@@ -1,5 +1,6 @@
 """Behaviour tests for .githooks/pre-push (R10-52): the real hook runs in a throwaway repo with stub guards.sh and gradlew.
-Run: python3 -I -m unittest discover -s scripts/hooks"""
+Owner decision 7075952806 item 1 on #15: the hook tests run (with --jobs 4) only when the push changes a hook-suite input
+(prepush_scope.py --hook-tests); guards.sh runs on every push. Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os
 import shutil
@@ -83,8 +84,8 @@ class PrePushHook(unittest.TestCase):
         self.assertEqual(rc, 3)
         self.assertTrue(self.gradle_called())
 
-    def test_failing_hook_tests_block_even_a_docs_only_push_and_skip_gradle(self):
-        self.commit("docs/a.md", "x")
+    def test_failing_hook_tests_block_a_hook_change_push_and_skip_gradle(self):
+        self.commit("scripts/hooks/note.md", "x")
         self.hook_test(passes=False)
         rc, _ = self.push()
         self.assertNotEqual(rc, 0)
@@ -92,7 +93,7 @@ class PrePushHook(unittest.TestCase):
 
     def test_a_skipped_hook_test_blocks_the_push_and_skips_gradle(self):
         """R12-04 (#28): the pre-push hook runs the skip gate, not a bare discover."""
-        self.commit("docs/a.md", "x")
+        self.commit("scripts/hooks/note.md", "x")
         with open(os.path.join(self.repo, "scripts", "hooks", "test_stub.py"), "w") as f:
             f.write("import unittest as ut\n\nclass T(ut.TestCase):\n    @ut.sk" + "ip('later')\n    def test_x(self):\n        pass\n")
         rc, out = self.push()
@@ -120,13 +121,16 @@ class PrePushHook(unittest.TestCase):
         """R11-51: git exports GIT_DIR when pushing from a linked worktree; the guards and tests the hook runs must not inherit it."""
         sentinel = tempfile.mkdtemp()
         subprocess.run(["git", "init", "-q", sentinel], check=True)
-        probe = ("import subprocess, unittest\n\nclass T(unittest.TestCase):\n    def test_x(self):\n"
-                 "        subprocess.run(['git', 'config', 'leak.probe', '1'], check=True)\n")
+        # The runner starts the tests in an empty cwd (R2-01), so the probe names its own throwaway repo as cwd: without a leaked
+        # GIT_DIR it writes there, with one it writes to the sentinel.
+        probe = ("import os, subprocess, unittest\n\nclass T(unittest.TestCase):\n    def test_x(self):\n"
+                 "        subprocess.run(['git', 'config', 'leak.probe', '1'], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))\n")
         with open(os.path.join(self.repo, "scripts", "hooks", "test_stub.py"), "w") as f:
             f.write(probe)
-        self.commit("docs/a.md", "x")
+        self.commit(".githooks/note.md", "x")
         rc, out = self.push(GIT_DIR=os.path.join(sentinel, ".git"))
         self.assertEqual(rc, 0, out)
+        self.assertIn("shards", out)  # the probe ran
         sentinel_cfg = subprocess.run(["git", "config", "--local", "--list"], cwd=sentinel, capture_output=True, text=True).stdout
         self.assertNotIn("leak.probe", sentinel_cfg)
 
@@ -134,6 +138,63 @@ class PrePushHook(unittest.TestCase):
         self.commit("docs/a.md", "x")
         self.assertEqual(self.push(stdin=f"refs/heads/b {self.rev()} refs/heads/b {ZERO}\n")[0], 0)
         self.assertTrue(self.gradle_called())
+
+    def hook_tests_ran(self, out):
+        return "hook tests: ran" in out
+
+    def test_app_only_push_skips_the_hook_tests_but_not_guards_or_gradle(self):
+        self.commit("app/src/main/A.kt", "x")
+        self.commit("docs/product/a.md", "x")
+        self.hook_test(passes=False)
+        rc, out = self.push()
+        self.assertEqual(rc, 0, out)
+        self.assertFalse(self.hook_tests_ran(out), out)
+        self.assertIn("skipping the hook tests", out)
+        self.assertTrue(self.gradle_called())
+        self.assertEqual(self.push(STUB_GUARDS="1")[0], 1)  # guards.sh still runs on every push
+
+    def test_docs_only_push_with_a_failing_hook_test_passes(self):
+        self.commit("docs/product/a.md", "x")
+        self.hook_test(passes=False)
+        rc, out = self.push()
+        self.assertEqual(rc, 0, out)
+        self.assertFalse(self.gradle_called())
+
+    def test_hook_inputs_run_the_hook_tests_in_four_jobs(self):
+        for i in range(2, 6):  # five units, so the shard count shows the job count
+            with open(os.path.join(self.repo, "scripts", "hooks", f"test_stub{i}.py"), "w") as f:
+                f.write("import unittest\n\nclass T(unittest.TestCase):\n    def test_y(self):\n        pass\n")
+        for path in ("scripts/hooks/x.py", "scripts/verify.sh", ".githooks/pre-commit", ".claude/settings.json", "docs/PLAN.md"):
+            with self.subTest(path):  # .githooks/pre-push and scripts/guards.sh are the hook and stub under test, so not rewritten here
+                self.base = self.rev()
+                self.commit(path, "#" + path)
+                rc, out = self.push()
+                self.assertEqual(rc, 0, out)
+                self.assertIn("hook tests: ran 5 tests in 4 shards", out)  # serial mode prints no shard line
+
+    def test_a_deleted_hook_file_runs_the_hook_tests(self):
+        self.commit("scripts/hooks/old_helper.py", "x")
+        self.base = self.rev()
+        self.run_git("rm", "-q", "scripts/hooks/old_helper.py")
+        self.run_git("commit", "-q", "-m", "rm")
+        self.hook_test(passes=False)
+        self.assertNotEqual(self.push()[0], 0)
+
+    def test_unknown_or_empty_ranges_run_the_hook_tests(self):
+        self.commit("app/src/main/A.kt", "x")
+        self.hook_test(passes=False)
+        for stdin in ("nonsense\n", "", f"refs/heads/b {self.rev()} refs/heads/b {'1' * 40}\n",
+                      f"refs/heads/b {self.rev()} refs/heads/b {self.rev()}\n", f"refs/heads/b {self.rev()} refs/heads/b {ZERO}\n"):
+            with self.subTest(stdin):
+                rc, out = self.push(stdin=stdin)
+                self.assertNotEqual(rc, 0, out)
+                self.assertTrue(self.hook_tests_ran(out), out)
+
+    def test_missing_scope_script_runs_the_hook_tests(self):
+        self.commit("app/src/main/A.kt", "x")
+        self.hook_test(passes=False)
+        os.remove(os.path.join(self.repo, "scripts", "hooks", "prepush_scope.py"))
+        self.assertNotEqual(self.push()[0], 0)
 
 
 if __name__ == "__main__":
