@@ -22,9 +22,10 @@ import unittest
 # item 3 on #15); unlisted files count 1. Only balances the shards: a stale entry costs time, never coverage (test_run_hook_tests).
 WEIGHTS = {
     "test_gitenv_isolation.py": 171, "test_gitenv_hostile_config.py": 170, "test_guards_sh.py": 164, "test_guards_cli_flags.py": 77,
-    "test_guard_mark_ready.py": 14, "test_guard_round2.py": 9, "test_guard_forms.py": 8, "test_guard_update_branch.py": 8,
-    "test_guard_actionlint.py": 7, "test_guard_wrapper_forms.py": 6, "test_pretooluse_guard.py": 6, "test_guard_linter_dir.py": 5,
-    "test_run_hook_tests.py": 4, "test_context_guard.py": 3,
+    "test_guard_hardening4.py": 18, "test_guard_hardening.py": 15, "test_guard_mark_ready.py": 14, "test_guard_round2.py": 9,
+    "test_guard_hardening2.py": 8, "test_guard_hardening3.py": 8, "test_guard_round1.py": 8, "test_guard_forms.py": 8,
+    "test_guard_update_branch.py": 8, "test_guard_actionlint.py": 7, "test_guard_wrapper_forms.py": 6, "test_pretooluse_guard.py": 6,
+    "test_guard_linter_dir.py": 5, "test_run_hook_tests.py": 4, "test_context_guard.py": 3,
 }
 
 
