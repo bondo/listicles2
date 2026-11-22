@@ -1221,13 +1221,13 @@ class Pr3RuleTests(unittest.TestCase):
         self.assertIn("dr-rounds", ids(prompt_rules.check_text("design-reviewer", real("design-reviewer") + old)))
         self.assertIn("max 3 opus rounds per design pr", norm)
 
-    def test_an_escalation_drop_becomes_withdrawn_and_an_owner_finding_stays_open(self):  # R1-04 of #129
+    def test_an_escalation_drop_becomes_withdrawn_and_no_finding_stays_open_for_the_owner(self):  # R1-04 of #129; R1-02 of #299 (7075812943)
         prompt = prompt_rules.normalize(real("escalation-reviewer")).lower()
         self.assertIn("a `drop` sets the finding to `withdrawn`", prompt)
-        self.assertIn("an `owner` finding stays open for the owner", prompt)
+        self.assertIn("no finding stays open for the owner", prompt)
         self.assertIn("a dropped finding becomes `withdrawn`", prompt_rules.normalize(self.doc("REVIEW.md")).lower())
         for old, new in (("a `drop` sets the finding to `withdrawn`", "a `drop` closes the finding"),
-                         ("an `owner` finding stays open for the owner", "")):
+                         ("no finding stays open for the owner", "")):
             text = re.sub(re.escape(old), new, prompt_rules.normalize(real("escalation-reviewer")), flags=re.I)
             self.assertIn("escalation-role", ids(prompt_rules.check_text("escalation-reviewer", text)), old)
 
@@ -2681,6 +2681,86 @@ class DelegatedDecisionsTests(unittest.TestCase):
     def test_the_approver_prompt_exists_and_roles_yaml_names_it(self):
         self.assertTrue((PROMPTS / "approver.md").is_file())
         self.assertIn("approver", prompt_rules.ROLES)
+
+
+class PrReviewRound1Tests(unittest.TestCase):
+    """PR #299, round 1 (R1-01 to R1-04): the autonomy pin bites, an `owner` ruling is decided by the escalation reviewer, the over-cap
+    exception and the approver record are stated where the old rule is, and the approver scope is the one of ORCHESTRATION 7.5."""
+
+    OWNER_RULING = ("`owner`: taste or scope: you decide it yourself, per finding `fix` or `drop`; "
+                    "your ruling is final (owner decision, #15 comment 7075812943).")
+    ORCH_OWNER = "an `owner` ruling decides the taste or scope question itself, per finding `fix` or `drop`, and is final"
+
+    def doc(self, path):
+        return (ROOT / path).read_text(encoding="utf-8")
+
+    def doc_swap(self, path, old, new):
+        norm = prompt_rules.normalize(self.doc(path))
+        self.assertIn(old.lower(), norm.lower(), f"{path} lacks {old!r}")
+        return ids(prompt_rules.check_doc_text(path, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    def role_swap(self, role, old, new):
+        norm = prompt_rules.normalize(real(role))
+        self.assertIn(old.lower(), norm.lower(), f"{role}.md lacks {old!r}")
+        return ids(prompt_rules.check_text(role, re.sub(re.escape(old), lambda _: new, norm, count=1, flags=re.I)))
+
+    # R1-01: the pin must still bite when the same words are in the owner-retained sentence.
+    def test_the_ask_list_clauses_stay_pinned_although_the_retained_list_repeats_them(self):
+        for old in ("licence and permission acceptances (never accept them for the owner)", "repository settings and visibility"):
+            with self.subTest(old=old):
+                self.assertIn("autonomy", self.role_swap("orchestrator", old, ""))
+        self.assertTrue(len(re.findall(r"licence and permission acceptances", prompt_rules.normalize(real("orchestrator")))) >= 2)
+
+    # R1-02: what an `owner` ruling means.
+    def test_the_escalation_reviewer_decides_an_owner_ruling_itself(self):
+        norm = prompt_rules.normalize(real("escalation-reviewer"))
+        self.assertIn(self.OWNER_RULING, norm)
+        self.assertIn("escalation-role", self.role_swap("escalation-reviewer", self.OWNER_RULING, "`owner`: taste or scope goes to the owner."))
+        self.assertIn("escalation-role", ids(prompt_rules.check_text(
+            "escalation-reviewer", real("escalation-reviewer") + "\nAn `owner` finding stays open for the owner.\n")))
+
+    def test_the_orchestrator_and_orchestration_follow_the_owner_ruling_of_the_escalation_reviewer(self):
+        self.assertIn(self.ORCH_OWNER, prompt_rules.normalize(real("orchestrator")))
+        self.assertIn(self.ORCH_OWNER, prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md")))
+        self.assertIn("orch-spawn-checks", self.role_swap("orchestrator", self.ORCH_OWNER, "`owner` goes to the owner"))
+        self.assertIn("orch-spawn-checks", self.doc_swap("docs/ORCHESTRATION.md", self.ORCH_OWNER, "`owner` goes to the owner"))
+
+    def test_review_md_says_the_escalation_reviewer_decides_taste_or_scope(self):
+        for old, new in (("which the escalation reviewer decides itself, per finding `fix` or `drop`", "which stay with the owner"),
+                         ("No finding is left open for the owner.", "An `owner` finding stays open for the owner.")):
+            self.assertIn("review-escalation", self.doc_swap("REVIEW.md", old, new))
+
+    # R1-03: the stale ask wording.
+    def test_the_over_cap_exception_is_stated_where_the_stop_and_ask_rule_is(self):
+        clause = "The over-cap deferrals of the delegated decisions (3) are the exception."
+        self.assertIn(clause.lower(), prompt_rules.normalize(real("orchestrator")).lower())
+        self.assertIn("delegated-decisions", self.role_swap("orchestrator", clause, ""))
+        follow = "minors out of the PR's scope or at the line guard may still be deferred (owner decision, #15 comment 7075812943)"
+        self.assertIn("followups-over-cap", self.doc_swap("docs/FOLLOW-UPS.md", follow, ""))
+
+    def test_risk_high_is_no_longer_listed_as_needing_an_owner_approval(self):
+        norm = prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))
+        self.assertNotIn("starting `risk:high` work", norm)
+        self.assertIn("orch-delegated-decisions", self.doc_swap(
+            "docs/ORCHESTRATION.md", "Approvals of orchestrator decisions (merges of PRs that stay with the owner)",
+            "Approvals of orchestrator decisions (merges, starting `risk:high` work)"))
+
+    def test_the_approver_record_is_named_where_owner_only_prs_wait_for_the_owner(self):
+        for path, rule in (("REVIEW.md", "review-approver-record"), ("docs/PLAN.md", "plan-approver-record")):
+            norm = prompt_rules.normalize(self.doc(path))
+            self.assertIn("the approver's record", norm, path)
+            self.assertIn(rule, self.doc_swap(path, "the approver's record", "nothing"))
+
+    # R1-04: one scope rule in both texts.
+    def test_the_approver_scope_is_that_of_section_7_5_and_matches_merge_ready(self):
+        clause = ("every owner-only changed path is tooling, build, CI or gate (`scripts/`, build files, `ci.yml` and other workflows, "
+                  "`verification-metadata`, architecture and gate tests, `merge_ready.py` and similar); a path that may merge as `general` "
+                  "(`scripts/merge_ready.py`) does not count")
+        self.assertIn(clause.lower(), prompt_rules.normalize(real("approver")).lower())
+        self.assertIn("approver-role", self.role_swap("approver", "a path that may merge as `general` (`scripts/merge_ready.py`) does not count", ""))
+        self.assertIn("approver-role", self.role_swap("approver", "every owner-only changed path is", "every changed path is"))
+        import merge_ready
+        self.assertFalse(merge_ready.owner_only("docs/tasks.toml"))  # the example of R1-04: a gate PR that marks its task done
 
 
 if __name__ == "__main__":
