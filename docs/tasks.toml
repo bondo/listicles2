@@ -1235,11 +1235,12 @@ notes = "P9 of docs/milestones/M1.md; wireframes 42, 43; implements the ProfileR
 id = "M1-40"
 title = "Process docs wording: owner-merge exceptions next to the merge-agent rule (issue 147), dispatcher review line (issue 218)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env (process docs and prompts), rule test first, owner merge; after the #255/#256 process-docs PR. Also #260 items 1, 9-11. Then the detekt 2.0 tracking of issue 218 moves to M6 (Q7)"
+pr = 293
+notes = "Tooling env (process docs and prompts), rule test first, owner merge; after the #255/#256 process-docs PR. Also #260 items 1, 9-11 and the token rules of #15 comment 7070278995 (ORCHESTRATION 7.2.3). Then the detekt 2.0 tracking of issue 218 moves to M6 (Q7): the orchestrator re-labels #218 target:M6 after the merge; no M6 task row (M6 has no agent task)"
 
 [[task]]
 id = "M1-41"
