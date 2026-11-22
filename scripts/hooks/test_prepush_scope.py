@@ -4,6 +4,7 @@ Tests prepush_scope.py: the pre-push hook skips the Android build for diffs that
 imports; HookSuiteInputs derives that set from the hook code itself. Unknown or empty ranges run it."""
 
 import ast
+import functools
 import os
 import posixpath
 import subprocess
@@ -256,15 +257,16 @@ class HookTestsCli(RepoCase):
         self.assertEqual(self.scope(self.rev(), self.base), "skip")  # hook tests run, Gradle does not
 
 
-def path_of(base, args, loops, names):
+def path_of(base, args, rows_of, names):
     """The repo-relative paths an os.path.join-style argument list names: constants and module-level string names as written,
-    f-strings with X for each substitution, a loop variable over literal rows expanded (starred or not), any other value as the
-    placeholder segment X. None when a starred argument cannot be read (the caller reports it)."""
+    f-strings with X for each substitution, a variable of an enclosing loop over literal rows expanded (starred or not), any other
+    value as the placeholder segment X. None when a starred argument cannot be read (the caller reports it)."""
     variants = [[base] if base else []]
     for a in args:
         var = a.value if isinstance(a, ast.Starred) else a
-        if isinstance(var, ast.Name) and var.id in loops:
-            variants = [v + list(row) for v in variants for row in loops[var.id]]
+        rows = rows_of(var.id) if isinstance(var, ast.Name) else None
+        if rows is not None:
+            variants = [v + list(row) for v in variants for row in rows]
         elif isinstance(a, ast.Starred):
             return None
         elif isinstance(a, ast.Constant) and isinstance(a.value, str):
@@ -279,33 +281,51 @@ def path_of(base, args, loops, names):
     return [posixpath.normpath("/".join(v)) if v else "." for v in variants]
 
 
+def literal_rows(loop):
+    """The rows of `for v in (("a", "b"), ...)` or `for v in ("a", ...)`, or None when the iterable is not such a literal."""
+    if not isinstance(loop.iter, (ast.Tuple, ast.List)):
+        return None
+    rows = [[e.value for e in t.elts] if isinstance(t, ast.Tuple) else [t.value] if isinstance(t, ast.Constant) else None
+            for t in loop.iter.elts]
+    return rows if all(r is not None and all(isinstance(x, str) for x in r) for r in rows) else None
+
+
 def hook_code_reads(sources):
     """Repo paths named by the hook code in `sources` ({file name: source}): calls to a `read(...)` helper and os.path.join on
-    ROOT, SCRIPT_ROOT (the repo root) or HERE (scripts/hooks). Returns (paths as {path: [file]}, unreadable as [file:line])."""
+    ROOT, SCRIPT_ROOT (the repo root) or HERE (scripts/hooks). A name resolves only through its innermost enclosing `for`.
+    Only the `read` helper's own pass-through of its *parts is exempt. Returns (paths as {path: [file]}, unreadable as [file:line])."""
     paths, unreadable = {}, []
     for name, src in sorted(sources.items()):
         tree = ast.parse(src)
-        loops, helper_args = {}, set()
+        parent = {id(c): n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
         names = {t.id: n.value.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
                  and isinstance(n.value.value, str) for t in n.targets if isinstance(t, ast.Name)}
+        helper_args = set()
         for node in ast.walk(tree):
-            if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and isinstance(node.iter, (ast.Tuple, ast.List)):
-                rows = [[e.value for e in t.elts] if isinstance(t, ast.Tuple) else [t.value] if isinstance(t, ast.Constant) else None
-                        for t in node.iter.elts]
-                if all(r is not None and all(isinstance(x, str) for x in r) for r in rows):
-                    loops[node.target.id] = rows
-            if isinstance(node, ast.FunctionDef) and node.args.vararg:
+            if isinstance(node, ast.FunctionDef) and node.name == "read" and node.args.vararg:
                 helper_args |= {id(c) for c in ast.walk(node) if isinstance(c, ast.Call)
                                 and any(isinstance(a, ast.Starred) and getattr(a.value, "id", None) == node.args.vararg.arg for a in c.args)}
+
+        def rows_of(var, call):
+            n = parent.get(id(call))
+            while n is not None:
+                if isinstance(n, ast.For) and isinstance(n.target, ast.Name) and n.target.id == var:
+                    return literal_rows(n)
+                if isinstance(n, (ast.FunctionDef, ast.Lambda)) and var in {a.arg for a in n.args.args + n.args.kwonlyargs}:
+                    return None
+                n = parent.get(id(n))
+            return None
+
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or id(node) in helper_args:
                 continue
             f = node.func
+            resolve = functools.partial(rows_of, call=node)
             if isinstance(f, ast.Name) and f.id == "read":
-                found = path_of("", node.args, loops, names)
+                found = path_of("", node.args, resolve, names)
             elif (isinstance(f, ast.Attribute) and f.attr == "join" and ast.unparse(f) == "os.path.join" and node.args
                   and isinstance(node.args[0], ast.Name) and node.args[0].id in ("ROOT", "SCRIPT_ROOT", "HERE")):
-                found = path_of("scripts/hooks" if node.args[0].id == "HERE" else "", node.args[1:], loops, names)
+                found = path_of("scripts/hooks" if node.args[0].id == "HERE" else "", node.args[1:], resolve, names)
             else:
                 continue
             if found is None:
@@ -336,8 +356,10 @@ LISTED_DIRS = {"core": "core/X/build.gradle.kts", "scripts/hooks": "scripts/hook
 
 class HookSuiteInputs(unittest.TestCase):
     """The hook_tests_scope set is derived from the hook code: every repo path it reads, runs or copies must make the suite run.
-    Not seen by this parse: what a run script reads in turn (scripts/ is a prefix for that reason) and guards.sh on the whole repo
-    (test_guards_sh's self-check), which pre-push runs on every push anyway. CI runs the full suite on every PR as the backstop."""
+    Not seen by this parse: what a run script reads in turn (scripts/ is a prefix for that reason), commands run with cwd=ROOT
+    (today the mark-ready and update-branch wrappers and git ls-files on them, all under scripts/), root paths built other than
+    with os.path.join, and guards.sh on the whole repo (test_guards_sh's self-check), which pre-push runs on every push anyway.
+    CI runs the full suite on every PR as the backstop."""
 
     def test_every_repo_path_the_hook_code_reads_runs_the_suite(self):
         paths, unreadable = hook_code_reads(hook_sources())

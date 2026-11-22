@@ -23,9 +23,10 @@ SKIP_FILES = {"README.md", "CLAUDE.md", "REVIEW.md"}
 # scripts/hooks/*.py and fails when a repo path it names is not covered here. scripts/ is a prefix because the suite runs scripts by
 # computed names and they read further files; *.py anywhere because test_guards_sh greps every tracked .py file for lint suppressions.
 # guards.sh on the whole repository (test_guards_sh's self-check) needs nothing here: pre-push runs guards.sh on every push.
+# .gitattributes and .gitmodules change what the git commands the suite runs see (git grep -I, diffs in test repos).
 HOOK_SUITE_PREFIXES = ("scripts/", ".githooks/", ".claude/", ".github/", "agents/")
 HOOK_SUITE_FILES = {
-    "CLAUDE.md", "REVIEW.md", ".gitignore", "docs/PLAN.md", "docs/ORCHESTRATION.md", "docs/tasks.toml", "handoff/TEMPLATE.md",
+    "CLAUDE.md", "REVIEW.md", ".gitignore", ".gitattributes", ".gitmodules", "docs/PLAN.md", "docs/ORCHESTRATION.md", "docs/tasks.toml", "handoff/TEMPLATE.md",
     "app/src/androidTest/kotlin/dk/bjarkebjarke/tally/TallyAppTest.kt",
 }
 HOOK_SUITE_GLOBS = ("core/*/build.gradle.kts",)
@@ -72,8 +73,9 @@ def changed_paths(local, remote):
         return None
     else:
         base = remote
-    out = run_git("diff", "--name-only", "--no-renames", base, local)  # renames must show both paths
-    return None if out is None else [p for p in out.splitlines() if p]
+    # Renames must show both paths; -z and quotePath off keep non-ASCII names unquoted (a quoted name matches no prefix).
+    out = run_git("-c", "core.quotePath=false", "diff", "--name-only", "-z", "--no-renames", base, local)
+    return None if out is None else [p for p in out.split("\0") if p]
 
 
 def paths_mode():
