@@ -1,7 +1,8 @@
 """Build guards (M1-51, issue 257, checklist follow-up 4 in docs/ANDROID-BEST-PRACTICES.md): the targetSdk floor.
 
 Every `targetSdk` in a Gradle build file (`*.gradle.kts`, `*.gradle`) is a literal at or above TARGET_SDK_FLOOR, the Play minimum for new
-apps and updates (36 since 2026-08-31). A value this script cannot read (an expression, a variable, a preview) fails too, and so does a
+apps and updates (36 since 2026-08-31). A value this script cannot read (an expression, a variable, a preview) and any other way of setting it (a qualifier or chain it
+does not know) fail too, and so does a
 tree with no targetSdk at all, so a moved or renamed build file cannot make the check pass vacuously. Comments and strings are ignored.
 
 The manifest guard (follow-up 5, M1-58) and the catalog-only coordinates guard (follow-up 3, M1-59) are added to this script by their own PRs.
@@ -119,6 +120,11 @@ def line_of(text, offset):
 TARGET_STATEMENT = re.compile(
     r"(?:^|[{;])[ \t]*(?:\w+\??\.)*(setTargetSdk(?:Version)?|targetSdk(?:Version|Preview)?)\b(?=[ \t]*[=({]|[ \t]+[\w\"'])", re.M
 )
+# Every mention of the name. One that is followed by `=`, `(`, `{` or a literal and was not read as a statement above could set a target in
+# a form the pattern above does not know (`getByName("x").targetSdk = 30`, `a!!.targetSdk = 30`, a chain split over lines), so it fails
+# closed (R2-01) instead of hiding a low value next to a plain one. A read (`f(x.targetSdk)`, `x.targetSdk == 36`, `targetSdk: Int`) is not.
+TARGET_TOKEN = re.compile(r"(?<![\w$])(?:setTargetSdk(?:Version)?|targetSdk(?:Version|Preview)?)\b")
+TARGET_SETS = re.compile(r"[ \t\r\n]*(?:=(?!=)|\(|\{)|[ \t]+[\d\"']")
 TARGET_ASSIGN = re.compile(r"[ \t]*=[ \t]*(\d+)(?=[ \t]*(?:$|;|\}))", re.M)
 TARGET_CALL = re.compile(r"[ \t]*\([ \t]*(\d+)[ \t]*\)")
 TARGET_GROOVY = re.compile(r"[ \t]+(\d+)(?=[ \t]*(?:$|;|\}))", re.M)
@@ -146,6 +152,13 @@ def scan_target_sdk(root):
             values.append((p, line, value))
             if value < TARGET_SDK_FLOOR:
                 problems.append(f"{p}:{line}: targetSdk {value} is below the Play minimum {TARGET_SDK_FLOOR}")
+        statements = {m.start(1) for m in TARGET_STATEMENT.finditer(text)}
+        for m in TARGET_TOKEN.finditer(text):
+            if m.start() not in statements and TARGET_SETS.match(text, m.end()):
+                problems.append(
+                    f"{p}:{line_of(text, m.start())}: {m.group()} is set in a form this guard cannot read; "
+                    f"write `targetSdk = <number>` as its own statement, so the floor of {TARGET_SDK_FLOOR} can be checked"
+                )
     return problems, values
 
 
