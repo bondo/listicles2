@@ -20,7 +20,7 @@ renders it and pushes it to the `status` branch (task M0.5-27). The README embed
 2. `scripts/status_visual.py render` turns that JSON plus `docs/tasks.toml` into `status.svg`, a tiny `status.json`, the detail page `status.md` and the graph `status-graph.svg`.
    It is offline and deterministic. Every title is stripped of control characters, clipped and XML-escaped.
 3. `scripts/status_publish.py` pushes the files to the `status` branch with a plain push (creates the orphan branch
-   if missing, never force-pushes). It makes no commit when the SVG is unchanged apart from the "updated" stamp and the page is unchanged, so the
+   if missing, never force-pushes). It makes no commit when the SVG is unchanged apart from the "updated" stamp and the page and the graph are unchanged, so the
    stamp shows the time of the last change, not of the last check.
 
 Runs: every 30 minutes, on `workflow_dispatch`, on `issues` events and on push to `main`. There is no `pull_request`
@@ -35,9 +35,9 @@ a light or a dark GitHub page, but it may not match the page's theme.
 A directed graph of every task that is not done, from the same model as `status.svg` (`scripts/status_graph.py`, task M1-70).
 It is written next to the SVG by `status_visual.py render` (`--graph` overrides the path) and published to the `status` branch by
 `status_publish.py` next to `status.svg`, so the workflow needs no change. The README embeds it under the status picture.
-- **Nodes** are open tasks only; done and dropped tasks are not drawn. A node shows the task id (the full title is a tooltip, and
-  the detail page has every title). Nodes sit in one band per milestone that has open tasks; the band label says how many of that
-  milestone's tasks are done, like "M1 Accounts and households: 32/76 done, 44 open". Milestones that are all done, or not planned
+- **Nodes** are open tasks only; done and dropped tasks are not drawn. A node shows the task id (the full title is a tooltip when the SVG is
+  opened on its own, not inside the README, and the detail page has every title). Nodes sit in one band per milestone that has open tasks; the band label says how many of that
+  milestone's tasks are done, like "M1 Accounts and households: 35/78 done, 43 open". Milestones that are all done, or not planned
   yet, have no band and are named in a line under the title.
 - **Colour and shape** are the derived state, the same markers as the status picture: green circle = ready, blue triangle = in
   progress (an open PR names the task), yellow square = blocked (unmet dependencies or a `blocked` label), red diamond = owner to-do.
@@ -46,7 +46,7 @@ It is written next to the SVG by `status_visual.py render` (`--graph` overrides 
   transitive reduction): A to C is not drawn when A to B to C exists, so what you see is the shortest set of arrows with the same
   meaning. The legend says so and counts what is hidden.
 - **Not drawn**: a dependency on a done or dropped task (no node to point from), and a `milestone:Mx` dependency ("all of Mx", which
-  has no single node). The legend counts both ("82 dependencies on done tasks, 2 on whole milestones").
+  has no single node). The legend counts both (like "80 dependencies on done or dropped tasks, 2 on whole milestones").
 - **Layout** is a deterministic layered layout in plain Python (no layout tool, no network): a task's column is the length of its
   longest chain of open dependencies, so arrows run left to right; rows inside a band are ordered by a few barycentre sweeps.
   The same input gives the same bytes, and there is no clock in the picture, so the publisher compares it byte for byte and

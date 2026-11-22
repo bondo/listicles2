@@ -9,7 +9,7 @@ open-task graph status-graph.svg the same way (--graph, or a file of that name n
 compared byte for byte.
 
 Creates the orphan branch when the remote has none; builds a new commit on the remote tip otherwise; makes no
-commit when the SVG is unchanged apart from its generated stamp and the page is unchanged. Never force-pushes: a rejected push is retried once
+commit when the SVG is unchanged apart from its generated stamp and the page and the graph are unchanged. Never force-pushes: a rejected push is retried once
 on the fresh tip, then fails. Prints created, updated or unchanged. Exit 2 on any error.
 """
 

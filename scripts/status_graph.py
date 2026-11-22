@@ -79,6 +79,10 @@ def layers(ids, edges):
     return {i: depth(i) for i in ids}
 
 
+def attr(value):
+    return escape(value, {'"': "&quot;"})
+
+
 def plural(n, one, many):
     return f"{n} {one if n == 1 else many}"
 
@@ -149,7 +153,7 @@ def render_graph_svg(model):
     width_of = max((status_visual.text_width(n["id"]) for n in nodes), default=0) * CHAR + NODE_PAD
     pitch = width_of + GAP
     columns = max(layer.values(), default=-1) + 1
-    width = max(MIN_WIDTH, 2 * PAD + columns * pitch - GAP)
+    width = max(MIN_WIDTH, 2 * PAD + 20 + columns * pitch - GAP)  # nodes sit 10 px inside their band
     out = []
 
     def text(x, y, content, cls="fg", extra=""):
@@ -193,11 +197,11 @@ def render_graph_svg(model):
             x1, y1, y2 = x1 + width_of, y1 + NODE_H // 2, y2 + NODE_H // 2
             dx = max((x2 - x1) // 2, 12)
             curve = f"M{x1} {y1} C{x1 + dx} {y1} {x2 - dx} {y2} {x2 - 1} {y2}"
-            edge_paths.append(f'<path d="{curve}" class="edge" data-from="{escape(a)}" data-to="{escape(b)}" marker-end="url(#ah)"/>')
+            edge_paths.append(f'<path d="{curve}" class="edge" data-from="{attr(a)}" data-to="{attr(b)}" marker-end="url(#ah)"/>')
         for n in nodes:
             x, ny = pos[n["id"]]
             mid = ny + NODE_H // 2
-            node_svg.append(f'<g data-id="{escape(n["id"])}" data-state="{n["state"]}">'
+            node_svg.append(f'<g data-id="{attr(n["id"])}" data-state="{n["state"]}">'
                             f'<title>{escape(n["id"] + ": " + status_visual.clip(n["title"], 100) + " (" + WORDS[n["state"]] + ")")}</title>'
                             f'<rect x="{x}" y="{ny}" width="{width_of}" height="{NODE_H}" rx="4" class="nd-{n["state"]}"/>'
                             f'{_marker(n["state"], x + 10, mid, *MARK[n["state"]])}'
@@ -209,9 +213,9 @@ def render_graph_svg(model):
         shapes.append(_marker(state, x + 6, legend_y - 4, cls, shape))
         shapes.append(f'<text x="{x + 16}" y="{legend_y}" class="fg s">{WORDS[state]}</text>')
         x += 24 + 7 * len(WORDS[state]) + 18
-    notes = ["Arrows point from dependency to dependent. Transitive arrows are not drawn (A to C is skipped when A to B to C exists): "
+    notes = ["Arrows point from dependency to dependent. Transitive arrows are not drawn (A to C is skipped when A to B to C exists):",
              f"{plural(graph['dropped_transitive'], 'transitive arrow', 'transitive arrows')} hidden.",
-             "Also not drawn: " + plural(graph["outside_done"], "dependency", "dependencies") + " on done tasks, "
+             "Also not drawn: " + plural(graph["outside_done"], "dependency", "dependencies") + " on done or dropped tasks, "
              + ("1 on a whole milestone." if graph["outside_milestone"] == 1 else f"{graph['outside_milestone']} on whole milestones.")]
     for k, ln in enumerate(notes):
         shapes.append(f'<text x="{PAD}" y="{legend_y + 22 + 16 * k}" class="muted s">{escape(ln)}</text>')
