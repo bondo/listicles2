@@ -561,6 +561,33 @@ class HookSuiteInputs(unittest.TestCase):
         for p in ("docs/a.md",):
             self.assertEqual(prepush_scope.hook_tests_scope([p]), "skip", p)  # so HookSuiteInputs would fail on them
 
+    def test_a_join_resolved_to_a_root_through_names_counts_once(self):
+        """R4-01 (regression in c6bbd8c): a join or read(...) that only path_of resolves to the repo root or scripts/hooks (loop
+        variable, module constant, empty f-string) is a root use again; os.path.join(ROOT, '.') still counts exactly once."""
+        src = "\n".join([
+            "import os, subprocess",
+            "HERE = os.path.dirname(os.path.abspath(__file__))",
+            "ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))",
+            "SUB = ''",
+            "UP = '..'",
+            "TOP = os.path.join(HERE, UP, UP)",
+            "subprocess.run(['git', 'ls-files'], cwd=TOP)",
+            "for d in ('scripts/hooks', '.'):",
+            "    subprocess.run(['git', 'ls-files'], cwd=os.path.join(ROOT, d))",
+            "subprocess.run(['git', 'ls-files', 'docs/FOLLOW-UPS.md'], cwd=os.path.join(ROOT, SUB))",
+            "os.path.join(ROOT, f'')",
+            "read(SUB)",
+            "os.path.join(ROOT, '.')",
+        ])
+        paths, unreadable, root_uses = hook_code_reads({"test_new.py": src})
+        self.assertEqual(root_uses, {"test_new.py": [6, 9, 10, 11, 12, 13]})
+        self.assertEqual(unreadable, [])
+
+    def test_a_root_name_as_a_string_key_or_argument_counts(self):
+        """R4-02: getattr(m, 'ROOT'), vars(m)['ROOT'] and globals()['HERE'] reach another module's root by name."""
+        src = "import m\ngetattr(m, 'ROOT')\nvars(m)['ROOT']\nglobals()['HERE']\nROOTS = {'ROOT': '.'}\n"
+        self.assertEqual(hook_code_reads({"test_new.py": src})[2], {"test_new.py": [2, 3, 4]})
+
     def test_an_imported_root_resolves_through_its_own_module(self):
         """R3-02: two modules define TOP differently; the import takes the named module's, and a root name from elsewhere counts."""
         m = "import os\nTOP = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))\n"
