@@ -16,8 +16,9 @@ import {
 // or a query filter can be a hole and still pass both, denied by this setup and not by its
 // authorization logic: it needs its own allow and deny tests in a seeded world (M1-08 on). So does
 // M1-08's helper that asserts each collection denies an unverified token: it must make each request
-// twice in one seeded world, assertSucceeds with a verified token and assertFails with an unverified
-// one, or it cannot fail.
+// twice in one seeded world, first assertFails with an unverified token (a denied request writes
+// nothing), then assertSucceeds with a verified one, or it cannot fail. Verified first is vacuous for
+// a create or delete: the unverified request then meets a changed world (an update, a missing doc).
 // The contexts hand out the compat Firestore type, used as is (no type casts).
 export type Db = ReturnType<RulesTestContext["firestore"]>;
 
