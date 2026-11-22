@@ -555,31 +555,27 @@ class Conventions(unittest.TestCase):
 
     def test_comments_strings_and_lookalikes_are_not_flagged(self):
         code = (
-            "// allprojects { }\n/* subprojects { } */\nval s = \"allprojects { }\"\nval myallprojects = 1\n"
+            "// allprojects { } minSdk\n/* subprojects { } jvmTarget */\nval s = \"allprojects { }\"\nval myallprojects = 1\n"
             "fun mysubprojects(f: () -> Unit) = f()\nval n = allprojects.size\n"
         )
-        self.assertEqual(self.problems({"build.gradle.kts": code}), [])
+        self.assertEqual(self.problems({"build.gradle.kts": code, "core/domain/build.gradle.kts": DOMAIN + code}), [])
 
     def test_a_module_without_a_convention_plugin_is_flagged(self):
         found = self.problems({"core/domain/build.gradle.kts": 'plugins {\n    alias(libs.plugins.kotlin.jvm)\n}\n'})
         self.assertEqual(found, ["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"])
 
-    def test_a_module_with_two_convention_plugins_is_flagged(self):
-        found = self.problems({"core/domain/build.gradle.kts": DOMAIN.replace("}", '    id("listicles.android.library")\n}')})
-        self.assertEqual(len(found), 1, found)
-        self.assertIn("applies 2", found[0])
-
-    def test_a_commented_out_convention_plugin_does_not_count(self):
-        found = self.problems({"core/domain/build.gradle.kts": 'plugins {\n    // id("listicles.jvm.library")\n}\n'})
-        self.assertEqual(len(found), 1, found)
+    def test_two_convention_plugins_or_a_commented_out_one_are_flagged(self):
+        for text, n in ((DOMAIN.replace("}", '    id("listicles.android.library")\n}'), 2), ('plugins {\n    // id("listicles.jvm.library")\n}\n', 0)):
+            with self.subTest(n=n):
+                self.assertEqual([f"core/domain/build.gradle.kts: applies {n} listicles convention plugins; apply exactly one (build-logic/)"],
+                                 self.problems({"core/domain/build.gradle.kts": text}))
 
     def test_a_module_without_a_build_file_is_flagged(self):
         found = self.problems({"core/domain/build.gradle.kts": None})
         self.assertEqual(found, [":core:domain: no build file at core/domain/build.gradle.kts"])
 
     def test_a_groovy_build_file_counts(self):
-        found = self.problems({"core/domain/build.gradle.kts": None, "core/domain/build.gradle": "plugins { id(\"listicles.jvm.library\") }\n"})
-        self.assertEqual(found, [])
+        self.assertEqual(self.problems({"core/domain/build.gradle.kts": None, "core/domain/build.gradle": DOMAIN}), [])
 
     def test_settings_without_modules_is_flagged(self):
         found = self.problems({"settings.gradle.kts": 'rootProject.name = "x"\n'})
@@ -602,9 +598,6 @@ class Conventions(unittest.TestCase):
                 found = self.problems({"core/domain/build.gradle.kts": DOMAIN + line + "\n"})
                 self.assertEqual(len(found), 1, found)
                 self.assertRegex(found[0], rf"^core/domain/build\.gradle\.kts:4: {re.escape(name)} is set by the convention plugins")
-
-    def test_owned_names_in_comments_are_not_flagged(self):
-        self.assertEqual(self.problems({"core/domain/build.gradle.kts": DOMAIN + "// minSdk and jvmTarget come from build-logic\n"}), [])
 
     def test_the_root_build_file_is_not_a_module(self):
         self.assertEqual(self.problems({"build.gradle.kts": 'tasks.withType<Detekt>().configureEach { jvmTarget = "17" }\n'}), [])

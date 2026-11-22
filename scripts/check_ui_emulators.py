@@ -4,7 +4,8 @@
   * ci.yml `ui` job: the parsed job equals one frozen mapping (EXPECTED_UI), which runs the `:app` and `:core:data` connected tests inside
     `firebase emulators:exec --only auth,firestore --project demo-tally`. Any other key, step, flag, `if`, `needs` or fallback fails,
   * verify.sh and the CI `tasks` job run this check and its tests; verify.sh compiles the :core:data androidTest sources,
-  * :core:data has :core:testing and the JUnit Platform on its unit tests (#217 item 3) and a smoke test using the emulators.
+  * :core:data has :core:testing and the JUnit Platform on its unit tests (#217 item 3; through its convention plugin, M1-46) and a smoke
+    test using the emulators.
 Run: python3 -I scripts/check_ui_emulators.py  (exit 1 and one line per problem).
 """
 
@@ -61,7 +62,9 @@ EXPECTED_UI = {
 }
 UI_PROBLEM = "ci.yml jobs.ui (parsed) is not equal to EXPECTED_UI in check_ui_emulators.py"
 DATA_COMPILE = ":core:data:assembleDebugAndroidTest"
-CLASSPATH = 'testImplementation(project(":core:testing"))'
+CONVENTION = "alias(libs.plugins.listicles.android.library)"
+CONVENTIONS_KT = "build-logic/src/main/kotlin/Conventions.kt"
+CLASSPATH = 'dependencies.add("testImplementation", dependencies.project(mapOf("path" to TEST_SUPPORT)))'
 
 
 def _active_lines(text):
@@ -120,12 +123,15 @@ def wiring_problems(root):
 def data_module_problems(root):
     problems = []
     build = (root / "core/data/build.gradle.kts").read_text()
-    if CLASSPATH not in build:
-        problems.append(f":core:data must have {CLASSPATH} (#217 item 3)")
+    if not re.search(rf"(?m)^\s*{re.escape(CONVENTION)}\s*$", build):
+        problems.append(f":core:data must apply {CONVENTION}, which adds :core:testing and the JUnit Platform (#217 item 3)")
+    conv = (root / CONVENTIONS_KT).read_text() if (root / CONVENTIONS_KT).is_file() else ""
+    if not re.search(rf"(?m)^\s*{re.escape(CLASSPATH)}\s*$", conv) or 'TEST_SUPPORT = ":core:testing"' not in conv:
+        problems.append(f"{CONVENTIONS_KT} must add :core:testing to every module's testImplementation (#217 item 3)")
     smoke = (root / SMOKE).read_text() if (root / SMOKE).is_file() else ""
-    if not re.search(r"(?m)^\s*unitTests\.all \{ it\.useJUnitPlatform\(\) \}\s*$", build):
+    if not re.search(r"(?m)^\s*useJUnitPlatform\(\)\s*$", conv):
         problems.append(
-            ":core:data must run its unit tests on the JUnit Platform (unitTests.all { it.useJUnitPlatform() }), "
+            f"{CONVENTIONS_KT} must run unit tests on the JUnit Platform (useJUnitPlatform()), "
             "or the :core:testing network block never installs (#217 item 3)"
         )
     if "@Test" not in smoke or "FirebaseEmulator.requireRunning()" not in smoke:

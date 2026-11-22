@@ -22,6 +22,7 @@ FIREBASE = "firebase/firebase.json"
 HELPER = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/FirebaseEmulator.kt"
 SMOKE = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/EmulatorSmokeTest.kt"
 BUILD = "core/data/build.gradle.kts"
+CONV = "build-logic/src/main/kotlin/Conventions.kt"
 EXEC = "firebase emulators:exec --only auth,firestore --project demo-tally"
 
 
@@ -30,7 +31,7 @@ class Wiring(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, VERIFY, FIREBASE, HELPER, SMOKE, BUILD):
+        for name in (CI, VERIFY, FIREBASE, HELPER, SMOKE, BUILD, CONV):
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / name, self.root / name)
 
@@ -126,15 +127,21 @@ class Wiring(unittest.TestCase):
         self.assertEqual(got, ["ci.yml tasks job has no step running: python3 -I scripts/check_ui_emulators.py"])
 
     def test_the_data_module_must_have_the_test_support_module_on_its_unit_test_classpath(self):
-        got = self.mutated(BUILD, 'testImplementation(project(":core:testing"))', "")
-        self.assertEqual(got, [":core:data must have testImplementation(project(\":core:testing\")) (#217 item 3)"])
+        msg = f"{CONV} must add :core:testing to every module's testImplementation (#217 item 3)"
+        for old, new in (('"testImplementation", dependencies', '"implementation", dependencies'), ('= ":core:testing"', '= ":core:other"')):
+            with self.subTest(new):
+                shutil.copy(ROOT / CONV, self.root / CONV)
+                self.assertEqual(self.mutated(CONV, old, new), [msg])
+        shutil.copy(ROOT / CONV, self.root / CONV)
+        got = self.mutated(BUILD, "listicles.android.library", "android.library")
+        self.assertEqual(got, [f":core:data must apply {c.CONVENTION}, which adds :core:testing and the JUnit Platform (#217 item 3)"])
 
     def test_the_data_module_must_run_unit_tests_on_the_junit_platform(self):
         # R1-02: the :core:testing network block is a JUnit Platform listener; on Gradle's JUnit 4 runner it never installs.
-        for old, new in (("useJUnitPlatform", "useJUnit"), ("unitTests.all {", "// unitTests.all {")):
+        for old, new in (("useJUnitPlatform()", "useJUnit()"), ("useJUnitPlatform()", "// useJUnitPlatform()")):
             with self.subTest(new):
-                shutil.copy(ROOT / BUILD, self.root / BUILD)
-                got = self.mutated(BUILD, old, new)
+                shutil.copy(ROOT / CONV, self.root / CONV)
+                got = self.mutated(CONV, old, new)
                 self.assertEqual(len(got), 1)
                 self.assertIn("JUnit Platform", got[0])
 

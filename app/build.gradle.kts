@@ -2,7 +2,7 @@ import com.google.gms.googleservices.GoogleServicesTask
 import org.gradle.process.CommandLineArgumentProvider
 
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.listicles.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
@@ -17,15 +17,12 @@ apply(from = rootProject.file("config/licensee/policy.gradle"))
 
 android {
     namespace = "dk.bjarkebjarke.tally"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "dk.bjarkebjarke.tally"
-        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "0.0.1"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -36,13 +33,7 @@ android {
         }
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
     testOptions {
-        unitTests.all { it.useJUnitPlatform() }
         // RenameTest reads the merged manifest and string resources.
         unitTests.isIncludeAndroidResources = true
     }
@@ -217,16 +208,7 @@ val checkUnitTestResults by tasks.registering(Exec::class) {
 
 tasks.withType<Test>().configureEach {
     systemProperty("tally.googleServicesStandIn", googleServicesStandIn)
-    // A test task that discovers zero tests is a failure, not a pass.
-    failOnNoDiscoveredTests = true
     if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        allWarningsAsErrors.set(true)
-    }
 }
 
 dependencies {
@@ -247,7 +229,6 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
-    testImplementation(project(":core:testing"))
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.vintage.engine)

@@ -18,13 +18,11 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
 
 The catalog-only coordinates guard (follow-up 3, M1-59) is added to this script by its own PR.
 
-4. Convention plugins (M1-46, issues 217 and 48). No Gradle file and no Kotlin source under build-logic/ configures other projects: an
-   `allprojects`/`subprojects` block or call, `configure(allprojects ...)`, `gradle.allprojects`, `gradle.beforeProject`/`afterProject`
-   (with or without `lifecycle`). Every module in a settings.gradle.kts `include(...)` has a build file that applies exactly one
-   `listicles.*` convention plugin and does not set again what those plugins own (Java and Kotlin JVM target, `-Xjdk-release`,
-   `allWarningsAsErrors`, JUnit Platform, `failOnNoDiscoveredTests`, compileSdk, minSdk). build-logic/ sources set no targetSdk (check 1
-   reads Gradle files only). Without a settings.gradle.kts the module part is skipped; the real-repository test checks that it reads four.
-   Known gap: a read of other projects (`allprojects.flatMap { ... }`) is not configuration and is not caught (M1-63).
+4. Convention plugins (M1-46, issue 217). No Gradle file or build-logic/ Kotlin source configures other projects (`allprojects`/`subprojects`
+   blocks or calls, `configure(allprojects ...)`, `gradle.allprojects`/`beforeProject`/`afterProject`). Every module in settings.gradle.kts
+   `include(...)` applies exactly one `listicles.*` convention plugin and does not set again what they own (see OWNED). build-logic/ sets no
+   targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
+   Known gap: a read of other projects (`allprojects.flatMap { ... }`) is not caught (issue 48, M1-63).
 
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
@@ -352,7 +350,8 @@ def convention_problems(root):
     for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
         text = strip(read(root, p), blank_strings=True)
         for m in CROSS_PROJECT.finditer(text):
-            problems.append(f"{p}:{line_of(text, m.start())}: configures other projects ({m.group().strip()}); move it into a convention plugin in build-logic/")
+            where = f"{p}:{line_of(text, m.start())}"
+            problems.append(f"{where}: configures other projects ({m.group().strip()}); move it into a convention plugin in build-logic/")
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
                 problems.append(f"{p}:{line_of(text, m.start())}: {m.group()} in build-logic; set it in the module build file, where the floor guard reads it")

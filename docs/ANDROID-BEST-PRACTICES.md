@@ -161,6 +161,7 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 |---|---|
 | Dependencies and plugins only through `gradle/libs.versions.toml`, kebab-case names, `alias(libs.plugins...)` | tooling in part: the catalog exists; nothing fails a hardcoded `"group:name:version"`, a guard is proposed |
 | Configuration cache and build cache on | tooling in part: set in `gradle.properties` |
+| Shared module settings in convention plugins (`build-logic/`: `listicles.jvm.library`, `listicles.jvm.testsupport`, `listicles.android.library`, `listicles.android.application`), no `allprojects`/`subprojects` configuration | tooling: `scripts/check_build_guards.py` check 4 (M1-46); the cross-project reads of the root check tasks go in M1-63 |
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
 | JVM modules use only Java and Android API available at minSdk 26 (lint NewApi skips pure JVM modules; no desugaring is configured) | tooling: `checkJdkRelease` (JDK 17 API) and `checkJavaApiLevel` (`scripts/check_java_api_level.py` reads the main classes of every JVM module against `api-versions.xml` of the compileSdk platform; M1-37) |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
