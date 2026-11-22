@@ -290,6 +290,18 @@ def literal_rows(loop):
     return rows if all(r is not None and all(isinstance(x, str) for x in r) for r in rows) else None
 
 
+def rows_of(var, call, parent):
+    """The literal rows of the innermost `for var in ...` around `call`; None when a function parameter or nothing binds it first."""
+    n = parent.get(id(call))
+    while n is not None:
+        if isinstance(n, ast.For) and isinstance(n.target, ast.Name) and n.target.id == var:
+            return literal_rows(n)
+        if isinstance(n, (ast.FunctionDef, ast.Lambda)) and var in {a.arg for a in n.args.args + n.args.kwonlyargs}:
+            return None
+        n = parent.get(id(n))
+    return None
+
+
 def hook_code_reads(sources):
     """Repo paths named by the hook code in `sources` ({file name: source}): calls to a `read(...)` helper and os.path.join on
     ROOT, SCRIPT_ROOT (the repo root) or HERE (scripts/hooks). A name resolves only through its innermost enclosing `for`.
@@ -306,21 +318,11 @@ def hook_code_reads(sources):
                 helper_args |= {id(c) for c in ast.walk(node) if isinstance(c, ast.Call)
                                 and any(isinstance(a, ast.Starred) and getattr(a.value, "id", None) == node.args.vararg.arg for a in c.args)}
 
-        def rows_of(var, call):
-            n = parent.get(id(call))
-            while n is not None:
-                if isinstance(n, ast.For) and isinstance(n.target, ast.Name) and n.target.id == var:
-                    return literal_rows(n)
-                if isinstance(n, (ast.FunctionDef, ast.Lambda)) and var in {a.arg for a in n.args.args + n.args.kwonlyargs}:
-                    return None
-                n = parent.get(id(n))
-            return None
-
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or id(node) in helper_args:
                 continue
             f = node.func
-            resolve = functools.partial(rows_of, call=node)
+            resolve = functools.partial(rows_of, call=node, parent=parent)
             if isinstance(f, ast.Name) and f.id == "read":
                 found = path_of("", node.args, resolve, names)
             elif (isinstance(f, ast.Attribute) and f.attr == "join" and ast.unparse(f) == "os.path.join" and node.args
