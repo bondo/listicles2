@@ -51,6 +51,9 @@ It is written next to the SVG by `status_visual.py render` (`--graph` overrides 
   longest chain of open dependencies, so arrows run left to right; rows inside a band are ordered by a few barycentre sweeps.
   The same input gives the same bytes, and there is no clock in the picture, so the publisher compares it byte for byte and
   commits only when the graph really changed. A long arrow can pass behind the nodes it skips.
+- **Size**: the picture grows with the longest chain of open tasks (one column each). GitHub scales it to the README column (about
+  830 px), so the text is drawn large enough (14 px) to stay at 9 px or more after scaling (tested for a 13-column chain with 6-character
+  ids); click the image to open it at full size.
 - Light and dark mode and contrast follow the status picture (theme classes only, text contrast at least 4.5:1 on every node fill,
   checked by `scripts/test_status_graph.py`).
 
