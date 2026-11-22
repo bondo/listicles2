@@ -213,8 +213,8 @@ def wiring_problems(text):
     for script in ci_scope.SELFTESTS:
         if script in static:
             problems.append(f"static: calls {script} directly")
-    if "scripts/hooks/run_hook_tests.py --jobs 4" not in (job_in(text, "guards") or ""):
-        problems.append("guards: hook tests not run with --jobs 4")
+    if "scripts/hooks/run_hook_tests.py --jobs 8" not in (job_in(text, "guards") or ""):
+        problems.append("guards: hook tests not run with --jobs 8")
     if "python3 -I scripts/test_ci_scope.py" not in text:
         problems.append("ci.yml does not run test_ci_scope.py")
     return problems
@@ -252,7 +252,7 @@ class CiWiring(unittest.TestCase):
             ("static: gradle step does not use gradle-exclude", ':app:lintDebug "${exclude[@]}"', ":app:lintDebug"),
             ("static: no two-commit checkout", "fetch-depth: 2", "fetch-depth: 1"),
             ("static: calls scripts/test_warnings_gate.py directly", step, "      - run: python3 -I scripts/test_warnings_gate.py\n" + step),
-            ("guards: hook tests not run with --jobs 4", "run_hook_tests.py --jobs 4", "run_hook_tests.py"),
+            ("guards: hook tests not run with --jobs 8", "run_hook_tests.py --jobs 8", "run_hook_tests.py --jobs 4"),
             ("ci.yml does not run test_ci_scope.py", "python3 -I scripts/test_ci_scope.py", "python3 -I scripts/test_nothing.py"),
             ("static: does not run ci_scope.py selftests", "ci_scope.py selftests\n", "ci_scope.py selftests\n          || true\n"),
         ]
