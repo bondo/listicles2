@@ -13,13 +13,17 @@ import dk.bjarkebjarke.tally.TallyApp
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.start.EmailVerification
 import dk.bjarkebjarke.tally.domain.start.HouseholdNotice
+import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
+import dk.bjarkebjarke.tally.domain.start.NameState
 import dk.bjarkebjarke.tally.domain.start.StartStep
+import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import dk.bjarkebjarke.tally.testing.FakeEmailVerification
 import dk.bjarkebjarke.tally.testing.FakeHouseholdNotices
 import dk.bjarkebjarke.tally.testing.FakeNameState
 import dk.bjarkebjarke.tally.testing.FakeSessionState
 import dk.bjarkebjarke.tally.testing.FakeUpdateGate
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import org.junit.Rule
 import org.junit.Test
@@ -41,7 +45,13 @@ class StartRoutingTest {
     private val signIn = context.getString(R.string.app_tag)
     private val home = context.getString(R.string.lists_empty_title)
 
-    private fun start(source: SessionState = session): StartViewModel {
+    private fun start(
+        source: SessionState = session,
+        update: UpdateGate = this.update,
+        email: EmailVerification = this.email,
+        name: NameState = this.name,
+        notices: HouseholdNotices = this.notices,
+    ): StartViewModel {
         val viewModel = StartViewModel(update, source, email, name, notices)
         compose.setContent { TallyApp(viewModel) }
         return viewModel
@@ -196,12 +206,75 @@ class StartRoutingTest {
         compose.onNodeWithText(home).assertExists()
     }
 
+    /** R1-01: a failing later gate fails closed at its own step, never at sign-in, and the session stays observed. */
     @Test
-    fun aFailingGateSourceOpensSignInNotTheHome() {
+    fun aFailingEmailGateStopsAtVerifyEmailNotSignIn() {
         session.signedIn = true
-        val failing = EmailVerification { flow { throw IllegalStateException("gate failed") } }
-        val viewModel = StartViewModel(update, session, failing, name, notices)
-        compose.setContent { TallyApp(viewModel) }
+        val viewModel = start(email = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.VerifyEmail)
+    }
+
+    @Test
+    fun aFailingNameGateStopsAtTheNameStep() {
+        session.signedIn = true
+        val viewModel = start(name = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.EnterName)
+    }
+
+    @Test
+    fun aFailingNoticeGateDoesNotBlockTheHome() {
+        session.signedIn = true
+        val viewModel = start(notices = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
+    }
+
+    @Test
+    fun aFailingUpdateGateDoesNotBlockTheStart() {
+        session.signedIn = true
+        val viewModel = start(update = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
+    }
+
+    @Test
+    fun afterAGateFailureTheSessionIsStillObserved() {
+        session.signedIn = true
+        var collects = 0
+        val flaky =
+            EmailVerification {
+                flow {
+                    check(collects++ != 0) { "first read failed" }
+                    emit(true)
+                }
+            }
+        val viewModel = start(email = flaky)
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.VerifyEmail)
+        session.signedIn = false
+        compose.waitForIdle()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
+        session.signedIn = true
+        compose.waitForIdle()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
+    }
+
+    /** R1-02: signed out must not wait on, or even collect, the later gates (they have no account to read). */
+    @Test
+    fun signedOutNeverCollectsTheLaterGates() {
+        session.signedIn = false
+        var collected = false
+        val viewModel =
+            start(
+                email = { flow { collected = true } },
+                name = { flow { collected = true } },
+                notices = { flow { collected = true } },
+            )
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
+        collected shouldBe false
+    }
+
+    @Test
+    fun signedOutDoesNotWaitOnALaterGateThatNeverEmits() {
+        session.signedIn = false
+        val viewModel = start(name = { flow { awaitCancellation() } })
         viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
     }
 
