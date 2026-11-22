@@ -909,19 +909,31 @@ notes = "Join includes the one-household check (PLAN 3.1): deny a join without t
 
 [[task]]
 id = "M1-30"
-title = "App skeleton: Hilt, Navigation 3, root with the start-up gates, M1 home, connectivity helper, Google Services plugin + stand-in config"
+title = "App skeleton: Hilt with KSP, Google Services plugin + generated stand-in config, Connectivity helper (SYNC-03)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-29", "M1-02", "M1-36", "M1-49"]
+pr = 304
+notes = "Split 2026-11-22 (orchestrator, the 400-line rule): the start-up root, gates and M1 home moved to M1-60. The stand-in config is generated under build/ only when no app/google-services.json exists; no google-services.json is tracked (scripts/test_gitignore_secrets.py)"
+
+[[task]]
+id = "M1-60"
+title = "Start-up root: Navigation 3, P10 gates (#195, Q2 A), M1 home (#194, Q1 A), one routing test with fakes over all gates, signed-out start shows sign-in"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-29", "M1-02", "M1-36", "M1-49"]
-notes = "Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A; one routing test with fakes over all gates (#194, #195)"
+depends_on = ["M1-30", "M1-36", "M1-49"]
+notes = "Second half of the M1-30 split. Gate order P10 (docs/milestones/M1.md section 8), home per Q1 A (Lists empty state without Create list), unverified start per Q2 A. If it sizes over 450 lines: (b1) the Navigation 3 root, the home and signed-in/out routing, then (b2) the remaining gates and the household notice step, as a new task"
 
 [[task]]
 id = "M1-13"
 title = "Domain: email, password and name validation (12+ code points, name 1-50), property tests"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 303
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-37"]
@@ -934,7 +946,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-30", "M1-13", "M1-02", "M1-50"]
+depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
 notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState()"
 
 [[task]]
@@ -982,7 +994,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-14", "M1-30", "M1-02"]
+depends_on = ["M1-54", "M1-14", "M1-60", "M1-02"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1058,7 +1070,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-30", "M1-14"]
+depends_on = ["M1-60", "M1-14"]
 notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194)"
 
 [[task]]
@@ -1077,7 +1089,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-08", "M1-30"]
+depends_on = ["M1-08", "M1-60"]
 
 [[task]]
 id = "M1-28"
@@ -1097,7 +1109,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30"]
-notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4)"
+notes = "Tooling env (CI). Baseline and Startup Profiles are deferred to M6 (docs/milestones/M1.md section 4). From M1-30 (PR 304, self-review minor): without app/google-services.json a release build also gets the demo-tally stand-in; allow that only for this CI smoke build and fail any other release build"
 
 # Added by the M1 planning refresh (2026-11-21, docs/milestones/M1.md sections 5.1, 7 and 8).
 
@@ -1156,11 +1168,22 @@ notes = "Owner decisions 7003911995 and 7058176190 (Q5 A), cited in the PR; owne
 id = "M1-56"
 title = "Java API level check: also look up classes used only as class literals, annotations, checkcast, instanceof or catch targets (follow-up of M1-37)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-37"]
-notes = "Tooling env. Gap recorded in scripts/check_java_api_level.py: a java/ or android/ class that is only a class literal (X.class), an annotation type, or a checkcast, instanceof or catch target has no member reference, so it is not looked up. Needs a bytecode walk or the constant pool Class entries minus the bootstrap ones. Low value until domain code uses newer exception or interface types; schedule only if M1 domain code needs it"
+pr = 305
+notes = "Tooling env. Done: scripts/check_java_api_level.py walks the Code attributes (new, anewarray, multianewarray, checkcast, instanceof, ldc class, catch types) and the annotation attributes (types, enum types, class values, nested annotations, defaults) and looks each class up. Remaining gaps are M1-61"
+
+[[task]]
+id = "M1-61"
+title = "Java API level check: also look up classes named only in descriptors, Signature attributes, throws clauses, stack map frames and type annotations (follow-up of M1-56)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-56"]
+notes = "Tooling env. Gaps left by M1-56 (listed in the docstring of scripts/check_java_api_level.py): a java/ or android/ type that appears only in a field or method descriptor, a Signature, an Exceptions attribute, a StackMapTable frame or a RuntimeVisibleTypeAnnotations attribute. Low value: the JVM and ART load these lazily or not at all, and Kotlin emits type annotations only with -Xemit-jvm-type-annotations. Schedule only if M1 domain code needs it. Failing fixtures first, parse each attribute with the bounds-checked Reader and fail closed"
 
 [[task]]
 id = "M1-50"
@@ -1177,11 +1200,12 @@ notes = "Issue 257. Failing fixtures first. Before M1-14, the first repository"
 id = "M1-57"
 title = "Konsist: no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI module (checklist proposed follow-up 1, rest)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-50"]
-notes = "Split from M1-50, which covers the data-source and GlobalScope halves. Failing fixtures first, in the architecture package next to DataSourceRules. The DI module and its path do not exist yet: decide the rule for `Dispatchers.` with the first DI module (M1-02 or later), and keep it inert until then only if a fixture proves it fires. Before M1-16, the first ViewModel"
+pr = 307
+notes = "Split from M1-50, which covers the data-source and GlobalScope halves. Failing fixtures first, in the architecture package next to DataSourceRules. The DI module and its path do not exist yet: decide the rule for `Dispatchers.` with the first DI module (M1-02 or later), and keep it inert until then only if a fixture proves it fires. Before M1-16, the first ViewModel. Decided in PR 307: the rule keys on a Dagger or Hilt `@Module` file, not a path, so it is active now (fixtures prove it fires)"
 
 [[task]]
 id = "M1-51"
@@ -1198,11 +1222,12 @@ pr = 296
 id = "M1-58"
 title = "Build guard: manifest cleartext and backup (checklist follow-up 5), in scripts/check_build_guards.py"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-51"]
 notes = "Issue 257. Tooling env where it touches guards or CI; failing fixtures first. Fail on usesCleartextTraffic or cleartextTrafficPermitted other than false (manifests and every res/xml network security config), and on allowBackup other than false (or missing in the main manifest) without both dataExtractionRules and fullBackupContent as @xml resources that exist; fail closed on unreadable values and when no manifest with an application element is found. Update the section 9 rows of docs/ANDROID-BEST-PRACTICES.md and follow-up 5"
+pr = 308
 
 [[task]]
 id = "M1-59"
@@ -1355,7 +1380,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]
@@ -1381,7 +1406,7 @@ depends_on = [
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
-  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59",
+  "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
 ]
 
 [[task]]

@@ -1,11 +1,22 @@
-"""Build guards (M1-51, issue 257, checklist follow-up 4 in docs/ANDROID-BEST-PRACTICES.md): the targetSdk floor.
+"""Build guards (M1-51 and M1-58, issue 257, checklist follow-ups 4 and 5 in docs/ANDROID-BEST-PRACTICES.md): the targetSdk floor and the
+manifest cleartext and backup rules.
 
-Every `targetSdk` in a Gradle build file (`*.gradle.kts`, `*.gradle`) is a literal at or above TARGET_SDK_FLOOR, the Play minimum for new
+1. targetSdk floor. Every `targetSdk` in a Gradle build file (`*.gradle.kts`, `*.gradle`) is a literal at or above TARGET_SDK_FLOOR, the Play minimum for new
 apps and updates (36 since 2026-08-31). A value this script cannot read (an expression, a variable, a preview) fails too, and so does any
 other way of setting it (a qualifier or call chain it does not know), and so does a tree with no targetSdk at all, so a moved or renamed
 build file cannot make the check pass vacuously. Comments and strings are ignored.
 
-The manifest guard (follow-up 5, M1-58) and the catalog-only coordinates guard (follow-up 3, M1-59) are added to this script by their own PRs.
+2. Manifest. No `android:usesCleartextTraffic` or `cleartextTrafficPermitted` other than "false" (every manifest and every network security
+   config under `res/xml*`), and an `<application>` whose `allowBackup` is not "false" (a missing one counts as true in the main manifest;
+   an overlay manifest inherits it) must have both `android:dataExtractionRules` and `android:fullBackupContent`, each `@xml/<name>` with
+   that file present. A value that is not a literal, an unreadable file, and a tree with no manifest that has an `<application>` fail too.
+   Attributes are read by namespace (`android:` in a manifest, none in a network security config), so a `tools:` attribute cannot hide one.
+   An overlay manifest (`src/<set>/`) without `allowBackup` is skipped only when its module has a main manifest with an `<application>`.
+   The one scope exception: files of a `src/androidTest/` source set are not checked for cleartext (the test APK talks plain HTTP to the
+   Auth emulator on 10.0.2.2 and is never shipped), and such a manifest without `allowBackup` needs no main manifest; every other source
+   set is checked.
+
+The catalog-only coordinates guard (follow-up 3, M1-59) is added to this script by its own PR.
 
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
@@ -13,6 +24,7 @@ Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `bui
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 
 # Play: from 2026-08-31 new apps and updates must target API 36 or higher. Raise when the date changes; never lower.
 TARGET_SDK_FLOOR = 36
@@ -173,15 +185,146 @@ def target_sdk_problems(root):
     return problems
 
 
+# -- 3. manifest -------------------------------------------------------------------------------------------------------------------------
+
+def local(name):
+    return name.rsplit("}", 1)[-1]
+
+
+ANDROID_NS = "{http://schemas.android.com/apk/res/android}"
+
+
+def android_attrs(element):
+    """The `android:` attributes of a manifest element by local name; `tools:` and other namespaces with the same local name are not read."""
+    return {k[len(ANDROID_NS):]: v for k, v in element.attrib.items() if k.startswith(ANDROID_NS)}
+
+
+def plain_attrs(element):
+    """The attributes without a namespace (those of a network security config) by name."""
+    return {k: v for k, v in element.attrib.items() if not k.startswith("{")}
+
+
+def xml_resource_dirs(p):
+    parts = p.split("/")
+    return len(parts) >= 3 and parts[-2].startswith("xml") and parts[-3] == "res" and p.endswith(".xml")
+
+
+def module_of(p):
+    """The directory above `src/<set>/` of a source file, or its own directory (`""` is the repository root)."""
+    parts = p.split("/")
+    for i in range(len(parts) - 2):
+        if parts[i] == "src":
+            return "/".join(parts[:i])
+    return "/".join(parts[:-1])
+
+
+def is_overlay(p):
+    return re.search(r"(^|/)src/(?!main/)[^/]+/AndroidManifest\.xml$", p) is not None
+
+
+def is_android_test(p):
+    """True for a file of a module's `src/androidTest/` source set: it goes into the test APK only, which is never shipped."""
+    return "/src/androidTest/" in "/" + p
+
+
+def load_manifests(root):
+    """(application manifests as {path: root element}, other problems, number of manifest files seen)."""
+    found, problems, seen = {}, [], 0
+    for p in walk(root):
+        if os.path.basename(p) != "AndroidManifest.xml":
+            continue
+        seen += 1
+        try:
+            tree = ET.parse(os.path.join(root, *p.split("/")))
+        except (ET.ParseError, OSError) as e:
+            problems.append(f"{p}: cannot parse the manifest ({e})")
+            continue
+        if any(local(c.tag) == "application" for c in tree.getroot()):
+            found[p] = tree.getroot()
+    return found, problems, seen
+
+
+def application_manifests(root):
+    return sorted(load_manifests(root)[0])
+
+
+def xml_resource(root, module, value):
+    """None when `value` is `@xml/<name>` and <module>/src/*/res/xml*/<name>.xml exists, else the reason it is not."""
+    m = re.fullmatch(r"@xml/([A-Za-z0-9_]+)", value or "")
+    if not m:
+        return f'"{value}" is not an @xml/<name> resource'
+    base = os.path.join(root, *module.split("/")) if module else root
+    src = os.path.join(base, "src")
+    if os.path.isdir(src):
+        for variant in sorted(os.listdir(src)):
+            res = os.path.join(src, variant, "res")
+            if os.path.isdir(res) and any(
+                os.path.isfile(os.path.join(res, d, m.group(1) + ".xml")) for d in os.listdir(res) if d.startswith("xml")
+            ):
+                return None
+    return f"{value} is missing: no res/xml*/{m.group(1)}.xml in module {module or '.'}"
+
+
+def manifest_problems(root):
+    apps, problems, seen = load_manifests(root)
+    for p, top in sorted(apps.items()):
+        app = next(c for c in top if local(c.tag) == "application")
+        a = android_attrs(app)
+        for element in () if is_android_test(p) else top.iter():
+            v = android_attrs(element).get("usesCleartextTraffic")
+            if v is not None and v.lower() != "false":
+                problems.append(f'{p}: android:usesCleartextTraffic="{v}"; cleartext traffic must stay off')
+        backup = a.get("allowBackup")
+        mod = module_of(p)
+        main = apps.get((mod + "/" if mod else "") + "src/main/AndroidManifest.xml")
+        if backup is None and is_overlay(p) and (main is not None or is_android_test(p)):
+            continue  # inherits the value of the module's main manifest, which has an <application> and is checked itself; a test APK is not shipped
+        if backup is not None and backup.lower() == "false":
+            continue
+        rules = {k: a.get(k) for k in ("dataExtractionRules", "fullBackupContent")}
+        if is_overlay(p) and main is not None:  # a rule attribute the overlay lacks comes from the main manifest of the module
+            ma = android_attrs(next(c for c in main if local(c.tag) == "application"))
+            rules = {k: v if v is not None else ma.get(k) for k, v in rules.items()}
+        state = "missing, which means true" if backup is None else f'"{backup}"'
+        absent = [f"android:{k}" for k, v in rules.items() if v is None]
+        if absent:
+            problems.append(f"{p}: android:allowBackup is {state} without {' and '.join(absent)}; turn backup off or add both rule files")
+            continue
+        for k, v in rules.items():
+            why = xml_resource(root, module_of(p), v)
+            if why:
+                problems.append(f"{p}: android:{k} {why}")
+    for p in walk(root):
+        if not xml_resource_dirs(p):
+            continue
+        if is_android_test(p):
+            continue  # a network security config of the test APK may allow the emulators' plain HTTP
+        try:
+            top = ET.parse(os.path.join(root, *p.split("/"))).getroot()
+        except (ET.ParseError, OSError) as e:
+            problems.append(f"{p}: cannot parse the XML resource ({e})")
+            continue
+        if local(top.tag) != "network-security-config":
+            continue
+        for element in top.iter():
+            v = plain_attrs(element).get("cleartextTrafficPermitted")
+            if v is not None and v.lower() != "false":
+                problems.append(f'{p}: cleartextTrafficPermitted="{v}" on <{local(element.tag)}>; cleartext traffic must stay off')
+    if not apps and not any("cannot parse" in x for x in problems):
+        problems.append("no manifest with an <application> element found (the manifest check would pass vacuously)")
+    return problems
+
+
 def main(argv):
     root = os.path.abspath(argv[1]) if len(argv) > 1 else os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    problems = target_sdk_problems(root)
+    problems = target_sdk_problems(root) + manifest_problems(root)
     if problems:
         for p in problems:
             print(f"build-guards: {p}")
         return 1
     sdk = min(v for _p, _l, v in target_sdk_values(root))
-    print(f"build-guards: ok (targetSdk {sdk}, floor {TARGET_SDK_FLOOR})")
+    manifests = len(application_manifests(root))
+    print(f"build-guards: ok (targetSdk {sdk}, floor {TARGET_SDK_FLOOR}, {manifests} manifest)")
     return 0
 
 

@@ -27,11 +27,11 @@ Sources: [Guide to app architecture](https://developer.android.com/topic/archite
 | Composables and ViewModels never touch a data source (Firestore, DataStore, ...) directly; only repositories do | tooling: `NoDataSourceInUiTest` (imports and qualified names of `com.google.firebase`, `androidx.datastore`, `androidx.room` and `dk.bjarkebjarke.tally.data` in a file with a composable or a ViewModel); review for the rest |
 | Single source of truth per data type: the owner exposes immutable types and takes events or function calls to change them | review (M1) |
 | Unidirectional data flow: state down, events up | review (M1) |
-| ViewModel at screen level only; no `Context`, `Activity`, `Resources` or `AndroidViewModel` in it; `ViewModel` instances are not passed down to child composables (State hoisting page) | review (M1) |
+| ViewModel at screen level only; no `Context`, `Activity`, `Resources` or `AndroidViewModel` in it; `ViewModel` instances are not passed down to child composables (State hoisting page) | tooling: `NoPlatformInViewModelTest` for `Context`, `Activity` and `AndroidViewModel` (M1-57); `Resources` and the rest: review (M1) |
 | Expose one `uiState: StateFlow<...>` (`stateIn(..., WhileSubscribed(5_000), ...)` for streams); `MutableStateFlow` stays private | review (M1) |
 | Collect with `collectAsStateWithLifecycle`; do not send one-off events from the ViewModel to the UI, update state instead | review (M1) |
 | Reusable UI components use plain state holder classes, not ViewModels | review (M1) |
-| Dependency injection, constructor injection first; Hilt when the app has several screens with ViewModels (PLAN section 1 already chooses Hilt) | later (M1) |
+| Dependency injection, constructor injection first; Hilt when the app has several screens with ViewModels (PLAN section 1 already chooses Hilt) | review (Hilt with KSP since M1-30) |
 | Pure-Kotlin domain code with no Android classes | tooling in part: `core/domain` is its own JVM module; the no-float rule is tooling: `DomainNoFloatingPointTest` in the unit tests |
 | Use Jetpack libraries instead of hand-written boilerplate: lifecycle-aware collection (`collectAsStateWithLifecycle`), Navigation 3 for navigation, Hilt for dependency injection, DataStore for preferences | review |
 
@@ -75,7 +75,7 @@ Source: [Coroutines best practices](https://developer.android.com/kotlin/corouti
 
 | Rule | Status |
 |---|---|
-| Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | review; detekt `InjectDispatcher` enabled but active only where detekt is type-resolved (core modules today, not `:app`) |
+| Inject dispatchers; never hardcode `Dispatchers.*` in classes; tests use a `TestDispatcher` with `runTest` | tooling: `NoDispatchersOutsideDiTest` (`Dispatchers` only in a Dagger or Hilt `@Module` file, M1-57); detekt `InjectDispatcher` enabled but active only where detekt is type-resolved (core modules today, not `:app`) |
 | Suspend functions are main-safe: the class doing blocking work moves it with `withContext` | review |
 | The ViewModel creates the coroutines; the data layer exposes `suspend` for one-shot calls and `Flow` for streams | review |
 | No `GlobalScope`; work that must outlive a screen uses an injected external scope | tooling: `NoGlobalScopeTest` (every source set); detekt `GlobalCoroutineUsage` enabled and fixture-gated (`testDetektRules`) |
@@ -128,8 +128,8 @@ Sources: [Security checklist](https://developer.android.com/privacy-and-security
 | Rule | Status |
 |---|---|
 | Never commit API keys; keep them out of the source repository | tooling in part: the `secrets` (gitleaks) CI job and GitHub push protection catch a key inside a committed file; `.gitignore` keeps `google-services.json` (in any directory) and key and credential files out of `git add -A`, tested by `scripts/test_gitignore_secrets.py`; no guard blocks such a file by name once it is force-added, so the `google-services.json` rule in CLAUDE.md is also a review item |
-| Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | review (a `cleartextTrafficPermitted="true"` is a finding); manifest guard planned as M1-58 |
-| Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | review (manifest change); manifest guard planned as M1-58 |
+| Cleartext traffic is off by default from API 28; do not opt in. Use a network security config only if a real need appears | tooling: `scripts/check_build_guards.py` fails on `usesCleartextTraffic` or `cleartextTrafficPermitted` other than `false` in every manifest and every `res/xml*` network security config, and on a value it cannot read; the `src/androidTest/` source set is exempt (the test APK talks plain HTTP to the Auth emulator and is never shipped), every other source set is checked (M1-58) |
+| Backup: the manifest sets `android:allowBackup="false"` today. If that is ever turned on, add `dataExtractionRules` and `fullBackupContent` rules that exclude device-specific data | tooling: `scripts/check_build_guards.py` fails on `allowBackup` other than `false` (missing counts as true in the main manifest) unless both `dataExtractionRules` and `fullBackupContent` are `@xml/<name>` resources that exist, and when no manifest with an `<application>` is found (M1-58) |
 | Deep links and intents: App Links use `android:autoVerify="true"` plus a hosted `assetlinks.json`; treat data from an incoming link or intent (invite code) as untrusted input and validate it; set `android:exported` explicitly and keep components unexported unless needed ([Verify App Links](https://developer.android.com/training/app-links/verify-applinks), [Security checklist](https://developer.android.com/privacy-and-security/security-tips)) | review (M1-20) |
 | Sign-in uses Credential Manager (`androidx.credentials`), not legacy `GoogleSignIn`; on sign-out call `clearCredentialState()` ([About Credential Manager](https://developer.android.com/identity/credential-manager), [Implement Sign in with Google](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation)) | review (M1-14) |
 | Request the fewest permissions; validate input; keep data minimal (also Firestore rules, covered in REVIEW.md item 2) | review |
@@ -203,11 +203,11 @@ Checksums only, no PGP signatures: most Android and Kotlin artifacts are not sig
 
 ## Proposed follow-ups (not implemented here)
 Each would be its own PR, test-first, per CLAUDE.md.
-1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); still open (M1-57): ViewModels may not import `android.content.Context`, `Activity` or `AndroidViewModel`; no `Dispatchers.` outside the DI module.
+1. **Konsist architecture rules** after M0.5-11: composables and ViewModels may not import Firestore, DataStore or Room types and no `GlobalScope` (done, M1-50); ViewModels may not use `android.content.Context`, `Activity` or `AndroidViewModel`, and no `Dispatchers.` outside a Dagger or Hilt `@Module` file (done, M1-57).
 2. **detekt coroutines rules**: partly done (issue 38). `GlobalCoroutineUsage` is enabled and fixture-tested. `InjectDispatcher` is enabled and fixture-tested with a type-resolved fixture, but it only fires in type-resolved tasks (`detektMain`/`detektTest`), which today exist only for `:core:domain` and `:core:testing`. Still open: a type-resolved detekt run for `:app` and the planned `:core:data`, so the rule reaches code that will write `Dispatchers.IO`.
 3. **Guard for hardcoded dependency coordinates** in `*.gradle.kts` (everything must come from the catalog). Task M1-59.
 4. ~~Guard that `targetSdk` is at least the Play minimum~~ Done (M1-51, `scripts/check_build_guards.py`, see section 10); raise `TARGET_SDK_FLOOR` when the date changes.
-5. **Manifest guard**: fail on `usesCleartextTraffic="true"`, `cleartextTrafficPermitted="true"`, or `allowBackup="true"` without backup rules. Task M1-58.
+5. ~~Manifest guard: fail on `usesCleartextTraffic="true"`, `cleartextTrafficPermitted="true"`, or `allowBackup="true"` without backup rules~~ Done (M1-58, `scripts/check_build_guards.py`, see section 9); the `src/androidTest/` source set is exempt from the cleartext rule.
 6. **Compose compiler stability report** as a CI artifact (no gate) once there are screens.
 7. **Release smoke build** with R8 on, run in CI, once M1 has a release variant.
 8. **Roborazzi and accessibility checks** are already in PLAN section 5; make sure their tasks cite sections 6 and 7 above.

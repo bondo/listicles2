@@ -442,7 +442,9 @@ enforce the rules rather than goodwill.
 2. **Git hooks** (installed by `scripts/install-hooks.sh`, which a session-start hook
    runs automatically): pre-commit runs spotless and detekt on the changed modules,
    and pre-push runs the guards, the hook tests and the unit tests (it skips the Gradle unit tests for pushes that only touch
-   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build).
+   docs, scripts, hooks, CI, agents or firebase files; unknown paths still build). It runs the hook tests (`--jobs 4`) only
+   when the push changes a file they read, run or import (`scripts/hooks/prepush_scope.py --hook-tests`; unknown ranges
+   run them); CI's `guards` job runs the full hook suite on every PR.
 3. **Claude Code hooks** in `.claude/settings.json`, which agents can't skip:
    * PreToolUse denies `git commit --no-verify`, `git push --force`, `git reset --hard`
      on shared branches, and pushes to `main`.
