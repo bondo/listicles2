@@ -302,16 +302,56 @@ def rows_of(var, call, parent):
     return None
 
 
+PATH_WRAPPERS = ("os.path.normpath", "os.path.realpath", "os.path.abspath")
+DEFAULT_ROOTS = {"ROOT": ".", "SCRIPT_ROOT": ".", "HERE": "scripts/hooks"}
+
+
+def is_file_dir(node):
+    """os.path.dirname(__file__), optionally with abspath or realpath around __file__: the directory of a hook file."""
+    if not (isinstance(node, ast.Call) and ast.unparse(node.func) == "os.path.dirname" and len(node.args) == 1):
+        return False
+    inner = node.args[0]
+    if isinstance(inner, ast.Call) and ast.unparse(inner.func) in PATH_WRAPPERS[1:] and len(inner.args) == 1:
+        inner = inner.args[0]
+    return isinstance(inner, ast.Name) and inner.id == "__file__"
+
+
+def base_of(node, roots):
+    """The repo-relative directory an expression names when it is a root (a root name, a hook file's directory, a normalising
+    wrapper or a literal os.path.join on one of those), else None."""
+    if isinstance(node, ast.Name) and node.id in roots:
+        return roots[node.id]
+    if is_file_dir(node):
+        return "scripts/hooks"
+    if isinstance(node, ast.Call) and ast.unparse(node.func) in PATH_WRAPPERS and len(node.args) == 1:
+        return base_of(node.args[0], roots)
+    if isinstance(node, ast.Call) and ast.unparse(node.func) == "os.path.join" and node.args:
+        base = base_of(node.args[0], roots)
+        rest = node.args[1:]
+        if base is not None and all(isinstance(a, ast.Constant) and isinstance(a.value, str) for a in rest):
+            return posixpath.normpath("/".join([base] + [a.value for a in rest]))
+    return None
+
+
 def hook_code_reads(sources):
-    """Repo paths named by the hook code in `sources` ({file name: source}): calls to a `read(...)` helper and os.path.join on
-    ROOT, SCRIPT_ROOT (the repo root) or HERE (scripts/hooks). A name resolves only through its innermost enclosing `for`.
-    Only the `read` helper's own pass-through of its *parts is exempt. Returns (paths as {path: [file]}, unreadable as [file:line])."""
-    paths, unreadable = {}, []
+    """Repo paths named by the hook code in `sources` ({file name: source}): calls to a `read(...)` helper and os.path.join on a
+    root. A root is ROOT, SCRIPT_ROOT (the repo root), HERE or a hook file's own directory (scripts/hooks), or a module-level name
+    defined as one of those. A name resolves only through its innermost enclosing `for`; only the `read` helper's own pass-through
+    of its *parts is exempt. Every other use of a root (f-string, pathlib, cwd=ROOT, a bare __file__, a join that names the whole
+    repo) is a root use (R1-02). Returns (paths as {path: [file]}, unreadable as [file:line], root uses as {file: [line]})."""
+    paths, unreadable, root_uses = {}, [], {}
     for name, src in sorted(sources.items()):
         tree = ast.parse(src)
         parent = {id(c): n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
         names = {t.id: n.value.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
                  and isinstance(n.value.value, str) for t in n.targets if isinstance(t, ast.Name)}
+        roots, defined = dict(DEFAULT_ROOTS), set()
+        for n in tree.body:  # module-level root definitions, in order (ROOT may be defined from HERE)
+            if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+                base = base_of(n.value, roots)
+                if base in (".", "scripts/hooks"):
+                    roots[n.targets[0].id] = base
+                    defined |= {id(c) for c in ast.walk(n.value)}
         helper_args = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "read" and node.args.vararg:
@@ -319,23 +359,35 @@ def hook_code_reads(sources):
                                 and any(isinstance(a, ast.Starred) and getattr(a.value, "id", None) == node.args.vararg.arg for a in c.args)}
 
         for node in ast.walk(tree):
+            if id(node) in defined:
+                continue
+            up1 = parent.get(id(node))
+            up2 = parent.get(id(up1)) if up1 is not None else None
+            bare_file = isinstance(node, ast.Name) and node.id == "__file__" and not is_file_dir(up1) and not is_file_dir(up2)
+            rootish = (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in roots) or is_file_dir(node) or bare_file
+            is_base = isinstance(up1, ast.Call) and ast.unparse(up1.func) == "os.path.join" and up1.args and up1.args[0] is node
+            if rootish and not is_base:
+                root_uses.setdefault(name, []).append(node.lineno)
             if not isinstance(node, ast.Call) or id(node) in helper_args:
                 continue
             f = node.func
             resolve = functools.partial(rows_of, call=node, parent=parent)
             if isinstance(f, ast.Name) and f.id == "read":
                 found = path_of("", node.args, resolve, names)
-            elif (isinstance(f, ast.Attribute) and f.attr == "join" and ast.unparse(f) == "os.path.join" and node.args
-                  and isinstance(node.args[0], ast.Name) and node.args[0].id in ("ROOT", "SCRIPT_ROOT", "HERE")):
-                found = path_of("scripts/hooks" if node.args[0].id == "HERE" else "", node.args[1:], resolve, names)
+            elif ast.unparse(f) == "os.path.join" and node.args and base_of(node.args[0], roots) is not None:
+                base = base_of(node.args[0], roots)
+                found = path_of("" if base == "." else base, node.args[1:], resolve, names)
             else:
                 continue
             if found is None:
                 unreadable.append(f"{name}:{node.lineno}")
                 continue
             for p in found:
-                paths.setdefault(p, []).append(name)
-    return paths, unreadable
+                if p == ".":
+                    root_uses.setdefault(name, []).append(node.lineno)
+                else:
+                    paths.setdefault(p, []).append(name)
+    return paths, unreadable, {f: sorted(lines) for f, lines in root_uses.items()}
 
 
 def hook_sources():
@@ -355,8 +407,8 @@ ROOT_USES = {
     "run_hook_tests.py": (2, "the runner starts itself (__file__) in each shard"),
     "test_gitenv_isolation.py": (2, "discovers suites in scripts/hooks (HERE) with cwd=ROOT; their own reads are checked in their files"),
     "test_guards_sh.py": (1, "git grep for lint suppressions over every *.py: hook_tests_scope runs for any .py path"),
-    "test_mark_ready.py": (2, "cwd=ROOT runs the scripts/mark-ready.sh wrapper and git ls-files on it (scripts/ prefix)"),
-    "test_update_branch.py": (3, "cwd=ROOT runs the scripts/update-branch.sh wrapper and git ls-files on it (scripts/ prefix)"),
+    "test_mark_ready.py": (3, "imports from scripts/hooks; cwd=ROOT runs the scripts/mark-ready.sh wrapper and git ls-files on it"),
+    "test_update_branch.py": (4, "imports from scripts/hooks; cwd=ROOT runs the scripts/update-branch.sh wrapper and git ls-files on it"),
     "test_prepush_scope.py": (2, "imports from and lists scripts/hooks (HERE): scripts/ prefix"),
     "test_run_hook_tests.py": (2, "units and stale_weights of scripts/hooks (HERE): scripts/ prefix"),
 }
@@ -366,10 +418,9 @@ LISTED_DIRS = {"core": "core/X/build.gradle.kts", "scripts/hooks": "scripts/hook
 
 class HookSuiteInputs(unittest.TestCase):
     """The hook_tests_scope set is derived from the hook code: every repo path it reads, runs or copies must make the suite run.
-    Not seen by this parse: what a run script reads in turn (scripts/ is a prefix for that reason), commands run with cwd=ROOT
-    (today the mark-ready and update-branch wrappers and git ls-files on them, all under scripts/), root paths built other than
-    with os.path.join, and guards.sh on the whole repo (test_guards_sh's self-check), which pre-push runs on every push anyway.
-    CI runs the full suite on every PR as the backstop."""
+    Any other use of a root (cwd=ROOT, f-string or pathlib paths, a bare __file__) fails until ROOT_USES lists it with a reason.
+    Not seen by this parse: what a run script reads in turn (scripts/ is a prefix for that reason) and guards.sh on the whole repo
+    (test_guards_sh's self-check), which pre-push runs on every push anyway. CI runs the full suite on every PR as the backstop."""
 
     def test_every_repo_path_the_hook_code_reads_runs_the_suite(self):
         paths, unreadable, root_uses = hook_code_reads(hook_sources())
