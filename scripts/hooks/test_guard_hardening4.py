@@ -271,6 +271,23 @@ class Round4(Base):
                    "env -S $'git status\\ngit push --force origin work'",  # main checks the -S string as a command line
                    "(( IFS = 1 )); false && IFS=' '; P=--force1origin1work; git push $P"])  # bash: [--force][origin][work]
 
+    def test_r6_01_witnesses_of_round_6_s_surviving_mutants(self):
+        # main and head deny each; bash or the tool runs a force push (prlimit runs its arguments, -t/-d take no value, xargs -in is -i n)
+        self.deny(
+            [
+                "ionice -t prlimit git push --force origin work",
+                "watch -d prlimit git push --force origin work",
+                "echo x | xargs -in taskset -c 1 git push --force upstream work",
+                'IFS=_; A=work_--for; Ace=x; git push origin $A"ce"',  # the model's lexer reads ${A}ce: [push][origin][work][--force]
+                "watch -q 3 'git push --force origin work'",
+                "function f for IFS in _; do P=--force_origin_work; git push $P; done; f",
+            ]
+        )
+        # floor pins: main denies these, so the floor keeps them denied although the tools run no force push
+        self.deny(["watch git push '#' --force origin work", "xargs --max-args git push --force origin work",
+                   "env --split-string $'git status\\ngit push --force origin work'"])
+        self.allow(["( x; (( IFS = 1 )) ); git status"])  # the (( IFS rule runs in the model only
+
     def test_the_floor_keeps_main_s_denials_that_the_model_alone_would_allow(self):
         # main denies these; bash would not run them as the guard fears, but main's verdict is the floor (escalation of #252)
         self.deny([f"nice FOO=1 {PUSH}", "F=--force-with-lease; (F=--force); git push $F origin work"])
