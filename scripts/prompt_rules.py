@@ -308,6 +308,13 @@ def resolve_permissions(text):
     return found
 
 
+# Stale or widened forms of the push decision (#15 comment 7075952806 item 2): the old loop-wait recipe, and "after a push" for "after every fix push".
+PUSH_WORDING_STALE = (
+    r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
+    r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push",
+    r"loop for ci after a fix push",
+)
+
 RULES = (
     Rule(
         "data-fenced", ALL,
@@ -913,8 +920,7 @@ RULES = (
         ),
         "the orchestrator spawns the reviewer on the push, the implementer does not loop-wait for CI, CI must be green before READY and the merge request "
         "(owner decision, #15 comment 7075952806; ORCHESTRATION 7.1)",
-        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
-                   r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
+        forbidden=PUSH_WORDING_STALE,
     ),
     Rule(
         "implementer-reviews-on-push", ("implementer",),
@@ -925,8 +931,7 @@ RULES = (
             r"ci must be green before ready and before the merge request",
         ),
         "the implementer checks with verify.sh, pushes and ends the turn; it does not loop-wait for CI (owner decision, #15 comment 7075952806)",
-        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
-                   r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
+        forbidden=PUSH_WORDING_STALE,
     ),
     Rule(
         "orch-model", ("orchestrator",),
@@ -1166,7 +1171,8 @@ DOC_RULES = (
         "review-escalation", "REVIEW.md",
         (
             r"one escalation reviewer per pr", r"agents/prompts/escalation-reviewer\.md", r"decides `fix`, `split` or `owner`",
-            r"one more fresh round \(round 5\) reviews\. anything above `nit` still open after it goes to the owner", r"no second escalation", r"no commit lands unreviewed",
+            r"one more fresh round \(round 5\) reviews\. anything above `nit` still open after it goes to the owner",
+            r"no second escalation", r"no commit lands unreviewed",
             r"the escalation reviewer rules with both arguments in front of it", r"a dropped finding becomes `withdrawn`",
             r"`owner`: taste or scope questions, which the escalation reviewer decides itself, per finding `fix` or `drop` "
             r"\(owner decision, #15 comment 7075812943\)", r"no finding is left open for the owner",
@@ -1663,8 +1669,7 @@ DOC_RULES = (
         ),
         "ORCHESTRATION 7.1 (home), 7.5, 7.8 and 8.2: reviews start on push, no loop-wait for CI, CI green before READY and the merge request "
         "(owner decision, #15 comment 7075952806)",
-        forbidden=(r"wait for ci and verify\.sh with a monitor/until-loop", r"do not end the turn while waiting",
-                   r"after a push do not wait in a loop for ci", r"do not wait in a loop for ci after a push", r"do not loop-wait for ci after a push", r"loop for ci after a fix push"),
+        forbidden=PUSH_WORDING_STALE,
     ),
 )
 
