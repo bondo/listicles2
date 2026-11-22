@@ -27,7 +27,7 @@ object Validation {
 
     /** 1 to 50 code points after trimming. */
     fun name(raw: String): NameError? {
-        val count = codePoints(raw.trim())
+        val count = codePoints(normalizedName(raw))
         return when {
             count == 0 -> NameError.Empty
             count > MAX_NAME_CODE_POINTS -> NameError.TooLong
@@ -35,8 +35,8 @@ object Validation {
         }
     }
 
-    /** The value to save: exactly what [name] validated. */
-    fun normalizedName(raw: String): String = raw
+    /** The value to save: exactly what [name] validated, so the stored name never exceeds 50 code points. */
+    fun normalizedName(raw: String): String = raw.trim()
 
     private fun codePoints(s: String): Int = s.codePointCount(0, s.length)
 }
