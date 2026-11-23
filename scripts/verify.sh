@@ -53,6 +53,7 @@ step state-body-tests python3 -I scripts/test_state_body.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
 step collab-inbox-tests python3 -I scripts/test_collab_inbox.py
+step repo-slug-tests python3 -I scripts/test_repo_slug.py
 step merge-ready-tests python3 -I scripts/test_merge_ready.py
 step status-visual-tests python3 -I scripts/test_status_visual.py
 step status-page-tests python3 -I scripts/test_status_page.py

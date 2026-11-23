@@ -449,14 +449,15 @@ ROOT_USES = {
     "run_hook_tests.py": (2, "the runner starts itself (__file__) in each shard"),
     "test_gitenv_isolation.py": (2, "discovers suites in scripts/hooks (HERE) with cwd=ROOT; their own reads are checked in their files"),
     "test_guards_sh.py": (1, "git grep for lint suppressions over every *.py: hook_tests_scope runs for any .py path"),
-    "test_mark_ready.py": (3, "imports from scripts/hooks; cwd=ROOT runs the scripts/mark-ready.sh wrapper and git ls-files on it"),
-    "test_update_branch.py": (4, "imports from scripts/hooks; cwd=ROOT runs the scripts/update-branch.sh wrapper and git ls-files on it"),
+    "test_mark_ready.py": (2, "imports from scripts/hooks and scripts/ (repo_slug); git ls-files on scripts/mark-ready.sh with cwd=ROOT"),
+    "test_update_branch.py": (2, "imports from scripts/hooks; git ls-files on scripts/update-branch.sh with cwd=ROOT"),
+    "test_guard_actionlint.py": (1, "this checkout's absolute path as text in a command the guard must deny; it reads no file"),
     "test_prepush_scope.py": (2, "imports from and lists scripts/hooks (HERE): scripts/ prefix"),
     "test_wiring.py": (2, "imports from and lists scripts/hooks (joins that name scripts/hooks itself)"),
     "test_run_hook_tests.py": (2, "units and stale_weights of scripts/hooks (HERE): scripts/ prefix"),
 }
 # Directories the hook code lists rather than reads; each maps to a representative path it then reads.
-LISTED_DIRS = {"core": "core/X/build.gradle.kts", "scripts/hooks": "scripts/hooks/X"}
+LISTED_DIRS = {"core": "core/X/build.gradle.kts", "scripts/hooks": "scripts/hooks/X", "scripts": "scripts/X"}  # scripts: test_mark_ready imports from it
 
 
 class HookSuiteInputs(unittest.TestCase):
