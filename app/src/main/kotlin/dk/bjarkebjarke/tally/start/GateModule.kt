@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.flowOf
 @InstallIn(SingletonComponent::class)
 object GateModule {
     /**
-     * M1-27: the gate reads `config/app` through [MinVersionRemote]. Until the app depends on `:core:data` (M1-78, its
+     * M1-27: the gate reads `config/app` through [MinVersionRemote]. Until the app depends on `:core:data` (M1-82, its
      * Firestore source needs the licensee terms the owner approves) the remote has no answer, so with no remembered
      * minimum the gate fails open and nothing blocks the start.
      */
