@@ -128,7 +128,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-29 | Rename to Tally&#58; applicationId and namespace dk.bjarkebjarke.tally, packages, app label en/da | done | M1-01 | implementer | [#268](https://github.com/bondo/listicles2/issues/268) |
 | M1-08 | Rules base&#58; signedIn() with email_verified, users/{uid} householdId set/clear and name, tombsto… | done | M1-52 | implementer | [#314](https://github.com/bondo/listicles2/issues/314) |
 | M1-09 | Rules spike&#58; PLAN 3.1 items a-e in the emulator, ADR 0002 with the results | done | M1-08 | implementer | [#333](https://github.com/bondo/listicles2/issues/333) |
-| M1-10 | Rules&#58; create household and member display name, allow and deny tests (transfer is M1-53) | ready | M1-09 | implementer |  |
+| M1-10 | Rules&#58; create household and member display name, allow and deny tests (transfer is M1-53) | in progress | M1-09 | implementer | [#352](https://github.com/bondo/listicles2/issues/352) |
 | M1-11 | Rules&#58; leave, remove member (removed marker), household soft delete and cleanup, allow and de… | blocked | M1-54, M1-53 | implementer |  |
 | M1-12 | Rules&#58; invites (create, get, list, revoke, cleanup), incl. unverified get denied (join is M1-54) | blocked | M1-10, M1-O12 | implementer |  |
 | M1-30 | App skeleton&#58; Hilt with KSP, Google Services plugin + generated stand-in config, Connectivity help… | done | M1-29, M1-02, M1-36, M1-49 | implementer | [#304](https://github.com/bondo/listicles2/issues/304) |
@@ -168,7 +168,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-63 | Debug APK as a CI artifact on every push to main | done | M1-30 | implementer |  |
 | M1-70 | Status&#58; dependency graph of the open tasks under the README status picture (status-graph.svg) | done | none | implementer | [#326](https://github.com/bondo/listicles2/issues/326) |
 | M1-75 | Status graph layout&#58; fewer crossings, arrows routed between rows and columns | done | M1-70 | implementer | [#338](https://github.com/bondo/listicles2/issues/338) |
-| M1-76 | Status graph styling&#58; a colour-blind-safe colour per source task, thicker critical path | ready | M1-75 | implementer |  |
+| M1-76 | Status graph styling&#58; a colour-blind-safe colour per source task, thicker critical path | in progress | M1-75 | implementer | [#353](https://github.com/bondo/listicles2/issues/353) |
 | M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | done | M1-01 | implementer | [#290](https://github.com/bondo/listicles2/issues/290) |
 | M1-57 | Konsist&#58; no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI … | done | M1-50 | implementer | [#307](https://github.com/bondo/listicles2/issues/307) |
 | M1-51 | Build guards&#58; scripts/check_build_guards.py with the targetSdk floor (checklist follow-up 4; foll… | done | M1-01 | implementer | [#296](https://github.com/bondo/listicles2/issues/296) |
@@ -220,7 +220,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 ```mermaid
 flowchart LR
     n0["M1-06 Rules fuzzing: fast-check against a TS … (blocked)"]:::blocked
-    n1["M1-10 Rules: create household and member di… (ready)"]:::ready
+    n1["M1-10 Rules: create household and member di… (in progress)"]:::progress
     n2["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n3["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
     n4["M1-71 guards check 1: test-runner options tha… (in progress)"]:::progress
@@ -242,7 +242,7 @@ flowchart LR
     n20["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
     n21["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
     n22["M1-61 Java API level check: also look up clas… (ready)"]:::ready
-    n23["M1-76 Status graph styling: a colour-blind-sa… (ready)"]:::ready
+    n23["M1-76 Status graph styling: a colour-blind-sa… (in progress)"]:::progress
     n24["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
     n25["M1-73 Advanced CodeQL workflow: java-kotlin… (in progress)"]:::progress
     n26["M1-74 Hash-locked pip requirements for the l… (ready)"]:::ready
@@ -470,6 +470,7 @@ flowchart LR
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
 - **owner to-do** [#346](https://github.com/bondo/listicles2/issues/346): &#91;owner&#93; M1-O8&#58; Turn on secret scanning non-provider patterns and validity checks
+- **owner to-do** [#354](https://github.com/bondo/listicles2/issues/354): &#91;owner&#93; M1-O1&#58; Create the Firebase project (Spark, Firestore eur3, Google + email sign-in, googl…
 - **task** M1-06: waits on M1-10
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-12: waits on M1-10
