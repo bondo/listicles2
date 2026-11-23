@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import dk.bjarkebjarke.tally.data.FirebaseEmulator
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
@@ -16,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -48,6 +50,7 @@ class SessionEmulatorTest {
     private lateinit var authentication: FirebaseAuthentication
     private lateinit var userData: FirestoreSession
     private val credentials = FakeCredentialState()
+    private val externalScope = CoroutineScope(SupervisorJob())
     private var rulesReplaced = false
 
     @Before
@@ -65,6 +68,7 @@ class SessionEmulatorTest {
 
     @After
     fun tearDown() {
+        externalScope.cancel()
         if (::app.isInitialized) {
             // Whatever a test left (or the code under test failed to clear): a new Firestore instance with the network
             // on and an empty cache, and no session.
@@ -127,11 +131,14 @@ class SessionEmulatorTest {
                 .document(path)
                 .set(mapOf("sent" to true))
                 .await()
+            assertTrue(cacheHas(path))
 
             assertEquals(SignOutResult.SignedOut, signOut()())
 
             assertNull(auth.currentUser)
             assertEquals(1, credentials.cleared)
+            // The copy on the phone is gone (read before the server read caches it again); the server keeps it.
+            assertFalse(cacheHas(path))
             assertTrue(serverHas(path))
         }
 
@@ -202,6 +209,19 @@ class SessionEmulatorTest {
         auth.signInWithCredential(GoogleAuthProvider.getCredential(token, null)).await()
     }
 
+    /** Firestore fails a cache read of a document its cache does not hold. */
+    private suspend fun cacheHas(path: String) =
+        try {
+            userData
+                .firestore()
+                .document(path)
+                .get(Source.CACHE)
+                .await()
+                .exists()
+        } catch (expected: FirebaseFirestoreException) {
+            false
+        }
+
     private suspend fun serverHas(path: String) =
         userData
             .firestore()
@@ -216,7 +236,7 @@ class SessionEmulatorTest {
             userData = userData,
             authentication = authentication,
             credentials = credentials,
-            externalScope = CoroutineScope(SupervisorJob()),
+            externalScope = externalScope,
             pendingWritesTimeoutMs = PENDING_WRITES_TIMEOUT_MS,
         )
 

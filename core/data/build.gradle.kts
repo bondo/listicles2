@@ -30,8 +30,8 @@ android {
 }
 
 dependencies {
-    // M1-67: implements the domain's session interfaces (M1-14) over Firebase.
-    implementation(project(":core:domain"))
+    // M1-67: implements the domain's session interfaces (M1-14) over Firebase; its public classes expose them.
+    api(project(":core:domain"))
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
