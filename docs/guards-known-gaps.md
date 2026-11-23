@@ -58,8 +58,14 @@ reason is true and specific (`REVIEW.md`, item 8).
   `thresholds` in markdown before `,` `;` `)`, a full stop or a word is prose even with a digit on the line, so `coverage thresholds are 80`
   in markdown is not compared. In a `.py` file that is no test file, `useJUnitPlatform` and `failOnNoDiscoveredTests` inside a `#` comment
   or a plain string are a mention: a gate's regex or message that pins them may be removed (the gate's own tests still count). A line
-  inside a multi-line string reads as code, the safe direction. Only `test_*.py` and `*_test.py` are test files: a `conftest.py` or
-  shared fixture module that pins the strings is not (R0 self-review nit).
+  inside a multi-line string reads as code, the safe direction, except its closing line, where the closing quotes can pair with a later
+  quote (`doc""" if failOnNoDiscoveredTests else "x"` passes; in Python those names in code are no Gradle setting; PR 334 R1-02). Only
+  `test_*.py` and `*_test.py` are test files: a `conftest.py` or shared fixture module that pins the strings is not (R0 self-review nit).
+  Accepted residual (PR 334 R1-01, F18): Gradle runs an `apply(from = ...)` target that does not end in `.kts` as Groovy whatever its
+  extension, and the guard reads every `.py` file as Python. So removing `tasks.withType(Test).configureEach { def h = /#/;
+  useJUnitPlatform() }` from a `config/gradle/junit.py` that a build applies passes, and so do `def x = /'/; useJUnitPlatform(); def y = /'/`
+  and `/* " */ useJUnitPlatform() /* " */`. The live setting was confirmed with `gradle --offline`. No `apply(from` target here is a `.py`
+  file, and one would have to be set up on purpose. No Groovy lexer is added for it.
 
 ## Check 2c: command-line flags are an allowlist (issues 177, 174, 164)
 
