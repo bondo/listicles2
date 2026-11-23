@@ -1692,11 +1692,12 @@ notes = "Answered on #15, comment 7058176190: Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A
 id = "M1-O8"
 title = "Turn on secret scanning non-provider patterns and validity checks (repo settings)"
 milestone = "M1"
-status = "todo"
+status = "dropped"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1"
+issue = 346
+notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1. Dropped 2026-11-23: the options need GitHub Advanced Security and are not available to the owner (owner decision, #15 comment 7106703649)."
 
 [[task]]
 id = "M1-O9"
@@ -1743,10 +1744,11 @@ notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be dec
 id = "M1-O13"
 title = "Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it as required)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-33"]
+issue = 318
 notes = "M1-33 runs the release build with R8 in its own CI job `release-smoke`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 12. Same sitting rule as M1-O11 (BRANCH-PROTECTION.md section 6): add it right after the M1-33 PR merges, never earlier, or every other open PR waits on `Expected, waiting for status` until it takes main in. Until then no ruleset rule requires `release-smoke`, so the M1-33 merge must confirm by hand that the job is green on the head"
 
 [[task]]
