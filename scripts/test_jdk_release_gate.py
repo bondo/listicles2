@@ -18,7 +18,6 @@ GATE_MESSAGE = "JVM modules must compile against the JDK 17 API"
 KOTLIN_TASK = ":core:domain:compileKotlin"
 JAVA_TASK = ":core:domain:compileJava"
 # Groovy init script; the first %s is a project path, the second the statement run for that project after it is evaluated.
-# Groovy init script; %s is the statement run for the project with path ':core:domain' after it is evaluated.
 INIT = """
 allprojects {
     afterEvaluate { p ->
@@ -46,12 +45,23 @@ JAVA_BAD = {
 }
 
 
-def gradle(*args, init=None, project=":core:domain"):
+# Adds the project :fakes in the given directory to this build only (the init script also runs for build-logic).
+SETTINGS_INIT = """
+settingsEvaluated { s ->
+    if (s.rootDir.canonicalPath == new File('%s').canonicalPath) {
+        s.include(':fakes')
+        s.project(':fakes').projectDir = new File('%s')
+    }
+}
+"""
+
+
+def gradle(*args, init=None, project=":core:domain", settings=None):
     cmd = [os.path.join(ROOT, "gradlew"), "-q", "--console=plain", "--no-daemon", *args]
     tmp = None
-    if init is not None:
+    if init is not None or settings is not None:
         with tempfile.NamedTemporaryFile("w", suffix=".init.gradle", delete=False) as tmp:
-            tmp.write(INIT % (project, init))
+            tmp.write(settings if settings is not None else INIT % (project, init))
         cmd += ["-I", tmp.name]
     try:
         # Retry only Maven/Gradle 429 (rate limit) so a throttled download is not read as a test failure.
@@ -104,6 +114,20 @@ class JdkReleaseGateTest(unittest.TestCase):
         rc, out = gradle("checkJdkRelease", init="p.dependencies.add('implementation', p.project(':core:testing'))")
         self.assertNotEqual(rc, 0, f"gate accepted a main dependency on :core:testing:\n{out}")
         self.assertIn(":core:domain:implementation -> :core:testing", out)
+
+    def test_the_testsupport_plugin_on_an_unlisted_module_fails(self):
+        # PR 349 R1-01: listicles.jvm.testsupport skips the JDK 17 compile check, so it must not work outside the
+        # test-support modules that the leak check (and checkJavaApiLevel) also follow. A JVM library there passes.
+        for plugin, fails in (("listicles.jvm.testsupport", True), ("listicles.jvm.library", False)):
+            with self.subTest(plugin=plugin), tempfile.TemporaryDirectory() as d:
+                with open(os.path.join(d, "build.gradle.kts"), "w") as f:
+                    f.write(f'plugins {{\n    id("{plugin}")\n}}\n')
+                rc, out = gradle(":fakes:checkJdkRelease", settings=SETTINGS_INIT % (ROOT, d))
+                if fails:
+                    self.assertNotEqual(rc, 0, f"an unlisted module got the test-support exemption:\n{out}")
+                    self.assertIn("listicles.jvm.testsupport is only for the test-support modules [:core:testing], not :fakes", out)
+                else:
+                    self.assertEqual(rc, 0, out)
 
     def test_test_dependency_on_test_support_module_passes(self):
         rc, out = gradle("checkJdkRelease", init="p.dependencies.add('testImplementation', p.project(':core:testing'))")
