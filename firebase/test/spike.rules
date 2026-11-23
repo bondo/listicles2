@@ -4,7 +4,8 @@
     // tests the conditions that make no call first (ADR 0002's layout), so item (e) counts real calls.
     // The task named at a block moves it into firestore.rules, with its field validation (P4) and full
     // allow and deny tests, and deletes it here. M1-10 moved userDoc and oneHousehold (the owner's
-    // member create needs them); (b) uses them from firestore.rules.
+    // member create needs them); (b) uses them from firestore.rules. M1-53 moved (c), the transfer:
+    // spike.test.ts's (c) tests now run on firestore.rules.
     function inviteDoc(code) { return /databases/$(database)/documents/invites/$(code); }
     function live(hid) { return get(householdDoc(hid)).data.deleted == false; }
 
@@ -33,27 +34,6 @@
         && live(hid) && oneHousehold(hid);
     }
 
-    // (c), M1-53: Transfer ownership. The owner of the live household changes only ownerUid, to a
-    // member before and after the batch, after which the old owner's role is member and the new
-    // owner's owner.
-    function transfers(hid, before, after) {
-      return before.deleted == false && before.ownerUid == request.auth.uid
-        && after.diff(before).affectedKeys().hasOnly(['ownerUid'])
-        && exists(memberDoc(hid, after.ownerUid)) && existsAfter(memberDoc(hid, after.ownerUid))
-        && getAfter(memberDoc(hid, before.ownerUid)).data.role == 'member'
-        && getAfter(memberDoc(hid, after.ownerUid)).data.role == 'owner';
-    }
-
-    // Each role update: only role, by the owner of the live household before the batch, to the role
-    // ownerUid gives this doc after it.
-    function takesRole(hid, uid) {
-      let household = get(householdDoc(hid)).data;
-      return household.deleted == false && household.ownerUid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
-        && request.resource.data.role
-          == (getAfter(householdDoc(hid)).data.ownerUid == uid ? 'owner' : 'member');
-    }
-
     // (d), M2: LIST-01's queries: the caller's own lists, or those shared with a live household the
     // caller is a member of.
     function readsList(data) {
@@ -72,13 +52,8 @@
         && live(resource.data.householdId);
     }
 
-    match /households/{hid} {
-      allow update: if signedIn() && transfers(hid, resource.data, request.resource.data);
-    }
-
     match /households/{hid}/members/{uid} {
       allow create: if signedIn() && joins(hid, uid);
-      allow update: if signedIn() && takesRole(hid, uid);
     }
 
     match /lists/{lid} {
