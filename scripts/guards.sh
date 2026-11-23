@@ -173,8 +173,8 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # `--` ends the flags. A tool named as the thing being installed (`pip install ruff --upgrade`, `npm i -D eslint`, `cargo install`) is not run, so datacmd skips it.
 # For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
 # there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known. Only an npm form whose script is
-# known to end in a test runner (ddrun, pkgscripts below; issue 164 item 3) skips that check, so `npm test -- -u` passes when every tracked
-# `test` script is a plain `jest ...`; in every other case the check is as before (fail closed). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
+# known to end in a test runner (ddrun, pkgscripts below; issue 164 item 3) skips that check, so `npm test -- --ci` passes when every tracked
+# `test` script is a plain `jest ...` (its runner options are check 1 on command lines: runopt below, task M1-71); in every other case the check is as before (fail closed). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
 # tsc names are read case-insensitively (as tsc does), mypy and shellcheck accept unique prefixes of long options so a proper prefix of a
 # listed option counts as that option (a prefix that is ambiguous is an error in the tool itself), and SHELLCHECK_OPTS counts as
 # `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
@@ -454,11 +454,82 @@ function ddrun(p,   n, w, i, a, v) {
   for (i++; i <= n; i++) if (w[i] != "" && w[i] !~ NPMBOOL) return 0
   if (v == "" || !(v in NS)) return 0
   for (i = 1; i <= NS[v]; i++) if (!plainrun(NC[v, i])) return 0
-  return 1
+  DDN = v; return 1
 }
 # plainrun: script c (npm appends the tail to it) is one plain `[npx] <runner> <words>` and nothing else: no command before it (one could
 # redefine the runner: a function, PATH=, a copy over its file), no separator, quote, `$`, backtick, bracket, redirection, `#`, `~` or `\`.
 function plainrun(c) { return (c ~ RUNRE) }
+# Check 1 on command lines (task M1-71, owner decision #15 comment 7092471489): jest, vitest and mocha options that rewrite or skip tests
+# (snapshot update, --passWithNoTests), filter them (-t, path patterns, positional path filters, mocha --grep and kin) or run only changed
+# ones (jest -o, --changedSince, --findRelatedTests, vitest --changed) fail with no escape hatch, like check 1. --shard passes.
+# Long names are read as yargs and cac read them (kebab-case is camelCase) and case-insensitively; they are denied for every runner
+# (RDL). Short options differ per runner (RDS: jest -t filters, mocha -t is --timeout) and may be grouped (-iu). Positional words are
+# path filters after jest and after vitest (but its first one may be run, watch or dev) when the runner is the command (cmdat), and in
+# an npm `--` tail that ddrun resolves to jest or mocha (a mocha spec there may replace the configured one). The value of an option in
+# RVL or RVS is no positional word; the value of any other option is (fail closed: write it with =). A runner word that is not the command
+# (`firebase emulators:exec "jest -u"`) has its options read, not its positional words. An unresolved tail is read with the long names
+# only, because its short options are ambiguous (-t is tsc --target): 2c keeps them, waivable as before.
+function rclean(t) { sub(/^["\047\\]+/, "", t); sub(/["\047\\,;]+$/, "", t); return t }
+# rscan: 1 when the words of s hold a denied option: ds and vs are the denied and the value-taking short letters, pos makes positional
+# words deny (vit: except a first run, watch or dev).
+function rscan(s, ds, vs, pos, vit,   n, w, i, j, t, c, nm, q, first, rest) {
+  n = split(s, w, /[ \t]+/); first = 1; rest = 0
+  for (i = 1; i <= n; i++) {
+    t = rclean(w[i]); if (t == "") continue
+    if (t ~ /^[0-9]*(<|>|&>)/) { if (t ~ /^[0-9]*(<|>>?|&>>?|>&)$/) i++; continue }  # a redirection and its target
+    if (t == "--") { rest = 1; continue }
+    if (rest && pos) return 1  # after `--` every word is a path filter
+    if (t ~ /^--./) {
+      nm = substr(t, 3); q = index(nm, "="); if (q) nm = substr(nm, 1, q - 1)
+      nm = tolower(nm); gsub(/-/, "", nm)
+      if (index(RDL, " " nm " ")) return 1
+      if (!q && index(RVL, " " nm " ") && i < n && rclean(w[i + 1]) !~ /^-/) i++
+      continue
+    }
+    if (t ~ /^-[A-Za-z]/) {
+      for (j = 2; j <= length(t); j++) {
+        c = substr(t, j, 1); if (c !~ /[A-Za-z]/) break
+        if (index(ds, c)) return 1
+        if (index(vs, c)) { if (j == length(t) && i < n && rclean(w[i + 1]) !~ /^-/) i++; break }
+      }
+      continue
+    }
+    if (t ~ /^-/) continue
+    if (pos && !(vit && first && t ~ /^(run|watch|dev)$/)) return 1
+    first = 0
+  }
+  return 0
+}
+# cmdat: the index of the command word of the words w[1..n] after a YAML `- key:` or a package.json key, VAR= assignments and launchers
+# (npx, npm exec, yarn, pnpm, bunx, node, env, ...) with their options; 0 when there is none.
+function cmdat(w, n,   i, t, l) {
+  for (i = 1; i <= n; i++) {
+    t = rclean(w[i])
+    if (t == "" || t == "-" || w[i] ~ /:$/ || t ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue
+    if (t ~ /^(sudo|env|time|exec|command|nice|nohup|node|npm|npx|pnpx|bunx|yarn|pnpm|bun|dlx|x)$/) { l = 1; continue }
+    if (l && t ~ /^-/) continue
+    return i
+  }
+  return 0
+}
+# runopt: 1 when command p passes a denied option to jest, vitest or mocha, directly or in an npm `--` tail.
+function runopt(p,   n, w, k, a, r, i, dd, ds, vs, pos, tl) {
+  if (datacmd(p)) return 0
+  n = split(p, w, /[ \t]+/); k = cmdat(w, n)
+  if (k) {
+    a = rclean(w[k]); sub(/^.*\//, "", a); sub(/\.[cm]?js$/, "", a)
+    if (a in RDS) { tl = ""; for (i = k + 1; i <= n; i++) tl = tl " " w[i]; if (rscan(tl, RDS[a], RVS[a], a != "mocha", a == "vitest")) return 1 }
+  }
+  for (r in RDS) if (has(p, r) && rscan(after(p, r), RDS[r], RVS[r], 0, 0)) return 1
+  dd = ddseg(p); if (dd == "") return 0
+  if (!ddrun(p)) return rscan(dd, "", "", 0, 0)
+  ds = vs = ""; pos = 0
+  for (i = 1; i <= NS[DDN]; i++) {
+    a = NC[DDN, i]; sub(/^[ \t]*(npx[ \t]+)?/, "", a); sub(/[ \t].*$/, "", a)
+    if (a in RDS) { ds = ds RDS[a]; vs = vs RVS[a]; pos = 1 } else ds = ds RDS["jest"] RDS["mocha"]  # playwright, cypress: task M1-77
+  }
+  return rscan(dd, ds, vs, pos, 0)
+}
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
 function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
@@ -569,6 +640,7 @@ function flush(   n, i, parts, j) {
   j = just(cur)
   n = split(stripc(cur), parts, /[;&|]+/)
   if (F ~ /([Mm]akefile|\.mk)$/) for (i = 1; i <= n; i++) sub(/^[ \t@+-]+/, "", parts[i])  # recipe prefixes: silent, always run, ignore errors
+  for (i = 1; i <= n; i++) if (runopt(parts[i])) { printf "@runopt@%s:%d:%s\n", F, start, cur; break }
   for (i = 1; i <= n; i++) if (baseline(parts[i]) || (!j && relaxed(parts[i]))) { printf "%s:%d:%s\n", F, start, cur; break }
   cur = ""
 }
@@ -581,6 +653,13 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   # not vitest: its typecheck mode runs tsc).
   RUNRE = "^[ \t]*(npx[ \t]+)?(jest|mocha|playwright|cypress)([ \t]+[A-Za-z0-9_./:=@,+%-]+)*[ \t]*$"
   NPMBOOL = "^(-s|--silent|-q|--quiet|--if-present|--ignore-scripts)$"
+  # runopt (check 1, task M1-71): denied long names (normalized: lower case, no dashes) and short letters per runner, and the allowed
+  # options whose value may follow as the next word. jest -t, -o, -f: name filter, onlyChanged, onlyFailures; vitest -u: update;
+  # mocha -g, -f, -i: grep, fgrep, invert (its -t, -u, -R are timeout, ui, reporter).
+  RDL = " updatesnapshot update passwithnotests testnamepattern testpathignorepatterns testpathpattern testpathpatterns onlychanged changedsince findrelatedtests lastcommit onlyfailures changed grep fgrep invert exclude ignore "
+  RVL = " config maxworkers shard testtimeout timeout reporters reporter reporteroption reporteroptions outputfile coveragereporters coveragedirectory seed testenvironment environment pool ui slow require spec jobs "
+  RDS["jest"] = "utof"; RDS["vitest"] = "ut"; RDS["mocha"] = "gfi"
+  RVS["jest"] = "cw"; RVS["vitest"] = "c"; RVS["mocha"] = "tuRsrj"
   np = split(ENVIRON["NPMS"], P, "\n")  # pkgscripts: name TAB command; a bare TAB makes every tail unknown
   for (i = 1; i <= np; i++) if ((j = index(P[i], "\t")) == 1) NPMU = 1; else if (j) { nm = substr(P[i], 1, j - 1); NC[nm, ++NS[nm]] = substr(P[i], j + 1) }
   nl = split(ENVIRON["CLI_ALLOW"], L, "\n")
@@ -746,7 +825,7 @@ cliflags() { # cliflags <pathspec>...
       else continue; fi || { echo "$f:0: the YAML fold scan failed"; continue; }  # a file missing from the tree has nothing to scan (R1-02)
       printf '%s\n' "$y" | NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
     esac
-  done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++' | sed 's/^/guard: unjustified CLI flag: /'
+  done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++ { if (sub(/^@runopt@/, "")) print "guard: test-runner option that skips or rewrites tests: " $0; else print "guard: unjustified CLI flag: " $0 }'
 }
 out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*makefile' '*.mk' '*pre-commit-config.yaml')
 [ -n "$out" ] && { echo "$out"; fail=1; }
