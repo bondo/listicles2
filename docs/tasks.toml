@@ -1643,7 +1643,7 @@ depends_on = [
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-85",
 ]
 
 [[task]]
@@ -1860,3 +1860,13 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M6-O1"]
 notes = "DEFERRED, owner decision on #15, comment 6974778901 (2026-11-18): Git LFS is NOT adopted now. Revisit trigger: tracked binaries on main above 50 MB, OR pack growth above 20 MB per month (for example Roborazzi golden churn), OR any single file above 5 MB. Becomes ready once M6-O1 is done (the release key), whether or not the trigger has fired: at release the owner checks the trigger and either adopts LFS (the 3 PRs below) or drops this task. Before that, if the trigger fires earlier, the owner clears the depends_on. Why not now: cloud agents check LFS files out as pointers, the proxy rejects lfs.github.com, LFS auth through the git proxy is unverified, and CI checkouts would spend LFS bandwidth. If adopted: about 3 PRs (.gitattributes for goldens only, no history migrate; CI lfs: true plus a cache; agent git lfs pull in verify), and the owner allows lfs.github.com and sets an LFS budget. Until then the M0.5-29 guard keeps files small (M1-03 goldens: small fixed device size, one golden per state)"
+
+[[task]]
+id = "M1-85"
+title = "Repo name and checkout path from one place, so the scripts work before and after the repo rename"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "owner request 2026-11-23 in the orchestrator #38 chat: prepare the repo rename; see #15"

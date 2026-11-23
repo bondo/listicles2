@@ -8,12 +8,12 @@ is the source; the summary is derived from it, so edit the block and run `render
 Usage:
   scripts/state_body.py validate [--comments N] BODY   exit 1 with every problem on stderr; BODY is a file or - for stdin.
       A valid body also gets one `rotate:` line per rotation limit it has passed (exit 0): a body of BODY_LIMIT bytes or more,
-      or N >= COMMENT_LIMIT comments (N from: gh api repos/bondo/listicles2/issues/<state issue> --jq .comments; #15 until the first
+      or N >= COMMENT_LIMIT comments (N from: gh api repos/{owner}/{repo}/issues/<state issue> --jq .comments; #15 until the first
       rotation, merge_ready.py STATE_ISSUE). Owner decision 7076313976:
       rotate then (or at milestone end) at the next handover boundary.
   scripts/state_body.py render BODY     print the body with the summary regenerated and the block in canonical form
 
-Read the body with: gh api repos/bondo/listicles2/issues/15 --jq .body > state.md
+Read the body with: gh api repos/{owner}/{repo}/issues/15 --jq .body > state.md
 scripts/tasks.py --state state.md reads the claimed and in-review task ids from the same block.
 """
 

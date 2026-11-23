@@ -3,12 +3,12 @@
 # merged (the owner confirmed it, the status row lagged). Reads GitHub through `gh` (GH_TOKEN, read-only) and runs
 # `tasks.py drift --check`. A gh failure, incomplete_results or more than 1000 search results fail the check ("could not
 # look" is not "no drift").
-# Env: GITHUB_REPOSITORY (default bondo/listicles2), OWNER_DRIFT_RETRIES (3), OWNER_DRIFT_SLEEP (5 s, doubled each
+# Env: GITHUB_REPOSITORY (else the origin remote: scripts/repo_slug.py, M1-85), OWNER_DRIFT_RETRIES (3), OWNER_DRIFT_SLEEP (5 s, doubled each
 # retry), OWNER_DRIFT_TASKS (task file; tests only). Needs python3 and gh.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-REPO="${GITHUB_REPOSITORY:-bondo/listicles2}"
+REPO="$(python3 -I scripts/repo_slug.py)" || exit 1
 RETRIES="${OWNER_DRIFT_RETRIES:-3}"
 PAUSE="${OWNER_DRIFT_SLEEP:-5}"
 TMP="$(mktemp -d)"
