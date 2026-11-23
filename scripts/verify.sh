@@ -49,6 +49,7 @@ step java-api-level-tests python3 -I scripts/test_check_java_api_level.py
 step pit-config-tests python3 -I scripts/test_check_pit_config.py
 step pit-config python3 -I scripts/check_pit_config.py
 step tasks-tests python3 -I scripts/test_tasks.py
+step state-body-tests python3 -I scripts/test_state_body.py
 step issue-forms-tests python3 -I scripts/test_issue_forms.py
 step issue-forms python3 -I scripts/issue_forms.py
 step collab-inbox-tests python3 -I scripts/test_collab_inbox.py
