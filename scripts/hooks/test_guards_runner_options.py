@@ -337,5 +337,19 @@ class PlaywrightCypressReviewRound1Tests(RunnerCase):
         self.assertPasses()
 
 
+class PlaywrightCypressReviewRound2Tests(RunnerCase):
+    """PR 358 R2-01: the -p/--package value is skipped only after a launcher that takes a package (npx, pnpx, bunx, dlx, npm exec and
+    npm x); `time -p` and `command -p` take no value, so the runner after them is the command."""
+
+    def test_time_and_command_p_keep_the_runner_as_the_command(self):
+        bad = ["time -p jest src", "command -p jest src", "time -p vitest run src", "time -p playwright test login",
+               "time -p cypress run a.cy.ts", "pnpm dlx --package @playwright/test playwright test login",
+               "npm x -p cypress -- cypress run a.cy.ts", "bunx -p @playwright/test playwright test login"]
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+        self.put("scripts/test.sh", "time -p jest --ci\ncommand -p npx playwright test --shard 1/2\n")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
