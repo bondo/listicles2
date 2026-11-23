@@ -51,7 +51,7 @@ def googleTermsFile = project.ext.has('licenseeGoogleTermsFile') ?
         rootProject.file('config/licensee/google-sdk-terms.txt')
 
 def allowedSpdxIds = ['Apache-2.0', 'MIT', 'BSD-2-Clause', 'BSD-3-Clause']
-// M1-26 (owner decisions, issue 15 comments 7083187223 and 7085175461, group B): these two terms are each allowed for
+// M1-26, M1-O14 (owner decisions, issue 15 comments 7083187223, 7085175461 and 7095943127, group B): these two terms are each allowed for
 // exactly one artifact, not pooled: the Play Integrity terms for integrity, the Play Core license for core-common.
 def googleTermsUrls = ['https://developer.android.com/studio/terms.html', 'https://developer.android.com/studio/terms']
 def artifactTermsUrls = [
@@ -76,6 +76,13 @@ licensee {
         approvedCoordinates << coordinates
         allowDependency(parts[0], parts[1], parts[2]) { because(reason) }
     }
+
+    // M1-O14 (owner decisions, issue 15 comments 7085175461 and 7095943127, group C): two permissive licence texts at URLs licensee
+    // does not map to an SPDX id. licensee's allowUrl cannot be scoped to an artifact (only allowDependency can, and that needs an
+    // exact version and skips the licence check), so these are allowed by URL for any artifact:
+    // re2j (the Go licence, BSD-3-Clause text) and animal-sniffer-annotations (the MIT text).
+    allowUrl('https://golang.org/LICENSE') { because('The Go licence text, BSD-3-Clause (com.google.re2j:re2j)') }
+    allowUrl('https://spdx.org/licenses/MIT.txt') { because('The MIT licence text (org.codehaus.mojo:animal-sniffer-annotations)') }
 }
 
 // Runs after every licensee task (one per Android variant, or one per JVM project), only when licensee itself passed.
