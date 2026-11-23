@@ -458,6 +458,8 @@ flowchart LR
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
+- **PR to merge** [#331](https://github.com/bondo/listicles2/issues/331): M1-44&#58; CI hardening&#58; job timeouts, pinned python and node, npm ci --ignore-scripts, gitleaks do…
+- **PR to merge** [#334](https://github.com/bondo/listicles2/issues/334): Task 1b&#58; guards accept plural "thresholds" in markdown prose and useJUnitPlatform/failOnNoDiscov…
 - **task** M1-06: waits on M1-10
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
