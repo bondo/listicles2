@@ -1656,6 +1656,7 @@ class MovedCheckSettings(DiffCase):
             'val t = "${"}"} \\" x"; useJUnitPlatform()\nval r = """ a """"; failOnNoDiscoveredTests = true',
             "/* one /* nested */ block */ useJUnitPlatform()\n/*\n x\n*/ failOnNoDiscoveredTests = true",
             "val `name with useJUnitPlatform() in it` = 1; useJUnitPlatform()\nrun { failOnNoDiscoveredTests = true }",
+            "useJUnitPlatform(/* no options */)\nfailOnNoDiscoveredTests = /* on */ true",
         ]:
             with self.subTest(body=body):
                 self.move(body)
@@ -1697,6 +1698,9 @@ class MovedCheckSettings(DiffCase):
             "useJUnitPlatform(options)\nfailOnNoDiscoveredTests = true && flag",
             "useJUnitPlatform\nfailOnNoDiscoveredTests.set(flag)",
             "useJUnitPlatform() {}\nfailOnNoDiscoveredTests = !true",
+            "useJUnitPlatform(\"\")\nfailOnNoDiscoveredTests = `true`",
+            "useJUnitPlatform('x')\nfailOnNoDiscoveredTests.set(\"\" == \"\")",
+            "useJUnitPlatform(`x`)\nfailOnNoDiscoveredTests = \"${true}\"",
         ]:
             with self.subTest(body=body):
                 self.move(body)
