@@ -1001,8 +1001,8 @@ class NestedBuilds(unittest.TestCase):
         # fails later for another reason (policy.gradle does not fit licensee 1.0.0), so the verification text alone is not enough.
         build = (ROOT / "build.gradle.kts").read_text(encoding="utf-8")
         case = re.search(
-            r"licenseeCase\([^)]*message = \"Error resolving plugin \[id: 'app\.cash\.licensee', version: '([^']+)'\]\\n> Dependency verification failed\""
-            r'[^)]*licensee = "([^"]+)"',
+            r"licenseeCase\([^)]*message =\s*\"Error resolving plugin \[id: 'app\.cash\.licensee', version: '([^']+)'\]\\n\" \+\s*"
+            r'"> Dependency verification failed"[^)]*licensee = "([^"]+)"',
             build,
         )
         self.assertIsNotNone(case, "testLicenseeGate has no case with another licensee version and the strict verification error")

@@ -438,13 +438,17 @@ val testLicenseeGate =
                     message = coordinates,
                 ),
                 licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl-3.0"),
-                // Issue 217 item 4: the fixture build verifies dependencies (config/licensee/fixture/gradle). An older licensee version
-                // that is on Maven Central but not in that file must be refused by Gradle, whatever its licences.
+                // Issue 217 item 4: the fixture build verifies dependencies (config/licensee/fixture/gradle). An older licensee
+                // version that is on Maven Central but not in that file must be refused by Gradle, whatever its licences. The expected
+                // text appears only when strict verification stops the plugin from resolving; lenient mode prints the same warning,
+                // resolves the plugin and fails later for another reason.
                 licenseeCase(
                     "dependency verification is on in the fixture build",
                     allowed,
                     passes = false,
-                    message = "Dependency verification failed",
+                    message =
+                        "Error resolving plugin [id: 'app.cash.licensee', version: '1.0.0']\n" +
+                            "> Dependency verification failed",
                     licensee = "1.0.0",
                 ),
             ) +

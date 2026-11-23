@@ -401,7 +401,7 @@ def check_verification(meta, props_text, verify_text=""):
 FIXTURE = "config/licensee/fixture"
 LICENSEE = ("app.cash.licensee", "licensee-gradle-plugin")
 # Any way to tell Gradle to skip verification in the testLicenseeGate command: --dependency-verification, -F, -Dorg.gradle.dependency.verification.
-GATE_OFF = re.compile(r"dependency[-.]verification|\"-F\"")
+GATE_OFF = re.compile(r"dependency[-.]verification|\"-F")  # "-F" alone or attached ("-Flenient")
 
 
 def _relabel(problems, old, new):
@@ -442,7 +442,7 @@ def _nested_settings(root, rel, blocks):
     text = _read(root / rel)
     if text is None:
         return [f"{rel} missing"]
-    return [f"{rel}: {p}" for p in check_settings(text, blocks)]
+    return [f"{rel}: {p.removeprefix('settings.gradle.kts: ')}" for p in check_settings(text, blocks)]
 
 
 def main(root):
