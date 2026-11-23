@@ -20,5 +20,6 @@ that waits on it, transitive arrows are left out, and each milestone band says h
 
 Pushes to `main` (a newer push can cancel an older run) upload the debug APK that CI builds as an Actions artifact named `tally-debug-<short sha>`, kept for 30 days:
 open the CI run for the commit on the Actions tab and download it under Artifacts (the file is a zip with one `.apk`).
+The newest one: [successful CI runs of pushes to `main`](https://github.com/bondo/listicles2/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush+is%3Asuccess), newest on top; open the top run and download `tally-debug-<short sha>` under Artifacts (a GitHub login is needed).
 It carries the `demo-tally` stand-in Firebase config (M1-30), so it installs and shows the UI but cannot reach the real Firebase project.
 Install it on your own device only: installs by anyone else wait for M1-O5 (#291). Pull requests do not publish an APK.
