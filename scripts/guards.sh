@@ -554,7 +554,7 @@ function rscan(s, R, pos, fw, dl,   n, w, w0, m, o, i, j, t, c, nm, n0, q, first
   return 0
 }
 # rname: the runner a word names, as a path, `name@version` or `name.js`, after `(`, `{` or `$(`, and `@playwright/test`; RDS holds the runners.
-function rname(t) { t = rclean(t); sub(/^\$?[({]+/, "", t); if (t ~ /^@playwright\/test(@[^\/]*)?$/) return "playwright"; sub(/^.*\//, "", t); if (t ~ /^[^@]+@/) sub(/@.*$/, "", t); sub(/\.[cm]?js$/, "", t); return t }
+function rname(t) { t = rclean(t); sub(/^\$?[({]+/, "", t); if (t ~ /^@playwright\/test(@[^\/]*)?$/ || t ~ /(^|\/)(@playwright\/test|playwright)\/cli\.[cm]?js$/) return "playwright"; sub(/^.*\//, "", t); if (t ~ /^[^@]+@/) sub(/@.*$/, "", t); sub(/\.[cm]?js$/, "", t); return t }
 # cmdat: the index of the command word of the words w[1..n] after a YAML `- key:` or a package.json key, VAR= assignments (a quoted value
 # may hold blanks), shell keywords and launchers (npx, npm exec, yarn run, bunx, node, env, sudo, timeout, nice, ...) with their
 # options, a value after a one-letter option (sudo -u bob, nice -n 5) and a number (timeout 60), from word i0 on; 0 when there is none
@@ -569,6 +569,7 @@ function cmdat(w, n, i0,   i, t, l, v, q) {
       continue
     }
     if (t ~ /^(sudo|env|time|timeout|exec|command|nice|nohup|node|npm|npx|pnpx|bunx|yarn|pnpm|bun|dlx|x|run|if|then|do|else|elif|while|until|!)$/) { l = 1; continue }
+    if (l && t ~ /^(-p|--package)$/ && i < n) { i++; continue }  # the npx and npm exec package, also a runner name (R1-02)
     if (l && t ~ /^-/) { if (t ~ /^-[A-Za-z]$/ && i < n && rclean(w[i + 1]) !~ /^-/ && !(rname(w[i + 1]) in RDS)) i++; continue }
     if (l && t ~ /^[0-9.]+[smhd]?$/) continue
     return i
@@ -587,7 +588,7 @@ function runopt(p,   n, w, k, a, r, i, dd, rs, dl, tl, s0, t1) {
     if (rscan(tl, a, a != "mocha", (a in RREQ) ? "" : RSUB[a], "")) return 1
   }
   for (r in RDS) for (s0 = p; has(s0, r); s0 = substr(s0, 2)) {  # every mention: a package.json value ends a scan (R2-02)
-    s0 = after(s0, r); t1 = s0; if (r == "playwright") sub(/^\/test(@[^ \t]*)?/, "", t1)  # the package @playwright/test
+    s0 = after(s0, r); t1 = s0; if (r == "playwright") sub(/^(\/test(@[^ \t\/]*)?)?(\/cli\.[cm]?js)?/, "", t1)  # @playwright/test, .../cli.js (R1-01)
     if ((r in RREQ) && (t1 = rsub(t1, r)) == "\n") continue
     if (rscan(t1, r, 0, "", "")) return 1
   }
