@@ -155,12 +155,71 @@ a tail that reaches a test runner skips the eslint, prettier and tsc union check
   firebase is no such runner (`emulators:exec` runs its argument as a command), and nor is vitest (its typecheck mode runs tsc).
 
 **Not covered, or a new cost.**
-- A resolved tail is not read at all, the same as a direct `jest ...` call in a script: runner options that skip or rewrite tests
-  (`-u`, `--passWithNoTests`, `-t`, a test path pattern) pass after `npm test --` when the script is jest. Check 1 reads them in config only (task M1-71).
+- A resolved tail skips the union check; its runner options are read by check 1 on command lines (next section, task M1-71).
 - A `\u` anywhere in a package.json, a value included (`"description": "caf\u00e9"`), makes every tail unknown: a false positive, never
   a miss (PR 309 R3-03, accepted). The repo's own `firebase/package.json` `test` script (firebase, with escaped quotes) is not resolved.
 - Only tracked package.json files are read. A command run where an untracked one decides (`node_modules`, a generated file), and npm
   settings from `.npmrc` or `npm_config_*` (`script-shell`), are not followed.
+
+## Check 1 on command lines: test-runner options (task M1-71)
+
+Owner decision (issue 15, comment 7092471489). `runopt` in the 2c scan (same files, same logical lines, the joined YAML lines too) fails
+a jest, vitest or mocha command that rewrites or skips tests, with no `justified:` escape hatch, like the rest of check 1:
+- rewrite and skip-all: `-u`, `--updateSnapshot` (vitest `--update`), `--passWithNoTests`;
+- name and path filters: `-t`, `--testNamePattern`, `--testPathIgnorePatterns`, `--testPathPattern(s)` (what a positional jest word sets),
+  positional path filters, mocha `--grep`, `-g`, `--fgrep`, `-f`, `--invert`, `-i`, the path excludes `--exclude` (vitest, mocha) and
+  `--ignore` (mocha), a jest `--filter` module, and a jest config given as inline JSON (`-c` or `--config` with a value that starts with
+  `{`, which no config scan reads);
+- changed-only: jest `-o`, `--onlyChanged`, `--changedSince`, `--findRelatedTests`, `--lastCommit`, `-f`/`--onlyFailures`, vitest `--changed`.
+
+`--shard` passes (kept for CI splitting). Names past the decision's list (`--testPathPattern(s)`, `--lastCommit`, `--onlyFailures`,
+`--exclude`, `--ignore`, `--filter`, inline JSON config, mocha `-f` and `-i`) are spellings or siblings of the listed ones, denied because that is the fail-closed side.
+
+**How it reads a command.** Long names are compared in lower case without dashes, as yargs (jest, mocha) and cac (vitest) accept
+kebab-case for camelCase (`--pass-with-no-tests`), with or without `=value`. Short options are per runner, because they clash (jest `-t` is
+the name filter, mocha `-t` is `--timeout`; jest `-i` is `--runInBand`, mocha `-i` is `--invert`), and may be grouped (`-iu`). A
+group is read as yargs-parser (jest, mocha) reads it (R1-01): every character is a flag, digits included, until one takes the rest of
+the group as its value, which happens only when the rest starts with `=`, is a number (after a letter: `-w2`), or starts with a
+character that is no word character. So `-wu`, `-w2u`, `-1u` and `-x9u` all set `-u`. mri (vitest, and a tail resolved to a runner
+the check does not know) reads every character of a single-dash word before `=` as a flag. A word that starts with a dash is skipped only as a negative
+number (`--seed -1`). A one-letter long option (`--u`, mocha `--g smoke`) is that short option, as both parsers read it (R1-02).
+Positional words are path filters after jest, and after vitest except a first `run`, `watch` or `dev` (`vitest related`, `list` and
+`bench` fail), when the runner is the command: the first word after a YAML `- key:` or a package.json key, `VAR=` assignments (a
+quoted value may hold blanks: `FOO="a b" jest src`), shell keywords (`if`, `then`, `do`, `while`, `until`, `else`, `!`, `{`, `(`,
+`$(`) and launchers with their options (`npx --yes`, `npm exec`, `yarn run`, `bun run`, `pnpm exec`, `bunx`, `node --flag path/jest.js`,
+`env -u X`, `sudo -u bob`, `nice -n 5`, `timeout -s KILL 60`; a one-letter option's value and a number are skipped). The runner word
+may carry a path, `@version` (`npx jest@30`) or `.js` (R1-03). In a package.json a command ends with its JSON string value, and
+every script value on a line is read (`{ "test": "jest --ci", "e2e": "jest src" }`). A mocha
+positional word is its spec and passes. After a bare `--` every word is positional. The value of an option listed in `RVL` or `RVS`
+(`--maxWorkers 2`, `-c jest.config.cjs`, `--shard 1/3`, mocha `-t 5000`) is no positional word; the value of any other option is, so
+write it with `=` (`--testSequencer=./seq.js`): a false positive, never a miss. Redirections and their targets are skipped.
+
+**npm `--` tails.** A tail that M1-65 resolves (every definition of the script a plain `[npx] jest|mocha ...`) is read with that runner's
+short options, and its positional words fail (for mocha too, and its `--spec`: a spec in the tail may replace the configured one). A tail that is not
+resolved is read with the long names only and fails with no escape hatch; its short options are ambiguous across tools (`-t` is tsc
+`--target`, `-f` is the ESLint formatter), so 2c keeps checking them as before, waivable by a reason.
+
+**Not covered (tripwire, F18).**
+- A runner inside a quoted command string (`firebase emulators:exec "jest src"`, `bash -c "jest src"`) has its options read but not its
+  positional words; nor does a runner held in a variable (`$JEST src`), one after a launcher option whose value is not one word
+  directly after a one-letter option (`sudo --user=bob` passes, `sudo --user bob jest src` reads `bob` as the command), one after a
+  wrapper the list does not name (`xargs jest`, `watch jest`, `cross-env CI=1 jest src`, `nyc --reporter=lcov jest src`,
+  `c8 vitest run src`, `dotenv -e .env -- jest src`, `yarn workspace app jest src`, `pnpm --filter app exec jest src`,
+  `stdbuf -oL jest src`, a `case` arm `a) jest src;;`), or a runner run from a Python or JS file. Their options are still read (PR 339
+  R2-03, accepted residual).
+- vitest (mri) reads a word with three or more dashes as a short group: `vitest run ---u` and `---t=smoke` pass the guard, which reads
+  every `--` word as a long name (PR 339 R2-01, accepted residual). jest and mocha (yargs) do not read `---u` as `-u`.
+- Options that weaken a run without filtering it: jest `--ci=false` (writes new snapshots), `--bail`, `--listTests`, `--watch` (only
+  changed tests; it does not end in CI), vitest `--allowOnly`, dot options (`--coverage.*`, `--typecheck.only`), `--project`, jest
+  `--selectProjects`, `--roots`, `--testMatch`, `--testRegex` (the last three are refused in config by check 1), and a command whose
+  exit status is dropped (`jest || true`). vitest `--dir` and `--root` and jest `--rootDir` fail only when their value is a separate
+  word (read as a path filter); written with `=` they pass.
+- playwright and cypress options (`--grep`, `--last-failed`, `--only-changed`, `--update-snapshots`): a tail resolved to them is read
+  with the long names and every short letter of jest and mocha, without positional words; a direct call is not read (task M1-81).
+- yarn, pnpm and bun tails are never resolved (M1-65), so only their long runner options fail with no escape hatch. Their forms
+  that pass arguments to the script without `--` (`yarn test --passWithNoTests`, `pnpm test -u`, `pnpm run test --passWithNoTests`) are
+  not read at all, as in 2c (the repo is npm-only).
+- A runner name used as data on a command line (`echo jest -u`) fails: a false positive.
 
 ## Check 2c: YAML values over several lines (task M1-64, issue 164 item 2)
 

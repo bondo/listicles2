@@ -34,6 +34,8 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
    Known gap: a read of other projects (`allprojects.flatMap { ... }`) is not caught (issue 48, M1-68).
+   The root build's `val listiclesModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
+   `listiclesChecks` by task path (aggregation_problems; M1-68 part B2: each module runs its own checks, the root reads none).
 
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
@@ -573,9 +575,30 @@ def convention_problems(root):
     return problems
 
 
+ROOT_MODULES = re.compile(r"(?m)^val listiclesModules = listOf\(([^)]*)\)")
+ROOT_WIRING = re.compile(r'(?m)^tasks\.named\("detekt"\)\s*\{\s*dependsOn\(listiclesModules\.map\s*\{\s*"\$it:listiclesChecks"\s*\}\)\s*\}')
+
+
+def aggregation_problems(root):
+    modules = module_paths(root)
+    if modules is None:
+        return []
+    text = strip(read(root, "build.gradle.kts")) if os.path.isfile(os.path.join(root, "build.gradle.kts")) else ""
+    lists = ROOT_MODULES.findall(text)
+    if len(lists) != 1:
+        return ["build.gradle.kts: no `val listiclesModules = listOf(...)` (the root runs every module's listiclesChecks by task path)"]
+    listed = re.findall(r"\"(:[^\"]+)\"", lists[0])
+    problems = [f"build.gradle.kts: listiclesModules misses {m} (settings.gradle.kts includes it)" for m in modules if m not in listed]
+    problems += [f"build.gradle.kts: listiclesModules lists {m}, which settings.gradle.kts does not include" for m in dict.fromkeys(listed) if m not in modules]
+    problems += [f"build.gradle.kts: listiclesModules lists {m} twice" for m in dict.fromkeys(listed) if listed.count(m) > 1]
+    if not ROOT_WIRING.search(text):
+        problems.append('build.gradle.kts: detekt does not depend on dependsOn(listiclesModules.map { "$it:listiclesChecks" })')
+    return problems
+
+
 def main(argv):
     root = os.path.abspath(argv[1]) if len(argv) > 1 else os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    problems = catalog_problems(root) + target_sdk_problems(root) + manifest_problems(root) + convention_problems(root)
+    problems = catalog_problems(root) + target_sdk_problems(root) + manifest_problems(root) + convention_problems(root) + aggregation_problems(root)
     if problems:
         for p in problems:
             print(f"build-guards: {p}")
