@@ -957,7 +957,7 @@ class NpmTailResolutionTests(CliFlagCase):
 
     def test_a_tail_that_reaches_a_test_runner_passes(self):
         self.write("tools/package.json", self.scripts([
-            ("test", "jest"), ("e2e", "npx playwright test"), ("unit", "tsc --noEmit && vitest run"), ("m", "mocha --recursive"),
+            ("test", "jest"), ("e2e", "npx playwright test"), ("unit", "npx jest --ci"), ("m", "mocha --recursive"),
             ("cy", "cypress run --spec a/b.cy.ts"), ("ci", "npm test -- -u")]))
         for line in ["cd tools && npm test -- -u", "npm run e2e -- -c x.ts", "npm t -- --coverage", "npm tst -- -u",
                      "npm run-script unit -- --watch", "npm -s test -- -u", "npm run --silent e2e -- --headed", "npm rum m -- --quiet",
@@ -1000,18 +1000,27 @@ class NpmTailResolutionTests(CliFlagCase):
         for cmd in ["eslint .", "jest && eslint .", "jest; eslint .", "jest | eslint .", "jest || eslint .", "jest & eslint .",
                     "eslint . \\\; jest", "jest \\\"$X\\\"", "jest $(eslint)", "jest `x`", "CI=1 jest", "npx -y jest", "node jest.js",
                     "firebase emulators:exec --only firestore", "npx", "jest;", "(jest)", "jest # x", "./node_modules/.bin/jest",
-                    "jest > out", "jest ~/x", "jest \\u0026\\u0026 eslint ."]:
+                    "jest > out", "jest ~/x", "jest \\u0026\\u0026 eslint .", "vitest run", "npx vitest",
+                    "jest() { eslint $@ ; } ; jest", "PATH=lint:/usr/bin:/bin ; jest", "eslint . ';jest", "eslint . #;jest",
+                    "tsc --noEmit && jest", "cp lint/jest node_modules/.bin/jest ; jest"]:
             with self.subTest(cmd=cmd):
                 self.fails_with(self.scripts([("test", cmd)]))
         self.write("firebase/package.json", self.scripts([("test", "eslint .")]))  # every definition of the name must be a runner
         self.fails_with(self.scripts([("test", "jest")]))
+        self.write("firebase/package.json", self.JEST)
+        for path in ["docs/x/package.json", "build/package.json", "x/node_modules/y/package.json"]:  # every tracked file, excluded paths too
+            with self.subTest(path=path):
+                self.write(path, self.scripts([("test", "eslint .")]))
+                self.fails_with(self.scripts([("test", "jest")]))
+                self.repo.git("rm", "-q", path)
 
     def test_c1_c2_npm_forms_only(self):
         pkg = self.scripts([("t", "eslint ."), ("tst", "eslint ."), ("test", "jest")])
         for line in ["cd tools && yarn t -- --quiet", "cd tools && yarn tst -- --quiet", "yarn test -- --quiet", "pnpm test -- --quiet",
                      "bun test -- --quiet", "npx jest -- --quiet", "npm exec jest -- --quiet", "npm run t -- --quiet",
                      "npm --prefix tools test -- --quiet", "npm --workspace=tools test -- --quiet", "npm start -- --quiet",
-                     "npm run -- test --quiet", "npm run --prefix x test -- --quiet", "npm it -- --quiet"]:
+                     "npm run -- test --quiet", "npm run --prefix x test -- --quiet", "npm it -- --quiet", "./bin/npm test -- --quiet",
+                     "scripts/npm test -- --quiet", "x: npm test -- --quiet", "- npm test -- --quiet", "sudo npm test -- --quiet"]:
             with self.subTest(line=line):
                 self.fails_with(pkg, line)
         for line in ["cd tools && npm t -- --quiet", "npm tst -- --quiet", "npm run test -- --quiet"]:
