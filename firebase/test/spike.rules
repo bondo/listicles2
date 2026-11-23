@@ -3,9 +3,9 @@
     // Each rule makes every get()/exists() call of its PLAN 3.1 row, reads a document once (let) and
     // tests the conditions that make no call first (ADR 0002's layout), so item (e) counts real calls.
     // The task named at a block moves it into firestore.rules, with its field validation (P4) and full
-    // allow and deny tests, and deletes it here.
+    // allow and deny tests, and deletes it here. M1-10 moved userDoc and oneHousehold (the owner's
+    // member create needs them); (b) uses them from firestore.rules.
     function inviteDoc(code) { return /databases/$(database)/documents/invites/$(code); }
-    function userDoc(uid) { return /databases/$(database)/documents/users/$(uid); }
     function live(hid) { return get(householdDoc(hid)).data.deleted == false; }
 
     // (a), M1-12: Query invites as the owner decided on #280 (M1-O12): a member of the live household
@@ -31,13 +31,6 @@
       return invite.householdId == hid && invite.expiresAt > request.time
         && exists(memberDoc(hid, invite.createdBy)) && !existsAfter(inviteDoc(code))
         && live(hid) && oneHousehold(hid);
-    }
-
-    // The users doc exists and holds no household before the batch and this one after it.
-    function oneHousehold(hid) {
-      let user = userDoc(request.auth.uid);
-      return exists(user) && get(user).data.householdId == null
-        && getAfter(user).data.householdId == hid;
     }
 
     // (c), M1-53: Transfer ownership. The owner of the live household changes only ownerUid, to a
