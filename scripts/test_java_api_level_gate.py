@@ -44,8 +44,8 @@ allprojects {
         }
     }
 }
-rootProject {
-    afterEvaluate { r -> %s }
+rootProject { r0 ->
+    if (r0.gradle.parent == null) r0.afterEvaluate { r -> %s }  // the main build, not the included build-logic
 }
 """
 

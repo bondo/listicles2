@@ -21,9 +21,9 @@ from xml.sax.saxutils import escape
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import status_visual  # noqa: E402  # justified: must follow the sys.path insert above
 
-PAD, MIN_WIDTH = 24, 880
-NODE_H, ROW, HEADER, BAND_GAP, GAP = 22, 28, 24, 10, 26
-CHAR, NODE_PAD = 7, 26  # node width = id width * CHAR + NODE_PAD (marker and padding)
+PAD, MIN_WIDTH = 24, 960
+NODE_H, ROW, HEADER, BAND_GAP, GAP = 24, 30, 26, 10, 10
+CHAR, NODE_PAD = 8, 24  # node width = id width * CHAR + NODE_PAD (marker and padding)
 SWEEPS = 3
 WORDS = {"ready": "ready", "review": "in progress", "blocked": "blocked", "owner": "owner to-do"}
 MARKS = (("ready", "ok", "mk-ready"), ("review", "info", "mk-progress"), ("blocked", "warn", "mk-blocked"), ("owner", "bad", "mk-owner"))
@@ -35,8 +35,8 @@ CSS = (
     ".warn{fill:#9a6700}.bad{fill:#cf222e}.edge{stroke:#8c959f;fill:none;stroke-width:1.2}.ah{fill:#8c959f}"
     ".nd-ready{fill:#dafbe1;stroke:#1a7f37}.nd-review{fill:#ddf4ff;stroke:#0969da}"
     ".nd-blocked{fill:#fff8c5;stroke:#9a6700}.nd-owner{fill:#ffebe9;stroke:#cf222e}"
-    "text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}"
-    ".t{font-size:20px;font-weight:600}.h{font-size:13px;font-weight:600}.s{font-size:12px}.n{font-size:11px;font-weight:600}"
+    "text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px}"
+    ".t{font-size:22px;font-weight:600}.h{font-size:14px;font-weight:600}.s{font-size:14px}.n{font-size:14px;font-weight:600}"
     "@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}.fg{fill:#e6edf3}.muted{fill:#9198a1}"
     ".ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.edge{stroke:#6e7681}.ah{fill:#6e7681}"
     ".nd-ready{fill:#12261e;stroke:#3fb950}.nd-review{fill:#10294d;stroke:#4493f8}"
@@ -170,7 +170,7 @@ def render_graph_svg(model):
         lines.append("Not planned yet: " + ", ".join(graph["planned"]))
     for ln in lines:
         text(PAD, y, escape(status_visual.clip(ln, 140)), "muted s")
-        y += 18
+        y += 20
     y += 6
     if not nodes:
         text(PAD, y + 10, "No open tasks.", "ok")
@@ -187,7 +187,7 @@ def render_graph_svg(model):
             name = status_visual.clip(bid + " " + b["title"], 40)
             label = f"{name}: {b['done']}/{b['total']} done, {opened} open"
             bands_svg.append(f'<rect x="{PAD}" y="{top}" width="{width - 2 * PAD}" height="{HEADER + rows * ROW + 4}" rx="6" class="card"/>')
-            bands_svg.append(f'<text x="{PAD + 10}" y="{top + 17}" class="fg h">{escape(label)}</text>')
+            bands_svg.append(f'<text x="{PAD + 10}" y="{top + 18}" class="fg h">{escape(label)}</text>')
             for (bb, col), cell in cells.items():
                 if bb == bid:
                     for idx, tid in enumerate(cell):
@@ -206,21 +206,21 @@ def render_graph_svg(model):
                             f'<title>{escape(n["id"] + ": " + status_visual.clip(n["title"], 100) + " (" + WORDS[n["state"]] + ")")}</title>'
                             f'<rect x="{x}" y="{ny}" width="{width_of}" height="{NODE_H}" rx="4" class="nd-{n["state"]}"/>'
                             f'{_marker(n["state"], x + 10, mid, *MARK[n["state"]])}'
-                            f'<text x="{x + 19}" y="{mid + 4}" class="fg n">{escape(status_visual.clip(n["id"], 12))}</text></g>')
+                            f'<text x="{x + 20}" y="{mid + 5}" class="fg n">{escape(status_visual.clip(n["id"], 12))}</text></g>')
     y += 4
     legend_y = y + 14
     x = PAD
     for state, cls, shape in MARKS:
         shapes.append(_marker(state, x + 6, legend_y - 4, cls, shape))
         shapes.append(f'<text x="{x + 16}" y="{legend_y}" class="fg s">{WORDS[state]}</text>')
-        x += 24 + 7 * len(WORDS[state]) + 18
-    notes = ["Arrows point from dependency to dependent. Transitive arrows are not drawn (A to C is skipped when A to B to C exists):",
+        x += 24 + 8 * len(WORDS[state]) + 18
+    notes = ["Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:",
              f"{plural(graph['dropped_transitive'], 'transitive arrow', 'transitive arrows')} hidden.",
              "Also not drawn: " + plural(graph["outside_done"], "dependency", "dependencies") + " on done or dropped tasks, "
              + ("1 on a whole milestone." if graph["outside_milestone"] == 1 else f"{graph['outside_milestone']} on whole milestones.")]
     for k, ln in enumerate(notes):
-        shapes.append(f'<text x="{PAD}" y="{legend_y + 22 + 16 * k}" class="muted s">{escape(ln)}</text>')
-    height = legend_y + 22 + 16 * len(notes) + 12
+        shapes.append(f'<text x="{PAD}" y="{legend_y + 24 + 20 * k}" class="muted s">{escape(ln)}</text>')
+    height = legend_y + 24 + 20 * len(notes) + 12
     summary = f"{plural(len(nodes), 'open task', 'open tasks')}, {plural(len(edges), 'dependency', 'dependencies')}"
     head = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" '
             f'aria-labelledby="ti de"><title id="ti">{TITLE}</title><desc id="de">{escape(summary)}</desc><style>{CSS}</style>'

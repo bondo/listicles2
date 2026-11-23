@@ -1,7 +1,6 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.listicles.jvm.library)
     alias(libs.plugins.kover)
-    alias(libs.plugins.detekt)
     alias(libs.plugins.licensee)
     alias(libs.plugins.pitest)
 }
@@ -9,26 +8,7 @@ plugins {
 // M0.5-10: shipped dependencies must be on the owner's licence allowlist.
 apply(from = rootProject.file("config/licensee/policy.gradle"))
 
-detekt {
-    // Type-resolved tasks (detektMain, detektTest); the root task covers all sources without types.
-    buildUponDefaultConfig = true
-    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        allWarningsAsErrors.set(true)
-    }
-}
-
 dependencies {
-    detektPlugins(libs.compose.rules.detekt)
     // M1-60: observable state (Flow) in domain interfaces, e.g. SessionState (checklist section 4).
     api(libs.kotlinx.coroutines.core)
     testImplementation(platform(libs.junit.bom))

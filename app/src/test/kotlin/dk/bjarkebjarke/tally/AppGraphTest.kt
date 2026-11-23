@@ -8,6 +8,10 @@ import dagger.hilt.internal.GeneratedComponentManagerHolder
 import dk.bjarkebjarke.tally.connectivity.AndroidConnectivity
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import dk.bjarkebjarke.tally.domain.session.SessionState
+import dk.bjarkebjarke.tally.domain.start.EmailVerification
+import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
+import dk.bjarkebjarke.tally.domain.start.NameState
+import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -34,6 +38,30 @@ class AppGraphTest {
 
     @Inject
     lateinit var session: SessionState
+
+    @Inject
+    lateinit var update: UpdateGate
+
+    @Inject
+    lateinit var email: EmailVerification
+
+    @Inject
+    lateinit var name: NameState
+
+    @Inject
+    lateinit var notices: HouseholdNotices
+
+    /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-15, M1-39, M1-18). */
+    @Test
+    fun gateStandInsAllPass() {
+        hilt.inject()
+        runBlocking {
+            update.updateRequired().first() shouldBe false
+            email.verified().first() shouldBe true
+            name.saved().first() shouldBe true
+            notices.pending().first() shouldBe null
+        }
+    }
 
     @Test
     fun connectivityIsTheAndroidImplementation() {

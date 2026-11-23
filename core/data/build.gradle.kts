@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.listicles.android.library)
 }
 
 // M0.5-10: no licensee gate here yet. Nothing ships from this module until :app depends on it (M1-66); that PR applies
@@ -19,32 +19,14 @@ tasks.configureEach {
 
 android {
     namespace = "dk.bjarkebjarke.tally.data"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 26
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
 
     testOptions {
         // The :core:testing network block is a JUnit Platform listener: it never installs on Gradle's JUnit 4 runner.
         unitTests.all { it.useJUnitPlatform() }
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
     // The tests restore the project's Firestore rules (FirebaseEmulator): they travel in the test APK's assets, synced from firebase/.
     sourceSets.getByName("androidTest").assets.srcDir(firestoreRulesAssetDir.get().asFile)
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        allWarningsAsErrors.set(true)
-    }
 }
 
 dependencies {

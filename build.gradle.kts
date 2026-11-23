@@ -1,11 +1,11 @@
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import io.gitlab.arturbosch.detekt.Detekt
-import java.util.Properties
 
 // Dependabot alerts (issue 187, docs/SECURITY.md): transitive build and lint tool dependencies that have an advisory are
 // raised to the first fixed version, from gradle/patched-dependencies.properties. Constraints only raise: a newer version
 // that a plugin asks for still wins. scripts/dependency_floors.py checks gradle/verification-metadata.xml against the advisories.
-// This block runs before the script body, so it cannot share a value with the project configurations below; both read the file.
+// This block runs before the script body; the listicles.dependency.floors plugin (build-logic) reads the same file for every
+// project configuration, here and in each module.
 buildscript {
     val patched =
         java.util.Properties().apply {
@@ -31,6 +31,7 @@ plugins {
     alias(libs.plugins.google.services) apply false
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.listicles.dependency.floors)
 }
 
 spotless {
@@ -157,41 +158,6 @@ val checkWarningsAsErrors =
     }
 
 tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
-
-// The same floor for every project configuration (the Android lint tool, test and build tool classpaths). Constraints cannot be
-// declared on resolvable-only configurations such as compileClasspath, so the selection is raised while dependencies resolve.
-val patchedDependencies =
-    Properties().apply {
-        file("gradle/patched-dependencies.properties").inputStream().use { load(it) }
-    }
-
-fun versionParts(version: String): List<Int> = version.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
-
-fun isOlder(
-    version: String,
-    fixed: String,
-): Boolean {
-    val a = versionParts(version)
-    val b = versionParts(fixed)
-    for (i in 0 until maxOf(a.size, b.size)) {
-        val diff = a.getOrElse(i) { 0 } - b.getOrElse(i) { 0 }
-        if (diff != 0) return diff < 0
-    }
-    return false
-}
-
-allprojects {
-    configurations.configureEach {
-        resolutionStrategy.eachDependency {
-            val fixed = patchedDependencies.getProperty("${requested.group}:${requested.name}")
-            val wanted = requested.version
-            if (fixed != null && wanted != null && isOlder(wanted, fixed)) {
-                useVersion(fixed)
-                because("Dependabot alert: first fixed version is $fixed (docs/SECURITY.md)")
-            }
-        }
-    }
-}
 
 // Test-support JVM modules run only on the host JDK (21), never on Android, and use its newer API on purpose
 // (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18). checkJdkRelease fails if any
@@ -363,41 +329,19 @@ val checkJavaApiLevel =
         )
     }
 
-// The shared setting that checkJdkRelease checks: every JVM module compiles against the JDK 17 API.
-subprojects {
-    if (path in jdkTestSupportModules) return@subprojects
-    plugins.withId("org.jetbrains.kotlin.jvm") {
-        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
-            compilerOptions.freeCompilerArgs.add("-Xjdk-release=17")
-        }
-        tasks.withType<JavaCompile>().configureEach { options.release.set(17) }
-    }
-}
-
-// Every test JVM blocks network access (core/testing: NoNetwork). NIO sockets need the JDK's selector provider
-// replaced, which is only possible through a system property read when the JVM first needs one.
-subprojects {
-    tasks.withType<Test>().configureEach {
-        jvmArgs(
-            "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-            "-Djava.nio.channels.spi.SelectorProvider=dk.bjarkebjarke.tally.testing.BlockingSelectorProvider",
-            "-Djava.nio.channels.spi.AsynchronousChannelProvider=dk.bjarkebjarke.tally.testing.BlockingAsynchronousChannelProvider",
-        )
-    }
-}
-
 // M0.5-10: the licensee policy (config/licensee/policy.gradle) is tested against a fixture build whose
 // artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's
 // allowlist and fail, naming the artifact, for any other licence. Wired into detekt, so verify.sh and CI run it.
-// A case is one string, "name|deps|approved|pass or fail|text the output must contain", so the task stays
-// configuration-cache friendly (no script object references).
+// A case is one string, "name|deps|approved|pass or fail|text the output must contain|licensee version or empty", so the
+// task stays configuration-cache friendly (no script object references).
 fun licenseeCase(
     name: String,
     deps: String,
     approved: String = "",
     passes: Boolean,
     message: String = "",
-) = listOf(name, deps, approved, if (passes) "pass" else "fail", message).joinToString("|")
+    licensee: String = "",
+) = listOf(name, deps, approved, if (passes) "pass" else "fail", message, licensee).joinToString("|")
 
 val testLicenseeGate =
     tasks.register("testLicenseeGate") {
@@ -494,6 +438,19 @@ val testLicenseeGate =
                     message = coordinates,
                 ),
                 licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl-3.0"),
+                // Issue 217 item 4: the fixture build verifies dependencies (config/licensee/fixture/gradle). An older licensee
+                // version that is on Maven Central but not in that file must be refused by Gradle, whatever its licences. The expected
+                // text appears only when strict verification stops the plugin from resolving; lenient mode prints the same warning,
+                // resolves the plugin and fails later for another reason.
+                licenseeCase(
+                    "dependency verification is on in the fixture build",
+                    allowed,
+                    passes = false,
+                    message =
+                        "Error resolving plugin [id: 'app.cash.licensee', version: '1.0.0']\n" +
+                            "> Dependency verification failed",
+                    licensee = "1.0.0",
+                ),
             ) +
                 listOf(
                     "gpl3" to "gpl-3.0",
@@ -515,7 +472,9 @@ val testLicenseeGate =
         doLast {
             val problems = mutableListOf<String>()
             for (line in cases) {
-                val (name, deps, approved, expected, message) = line.split('|')
+                val fields = line.split('|')
+                val (name, deps, approved, expected, message) = fields
+                val licensee = fields[5]
                 val passes = expected == "pass"
                 val command =
                     mutableListOf(
@@ -525,7 +484,7 @@ val testLicenseeGate =
                         "--no-daemon",
                         "-p",
                         fixture.path,
-                        "-Dlicensee.version=$pluginVersion",
+                        "-Dlicensee.version=${licensee.ifEmpty { pluginVersion }}",
                         "-Pdeps=$deps",
                     )
                 if (approved.isNotEmpty()) command += "-Papproved=$approved"
