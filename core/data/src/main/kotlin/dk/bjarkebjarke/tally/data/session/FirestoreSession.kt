@@ -27,14 +27,19 @@ class FirestoreSession(
 
     override suspend fun awaitPendingWrites(): Boolean {
         val instance = firestore()
+        val wait =
+            try {
+                instance.waitForPendingWrites()
+            } catch (expected: IllegalStateException) {
+                // A clear() still running terminated the instance: a second sign-out while the first one finishes.
+                // Not around await(): a CancellationException is an IllegalStateException too, and it must go on.
+                return false
+            }
         return try {
-            instance.waitForPendingWrites().await()
+            wait.await()
             true
         } catch (expected: FirebaseFirestoreException) {
             // Firestore fails the wait when the signed-in user changes before the server acknowledged every write.
-            false
-        } catch (expected: IllegalStateException) {
-            // A clear() still running terminated the instance: a second sign-out while the first one finishes.
             false
         }
     }

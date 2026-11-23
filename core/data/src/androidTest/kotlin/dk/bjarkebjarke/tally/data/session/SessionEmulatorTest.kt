@@ -248,7 +248,7 @@ class SessionEmulatorTest {
                 try {
                     signOut().discardingUnsentChanges()
                 } finally {
-                    databases.setWritable(true)
+                    databases.setWritable(true) // owner only: the app, its owner, is the only one that writes there
                 }
 
             assertEquals(SignOutResult.Failed, result)
