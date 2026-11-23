@@ -21,17 +21,20 @@ DENIED = {
              "--pass-with-no-tests", "-t smoke", "-t=smoke", "--testNamePattern smoke", "--testNamePattern=smoke",
              "--test-name-pattern=smoke", "--testPathIgnorePatterns gen", "--testPathIgnorePatterns=gen", "--testPathPattern a",
              "--testPathPatterns=a", "-o", "--onlyChanged", "--only-changed", "--changedSince=main", "--changedSince main",
-             "--findRelatedTests a.js", "--lastCommit", "-f", "--onlyFailures", "-c jest.config.cjs -u"],
+             "--findRelatedTests a.js", "--lastCommit", "-f", "--onlyFailures", "-c jest.config.cjs -u",
+             # self-review: a value letter ends a group only before a number or a non-letter; inline JSON config; a path filter module
+             "-wu", "-cu", "--config='{\"passWithNoTests\":true}'", "-c '{\"testPathIgnorePatterns\":[\"gen\"]}'", "--filter=./f.js"],
     "vitest": ["run -u", "run --update", "--update", "run --passWithNoTests", "run -t smoke", "run --testNamePattern=smoke",
-               "run --changed", "--changed HEAD~1", "run --exclude gen"],
+               "run --changed", "--changed HEAD~1", "run --exclude gen", "run -cu"],
     "mocha": ["--grep smoke", "-g smoke", "--fgrep smoke", "-f smoke", "--invert", "-i", "--passWithNoTests", "--ignore gen",
-              "--exclude=gen"],
+              "--exclude=gen", "-tg smoke"],
 }
 # runner -> forms that must pass (the --shard of the owner decision, other options and their values, redirections)
 ALLOWED = {
     "jest": ["", "--ci --coverage", "--shard 1/3", "--shard=2/3", "--testTimeout 5000", "--testTimeout=5000", "--runInBand", "-i",
              "-w 2", "-w2", "--maxWorkers=50%", "--maxWorkers 2", "-c jest.config.cjs", "--config=jest.config.cjs --ci",
-             "--ci > out.log", "--reporters default", "--testSequencer=./seq.js", "--no-cache"],
+             "--ci > out.log", "--reporters default", "--testSequencer=./seq.js", "--no-cache", "-w4 --ci", "-c=jest.config.cjs",
+             "--env node", "--cacheDirectory d"],
     "vitest": ["", "run", "watch", "run --shard 1/2", "run --coverage", "--config vitest.config.ts run", "run --testTimeout=5000"],
     "mocha": ["", "'test/**/*.spec.js'", "-t 5000 test", "--timeout 5000", "-u bdd test", "--forbid-only --recursive test",
               "-R spec test", "--spec test/a.spec.js"],
@@ -128,7 +131,8 @@ class NpmTailTests(RunnerCase):
         lines = [f"cd tools && npm test -- {o}" for o in DENIED["jest"]]
         lines += [f"npm run m -- {o}" for o in DENIED["mocha"]]
         lines += ["npm test -- src", "npm test -- --ci src", "npm test -- -- --quiet", "npm t -- -u", "npm run test -- -u",
-                  "npm -s test -- -u", "npm run m -- test/a.spec.js"]
+                  "npm -s test -- -u", "npm run m -- test/a.spec.js",
+                  "npm run m -- --spec test/a.spec.js", "npm run m -- --spec=test/a.spec.js"]
         self.put("scripts/test.sh", "\n".join(lines) + "\n")
         self.each_line_fails("scripts/test.sh", lines)
 
