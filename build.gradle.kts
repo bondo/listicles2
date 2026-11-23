@@ -358,6 +358,27 @@ val testLicenseeGate =
         val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
         val terms = "developer.android.com/studio/terms"
         val a1 = "approved-a1.txt"
+        val realList = "../google-sdk-terms.txt"
+        val m1o14Artifacts =
+            listOf(
+                "com.google.firebase:firebase-auth:25.0.0",
+                "com.google.firebase:firebase-auth-interop:20.0.0",
+                "com.google.android.gms:play-services-auth:21.1.1",
+                "com.google.android.gms:play-services-auth-api-phone:18.0.2",
+                "com.google.android.gms:play-services-auth-base:18.0.10",
+                "com.google.android.gms:play-services-auth-blockstore:16.4.0",
+                "com.google.android.gms:play-services-base:18.9.0",
+                "com.google.android.gms:play-services-basement:18.9.0",
+                "com.google.android.gms:play-services-fido:21.0.0",
+                "com.google.android.gms:play-services-identity-credentials:16.0.0-alpha08",
+                "com.google.android.gms:play-services-tasks:18.4.0",
+                "com.google.android.libraries.identity.googleid:googleid:1.2.1",
+                "com.google.android.recaptcha:recaptcha:18.6.1",
+                "com.google.android.play:core-common:2.0.3",
+                "com.google.android.play:integrity:1.3.0",
+                "com.google.re2j:re2j:1.6",
+                "org.codehaus.mojo:animal-sniffer-annotations:1.27",
+            ).joinToString(",")
         val notGoogle = "not the Google/Android SDK terms"
         val coordinates = "must be group:artifact:version"
         val cases =
@@ -398,6 +419,45 @@ val testLicenseeGate =
                     "com.google.android.play:integrity:1.0",
                     passes = false,
                     message = "integrity/overview#tos",
+                ),
+                // M1-O14 (owner decisions, issue 15 comments 7085175461 and 7095943127): the 17 artifacts :app needs for Firebase
+                // Auth and Credential Manager, as fixture stubs with the real licence URLs, against the real google-sdk-terms.txt.
+                licenseeCase(
+                    "M1-O14: all 17 artifacts pass with the real list",
+                    m1o14Artifacts,
+                    realList,
+                    passes = true,
+                ),
+                licenseeCase(
+                    "M1-O14: Go licence URL on re2j",
+                    "com.google.re2j:re2j:1.6",
+                    passes = true,
+                ),
+                licenseeCase(
+                    "M1-O14: MIT.txt URL on animal-sniffer-annotations",
+                    "org.codehaus.mojo:animal-sniffer-annotations:1.27",
+                    passes = true,
+                ),
+                licenseeCase(
+                    "M1-O14: another Google SDK terms artifact still fails with the real list",
+                    "com.google.firebase:firebase-database:21.0.0",
+                    realList,
+                    passes = false,
+                    message = terms,
+                ),
+                licenseeCase(
+                    "M1-O14: a listed artifact at another version still fails with the real list",
+                    "com.google.firebase:firebase-auth:99.0.0",
+                    realList,
+                    passes = false,
+                    message = terms,
+                ),
+                licenseeCase(
+                    "M1-O14: Play Core license on core-common at an unlisted version still fails",
+                    "com.google.android.play:core-common:2.0.9",
+                    realList,
+                    passes = false,
+                    message = "playcore/license",
                 ),
                 licenseeCase(
                     "play integrity terms on another artifact, listed",
