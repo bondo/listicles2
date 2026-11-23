@@ -129,7 +129,8 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit_yaml(CI, set_with("firebase", "actions/setup-node@", "node-version", 24)), "node-version")
 
     def test_a_job_that_does_not_run_node_needs_no_pin(self):
-        self.assertEqual(self.edit_yaml(CI, lambda w: drop(w, "static", "actions/setup-node@")), [])
+        found = self.edit_yaml(CI, lambda w: drop(w, "static", "actions/setup-node@"))
+        self.assertEqual([p for p in found if "pinned" not in p], [])  # the YAML dump drops the tag comments, which pin_problems reads
 
     def test_python_jobs_install_pyyaml_right_after_setup_python(self):
         """R1-01: setup-python's interpreter has no PyYAML (the runner image's had), and most gate scripts import yaml."""
@@ -223,7 +224,8 @@ class Rules(unittest.TestCase):
     def test_codeql_covers_exactly_the_four_languages_once(self):
         self.flagged(self.edit(CODEQL, "language: [actions, javascript-typescript, python]", "language: [actions, javascript-typescript]"), "python")
         self.setUp()
-        self.flagged(self.edit(CODEQL, "language: [actions, javascript-typescript, python]", "language: [actions, javascript-typescript, python, java-kotlin]"), "java-kotlin", "once")
+        four = "language: [actions, javascript-typescript, python, java-kotlin]"
+        self.flagged(self.edit(CODEQL, "language: [actions, javascript-typescript, python]", four), "java-kotlin", "once")
         self.setUp()
         self.flagged(self.edit(CODEQL, "          languages: java-kotlin\n", "          languages: swift\n"), "java-kotlin")
 
@@ -233,7 +235,8 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit(CODEQL, "github.event_name != 'pull_request'", "github.event_name == 'push'"), "java-kotlin", "pull_request")
 
     def test_the_languages_without_a_build_run_on_pull_requests_and_build_nothing(self):
-        self.flagged(self.edit(CODEQL, "    name: analyze (${{ matrix.language }})\n", "    name: analyze (${{ matrix.language }})\n    if: github.event_name != 'pull_request'\n"), "analyze", "pull_request")
+        name = "    name: analyze (${{ matrix.language }})\n"
+        self.flagged(self.edit(CODEQL, name, name + "    if: github.event_name != 'pull_request'\n"), "analyze", "pull_request")
         self.setUp()
         self.flagged(self.edit(CODEQL, "          build-mode: none\n", "          build-mode: autobuild\n"), "analyze", "build-mode")
         self.setUp()
@@ -269,7 +272,8 @@ class Rules(unittest.TestCase):
 
     def test_the_codeql_steps_share_one_pinned_version_and_the_jobs_have_a_timeout(self):
         sha = "33d7b85da1a04171e211befe2c739303b9a4c066"
-        self.flagged(self.edit(CODEQL, f"codeql-action/analyze@{sha} # v4.39.3\n        with:\n          category: /language:java-kotlin", f"codeql-action/analyze@{'a' * 40} # v4.39.3\n        with:\n          category: /language:java-kotlin"), "codeql-action", "one")
+        tail = " # v4.39.3\n        with:\n          category: /language:java-kotlin"
+        self.flagged(self.edit(CODEQL, f"codeql-action/analyze@{sha}{tail}", f"codeql-action/analyze@{'a' * 40}{tail}"), "codeql-action", "one")
         self.setUp()
         self.flagged(self.edit(CODEQL, "    timeout-minutes: 45\n", ""), "analyze-java-kotlin", "timeout")
 
