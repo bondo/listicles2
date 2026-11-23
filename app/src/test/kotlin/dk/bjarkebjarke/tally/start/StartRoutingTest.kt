@@ -11,30 +11,48 @@ import androidx.test.core.app.ApplicationProvider
 import dk.bjarkebjarke.tally.R
 import dk.bjarkebjarke.tally.TallyApp
 import dk.bjarkebjarke.tally.domain.session.SessionState
+import dk.bjarkebjarke.tally.domain.start.EmailVerification
+import dk.bjarkebjarke.tally.domain.start.HouseholdNotice
+import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
+import dk.bjarkebjarke.tally.domain.start.NameState
+import dk.bjarkebjarke.tally.domain.start.StartStep
+import dk.bjarkebjarke.tally.domain.start.UpdateGate
+import dk.bjarkebjarke.tally.testing.FakeEmailVerification
+import dk.bjarkebjarke.tally.testing.FakeHouseholdNotices
+import dk.bjarkebjarke.tally.testing.FakeNameState
 import dk.bjarkebjarke.tally.testing.FakeSessionState
+import dk.bjarkebjarke.tally.testing.FakeUpdateGate
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * M1-60: the start-up root routes on the session (P10 step 2, signed in, and step 6, the M1 home of Q1 A). M1-62 adds
- * the other gates to this test. The real [StartViewModel] runs against a [FakeSessionState].
- */
+/** M1-60 and M1-62: the start-up root routes over all gates of P10. The real [StartViewModel] runs against fakes. */
 @RunWith(RobolectricTestRunner::class)
 class StartRoutingTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
+    private val update = FakeUpdateGate()
     private val session = FakeSessionState()
+    private val email = FakeEmailVerification()
+    private val name = FakeNameState()
+    private val notices = FakeHouseholdNotices()
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val signIn = context.getString(R.string.app_tag)
     private val home = context.getString(R.string.lists_empty_title)
 
-    private fun start(source: SessionState = session): StartViewModel {
-        val viewModel = StartViewModel(source)
+    private fun start(
+        source: SessionState = session,
+        update: UpdateGate = this.update,
+        email: EmailVerification = this.email,
+        name: NameState = this.name,
+        notices: HouseholdNotices = this.notices,
+    ): StartViewModel {
+        val viewModel = StartViewModel(update, source, email, name, notices)
         compose.setContent { TallyApp(viewModel) }
         return viewModel
     }
@@ -53,7 +71,7 @@ class StartRoutingTest {
         val viewModel = start()
         compose.onNodeWithText(signIn).assertExists()
         compose.onNodeWithText(home).assertDoesNotExist()
-        viewModel.uiState.value shouldBe StartUiState.Ready(StartRoute.SignIn)
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
     }
 
     @Test
@@ -65,7 +83,7 @@ class StartRoutingTest {
         compose.onNodeWithText(context.getString(R.string.lists_title)).assert(isHeading)
         compose.onNodeWithText(context.getString(R.string.lists_empty_body)).assertExists()
         compose.onNodeWithText(signIn).assertDoesNotExist()
-        viewModel.uiState.value shouldBe StartUiState.Ready(StartRoute.Home)
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
     }
 
     @Test
@@ -97,7 +115,167 @@ class StartRoutingTest {
     fun aFailingSessionSourceShowsSignIn() {
         val viewModel = start(SessionState { flow { throw IllegalStateException("session source failed") } })
         compose.onNodeWithText(signIn).assertExists()
-        viewModel.uiState.value shouldBe StartUiState.Ready(StartRoute.SignIn)
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
+    }
+
+    private fun text(id: Int) = context.getString(id)
+
+    @Test
+    fun anUpdateRequiredStopsEvenASignedInStart() {
+        update.required = true
+        session.signedIn = true
+        val viewModel = start()
+        compose.onNodeWithText(text(R.string.gate_update_title)).assertExists()
+        compose.onNodeWithText(home).assertDoesNotExist()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Update)
+    }
+
+    @Test
+    fun anUpdateRequiredStopsASignedOutStartToo() {
+        update.required = true
+        session.signedIn = false
+        start().uiState.value shouldBe StartUiState.Ready(StartStep.Update)
+        compose.onNodeWithText(signIn).assertDoesNotExist()
+    }
+
+    @Test
+    fun anUnverifiedEmailShowsTheVerifyStep() {
+        session.signedIn = true
+        email.isVerified = false
+        val viewModel = start()
+        compose.onNodeWithText(text(R.string.gate_verify_title)).assertExists()
+        compose.onNodeWithText(home).assertDoesNotExist()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.VerifyEmail)
+    }
+
+    @Test
+    fun aMissingNameShowsTheNameStep() {
+        session.signedIn = true
+        name.isSaved = false
+        val viewModel = start()
+        compose.onNodeWithText(text(R.string.gate_name_title)).assertExists()
+        compose.onNodeWithText(home).assertDoesNotExist()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.EnterName)
+    }
+
+    @Test
+    fun aRemovalNoticeShowsBeforeTheHome() {
+        session.signedIn = true
+        notices.notice = HouseholdNotice.Removed
+        val viewModel = start()
+        compose.onNodeWithText(text(R.string.gate_notice_removed)).assertExists()
+        compose.onNodeWithText(home).assertDoesNotExist()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Notice(HouseholdNotice.Removed))
+    }
+
+    @Test
+    fun aDeletedHouseholdNoticeShowsItsOwnText() {
+        session.signedIn = true
+        notices.notice = HouseholdNotice.HouseholdDeleted
+        start()
+        compose.onNodeWithText(text(R.string.gate_notice_deleted)).assertExists()
+        compose.onNodeWithText(text(R.string.gate_notice_removed)).assertDoesNotExist()
+    }
+
+    @Test
+    fun signedOutIgnoresTheLaterGates() {
+        session.signedIn = false
+        email.isVerified = false
+        name.isSaved = false
+        notices.notice = HouseholdNotice.Removed
+        start().uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
+    }
+
+    @Test
+    fun theEarliestFailingGateWins() {
+        session.signedIn = true
+        email.isVerified = false
+        name.isSaved = false
+        notices.notice = HouseholdNotice.Removed
+        val viewModel = start()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.VerifyEmail)
+        email.isVerified = true
+        compose.waitForIdle()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.EnterName)
+        name.isSaved = true
+        compose.waitForIdle()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Notice(HouseholdNotice.Removed))
+        notices.notice = null
+        compose.waitForIdle()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
+        compose.onNodeWithText(home).assertExists()
+    }
+
+    /** R1-01: a failing later gate fails closed at its own step, never at sign-in, and the session stays observed. */
+    @Test
+    fun aFailingEmailGateStopsAtVerifyEmailNotSignIn() {
+        session.signedIn = true
+        val viewModel = start(email = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.VerifyEmail)
+    }
+
+    @Test
+    fun aFailingNameGateStopsAtTheNameStep() {
+        session.signedIn = true
+        val viewModel = start(name = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.EnterName)
+    }
+
+    @Test
+    fun aFailingNoticeGateDoesNotBlockTheHome() {
+        session.signedIn = true
+        val viewModel = start(notices = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
+    }
+
+    @Test
+    fun aFailingUpdateGateDoesNotBlockTheStart() {
+        session.signedIn = true
+        val viewModel = start(update = { flow { throw IllegalStateException("gate failed") } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
+    }
+
+    @Test
+    fun afterAGateFailureTheSessionIsStillObserved() {
+        session.signedIn = true
+        var collects = 0
+        val flaky =
+            EmailVerification {
+                flow {
+                    check(collects++ != 0) { "first read failed" }
+                    emit(true)
+                }
+            }
+        val viewModel = start(email = flaky)
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.VerifyEmail)
+        session.signedIn = false
+        compose.waitForIdle()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
+        session.signedIn = true
+        compose.waitForIdle()
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.Home)
+    }
+
+    /** R1-02: signed out must not wait on, or even collect, the later gates (they have no account to read). */
+    @Test
+    fun signedOutNeverCollectsTheLaterGates() {
+        session.signedIn = false
+        var collected = false
+        val viewModel =
+            start(
+                email = { flow { collected = true } },
+                name = { flow { collected = true } },
+                notices = { flow { collected = true } },
+            )
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
+        collected shouldBe false
+    }
+
+    @Test
+    fun signedOutDoesNotWaitOnALaterGateThatNeverEmits() {
+        session.signedIn = false
+        val viewModel = start(name = { flow { awaitCancellation() } })
+        viewModel.uiState.value shouldBe StartUiState.Ready(StartStep.SignIn)
     }
 
     private val isHeading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)

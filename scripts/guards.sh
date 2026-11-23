@@ -80,17 +80,22 @@ out=$(gg "$PAT" -- "${EXCL[@]}" | unjust)
 # The checks above are line by line, so a justification on a TOML table header or an array opener would waive every entry after it.
 # entrycheck therefore reads the config files itself and requires the justification on every entry line of a relaxing multi-line
 # table (per-file-ignores), array/object (ignore = [, exclude_lines = [, ignores: [) or INI continuation (ignore =<newline>  E501),
-# and on the first element of an ESLint rule array that sets off/warn/0/1.
+# and on the first element of an ESLint rule array that sets off/warn/0/1, and on every `- entry` of an actionlint `ignore:` block list.
 ENTRY_AWK='
 function strip(l) { sub(/[ \t]*(#|\/\/).*$/, "", l); return l }
 function blank(l) { gsub(/"[^"]*"/, "\"\"", l); gsub(/\047[^\047]*\047/, "\047\047", l); return l }
 function nest(l,   t, o) { t = l; gsub(/[^[({]/, "", t); o = length(t); t = l; gsub(/[^])}]/, "", t); return o - length(t) }
 function check() { if (!just(line)) printf "%s:%d:%s\n", F, NR, line }
-BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
+function ind(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/); yml = (F ~ /actionlint\.ya?ml$/) }
 {
   line = $0; nc = strip(line); c = blank(nc); lc = tolower(nc)
   if (c ~ /^[ \t]*$/) next
   closer = (c ~ /^[ \t]*[])},;]*[ \t]*$/)
+  if (mode == 4) { if (ind(line) > yi || (ind(line) == yi && c ~ /^[ \t]*-/)) { check(); next } mode = 0 }
+  if (yml && line ~ /(^[ \t]*(-[ \t]+)?|[{,][ \t]*)"[^"]*\\[^"]*"[ \t]*:/) { printf "%s:%d:%s\n", F, NR, line; next }  # an escaped key may spell ignore
+  if (yml && lc ~ /ignore["\047]?[ \t]*:[^#]*[][ \t,]\*[A-Za-z0-9_]/) { printf "%s:%d:%s\n", F, NR, line; next }  # an alias: 2b cannot follow it
+  if (yml && lc ~ /^[ \t]*-?[ \t]*["\047]?ignore["\047]?[ \t]*:([ \t]+(&|!)[^ \t]*)*[ \t]*$/) { mode = 4; yi = ind(line); next }  # block list (anchor, tag)
   if (mode == 1 && c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/) mode = 0
   if (mode == 3 && line !~ /^[ \t]/) mode = 0
   if (mode == 1 || mode == 3) { if (!closer) check(); next }
@@ -154,7 +159,9 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
   cfgcheck "$ESPAT" '*eslint.config.*' '*eslintrc*' '*biome.json*'
   cfgcheck "$COVPAT" '*vitest.config.*' '*jest.config.*' '*nycrc*' '*c8rc*'
   # prettier: requirePragma makes it skip every file without the pragma; ignorePath points it at another ignore file
-  cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
+  cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*'
+  # actionlint: `ignore:` patterns drop its errors (issue 164 item 1)
+  cfgcheck '(^|[^A-Za-z0-9_-])["'"'"']?ignore["'"'"']?[[:space:]]*:' '*.github/actionlint.yaml' '*.github/actionlint.yml')  # a leading * (git ls-files drops a literal path next to :!)
 [ -n "$out" ] && { echo "$out"; fail=1; }
 
 # 2c. Command-line flags on tool invocation lines (issues 45 and 177): ruff, mypy, tsc, ESLint, Prettier, shellcheck and actionlint, in shell
@@ -178,7 +185,9 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # checked; a mypy `@argfile` fails; an empty quoted config (`--config-file ""`) disables the config, so it fails.
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
-# Not covered: action `with: args:` lines, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (2b does not read it), flags held in
+# In YAML the args-like keys of a step or hook (`with: args:`, `eslint_flags:`, pre-commit `args:`) are flags of the tool its `uses:`, `id:` or
+# `entry:` names (issue 164 item 2, yamlitem below). A YAML value over several lines (`run: >`, a plain or quoted scalar, a flow
+# collection) is checked once more as one line (YFOLD_AWK below). Not covered: flags held in
 # shell variables (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, tools run from Python (subprocess),
 # and yarn, pnpm and bun forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
 # is added only with a reason a reviewer can check, in scripts/hooks/test_guards_cli_flags.py too (docs/guards-known-gaps.md has the rationale).
@@ -468,6 +477,71 @@ function relaxed(p,   dd, e, pr, t, ok, s) {
   if (pr || dd != "") { s = (pr ? after(p, "prettier") : "") " " dd; if ((pr && scan(s, "prettier", 0)) || cfg(s, "--config", ok)) return 1 }
   return 0
 }
+# yamlitem: one YAML sequence item is a workflow step or a pre-commit hook. Its `uses:` (an action named after the tool), or in pre-commit
+# config its `entry:` or `id:`, gives the command; its args-like keys (ARGKEY, at any depth, in any order, quoted or not: inline, a flow or
+# block list, a flow mapping, a block scalar) are flags of that command, each checked by itemend when the item ends, when the key is a
+# generic one or starts with the tool name (`eslint_flags`, not `reviewdog_flags`). Lines inside another block scalar (`run: |`) are skipped.
+function notag(v) { while (v ~ /^[&!][^ \t]*([ \t]|$)/) sub(/^[&!][^ \t]*[ \t]*/, "", v); return v }  # anchors, tags
+function keycol(l) { sub(/[^ \t-].*$/, "", l); return length(l) }
+function indent(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+function toolof(v,   i, n, tl) {
+  n = split("ruff mypy eslint prettier shellcheck actionlint tsc", tl, " ")
+  for (i = 1; i <= n; i++) if (v ~ ("(^|[^A-Za-z])" tl[i] "([^A-Za-z]|$)")) return tl[i]
+  return ""
+}
+function hookcmd(v) { v = unq(v); return (v ~ /^ruff(-check)?$/ ? "ruff check" : (v == "ruff-format" ? "ruff format" : toolof(v))) }
+# AU: the text of the lines of an args key that have no reason; a reason waives its own line only (R1-06).
+# flowsplit: a flow collection with every comma outside quotes made a blank, as YAML splits `[.,--fix]` into two items (R1-01).
+function flowsplit(a,   i, c, q, r) {
+  for (i = 1; i <= length(a); i++) {
+    c = substr(a, i, 1)
+    if (q != "") { if (c == q) q = "" } else if (c == "\"" || c == "\047") q = c; else if (c == ",") c = " "
+    r = r c
+  }
+  return r
+}
+function argadd(k, v, l) { NA++; AK[NA] = k; AF[NA] = (v ~ /^[[{]/); AU[NA] = (v ~ /^[|>][-+0-9]*$/ || just(l) ? "" : v); AL[NA] = NR; ALN[NA] = l }
+function itemend(   a, i, tool) {
+  tool = toolof(IT)
+  for (i = 1; i <= NA; i++) {
+    a = (AF[i] ? flowsplit(AU[i]) : AU[i]); gsub(/[][{}]/, " ", a); gsub(/,([ \t]|$)/, " ", a)
+    if (IT != "" && (AK[i] ~ /^(extra_)?(args|flags|options|arguments)$/ || index(AK[i], tool "_") == 1) && a ~ /[^ \t]/ && relaxed(IT " " a))
+      printf "%s:%d:%s\n", F, AL[i], ALN[i]
+  }
+  IT = ""; NA = 0; IE = 0; IK = -1; IKP = 0; AM = 0; BS = -1
+}
+function ykey(k, v) {
+  if (k == "uses" && !PC) { v = unq(v); sub(/@.*$/, "", v); IT = toolof(v) }
+  else if (k == "entry" && PC) { IT = unq(v); IE = 1 }
+  else if (k == "id" && PC && !IE) IT = hookcmd(v)
+}
+# flowmap: the keys of a flow mapping (`- {id: ruff, args: [--fix]}`, `with: {args: check}`), nested ones included.
+function flowmap(v, l,   m, k, x) {
+  while (match(v, /[{,][ \t]*["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:[ \t]*(\[[^]]*\]|[^]{},]*)/)) {
+    m = substr(v, RSTART + 1, RLENGTH - 1); v = substr(v, RSTART + RLENGTH)
+    k = m; sub(/[ \t]*:.*$/, "", k); gsub(/["\047 \t]/, "", k); k = tolower(k); x = m; sub(/^[^:]*:[ \t]*/, "", x); sub(/[ \t]+$/, "", x)
+    if (k ~ ARGKEY) argadd(k, x, l); else ykey(k, x)
+  }
+}
+function yamlitem(l,   c, key, v) {
+  if (l ~ /^[ \t]*(#|$)/) return
+  if (AM) { if (indent(l) > AC || (indent(l) == AC && l ~ /^[ \t]*-([ \t]|$)/)) { v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); if (!just(l)) AU[NA] = AU[NA] " " stripc(v); return } AM = 0 }
+  if (BS >= 0) { if (indent(l) > BS) return; BS = -1 }
+  if (l ~ /(^[ \t]*(-[ \t]+)?|[{,][ \t]*)"[^"]*\\[^"]*"[ \t]*:/ && !just(l)) printf "%s:%d:%s\n", F, NR, l  # an escaped key (R1-02)
+  if (l ~ /^[ \t]*-[ \t]+(["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:([ \t]|$)|\{)/) { itemend(); IK = keycol(l) }
+  else if (l ~ /^[ \t]*-[ \t]*(#.*)?$/) { itemend(); IKP = 1; return }  # a bare `-`: the keys of the item start on the next line
+  else if (IKP) { IK = indent(l); IKP = 0 }
+  else if (IK >= 0 && indent(l) < IK) itemend()
+  if (IK < 0) return
+  v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); c = length(l) - length(v)
+  if (v ~ /^\{/) { flowmap(v, l); return }
+  if (!match(v, /^["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:([ \t]|$)/)) return
+  key = v; sub(/[ \t]*:.*$/, "", key); gsub(/["\047]/, "", key); key = tolower(key); v = stripc(substr(v, RLENGTH + 1)); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v); v = notag(v)
+  if (v ~ /^\{/) { flowmap(v, l); return }
+  if (key ~ ARGKEY) { argadd(key, v, l); AM = 1; AC = c; return }
+  if (v ~ /^[|>][-+0-9]*$/) { BS = c; return }
+  if (c == IK) ykey(key, v)
+}
 function flush(   n, i, parts, j) {
   if (cur == "") return
   j = just(cur)
@@ -480,6 +554,7 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0
   RUFFSUB = "^(check|format|rule|config|linter|clean|server|analyze|version|help|generate-shell-completion)$"
   SRCRE = "^[^-][^=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$"; SEVOK = "^(warning|info|style)$"; COLOROK = "^(always|never|auto)$"
+  ARGKEY = "^([A-Za-z0-9-]*_)?(args|flags|options|arguments)$"; YML = (F ~ /\.ya?ml$/); PC = (F ~ /pre-commit-config\.yaml$/); IK = -1; BS = -1
   nl = split(ENVIRON["CLI_ALLOW"], L, "\n")
   for (i = 1; i <= nl; i++) {
     if (L[i] ~ /^[ \t]*$/) continue
@@ -491,6 +566,7 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   } }
 {
   line = $0; sub(/\r$/, "", line)
+  if (YML) yamlitem(line)
   if (!cont && line ~ /^[ \t]*#/) next
   if (!cont) start = NR
   cont = (line ~ /\\[ \t]*$/)
@@ -498,13 +574,130 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   cur = (cur == "" ? "" : cur " ") line
   if (!cont) flush()
 }
-END { flush() }'
+END { flush(); if (YML) itemend() }'
+# YFOLD_AWK: prints a YAML file with each value that goes on over several lines joined into one line, as the runner reads it (issue 164
+# item 2). cliflags runs CLI_AWK on this text IN ADDITION to the file itself, so it can only add failures (PR 309 ruling 7084379032).
+# A group is a run of lines YAML joins with blanks: the lines of a plain or quoted scalar or a flow collection up to a blank line (a
+# line break), or the lines of equal indentation of a folded block (`>`; a more-indented line keeps its breaks). The group goes on
+# its first line and its other lines become blank, so line numbers hold. Double-quoted escapes are decoded (`\x2d` is `-`, `\n` a
+# command separator, an escaped line break joins with no blank). A reason waives a group only when every line of it has one.
+YFOLD_AWK='
+# yent: a pre-commit `entry:` (key on line h, value from line i) is split into words, so a line break is a blank there: the whole
+# value is one line on the key line, and a `#` in a block scalar is a word, not a comment.
+function yent(h, i, o, p,   j, m, g, e, w) {
+  j = yval(i, o, p); g = L[h]; sub(/[^ \t].*$/, "", g); e = h
+  for (m = h; m < j; m++) if (O[m] !~ /^[ \t]*$/) { w = O[m]; sub(/^[ \t]+/, "", w); if (YB && m > i) gsub(/#/, "\\#", w); g = g (e == h && m == h ? "" : " ") w; e = m }
+  put(h, e, g); return j
+}
+function yi(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+function hexc(h,   i, n, k) {
+  n = 0
+  for (i = 1; i <= length(h); i++) { k = index("0123456789abcdef", tolower(substr(h, i, 1))); if (!k) return "?"; n = n * 16 + k - 1 }
+  return (n == 10 ? ";" : (n == 9 ? "\t" : (n >= 32 && n < 127 ? sprintf("%c", n) : "?")))
+}
+# yscan: the text of s as YAML reads it, tracking an open quote (Q), the flow depth (D) and a node start (NS) over lines. A quoted
+# scalar loses its quotes in block context and keeps them in a flow, where 2c splits a list on commas outside quotes. A node property
+# (`&a`, `!!str`) keeps the node start; in a flow a `:` right after a closing quote is a value indicator (`{"run":"x"}`). CM is set when
+# a comment starts (its text is kept outside a flow), EB when s ends with an escaped line break.
+function yscan(s,   i, n, c, t, h, jq) {
+  t = ""; CM = 0; EB = 0; n = length(s)
+  for (i = 1; i <= n; i++) {
+    c = substr(s, i, 1)
+    if (Q == "\"") {
+      if (c == "\"") { Q = ""; jq = 1; if (KQ) t = t c; continue }
+      if (c == "\\") {
+        if (i == n) { EB = 1; break }
+        c = substr(s, ++i, 1)
+        if (c == "x" || c == "u" || c == "U") { h = (c == "x" ? 2 : (c == "u" ? 4 : 8)); c = hexc(substr(s, i + 1, h)); i += h }
+        else if (c == "n") c = ";"; else if (c == "t") c = "\t"; else if (c == "\"" || c == "\\") { if (KQ) c = "\\" c } else if (c !~ /[ \/]/) c = "?"
+      }
+      t = t c; continue
+    }
+    if (Q == "\047") { if (c == "\047") { if (substr(s, i + 1, 1) != "\047") { Q = ""; jq = 1; if (KQ) t = t c; continue } i++; if (KQ) t = t c } t = t c; continue }
+    if (c ~ /[ \t]/) { t = t c; continue }
+    if (c == "#" && (i == 1 || substr(s, i - 1, 1) ~ /[ \t]/)) { CM = 1; return (D ? t : t substr(s, i)) }
+    if (NS && (c == "&" || c == "!")) { while (i < n && substr(s, i + 1, 1) !~ (D ? "[] \t,[{}]" : "[ \t]")) { t = t c; c = substr(s, ++i, 1) } t = t c; continue }
+    if (NS && (c == "\"" || c == "\047")) { Q = c; KQ = (D > 0); NS = 0; if (KQ) t = t c; continue }
+    else if ((NS || D) && (c == "[" || c == "{")) { D++; NS = 1 }
+    else if (D && (c == "]" || c == "}")) { D--; NS = 0 }
+    else if (D && (c == "," || (c == ":" && (jq || substr(s, i + 1, 1) ~ /^[] \t,}]?$/)))) NS = 1
+    else NS = 0
+    jq = 0; t = t c
+  }
+  return t
+}
+function notag(v) { while (v ~ /^[&!][^ \t]*([ \t]|$)/) sub(/^[&!][^ \t]*[ \t]*/, "", v); return v }
+# put: the group of lines a..b (text G) on line a, the others blank; a reason on only some lines of it is no reason (R2-01, Y1).
+function put(a, b, g,   i, ok) {
+  if (a < 0) return
+  ok = 1; for (i = a; i <= b; i++) if (L[i] !~ /^[ \t]*$/ && !just(L[i])) ok = 0
+  if (!ok && a < b) gsub(/justified:/, "justified-", g)
+  O[a] = g; for (i = a + 1; i <= b; i++) O[i] = ""
+}
+# yval: the value that starts at offset o of line i, under a parent at column p; returns the line after it. A plain value goes on over
+# lines indented more than p, up to a comment; a quoted value or a flow collection goes on until it closes.
+function yval(i, o, p,   v, w, j, a, e, g, pl, eb) {
+  v = substr(L[i], o); w = v; sub(/^[ \t]+/, "", w); w = notag(w); o += length(v) - length(w); v = w; a = -1; YB = (v ~ /^[|>]/)
+  if (v ~ /^[|>]/) {
+    for (j = i + 1; j <= N && (L[j] ~ /^[ \t]*$/ || yi(L[j]) > p); j++) if (v ~ /^>/) {
+      if (a >= 0 && (L[j] ~ /^[ \t]*$/ || yi(L[j]) != yi(L[a]))) { put(a, e, g); a = -1 }
+      if (L[j] ~ /^[ \t]*$/) continue
+      w = L[j]; sub(/^[ \t]+/, "", w)
+      if (a < 0) { a = j; g = L[j] } else g = g " " w
+      e = j
+    }
+    put(a, e, g); return j
+  }
+  Q = ""; D = 0; NS = 1; pl = (v !~ /^["\047[{]/); a = i; e = i; g = substr(L[i], 1, o - 1) yscan(v); eb = EB
+  for (j = i + 1; j <= N; j++) {
+    if (Q == "" && !D && (!pl || CM)) break
+    if (L[j] ~ /^[ \t]*$/) { put(a, e, g); a = -1; continue }
+    if (Q == "" && L[j] ~ /^[ \t]*#/) { if (!D) break; O[j] = ""; continue }
+    if (Q == "" && !D && yi(L[j]) <= p) break
+    w = L[j]; sub(/^[ \t]+/, "", w); w = yscan(w)
+    if (a < 0) { a = j; g = L[j]; sub(/[^ \t].*$/, "", g); g = g w } else g = g (eb ? "" : " ") w
+    eb = EB; e = j
+  }
+  put(a, e, g); return j
+}
+{ sub(/\r$/, ""); L[++N] = $0; O[N] = $0 }
+END {
+  PK = -1
+  for (i = 1; i <= N; ) {
+    l = L[i]
+    if (l ~ /^[ \t]*(#|$)/ || l ~ /^(---|\.\.\.)([ \t]|$)/) { i++; continue }
+    r = l; sub(/^[ \t]*/, "", r); while (r ~ /^-([ \t]|$)/) sub(/^-[ \t]*/, "", r)
+    dash = (length(l) - length(r) > yi(l)); r = notag(r); c = length(l) - length(r)
+    k = 0
+    if (r ~ /^"/ && match(r, /^"([^"\\]|\\.)*"[ \t]*:([ \t]|$)/)) k = RLENGTH
+    else if (r ~ /^\047/ && match(r, /^\047[^\047]*\047[ \t]*:([ \t]|$)/)) k = RLENGTH
+    else if (r ~ /^([^]["\047 \t#&*!|>%@`{},?:-]|[-?:][^ \t])/ && match(r, /:([ \t]|$)/) && substr(r, 1, RSTART) !~ /[ \t]#/) k = RSTART + RLENGTH - 1
+    if (PK >= 0 && yi(l) > PK && !k && !dash) { p = PK; PK = -1; i = (PE ? yent(PH, i, c + 1, p) : yval(i, c + 1, p)); continue }
+    PK = -1
+    if (k) {
+      PE = (F ~ /pre-commit-config\.yaml$/ && substr(r, 1, k) ~ /^["\047]?entry["\047]?[ \t]*:/)
+      v = notag(substr(r, k + 1)); sub(/^[ \t]+/, "", v)
+      if (v ~ /^(#|$)/) { PK = c; PH = i; i++; continue }
+      i = (PE ? yent(i, i, c + k + 1, c) : yval(i, c + k + 1, c)); continue
+    }
+    if (dash && r ~ /^(#|$)/) { PK = yi(l); PH = i; PE = 0; i++; continue }  # `-` or `- &x` alone: a mapping or a value follows (R1-01)
+    if (dash) { i = yval(i, c + 1, yi(l)); continue }
+    i = (yi(l) ? yval(i, c + 1, yi(l) - 1) : i + 1)
+  }
+  for (i = 1; i <= N; i++) print O[i]
+}'
 cliflags() { # cliflags <pathspec>...
-  local f
+  local f y
   while IFS= read -r f; do
     if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
     else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
-  done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
+    case "$f" in *.yml | *.yaml) # the joined lines, in addition to the lines above; a fold scan that cannot run fails (no quiet gap)
+      if [ "$STAGED" = 1 ]; then y=$(git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK")
+      elif [ -f "$f" ]; then y=$(LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" "$f")
+      else continue; fi || { echo "$f:0: the YAML fold scan failed"; continue; }  # a file missing from the tree has nothing to scan (R1-02)
+      printf '%s\n' "$y" | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
+    esac
+  done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++' | sed 's/^/guard: unjustified CLI flag: /'
 }
 out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*makefile' '*.mk' '*pre-commit-config.yaml')
 [ -n "$out" ] && { echo "$out"; fail=1; }

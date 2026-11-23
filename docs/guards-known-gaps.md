@@ -85,8 +85,19 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
 - A bare `--` ends the flags of a tool. The ruff subcommand is found among the arguments, so `ruff --config ruff.toml check --diff .` fails
   (issue 174, R5-01) while `ruff format --diff .` passes.
 - actionlint: `-ignore`, an empty `-pyflakes=` or `-shellcheck=` and every unlisted flag fail; a non-empty `-shellcheck=<path>` passes
-  (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`.
-- Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2, the part a line scan can read: only the `entry:` and run lines are read, not `args:`; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
+  (issue 164 item 1). The wrapper in `scripts/install_linters.sh` carries a `justified:` reason for its `-pyflakes=`. The `ignore:`
+  entries of the actionlint config (`actionlint.yaml` or `actionlint.yml` in `.github/`) are read by 2b: the `ignore:` line and every
+  `- entry` of its block list need a reason, also when the key is quoted or written as a flow, and after an anchor or a tag
+  (`ignore: &a`, `ignore: !!seq`); an `ignore:` whose value is an alias (`*name`) fails with no escape hatch, because 2b cannot follow it, and so does a double-quoted key written with an escape (`"ign\x6Fre":`).
+- Makefiles (`Makefile`, `makefile`, `GNUmakefile`, `*.mk`), `.github/actions/*` and `.pre-commit-config.yaml` are scanned too (issue 164 item 2; recipe prefixes `@`, `+` and `-`, with blanks between them, are stripped before the lookup, and the `-` prefix, which makes make ignore the exit status, is not checked).
+- YAML args keys (issue 164 item 2): a sequence item (a workflow step or a pre-commit hook) is read as a whole, in any key order. Its
+  `uses:` (an action whose name contains the tool, such as `astral-sh/ruff-action` or `docker://rhysd/actionlint`), or in pre-commit
+  config its `entry:` or `id:` (`ruff` and `ruff-check` run `ruff check`, `ruff-format` runs `ruff format`), gives the command, and each
+  of its args-like keys (`args`, `extra_args`, `flags`, `options`, or a key that starts with the tool name such as `eslint_flags`; not
+  `reviewdog_flags`; at any depth, quoted or not, in any letter case, also after a bare `-` line) holds that command's flags, inline, as
+  a flow or block list (a flow list splits on every comma outside quotes, `[.,--fix]`), in a flow mapping (`- {id: ruff, args: [--fix]}`, `with: {args: check}`) or a block scalar. A reason waives
+  its own line only: the lines of a key that have no reason are checked together. A double-quoted key written with an escape (`"ar\x67s":`)
+  fails unless its line has a reason, because it may spell any key. This only adds failures to the line scan.
 - False positives removed: `uvx mypy@1.15`, `tsc -b > build.log` (issue 164 item 5) and `tsc --outFile dist/out.js` (item 4), and tools that
   are being installed (`pip install ruff --upgrade`, `npm i -D eslint --save-exact`, `cargo install`, `go install`).
 
@@ -94,14 +105,55 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
 - A flag after `--` of `npm`, `npx` and kin is always checked, also when the line names the tool (`npm run lint:eslint -- --quiet`), and passes
   when any of eslint, prettier and tsc lists it (tsc names read case-insensitively), because the script that runs is not known.
   So `npm test -- --coverage` or `npm run build -- --watch` now needs a `justified:` (issue 164 item 3 stays open, and is wider than under
-  the blocklist). Resolving the script name through `package.json` would narrow it; no such passthrough exists in the repo today.
-- `with: args:` of a lint action, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (its `ignore:` entries are not read by
-  2b), flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
+  the blocklist; task M1-65). Resolving the script name through `package.json` would narrow it; no such passthrough exists in the repo today.
+- YAML values over several lines (task M1-64, issue 164 item 2): see the next section for what the joined-line check leaves out.
+- Flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
 - A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
-- pre-commit `args:` lines (block style under `- id: ruff`, and the flow form `- {id: ruff, args: [--ignore=E501]}`), a tool name held in a
-  Make or shell variable (`$(RUFF) check --ignore E501 .`), and a flag hidden by shell escapes (`eslint \--quiet .`, `eslint $'--quiet' .`).
+- YAML args keys: a job-level reusable workflow (`uses: org/x/.github/workflows/ruff.yml@v1` with `with: args:`) is not a sequence item;
+  other inputs of a lint action (`severity:`, `ignore_paths:`, `fail_on_error:`, `reviewdog_flags:`) are not read; a `${{ }}`
+  expression or a YAML alias in an args key is not followed; a step item `- &anchor` or `- !!map` with its keys on the next lines is
+  not read (PR 309 R2-07). An actionlint `ignore:` alias whose name starts with `-` (`*-l`) is not detected (R2-06).
+- A tool name held in a Make or shell variable (`$(RUFF) check --ignore E501 .`), and a flag hidden by shell escapes (`eslint \--quiet .`, `eslint $'--quiet' .`).
 - Installer commands are matched by their subcommand (`pipx install`, `conda install`, `apt-get install`); `pipx run` and `conda run`
   run the tool, so they are scanned. A tsc `@response-file` fails, because the options inside it cannot be read. Because the rule covers the
   whole eslint, prettier and tsc union, any `@` word after an npm `--` fails too (`npm run build -- @scope/pkg`, `npm exec -- @commitlint/cli --edit`),
   and needs a `justified:`; `npx @scope/tool` without `--` passes. A segment with a `--` tail after npm, yarn, pnpm or bun is never an installer, and the
   npm script verbs (`test`, `t`, `tst`, `start`, `stop`, `restart`, `run`, `rum`, `urn`, `run-script`, `exec`, `x`) are read as runs.
+
+## Check 2c: YAML values over several lines (task M1-64, issue 164 item 2)
+
+Escalation ruling on PR 309 (comment 7084379032): the joined line is checked IN ADDITION to the per-line check, never instead of it.
+`cliflags` runs the 2c scan twice on every YAML file: on the file, as before, and on the text `YFOLD_AWK` prints, where each value that
+goes on over several lines is one line, as the runner reads it. A failure of either run fails, so the joined check only adds failures.
+
+**What is joined.** A plain scalar (lines indented more than its key, up to a comment line or a less indented line; also when the value
+starts on the line after the key, R2-05), a single- or double-quoted scalar (until it closes, at any indentation), a flow collection
+(`- {name: a, run: ruff check` over lines, `with: {args:`), and the lines of equal indentation of a folded block (`run: >`, any
+chomping or indentation indicator, after an anchor or a tag; R2-04). A blank line is a line break, so it starts a new line; in a
+folded block so is a change of indentation (YAML keeps the breaks around a more-indented line). Double-quoted escapes are decoded
+(`\x2d`, `\u002d`, `\t`, `\"`; `\n` is a command separator; an escaped line break joins with no blank; other escapes are a character that is
+no blank), also after a node property (`&a`, `!!str`) and in a JSON-style flow (`{"run":"..."}`). The YAML quotes are dropped in block
+context and kept in a flow collection, where an args list splits on commas outside quotes. A fold scan that cannot run fails the guard. A pre-commit `entry:` is split into words by pre-commit, so its whole value, a literal block
+(`entry: |`) too, is one line on the key line, and a `#` in its block is a word. A literal block (`run: |`) is not joined: its lines are
+shell lines.
+
+**Reasons.** A reason waives a joined value only when every line of it has one (Y1, Y3 and Y5 of the ruling, R2-01). A reason in a
+comment ends a plain value, so a plain value over several lines cannot carry one on each line: write a justified command on one line,
+or as a folded block with the reason on each line.
+
+**Not covered, or a new cost.**
+- A shell quote that spans a YAML line break (`ruff check '` and `' --ignore E501 .` around a blank line, in a folded block or a literal
+  block) leaves the tool and the flag on two lines; the same holds in a shell script. The line scan has no shell parser.
+- A reason on one line of a folded block does not waive it, even when its `#` makes the shell drop the rest (`ruff check --ignore E501 .
+  # justified: ...` and then `&& echo ok`): a false positive the per-line check did not have; put the reason on each line.
+- A run of equally indented lines of a folded block that are more indented than the block's own lines (`echo a` and then
+  `  ruff check` and `  --ignore E501 .`, or every line with an explicit indicator such as `run: >1` at +3) is joined although YAML
+  keeps the breaks: a false positive, never a miss. A flow mapping joined over lines lets a flag in another entry count for
+  the tool (`- {run: ruff check, name: x` and `--fix}`), as on one line.
+- The single-line forms that the per-line check reads as before still pass there; the joined run reads them decoded, so a double-quoted
+  `"ruff check \x2d-fix"` now fails.
+- Complex keys (`? run` and `: value` over lines) are read as plain lines.
+- A one-line double-quoted value whose reason exists only after escape decoding (`"ruff check \x2d-fix \x6austified: three words here"`)
+  passes: a reason is cleared only from a value joined over several lines. It takes two deliberate escapes; accepted residual of
+  PR 325 review round 1 (R1-04, the guard is a tripwire, F18), not a regression from main, which does not decode at all.
+
