@@ -172,8 +172,9 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # a flag only counts for the tool in its own command; only the text after the tool name is read (`grep -i shellcheck` has no flag), and a bare
 # `--` ends the flags. A tool named as the thing being installed (`pip install ruff --upgrade`, `npm i -D eslint`, `cargo install`) is not run, so datacmd skips it.
 # For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
-# there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known, so `npm test -- -u` needs a `justified:`
-# too (issue 164 item 3). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
+# there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known. Only an npm form whose script is
+# known to end in a test runner (ddrun, pkgscripts below; issue 164 item 3) skips that check, so `npm test -- -u` passes when every tracked
+# `test` script is a plain `jest ...`; in every other case the check is as before (fail closed). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
 # tsc names are read case-insensitively (as tsc does), mypy and shellcheck accept unique prefixes of long options so a proper prefix of a
 # listed option counts as that option (a prefix that is ambiguous is an error in the tool itself), and SHELLCHECK_OPTS counts as
 # `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
@@ -437,6 +438,27 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
 }
 function eslintbase(s) { return hit(s, "suppress-all|suppress-rule|suppressions-location|pass-on-unpruned-suppressions") }
 function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bun|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
+# ddrun: 1 when the `--` tail of p reaches a test runner, never a linter (PR 309 ruling 7084379032): a bare npm is the first word (after
+# a YAML `- key:` or a package.json key), then only -s/--silent/-q/--quiet/--if-present/--ignore-scripts, the verb test, t or tst (script
+# `test`) or run, rum, urn or run-script with a name, and nothing else up to the `--`; every tracked package.json definition of the script
+# must pass plainrun, and no package.json may be unknown.
+function ddrun(p,   n, w, i, a, v) {
+  if (NPMU) return 0
+  match(p, /(^|[ \t])--([ \t]|$)/); n = split(substr(p, 1, RSTART), w, /[ \t]+/)
+  for (i = 1; i <= n && (w[i] == "" || (F ~ /(\.ya?ml|package\.json)$/ && (w[i] == "-" || w[i] ~ /:$/))); i++) ;
+  a = w[i]; if (F ~ /package\.json$/) sub(/^"/, "", a)
+  if (a != "npm") return 0
+  for (i++; i <= n && w[i] ~ NPMBOOL; i++) ;
+  v = w[i]
+  if (v ~ /^(run|rum|urn|run-script)$/) { for (i++; i <= n && w[i] ~ NPMBOOL; i++) ; v = w[i] } else if (v ~ /^(test|t|tst)$/) v = "test"; else return 0
+  for (i++; i <= n; i++) if (w[i] != "" && w[i] !~ NPMBOOL) return 0
+  if (v == "" || !(v in NS)) return 0
+  for (i = 1; i <= NS[v]; i++) if (!plainrun(NC[v, i])) return 0
+  return 1
+}
+# plainrun: script c (npm appends the tail to it) is one plain `[npx] <runner> <words>` and nothing else: no command before it (one could
+# redefine the runner: a function, PATH=, a copy over its file), no separator, quote, `$`, backtick, bracket, redirection, `#`, `~` or `\`.
+function plainrun(c) { return (c ~ RUNRE) }
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
 function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
@@ -457,7 +479,7 @@ function datacmd(p,   n, w, i, j, k, a, b, c, m) {
   return (a ~ /^(cargo|go)$/ && b == "install")
 }
 function relaxed(p,   dd, e, pr, t, ok, s) {
-  dd = ddseg(p)
+  dd = ddseg(p); if (dd != "" && ddrun(p)) dd = ""
   if (match(p, /SHELLCHECK_OPTS(\+?=|:[ \t])/) && scan(substr(p, RSTART + RLENGTH), "shellcheck", 0)) return 1
   if (datacmd(p)) return 0
   if (has(p, "ruff")) { s = after(p, "ruff"); if (scan(s, "ruff", 0) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$")) return 1 }
@@ -555,6 +577,12 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   RUFFSUB = "^(check|format|rule|config|linter|clean|server|analyze|version|help|generate-shell-completion)$"
   SRCRE = "^[^-][^=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$"; SEVOK = "^(warning|info|style)$"; COLOROK = "^(always|never|auto)$"
   ARGKEY = "^([A-Za-z0-9-]*_)?(args|flags|options|arguments)$"; YML = (F ~ /\.ya?ml$/); PC = (F ~ /pre-commit-config\.yaml$/); IK = -1; BS = -1
+  # Test runners that are no linter and take an npm `--` tail as their own options (not firebase: emulators:exec runs its argument;
+  # not vitest: its typecheck mode runs tsc).
+  RUNRE = "^[ \t]*(npx[ \t]+)?(jest|mocha|playwright|cypress)([ \t]+[A-Za-z0-9_./:=@,+%-]+)*[ \t]*$"
+  NPMBOOL = "^(-s|--silent|-q|--quiet|--if-present|--ignore-scripts)$"
+  np = split(ENVIRON["NPMS"], P, "\n")  # pkgscripts: name TAB command; a bare TAB makes every tail unknown
+  for (i = 1; i <= np; i++) if ((j = index(P[i], "\t")) == 1) NPMU = 1; else if (j) { nm = substr(P[i], 1, j - 1); NC[nm, ++NS[nm]] = substr(P[i], j + 1) }
   nl = split(ENVIRON["CLI_ALLOW"], L, "\n")
   for (i = 1; i <= nl; i++) {
     if (L[i] ~ /^[ \t]*$/) continue
@@ -686,16 +714,37 @@ END {
   }
   for (i = 1; i <= N; i++) print O[i]
 }'
+# pkgscripts: `name TAB command` for every script of every tracked package.json (excluded paths too; one it cannot read is unknown), read
+# only from the one strict layout: the file's only
+# "scripts" token, on a line of its own as `"scripts": {`, then one `"name": "command",` per line up to a `}` line. Any other "scripts"
+# token or layout, and any \u escape (it can spell any key; also in a value, PR 309 R3-03), prints a bare TAB: every tail is then unknown.
+pkgscripts() {
+  local f
+  while IFS= read -r f; do
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null || echo '"scripts"'; else cat -- "$f" 2>/dev/null || echo '"scripts"'; fi | LC_ALL=C awk '
+      { sub(/\r$/, ""); t = $0; c = gsub(/"scripts"/, "", t) }
+      /\\u/ { print "\t" }
+      s { if (c) print "\t"
+          else if ($0 ~ /^[ \t]*\}[ \t]*,?[ \t]*$/) s = 0
+          else if ($0 ~ /^[ \t]*"[^"\\\t]+"[ \t]*:[ \t]*"([^"\\]|\\.)*"[ \t]*,?[ \t]*$/) {
+            n = $0; sub(/^[ \t]*"/, "", n); v = n; sub(/".*$/, "", n); sub(/^[^"]*"[ \t]*:[ \t]*"/, "", v); sub(/"[ \t]*,?[ \t]*$/, "", v); print n "\t" v }
+          else print "\t"
+          next }
+      c { if (++k > 1 || $0 !~ /^[ \t]*"scripts"[ \t]*:[ \t]*\{[ \t]*$/) print "\t"; else s = 1 }
+      END { if (s) print "\t" }'
+  done < <(git ls-files -- '*package.json')
+}
+NPMS=$(pkgscripts)
 cliflags() { # cliflags <pathspec>...
   local f y
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
-    else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
+    else NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
     case "$f" in *.yml | *.yaml) # the joined lines, in addition to the lines above; a fold scan that cannot run fails (no quiet gap)
       if [ "$STAGED" = 1 ]; then y=$(git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK")
       elif [ -f "$f" ]; then y=$(LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" "$f")
       else continue; fi || { echo "$f:0: the YAML fold scan failed"; continue; }  # a file missing from the tree has nothing to scan (R1-02)
-      printf '%s\n' "$y" | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
+      printf '%s\n' "$y" | NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
     esac
   done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++' | sed 's/^/guard: unjustified CLI flag: /'
 }
