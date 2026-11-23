@@ -5,7 +5,7 @@ Process: docs/ORCHESTRATION.md section 4. Standard library only (Python 3.11+ fo
 
 Usage:
   scripts/tasks.py [--file PATH | --ref GITREF] [--issues JSON] [--prs JSON] [--claimed IDS]
-                   [--in-review IDS] [--assignee owner|agent|ROLE] [--json]
+                   [--in-review IDS | --state BODY] [--assignee owner|agent|ROLE] [--json]
                    {validate,ready,review,status,drift}
 
   validate  schema, ids, dependencies and cycles; exit 1 on any error
@@ -25,6 +25,9 @@ Usage:
 --claimed: comma-separated task ids held by running sessions (the state issue's Sessions table).
 --in-review: comma-separated task ids committed on a branch and awaiting review or merge
           (the state issue's Branches table). They are not ready, and `review` lists them.
+--state:  the state issue body (gh api repos/bondo/listicles2/issues/15 --jq .body > FILE): both lists come from
+          its ```json block (sessions[].tasks, branches[].in_review; scripts/state_body.py validates the rest).
+          Instead of --claimed and --in-review, not with them.
 """
 
 from __future__ import annotations
@@ -558,6 +561,37 @@ def read_json(path: str | None) -> list[dict] | None:
     return out
 
 
+def state_ids(text: str) -> tuple[list[str], list[str]]:
+    """Claimed and in-review task ids from the state body's one ```json block (M1-77; same block as state_body.py)."""
+    if not text.strip():
+        raise InputError("the state body is empty (a failed gh call?); refusing to read it as no claims")
+    lines = re.split(r"\r\n|\r|\n", text)  # the same CommonMark line ends and fence matching as state_body.py
+    opens = [i for i, ln in enumerate(lines) if ln.rstrip(" \t") == "```json"]
+    if len(opens) != 1:
+        raise InputError(f"{len(opens) or 'no'} ```json blocks in the state body; exactly one holds the state")
+    close = next((i for i in range(opens[0] + 1, len(lines)) if lines[i].rstrip() == "```"), None)
+    if close is None:
+        raise InputError("the ```json block in the state body is not closed")
+    try:
+        data = json.loads("\n".join(lines[opens[0] + 1:close]))
+    except json.JSONDecodeError as e:
+        raise InputError(f"malformed JSON in the state block: {e}") from None
+    if not isinstance(data, dict) or data.get("schema") != 1:
+        raise InputError("the state block must be a JSON object with schema 1")
+    out: list[list[str]] = []
+    for key, field_name in (("sessions", "tasks"), ("branches", "in_review")):
+        rows, ids = data.get(key), []
+        if not isinstance(rows, list):
+            raise InputError(f"state block: {key} must be a list")
+        for i, row in enumerate(rows):
+            got = row.get(field_name) if isinstance(row, dict) else None
+            if not isinstance(got, list) or not all(isinstance(x, str) for x in got):
+                raise InputError(f"state block: {key}[{i}].{field_name} must be a list of task ids")
+            ids += got
+        out.append(ids)
+    return out[0], out[1]
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     src = ap.add_mutually_exclusive_group()
@@ -568,6 +602,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--followups", help="JSON file with OPEN `follow-up` issues (number, title, state, labels)")
     ap.add_argument("--claimed", default="", help="comma-separated task ids held by running sessions")
     ap.add_argument("--in-review", default="", help="comma-separated task ids awaiting review or merge")
+    ap.add_argument("--state", help="state issue body: read the claimed and in-review ids from its JSON block")
     ap.add_argument("--assignee", help="filter: owner, agent, or one role")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--check", action="store_true",
@@ -592,7 +627,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     claimed = [c.strip() for c in a.claimed.split(",") if c.strip()]
     in_review = [c.strip() for c in a.in_review.split(",") if c.strip()]
-    for flag, ids in (("--claimed", claimed), ("--in-review", in_review)):
+    if a.state is not None:
+        if a.claimed or a.in_review:
+            print("error: --state gives the claimed and in-review ids; do not pass --claimed or --in-review with it",
+                  file=sys.stderr)
+            return 1
+        try:
+            claimed, in_review = state_ids(Path(a.state).read_text(encoding="utf-8"))
+        except (InputError, OSError) as e:
+            print(f"error: --state {a.state}: {e}", file=sys.stderr)
+            return 1
+    sources = (("--state", claimed), ("--state", in_review)) if a.state is not None else (
+        ("--claimed", claimed), ("--in-review", in_review))
+    for flag, ids in sources:
         unknown_ids = sorted(set(ids) - set(graph.by_id))
         if unknown_ids:
             print(f"error: {flag} names unknown tasks: {unknown_ids}", file=sys.stderr)
