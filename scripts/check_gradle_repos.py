@@ -13,6 +13,7 @@ Settings it cannot read with confidence (an unterminated string or template) are
 Run: python3 -I scripts/check_gradle_repos.py  (exit 1 and one line per problem when the setup is off).
 """
 
+import hashlib
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -259,13 +260,13 @@ def _repositories(blanked, kept, name):
     return "\n".join(blanked[a:b] for a, b in parts), "\n".join(kept[a:b] for a, b in parts)
 
 
-def _unfiltered_google(blanked):
-    """Names of the BLOCKS whose text holds a google() without a content filter, plus None if one sits outside all of them.
+def _unfiltered_google(blanked, blocks=BLOCKS):
+    """Names of the blocks (BLOCKS by default) whose text holds a google() without a content filter, plus None if one sits outside all of them.
 
     The whole file is searched, not only braced repositories { } bodies, so repositories.google(), with(repositories) { google() }
     and pluginManagement.repositories.google() need the same filter. Strings are blanked, so URLs never match."""
     exclusive = _exclusive(blanked)
-    owners = [(name, a, b) for name in BLOCKS for a, b in _spans(blanked, name)]
+    owners = [(name, a, b) for name in blocks for a, b in _spans(blanked, name)]
     bad = set()
     # A qualified call (this.google(), foo.google()) counts too, and so does any other use of the name (google as a value).
     for call in re.finditer(r"(?<!\w)google\b`?\s*(\(\s*\))?", blanked):  # `google` in backticks is the same name
@@ -281,14 +282,16 @@ def _outer(blanked, kept, name):
     return "\n".join(blanked[a:b] for a, b in spans), "\n".join(kept[a:b] for a, b in spans), spans
 
 
-def check_settings(text):
+def check_settings(text, blocks=BLOCKS):
+    """Problems with a settings.gradle.kts. blocks are the outer blocks that must list the mirror and mavenCentral():
+    both for the root and build-logic, pluginManagement alone for the licensee fixture, which resolves its artifacts from repo/."""
     try:
         blanked, kept = _strip(text, blank_strings=True), _strip(text)
     except Unparsable as e:
         return [f"settings.gradle.kts: cannot parse ({e}), so the repositories cannot be checked"]
-    unfiltered = _unfiltered_google(blanked)
+    unfiltered = _unfiltered_google(blanked, blocks)
     problems, inside = [], []
-    for name in BLOCKS:
+    for name in blocks:
         repos, _ = _repositories(blanked, kept, name)
         outer, outer_kept, spans = _outer(blanked, kept, name)
         inside += spans
@@ -312,7 +315,7 @@ def check_settings(text):
         if re.search(r"(?<!\w)(?:get)?[dD]ependencyResolutionManagement\b", blanked[a:b]):
             problems.append("pluginManagement: refers to dependencyResolutionManagement, so repositories added there come before its own mirror")
             break
-    where = " and ".join(BLOCKS)
+    where = " and ".join(blocks)
     if None in unfiltered:
         problems.append(f"settings.gradle.kts: google() outside {where} needs a content filter")
     if any(not any(a <= m.start() < b for a, b in inside) for m in re.finditer(r"(?<!\w)mavenCentral\b", blanked)):
@@ -320,7 +323,7 @@ def check_settings(text):
     return problems
 
 
-def check_properties(text):
+def check_properties(text, name="gradle.properties"):
     props = {}
     for line in text.splitlines():
         line = line.strip()
@@ -331,9 +334,9 @@ def check_properties(text):
     for key, minimum in ((TENTATIVES, MIN_TENTATIVES), (BACKOFF, MIN_BACKOFF_MS)):
         value = props.get(key)
         if value is None or not value.isdigit():
-            problems.append(f"gradle.properties: {key} missing or not a number")
+            problems.append(f"{name}: {key} missing or not a number")
         elif int(value) < minimum:
-            problems.append(f"gradle.properties: {key}={value} is below {minimum}")
+            problems.append(f"{name}: {key}={value} is below {minimum}")
     return problems
 
 
@@ -396,6 +399,64 @@ def check_verification(meta, props_text, verify_text=""):
     return problems
 
 
+FIXTURE = "config/licensee/fixture"
+FIXTURE_GROUP = "fixture"
+LICENSEE = ("app.cash.licensee", "licensee-gradle-plugin")
+# Any way to tell Gradle to skip verification in the testLicenseeGate command: --dependency-verification, -F, -Dorg.gradle.dependency.verification.
+GATE_OFF = re.compile(r"dependency[-.]verification|\"-F\"")
+
+
+def _relabel(problems, old, new):
+    return [new + p[len(old) :] if p.startswith(old) else p for p in problems]
+
+
+def check_fixture_metadata(meta, poms, licensee_version):
+    """Problems with the licensee fixture build's verification metadata (text, or None if missing).
+
+    The fixture is a separate build run by testLicenseeGate, so the root metadata does not cover it. The file must pass the same
+    checks as the root one, hold the licensee plugin version of the catalog (a bump needs it regenerated, and this says so before
+    the gate does), and a sha256 equal to the file's for every POM under repo/ (poms maps (artifact, version) to its sha256)."""
+    where = f"{FIXTURE}/gradle/{META}"
+    problems = _relabel(check_verification(meta, ""), META, where)
+    try:
+        root = ET.fromstring(meta or "")
+    except ET.ParseError:
+        return problems  # missing or not XML, already reported
+    found = {}
+    for comp in (e for e in root.iter() if e.tag.rsplit("}", 1)[-1] == "component"):
+        names = {a.get("name"): [h.get("value") for h in a if h.tag.rsplit("}", 1)[-1] == "sha256"] for a in comp if a.tag.rsplit("}", 1)[-1] == "artifact"}
+        found[(comp.get("group"), comp.get("name"), comp.get("version"))] = names
+    if not any(g == LICENSEE[0] and n == LICENSEE[1] and v == licensee_version for g, n, v in found):
+        problems.append(f"{where}: no component {LICENSEE[0]}:{LICENSEE[1]} for licensee {licensee_version}")
+    for (artifact, version), digest in sorted(poms.items()):
+        pom = f"{artifact}-{version}.pom"
+        recorded = found.get((FIXTURE_GROUP, artifact, version), {}).get(pom)
+        if recorded is None:
+            problems.append(f"{where}: no sha256 for {FIXTURE_GROUP}:{artifact}:{version} ({pom})")
+        elif digest not in recorded:
+            problems.append(f"{where}: sha256 of {FIXTURE_GROUP}:{artifact}:{version} ({pom}) does not match the file")
+    return problems
+
+
+def check_gate_command(build_text):
+    """The root build.gradle.kts starts the fixture builds (testLicenseeGate); none of its code may switch verification off."""
+    code = (ln for ln in build_text.splitlines() if not ln.lstrip().startswith("//"))
+    if any(GATE_OFF.search(ln) for ln in code):
+        return ["build.gradle.kts: the licensee gate switches Gradle dependency verification off"]
+    return []
+
+
+def _read(path):
+    return path.read_text(encoding="utf-8") if path.is_file() else None
+
+
+def _nested_settings(root, rel, blocks):
+    text = _read(root / rel)
+    if text is None:
+        return [f"{rel} missing"]
+    return [f"{rel}: {p}" for p in check_settings(text, blocks)]
+
+
 def main(root):
     root = Path(root)
     problems = check_settings((root / "settings.gradle.kts").read_text(encoding="utf-8"))
@@ -405,6 +466,26 @@ def main(root):
         meta.read_text(encoding="utf-8") if meta.is_file() else None, (root / "gradle.properties").read_text(encoding="utf-8"),
         (root / "scripts" / "verify.sh").read_text(encoding="utf-8"),
     )
+    # M1-69 (issue 217 item 4): the nested builds. build-logic is an included build, so the root metadata covers its artifacts and the
+    # root gradle.properties applies, but its settings file has its own repositories. The fixture is a separate build with its own.
+    problems += _nested_settings(root, "build-logic/settings.gradle.kts", BLOCKS)
+    problems += _nested_settings(root, f"{FIXTURE}/settings.gradle.kts", BLOCKS[:1])
+    fixture_props = _read(root / FIXTURE / "gradle.properties")
+    if fixture_props is None:
+        problems.append(f"{FIXTURE}/gradle.properties missing")
+    else:
+        problems += check_properties(fixture_props, f"{FIXTURE}/gradle.properties")
+        off = [p for p in check_verification(None, fixture_props) if p.startswith("gradle.properties")]
+        problems += _relabel(off, "gradle.properties", f"{FIXTURE}/gradle.properties")
+    catalog = re.search(r'(?m)^licensee\s*=\s*"([^"]+)"', _read(root / "gradle" / "libs.versions.toml") or "")
+    poms = {}
+    for pom in sorted((root / FIXTURE / "repo" / FIXTURE_GROUP).glob("*/*/*.pom")):
+        poms[(pom.parent.parent.name, pom.parent.name)] = hashlib.sha256(pom.read_bytes()).hexdigest()
+    if catalog is None:
+        problems.append("gradle/libs.versions.toml: no licensee version")
+    else:
+        problems += check_fixture_metadata(_read(root / FIXTURE / "gradle" / META), poms, catalog[1])
+    problems += check_gate_command((root / "build.gradle.kts").read_text(encoding="utf-8"))
     for p in problems:
         print(f"gradle-repos: {p}")
     return 1 if problems else 0
