@@ -1,5 +1,5 @@
 [versions]
-agp = "9.5.1"
+agp = "9.5.2"
 kotlin = "2.4.21"
 composeBom = "2026.09.00"
 activityCompose = "1.13.0"
@@ -19,7 +19,7 @@ androidxTestRunner = "1.7.0"
 # Espresso 3.5.1 (what Compose test pulls) calls InputManager.getInstance(), gone on SDK 37, so Compose tests fail under Robolectric.
 androidxTestEspresso = "3.7.0"
 detekt = "1.23.8"
-composeRulesDetekt = "0.4.28"
+composeRulesDetekt = "0.6.8"
 kotlinxCoroutines = "1.11.0"
 spotless = "8.11.0"
 ktlint = "1.8.0"

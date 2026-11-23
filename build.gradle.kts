@@ -383,7 +383,7 @@ val testLicenseeGate =
                 // exactly its own artifact (integrity: Play Integrity terms; core-common: Play Core license), listed.
                 licenseeCase(
                     "play integrity terms on integrity, listed",
-                    "com.google.android.play:integrity:1.0",
+                    "com.google.android.play:integrity:1.6.0",
                     "approved-play-integrity.txt",
                     passes = true,
                 ),
@@ -395,7 +395,7 @@ val testLicenseeGate =
                 ),
                 licenseeCase(
                     "play integrity terms on integrity, not listed",
-                    "com.google.android.play:integrity:1.0",
+                    "com.google.android.play:integrity:1.6.0",
                     passes = false,
                     message = "integrity/overview#tos",
                 ),
@@ -422,7 +422,7 @@ val testLicenseeGate =
                 ),
                 licenseeCase(
                     "play core license on integrity, listed",
-                    "com.google.android.play:integrity:2.0",
+                    "com.google.android.play:integrity:1.6.0",
                     "approved-integrity-core.txt",
                     passes = false,
                     message = notGoogle,
