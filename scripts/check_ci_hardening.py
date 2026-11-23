@@ -52,6 +52,7 @@ REQUIREMENTS_CI = "scripts/requirements-ci.txt"
 INSTALL_CI = "pip install -r scripts/requirements-ci.txt"
 SHELL_SCRIPT = re.compile(r"scripts/[\w.-]+\.sh")
 USES_LINE = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<ref>\S+)(?P<rest>.*)$")
+ANY_USES = re.compile(r"\buses\s*:")
 PINNED = re.compile(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}")
 TAG_COMMENT = re.compile(r"\s+#\s*v\d+(?:\.\d+)+\b")
 CODEQL_ACTION = "github/codeql-action/"
@@ -165,6 +166,8 @@ def pin_problems(root):
             m = USES_LINE.match(line)
             if m and not m["ref"].startswith("./") and not (PINNED.fullmatch(m["ref"]) and TAG_COMMENT.match(m["rest"])):
                 problems.append(f"{path.name}: {m['ref']} must be pinned to a commit sha with a version tag comment (`@<40 hex> # v1.2.3`)")
+            elif not m and ANY_USES.search(line.split("#", 1)[0]):
+                problems.append(f"{path.name}: unreadable uses: (write `uses: owner/repo@<40 hex> # v1.2.3` on its own line, no flow style): {line.strip()}")
     return problems
 
 
@@ -194,8 +197,11 @@ def _codeql_job_problems(where, job):
             problems.append(f"{who}: build-mode must be manual (a Gradle build CodeQL traces), not {mode!r}")
         if job.get("if") != NOT_A_PULL_REQUEST:
             problems.append(f"{who}: `if: {NOT_A_PULL_REQUEST}` keeps it off pull_request (weekly and pushes to main only), not {job.get('if')!r}")
-        if not any("./gradlew" in _code(s) for s in steps[inits[0] + 1 : last]):
+        builds = [_code(s) for s in steps[inits[0] + 1 : last] if "./gradlew" in _code(s)]
+        if not builds:
             problems.append(f"{who}: no step runs ./gradlew between codeql-action init and analyze")
+        elif not all("--no-build-cache" in b and "--build-cache" not in b and "caching=true" not in b for b in builds):
+            problems.append(f"{who}: the traced ./gradlew build must pass --no-build-cache (a task restored from the cache starts no compiler)")
         if not any(_is_use(s, "actions/setup-java@") for s in steps[: inits[0]]):
             problems.append(f"{who}: actions/setup-java must come before codeql-action init")
     else:
@@ -218,6 +224,8 @@ def codeql_problems(root):
     else:
         if ((on["push"] or {}).get("branches")) != ["main"]:
             problems.append("codeql.yml trigger push must be branches: [main]")
+        if set(on["pull_request"] or {}) - {"types"}:
+            problems.append("codeql.yml trigger pull_request must have no branches, paths or -ignore filter (only types)")
         cron = on["schedule"]
         if not (isinstance(cron, list) and len(cron) == 1 and isinstance(cron[0], dict) and WEEKLY_CRON.fullmatch(str(cron[0].get("cron")))):
             problems.append("codeql.yml trigger schedule must be one weekly cron (fixed minute, hour and weekday)")

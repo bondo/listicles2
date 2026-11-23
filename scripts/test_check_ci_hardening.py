@@ -28,6 +28,8 @@ VERIFY = "scripts/verify.sh"
 ADR = "docs/adr/0003-gradle-dependency-verification.md"
 REQ_CI = "scripts/requirements-ci.txt"
 INSTALL_CI = "pip install -r scripts/requirements-ci.txt"
+SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
+BUILD = "./gradlew --no-build-cache -q --console=plain :app:assembleDebug"
 
 
 class Rules(unittest.TestCase):
@@ -245,7 +247,7 @@ class Rules(unittest.TestCase):
     def test_java_kotlin_builds_with_gradle_between_init_and_analyze(self):
         self.flagged(self.edit(CODEQL, "          build-mode: manual\n", "          build-mode: none\n"), "java-kotlin", "build-mode")
         self.setUp()
-        self.flagged(self.edit(CODEQL, "./gradlew -q --console=plain :app:assembleDebug", "true"), "java-kotlin", "gradlew")
+        self.flagged(self.edit(CODEQL, BUILD, "true"), "java-kotlin", "gradlew")
 
         def reorder(w):
             steps = w["jobs"]["analyze-java-kotlin"]["steps"]
@@ -278,9 +280,8 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit(CODEQL, "    timeout-minutes: 45\n", ""), "analyze-java-kotlin", "timeout")
 
     def test_the_traced_gradle_build_never_reads_the_build_cache(self):
-        """R1-01: a task restored FROM-CACHE starts no compiler, so CodeQL's tracer would extract nothing for it (gradle.properties turns the cache on)."""
+        """R1-01: a task restored FROM-CACHE starts no compiler, so CodeQL's tracer extracts nothing (gradle.properties turns the cache on)."""
         self.assertIn("org.gradle.caching=true", (ROOT / "gradle.properties").read_text())
-        build = "./gradlew -q --console=plain :app:assembleDebug"
         for label, run in (
             ("flag missing", "./gradlew -q --console=plain :app:assembleDebug"),
             ("cache turned back on", "./gradlew --no-build-cache --build-cache :app:assembleDebug"),
@@ -288,22 +289,22 @@ class Rules(unittest.TestCase):
         ):
             with self.subTest(label):
                 self.setUp()
-                self.flagged(self.edit(CODEQL, build, run), "java-kotlin", "--no-build-cache")
+                self.flagged(self.edit(CODEQL, BUILD, run), "java-kotlin", "--no-build-cache")
         self.setUp()
-        self.assertEqual(self.edit(CODEQL, build, "./gradlew --no-build-cache -q --console=plain :app:assembleDebug"), [])
+        self.assertEqual(c.problems(self.root), [])
 
     def test_a_flow_style_or_odd_uses_cannot_bypass_the_pin_rule(self):
         """R1-02: `- { uses: actions/checkout@v4 }` is not a block-style line; anything the line rule cannot read fails closed."""
         step = "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"
-        for label, text in (
-            ("flow style tag", "      - { uses: actions/checkout@v4 }\n"),
-            ("flow style pinned", "      - { uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' } # v7.0.1\n"),
-            ("quoted", "      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1\n"),
-            ("value on the next line", "      - uses:\n          actions/checkout@v4\n"),
+        for label, text, word in (
+            ("flow style tag", "      - { uses: actions/checkout@v4 }\n", "unreadable"),
+            ("flow style pinned", f"      - {{ uses: 'actions/checkout@{SHA}' }} # v7.0.1\n", "unreadable"),
+            ("quoted", f"      - uses: 'actions/checkout@{SHA}' # v7.0.1\n", "pinned"),
+            ("value on the next line", "      - uses:\n          actions/checkout@v4\n", "unreadable"),
         ):
             with self.subTest(label):
                 self.setUp()
-                self.flagged(self.edit(STATUS, step, text + step), "status.yml", "uses")
+                self.flagged(self.edit(STATUS, step, text + step), "status.yml", word)
 
     def test_the_codeql_pull_request_trigger_has_no_filters(self):
         """R1-03: a branches, paths or -ignore filter would silently skip the pull request analysis."""
