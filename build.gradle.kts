@@ -106,172 +106,16 @@ kover {
     }
 }
 
-// M0.5-09: every Kotlin compile task (all modules, all variants, tests included) must treat warnings as errors.
-// Run: ./gradlew checkWarningsAsErrors (wired into detekt, so verify.sh and CI run it).
-val checkWarningsAsErrors =
-    tasks.register("checkWarningsAsErrors") {
-        group = "verification"
-        description = "Fails if any Kotlin compile task does not set allWarningsAsErrors or hides warnings."
-        // Evaluated lazily (when the task graph is built), after every project has been configured.
-        val compileTasks =
-            provider {
-                allprojects.flatMap { p ->
-                    p.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().toList()
-                }
-            }
+// M0.5-09, issue 211 and M1-68 part B2 (issue 48): checkWarningsAsErrors and checkJdkRelease are each module's own
+// tasks (build-logic ModuleChecks.kt), so the root reads no other project. listiclesChecks groups a module's checks,
+// and detekt (verify.sh and CI) runs it for every module by task path. check_build_guards.py keeps this list equal to
+// the modules in settings.gradle.kts. Run: ./gradlew checkWarningsAsErrors checkJdkRelease (every module).
+val listiclesModules = listOf(":app", ":core:data", ":core:domain", ":core:testing")
+tasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }
 
-        // Flags that turn warnings off or hide them, which would bypass allWarningsAsErrors.
-        // A bare flag takes the next element as its value, so check the list as a sequence.
-        fun hidesWarnings(args: List<String>): Boolean =
-            args.withIndex().any { (i, arg) ->
-                val value =
-                    if (arg.contains('=')) arg.substringAfter('=') else args.getOrNull(i + 1).orEmpty()
-                // The value is a comma-separated list; every entry must raise its diagnostic to an error.
-                val allErrors =
-                    value.split(',').map { it.trim() }.filter { it.isNotEmpty() }.let { entries ->
-                        entries.isNotEmpty() && entries.all { it.endsWith(":error") }
-                    }
-                arg == "-nowarn" ||
-                    arg.startsWith("-Xsuppress-warning") ||
-                    (arg.startsWith("-Xwarning-level") && !allErrors)
-            }
-        val offenders =
-            compileTasks.map { all ->
-                all
-                    .filter {
-                        val o = it.compilerOptions
-                        !o.allWarningsAsErrors.getOrElse(false) ||
-                            o.suppressWarnings.getOrElse(false) ||
-                            hidesWarnings(o.freeCompilerArgs.getOrElse(emptyList()))
-                    }.map { it.path }
-            }
-        val taskCount = compileTasks.map { it.size }
-        inputs.property("offenders", offenders)
-        inputs.property("taskCount", taskCount)
-        doLast {
-            check(taskCount.get() > 0) { "checkWarningsAsErrors found no Kotlin compile tasks; the check is broken" }
-            check(offenders.get().isEmpty()) {
-                "warnings are not all errors (allWarningsAsErrors off, suppressWarnings, -nowarn, " +
-                    "-Xsuppress-warning, -Xwarning-level=...:disabled/warning/info) for: ${offenders.get().joinToString()}"
-            }
-        }
-    }
-
-tasks.named("detekt") { dependsOn(checkWarningsAsErrors) }
-
-// Test-support JVM modules run only on the host JDK (21), never on Android, and use its newer API on purpose
-// (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18). checkJdkRelease fails if any
-// non-test configuration depends on one of them, so such a module can never reach the app.
-val jdkTestSupportModules = setOf(":core:testing")
-
-// Issue 211: every JVM module (Kotlin JVM plugin) compiles against the JDK 17 API, not the JDK 21 one the build runs
-// on. minSdk is 26 and Android has java.util.List.removeFirst()/removeLast() only from API 35, so a call that
-// resolves to the JDK 21 member crashes on Android 8 to 14. Kotlin (-Xjdk-release) and Java (--release) must both
-// say 17. This closes the JDK 18 to 21 gap only: Java 9 to 17 APIs that are newer than API 26 (for example
-// Stream.toList) are checked by checkJavaApiLevel below. The task first runs its own negative cases on the
-// predicate, then checks every real compile task.
-// Run: ./gradlew checkJdkRelease (wired into detekt, so verify.sh and CI run it).
-val checkJdkRelease =
-    tasks.register("checkJdkRelease") {
-        group = "verification"
-        description = "Fails if a JVM module's Kotlin or Java compile task does not target the JDK 17 API."
-        val wanted = "17"
-
-        // The last -Xjdk-release value wins, as on the Kotlin command line; a bare flag has no value.
-        fun kotlinRelease(args: List<String>): String? =
-            args.lastOrNull { it.startsWith("-Xjdk-release") }?.substringAfter('=', "")
-
-        fun kotlinOk(args: List<String>) = kotlinRelease(args) == wanted
-
-        fun javaOk(release: String) = release == wanted
-
-        val jvmProjects =
-            provider {
-                allprojects.filter {
-                    it.plugins.hasPlugin("org.jetbrains.kotlin.jvm") && it.path !in jdkTestSupportModules
-                }
-            }
-        // "project path -> configuration" for every non-test configuration that depends on a test-support module.
-        val leaks =
-            provider {
-                allprojects.flatMap { p ->
-                    p.configurations
-                        .filterNot { it.name.contains("test", ignoreCase = true) }
-                        .flatMap { c ->
-                            c.dependencies
-                                .withType<ProjectDependency>()
-                                .filter { it.path in jdkTestSupportModules }
-                                .map { "${p.path}:${c.name} -> ${it.path}" }
-                        }
-                }
-            }
-        inputs.property("leaks", leaks)
-        val kotlinTasks =
-            jvmProjects.map { ps ->
-                ps.flatMap { p ->
-                    p.tasks
-                        .withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>()
-                        .map { it.path to it.compilerOptions.freeCompilerArgs.getOrElse(emptyList()) }
-                }
-            }
-        val javaTasks =
-            jvmProjects.map { ps ->
-                ps.flatMap { p ->
-                    p.tasks.withType<JavaCompile>().map {
-                        it.path to (
-                            it.options.release.orNull
-                                ?.toString() ?: ""
-                        )
-                    }
-                }
-            }
-        val moduleCount = jvmProjects.map { it.size }
-        inputs.property("kotlinTasks", kotlinTasks)
-        inputs.property("javaTasks", javaTasks)
-        inputs.property("moduleCount", moduleCount)
-        doLast {
-            // Negative cases first: a predicate that accepts everything would make the real check pass.
-            val selfTest =
-                listOf(
-                    kotlinOk(listOf("-Xjdk-release=17")),
-                    kotlinOk(listOf("-Xfoo", "-Xjdk-release=17", "-Xbar")),
-                    !kotlinOk(emptyList()),
-                    !kotlinOk(listOf("-Xjdk-release=21")),
-                    !kotlinOk(listOf("-Xjdk-release=1.8")),
-                    !kotlinOk(listOf("-Xjdk-release=17", "-Xjdk-release=21")),
-                    !kotlinOk(listOf("-Xjdk-release")),
-                    !kotlinOk(listOf("-Xjdk-release=")),
-                    !kotlinOk(listOf("-Xjdk-release=170")),
-                    javaOk("17"),
-                    !javaOk(""),
-                    !javaOk("21"),
-                    !javaOk("1.8"),
-                )
-            check(selfTest.all { it }) { "checkJdkRelease self-test failed: $selfTest" }
-            check(moduleCount.get() > 0 && kotlinTasks.get().isNotEmpty() && javaTasks.get().isNotEmpty()) {
-                "checkJdkRelease found no JVM module compile tasks; the check is broken"
-            }
-            val offenders =
-                kotlinTasks.get().filterNot { (_, args) -> kotlinOk(args) }.map { (path, args) ->
-                    val flags = args.filter { it.startsWith("-Xjdk-release") }.ifEmpty { listOf("no -Xjdk-release") }
-                    "$path (Kotlin: $flags)"
-                } +
-                    javaTasks.get().filterNot { (_, release) -> javaOk(release) }.map { (path, release) ->
-                        "$path (Java release: ${release.ifEmpty { "unset" }})"
-                    }
-            check(leaks.get().isEmpty()) {
-                "test-support modules (use JDK 21 API) must only be test dependencies: ${leaks.get().joinToString()}"
-            }
-            check(offenders.isEmpty()) {
-                "JVM modules must compile against the JDK $wanted API (-Xjdk-release=$wanted, " +
-                    "options.release=$wanted), not the JDK 21 one the build runs on: Android has the JDK 18 to 21 " +
-                    "API (for example List.removeFirst) only from API 35 and minSdk is 26. " +
-                    "Offenders: ${offenders.joinToString()}"
-            }
-        }
-    }
-
-tasks.named("detekt") { dependsOn(checkJdkRelease) }
+// The test-support modules (host JDK 21 API on purpose): the one list in build-logic (TestSupportModules), which every
+// module's checkJdkRelease and the listicles.jvm.testsupport plugin also follow; checkJavaApiLevel below skips them.
+val jdkTestSupportModules = TestSupportModules.paths
 
 // M1-37 (issue 228): checkJdkRelease closes the JDK 18 to 21 gap only. A Java 9 to 17 member that is newer than minSdk (Stream.toList is
 // API 34, Objects.requireNonNullElse is API 30) still compiles in a JVM module, and Android lint's NewApi skips pure JVM modules.
@@ -358,6 +202,27 @@ val testLicenseeGate =
         val allowed = "fixture:apache:1.0,fixture:mit:1.0,fixture:bsd2:1.0,fixture:bsd3:1.0"
         val terms = "developer.android.com/studio/terms"
         val a1 = "approved-a1.txt"
+        val realList = "../google-sdk-terms.txt"
+        val m1o14Artifacts =
+            listOf(
+                "com.google.firebase:firebase-auth:25.0.0",
+                "com.google.firebase:firebase-auth-interop:20.0.0",
+                "com.google.android.gms:play-services-auth:21.1.1",
+                "com.google.android.gms:play-services-auth-api-phone:18.0.2",
+                "com.google.android.gms:play-services-auth-base:18.0.10",
+                "com.google.android.gms:play-services-auth-blockstore:16.4.0",
+                "com.google.android.gms:play-services-base:18.9.0",
+                "com.google.android.gms:play-services-basement:18.9.0",
+                "com.google.android.gms:play-services-fido:21.0.0",
+                "com.google.android.gms:play-services-identity-credentials:16.0.0-alpha08",
+                "com.google.android.gms:play-services-tasks:18.4.0",
+                "com.google.android.libraries.identity.googleid:googleid:1.2.1",
+                "com.google.android.recaptcha:recaptcha:18.6.1",
+                "com.google.android.play:core-common:2.0.3",
+                "com.google.android.play:integrity:1.3.0",
+                "com.google.re2j:re2j:1.6",
+                "org.codehaus.mojo:animal-sniffer-annotations:1.27",
+            ).joinToString(",")
         val notGoogle = "not the Google/Android SDK terms"
         val coordinates = "must be group:artifact:version"
         val cases =
@@ -398,6 +263,45 @@ val testLicenseeGate =
                     "com.google.android.play:integrity:1.0",
                     passes = false,
                     message = "integrity/overview#tos",
+                ),
+                // M1-O14 (owner decisions, issue 15 comments 7085175461 and 7095943127): the 17 artifacts :app needs for Firebase
+                // Auth and Credential Manager, as fixture stubs with the real licence URLs, against the real google-sdk-terms.txt.
+                licenseeCase(
+                    "M1-O14: all 17 artifacts pass with the real list",
+                    m1o14Artifacts,
+                    realList,
+                    passes = true,
+                ),
+                licenseeCase(
+                    "M1-O14: Go licence URL on re2j",
+                    "com.google.re2j:re2j:1.6",
+                    passes = true,
+                ),
+                licenseeCase(
+                    "M1-O14: MIT.txt URL on animal-sniffer-annotations",
+                    "org.codehaus.mojo:animal-sniffer-annotations:1.27",
+                    passes = true,
+                ),
+                licenseeCase(
+                    "M1-O14: another Google SDK terms artifact still fails with the real list",
+                    "com.google.firebase:firebase-database:21.0.0",
+                    realList,
+                    passes = false,
+                    message = terms,
+                ),
+                licenseeCase(
+                    "M1-O14: a listed artifact at another version still fails with the real list",
+                    "com.google.firebase:firebase-auth:99.0.0",
+                    realList,
+                    passes = false,
+                    message = terms,
+                ),
+                licenseeCase(
+                    "M1-O14: Play Core license on core-common at an unlisted version still fails",
+                    "com.google.android.play:core-common:2.0.9",
+                    realList,
+                    passes = false,
+                    message = "playcore/license",
                 ),
                 licenseeCase(
                     "play integrity terms on another artifact, listed",
