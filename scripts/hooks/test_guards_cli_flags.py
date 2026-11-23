@@ -958,18 +958,20 @@ class NpmTailResolutionTests(CliFlagCase):
     def test_a_tail_that_reaches_a_test_runner_passes(self):
         self.write("tools/package.json", self.scripts([
             ("test", "jest"), ("e2e", "npx playwright test"), ("unit", "npx jest --ci"), ("m", "mocha --recursive"),
-            ("cy", "cypress run --spec a/b.cy.ts"), ("ci", "npm test -- -u")]))
-        for line in ["cd tools && npm test -- -u", "npm run e2e -- -c x.ts", "npm t -- --coverage", "npm tst -- -u",
-                     "npm run-script unit -- --watch", "npm -s test -- -u", "npm run --silent e2e -- --headed", "npm rum m -- --quiet",
-                     "npm urn cy -- --browser chrome", "npm test -- -- --quiet"]:
+            ("cy", "cypress run --spec a/b.cy.ts"), ("ci", "npm test -- --ci")]))
+        # M1-71: runner options that skip or rewrite tests (-u, a path filter such as `-- --quiet`) now fail after the tail
+        # (test_guards_runner_options.py), so these tails use options that pass.
+        for line in ["cd tools && npm test -- --ci", "npm run e2e -- -c x.ts", "npm t -- --coverage", "npm tst -- --ci",
+                     "npm run-script unit -- --watch", "npm -s test -- --ci", "npm run --silent e2e -- --headed", "npm rum m -- --quiet",
+                     "npm urn cy -- --browser chrome"]:
             with self.subTest(ok=line):
                 self.write("scripts/lint.sh", line + "\n")
                 self.assertPasses()
         self.write("scripts/lint.sh", "true\n")
-        self.write(".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - run: cd tools && npm test -- -u\n")
+        self.write(".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - run: cd tools && npm test -- --ci\n")
         self.assertPasses()
         self.write("tools/package.json", self.scripts([("test", "jest")]).replace("\n", "\r\n"))
-        self.write("scripts/lint.sh", "cd tools && npm test -- -u\n")
+        self.write("scripts/lint.sh", "cd tools && npm test -- --ci\n")
         self.assertPasses()
 
     def test_r4_01_and_n1_to_n4_any_other_scripts_layout_makes_every_tail_unknown(self):
@@ -1035,7 +1037,7 @@ class NpmTailResolutionTests(CliFlagCase):
         self.write("tools/package.json", self.scripts([("test", "eslint .")]))
         self.write("scripts/lint.sh", self.LINE + " # justified: three words here\n")
         self.assertPasses()
-        self.repo.write("scripts/lint.sh", "cd tools && npm test -- -u\n", raw=True)
+        self.repo.write("scripts/lint.sh", "cd tools && npm test -- --ci\n", raw=True)
         self.repo.git("add", "scripts/lint.sh")
         self.assertFails(MARK + ": scripts/lint.sh:1:", "--staged")
         self.repo.write("tools/package.json", self.scripts([("test", "jest")]), raw=True)  # the worktree resolves, the index does not
