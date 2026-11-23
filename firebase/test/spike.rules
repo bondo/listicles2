@@ -1,8 +1,9 @@
     // M1-09, the rules spike (PLAN 3.1 items a-e, docs/adr/0002-rules-spike.md). Test only:
     // spike.test.ts inserts these blocks under the documents match of firestore.rules; never deployed.
-    // Each rule makes every get()/exists() call of its PLAN 3.1 row and reads a document once (let),
-    // so item (e) counts real calls. The task named at a block moves it into firestore.rules, with
-    // its field validation (P4) and full allow and deny tests, and deletes it here.
+    // Each rule makes every get()/exists() call of its PLAN 3.1 row, reads a document once (let) and
+    // tests the conditions that make no call first (ADR 0002's layout), so item (e) counts real calls.
+    // The task named at a block moves it into firestore.rules, with its field validation (P4) and full
+    // allow and deny tests, and deletes it here.
     function inviteDoc(code) { return /databases/$(database)/documents/invites/$(code); }
     function userDoc(uid) { return /databases/$(database)/documents/users/$(uid); }
     function live(hid) { return get(householdDoc(hid)).data.deleted == false; }
@@ -21,11 +22,13 @@
     // member, it is gone after the batch; LIVE; the one-household check. A create implies !M(uid).
     function joins(hid, uid) {
       let doc = request.resource.data;
-      let invite = get(inviteDoc(doc.viaInvite)).data;
       return uid == request.auth.uid && doc.role == 'member' && doc.joinedAt == request.time
-        && invite.householdId == hid && invite.expiresAt > request.time
-        && exists(memberDoc(hid, invite.createdBy))
-        && !existsAfter(inviteDoc(doc.viaInvite))
+        && joinsVia(hid, doc.viaInvite, get(inviteDoc(doc.viaInvite)).data);
+    }
+
+    function joinsVia(hid, code, invite) {
+      return invite.householdId == hid && invite.expiresAt > request.time
+        && exists(memberDoc(hid, invite.createdBy)) && !existsAfter(inviteDoc(code))
         && live(hid) && oneHousehold(hid);
     }
 
@@ -51,10 +54,10 @@
     // ownerUid gives this doc after it.
     function takesRole(hid, uid) {
       let household = get(householdDoc(hid)).data;
-      let role = getAfter(householdDoc(hid)).data.ownerUid == uid ? 'owner' : 'member';
       return household.deleted == false && household.ownerUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
-        && request.resource.data.role == role;
+        && request.resource.data.role
+          == (getAfter(householdDoc(hid)).data.ownerUid == uid ? 'owner' : 'member');
     }
 
     // (d), M2: LIST-01's queries: the caller's own lists, or those shared with a live household the
