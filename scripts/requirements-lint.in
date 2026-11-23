@@ -1,0 +1,8 @@
+# Python lint tools, exact versions: the top level of the hash lock requirements-lint.txt (issue 189 item 5, M1-74).
+# Dependabot (pip, /scripts) bumps these pins and recompiles the lock. By hand, from scripts/ with Python 3.13:
+#   pip-compile --allow-unsafe --generate-hashes --strip-extras requirements-lint.in
+# CI installs the lock with: pip install --require-hashes -r scripts/requirements-lint.txt. lint_python.sh fails if the installed ruff or mypy differs.
+# types-PyYAML supplies the stubs for scripts/issue_forms.py, so mypy needs no ignore_missing_imports.
+ruff==0.17.5
+mypy==2.4.1
+types-PyYAML==6.0.12.20261113

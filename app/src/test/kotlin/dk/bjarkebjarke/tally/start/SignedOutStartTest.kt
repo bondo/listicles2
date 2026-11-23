@@ -1,6 +1,7 @@
 package dk.bjarkebjarke.tally.start
 
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -35,7 +36,15 @@ class SignedOutStartTest {
 
     @Test
     fun signedOutStartShowsSignIn() {
+        // The update gate reads its remembered minimum on IO (R1-02), so the first state arrives a moment later.
+        compose.waitUntil(START_TIMEOUT_MS) {
+            compose.onAllNodesWithText(compose.activity.getString(R.string.app_tag)).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText(compose.activity.getString(R.string.app_tag)).assertExists()
         compose.onNodeWithText(compose.activity.getString(R.string.lists_empty_title)).assertDoesNotExist()
+    }
+
+    private companion object {
+        const val START_TIMEOUT_MS = 5_000L
     }
 }

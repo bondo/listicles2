@@ -39,7 +39,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -182,7 +182,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -230,7 +230,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
       - name: guards
         env:
           GUARD_BASE: origin/${{ github.base_ref || 'main' }}
@@ -255,7 +255,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 22 }
       - name: ci scope tests (classification, merge-commit CLI, required checks keep reporting)
@@ -358,9 +358,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
-      - name: ruff and mypy (versions pinned in scripts/requirements-lint.txt)
-        run: pip install -r scripts/requirements-lint.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
+      - name: ruff and mypy (hash-locked in scripts/requirements-lint.txt, M1-74)
+        run: pip install --require-hashes -r scripts/requirements-lint.txt
       - name: lint tests (config, wiring, deliberate violations)
         run: python3 -I scripts/test_lint_python.py
       - name: ruff check and mypy on scripts/
@@ -377,7 +377,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.13" }
       - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install -r scripts/requirements-ci.txt
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
       - name: lint tests (deliberate violations must fail; the pinned linters are installed by scripts/install_linters.sh, sha256-checked)
         run: python3 -I scripts/test_lint_workflows.py
       - name: shellcheck (-S warning), actionlint, zizmor (--offline)
