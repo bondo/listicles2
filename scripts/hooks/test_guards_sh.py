@@ -1670,6 +1670,9 @@ class MovedCheckSettings(DiffCase):
     def test_a_move_into_a_precompiled_script_plugin_passes(self):
         self.move("useJUnitPlatform()\nfailOnNoDiscoveredTests = true", "build-logic/src/main/kotlin/listicles.tests.gradle.kts")
         self.assertPasses()
+        # The setting on the file's last code line, so nothing follows it.
+        self.change("build-logic/src/main/kotlin/listicles.tests.gradle.kts", "useJUnitPlatform()\nfailOnNoDiscoveredTests = true\n// end\n")
+        self.assertPasses()
 
     def test_the_setting_in_a_comment_string_or_name_does_not_count(self):
         for body in [
@@ -1720,6 +1723,13 @@ class MovedCheckSettings(DiffCase):
             f"val x = /* {long} */\nuseJUnitPlatform()\nval y =\n// {long}\nfailOnNoDiscoveredTests = true",
             "other.useJUnitPlatform()\nxit.failOnNoDiscoveredTests = true",
             "fun <T> useJUnitPlatform() {}\nvar\nfailOnNoDiscoveredTests = true",
+            "fun\nuseJUnitPlatform()\nval\nfailOnNoDiscoveredTests = true",
+            "get\nuseJUnitPlatform()\nset\nfailOnNoDiscoveredTests = true",
+            # R1-03: a line break before `&&`, `||`, `?:`, `?.`, `.`, `::`, `as` or a lambda continues the expression.
+            'useJUnitPlatform()\n    .also { }\nfailOnNoDiscoveredTests = true\n    && System.getenv("X") == null',
+            'useJUnitPlatform()\n// a comment\n{ includeTags("fast") }\nfailOnNoDiscoveredTests = true\n\n    || flag',
+            "useJUnitPlatform()\n?.let { }\nfailOnNoDiscoveredTests.set(true)\n    ?: x",
+            "useJUnitPlatform()\n::class\nfailOnNoDiscoveredTests = true\nas Any",
         ]:
             with self.subTest(body=body):
                 self.move(body)
@@ -1731,7 +1741,7 @@ class MovedCheckSettings(DiffCase):
         for path in [self.PLUGIN, "build-logic/src/main/kotlin/listicles.tests.gradle.kts"]:
             with self.subTest(path=path):
                 self.repo.write(self.MODULE, self.MODULE_MOVED)
-                self.change(path, "#! useJUnitPlatform(); failOnNoDiscoveredTests = true\n" + self.PLUGIN_BASE)
+                self.change(path, "#! x; useJUnitPlatform(); failOnNoDiscoveredTests = true\n" + self.PLUGIN_BASE)
                 self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
                 self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
 
@@ -1766,6 +1776,10 @@ class MovedCheckSettings(DiffCase):
         self.change(self.MODULE, self.MODULE_MOVED)
         self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
         self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+        # R1-01: the plugin file is in the diff too, but its added line is another one (only added lines are read).
+        self.change(self.PLUGIN, self.plugin("useJUnitPlatform()\nfailOnNoDiscoveredTests = true\nmaxParallelForks = 2"))
+        self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+        self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
 
     def test_each_removed_setting_needs_its_own_added_setting(self):
         self.move("useJUnitPlatform()")
@@ -1798,6 +1812,11 @@ class MovedCheckSettings(DiffCase):
         self.change("scripts/check_x.py", "SETTING = ''\n")
         self.change(self.PLUGIN, self.plugin("failOnNoDiscoveredTests = true"))
         self.assertFails("guard: removed check setting: SETTING = 'failOnNoDiscoveredTests = true'")
+        # R1-01: a plain statement removed from a source file (not a build file) does not move either.
+        self.base("app/src/main/kotlin/Fixture.kt", "fun f() {\n    tasks.test { useJUnitPlatform() }\n}\n")
+        self.change("app/src/main/kotlin/Fixture.kt", "fun f() {\n}\n")
+        self.change(self.PLUGIN, self.plugin("useJUnitPlatform()"))
+        self.assertFails("guard: removed check setting: tasks.test { useJUnitPlatform() }")
 
     def test_other_check_settings_do_not_move(self):
         self.base(self.MODULE, "kover { minBound(80) }\n")
