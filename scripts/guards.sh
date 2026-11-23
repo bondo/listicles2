@@ -927,30 +927,39 @@ linecheck() { # linecheck <merge-base>
 # M1-68 (PR 320 R1): useJUnitPlatform() and failOnNoDiscoveredTests = true may move from a module build file into the convention
 # plugins. A removed line whose only check settings are these (MOVE_FN: moved) is accepted when the diff adds each of them to code of
 # a regular .kt/.kts file under build-logic/src/main/kotlin/ (movedsettings). Code means outside comments (nested block comments too),
-# strings, raw strings and their templates, char literals and backticked names: MOVE_LEX reads the whole head file to know that.
+# strings, raw strings and their templates, char literals, backticked names and a `#!` first line: MOVE_LEX reads the whole head file.
+# A setting counts only where a statement starts (stmt): not after `val`/`fun`, as a named argument or on the right of `=`.
 # What does not count: a weaker form (useJUnitPlatform { ... }, = true && x), a setting already there, any other path or check setting.
+# Known limit (part B's per-module check closes it): a text rule cannot see dead code or which modules apply the plugin.
 MOVE_FN='
 function chk(s) { return s ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ }
-function takes(t,   ids, id, post) {  # the movable settings in t, as " id id"; REST = t without them. A weaker form stops the scan.
+function stmt(p,   nl) {  # p, the code before a setting (earlier lines first), ends where a statement starts
+  sub(/[ \t]+$/, "", p); if (sub(/(this|it)[ \t]*\.$/, "", p) && p ~ /[A-Za-z0-9_$]$/) return 0
+  if (match(p, /[ \t\n]+$/)) { nl = index(substr(p, RSTART), "\n"); p = substr(p, 1, RSTART - 1) }
+  if (p == "" || p ~ /([;{})]|->)$/) return 1
+  return nl && p ~ /[]A-Za-z0-9_$#]$/ && p !~ /(^|[^A-Za-z0-9_$])(fun|val|var|get|set)$/  # a line break ends a statement
+}
+function takes(t, ctx,   ids, id, at, post) {  # the movable settings in t, as " id id"; REST = t without them. A weaker form stops the scan.
   t = " " t " "; ids = ""
   while (match(t, /[^A-Za-z0-9_$]useJUnitPlatform[ \t]*\([ \t]*\)|[^A-Za-z0-9_$]failOnNoDiscoveredTests[ \t]*(=[ \t]*true|\.set\([ \t]*true[ \t]*\))/)) {
-    post = substr(t, RSTART + RLENGTH); if (post !~ /^[ \t]*([;})]|$)/) break
-    id = substr(t, RSTART + 1, 1) == "u" ? "useJUnitPlatform" : "failOnNoDiscoveredTests"
-    ids = ids " " id; t = substr(t, 1, RSTART) " " post
+    at = RSTART; post = substr(t, RSTART + RLENGTH)  # before stmt(), whose match() and sub() reset RSTART and RLENGTH
+    if (post !~ /^[ \t]*([;})]|$)/ || !stmt(ctx "\n" substr(t, 1, at))) break
+    id = substr(t, at + 1, 1) == "u" ? "useJUnitPlatform" : "failOnNoDiscoveredTests"
+    ids = ids " " id; t = substr(t, 1, at) ")" post
   }
   REST = t; return ids
 }
 function moved(f, l,   ids, n, i, a) {  # removed line l of file f (a/<path>) only held settings that the diff adds to build-logic code
   if (f !~ /^a\/(.*\.gradle(\.kts)?|build-logic\/src\/main\/kotlin\/.*\.kts?)$/) return 0
-  ids = takes(l); if (ids == "" || chk(REST)) return 0
+  ids = takes(l, ""); if (ids == "" || chk(REST)) return 0
   n = split(ids, a, " "); for (i = 1; i <= n; i++) if (!index(" " MOVED " ", " " a[i] " ")) return 0
   return 1
 }'
 MOVE_LEX='
 BEGIN { n = split(ADDED, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1; top = 0; md[0] = "c"; cd = 0 }
-{ # the code of each line: a comment reads as a space, a string, char or name as #, so `useJUnitPlatform("")` is no plain call.
-  # State (block comment depth, string and template stack) carries over lines.
-  s = $0; L = length(s); out = ""; i = 1
+{ # the code of each line: per lexer step a comment gives a space, a string, char or name a #, so `useJUnitPlatform("")` is no
+  # plain call. State (block comment depth, string and template stack) carries over lines, and so does ctx, the code before the line.
+  s = NR == 1 && substr($0, 1, 2) == "#!" ? "" : $0; L = length(s); out = ""; i = 1
   while (i <= L) {
     c = substr(s, i, 1); c2 = substr(s, i, 2); c3 = substr(s, i, 3); m = md[top]; out = out (cd > 0 || c2 == "/*" || c2 == "//" ? " " : "#")
     if (cd > 0) { if (c2 == "/*") { cd++; i += 2 } else if (c2 == "*/") { cd--; i += 2 } else i++; continue }
@@ -971,7 +980,8 @@ BEGIN { n = split(ADDED, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1; top =
     else if (m == "t") { if (c == "{") bd[top]++; else if (c == "}" && --bd[top] == 0) top--; i++ }  # template code: blanked too
     else { out = substr(out, 1, length(out) - 1) c; i++ }
   }
-  if (NR in want) printf "%s", takes(out)
+  if (NR in want) printf "%s", takes(out, ctx)
+  ctx = ctx "\n" out; gsub(/[ \t]*\n[ \t\n]*/, "\n", ctx); gsub(/[ \t]+/, " ", ctx); if (length(ctx) > 100) ctx = substr(ctx, length(ctx) - 99)
 }'
 movedsettings() { # movedsettings <merge-base>: the ids of the movable settings on lines the diff adds to code in build-logic (see above)
   local f e lines
