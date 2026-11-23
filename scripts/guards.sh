@@ -934,7 +934,7 @@ linecheck() { # linecheck <merge-base>
 MOVE_FN='
 function chk(s) { return s ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ }
 function stmt(p,   nl) {  # p, the code before a setting (earlier lines first), ends where a statement starts
-  sub(/[ \t]+$/, "", p); if (sub(/(this|it)[ \t]*\.$/, "", p) && p ~ /[A-Za-z0-9_$]$/) return 0
+  sub(/[ \t]+$/, "", p); sub(/(this|it)[ \t]*\.$/, "", p)  # a receiver; `xit.` leaves `x`, which no rule below accepts
   if (match(p, /[ \t\n]+$/)) { nl = index(substr(p, RSTART), "\n"); p = substr(p, 1, RSTART - 1) }
   if (p == "" || p ~ /([;{})]|->)$/) return 1
   return nl && p ~ /[]A-Za-z0-9_$#]$/ && p !~ /(^|[^A-Za-z0-9_$])(fun|val|var|get|set)$/  # a line break ends a statement
@@ -980,9 +980,14 @@ BEGIN { n = split(ADDED, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1; top =
     else if (m == "t") { if (c == "{") bd[top]++; else if (c == "}" && --bd[top] == 0) top--; i++ }  # template code: blanked too
     else { out = substr(out, 1, length(out) - 1) c; i++ }
   }
-  if (NR in want) printf "%s", takes(out, ctx)
+  # R1-03: a line break before &&, ||, ?:, ?., ., ::, as or a lambda continues the expression, so the settings of an added line wait for
+  # the next line with code and are dropped when it starts with one of those.
+  w = out; sub(/^[ \t]+/, "", w)
+  if (w != "") { if (w !~ /^(&&|\|\||[?.{]|::|as([^A-Za-z0-9_$]|$))/) printf "%s", pend; pend = "" }
+  if (NR in want) pend = pend takes(out, ctx)
   ctx = ctx "\n" out; gsub(/[ \t]*\n[ \t\n]*/, "\n", ctx); gsub(/[ \t]+/, " ", ctx); if (length(ctx) > 100) ctx = substr(ctx, length(ctx) - 99)
-}'
+}
+END { printf "%s", pend }'
 movedsettings() { # movedsettings <merge-base>: the ids of the movable settings on lines the diff adds to code in build-logic (see above)
   local f e lines
   git -c core.quotePath=false diff -z --name-only --no-renames --diff-filter=AMT "$1" HEAD -- \
