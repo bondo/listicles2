@@ -13,7 +13,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gitenv  # noqa: E402, F401  # justified: after the sys.path insert, imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
-from test_mark_ready import FAKE_GH, GH_DIRS_LINE, NO_REMOTE, OLD_SLUG, REMOTE, SLUG, fixture_checkout  # noqa: E402  # justified: shares the fake gh and fixture with the sibling wrapper test
+from test_mark_ready import FAKE_GH, GH_DIRS_LINE, NO_REMOTE, OLD_SLUG, OTHER_OWNER, REMOTE, SLUG, fixture_checkout  # noqa: E402  # justified: shares the fake gh and fixture with the sibling wrapper test
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 WRAPPER = os.path.join(ROOT, "scripts", "update-branch.sh")
@@ -75,12 +75,12 @@ class UpdateBranch(unittest.TestCase):
         self.assertEqual((p.returncode, called), (0, True), p.stderr)
         with open(self.out, encoding="utf-8") as f:
             self.assertEqual(f.read().splitlines()[3], f"repos/{OLD_SLUG}/pulls/9/update-branch")
-        for remote in (NO_REMOTE, "https://gitlab.com/x/y.git"):
+        for remote in (NO_REMOTE, "https://gitlab.com/x/y.git", *OTHER_OWNER):
             if os.path.exists(self.out):
                 os.remove(self.out)
             p, called = self.run_wrapper("9", SHA, remote=remote, env={"GITHUB_REPOSITORY": "other/repo"})
             self.assertEqual((p.returncode, called), (1, False), (remote, p.stderr))
-            self.assertIn("origin", p.stderr)
+            self.assertIn("owner" if remote in OTHER_OWNER else "origin", p.stderr)
 
     def test_bad_input_never_reaches_gh(self):
         bad_numbers = ["", "abc", "0", "012", "-1", "+1", "1.5", "1234567", "12 13", "12/merge", "1;id", "$(id)", "12\n", "٣"]

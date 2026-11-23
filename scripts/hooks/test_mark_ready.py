@@ -30,7 +30,8 @@ FAKE_GH = (
 )
 GH_DIRS_LINE = re.compile(r'(?m)^gh_dirs="[^"\n]*"$')
 OLD_SLUG = "bondo/listicles2"  # the name before the rename
-SLUG = "octo-org/renamed-repo"  # fixtures only: the wrapper takes the repository from the checkout's origin remote
+SLUG = "bondo/renamed-repo"  # fixtures only: the wrapper takes the name from the checkout's origin remote and pins only the owner
+OTHER_OWNER = ["https://github.com/mallory/listicles2.git", "git@github.com:bondo-evil/x.git", "http://p@127.0.0.1:1/git/Bondo/x"]
 REMOTE = f"https://github.com/{SLUG}.git"
 NO_REMOTE = None
 
@@ -115,14 +116,26 @@ class MarkReady(unittest.TestCase):
         self.assertIn(f"repos/{SLUG}/pulls/5/", text)
         self.assertIn("GH_HOST=unset\nGH_REPO=unset", text)
 
-    def test_the_repository_follows_the_origin_remote_old_or_new_name_and_any_owner(self):
-        for remote, slug in ((f"git@github.com:{OLD_SLUG}.git", OLD_SLUG), ("http://local_proxy@127.0.0.1:4711/git/mallory/x", "mallory/x")):
+    def test_the_repository_follows_the_origin_remote_old_or_new_name(self):
+        for remote, slug in ((f"git@github.com:{OLD_SLUG}.git", OLD_SLUG), ("http://local_proxy@127.0.0.1:4711/git/bondo/tally", "bondo/tally")):
             if os.path.exists(self.out):
                 os.remove(self.out)
             p, called = self.run_wrapper("9", remote=remote)
             self.assertEqual((p.returncode, called), (0, True), p.stderr)
             with open(self.out, encoding="utf-8") as f:
                 self.assertEqual(f.read().splitlines()[3], f"repos/{slug}/pulls/9/ccr/ready_for_review")
+
+    def test_a_remote_of_another_owner_is_refused_without_calling_gh(self):
+        """`git remote set-url origin` is not denied by the guard, so the pinned wrapper pins the owner (a rename keeps it)."""
+        for remote in OTHER_OWNER:
+            p, called = self.run_wrapper("9", remote=remote)
+            self.assertEqual((p.returncode, called or os.path.exists(self.decoy_out)), (1, False), (remote, p.stderr))
+            self.assertIn("owner", p.stderr)
+
+    def test_git_says_why_the_remote_could_not_be_read(self):
+        p, _ = self.run_wrapper("9", remote=NO_REMOTE)
+        self.assertIn("origin", p.stderr.splitlines()[0])  # git's own message comes first, then the wrapper's
+        self.assertGreaterEqual(len(p.stderr.splitlines()), 2, p.stderr)
 
     def test_no_or_unparsable_remote_fails_loudly_without_calling_gh(self):
         for remote in (NO_REMOTE, "https://gitlab.com/x/y.git", "/srv/git/x.git"):

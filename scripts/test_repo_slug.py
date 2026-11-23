@@ -33,7 +33,7 @@ UNPARSABLE = [
     "https://github.com/bondo/..", "https://github.com/bondo/.", "https://github.com/bondo/.git", "https://github.com.evil.example/bondo/listicles2",
     "https://evil.example/github.com/bondo/listicles2", "http://127.0.0.1:1/bondo/listicles2", "http://evil.example/git/bondo/listicles2",
     "file:///srv/git/listicles2.git", "/srv/git/listicles2.git", "https://github.com/bondo/listicles2\n", " https://github.com/bondo/listicles2",
-    "https://github.com/bon do/listicles2", "https://github.com/bondo/list icles2", "https://github.com//listicles2", "git@gitlab.com:bondo/listicles2.git",
+    "https://github.com/bon do/listicles2", "https://github.com/bondo/list icles2", "https://github.com//listicles2", "git@gitlab.com:bondo/listicles2.git", "host:x@github.com:bondo/listicles2",
 ]
 
 
