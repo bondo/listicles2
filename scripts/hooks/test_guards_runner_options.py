@@ -271,5 +271,48 @@ class PlaywrightCypressTests(RunnerCase):
         self.each_line_fails("scripts/test.sh", lines)
 
 
+class PlaywrightCypressSelfReviewTests(RunnerCase):
+    """PR 358 self-review: a quoted value with blanks is one word, a mention of a runner is read only with its test subcommand, the
+    `@playwright/test` package name is playwright, and a tail resolved to runners with two parsers is read as mri."""
+
+    def test_a_quoted_value_with_blanks_is_one_word(self):
+        ok = ['npx playwright test --project="Mobile Chrome"', "npx playwright test --project 'Mobile Chrome'",
+              "npx playwright test --project=Mobile\\ Chrome --shard 1/2", 'npx cypress run --record --group "UI - Chrome"',
+              'npx cypress run --tag "nightly, smoke"', "npx cypress run -c '{\"video\": false}'", 'npx jest --testTimeout "5000"']
+        self.put("scripts/test.sh", "\n".join(ok) + "\n")
+        self.put("tools/package.json", self.pkg([("e2e", 'playwright test --project="Mobile Chrome"'), ("u", "jest --ci")]))
+        self.assertPasses()
+        bad = ['npx cypress run --env "grep=a b"', "npx cypress run -c '{\"e2e\": {\"specPattern\": \"x\"}}'",
+               "sh -c 'cypress run --env \"{ \\\"grep\\\": \\\"x\\\" }\"'", 'npx playwright test "tests/a b.spec.ts"',
+               'npx playwright test --grep "a b"', 'npx playwright test --project "Mobile Chrome" src', 'npx jest "src a"']
+        self.put("tools/package.json", self.pkg([("u", "jest --ci")]))
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+        entries = [("e2e", 'playwright test --project="Mobile Chrome" login'), ("cy", 'cypress run --env "grep=x y"')]
+        self.put("scripts/test.sh", "true\n")
+        self.put("tools/package.json", self.pkg(entries))
+        self.each_line_fails("tools/package.json", [v for _, v in entries], first=4)
+
+    def test_a_mention_is_read_only_with_the_test_subcommand(self):
+        ok = ["npx eslint e2e/playwright -c .eslintrc.json", "ls cypress/fixtures -s", "npx cypress open --spec x",
+              "npx playwright show-report -c x", "npx playwright test -c"]
+        self.put("scripts/test.sh", "\n".join(ok) + "\n")
+        self.assertPasses()
+
+    def test_the_playwright_package_name_is_playwright(self):
+        bad = ["npx @playwright/test test login", "npx @playwright/test@1.49.1 test -u", 'bash -c "npx @playwright/test test --list"']
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+
+    def test_a_tail_resolved_to_two_parsers_is_read_as_mri(self):
+        self.put("firebase/package.json", self.pkg([("test", "jest")]))
+        self.put("tools/package.json", self.pkg([("test", "playwright test")]))
+        bad = ["npm test -- -j2u", "npm test -- -u", "npm test -- --last-failed", "npm test -- src", "npm test -- -g smoke"]
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+        self.put("scripts/test.sh", "npm test -- --shard 1/2\n")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
