@@ -161,6 +161,7 @@ Source: [Version catalogs](https://developer.android.com/build/migrate-to-catalo
 |---|---|
 | Dependencies and plugins only through `gradle/libs.versions.toml`, kebab-case names, `alias(libs.plugins...)` | tooling in part: `scripts/check_build_guards.py` fails on a literal `group:artifact` in a `dependencies` block of any `*.gradle.kts` or `*.gradle` file (any configuration, `platform`, `add`, group notation, Groovy forms), on `force`, `module` and similar calls with one, on a literal plugin or dependency version and on a catalog declared in Gradle code, unless the line says `// justified: <reason>`, and when it finds no declaration (M1-59); kebab-case names and `alias(libs.plugins...)` are review |
 | Configuration cache and build cache on | tooling in part: set in `gradle.properties` |
+| Shared module settings in convention plugins (`build-logic/`: `listicles.jvm.library`, `listicles.jvm.testsupport`, `listicles.android.library`, `listicles.android.application`), no `allprojects`/`subprojects` configuration | tooling: `scripts/check_build_guards.py` check 4 (M1-46); the cross-project reads of the root check tasks go in M1-68 |
 | Kotlin style and formatting | tooling: spotless with ktlint, detekt with `maxIssues: 0`, Kotlin `allWarningsAsErrors` |
 | JVM modules use only Java and Android API available at minSdk 26 (lint NewApi skips pure JVM modules; no desugaring is configured) | tooling: `checkJdkRelease` (JDK 17 API) and `checkJavaApiLevel` (`scripts/check_java_api_level.py` reads the main classes of every JVM module against `api-versions.xml` of the compileSdk platform; M1-37) |
 | Lint with warnings as errors | tooling: `:app:lintDebug` in `verify.sh` |
@@ -194,6 +195,8 @@ cp gradle/verification-metadata.xml <repo>/gradle/   # the diff against the repo
 ```
 
 `scripts/check_gradle_repos.py` fails when the `aapt2` component lacks any of the three jars.
+
+The licensee fixture build (`config/licensee/fixture`, used by `testLicenseeGate`) is a separate build with its own `config/licensee/fixture/gradle/verification-metadata.xml` (M1-69). It holds sha256 for the licensee plugin and its dependencies only: Gradle verifies remote artifacts, not the local `repo/` POMs. A licensee version bump in `gradle/libs.versions.toml` needs this file regenerated with the command in the comment at the top of `config/licensee/fixture/settings.gradle.kts` (delete the fixture's `gradle` directory, run the write-verification-metadata build with the catalog's licensee version, then delete the `group="fixture"` components Gradle writes for `repo/`). `scripts/check_gradle_repos.py` fails when the file is missing, has an artifact without sha256, has `trusted-artifacts`, or lacks the catalog's licensee version, so a bump that skips it fails before the slow gate. The root command above does not touch it.
 
 `--refresh-dependencies` is required: Gradle does not record BOM and parent POM files it already has in its metadata cache, so without it a warm `~/.gradle` writes an incomplete file that only fails on a fresh CI runner. With it, the result is the same as from an empty cache.
 
