@@ -185,6 +185,36 @@ class SessionEmulatorTest {
         }
 
     @Test
+    fun aWaitWhileASignOutClearsIsAFailedWait() =
+        emulatorTest {
+            // UNDISPATCHED: when async returns, clear() has terminated the instance and waits for Firestore.
+            val clearing = async(start = CoroutineStart.UNDISPATCHED) { userData.clear() }
+
+            // A second "Sign out" while the first still clears (its screen went away): ask first, throw nothing.
+            assertFalse(userData.awaitPendingWrites())
+            assertTrue(clearing.await())
+        }
+
+    @Test
+    fun aClearWhoseCallerIsCancelledStillDeletesTheCopy() =
+        emulatorTest {
+            val path = "sign-out/${UUID.randomUUID()}"
+            userData
+                .firestore()
+                .document(path)
+                .set(mapOf("sent" to true))
+                .await()
+            assertTrue(cacheHas(path))
+
+            launch {
+                cancel() // the caller is gone before clear() starts
+                userData.clear()
+            }.join()
+
+            assertFalse(cacheHas(path))
+        }
+
+    @Test
     fun theAuthRecordKeepsTheGoogleNameEmailAndPhotoLink() =
         emulatorTest {
             // Privacy Q5 (docs/privacy section 2): what the Firebase Auth record keeps from a Google sign-in.

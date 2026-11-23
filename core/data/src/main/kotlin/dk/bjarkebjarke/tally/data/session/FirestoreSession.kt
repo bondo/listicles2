@@ -3,9 +3,7 @@ package dk.bjarkebjarke.tally.data.session
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
 
 /**
  * The signed-in user's Firestore instance, one per session, and its copy on the phone (PLAN 3.2; steps 1 to 3 and 6 of
@@ -43,10 +41,8 @@ class FirestoreSession(
     override suspend fun clear(): Boolean {
         val instance = firestore()
         return try {
-            withContext(NonCancellable) {
-                instance.terminate().await()
-                instance.clearPersistence().await()
-            }
+            instance.terminate().await()
+            instance.clearPersistence().await()
             true
         } catch (expected: FirebaseFirestoreException) {
             // The files could not be deleted; the next try starts from a new instance.
