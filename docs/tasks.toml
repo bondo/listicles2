@@ -1488,6 +1488,36 @@ issue = 176
 notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_sh.py, docs/guards-known-gaps.md). Test-first with negative cases: family split over two kept files, raise masked by a lowering in the same file or under a no-limit section, removal below the tool default, base without the setting. Owner merge: scripts/guards.sh"
 
 [[task]]
+id = "M1-77"
+title = "State issue part A: one JSON block in the body, scripts/state_body.py validate and render, tasks.py --state"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "Process PR (2a). Owner decision 7076085601 item 2: the block holds usage, sessions, branches, triggers, the owner queue and next steps; the script validates it (unknown, missing and wrongly typed fields fail) and renders a short summary above it; tasks.py reads the claimed and in-review ids from it. Tooling env (ci.yml wiring), owner merge. Test-first with negative cases"
+
+[[task]]
+id = "M1-78"
+title = "State issue part B: rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --approval accepts the previous state issue"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-77"]
+notes = "Process PR (2b). Owner decision 7076313976 (amends item 3 of 7076085601): rotate only at a handover boundary; the successor opens the new issue after the release, links back and carries the standing owner decisions over once (the block's decisions list); state_body.py reports when a limit is passed; merge_ready.py --approval and every other check that reads approvals on #15 accept the current and the previous state issue. Tooling env, owner merge (scripts/merge_ready.py). Test-first with negative cases"
+
+[[task]]
+id = "M1-79"
+title = "State issue part C: ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, rotation and the comment rule"
+milestone = "M1"
+status = "todo"
+assignee = "process"
+risk = "normal"
+depends_on = ["M1-77", "M1-78"]
+notes = "Process PR (2c), docs and prompt text only. Owner decision 7076085601 item 1: comments on the state issue only for decisions, approvals, vetoes, handovers, takeovers, lock-lost, incidents, PAUSED/RESUMED, metrics blocks and the weekly digest; progress goes to the body (Updated: and the block). The 4.3 ready query reads the body with tasks.py --state; the template becomes prose, the generated summary and the block. Owner merge (docs/ORCHESTRATION.md, agents/prompts/). Merge origin/main first if PR 322 lands before it"
+
+[[task]]
 id = "M1-FU"
 title = "Follow-up burn-down for M1 (planner: add each new M1 task to depends_on)"
 milestone = "M1"
@@ -1500,7 +1530,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70", "M1-71",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70", "M1-71", "M1-77", "M1-78", "M1-79",
 ]
 
 [[task]]
