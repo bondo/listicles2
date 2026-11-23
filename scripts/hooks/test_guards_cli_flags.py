@@ -1002,7 +1002,8 @@ class NpmTailResolutionTests(CliFlagCase):
                     "firebase emulators:exec --only firestore", "npx", "jest;", "(jest)", "jest # x", "./node_modules/.bin/jest",
                     "jest > out", "jest ~/x", "jest \\u0026\\u0026 eslint .", "vitest run", "npx vitest",
                     "jest() { eslint $@ ; } ; jest", "PATH=lint:/usr/bin:/bin ; jest", "eslint . ';jest", "eslint . #;jest",
-                    "tsc --noEmit && jest", "cp lint/jest node_modules/.bin/jest ; jest"]:
+                    "tsc --noEmit && jest", "cp lint/jest node_modules/.bin/jest ; jest",
+                    "jest \\neslint .", "jest ; eslint ."]:  # PR 330 R1-01: a JSON newline and a `;` after the runner
             with self.subTest(cmd=cmd):
                 self.fails_with(self.scripts([("test", cmd)]))
         self.write("firebase/package.json", self.scripts([("test", "eslint .")]))  # every definition of the name must be a runner
@@ -1020,7 +1021,9 @@ class NpmTailResolutionTests(CliFlagCase):
                      "bun test -- --quiet", "npx jest -- --quiet", "npm exec jest -- --quiet", "npm run t -- --quiet",
                      "npm --prefix tools test -- --quiet", "npm --workspace=tools test -- --quiet", "npm start -- --quiet",
                      "npm run -- test --quiet", "npm run --prefix x test -- --quiet", "npm it -- --quiet", "./bin/npm test -- --quiet",
-                     "scripts/npm test -- --quiet", "x: npm test -- --quiet", "- npm test -- --quiet", "sudo npm test -- --quiet"]:
+                     "scripts/npm test -- --quiet", "x: npm test -- --quiet", "- npm test -- --quiet", "sudo npm test -- --quiet",
+                     # PR 330 R1-01: a word after the name, a name no tracked package.json defines, a value option after run
+                     "npm test --prefix node_modules/x -- --quiet", "npm run lint -- --quiet", "npm run --workspace=node_modules/x test -- --quiet"]:
             with self.subTest(line=line):
                 self.fails_with(pkg, line)
         for line in ["cd tools && npm t -- --quiet", "npm tst -- --quiet", "npm run test -- --quiet"]:
