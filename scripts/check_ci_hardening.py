@@ -52,7 +52,6 @@ REQUIREMENTS_CI = "scripts/requirements-ci.txt"
 INSTALL_CI = "pip install -r scripts/requirements-ci.txt"
 SHELL_SCRIPT = re.compile(r"scripts/[\w.-]+\.sh")
 USES_LINE = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<ref>\S+)(?P<rest>.*)$")
-ANY_USES = re.compile(r"\buses\s*:")
 PINNED = re.compile(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}")
 TAG_COMMENT = re.compile(r"\s+#\s*v\d+(?:\.\d+)+\b")
 CODEQL_ACTION = "github/codeql-action/"
@@ -158,16 +157,37 @@ def workflow_problems(root):
     return problems
 
 
+def _parsed_uses(workflow):
+    """Every `uses` value the YAML parser sees, on jobs (reusable workflows) and on steps, whatever the spelling of the line."""
+    values = []
+    for job in (workflow.get("jobs") or {}).values():
+        values += [job.get("uses")] if isinstance(job, dict) else []
+        values += [s.get("uses") for s in _steps(job)]
+    return [v for v in values if v is not None]
+
+
 def pin_problems(root):
-    """Every `uses:` of a remote action is `owner/repo@<40 hex> # vX.Y` (a local ./ action has no sha)."""
+    """Every `uses:` of a remote action is `owner/repo@<40 hex> # vX.Y` on a line of its own (a local ./ action has no sha).
+    The line rule accepts refs; every `uses` the YAML parser sees must be one of them, so anything the line rule cannot read
+    (flow style, quoted key, a value on the next line) fails closed."""
     problems = []
     for path in sorted((root / ".github/workflows").glob("*.y*ml")):
+        accepted = []
         for line in path.read_text().splitlines():
             m = USES_LINE.match(line)
-            if m and not m["ref"].startswith("./") and not (PINNED.fullmatch(m["ref"]) and TAG_COMMENT.match(m["rest"])):
+            if not m or m["ref"].startswith("./"):
+                continue
+            if PINNED.fullmatch(m["ref"]) and TAG_COMMENT.match(m["rest"]):
+                accepted.append(m["ref"])
+            else:
                 problems.append(f"{path.name}: {m['ref']} must be pinned to a commit sha with a version tag comment (`@<40 hex> # v1.2.3`)")
-            elif not m and ANY_USES.search(line.split("#", 1)[0]):
-                problems.append(f"{path.name}: unreadable uses: (write `uses: owner/repo@<40 hex> # v1.2.3` on its own line, no flow style): {line.strip()}")
+        for ref in _parsed_uses(yaml.safe_load(path.read_text()) or {}):
+            if str(ref).startswith("./"):
+                continue
+            if str(ref) in accepted:
+                accepted.remove(str(ref))
+            else:
+                problems.append(f"{path.name}: unreadable uses: {ref!r} (write `uses: owner/repo@<40 hex> # v1.2.3` on its own line, no flow or quoted key)")
     return problems
 
 
@@ -202,6 +222,8 @@ def _codeql_job_problems(where, job):
             problems.append(f"{who}: no step runs ./gradlew between codeql-action init and analyze")
         elif not all("--no-build-cache" in b and "--build-cache" not in b and "caching=true" not in b for b in builds):
             problems.append(f"{who}: the traced ./gradlew build must pass --no-build-cache (a task restored from the cache starts no compiler)")
+        if re.search(r"(?<![\w-])(?:-I|--init-script)(?![\w-])|init\.d", "\n".join(_code(s) for s in steps)):
+            problems.append(f"{who}: no init script (-I, --init-script, init.d): it could turn the build cache back on past --no-build-cache")
         if not any(_is_use(s, "actions/setup-java@") for s in steps[: inits[0]]):
             problems.append(f"{who}: actions/setup-java must come before codeql-action init")
     else:
@@ -224,8 +246,9 @@ def codeql_problems(root):
     else:
         if ((on["push"] or {}).get("branches")) != ["main"]:
             problems.append("codeql.yml trigger push must be branches: [main]")
-        if set(on["pull_request"] or {}) - {"types"}:
-            problems.append("codeql.yml trigger pull_request must have no branches, paths or -ignore filter (only types)")
+        pr = on["pull_request"] or {}
+        if set(pr) - {"types"} or ("types" in pr and not {"opened", "synchronize", "reopened"} <= set(pr["types"] or [])):
+            problems.append("codeql.yml trigger pull_request: no branches, paths or -ignore filter; types, if any, include opened, synchronize, reopened")
         cron = on["schedule"]
         if not (isinstance(cron, list) and len(cron) == 1 and isinstance(cron[0], dict) and WEEKLY_CRON.fullmatch(str(cron[0].get("cron")))):
             problems.append("codeql.yml trigger schedule must be one weekly cron (fixed minute, hour and weekday)")

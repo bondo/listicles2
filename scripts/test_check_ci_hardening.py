@@ -132,7 +132,7 @@ class Rules(unittest.TestCase):
 
     def test_a_job_that_does_not_run_node_needs_no_pin(self):
         found = self.edit_yaml(CI, lambda w: drop(w, "static", "actions/setup-node@"))
-        self.assertEqual([p for p in found if "pinned" not in p], [])  # the YAML dump drops the tag comments, which pin_problems reads
+        self.assertEqual([p for p in found if "pinned" not in p and "unreadable" not in p], [])  # the YAML dump drops the tag comments
 
     def test_python_jobs_install_pyyaml_right_after_setup_python(self):
         """R1-01: setup-python's interpreter has no PyYAML (the runner image's had), and most gate scripts import yaml."""
@@ -309,7 +309,8 @@ class Rules(unittest.TestCase):
             with self.subTest(label):
                 self.setUp()
                 if text is None:  # R2: a job that calls a reusable workflow has `uses` on the job, not on a step
-                    self.flagged(self.set_text(STATUS, (self.root / STATUS).read_text() + "  reuse: { uses: o/r/.github/workflows/w.yml@v1 }\n"), "status.yml", word)
+                    reuse = (self.root / STATUS).read_text() + "  reuse: { uses: o/r/.github/workflows/w.yml@v1 }\n"
+                    self.flagged(self.set_text(STATUS, reuse), "status.yml", word)
                     continue
                 self.flagged(self.edit(STATUS, step, text + step), "status.yml", word)
 
@@ -325,7 +326,8 @@ class Rules(unittest.TestCase):
         for types in (["closed"], ["opened"], ["opened", "synchronize"], []):
             with self.subTest(types=types):
                 self.setUp()
-                self.flagged(self.edit_yaml(CODEQL, lambda w, types=types: w[True]["pull_request"].__setitem__("types", types)), "codeql.yml", "trigger", "types")
+                found = self.edit_yaml(CODEQL, lambda w, types=types: w[True]["pull_request"].__setitem__("types", types))
+                self.flagged(found, "codeql.yml", "trigger", "types")
 
     def test_the_traced_build_has_no_init_script_that_could_turn_the_cache_back_on(self):
         """R2-02: `gradle.startParameter.buildCacheEnabled = true` in an init script beats --no-build-cache."""
