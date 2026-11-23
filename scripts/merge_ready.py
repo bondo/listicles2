@@ -43,7 +43,9 @@ import time
 import tomllib
 import xml.etree.ElementTree as ET  # noqa: N817  # justified: the standard name of this module
 
-REPO = os.environ.get("GITHUB_REPOSITORY", "bondo/listicles2")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import repo_slug  # noqa: E402  # justified: must follow the sys.path insert above; the repository comes from one place (M1-85)
+
 BASE = "main"
 RETRIES = 5
 # Rate limit and server flakes, the merge PUT included: a retry after a lost answer fails because the PR is merged already, it never merges twice.
@@ -613,7 +615,7 @@ def parse_args(argv):
     return wait, approval, int(rest[0]), rest[1], rest[2]
 
 
-def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=time.sleep, clock=time.monotonic, merge_tree=None):
+def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=time.sleep, clock=time.monotonic, merge_tree=None, repo=None):
     args = parse_args(argv)
     if args is None:
         print("usage: merge_ready.py [--wait] [--approval <comment-id>] <N> <40-hex head sha> <kind>", file=err)
@@ -625,12 +627,17 @@ def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=ti
     if (kind == "owner-batch") != (approval is not None):
         print("merge_ready: --approval <comment-id> goes with kind owner-batch, and only with it", file=err)
         return 2
+    try:
+        repo = repo or repo_slug.resolve()
+    except repo_slug.RepoSlugError as e:
+        print(f"merge_ready: {e}", file=err)
+        return 1
     api = api or GhApi()
     resolve = resolver or ls_remote_resolver()
     try:
         deadline = clock() + WAIT_SECONDS
         while True:
-            pr, problems = evaluate(api, REPO, n, sha, kind, resolve, approval, merge_tree)
+            pr, problems = evaluate(api, repo, n, sha, kind, resolve, approval, merge_tree)
             if not (problems and wait and only_waiting(problems)):
                 break
             if clock() >= deadline:
@@ -642,7 +649,7 @@ def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=ti
                 print(f"merge_ready: refused PR {n}: {p}", file=err)
             return 1
         text = {"commit_title": f"{pr['title']} (#{n})", "commit_message": pr.get("body") or ""}  # the text checked above
-        api.put(f"repos/{REPO}/pulls/{n}/merge", {"merge_method": "squash", "sha": sha, **text})
+        api.put(f"repos/{repo}/pulls/{n}/merge", {"merge_method": "squash", "sha": sha, **text})
     except ApiError as e:
         print(f"merge_ready: {e}", file=err)
         return 1

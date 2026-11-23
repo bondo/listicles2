@@ -129,7 +129,7 @@ class UpdateBranch(unittest.TestCase):
             self.assertNotIn(bad, src, bad)
         self.assertEqual(src.count("api -X PUT"), 1)
         self.assertEqual(src.count('"repos/${repo}/pulls/${n}/update-branch" -f "expected_head_sha=${sha}"'), 1)
-        self.assertEqual(src.count('repo="$(python3 -I "$(dirname -- "$0")/repo_slug.py" --remote-only)" || exit 1'), 1, "the slug from the own checkout only")
+        self.assertNotIn("python", src, "the pinned wrapper runs no other file of the checkout")
 
 
 if __name__ == "__main__":

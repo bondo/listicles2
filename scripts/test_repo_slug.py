@@ -73,18 +73,14 @@ class ResolveTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
 
     def resolve(self, remote=None, environ=None, **kw):
-        return repo_slug.resolve(environ=environ or {}, root=checkout(self.tmp, remote), **kw)
+        return repo_slug.resolve(environ=environ or {}, root=checkout(tempfile.mkdtemp(dir=self.tmp), remote), **kw)
 
     def test_the_origin_remote_names_the_repository_before_and_after_a_rename(self):
         self.assertEqual(self.resolve("https://github.com/bondo/listicles2.git"), OLD)
-        shutil.rmtree(Path(self.tmp) / "checkout")
         self.assertEqual(self.resolve("git@github.com:octo-org/renamed.repo.git"), NEW)
 
     def test_github_repository_wins_over_the_remote_even_for_a_different_owner(self):
         self.assertEqual(self.resolve("https://github.com/bondo/listicles2", {"GITHUB_REPOSITORY": "mallory/widgets"}), "mallory/widgets")
-
-    def test_remote_only_ignores_the_environment(self):
-        self.assertEqual(self.resolve("https://github.com/bondo/listicles2", {"GITHUB_REPOSITORY": "mallory/widgets"}, remote_only=True), OLD)
 
     def test_an_empty_github_repository_counts_as_unset(self):
         self.assertEqual(self.resolve("https://github.com/bondo/listicles2", {"GITHUB_REPOSITORY": ""}), OLD)
@@ -129,15 +125,13 @@ class CliTests(unittest.TestCase):
         p = self.run_cli("git@github.com:octo-org/renamed.repo.git")
         self.assertEqual((p.returncode, p.stdout), (0, NEW + "\n"), p.stderr)
 
-    def test_environment_then_remote_only(self):
+    def test_the_environment_comes_first(self):
         self.assertEqual(self.run_cli(None, GITHUB_REPOSITORY="mallory/widgets").stdout, "mallory/widgets\n")
-        p = self.run_cli(None, "--remote-only", GITHUB_REPOSITORY="mallory/widgets")
-        self.assertEqual((p.returncode, p.stdout), (1, ""))
-        self.assertIn("repo_slug:", p.stderr)
 
     def test_failure_exits_1_with_a_reason_and_bad_usage_exits_2(self):
         p = self.run_cli("https://gitlab.com/x/y")
         self.assertEqual((p.returncode, p.stdout), (1, ""))
+        self.assertIn("repo_slug: ", p.stderr)
         self.assertIn("origin", p.stderr)
         self.assertEqual(self.run_cli("https://github.com/bondo/listicles2", "--bogus").returncode, 2)
 

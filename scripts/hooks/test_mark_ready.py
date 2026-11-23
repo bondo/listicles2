@@ -1,6 +1,6 @@
 """scripts/mark-ready.sh is the only thing the project permission rule lets agents run to mark a PR ready.
-It must accept exactly one PR number and make exactly one call, to the repository of its own checkout's `origin` remote (M1-85: scripts/repo_slug.py
---remote-only, never the environment), so it works before and after a repo rename. The wrapper finds `gh` only in the directories on its `gh_dirs=` line
+It must accept exactly one PR number and make exactly one call, to the repository of its own checkout's `origin` remote (M1-85: parsed in the pinned
+wrapper itself, the same forms as scripts/repo_slug.py, never from the environment), so it works before and after a repo rename. The wrapper finds `gh` only in the directories on its `gh_dirs=` line
 (never through PATH, R5-03), so a fake `gh` records the call through a copy of the real file, in a fixture checkout, whose `gh_dirs=` line is replaced.
 A decoy `gh` in PATH must never run.
 Run: python3 -I -m unittest discover -s scripts/hooks"""
@@ -14,7 +14,11 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(1, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import gitenv  # noqa: E402, F401  # justified: after the sys.path insert, imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
+
+import repo_slug  # noqa: E402  # justified: after the sys.path insert, the parser the wrappers must agree with
+import test_repo_slug  # noqa: E402  # justified: after the sys.path insert, its tables of parsable and unparsable remotes
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 WRAPPER = os.path.join(ROOT, "scripts", "mark-ready.sh")
@@ -32,10 +36,9 @@ NO_REMOTE = None
 
 
 def fixture_checkout(parent, scripts, remote=REMOTE):
-    """A git checkout under `parent` with scripts/<name> = text for each item, a copy of scripts/repo_slug.py and `origin` = remote."""
+    """A git checkout under `parent` with only scripts/<name> = text for each item (no helper next to it) and `origin` = remote."""
     root = os.path.join(parent, "checkout")
     os.makedirs(os.path.join(root, "scripts"))
-    shutil.copy(os.path.join(ROOT, "scripts", "repo_slug.py"), os.path.join(root, "scripts", "repo_slug.py"))
     for name, text in scripts.items():
         with open(os.path.join(root, "scripts", name), "w", encoding="utf-8") as f:
             f.write(text)
@@ -46,8 +49,11 @@ def fixture_checkout(parent, scripts, remote=REMOTE):
     return root
 
 
-def read_wrapper():
-    with open(WRAPPER, encoding="utf-8") as f:
+SLUG_BLOCK = re.compile(r"(?ms)^# slug-parse: begin[^\n]*\n(.*?)^# slug-parse: end$")
+
+
+def read_wrapper(name="mark-ready.sh"):
+    with open(os.path.join(ROOT, "scripts", name), encoding="utf-8") as f:
         return f.read()
 
 
@@ -150,7 +156,16 @@ class MarkReady(unittest.TestCase):
             self.assertNotIn(bad, src, bad)
         self.assertEqual(src.count("api -X POST"), 1)
         self.assertEqual(len(re.findall(r'exec "\$d/gh" api -X POST "repos/\$\{repo\}/pulls/\$\{n\}/ccr/ready_for_review"', src)), 1)
-        self.assertEqual(src.count('repo="$(python3 -I "$(dirname -- "$0")/repo_slug.py" --remote-only)" || exit 1'), 1, "the slug from the own checkout only")
+        self.assertNotIn("python", src, "the pinned wrapper runs no other file of the checkout")
+
+    def test_both_wrappers_parse_the_remote_with_the_same_block_as_repo_slug_py(self):
+        blocks = {name: SLUG_BLOCK.findall(read_wrapper(name)) for name in ("mark-ready.sh", "update-branch.sh")}
+        self.assertTrue(all(len(b) == 1 for b in blocks.values()), blocks)
+        self.assertEqual(blocks["mark-ready.sh"], blocks["update-branch.sh"])
+        for url in [*test_repo_slug.PARSED, *test_repo_slug.UNPARSABLE]:
+            p = subprocess.run(["bash", "-pc", 'remote="$1"\n' + blocks["mark-ready.sh"][0] + 'printf "%s" "$repo"', "x", url], capture_output=True, text=True,
+                               env={"PATH": "/usr/bin:/bin"}, timeout=30)
+            self.assertEqual((p.returncode, p.stdout), (0, repo_slug.slug_from_url(url) or ""), repr(url))
 
     def test_a_decoy_gh_earlier_in_path_is_not_used(self):
         """R5-03: `gh` is resolved in fixed directories, not through PATH, so a shim planted in a PATH directory cannot run."""

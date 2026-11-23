@@ -25,7 +25,7 @@ Usage:
 --claimed: comma-separated task ids held by running sessions (the state issue's Sessions table).
 --in-review: comma-separated task ids committed on a branch and awaiting review or merge
           (the state issue's Branches table). They are not ready, and `review` lists them.
---state:  the state issue body (gh api repos/bondo/listicles2/issues/15 --jq .body > FILE): both lists come from
+--state:  the state issue body (gh api repos/{owner}/{repo}/issues/15 --jq .body > FILE): both lists come from
           its ```json block (sessions[].tasks, branches[].in_review; scripts/state_body.py validates the rest).
           Instead of --claimed and --in-review, not with them.
 """
