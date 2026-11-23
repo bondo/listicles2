@@ -19,7 +19,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Steps 2 to 5 run in [externalScope], an application-wide scope with a `SupervisorJob`: once started they finish even
  * when the screen that asked goes away, which signing out itself causes. M1-32 ends account deletion through
  * [discardingUnsentChanges]. The screen disables "Sign out" while one runs (M1-25); a new screen can still start one
- * while the previous one's steps 2 to 5 run, and [LocalUserData.awaitPendingWrites] then answers a failed wait.
+ * while the previous one's steps 2 and 3 run, and [LocalUserData.awaitPendingWrites] then answers a failed wait. One
+ * started after step 3 runs the steps again, on a new Firestore instance.
  */
 class SignOut(
     private val connectivity: Connectivity,

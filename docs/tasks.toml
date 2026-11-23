@@ -1766,8 +1766,8 @@ milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1", "M1-66"]
-notes = "Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Sign in once with a real Google account in the debug app, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M1-O15 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+depends_on = ["M1-O1", "M1-O2", "M1-66", "M1-16"]
+notes = "Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M1-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M1-O15 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
