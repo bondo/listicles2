@@ -22,7 +22,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = (".github/workflows/ci.yml", ".github/workflows/status.yml")
 MAX_TIMEOUT = 60
-PYTHON_VERSION = "3.12"
+PYTHON_VERSION = "3.13"  # what the runner image shipped before the pin; 3.12 fails a hook test (chr() raises OverflowError there)
 NODE_VERSION = "22"
 SETUP_PYTHON = "actions/setup-python@"
 SETUP_NODE = "actions/setup-node@"
@@ -35,6 +35,14 @@ TESTS_CMD = "python3 -I scripts/test_check_ci_hardening.py"
 VERIFY_STEPS = (f"step ci-hardening-tests {TESTS_CMD}", f"step ci-hardening {CHECK_CMD}")
 PYTHON_WORD = re.compile(r"(?<![\w./-])(?:python3?|pip3?)(?![\w-])")
 NODE_WORD = re.compile(r"(?<![\w./-])(?:node|npm|npx)(?![\w-])")
+# Gradle tasks that run python3 in an Exec (checkUnitTestResults finalizes the unit-test tasks, checkJavaApiLevel in build.gradle.kts):
+# a job that runs one of them needs the python pin although its commands never say `python3`. A fixed list, held to the build files by
+# the tests; `check` and `build` stay out (they would match build/ paths).
+GRADLE_PYTHON_TASKS = ("testDebugUnitTest", "verifyRoborazziDebug", "recordRoborazziDebug", "checkJavaApiLevel")
+GRADLE_PYTHON = re.compile(r"gradlew\b[\s\S]*(?<![\w])(?:" + "|".join(GRADLE_PYTHON_TASKS) + r")(?![\w])")
+# setup-python's interpreter has no PyYAML (the runner image's had) and most gate scripts import yaml.
+REQUIREMENTS_CI = "scripts/requirements-ci.txt"
+INSTALL_CI = "pip install -r scripts/requirements-ci.txt"
 SHELL_SCRIPT = re.compile(r"scripts/[\w.-]+\.sh")
 
 
@@ -52,12 +60,16 @@ def _code(step):
     return "\n".join(ln for ln in text.splitlines() if not ln.strip().startswith("#"))
 
 
+def _runs_python(text):
+    return bool(PYTHON_WORD.search(text) or GRADLE_PYTHON.search(text))
+
+
 def _needs_python(code, root):
-    if PYTHON_WORD.search(code):
+    if _runs_python(code):
         return True
     for script in SHELL_SCRIPT.findall(code):
         path = root / script
-        if path.is_file() and PYTHON_WORD.search(path.read_text()):
+        if path.is_file() and _runs_python(path.read_text()):
             return True
     return False
 
@@ -70,7 +82,7 @@ def _load(root, name):
     return yaml.safe_load((root / name).read_text()) or {}
 
 
-def _setup_problems(where, steps, prefix, tool, want, version_key, needs):
+def _setup_problems(where, steps, prefix, tool, want, version_key, needs, install=None):
     first = next((i for i, s in enumerate(steps) if needs(_code(s))), None)
     if first is None:
         return []
@@ -84,7 +96,24 @@ def _setup_problems(where, steps, prefix, tool, want, version_key, needs):
         got = (steps[i].get("with") or {}).get(version_key)
         if str(got) != want:
             problems.append(f"{where}: {version_key} must be {want} (one {tool} version in every job), not {got!r}")
+    if install:
+        found = [i for i, s in enumerate(steps) if s.get("run") == install]
+        if not found:
+            problems.append(f"{where}: no step runs `{install}` (requirements-ci.txt: PyYAML, which setup-python's {tool} lacks)")
+        elif found[0] > first:
+            problems.append(f"{where}: `{install}` must come before the first step that runs {tool} ({steps[first].get('name', first)})")
     return problems
+
+
+def requirements_ci_problems(root):
+    path = root / REQUIREMENTS_CI
+    if not path.is_file():
+        return [f"{REQUIREMENTS_CI} is missing (PyYAML pinned with ==, installed by every job that sets up python)"]
+    lines = [ln.split("#", 1)[0].strip() for ln in path.read_text().splitlines()]
+    lines = [ln for ln in lines if ln]
+    if lines != [ln for ln in lines if re.fullmatch(r"PyYAML==\d+\.\d+\.\d+", ln)] or len(lines) != 1:
+        return [f"{REQUIREMENTS_CI} must hold exactly one line, PyYAML==X.Y.Z (the other scripts use the standard library)"]
+    return []
 
 
 def workflow_problems(root):
@@ -97,7 +126,7 @@ def workflow_problems(root):
             if type(timeout) is not int or not 1 <= timeout <= MAX_TIMEOUT:
                 problems.append(f"{where}: timeout-minutes must be a whole number from 1 to {MAX_TIMEOUT}, not {timeout!r}")
             steps = _steps(job)
-            problems += _setup_problems(where, steps, SETUP_PYTHON, "python", PYTHON_VERSION, "python-version", lambda c: _needs_python(c, root))
+            problems += _setup_problems(where, steps, SETUP_PYTHON, "python", PYTHON_VERSION, "python-version", lambda c: _needs_python(c, root), INSTALL_CI)
             problems += _setup_problems(where, steps, SETUP_NODE, "node", NODE_VERSION, "node-version", _needs_node)
             for step in steps:
                 code = _code(step)
@@ -142,7 +171,7 @@ def adr_problems(root):
 
 def problems(root=ROOT):
     root = Path(root)
-    return workflow_problems(root) + verify_problems(root) + adr_problems(root)
+    return workflow_problems(root) + requirements_ci_problems(root) + verify_problems(root) + adr_problems(root)
 
 
 def main(root=ROOT):
