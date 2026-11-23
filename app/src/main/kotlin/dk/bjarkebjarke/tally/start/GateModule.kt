@@ -15,6 +15,7 @@ import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
 import dk.bjarkebjarke.tally.domain.start.NameState
 import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import dk.bjarkebjarke.tally.update.PreferencesMinVersionStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 
 /**
@@ -36,7 +37,7 @@ object GateModule {
     @Provides
     fun minVersionStore(
         @ApplicationContext context: Context,
-    ): MinVersionStore = PreferencesMinVersionStore(context)
+    ): MinVersionStore = PreferencesMinVersionStore(context, Dispatchers.IO)
 
     @Provides
     fun updateGate(

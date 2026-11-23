@@ -22,7 +22,7 @@ class UpdateScreenTest {
     val compose = createComposeRule()
 
     private val opened = mutableListOf<String>()
-    private val uriHandler =
+    private var uriHandler: UriHandler =
         object : UriHandler {
             override fun openUri(uri: String) {
                 opened += uri
@@ -68,5 +68,18 @@ class UpdateScreenTest {
         compose.onNodeWithText("Get the update").performClick()
         opened shouldBe listOf(RELEASES_URL)
         RELEASES_URL shouldBe "https://github.com/bondo/listicles2/releases"
+    }
+
+    /** R1-03: with no browser the handler throws IllegalArgumentException; the screen stays up instead of crashing. */
+    @Test
+    @Config(qualifiers = "en")
+    fun noAppToOpenTheLinkDoesNotCrash() {
+        uriHandler =
+            object : UriHandler {
+                override fun openUri(uri: String): Unit = throw IllegalArgumentException("No activity found")
+            }
+        show()
+        compose.onNodeWithText("Get the update").performClick()
+        compose.onNodeWithText("Update the app").assertExists()
     }
 }
