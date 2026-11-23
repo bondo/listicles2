@@ -44,7 +44,7 @@ roles:
   merge-agent:
     model: sonnet
     effort: medium
-    session: long-lived, started by the orchestrator; merges only under an owner authorization on #15 (7005366747 standing, 7007421567 batches)
+    session: long-lived, started by the orchestrator; merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge
     definition: docs/ORCHESTRATION.md section 7.5
   # Owner decision, #15 comment 7075812943: approves owner-only tooling, build, CI and gate PRs in the owner's place (ORCHESTRATION 7.5); never merges, edits or pushes.
   approver:
