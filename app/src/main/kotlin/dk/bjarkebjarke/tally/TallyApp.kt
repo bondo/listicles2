@@ -29,6 +29,7 @@ import dk.bjarkebjarke.tally.domain.start.StartStep
 import dk.bjarkebjarke.tally.home.HomeScreen
 import dk.bjarkebjarke.tally.start.StartUiState
 import dk.bjarkebjarke.tally.start.StartViewModel
+import dk.bjarkebjarke.tally.update.UpdateScreen
 
 /** The app root: collects the start-up state of [viewModel] (checklist sections 1 and 2: state hoisted to the root). */
 @Composable
@@ -59,7 +60,7 @@ fun TallyApp(
                     onBack = {},
                     entryProvider =
                         entryProvider {
-                            entry<StartStep.Update> { StepPlaceholder(R.string.gate_update_title) }
+                            entry<StartStep.Update> { UpdateScreen() }
                             entry<StartStep.SignIn> { SignInPlaceholder() }
                             entry<StartStep.VerifyEmail> { StepPlaceholder(R.string.gate_verify_title) }
                             entry<StartStep.EnterName> { StepPlaceholder(R.string.gate_name_title) }
@@ -96,7 +97,7 @@ private fun noticeTitle(notice: HouseholdNotice): Int =
         HouseholdNotice.HouseholdDeleted -> R.string.gate_notice_deleted
     }
 
-/** A gate step until its screen exists (M1-27 update, M1-17 verify, M1-39 name, M1-21 notices): its title only. */
+/** A gate step until its screen exists (M1-17 verify, M1-39 name, M1-21 notices): its title only. */
 @Composable
 private fun StepPlaceholder(
     @StringRes title: Int,

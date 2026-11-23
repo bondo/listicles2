@@ -990,6 +990,16 @@ depends_on = ["M1-71"]
 notes = "Found in M1-71: runopt reads jest, vitest and mocha only. A direct playwright or cypress call is not read, and an npm `--` tail resolved to them is read with the jest and mocha long names and short letters, without positional words, so `--update-snapshots`, `--last-failed`, `--grep-invert` and a positional test filter pass. Decide with the owner which options count (as #15 comment 7092471489 did for jest, vitest and mocha); tooling env, test-first with negative cases, keep it a tripwire (F18), list the rest in docs/guards-known-gaps.md. Owner merge: scripts/guards.sh"
 
 [[task]]
+id = "M1-82"
+title = "Firestore source for the minimum app version: config/app.minVersionCode bound in GateModule"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-27", "M1-66"]
+notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee)"
+
+[[task]]
 id = "M1-13"
 title = "Domain: email, password and name validation (12+ code points, name 1-50), property tests"
 milestone = "M1"
@@ -1170,10 +1180,12 @@ depends_on = ["M1-30"]
 id = "M1-27"
 title = "Minimum app version: config/app.minVersionCode, schemaVersion, update screen"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-08", "M1-60", "M1-62", "M1-66"]
+depends_on = ["M1-08", "M1-60", "M1-62"]
+notes = "The Firestore source and its binding are M1-82 (needs :app on :core:data, M1-66)"
+pr = 343
 
 [[task]]
 id = "M1-28"
@@ -1573,7 +1585,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-68", "M1-69"]
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-68", "M1-69", "M1-82"]
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]
@@ -1642,7 +1654,7 @@ depends_on = [
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-83", "M1-84",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-84",
 ]
 
 [[task]]
@@ -1717,17 +1729,18 @@ notes = "Answered on #15, comment 7058176190: Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 A
 id = "M1-O8"
 title = "Turn on secret scanning non-provider patterns and validity checks (repo settings)"
 milestone = "M1"
-status = "todo"
+status = "dropped"
 assignee = "owner"
 risk = "normal"
 depends_on = []
-notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1"
+issue = 346
+notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1. Dropped 2026-11-23: the options need GitHub Advanced Security and are not available to the owner (owner decision, #15 comment 7106703649)."
 
 [[task]]
 id = "M1-O9"
 title = "Turn off CodeQL default setup when the advanced workflow of M1-73 merges"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-73"]
@@ -1747,10 +1760,11 @@ notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task
 id = "M1-O11"
 title = "Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as required)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-03"]
+issue = 289
 notes = "M1-03 runs the Roborazzi verify in its own CI job `screenshots`, not in `unit`, because test_ci_scope.py forbids `if:` in the jobs it guards and the diff artifact upload needs `if: failure()`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 11. Do it right after the M1-03 PR merges, in the same sitting (BRANCH-PROTECTION.md section 6): a required check that no open PR has yet reports `Expected, waiting for status` on every other PR until it takes main in, so adding it earlier stalls them. Until then no ruleset rule requires `screenshots`, so the M1-03 merge must confirm by hand that the screenshots job is green on the head"
 
 [[task]]
@@ -1767,10 +1781,11 @@ notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be dec
 id = "M1-O13"
 title = "Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it as required)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-33"]
+issue = 318
 notes = "M1-33 runs the release build with R8 in its own CI job `release-smoke`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 12. Same sitting rule as M1-O11 (BRANCH-PROTECTION.md section 6): add it right after the M1-33 PR merges, never earlier, or every other open PR waits on `Expected, waiting for status` until it takes main in. Until then no ruleset rule requires `release-smoke`, so the M1-33 merge must confirm by hand that the job is green on the head"
 
 [[task]]
