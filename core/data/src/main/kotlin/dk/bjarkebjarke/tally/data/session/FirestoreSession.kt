@@ -44,9 +44,6 @@ class FirestoreSession(
             instance.terminate().await()
             instance.clearPersistence().await()
             true
-        } catch (expected: FirebaseFirestoreException) {
-            // The files could not be deleted; the next try starts from a new instance.
-            false
         } finally {
             drop(instance)
         }

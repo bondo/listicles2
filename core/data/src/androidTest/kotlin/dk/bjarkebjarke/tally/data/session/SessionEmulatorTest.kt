@@ -215,6 +215,32 @@ class SessionEmulatorTest {
         }
 
     @Test
+    fun aCopyThatCannotBeDeletedFailsTheSignOutAndKeepsTheSession() =
+        emulatorTest {
+            signIn(googleIdToken("stuck-${UUID.randomUUID()}@example.com"))
+            val before = userData.firestore()
+            before
+                .document("sign-out/${UUID.randomUUID()}")
+                .set(mapOf("sent" to true))
+                .await()
+            // The first half of a clear, then a databases directory the app cannot write: clearPersistence fails.
+            before.terminate().await()
+            val databases = checkNotNull(app.applicationContext.getDatabasePath("firestore").parentFile)
+            assertTrue(databases.setWritable(false, false))
+            val result =
+                try {
+                    signOut().discardingUnsentChanges()
+                } finally {
+                    databases.setWritable(true)
+                }
+
+            assertEquals(SignOutResult.Failed, result)
+            assertNotNull(auth.currentUser)
+            assertEquals(0, credentials.cleared)
+            assertNotSame(before, userData.firestore())
+        }
+
+    @Test
     fun theAuthRecordKeepsTheGoogleNameEmailAndPhotoLink() =
         emulatorTest {
             // Privacy Q5 (docs/privacy section 2): what the Firebase Auth record keeps from a Google sign-in.
