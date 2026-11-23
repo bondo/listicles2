@@ -78,8 +78,8 @@ export const PATHS = [
     ...UNPLANNED.map((t) => instantiate(t)),
 ];
 
-const token = (emailVerified: boolean): TokenOptions => ({
-    email: `${UID}@example.com`,
+const token = (uid: string, emailVerified: boolean): TokenOptions => ({
+    email: `${uid}@example.com`,
     email_verified: emailVerified,
     firebase: { sign_in_provider: "password" },
 });
@@ -88,11 +88,12 @@ const token = (emailVerified: boolean): TokenOptions => ({
 export const CLIENT_NAMES = ["anonymous", "unverified", "verified"] as const;
 export type Client = (typeof CLIENT_NAMES)[number];
 
-export function connect(env: RulesTestEnvironment): Record<Client, Db> {
+// The clients of `uid` (alice unless another user is named, as in the spike's batches of M1-09).
+export function connect(env: RulesTestEnvironment, uid = UID): Record<Client, Db> {
     return {
         anonymous: env.unauthenticatedContext().firestore(),
-        unverified: env.authenticatedContext(UID, token(false)).firestore(),
-        verified: env.authenticatedContext(UID, token(true)).firestore(),
+        unverified: env.authenticatedContext(uid, token(uid, false)).firestore(),
+        verified: env.authenticatedContext(uid, token(uid, true)).firestore(),
     };
 }
 
@@ -293,18 +294,24 @@ export const matchOf = (m: Mutant): string =>
 
 const ANCHOR = "match /databases/{database}/documents {";
 
-// The rules with the mutant's block as the first statement under the documents match.
-export function mutate(rules: string, m: Mutant): string {
+// The rules with `block` as the first statements under the documents match (a mutant, or the spike's
+// blocks of M1-09).
+export function underDocuments(rules: string, block: string): string {
     const at = rules.indexOf(ANCHOR);
     if (at < 0 || rules.includes(ANCHOR, at + 1)) throw new Error(`need exactly one "${ANCHOR}"`);
     const end = at + ANCHOR.length;
+    return `${rules.slice(0, end)}${block}${rules.slice(end)}`;
+}
+
+// The rules with the mutant's block as the first statement under the documents match.
+export function mutate(rules: string, m: Mutant): string {
     const doc = `d${String(m.template.split("/").length - 1)}`;
     const who =
         m.who === "others" || m.who === "self"
             ? `request.auth != null && request.auth.uid ${m.who === "self" ? "==" : "!="} ${doc}`
             : WHO[m.who];
     const allow = `allow ${m.methods.join(", ")}: if ${who};`;
-    return `${rules.slice(0, end)}\n    match ${matchOf(m)} {\n      ${allow}\n    }${rules.slice(end)}`;
+    return underDocuments(rules, `\n    match ${matchOf(m)} {\n      ${allow}\n    }`);
 }
 
 // What a probe gets under a mutant, as Firestore decides: an exact match opens the documents of its
