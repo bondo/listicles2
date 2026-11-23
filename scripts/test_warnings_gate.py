@@ -50,7 +50,8 @@ BAD = {
     "xdont-warn-on-error-suppression": "compilerOptions.freeCompilerArgs.add('-Xdont-warn-on-error-suppression')",
     "xdont-warn-other-flag": "compilerOptions.freeCompilerArgs.add('-Xdont-warn-anything')",
     "argfile": "compilerOptions.freeCompilerArgs.add('@args.txt')",
-    "argfile-as-value": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level', '@levels.txt'])",
+    # PR 359 R1-02: the value of a bare flag that is not otherwise checked, so only the @ rule can reject it.
+    "argfile-as-value": "compilerOptions.freeCompilerArgs.addAll(['-opt-in', '@x.txt'])",
 }
 
 

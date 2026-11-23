@@ -872,6 +872,12 @@ class Conventions(unittest.TestCase):
             "project(path = \":app\").extensions",
             "rootProject.findProject(\":app\")?.tasks",
             "evaluationDependsOn(\":app\")",
+            # PR 359 R1-01: findProject(...)!!.member and the configure forms that take an Action or a lambda argument.
+            "val ext = findProject(\":app\")!!.extensions",
+            "rootProject.findProject(\":app\")!!.tasks.named(\"x\")",
+            "project(\":app\", Action { pluginManager.apply(\"x\") })",
+            "project(\":app\", { pluginManager.apply(\"x\") })",
+            "project(':app', { p -> p.pluginManager.apply('x') })",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
@@ -893,6 +899,7 @@ class Conventions(unittest.TestCase):
             # A project dependency is not a read of the other project's configuration.
             "dependencies { implementation(project(\":core:domain\")) }\nval d = dependencies.project(mapOf(\"path\" to \":x\"))\n"
             "dependencies { kover(project(path = \":app\")) }\nval subproject = project.path\n"
+            "dependencies { implementation(project(\":x\", \"cfg\")) }\n"
         )
         self.assertEqual(self.problems({"build.gradle.kts": code, "core/domain/build.gradle.kts": DOMAIN + code}), [])
 
