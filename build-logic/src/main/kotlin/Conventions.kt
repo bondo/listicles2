@@ -5,6 +5,7 @@ import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.junitplatform.JUnitPlatformOptions
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.getByType
@@ -24,6 +25,7 @@ private const val JDK_RELEASE = 17
 private const val TEST_SUPPORT = ":core:testing"
 private const val SPI = "-Djava.nio.channels.spi"
 private const val BLOCKING = "dk.bjarkebjarke.tally.testing.Blocking"
+private const val TEST_SETTINGS = "must run on the JUnit Platform with failOnNoDiscoveredTests on (M1-68)"
 
 /** Java and Kotlin 17, warnings as errors (M0.5-09) and the test-JVM network block for every module. */
 internal fun Project.configureKotlinModule(compilerOptions: KotlinJvmCompilerOptions) {
@@ -34,17 +36,49 @@ internal fun Project.configureKotlinModule(compilerOptions: KotlinJvmCompilerOpt
     // Every test JVM blocks network access (core/testing: NoNetwork). NIO sockets need the JDK's selector provider
     // replaced, which is only possible through a system property read when the JVM first needs one.
     tasks.withType<Test>().configureEach {
+        // The :core:testing network block is a JUnit Platform listener; a test task that discovers zero tests fails.
+        useJUnitPlatform()
+        failOnNoDiscoveredTests.set(true)
         jvmArgs(
             "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
             "$SPI.SelectorProvider=${BLOCKING}SelectorProvider",
             "$SPI.AsynchronousChannelProvider=${BLOCKING}AsynchronousChannelProvider",
         )
     }
-    // #217 item 3: the flags above name classes of :core:testing, so every test classpath gets it, in the same place
-    // (a new module included; the existing ones also declare it, which check_ui_emulators.py reads for :core:data).
+    // #217 item 3: the flags above name classes of :core:testing, so every test classpath gets it, here and only here
+    // (check_build_guards.py check 4 flags a module that adds it again; check_ui_emulators.py reads this line).
     if (path != TEST_SUPPORT) {
         dependencies.add("testImplementation", dependencies.project(mapOf("path" to TEST_SUPPORT)))
     }
+    registerTestSettingsCheck()
+}
+
+/**
+ * M1-68 (PR 320 R2-01): checkTestSettings reads the settings every Test task of this module ends up with, after
+ * the module build file and any later configuration, and every Test task depends on it.
+ * Tested by scripts/test_test_settings_gate.py.
+ */
+private fun Project.registerTestSettingsCheck() {
+    val testTasks = provider { tasks.withType<Test>().map { it.path } }
+    val offenders =
+        provider {
+            tasks
+                .withType<Test>()
+                .filter { it.options !is JUnitPlatformOptions || !it.failOnNoDiscoveredTests.getOrElse(false) }
+                .map { it.path }
+        }
+    val check =
+        tasks.register("checkTestSettings") {
+            group = "verification"
+            description = "Fails if a Test task here is not on the JUnit Platform with failOnNoDiscoveredTests on."
+            inputs.property("testTasks", testTasks)
+            inputs.property("offenders", offenders)
+            doLast {
+                check(testTasks.get().isNotEmpty()) { "checkTestSettings found no Test tasks; the check is broken" }
+                check(offenders.get().isEmpty()) { "Test tasks $TEST_SETTINGS: ${offenders.get().joinToString()}" }
+            }
+        }
+    tasks.withType<Test>().configureEach { dependsOn(check) }
 }
 
 /** A Kotlin JVM module: the shared settings, detekt with the project config, and (unless test support) JDK 17 API. */
