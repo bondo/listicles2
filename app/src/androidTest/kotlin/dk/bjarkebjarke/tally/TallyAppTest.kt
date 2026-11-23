@@ -20,7 +20,7 @@ import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dk.bjarkebjarke.tally.start.StartRoute
+import dk.bjarkebjarke.tally.domain.start.StartStep
 import dk.bjarkebjarke.tally.start.StartUiState
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -95,7 +95,7 @@ class TallyAppTest {
 
     private companion object {
         const val TAG = "tiny-target"
-        val SIGN_IN = StartUiState.Ready(StartRoute.SignIn)
+        val SIGN_IN = StartUiState.Ready(StartStep.SignIn)
         const val TINY_DP = 8
         const val CORNER_PX = 2
         const val DARK_MAX = 0.2f
