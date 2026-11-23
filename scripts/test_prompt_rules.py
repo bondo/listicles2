@@ -1730,7 +1730,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
                               r"\(owner decision, #15 comment 7085221356\): " + self.ACTIVE)
         self.assertRegex(doc, self.VERIFY + r"; the orchestrator never passes an approval on to it; owner-only prs still need a batch approval, "
                               r"`veto #n` still stops a merge and `scripts/merge_ready\.py` still runs every check")
-        # orchestrator.md line 103 holds "guard thresholds" in prose; the guard accepts an edit of it since task 1b (see #322)
+        # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
         prompt = self.norm(self.ORCH_MD)
         self.assertRegex(prompt, r"a merge agent you spawn needs no owner authorization in its own session \(#15 comment 7085221356\): "
                                  r"it carries the tag `role:merge-agent`, its `parent_session_id` is you and the body of #15 names it as active; "
