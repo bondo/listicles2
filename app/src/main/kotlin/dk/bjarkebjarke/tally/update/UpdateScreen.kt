@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -52,7 +53,7 @@ fun UpdateScreen(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
-        Button({ uriHandler.openUri(RELEASES_URL) }, Modifier.fillMaxWidth().padding(top = Spacing.s)) {
+        Button({ openReleases(uriHandler) }, Modifier.fillMaxWidth().padding(top = Spacing.s)) {
             Text(stringResource(R.string.gate_update_button))
         }
         Text(
@@ -61,6 +62,15 @@ fun UpdateScreen(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** No browser (or a restricted profile) makes the handler throw; this screen has no other action, so it stays up. */
+private fun openReleases(uriHandler: UriHandler) {
+    try {
+        uriHandler.openUri(RELEASES_URL)
+    } catch (_: IllegalArgumentException) {
+        // Nothing can open the link: the screen stays as it is.
     }
 }
 
