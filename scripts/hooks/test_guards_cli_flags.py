@@ -930,5 +930,107 @@ class PrReviewRound1SplitTests(CliFlagCase):
                 self.assertPasses()
 
 
+class NpmTailResolutionTests(CliFlagCase):
+    """Task M1-65 (issue 164 item 3, PR 309 ruling 7084379032): an npm `--` tail is resolved through the package.json scripts only for
+    the npm forms, and only when every tracked definition of the script ends in a plain `[npx] <runner> <words>`. Any other layout, any
+    `"scripts"` token outside the one strict layout and any `\\u` make every tail unknown, and an unknown tail keeps main's union check."""
+
+    JEST = '{\n  "scripts": {\n    "test": "jest"\n  }\n}\n'
+    LINE = "cd tools && npm test -- --quiet"
+
+    def write(self, rel, text):
+        self.repo.write(rel, text, raw=True)
+        self.repo.git("add", "-A")
+        self.repo.git("commit", "-q", "--allow-empty", "-m", "c")
+
+    def scripts(self, entries):
+        return '{\n  "name": "t",\n  "scripts": {\n' + ",\n".join(f'    "{k}": "{v}"' for k, v in entries) + '\n  }\n}\n'
+
+    def fails_with(self, pkg, line=LINE):
+        self.write("tools/package.json", pkg)
+        self.write("scripts/lint.sh", line + "\n")
+        self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def setUp(self):
+        super().setUp()
+        self.write("firebase/package.json", self.JEST)
+
+    def test_a_tail_that_reaches_a_test_runner_passes(self):
+        self.write("tools/package.json", self.scripts([
+            ("test", "jest"), ("e2e", "npx playwright test"), ("unit", "tsc --noEmit && vitest run"), ("m", "mocha --recursive"),
+            ("cy", "cypress run --spec a/b.cy.ts"), ("ci", "npm test -- -u")]))
+        for line in ["cd tools && npm test -- -u", "npm run e2e -- -c x.ts", "npm t -- --coverage", "npm tst -- -u",
+                     "npm run-script unit -- --watch", "npm -s test -- -u", "npm run --silent e2e -- --headed", "npm rum m -- --quiet",
+                     "npm urn cy -- --browser chrome", "npm test -- -- --quiet"]:
+            with self.subTest(ok=line):
+                self.write("scripts/lint.sh", line + "\n")
+                self.assertPasses()
+        self.write("scripts/lint.sh", "true\n")
+        self.write(".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - run: cd tools && npm test -- -u\n")
+        self.assertPasses()
+        self.write("tools/package.json", self.scripts([("test", "jest")]).replace("\n", "\r\n"))
+        self.write("scripts/lint.sh", "cd tools && npm test -- -u\n")
+        self.assertPasses()
+
+    def test_r4_01_and_n1_to_n4_any_other_scripts_layout_makes_every_tail_unknown(self):
+        strict = self.JEST[:-2] + ",\n"
+        for pkg in [
+            '{\n  "name": "t",\n  "scripts"\n  : {\n    "test": "eslint ."\n  }\n}\n',  # R4-01
+            '{\n  "name": "t",\n  "scripts"\n  :\n  {\n    "test": "eslint ."\n  }\n}\n',
+            '{\n  "name": "t",\n  "scripts"\r: {\n    "test": "eslint ."\n  }\n}\n',
+            strict + '  "scripts"\n  : {\n    "test": "eslint ."\n  }\n}\n',
+            '{\n  "x": {\n    "a": 1}, "scripts": {\n    "test": "eslint ."\n  }\n}\n',  # N1
+            '{\n  "x": {\n    "a": 1}, "scr\\u0069pts": {\n    "test": "eslint ."\n  }\n}\n',  # N2
+            '{\n  "x": {\n    "a": 1\n  }, "scripts"\n  : {\n    "test": "eslint ."\n  }\n}\n',  # N3
+            '{ "scripts"\n: {\n    "test": "eslint ."\n  }\n}\n',  # N4
+            strict + '  "scripts": {\n    "test": "eslint ."\n  }\n}\n',
+            strict + '  "scr\\u0069pts": {\n    "test": "eslint ."\n  }\n}\n',
+            '{\n  "scripts": {"test": "jest"}\n}\n',
+            '{\n  "x": {\n    "scripts": {\n      "test": "jest"\n    }\n  },\n  "scripts": {\n    "test": "jest"\n  }\n}\n',
+            '{\n  "description": "scripts",\n  "scripts": {\n    "test": "jest"\n  }\n}\n',
+            '{\n  "description": "caf\\u00e9",\n  "scripts": {\n    "test": "jest"\n  }\n}\n',  # R3-03: fails closed
+            '{\n  "scripts": {\n    "test": "jest", "lint": "eslint ."\n  }\n}\n',
+            '{\n  "scripts": {\n\n    "test": "jest"\n  }\n}\n',
+            '{\n  "scripts": {\n    "test": "jest"\n',
+        ]:
+            with self.subTest(pkg=pkg):
+                self.fails_with(pkg)
+
+    def test_a_script_that_is_not_a_plain_runner_keeps_the_union_check(self):
+        for cmd in ["eslint .", "jest && eslint .", "jest; eslint .", "jest | eslint .", "jest || eslint .", "jest & eslint .",
+                    "eslint . \\\; jest", "jest \\\"$X\\\"", "jest $(eslint)", "jest `x`", "CI=1 jest", "npx -y jest", "node jest.js",
+                    "firebase emulators:exec --only firestore", "npx", "jest;", "(jest)", "jest # x", "./node_modules/.bin/jest",
+                    "jest > out", "jest ~/x", "jest \\u0026\\u0026 eslint ."]:
+            with self.subTest(cmd=cmd):
+                self.fails_with(self.scripts([("test", cmd)]))
+        self.write("firebase/package.json", self.scripts([("test", "eslint .")]))  # every definition of the name must be a runner
+        self.fails_with(self.scripts([("test", "jest")]))
+
+    def test_c1_c2_npm_forms_only(self):
+        pkg = self.scripts([("t", "eslint ."), ("tst", "eslint ."), ("test", "jest")])
+        for line in ["cd tools && yarn t -- --quiet", "cd tools && yarn tst -- --quiet", "yarn test -- --quiet", "pnpm test -- --quiet",
+                     "bun test -- --quiet", "npx jest -- --quiet", "npm exec jest -- --quiet", "npm run t -- --quiet",
+                     "npm --prefix tools test -- --quiet", "npm --workspace=tools test -- --quiet", "npm start -- --quiet",
+                     "npm run -- test --quiet", "npm run --prefix x test -- --quiet", "npm it -- --quiet"]:
+            with self.subTest(line=line):
+                self.fails_with(pkg, line)
+        for line in ["cd tools && npm t -- --quiet", "npm tst -- --quiet", "npm run test -- --quiet"]:
+            with self.subTest(ok=line):
+                self.write("scripts/lint.sh", line + "\n")
+                self.assertPasses()
+
+    def test_a_reason_still_waives_an_unknown_tail_and_staged_mode_reads_the_index(self):
+        self.write("tools/package.json", self.scripts([("test", "eslint .")]))
+        self.write("scripts/lint.sh", self.LINE + " # justified: three words here\n")
+        self.assertPasses()
+        self.repo.write("scripts/lint.sh", "cd tools && npm test -- -u\n", raw=True)
+        self.repo.git("add", "scripts/lint.sh")
+        self.assertFails(MARK + ": scripts/lint.sh:1:", "--staged")
+        self.repo.write("tools/package.json", self.scripts([("test", "jest")]), raw=True)  # the worktree resolves, the index does not
+        self.assertFails(MARK + ": scripts/lint.sh:1:", "--staged")
+        self.repo.git("add", "tools/package.json")
+        self.assertPasses("--staged")
+
+
 if __name__ == "__main__":
     unittest.main()
