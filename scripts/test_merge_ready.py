@@ -3,6 +3,7 @@
 The GitHub REST API is replaced by a fake; no test touches the network. Every negative case must leave the merge call
 unmade (`FakeApi.merged` stays empty)."""
 
+import ast
 import base64
 import copy
 import io
@@ -1397,8 +1398,20 @@ class WiringTests(unittest.TestCase):
 
     def test_script_and_tests_are_protected_process_files(self):
         guard = self.read("scripts/hooks/pretooluse_guard.py")
-        for path in ("scripts/merge_ready.py", "scripts/test_merge_ready.py"):
+        for path in ("scripts/merge_ready.py", "scripts/test_merge_ready.py", "scripts/repo_slug.py", "scripts/test_repo_slug.py"):
             self.assertIn(f'"{path}",', guard)
+
+    def test_every_module_of_the_checkout_that_merge_ready_imports_is_a_protected_owner_only_file(self):
+        """M1-85: the merge runs the code it imports, so a helper next to it must be as protected as merge_ready.py itself."""
+        tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+        names = {a.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for a in node.names}
+        names |= {node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
+        local = sorted(f"scripts/{m}.py" for m in names if (ROOT / "scripts" / f"{m}.py").is_file())
+        self.assertIn("scripts/repo_slug.py", local)
+        for path in local:
+            with self.subTest(path=path):
+                self.assertIn(path, pretooluse_guard.PROTECTED)
+                self.assertIn(path.casefold(), merge_ready.OWNER_ONLY_FILES)
 
     def test_docs_tell_the_merge_agent_to_run_from_clean_main(self):
         self.assertRegex(self.read("docs/ORCHESTRATION.md"), r"(?i)clean checkout of `origin/main`")
@@ -1470,12 +1483,21 @@ class RepositoryTests(unittest.TestCase):
         api = make_api()
         with mock.patch.object(repo_slug, "resolve", return_value=REPO) as resolve:
             code, text = go(api, repo=None)
-        resolve.assert_called_once_with()
+        resolve.assert_called_once_with(owner="bondo")
         self.assertEqual((code, [m[0] for m in api.merged]), (0, [f"repos/{REPO}/pulls/{N}/merge"]), text)
-        with mock.patch.object(repo_slug, "resolve", return_value="octo-org/renamed-repo"), \
+        with mock.patch.object(repo_slug, "resolve", return_value="bondo/renamed-repo"), \
                 mock.patch.object(merge_ready, "evaluate", return_value=({}, ["stop here"])) as evaluate:
             code, text = go(make_api(), repo=None)
-        self.assertEqual((code, evaluate.call_args.args[1]), (1, "octo-org/renamed-repo"), text)
+        self.assertEqual((code, evaluate.call_args.args[1]), (1, "bondo/renamed-repo"), text)
+
+    def test_a_repository_of_another_owner_is_refused_before_any_call(self):
+        """The guard does not deny `git remote set-url`, so the merge pins the owner as the wrappers do (a rename keeps it)."""
+        for slug in ("mallory/listicles2", "bondo-evil/tally", "Bondo/tally"):
+            api = make_api()
+            with self.subTest(slug=slug), mock.patch.dict(os.environ, {"GITHUB_REPOSITORY": slug}):
+                code, text = go(api, repo=None)
+                self.assertEqual((code, api.requested, api.merged), (1, [], []), text)
+                self.assertIn("owner", text)
 
     def test_an_unresolvable_repository_fails_loudly_before_any_call(self):
         api = make_api()

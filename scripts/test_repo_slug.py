@@ -26,6 +26,7 @@ PARSED = {
     "git@github.com:bondo/listicles2.git": OLD, "git@github.com:bondo/listicles2": OLD, "ssh://git@github.com/bondo/listicles2.git": OLD,
     "ssh://git@github.com:22/bondo/listicles2": OLD, "http://local_proxy@127.0.0.1:43123/git/bondo/listicles2": OLD,
     "http://local_proxy@127.0.0.1:43123/git/bondo/listicles2.git": OLD, "http://localhost:8080/git/bondo/listicles2": OLD,
+    "https://a\u00a0b@github.com/bondo/x": "bondo/x",  # \s is ASCII here (re.ASCII), as [:space:] is in the wrappers (LC_ALL=C)
     "https://github.com/octo-org/renamed.repo": NEW, "git@github.com:octo-org/renamed.repo.git": NEW, "https://github.com/a/b_c-d.e": "a/b_c-d.e",
 }
 UNPARSABLE = [
@@ -35,7 +36,7 @@ UNPARSABLE = [
     "https://evil.example/github.com/bondo/listicles2", "http://127.0.0.1:1/bondo/listicles2", "http://evil.example/git/bondo/listicles2",
     "file:///srv/git/listicles2.git", "/srv/git/listicles2.git", "https://github.com/bondo/listicles2\n", " https://github.com/bondo/listicles2",
     "https://github.com/bon do/listicles2", "https://github.com/bondo/list icles2", "https://github.com//listicles2", "git@gitlab.com:bondo/listicles2.git",
-    "host:x@github.com:bondo/listicles2",
+    "host:x@github.com:bondo/listicles2", "ssh://git@github.com:\u0662\u0662/bondo/x",  # an Arabic-Indic port: \d is ASCII only
 ]
 
 
@@ -91,6 +92,14 @@ class ResolveTests(unittest.TestCase):
         for bad in ("bondo", "bondo/listicles2/x", "../x", "bondo/..", "-x/y", "a b/c"):
             with self.assertRaisesRegex(repo_slug.RepoSlugError, "GITHUB_REPOSITORY"):
                 self.resolve("https://github.com/bondo/listicles2", {"GITHUB_REPOSITORY": bad})
+
+    def test_an_owner_pin_refuses_a_repository_of_another_owner_from_either_source(self):
+        self.assertEqual(self.resolve("https://github.com/bondo/listicles2", owner="bondo"), OLD)
+        self.assertEqual(self.resolve(None, {"GITHUB_REPOSITORY": "bondo/tally"}, owner="bondo"), "bondo/tally")
+        for remote, environ in (("https://github.com/mallory/widgets", {}), ("https://github.com/bondo/x", {"GITHUB_REPOSITORY": "mallory/widgets"}),
+                                ("https://github.com/Bondo/x", {}), ("https://github.com/bondo-evil/x", {})):
+            with self.subTest(remote=remote, environ=environ), self.assertRaisesRegex(repo_slug.RepoSlugError, "owner"):
+                self.resolve(remote, environ, owner="bondo")
 
     def test_no_remote_and_no_github_repository_fails_loudly(self):
         with self.assertRaisesRegex(repo_slug.RepoSlugError, "origin"):

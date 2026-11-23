@@ -180,6 +180,28 @@ class MarkReady(unittest.TestCase):
                                env={"PATH": "/usr/bin:/bin"}, timeout=30)
             self.assertEqual((p.returncode, p.stdout), (0, repo_slug.slug_from_url(url) or ""), repr(url))
 
+    def test_a_gitfile_in_scripts_cannot_swap_the_checkout_whose_remote_names_the_repository(self):
+        """git looks for .git upward from where it starts; both wrappers start at the checkout root, so a planted scripts/.git is never read."""
+        other = fixture_checkout(os.path.join(self.tmp.name, "other"), {}, "https://github.com/bondo/secret-other.git")
+        for name, args, tail in (("mark-ready.sh", ("5",), "ccr/ready_for_review"), ("update-branch.sh", ("5", "a" * 40), "update-branch")):
+            with self.subTest(name=name):
+                shutil.rmtree(os.path.join(self.tmp.name, "checkout"), ignore_errors=True)
+                root = fixture_checkout(self.tmp.name, {name: GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed}"', read_wrapper(name))})
+                with open(os.path.join(root, "scripts", ".git"), "w", encoding="utf-8") as f:
+                    f.write(f"gitdir: {os.path.join(other, '.git')}\n")
+                p = subprocess.run(["bash", f"scripts/{name}", *args], capture_output=True, text=True, cwd=root, timeout=30,
+                                   env={"PATH": "/usr/bin:/bin", "FAKE_GH_OUT": self.out})
+                self.assertEqual(p.returncode, 0, p.stderr)
+                with open(self.out, encoding="utf-8") as f:
+                    self.assertEqual(f.read().splitlines()[3], f"repos/{SLUG}/pulls/5/{tail}")
+
+    def test_both_wrappers_parse_the_remote_in_the_c_locale(self):
+        """Bracket ranges in a bash regex follow the locale; LC_ALL=C makes them ASCII, as repo_slug.py's patterns are (re.ASCII)."""
+        for name in ("mark-ready.sh", "update-branch.sh"):
+            src = read_wrapper(name)
+            self.assertIn("\nLC_ALL=C\n", src, name)
+            self.assertLess(src.index("\nLC_ALL=C\n"), src.index("# slug-parse: begin"), name)
+
     def test_a_decoy_gh_earlier_in_path_is_not_used(self):
         """R5-03: `gh` is resolved in fixed directories, not through PATH, so a shim planted in a PATH directory cannot run."""
         p, called = self.run_wrapper("7")
