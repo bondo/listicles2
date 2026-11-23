@@ -109,7 +109,10 @@ class DirectTests(RunnerCase):
                  '  "x": { "jest": "30.5.2", "y": "z" }\n}\n')
         self.assertPasses()
         lines = ['  "scripts": { "test": "jest src", "format": "prettier --check ." },', '  "a": { "t": "npx jest@30 -u" },',
-                 '  "b": { "t": "jest --ci", "u": "jest -- src" },']
+                 '  "b": { "t": "jest --ci", "u": "jest -- src" },',
+                 # R2-02: the options of every mention of a runner on the line are read, also behind a wrapper cmdat does not name
+                 '  "c": { "test": "jest --runInBand", "e2e": "cross-env CI=1 jest -u" },',
+                 '  "d": { "a": "jest --ci", "b": "nyc jest --passWithNoTests" },', '  "e": { "a": "mocha", "b": "c8 mocha --grep x" },']
         self.put("firebase/package.json", "{\n" + "\n".join(lines) + "\n}\n")
         self.each_line_fails("firebase/package.json", lines, first=2)
 
