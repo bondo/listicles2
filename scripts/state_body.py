@@ -16,6 +16,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -60,7 +61,7 @@ def list_of(inner: Check, lo: int = 0, hi: int | None = None) -> Check:
             errs.append(f"{path}: expected a list, got {json.dumps(v)[:60]}")
             return
         if len(v) < lo or (hi is not None and len(v) > hi):
-            errs.append(f"{path}: expected {lo} to {hi} items, got {len(v)}")
+            errs.append(f"{path}: expected {lo} to {hi if hi is not None else 'any number of'} items, got {len(v)}")
         for i, item in enumerate(v):
             inner(item, f"{path}[{i}]", errs)
     return check
@@ -83,7 +84,17 @@ def obj(fields: dict[str, Check], optional: frozenset[str] = frozenset()) -> Che
 TEXT = kind(lambda v: isinstance(v, str) and v.strip() != "" and not set(v) & {"\n", "\r"}, "a non-empty string on one line")
 COUNT = kind(lambda v: type(v) is int and v >= 0, "a whole number >= 0")
 NUMBER = kind(lambda v: type(v) is int and v > 0, "a PR or issue number")
-TIME = pattern(r"\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d)?Z", "a UTC time like 2026-11-23T05:33Z")
+def is_time(v: Any) -> bool:
+    if not isinstance(v, str) or not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d)?Z", v):
+        return False
+    try:
+        datetime.strptime(v, "%Y-%m-%dT%H:%M:%SZ" if v.count(":") == 2 else "%Y-%m-%dT%H:%MZ")
+    except ValueError:
+        return False
+    return True
+
+
+TIME = kind(is_time, "a UTC time like 2026-11-23T05:33Z")
 SESSION = pattern(r"session_[A-Za-z0-9]+", "a session id")
 TASK = pattern(r"M\d+(\.\d+)?-(\d\d|O\d+|FU)", "a task id")
 SHA = pattern(r"[0-9a-f]{7,40}", "a commit SHA")
@@ -92,7 +103,9 @@ USAGE = pattern(r"ok|near limit \((5-hour(, forecast|, rateLimitType unknown)?|7
                 "one of the ORCHESTRATION.md 3.1 usage states")
 STATUSES = ("running", "idle-with-result", "idle-no-result", "failed", "archived", "interrupted (usage)")
 
-SESSION_ROW = obj({"id": SESSION, "role": ROLE, "branch": nullable(TEXT), "pr": nullable(NUMBER), "tasks": list_of(TASK),
+TAG = pattern(r"[a-z][a-z-]*:\S+", "a session tag like pr:319 (ORCHESTRATION.md 2.1)")
+
+SESSION_ROW = obj({"id": SESSION, "role": ROLE, "tags": list_of(TAG), "branch": nullable(TEXT), "pr": nullable(NUMBER), "tasks": list_of(TASK),
                    "spawned": TIME, "expects": TEXT, "checked": TIME, "status": one_of(*STATUSES), "note": TEXT},
                   optional=frozenset({"note"}))
 BRANCH_ROW = obj({"name": TEXT, "holder": nullable(SESSION), "pr": nullable(NUMBER), "in_review": list_of(TASK),
@@ -185,6 +198,8 @@ def read(path: str) -> str:
         return Path(path).read_text(encoding="utf-8")
     except OSError as e:
         raise StateError([f"cannot read {path}: {e.strerror}"]) from None
+    except UnicodeDecodeError:
+        raise StateError([f"cannot read {path}: not UTF-8"]) from None
 
 
 def main(argv: list[str] | None = None) -> int:
