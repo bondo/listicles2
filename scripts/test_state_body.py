@@ -97,6 +97,18 @@ class ValidTest(unittest.TestCase):
                                         "text": "rename the repo?", "then": "ask again in M2"}], data)
         self.assertEqual(errors(body(data)), "")
 
+    def test_optional_note_may_be_missing(self):
+        self.assertEqual(errors(body(changed("sessions.0.note", DELETE))), "")
+
+    def test_unicode_line_separators_inside_a_text_value_are_not_line_ends(self):
+        # CommonMark ends lines only at \n, \r\n and \r; ensure_ascii=False writes U+2028 and U+0085 raw (R1-01)
+        for sep in ("\u2028", "\u0085", "\u2029"):
+            with self.subTest(sep=repr(sep)):
+                data = changed("next", [f"a{sep}b"])
+                text = f"{PROSE}\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```\n"
+                self.assertIn(sep, text)
+                self.assertEqual(state_body.load(text), data)
+
     def test_usage_states_from_the_template(self):
         for state in ("ok", "near limit (5-hour)", "near limit (5-hour, forecast)",
                       "near limit (5-hour, rateLimitType unknown)", "near limit (7-day)", "near limit (overage)",
@@ -170,6 +182,10 @@ class SchemaTest(unittest.TestCase):
         self.assert_error(changed("branches.0.reviewed_through", "zzz"), "reviewed_through: expected a commit SHA")
         self.assert_error(changed("triggers.0.id", "t_1"), "triggers[0].id: expected a trigger id")
         self.assert_error(changed("usage.state", "fine"), "usage.state: expected one of")
+        self.assert_error(changed("usage.state", "paused until 99:99 UTC"), "usage.state: expected one of")
+        self.assert_error(changed("updated.at", "\u0662\u0660\u0662\u0666-11-23T05:33Z"), "updated.at: expected a UTC time")
+        self.assert_error(changed("sessions.0.tasks", ["M\u0661-14"]), "sessions[0].tasks[0]: expected a task id")
+        self.assert_error(changed("branches.0.reviewed_through", "\u0661" * 7), "reviewed_through: expected a commit SHA")
         self.assert_error(changed("sessions.0.status", "parked"), "sessions[0].status: expected one of")
         self.assert_error(changed("owner_queue.0.kind", "chore"), "owner_queue[0].kind: expected one of")
         self.assert_error(changed("sessions.0.role", "Implementer!"), "sessions[0].role: expected a role")
@@ -185,6 +201,13 @@ class SchemaTest(unittest.TestCase):
     def test_a_task_is_claimed_by_one_session_only(self):
         two = changed("sessions", STATE["sessions"] + [dict(STATE["sessions"][0], id=S0)])
         self.assert_error(two, "M1-14 is claimed by 2 sessions")
+
+    def test_a_task_repeated_inside_one_row_is_named_as_such(self):
+        msg = errors(body(changed("sessions.0.tasks", ["M1-14", "M1-14"])))
+        self.assertIn("sessions[0]: M1-14 listed twice", msg)
+        self.assertNotIn("claimed by", msg)
+        msg = errors(body(changed("branches.0.in_review", ["M1-44", "M1-44"])))
+        self.assertIn("branches[0]: M1-44 listed twice", msg)
 
     def test_duplicate_session_ids_and_branch_names(self):
         self.assert_error(changed("sessions", STATE["sessions"] * 2), f"duplicate session {S2}")
