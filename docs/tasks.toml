@@ -1437,11 +1437,12 @@ notes = "Split from M1-46. Each convention plugin registers the module's own che
 id = "M1-69"
 title = "Nested builds: dependency verification for the licensee fixture build (issue 217 item 4), check_gradle_repos.py over build-logic/settings.gradle.kts"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-46"]
-notes = "Split from M1-46. build-logic is an included build, so the root verification metadata already covers it; the fixture is a separate build run by testLicenseeGate"
+pr = 328
+notes = "Split from M1-46. build-logic is an included build, so the root verification metadata already covers it; the fixture is a separate build run by testLicenseeGate. Gradle verifies remote artifacts only, so the fixture metadata covers the licensee plugin and its dependencies, not the local repo/ POMs"
 
 [[task]]
 id = "M1-47"
