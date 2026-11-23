@@ -54,6 +54,11 @@ reason is true and specific (`REVIEW.md`, item 8).
 - **Values split from their key** (`"strict":` then `false` on the next line), the YAML eslintrc form, a multi-line block directive, rarer
   mypy and ruff options, and the INI key case (comments on issue 46 from PR 43 review rounds 1 to 4): not done in this batch. They are
   small and independent, so a later batch can take them one at a time with tests.
+- **Mentions the threshold scan lets through (task 1b, see #322; M1-68 part B; tests in `scripts/hooks/test_guards_mentions.py`).** Plural
+  `thresholds` in markdown before `,` `;` `)`, a full stop or a word is prose even with a digit on the line, so `coverage thresholds are 80`
+  in markdown is not compared. In a `.py` file that is no test file, `useJUnitPlatform` and `failOnNoDiscoveredTests` inside a `#` comment
+  or a plain string are a mention: a gate's regex or message that pins them may be removed (the gate's own tests still count). A line
+  inside a multi-line string reads as code, the safe direction.
 
 ## Check 2c: command-line flags are an allowlist (issues 177, 174, 164)
 
