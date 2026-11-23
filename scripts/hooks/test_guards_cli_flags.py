@@ -998,7 +998,7 @@ class NpmTailResolutionTests(CliFlagCase):
 
     def test_a_script_that_is_not_a_plain_runner_keeps_the_union_check(self):
         for cmd in ["eslint .", "jest && eslint .", "jest; eslint .", "jest | eslint .", "jest || eslint .", "jest & eslint .",
-                    "eslint . \\\; jest", "jest \\\"$X\\\"", "jest $(eslint)", "jest `x`", "CI=1 jest", "npx -y jest", "node jest.js",
+                    "eslint . \\\\; jest", "jest \\\"$X\\\"", "jest $(eslint)", "jest `x`", "CI=1 jest", "npx -y jest", "node jest.js",
                     "firebase emulators:exec --only firestore", "npx", "jest;", "(jest)", "jest # x", "./node_modules/.bin/jest",
                     "jest > out", "jest ~/x", "jest \\u0026\\u0026 eslint .", "vitest run", "npx vitest",
                     "jest() { eslint $@ ; } ; jest", "PATH=lint:/usr/bin:/bin ; jest", "eslint . ';jest", "eslint . #;jest",
