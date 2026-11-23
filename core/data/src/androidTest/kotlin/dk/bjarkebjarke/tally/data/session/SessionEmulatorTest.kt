@@ -55,6 +55,7 @@ class SessionEmulatorTest {
         FirebaseEmulator.requireRunning()
         app = FirebaseEmulator.app(InstrumentationRegistry.getInstrumentation().targetContext)
         auth = FirebaseAuth.getInstance(app)
+        auth.signOut() // Firebase restores a user an earlier run left signed in
         authentication = FirebaseAuthentication(auth)
         userData = FirestoreSession { FirebaseEmulator.firestore(app) }
         // The documents below are outside the project's rules: these tests are about the copy on the phone.
