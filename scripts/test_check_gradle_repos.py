@@ -1004,6 +1004,14 @@ class NestedBuilds(unittest.TestCase):
         self.edit("build.gradle.kts", '"-Pdeps=$deps",', '"-Pdeps=$deps",\n                        "--dependency-verification=off",')
         self.assert_fails("build.gradle.kts: the licensee gate switches Gradle dependency verification off")
 
+    def test_fixture_run_must_not_use_the_short_flag_to_switch_verification_off(self):
+        self.edit("build.gradle.kts", '"-Pdeps=$deps",', '"-Pdeps=$deps",\n                        "-F",\n                        "off",')
+        self.assert_fails("build.gradle.kts: the licensee gate switches Gradle dependency verification off")
+
+    def test_dependency_verification_named_only_in_a_comment_is_fine(self):
+        self.edit("build.gradle.kts", '"-Pdeps=$deps",', '"-Pdeps=$deps",\n                        // never --dependency-verification off here')
+        self.assertEqual(self.run_main(), (0, ""))
+
     def test_pure_function_good_and_bad_inputs(self):
         pom = b"<project/>"
         digest = hashlib.sha256(pom).hexdigest()
