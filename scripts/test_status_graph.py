@@ -239,6 +239,206 @@ class Layout(unittest.TestCase):
         self.assertTrue(no_overlap([box(g) for g in found.values()]))
 
 
+def paths(svg):
+    """Each arrow (from, to) -> its polyline as a list of points. Only M, H and V commands are understood: a curve fails the test."""
+    out = {}
+    for p in ET.fromstring(svg).iter(NS + "path"):
+        if not p.get("data-from"):
+            continue
+        pts = []
+        for cmd, arg in re.findall(r"([A-Za-z])\s*([^A-Za-z]*)", p.get("d")):
+            nums = [float(v) for v in arg.replace(",", " ").split()]
+            if cmd == "M":
+                pts.append((nums[0], nums[1]))
+            elif cmd == "H":
+                pts.append((nums[0], pts[-1][1]))
+            elif cmd == "V":
+                pts.append((pts[-1][0], nums[0]))
+            else:
+                raise AssertionError(f"arrow {p.get('data-from')} to {p.get('data-to')} uses command {cmd}: arrows are straight, orthogonal segments")
+        out[(p.get("data-from"), p.get("data-to"))] = pts
+    return out
+
+
+def segments(pts):
+    return [(a, b) for a, b in zip(pts, pts[1:]) if a != b]
+
+
+def hits_interior(seg, rect):
+    (x1, y1), (x2, y2) = seg
+    bx, by, bw, bh = rect
+    if y1 == y2:
+        return by < y1 < by + bh and max(x1, x2) > bx and min(x1, x2) < bx + bw
+    assert x1 == x2, seg
+    return bx < x1 < bx + bw and max(y1, y2) > by and min(y1, y2) < by + bh
+
+
+def overlap(s1, s2):
+    """Two axis-parallel segments lie on one line and share more than a point."""
+    (ax1, ay1), (ax2, ay2) = s1
+    (bx1, by1), (bx2, by2) = s2
+    if ay1 == ay2 and by1 == by2 and ay1 == by1:
+        return min(max(ax1, ax2), max(bx1, bx2)) > max(min(ax1, ax2), min(bx1, bx2))
+    if ax1 == ax2 and bx1 == bx2 and ax1 == bx1:
+        return min(max(ay1, ay2), max(by1, by2)) > max(min(ay1, ay2), min(by1, by2))
+    return False
+
+
+def random_text(seed, n, density=0.22, milestones="ABC"):
+    """A random DAG over n tasks spread over the milestones, ids in the order the file lists them."""
+    rng = random.Random(seed)
+    ids = [f"{rng.choice(milestones)}-{i:02d}" for i in range(n)]
+    rows = [task(tid, tid[0], deps=[ids[j] for j in range(i) if rng.random() < density]) for i, tid in enumerate(ids)]
+    return tasks_text(*rows, milestones=tuple(milestones))
+
+
+def small_degree(text, limit=8):
+    """Arrows per node end beyond the eight port slots may share one; the routing tests keep to graphs below that."""
+    ends = {}
+    for a, b in edges(svg_of(text)):
+        ends[("out", a)] = ends.get(("out", a), 0) + 1
+        ends[("in", b)] = ends.get(("in", b), 0) + 1
+    return max(ends.values(), default=0) <= limit
+
+
+class Routing(unittest.TestCase):
+    """Task M1-75: arrows run in the gaps between rows and columns, never through a node, side by side where they share a gap."""
+
+    def graphs(self):
+        yield TASKS
+        for seed in range(25):
+            text = random_text(seed, 6 + seed)
+            if small_degree(text):
+                yield text
+
+    def test_arrows_are_orthogonal_polylines(self):
+        for text in self.graphs():
+            self.assertEqual(sorted(paths(svg_of(text))), edges(svg_of(text)))
+
+    def test_no_arrow_segment_goes_through_a_node(self):
+        for text in self.graphs():
+            svg = svg_of(text)
+            rects = {k: box(g) for k, g in nodes(svg).items()}
+            for (a, b), pts in paths(svg).items():
+                for seg in segments(pts):
+                    for tid, rect in rects.items():
+                        self.assertFalse(hits_interior(seg, rect), f"{a}->{b} crosses the box of {tid}")
+
+    def test_an_arrow_leaves_the_right_side_of_its_source_and_arrives_at_the_left_side_of_its_target(self):
+        for text in self.graphs():
+            svg = svg_of(text)
+            found = nodes(svg)
+            for (a, b), pts in paths(svg).items():
+                ax, ay, aw, ah = box(found[a])
+                bx, by, bw, bh = box(found[b])
+                self.assertEqual(pts[0][0], ax + aw, (a, b))
+                self.assertTrue(ay < pts[0][1] < ay + ah, (a, b))
+                self.assertTrue(bx - 3 <= pts[-1][0] <= bx and by < pts[-1][1] < by + bh, (a, b))
+                self.assertGreaterEqual(pts[-1][0] - pts[-2][0], 8, f"{a}->{b}: the last segment must be long enough for the arrowhead")
+
+    def test_arrows_stay_inside_the_canvas(self):
+        for text in self.graphs():
+            root = ET.fromstring(svg_of(text))
+            width, height = float(root.get("width")), float(root.get("height"))
+            for pts in paths(svg_of(text)).values():
+                for x, y in pts:
+                    self.assertTrue(0 <= x <= width and 0 <= y <= height, (x, y))
+
+    def test_two_arrows_never_run_along_the_same_line(self):
+        for text in self.graphs():
+            svg = svg_of(text)
+            found = list(paths(svg).items())
+            for i, (e1, p1) in enumerate(found):
+                for e2, p2 in found[i + 1:]:
+                    for s1 in segments(p1):
+                        for s2 in segments(p2):
+                            self.assertFalse(overlap(s1, s2), f"{e1} and {e2} overlap: {s1} {s2}")
+
+    def test_arrows_that_share_a_gap_get_different_offsets(self):
+        """P1 and P2 both feed Q1 and Q2: four arrows through one gap, each with a track of its own."""
+        rows = [task("A-01", "A"), task("A-02", "A"), task("A-03", "A", deps=["A-01", "A-02"]), task("A-04", "A", deps=["A-01", "A-02"])]
+        svg = svg_of(tasks_text(*rows, milestones=("A",)))
+        xs = []
+        for pts in paths(svg).values():
+            verticals = [s for s in segments(pts) if s[0][0] == s[1][0]]
+            self.assertEqual(len(verticals), 1)
+            xs.append(verticals[0][0][0])
+        self.assertEqual(len(set(xs)), 4, xs)
+
+    def test_a_chain_is_drawn_as_straight_lines(self):
+        rows = [task(f"A-{i:02d}", "A", deps=[f"A-{i - 1:02d}"] if i > 1 else []) for i in range(1, 6)]
+        for pts in paths(svg_of(tasks_text(*rows, milestones=("A",)))).values():
+            self.assertEqual(len(pts), 2, pts)
+            self.assertEqual(pts[0][1], pts[1][1])
+
+    def test_a_long_arrow_runs_between_rows_not_behind_the_nodes_it_skips(self):
+        """A-06 sits in column 0 and A-07 in column 3, behind A-02 to A-04's column positions: the arrow must pass between rows."""
+        rows = [task("A-01", "A"), task("A-02", "A", deps=["A-01"]), task("A-03", "A", deps=["A-02"]), task("A-04", "A", deps=["A-03"]),
+                task("A-05", "A", deps=["A-04"]), task("A-06", "A"), task("A-07", "A", deps=["A-06", "A-03"])]
+        svg = svg_of(tasks_text(*rows, milestones=("A",)))
+        rects = [box(g) for g in nodes(svg).values()]
+        long_edge = paths(svg)[("A-06", "A-07")]
+        for seg in segments(long_edge):
+            for rect in rects:
+                self.assertFalse(hits_interior(seg, rect))
+        self.assertEqual(paths(svg)[("A-03", "A-07")][0][0], box(nodes(svg)["A-03"])[0] + box(nodes(svg)["A-03"])[2])
+
+    def test_the_picture_is_deterministic_with_routing(self):
+        text = random_text(3, 30)
+        self.assertEqual(svg_of(text), svg_of(text))
+
+
+def graph_and_layer(text):
+    graph = status_graph.open_graph(model(text))
+    return graph, status_graph.layers([n["id"] for n in graph["nodes"]], graph["edges"])
+
+
+class Ordering(unittest.TestCase):
+    """Task M1-75: the boxes inside a column are ordered so that connected tasks sit near each other."""
+
+    def counts(self, text):
+        graph, layer = graph_and_layer(text)
+        before = status_graph.crossings(graph, layer, status_graph.order_cells(graph, layer, sweeps=0))
+        after = status_graph.crossings(graph, layer, status_graph.order_cells(graph, layer))
+        return before, after
+
+    def test_a_crossing_in_the_input_order_is_removed(self):
+        rows = [task("A-01", "A"), task("A-02", "A"), task("A-03", "A", deps=["A-02"]), task("A-04", "A", deps=["A-01"])]
+        self.assertEqual(self.counts(tasks_text(*rows, milestones=("A",))), (1, 0))
+
+    def test_an_order_without_crossings_is_left_alone(self):
+        rows = [task("A-01", "A"), task("A-02", "A"), task("A-03", "A", deps=["A-01"]), task("A-04", "A", deps=["A-02"])]
+        graph, layer = graph_and_layer(tasks_text(*rows, milestones=("A",)))
+        self.assertEqual(status_graph.order_cells(graph, layer), status_graph.order_cells(graph, layer, sweeps=0))
+
+    def test_ordering_never_adds_crossings_on_random_dags(self):
+        improved = 0
+        for seed in range(40):
+            before, after = self.counts(random_text(seed, 8 + seed % 20, density=0.2))
+            self.assertLessEqual(after, before, f"seed {seed}")
+            improved += after < before
+        self.assertGreater(improved, 5)  # the property is not met by doing nothing
+
+    def test_ordering_keeps_every_task_once_in_its_own_cell(self):
+        graph, layer = graph_and_layer(random_text(5, 25))
+        cells = status_graph.order_cells(graph, layer)
+        flat = sorted(i for cell in cells.values() for i in cell)
+        self.assertEqual(flat, sorted(n["id"] for n in graph["nodes"]))
+        band_of = {n["id"]: n["milestone"] for n in graph["nodes"]}
+        for (band, col), cell in cells.items():
+            self.assertTrue(all(band_of[i] == band and layer[i] == col for i in cell))
+
+    def test_ordering_is_deterministic(self):
+        graph, layer = graph_and_layer(random_text(9, 30))
+        self.assertEqual(status_graph.order_cells(graph, layer), status_graph.order_cells(graph, layer))
+
+    def test_the_drawn_picture_has_fewer_crossings_than_the_input_order_would_give(self):
+        text = random_text(11, 30, density=0.2)
+        graph, layer = graph_and_layer(text)
+        shown = status_graph.crossings(graph, layer, status_graph.order_cells(graph, layer))
+        self.assertLessEqual(shown, status_graph.crossings(graph, layer, status_graph.order_cells(graph, layer, sweeps=0)))
+
+
 class Labels(unittest.TestCase):
     def test_each_milestone_band_says_how_many_tasks_are_done(self):
         joined = "\n".join(texts(svg_of()))
