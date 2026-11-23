@@ -113,10 +113,9 @@ kover {
 val listiclesModules = listOf(":app", ":core:data", ":core:domain", ":core:testing")
 tasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }
 
-// Test-support JVM modules run only on the host JDK (21), never on Android, and use its newer API on purpose
-// (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18); checkJdkRelease keeps them
-// out of every module's non-test configurations, and checkJavaApiLevel below skips them.
-val jdkTestSupportModules = setOf(":core:testing")
+// The test-support modules (host JDK 21 API on purpose): the one list in build-logic (TestSupportModules), which every
+// module's checkJdkRelease and the listicles.jvm.testsupport plugin also follow; checkJavaApiLevel below skips them.
+val jdkTestSupportModules = TestSupportModules.paths
 
 // M1-37 (issue 228): checkJdkRelease closes the JDK 18 to 21 gap only. A Java 9 to 17 member that is newer than minSdk (Stream.toList is
 // API 34, Objects.requireNonNullElse is API 30) still compiles in a JVM module, and Android lint's NewApi skips pure JVM modules.

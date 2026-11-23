@@ -17,7 +17,7 @@ private const val WARNINGS =
 /** Registers checkWarningsAsErrors, checkJdkRelease and listiclesChecks; [jdkRelease]: the JDK 17 API applies. */
 internal fun Project.registerModuleChecks(
     jdkRelease: Boolean,
-    testSupport: String,
+    testSupport: Set<String>,
 ) {
     val warnings = registerWarningsCheck()
     val release = registerJdkReleaseCheck(jdkRelease, testSupport)
@@ -99,7 +99,7 @@ internal fun jdkReleaseSelfTest() =
  */
 private fun Project.registerJdkReleaseCheck(
     jdkRelease: Boolean,
-    testSupport: String,
+    testSupport: Set<String>,
 ) = tasks.register("checkJdkRelease") {
     group = "verification"
     description = "Fails if this module's compile tasks or non-test configurations can reach the JDK 21 API."
@@ -109,7 +109,7 @@ private fun Project.registerJdkReleaseCheck(
             p.configurations.filterNot { it.name.contains("test", ignoreCase = true) }.flatMap { c ->
                 c.dependencies
                     .withType<ProjectDependency>()
-                    .filter { it.path == testSupport }
+                    .filter { it.path in testSupport }
                     .map { "${p.path}:${c.name} -> ${it.path}" }
             }
         }

@@ -27,6 +27,16 @@ private const val SPI = "-Djava.nio.channels.spi"
 private const val BLOCKING = "dk.bjarkebjarke.tally.testing.Blocking"
 private const val TEST_SETTINGS = "must run on the JUnit Platform with failOnNoDiscoveredTests on (M1-68)"
 
+/**
+ * The test-support modules: they run only on the host JDK (21), never on Android, and use its newer API on purpose
+ * (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18). The one list (PR 349 R1-01):
+ * only these may apply listicles.jvm.testsupport, every module's checkJdkRelease keeps them out of its non-test
+ * configurations, and the root's checkJavaApiLevel skips them. Public, so the root build script reads it too.
+ */
+object TestSupportModules {
+    val paths: Set<String> = setOf(TEST_SUPPORT)
+}
+
 /** Java and Kotlin 17, warnings as errors (M0.5-09), the test-JVM network block and the module's own checks. */
 internal fun Project.configureKotlinModule(
     compilerOptions: KotlinJvmCompilerOptions,
@@ -54,7 +64,7 @@ internal fun Project.configureKotlinModule(
         dependencies.add("testImplementation", dependencies.project(mapOf("path" to TEST_SUPPORT)))
     }
     registerTestSettingsCheck()
-    registerModuleChecks(jdkRelease, TEST_SUPPORT)
+    registerModuleChecks(jdkRelease, TestSupportModules.paths)
 }
 
 /**
