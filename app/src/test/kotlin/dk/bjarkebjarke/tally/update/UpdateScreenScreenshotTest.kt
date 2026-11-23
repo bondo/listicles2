@@ -8,7 +8,9 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dk.bjarkebjarke.tally.ScreenshotOptions
-import dk.bjarkebjarke.tally.TallyTheme
+import dk.bjarkebjarke.tally.TallyApp
+import dk.bjarkebjarke.tally.domain.start.StartStep
+import dk.bjarkebjarke.tally.start.StartUiState
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,7 +20,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * M1-27 (R1-05) goldens of the "Update the app" screen: light and dark in English and Danish, and one Danish light
- * golden at 200 % font scale (owner decision Q3 A). Same small fixed device as TallyAppScreenshotTest.
+ * golden at 200 % font scale (owner decision Q3 A). Rendered through TallyApp, as the app hosts the screen (inside its
+ * Surface). Same small fixed device as TallyAppScreenshotTest.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -28,19 +31,19 @@ class UpdateScreenScreenshotTest {
 
     @Test
     @Config(qualifiers = "en-$DEVICE")
-    fun englishLight() = capture("UpdateScreen_en_light.png") { TallyTheme(false) { UpdateScreen() } }
+    fun englishLight() = capture("UpdateScreen_en_light.png") { TallyApp(UPDATE, darkTheme = false) }
 
     @Test
     @Config(qualifiers = "en-$DEVICE")
-    fun englishDark() = capture("UpdateScreen_en_dark.png") { TallyTheme(true) { UpdateScreen() } }
+    fun englishDark() = capture("UpdateScreen_en_dark.png") { TallyApp(UPDATE, darkTheme = true) }
 
     @Test
     @Config(qualifiers = "da-$DEVICE")
-    fun danishLight() = capture("UpdateScreen_da_light.png") { TallyTheme(false) { UpdateScreen() } }
+    fun danishLight() = capture("UpdateScreen_da_light.png") { TallyApp(UPDATE, darkTheme = false) }
 
     @Test
     @Config(qualifiers = "da-$DEVICE")
-    fun danishDark() = capture("UpdateScreen_da_dark.png") { TallyTheme(true) { UpdateScreen() } }
+    fun danishDark() = capture("UpdateScreen_da_dark.png") { TallyApp(UPDATE, darkTheme = true) }
 
     @Test
     @Config(qualifiers = "da-$DEVICE")
@@ -49,7 +52,7 @@ class UpdateScreenScreenshotTest {
             CompositionLocalProvider(
                 LocalDensity provides Density(LocalDensity.current.density, fontScale = FONT_SCALE_200),
             ) {
-                TallyTheme(false) { UpdateScreen() }
+                TallyApp(UPDATE, darkTheme = false)
             }
         }
 
@@ -64,5 +67,6 @@ class UpdateScreenScreenshotTest {
     private companion object {
         const val DEVICE = "w360dp-h640dp-xhdpi"
         const val FONT_SCALE_200 = 2f
+        val UPDATE = StartUiState.Ready(StartStep.Update)
     }
 }

@@ -1177,11 +1177,12 @@ depends_on = ["M1-30"]
 id = "M1-27"
 title = "Minimum app version: config/app.minVersionCode, schemaVersion, update screen"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-08", "M1-60", "M1-62", "M1-66"]
-notes = "PR 343 has the gate, the update screen and the store; the Firestore source and its binding are M1-82 (needs :app on :core:data, M1-66). Kept todo while M1-66 is todo (S2-01 in PR 319)"
+depends_on = ["M1-08", "M1-60", "M1-62"]
+notes = "The Firestore source and its binding are M1-82 (needs :app on :core:data, M1-66)"
+pr = 343
 
 [[task]]
 id = "M1-28"

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -79,5 +80,5 @@ private fun openReleases(uriHandler: UriHandler) {
 @PreviewFontScale
 @Composable
 private fun UpdateScreenPreview() {
-    TallyTheme { UpdateScreen() }
+    TallyTheme { Surface(Modifier.fillMaxSize()) { UpdateScreen() } }
 }
