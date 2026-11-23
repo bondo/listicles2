@@ -153,6 +153,8 @@ class SchemaTest(unittest.TestCase):
         self.assert_error(changed("sessions", {}), "sessions: expected a list")
         self.assert_error(changed("sessions.0", "x"), "sessions[0]: expected an object")
         self.assert_error(changed("updated.after", "  "), "updated.after: expected a non-empty string")
+        # a line break would let a text value end the summary or open a second ```json block when rendered
+        self.assert_error(changed("next", ["a\n```json"]), "next[0]: expected a non-empty string on one line")
 
     def test_schema_version(self):
         self.assert_error(changed("schema", 2), "schema: expected 1")
@@ -241,11 +243,11 @@ class RenderTest(unittest.TestCase):
 
 class CliTest(unittest.TestCase):
     def write(self, text):
-        f = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8")
-        f.write(text)
-        f.close()
-        self.addCleanup(Path(f.name).unlink)
-        return f.name
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        path = Path(d.name, "state.md")
+        path.write_text(text, encoding="utf-8")
+        return str(path)
 
     def test_validate_ok_and_counts(self):
         code, out, _ = run_cli("validate", self.write(body()))
