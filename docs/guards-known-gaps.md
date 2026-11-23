@@ -214,12 +214,46 @@ resolved is read with the long names only and fails with no escape hatch; its sh
   `--selectProjects`, `--roots`, `--testMatch`, `--testRegex` (the last three are refused in config by check 1), and a command whose
   exit status is dropped (`jest || true`). vitest `--dir` and `--root` and jest `--rootDir` fail only when their value is a separate
   word (read as a path filter); written with `=` they pass.
-- playwright and cypress options (`--grep`, `--last-failed`, `--only-changed`, `--update-snapshots`): a tail resolved to them is read
-  with the long names and every short letter of jest and mocha, without positional words; a direct call is not read (task M1-81).
+- playwright and cypress: next section (task M1-81).
 - yarn, pnpm and bun tails are never resolved (M1-65), so only their long runner options fail with no escape hatch. Their forms
   that pass arguments to the script without `--` (`yarn test --passWithNoTests`, `pnpm test -u`, `pnpm run test --passWithNoTests`) are
   not read at all, as in 2c (the repo is npm-only).
 - A runner name used as data on a command line (`echo jest -u`) fails: a false positive.
+
+
+## Check 1 on command lines: playwright and cypress (task M1-81)
+
+Owner decision (issue 15, comment 7102820038: the full proposal of PR 358 comment 7102517597). `runopt` reads `playwright test` and
+`cypress run` in the same places as jest (direct, after launchers, package.json scripts, YAML, quoted commands for options) and fails,
+with no escape hatch:
+- playwright: `-u`, `--update-snapshots` (any mode), `--ignore-snapshots`, `--pass-with-no-tests`, `--list`, positional file filters
+  after `test`, `-g`, `--grep`, `--grep-invert` (`-gv`), `--test-list`, `--test-list-invert`, `--no-deps`, `--last-failed`,
+  `--only-changed` (with or without a ref), and `-c` or `--config` whose value is no file named `*.config.{ts,js,mts,mjs,cts,cjs}` (a
+  test directory there narrows `testDir`);
+- cypress: `-s`, `--spec`, positional words after `run`, `-c` or `--config` whose value names `specPattern` or `excludeSpecPattern`
+  (any case and nesting), and `-e` or `--env` whose value names a @cypress/grep key (`grep`, `grepTags`, `grepInvert`, `grepUntagged`,
+  `grepFilterSpecs`, `grepOmitFiltered`: a key is `grep` and letters before `=` or `:`).
+
+`--shard` and the other options of the proposal pass. Both CLIs use commander, so the guard reads short groups as commander does: every
+letter is a flag until one that takes a value, which takes the rest (`-xu` sets `-u`, `-gsmoke` is `-g smoke`, `-j2 src` has the path
+filter `src`). The value-taking long names are their own (`RVX`: `--workers`, `--project`, `--browser`, `--record`, ...), not jest's, so
+`--ui` takes no value after playwright. The denied long names join the shared list, so an unresolved tail fails on them too. A tail
+resolved to them is read with their own letters and positional rule (jest letters there are no longer denied: `npm run e2e -- -o`
+passes, commander refuses it). A tail resolved to two runners with different parsers is read as mri, the strictest.
+
+**Not covered (tripwire, F18).**
+- Known gaps by the decision: playwright `--project` and `--retries`, cypress `--component`, `-P`/`--project` (another project
+  directory), `-C`/`--config-file` (another config file), `--config` keys other than the two spec patterns (`retries`, `testIsolation`),
+  and `CYPRESS_*` env assignments (`CYPRESS_grep=smoke`, `CYPRESS_SPEC_PATTERN=x`). Check 1 reads neither runner's config file
+  (playwright `grep`, `grepInvert`, `testIgnore`, `testMatch`, `retries`; cypress `specPattern`), nor `PWTEST_*` env.
+- Other subcommands (`playwright show-report`, `merge-reports`, `install`, `codegen`; `cypress open`, `install`, `verify`, `cache`,
+  `info`) are not read as test runs: their positional words pass. Their options are still read by the every-mention scan, so
+  `cypress open --spec x` fails, the safe direction.
+- A cypress `--config` or `--env` JSON value split over several words is read word by word: a key after a blank is read as a positional
+  word, which fails too. A playwright `-c` with no value passes (commander refuses it).
+- A path or package that names the runner (`cypress/fixtures`, `@playwright/test`) is a mention, so options after it on the line are
+  read: `ls cypress/fixtures -s` fails (a false positive, as `echo jest -u` above).
+- An unresolved tail is not read for cypress `--spec` (mocha passes its own `--spec`); 2c still fails it, waivable by a reason.
 
 ## Check 2c: YAML values over several lines (task M1-64, issue 164 item 2)
 

@@ -174,7 +174,7 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
 # there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known. Only an npm form whose script is
 # known to end in a test runner (ddrun, pkgscripts below; issue 164 item 3) skips that check, so `npm test -- --ci` passes when every tracked
-# `test` script is a plain `jest ...` (its runner options are check 1 on command lines: runopt below, task M1-71); in every other case the check is as before (fail closed). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
+# `test` script is a plain `jest ...` (its runner options are check 1 on command lines: runopt below, tasks M1-71, M1-81); in every other case the check is as before (fail closed). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
 # tsc names are read case-insensitively (as tsc does), mypy and shellcheck accept unique prefixes of long options so a proper prefix of a
 # listed option counts as that option (a prefix that is ambiguous is an error in the tool itself), and SHELLCHECK_OPTS counts as
 # `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
@@ -467,18 +467,42 @@ function plainrun(c) { return (c ~ RUNRE) }
 # path filters after jest and after vitest (but its first one may be run, watch or dev) when the runner is the command (cmdat), and in
 # an npm `--` tail that ddrun resolves to jest or mocha (a mocha spec there may replace the configured one). The value of an option in
 # RVL or RVS is no positional word; the value of any other option is (fail closed: write it with =). A runner word that is not the command
-# (`firebase emulators:exec "jest -u"`) has its options read, not its positional words. An unresolved tail is read with the long names
+# (`firebase emulators:exec "jest -u"`) has its options read, not its positional words. Task M1-81 (#15 comment 7102820038) adds playwright
+# and cypress, read only as `playwright test` and `cypress run`, with the commander grouping and their own value-taking names; positional
+# words after the subcommand fail for both, and so do those of a resolved tail. An unresolved tail is read with the long names
 # only, because its short options are ambiguous (-t is tsc --target): 2c keeps them, waivable as before.
 function rclean(t) { sub(/^["\047\\]+/, "", t); sub(/["\047\\,;]+$/, "", t); return t }
-# rscan: 1 when the words of s hold a denied option: ds and vs are the denied and the value-taking short letters, pos makes positional
-# words deny (vit: except a first run, watch or dev), dl adds denied long names. A group (-w2u) is read as yargs-parser reads it (R1-01):
-# every character is a flag, digits too, until one takes the rest as its value: the rest starts with `=`, is a number (a letter only), or
-# starts with a character that is no word character; mri (vitest, mr: and runners not known) only stops at `=`. A word is skipped only as a
-# negative number. A one-letter long option (--u) is that short option (R1-02). A jest config given as inline JSON (-c or --config with a
-# value that starts with `{`) is denied: no config scan reads it. In a package.json the command ends with its JSON value (jsend).
+# rscan: 1 when the words of s hold a denied option of the runners R (rtab; none: an unresolved tail, long names only), pos makes
+# positional words deny (fw: a first word that is not one), dl adds denied long names. A group (-w2u) is read as yargs-parser reads it
+# (R1-01): every character is a flag, digits too, until one takes the rest as its value: the rest starts with `=`, is a number (a letter
+# only), or starts with a character that is no word character; mri (vitest, and runners with mixed parsers) only stops at `=`; commander
+# (playwright, cypress) stops at a value letter. A word is skipped only as a negative number. A one-letter long option (--u) is that short
+# option (R1-02). The value of -c, --config, and cypress -e, --env is checked by rval. In a package.json the command ends with its JSON
+# value (jsend).
 function jsend(x) { return JSF && x ~ /(^|[^\\])"[],}]*$/ }
-function rscan(s, ds, vs, pos, vit, dl, mr,   n, w, i, j, t, c, nm, n0, q, first, rest, v, r, br, st) {
-  n = split(s, w, /[ \t]+/); first = 1; rest = 0; st = 0
+# rtab: the tables of the runners R (blank-separated) joined: denied and value-taking short letters (TDS, TVS) and long names (TDL, TVL),
+# the value checks (TCK) and the parser (TMR: y yargs, m mri, c commander; two different ones read as mri, the strictest).
+function rtab(R,   n, x, i) {
+  TDS = TVS = TDL = TVL = TCK = TMR = ""
+  if (!(n = split(R, x, " "))) { TVL = RVL; TCK = "j"; TMR = "y"; return }
+  for (i = 1; i <= n; i++) {
+    TDS = TDS RDS[x[i]]; TVS = TVS RVS[x[i]]; TDL = TDL RDX[x[i]]; TVL = TVL ((x[i] in RVX) ? RVX[x[i]] : RVL); TCK = TCK RCK[x[i]]
+    TMR = (TMR == "" || TMR == RM[x[i]]) ? RM[x[i]] : "m"
+  }
+}
+# rval: 1 when the value v of a config (isc) or env (ise) option is denied: jest inline JSON (no config scan reads it), a playwright
+# config that is no `*.config.{ts,js,mts,mjs,cts,cjs}` file (a test directory narrows testDir), a cypress config naming specPattern or
+# excludeSpecPattern, a cypress env naming a @cypress/grep key (grep, grepTags, grepInvert, ...). Task M1-81, #15 comment 7102820038.
+function rval(isc, ise, v) {
+  v = rclean(v); if (v == "") return 0
+  if (isc && index(TCK, "j") && v ~ /^\{/) return 1
+  if (isc && index(TCK, "p") && v !~ /(^|\/)[^\/]*\.config\.[cm]?[jt]s$/) return 1
+  v = tolower(v)
+  if (isc && index(TCK, "y") && index(v, "specpattern")) return 1
+  return ise && index(TCK, "y") && v ~ /(^|[^a-z0-9_])grep[a-z]*["\047]?[ \t]*[=:]/
+}
+function rscan(s, R, pos, fw, dl,   n, w, i, j, t, c, nm, n0, q, first, rest, v, r, br, st) {
+  rtab(R); n = split(s, w, /[ \t]+/); first = 1; rest = 0; st = 0
   for (i = 1; i <= n; i++) {
     if (st) break
     st = jsend(w[i]); t = rclean(w[i]); if (t == "") continue
@@ -488,10 +512,10 @@ function rscan(s, ds, vs, pos, vit, dl, mr,   n, w, i, j, t, c, nm, n0, q, first
     if (t ~ /^--./) {
       nm = substr(t, 3); q = index(nm, "="); if (q) nm = substr(nm, 1, q - 1)
       n0 = nm; nm = tolower(nm); gsub(/-/, "", nm)
-      if (index(RDL dl, " " nm " ") || (length(n0) == 1 && index(ds, n0))) return 1
+      if (index(RDL TDL dl, " " nm " ") || (length(n0) == 1 && index(TDS, n0))) return 1
       v = (q ? substr(t, q + 3) : "")
-      if (!q && (index(RVL, " " nm " ") || (length(n0) == 1 && index(vs, n0))) && i < n && rclean(w[i + 1]) !~ /^-/) { i++; v = w[i] }
-      if ((nm == "config" || n0 == "c") && rclean(v) ~ /^\{/) return 1
+      if (!q && (index(TVL, " " nm " ") || (length(n0) == 1 && index(TVS, n0))) && i < n && rclean(w[i + 1]) !~ /^-/) { i++; v = w[i] }
+      if (rval(nm == "config" || n0 == "c", nm == "env" || n0 == "e", v)) return 1
       continue
     }
     if (t ~ /^-([0-9]+(\.[0-9]+)?|\.[0-9]+)$/ || t == "-") continue  # a negative number
@@ -499,15 +523,16 @@ function rscan(s, ds, vs, pos, vit, dl, mr,   n, w, i, j, t, c, nm, n0, q, first
       br = 0
       for (j = 2; j <= length(t); j++) {
         c = substr(t, j, 1); r = substr(t, j + 1)
-        if (index(ds, c)) return 1
+        if (index(TDS, c)) return 1
         if (r ~ /^=/) { v = substr(r, 2); br = 1; break }
-        if (!mr && ((c ~ /[A-Za-z]/ && r ~ /^-?[0-9]+(\.[0-9]*)?(e-?[0-9]+)?$/) || r ~ /^[^A-Za-z0-9_]/)) { v = r; br = 1; break }
+        if (TMR == "c" && r != "" && index(TVS, c)) { v = r; br = 1; break }
+        if (TMR == "y" && ((c ~ /[A-Za-z]/ && r ~ /^-?[0-9]+(\.[0-9]*)?(e-?[0-9]+)?$/) || r ~ /^[^A-Za-z0-9_]/)) { v = r; br = 1; break }
       }
-      if (!br && index(vs, c) && i < n && rclean(w[i + 1]) !~ /^-/) { i++; v = w[i]; br = 1 }
-      if (br && c == "c" && rclean(v) ~ /^\{/) return 1
+      if (!br && index(TVS, c) && i < n && rclean(w[i + 1]) !~ /^-/) { i++; v = w[i]; br = 1 }
+      if (br && rval(c == "c", c == "e", v)) return 1
       continue
     }
-    if (pos && !(vit && first && t ~ /^(run|watch|dev)$/)) return 1
+    if (pos && !(fw != "" && first && t ~ fw)) return 1
     first = 0
   }
   return 0
@@ -534,26 +559,28 @@ function cmdat(w, n, i0,   i, t, l, v, q) {
   }
   return 0
 }
-# runopt: 1 when command p passes a denied option to jest, vitest or mocha, directly or in an npm `--` tail.
-function runopt(p,   n, w, k, a, r, i, dd, ds, vs, dl, pos, tl, mr, s0) {
+# runopt: 1 when command p passes a denied option to jest, vitest, mocha, playwright or cypress, directly or in an npm `--` tail.
+# playwright and cypress are read only with their test subcommand (RSUB, RREQ: `playwright test`, `cypress run`) as the command.
+function runopt(p,   n, w, k, a, r, i, dd, rs, dl, tl, s0, w1) {
   if (datacmd(p)) return 0
   n = split(p, w, /[ \t]+/)
   for (k = cmdat(w, n, 1); k; k = (JSF ? cmdat(w, n, i) : 0)) {  # in a package.json, every script value on the line
     a = rname(w[k]); tl = ""; for (i = k + 1; i <= n && !jsend(w[i - 1]); i++) tl = tl " " w[i]
-    if ((a in RDS) && rscan(tl, RDS[a], RVS[a], a != "mocha", a == "vitest", "", a == "vitest")) return 1
+    if (!(a in RDS)) continue
+    if (a in RREQ) { w1 = tl; sub(/^[ \t]+/, "", w1); sub(/[ \t].*$/, "", w1); if (rclean(w1) !~ RSUB[a]) continue; tl = substr(tl, index(tl, w1) + length(w1)) }
+    if (rscan(tl, a, a != "mocha", (a in RREQ) ? "" : RSUB[a], "")) return 1
   }
   for (r in RDS) for (s0 = p; has(s0, r); s0 = substr(s0, 2)) {  # every mention: a package.json value ends a scan (R2-02)
-    s0 = after(s0, r); if (rscan(s0, RDS[r], RVS[r], 0, 0, "", r == "vitest")) return 1
+    s0 = after(s0, r); if (rscan(s0, r, 0, "", "")) return 1
   }
   dd = ddseg(p); if (dd == "") return 0
-  if (!ddrun(p)) return rscan(dd, "", "", 0, 0, "", 0)
-  ds = vs = dl = ""; pos = mr = 0
-  for (i = 1; i <= NS[DDN]; i++) {
-    a = NC[DDN, i]; sub(/^[ \t]*(npx[ \t]+)?/, "", a); sub(/[ \t].*$/, "", a)
-    if (a in RDS) { ds = ds RDS[a]; vs = vs RVS[a]; pos = 1 } else { ds = ds RDS["jest"] RDS["mocha"]; mr = 1 }  # playwright, cypress: task M1-81
+  if (!ddrun(p)) return rscan(dd, "", 0, "", "")
+  rs = dl = ""
+  for (i = 1; i <= NS[DDN]; i++) {  # plainrun: every definition is `[npx] <runner> ...`, a runner of RUNRE, all in RDS
+    a = NC[DDN, i]; sub(/^[ \t]*(npx[ \t]+)?/, "", a); sub(/[ \t].*$/, "", a); rs = rs " " a
     if (a == "mocha") dl = "spec "  # a spec in the tail, like a positional word, may replace the configured one
   }
-  return rscan(dd, ds, vs, pos, 0, dl, mr)
+  return rscan(dd, rs, 1, "", dl)
 }
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
@@ -681,10 +708,18 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   # runopt (check 1, task M1-71): denied long names (normalized: lower case, no dashes) and short letters per runner, and the allowed
   # options whose value may follow as the next word. jest -t, -o, -f: name filter, onlyChanged, onlyFailures; vitest -u: update;
   # mocha -g, -f, -i: grep, fgrep, invert (its -t, -u, -R are timeout, ui, reporter).
-  RDL = " updatesnapshot update passwithnotests testnamepattern testpathignorepatterns testpathpattern testpathpatterns onlychanged changedsince findrelatedtests lastcommit onlyfailures changed grep fgrep invert exclude ignore filter "
+  RDL = " updatesnapshot update passwithnotests testnamepattern testpathignorepatterns testpathpattern testpathpatterns onlychanged changedsince findrelatedtests lastcommit onlyfailures changed grep fgrep invert exclude ignore filter updatesnapshots ignoresnapshots list grepinvert testlist testlistinvert nodeps lastfailed "
   RVL = " config maxworkers shard testtimeout timeout reporters reporter reporteroption reporteroptions outputfile coveragereporters coveragedirectory seed testenvironment environment env cachedirectory pool ui slow require spec jobs "
   RDS["jest"] = "utof"; RDS["vitest"] = "ut"; RDS["mocha"] = "gfi"
   RVS["jest"] = "cw"; RVS["vitest"] = "c"; RVS["mocha"] = "tuRsrj"
+  RM["jest"] = RM["mocha"] = "y"; RM["vitest"] = "m"; RCK["jest"] = RCK["vitest"] = RCK["mocha"] = "j"; RSUB["vitest"] = "^(run|watch|dev)$"
+  # Task M1-81 (#15 comment 7102820038): playwright and cypress (commander) with their own value-taking long names (RVX, in place of
+  # RVL) and denied extras (RDX); their long denied names are in RDL. playwright -u, -g (also -gv); cypress -s (--spec).
+  RDS["playwright"] = "ug"; RVS["playwright"] = "cj"; RM["playwright"] = "c"; RCK["playwright"] = "p"; RSUB["playwright"] = "^test$"
+  RVX["playwright"] = " config workers reporter output trace timeout globaltimeout maxfailures repeateach tsconfig updatesourcemethod uihost uiport project retries shard "
+  RDS["cypress"] = "s"; RVS["cypress"] = "bcCekpProt"; RM["cypress"] = "c"; RCK["cypress"] = "y"; RSUB["cypress"] = "^run$"; RDX["cypress"] = "spec "
+  RVX["cypress"] = " browser config configfile env port project reporter reporteroptions key tag record group cibuildid autocancelafterfailures "
+  RREQ["playwright"] = RREQ["cypress"] = 1
   np = split(ENVIRON["NPMS"], P, "\n")  # pkgscripts: name TAB command; a bare TAB makes every tail unknown
   for (i = 1; i <= np; i++) if ((j = index(P[i], "\t")) == 1) NPMU = 1; else if (j) { nm = substr(P[i], 1, j - 1); NC[nm, ++NS[nm]] = substr(P[i], j + 1) }
   nl = split(ENVIRON["CLI_ALLOW"], L, "\n")

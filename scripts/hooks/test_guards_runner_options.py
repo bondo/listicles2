@@ -258,7 +258,8 @@ class PlaywrightCypressTests(RunnerCase):
         self.put("scripts/test.sh", "\n".join(lines) + "\n")
         self.each_line_fails("scripts/test.sh", lines)
         ok = self.lines("npm run e2e --", [o for o in PW_ALLOWED if o]) + self.lines("npm run cy --", [o for o in CY_ALLOWED if o])
-        ok += ["npm run e2e -- -t smoke", "npm run cy -- -u"]  # not their options any more (commander refuses them): no jest letters
+        # jest and mocha letters are no longer read here (commander refuses them); a word after one is still a positional filter
+        ok += ["npm run e2e -- -t", "npm run e2e -- -o", "npm run cy -- -u", "npm run cy -- -f"]
         self.put("scripts/test.sh", "\n".join(ok) + "\n")
         self.assertPasses()
 
