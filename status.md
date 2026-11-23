@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 59/97 (60%) | 38 |
+| M1 | Accounts and households | 63/97 (64%) | 34 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 59/97 done (60%), 38 open.
+**Progress:** 63/97 done (64%), 34 open.
 
 ### Tasks
 
@@ -207,12 +207,12 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-O5 | Approve the privacy text (OQ-30) before anyone but the owner installs the app | owner to-do | M1-28 | owner |  |
 | M1-O6 | Deploy firestore.rules to the real project after each merged rules PR and before each tester build | owner to-do | M1-O1, M1-11 | owner |  |
 | M1-O7 | Answer the M1 planning questions Q1-Q7 (docs/milestones/M1.md section 6.1) | done | none | owner |  |
-| M1-O8 | Turn on secret scanning non-provider patterns and validity checks (repo settings) | owner to-do | none | owner |  |
-| M1-O9 | Turn off CodeQL default setup when the advanced workflow of M1-73 merges | owner to-do | M1-73 | owner |  |
+| M1-O8 | Turn on secret scanning non-provider patterns and validity checks (repo settings) | dropped | none | owner |  |
+| M1-O9 | Turn off CodeQL default setup when the advanced workflow of M1-73 merges | done | M1-73 | owner |  |
 | M1-O10 | Ask the owner about the repo rename to Tally (right before M1-O1) | done | M1-29 | owner |  |
-| M1-O11 | Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… | owner to-do | M1-03 | owner |  |
+| M1-O11 | Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… | done | M1-03 | owner |  |
 | M1-O12 | Decide #280 (who may list invites) before M1-12 starts | done | none | owner |  |
-| M1-O13 | Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… | owner to-do | M1-33 | owner |  |
+| M1-O13 | Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… | done | M1-33 | owner |  |
 | M1-O14 | Decide the licences of the 17 artifacts &#58;app needs for Firebase Auth and Credential Manager (list … | done | none | owner |  |
 | M1-O15 | Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5) | owner to-do | M1-O1, M1-O2, M1-66, M1-16 | owner |  |
 
@@ -255,11 +255,7 @@ flowchart LR
     n30["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
     n31["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
     n32["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n33["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n34["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n35["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n36["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
-    n37["M1-O15 Check once with a real Google sign-in … (owner to-do)"]:::owner
+    n33["M1-O15 Check once with a real Google sign-in … (owner to-do)"]:::owner
     n18 --> n1
     n17 --> n1
     n3 --> n4
@@ -351,10 +347,10 @@ flowchart LR
     n27 --> n30
     n27 --> n32
     n1 --> n32
-    n27 --> n37
-    n28 --> n37
-    n3 --> n37
-    n5 --> n37
+    n27 --> n33
+    n28 --> n33
+    n3 --> n33
+    n5 --> n33
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
