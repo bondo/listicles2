@@ -75,6 +75,10 @@ firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+# M1-46: build-logic compiles against the plugins the build applies (compileOnly; the versions above).
+android-gradle-api = { module = "com.android.tools.build:gradle-api", version.ref = "agp" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+detekt-gradle-plugin = { group = "io.gitlab.arturbosch.detekt", name = "detekt-gradle-plugin", version.ref = "detekt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -90,3 +94,9 @@ pitest = { id = "info.solidsoft.pitest", version.ref = "pitestPlugin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+# M1-46: the convention plugins of the included build build-logic/ (no version: they are built with the project).
+listicles-jvm-library = { id = "listicles.jvm.library" }
+listicles-jvm-testsupport = { id = "listicles.jvm.testsupport" }
+listicles-android-library = { id = "listicles.android.library" }
+listicles-android-application = { id = "listicles.android.application" }
+listicles-dependency-floors = { id = "listicles.dependency.floors" }
