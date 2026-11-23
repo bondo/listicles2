@@ -16,6 +16,7 @@ dependencies {
     testImplementation(libs.kotest.runner)
     testImplementation(libs.kotest.assertions)
     testImplementation(libs.kotest.property)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.konsist)
     testImplementation(project(":core:testing"))
     testRuntimeOnly(libs.junit.platform.launcher)
