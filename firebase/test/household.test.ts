@@ -9,6 +9,10 @@ import * as h from "./harness";
 // M1-10 (PLAN 3.1): Create household + owner, one batch with the one-household check (P1, P3, P4,
 // #199), and the update of the caller's own member doc (displayName, P4). Each test seeds its world
 // with rules off; every allow test goes through h.verifiedOnly. The transfer is M1-53's.
+// No test can isolate these (a scratch mutation pass dropped each condition in turn): hasAll (each
+// key's value is checked too), the household's own !exists (implied by create), ownerUid == caller
+// on either doc (the other doc checks it), deleted == false and exists(users/uid) (the users-doc set
+// and the get() that follows check them).
 type Fields = Record<string, unknown>;
 let env: RulesTestEnvironment;
 let alice: Record<h.Client, h.Db>;
