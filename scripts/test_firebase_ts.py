@@ -31,8 +31,9 @@ SCRIPTS = {
 }
 # Every verify.sh step and CI step this task adds. verify.sh runs them in this order: install first, the rules emulator test last.
 NPM = "bash -c 'cd firebase && npm {} --silent'"
-VERIFY = [NPM.format(c) for c in ("ci", "run typecheck", "run lint", "run format:check")] + ["python3 -I scripts/test_firebase_ts.py", NPM.format("test")]
-CI = ["npm ci --silent", "npm run typecheck --silent", "npm run lint --silent", "npm run format:check --silent", "npm test --silent"]
+VERIFY = [NPM.format(c) for c in ("ci --ignore-scripts", "run typecheck", "run lint", "run format:check")] + [
+    "python3 -I scripts/test_firebase_ts.py", NPM.format("test")]
+CI = ["npm ci --ignore-scripts --silent", "npm run typecheck --silent", "npm run lint --silent", "npm run format:check --silent", "npm test --silent"]
 CI_ROOT_CMD = "python3 -I scripts/test_firebase_ts.py"
 # Dependabot ignores these npm packages in /firebase, and nothing else: semver-major only. typescript: TypeScript 7 is not supported by
 # ts-jest (typescript <7) or typescript-eslint (typescript <6.1). @types/node: 26 declares APIs that the Node 22 used in CI lacks.
