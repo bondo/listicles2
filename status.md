@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 47/90 (52%) | 43 |
+| M1 | Accounts and households | 49/90 (54%) | 41 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 47/90 done (52%), 43 open.
+**Progress:** 49/90 done (54%), 41 open.
 
 ### Tasks
 
@@ -139,7 +139,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-71 | guards check 1&#58; test-runner options that skip or rewrite tests on command lines (jest, vitest, … | in progress | M1-65 | implementer | [#339](https://github.com/bondo/listicles2/issues/339) |
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/listicles2/issues/303) |
 | M1-14 | Auth data 1&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step | done | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/listicles2/issues/319) |
-| M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | ready | M1-14 | implementer |  |
+| M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | in progress | M1-14 | implementer | [#348](https://github.com/bondo/listicles2/issues/348) |
 | M1-66 | Auth wiring&#58; Credential Manager wrapper (Google ID option), &#58;app on &#58;core&#58;data with licensee, H… | blocked | M1-67, M1-O14 | implementer |  |
 | M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-66, M1-62 | implementer |  |
 | M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | blocked | M1-66, M1-03, M1-49 | implementer |  |
@@ -184,7 +184,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-42 | guards check 2c&#58; actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174) | done | M1-01 | implementer | [#321](https://github.com/bondo/listicles2/issues/321) |
 | M1-43 | prompt_rules.py&#58; sentence-level negation for the resolve-thread rule (issue 153) | done | M1-01 | implementer |  |
 | M1-44 | CI hardening nits&#58; job timeouts, pinned python and node, gitleaks download, npm install scripts … | done | M1-01 | implementer | [#331](https://github.com/bondo/listicles2/issues/331) |
-| M1-73 | Advanced CodeQL workflow&#58; java-kotlin with a Gradle build, plus actions, javascript-typescript a… | ready | M1-01 | implementer |  |
+| M1-73 | Advanced CodeQL workflow&#58; java-kotlin with a Gradle build, plus actions, javascript-typescript a… | in progress | M1-01 | implementer | [#347](https://github.com/bondo/listicles2/issues/347) |
 | M1-74 | Hash-locked pip requirements for the lint tools (issue 189 item 5) | ready | M1-44 | implementer |  |
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/listicles2/issues/292) |
 | M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issue 217 items 1-3) | done | M1-02 | implementer |  |
@@ -203,11 +203,11 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-O7 | Answer the M1 planning questions Q1-Q7 (docs/milestones/M1.md section 6.1) | done | none | owner |  |
 | M1-O8 | Turn on secret scanning non-provider patterns and validity checks (repo settings) | owner to-do | none | owner |  |
 | M1-O9 | Turn off CodeQL default setup when the advanced workflow of M1-73 merges | owner to-do | M1-73 | owner |  |
-| M1-O10 | Ask the owner about the repo rename to Tally (right before M1-O1) | owner to-do | M1-29 | owner |  |
+| M1-O10 | Ask the owner about the repo rename to Tally (right before M1-O1) | done | M1-29 | owner |  |
 | M1-O11 | Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… | owner to-do | M1-03 | owner |  |
 | M1-O12 | Decide #280 (who may list invites) before M1-12 starts | done | none | owner |  |
 | M1-O13 | Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… | owner to-do | M1-33 | owner |  |
-| M1-O14 | Decide the licences of the 17 artifacts &#58;app needs for Firebase Auth and Credential Manager (list … | owner to-do | none | owner |  |
+| M1-O14 | Decide the licences of the 17 artifacts &#58;app needs for Firebase Auth and Credential Manager (list … | done | none | owner |  |
 
 ### Open tasks and what blocks them
 
@@ -220,7 +220,7 @@ flowchart LR
     n2["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n3["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
     n4["M1-71 guards check 1: test-runner options tha… (in progress)"]:::progress
-    n5["M1-67 Auth data 2: Firebase session state, Go… (ready)"]:::ready
+    n5["M1-67 Auth data 2: Firebase session state, Go… (in progress)"]:::progress
     n6["M1-66 Auth wiring: Credential Manager wrap… (blocked)"]:::blocked
     n7["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
     n8["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
@@ -240,7 +240,7 @@ flowchart LR
     n22["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n23["M1-76 Status graph styling: a colour-blind-sa… (ready)"]:::ready
     n24["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n25["M1-73 Advanced CodeQL workflow: java-kotlin… (ready)"]:::ready
+    n25["M1-73 Advanced CodeQL workflow: java-kotlin… (in progress)"]:::progress
     n26["M1-74 Hash-locked pip requirements for the l… (ready)"]:::ready
     n27["M1-68 Root check tasks without cross-project… (ready)"]:::ready
     n28["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
@@ -254,16 +254,13 @@ flowchart LR
     n36["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
     n37["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
     n38["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n39["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
-    n40["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n41["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
-    n42["M1-O14 Decide the licences of the 17 artifacts… (owner to-do)"]:::owner
+    n39["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n40["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
     n1 --> n0
     n21 --> n2
     n20 --> n2
     n1 --> n3
     n5 --> n6
-    n42 --> n6
     n6 --> n7
     n6 --> n8
     n7 --> n9
@@ -354,7 +351,6 @@ flowchart LR
     n25 --> n30
     n26 --> n30
     n23 --> n30
-    n39 --> n31
     n31 --> n32
     n31 --> n33
     n31 --> n34
@@ -462,10 +458,11 @@ flowchart LR
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
 - **owner to-do** [#346](https://github.com/bondo/listicles2/issues/346): &#91;owner&#93; M1-O8&#58; Turn on secret scanning non-provider patterns and validity checks
+- **PR to merge** [#340](https://github.com/bondo/listicles2/issues/340): M1-77&#58; state issue body as one validated JSON block (scripts/state_body.py validate), part A of pr…
 - **task** M1-06: waits on M1-10
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-12: waits on M1-10
-- **task** M1-66: waits on M1-67, M1-O14
+- **task** M1-66: waits on M1-67
 - **task** M1-15: waits on M1-66
 - **task** M1-16: waits on M1-66
 - **task** M1-17: waits on M1-15, M1-16
@@ -484,7 +481,6 @@ flowchart LR
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +8
 - **task** M1-48: waits on M1-06, M1-10, M1-11 +19
 - **task** M1-FU: waits on M1-06, M1-10, M1-11 +27
-- **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
 - **task** M1-O4: waits on M1-O1
