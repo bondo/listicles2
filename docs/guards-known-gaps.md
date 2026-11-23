@@ -54,6 +54,11 @@ reason is true and specific (`REVIEW.md`, item 8).
 - **Values split from their key** (`"strict":` then `false` on the next line), the YAML eslintrc form, a multi-line block directive, rarer
   mypy and ruff options, and the INI key case (comments on issue 46 from PR 43 review rounds 1 to 4): not done in this batch. They are
   small and independent, so a later batch can take them one at a time with tests.
+- **Check settings moved into build-logic (M1-68 part A, PR 329 R2-01, accepted residual).** The next-line continuation check reads the
+  first code line after the setting with only spaces and tabs stripped, and only `{` starts a lambda. So a labeled or annotated lambda on
+  the next line (`useJUnitPlatform()` then `fast@{ includeTags("fast") }`), and a continuation after a form feed or lone CR (`= true`
+  then `\f&& flag`), still count as the setting. These are not accidental forms; the guard is a tripwire (F18), and part B's per-module
+  Test-task check (`checkTestSettings` in every module, `scripts/test_test_settings_gate.py`) closes the gap at build level.
 - **Mentions the threshold scan lets through (task 1b, see #322; M1-68 part B; tests in `scripts/hooks/test_guards_mentions.py`).** Plural
   `thresholds` in markdown before `,` `;` `)`, a full stop or a word is prose even with a digit on the line, so `coverage thresholds are 80`
   in markdown is not compared. In a `.py` file that is no test file, `useJUnitPlatform` and `failOnNoDiscoveredTests` inside a `#` comment
