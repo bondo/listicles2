@@ -134,7 +134,7 @@ describe("a member of the live household (M(uid), LIVE)", () => {
     });
 });
 
-// M(uid) of this household: neither a householdId that points at it nor a membership elsewhere.
+// Not M(uid): a householdId pointing at the household, or a membership elsewhere, makes no member.
 describe("not a member of the live household", () => {
     const outsiders: [string, () => Clients][] = [
         ["in no household", () => frank],
