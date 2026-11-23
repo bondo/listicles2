@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1910" viewBox="0 0 880 1910" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 52/95; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 2 PRs waiting, 33 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1910" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1888" viewBox="0 0 880 1888" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 53/95; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/0; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 1 PRs waiting, 33 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="1888" class="bg"/>
 <text x="24" y="36" class="fg t">Listicles status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-23 13:21 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-23 13:28 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 46. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -22,13 +22,13 @@
 <text x="60" y="308" class="ok">35 done</text>
 <rect x="24" y="332" width="832" height="484" rx="6" class="card"/>
 <text x="40" y="356" class="fg h">M1 Accounts and households</text>
-<text x="840" y="356" class="fg" text-anchor="end">54%  52/95</text>
+<text x="840" y="356" class="fg" text-anchor="end">55%  53/95</text>
 <text x="840" y="374" class="info s" text-anchor="end">current</text>
 <text x="40" y="374" class="muted s">Google and email sign-in, households, invite links, members and ownership, with rules tests.</text>
 <rect x="40" y="386" width="640" height="8" rx="3" class="track"/>
-<rect x="40" y="386" width="350" height="8" rx="3" class="bar"/>
+<rect x="40" y="386" width="357" height="8" rx="3" class="bar"/>
 <polyline points="40,414 43,417 48,410" class="tick mk-done"/>
-<text x="60" y="418" class="ok">52 done</text>
+<text x="60" y="418" class="ok">53 done</text>
 <rect x="40" y="430" width="8" height="8" class="warn mk-blocked"/>
 <text x="60" y="438" class="warn">blocked</text>
 <text x="180" y="438" class="fg h">M1-06</text>
@@ -48,8 +48,8 @@
 <text x="180" y="526" class="fg h">M1-12</text>
 <text x="262" y="526" class="fg">Rules: invites (create, get, list, revoke, cleanup), incl. unverified get denie…</text>
 <text x="262" y="540" class="muted s">waits on M1-10</text>
-<circle cx="44" cy="556" r="4.5" class="ok mk-ready"/>
-<text x="60" y="560" class="ok">ready</text>
+<polygon points="39,560 49,560 44,551" class="info mk-progress"/>
+<text x="60" y="560" class="info">in progress #358</text>
 <text x="180" y="560" class="fg h">M1-81</text>
 <text x="262" y="560" class="fg">guards check 1: playwright and cypress test-runner options on command lines</text>
 <polygon points="39,580 49,580 44,571" class="info mk-progress"/>
@@ -86,7 +86,7 @@
 <text x="180" y="770" class="fg h">M1-31</text>
 <text x="262" y="770" class="fg">Household data 2: leave, remove (marker, resumable), transfer, delete with …</text>
 <text x="262" y="784" class="muted s">waits on M1-11, M1-18</text>
-<text x="60" y="804" class="muted">+31 more open tasks</text>
+<text x="60" y="804" class="muted">+30 more open tasks</text>
 <rect x="24" y="828" width="832" height="146" rx="6" class="card"/>
 <text x="40" y="852" class="fg h">M2 Inventory lists</text>
 <text x="840" y="852" class="fg" text-anchor="end">0%  0/2</text>
@@ -144,59 +144,56 @@
 <text x="24" y="1486" class="fg h">#351</text>
 <text x="80" y="1486" class="fg">build(deps): Bump the gradle-minor-patch group across 1 d…</text>
 <text x="856" y="1486" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1508" class="fg h">#353</text>
-<text x="80" y="1508" class="fg">M1-76: status graph: a colour-blind-safe colour per source…</text>
-<text x="856" y="1508" class="warn" text-anchor="end">CI pending</text>
-<text x="24" y="1542" class="fg h">BLOCKERS</text>
-<text x="856" y="1542" class="muted s" text-anchor="end">33 open</text>
-<line x1="24" y1="1550" x2="856" y2="1550" class="rule"/>
+<text x="24" y="1520" class="fg h">BLOCKERS</text>
+<text x="856" y="1520" class="muted s" text-anchor="end">33 open</text>
+<line x1="24" y1="1528" x2="856" y2="1528" class="rule"/>
+<text x="24" y="1552" class="bad">owner to-do</text>
+<text x="120" y="1552" class="fg h">#120</text>
+<text x="190" y="1552" class="fg">[owner] Register a free limited-distribution Android deve…</text>
+<text x="856" y="1552" class="muted" text-anchor="end">6d</text>
 <text x="24" y="1574" class="bad">owner to-do</text>
-<text x="120" y="1574" class="fg h">#120</text>
-<text x="190" y="1574" class="fg">[owner] Register a free limited-distribution Android deve…</text>
-<text x="856" y="1574" class="muted" text-anchor="end">6d</text>
+<text x="120" y="1574" class="fg h">#289</text>
+<text x="190" y="1574" class="fg">[owner] M1-O11: Add the screenshots check to the main ru…</text>
+<text x="856" y="1574" class="muted" text-anchor="end">1d</text>
 <text x="24" y="1596" class="bad">owner to-do</text>
-<text x="120" y="1596" class="fg h">#289</text>
-<text x="190" y="1596" class="fg">[owner] M1-O11: Add the screenshots check to the main ru…</text>
+<text x="120" y="1596" class="fg h">#291</text>
+<text x="190" y="1596" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
 <text x="856" y="1596" class="muted" text-anchor="end">1d</text>
 <text x="24" y="1618" class="bad">owner to-do</text>
-<text x="120" y="1618" class="fg h">#291</text>
-<text x="190" y="1618" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
-<text x="856" y="1618" class="muted" text-anchor="end">1d</text>
+<text x="120" y="1618" class="fg h">#318</text>
+<text x="190" y="1618" class="fg">[owner] M1-O13: add release-smoke to the main ruleset r…</text>
+<text x="856" y="1618" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1640" class="bad">owner to-do</text>
-<text x="120" y="1640" class="fg h">#318</text>
-<text x="190" y="1640" class="fg">[owner] M1-O13: add release-smoke to the main ruleset r…</text>
+<text x="120" y="1640" class="fg h">#346</text>
+<text x="190" y="1640" class="fg">[owner] M1-O8: Turn on secret scanning non-provider patte…</text>
 <text x="856" y="1640" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1662" class="bad">owner to-do</text>
-<text x="120" y="1662" class="fg h">#346</text>
-<text x="190" y="1662" class="fg">[owner] M1-O8: Turn on secret scanning non-provider patte…</text>
+<text x="120" y="1662" class="fg h">#354</text>
+<text x="190" y="1662" class="fg">[owner] M1-O1: Create the Firebase project (Spark, Firest…</text>
 <text x="856" y="1662" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1684" class="bad">owner to-do</text>
-<text x="120" y="1684" class="fg h">#354</text>
-<text x="190" y="1684" class="fg">[owner] M1-O1: Create the Firebase project (Spark, Firest…</text>
-<text x="856" y="1684" class="muted" text-anchor="end">0d</text>
+<text x="24" y="1684" class="warn">task</text>
+<text x="120" y="1684" class="fg h">M1-06</text>
+<text x="190" y="1684" class="fg">waits on M1-10</text>
 <text x="24" y="1706" class="warn">task</text>
-<text x="120" y="1706" class="fg h">M1-06</text>
-<text x="190" y="1706" class="fg">waits on M1-10</text>
+<text x="120" y="1706" class="fg h">M1-11</text>
+<text x="190" y="1706" class="fg">waits on M1-54, M1-53</text>
 <text x="24" y="1728" class="warn">task</text>
-<text x="120" y="1728" class="fg h">M1-11</text>
-<text x="190" y="1728" class="fg">waits on M1-54, M1-53</text>
+<text x="120" y="1728" class="fg h">M1-12</text>
+<text x="190" y="1728" class="fg">waits on M1-10</text>
 <text x="24" y="1750" class="warn">task</text>
-<text x="120" y="1750" class="fg h">M1-12</text>
-<text x="190" y="1750" class="fg">waits on M1-10</text>
+<text x="120" y="1750" class="fg h">M1-66</text>
+<text x="190" y="1750" class="fg">waits on M1-67</text>
 <text x="24" y="1772" class="warn">task</text>
-<text x="120" y="1772" class="fg h">M1-66</text>
-<text x="190" y="1772" class="fg">waits on M1-67</text>
+<text x="120" y="1772" class="fg h">M1-15</text>
+<text x="190" y="1772" class="fg">waits on M1-66</text>
 <text x="24" y="1794" class="warn">task</text>
-<text x="120" y="1794" class="fg h">M1-15</text>
+<text x="120" y="1794" class="fg h">M1-16</text>
 <text x="190" y="1794" class="fg">waits on M1-66</text>
 <text x="24" y="1816" class="warn">task</text>
-<text x="120" y="1816" class="fg h">M1-16</text>
-<text x="190" y="1816" class="fg">waits on M1-66</text>
+<text x="120" y="1816" class="fg h">M1-17</text>
+<text x="190" y="1816" class="fg">waits on M1-15, M1-16</text>
 <text x="24" y="1838" class="warn">task</text>
-<text x="120" y="1838" class="fg h">M1-17</text>
-<text x="190" y="1838" class="fg">waits on M1-15, M1-16</text>
-<text x="24" y="1860" class="warn">task</text>
-<text x="120" y="1860" class="fg h">M1-18</text>
-<text x="190" y="1860" class="fg">waits on M1-54, M1-66</text>
-<text x="24" y="1882" class="muted">+19 more</text>
+<text x="120" y="1838" class="fg h">M1-18</text>
+<text x="190" y="1838" class="fg">waits on M1-54, M1-66</text>
+<text x="24" y="1860" class="muted">+19 more</text>
 </svg>

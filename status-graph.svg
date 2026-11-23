@@ -1,75 +1,74 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1156" height="936" viewBox="0 0 1156 936" role="img" aria-labelledby="ti de"><title id="ti">Open tasks and their dependencies</title><desc id="de">49 open tasks, 56 dependencies</desc><style>.bg{fill:#ffffff}.card{fill:#f6f8fa}.fg{fill:#1f2328}.muted{fill:#59636e}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.edge{stroke:#8c959f;fill:none;stroke-width:1.2}.ah{fill:#8c959f}.nd-ready{fill:#dafbe1;stroke:#1a7f37}.nd-review{fill:#ddf4ff;stroke:#0969da}.nd-blocked{fill:#fff8c5;stroke:#9a6700}.nd-owner{fill:#ffebe9;stroke:#cf222e}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px}.t{font-size:22px;font-weight:600}.h{font-size:14px;font-weight:600;paint-order:stroke;stroke:#f6f8fa;stroke-width:4px}.s{font-size:14px}.n{font-size:14px;font-weight:600}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}.fg{fill:#e6edf3}.muted{fill:#9198a1}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.edge{stroke:#6e7681}.h{stroke:#161b22}.ah{fill:#6e7681}.nd-ready{fill:#12261e;stroke:#3fb950}.nd-review{fill:#10294d;stroke:#4493f8}.nd-blocked{fill:#2f2408;stroke:#d29922}.nd-owner{fill:#3b1219;stroke:#f85149}}</style><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" class="ah"/></marker></defs><rect width="1156" height="936" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1152" height="972" viewBox="0 0 1152 972" role="img" aria-labelledby="ti de"><title id="ti">Open tasks and their dependencies</title><desc id="de">48 open tasks, 55 dependencies</desc><style>.bg{fill:#ffffff}.card{fill:#f6f8fa}.fg{fill:#1f2328}.muted{fill:#59636e}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.edge{fill:none;stroke-width:1.8}.crit{stroke-width:3.6}.key{stroke:#8c959f}.s0{stroke:#e69f00}.f0{fill:#e69f00}.s1{stroke:#56b4e9}.f1{fill:#56b4e9}.s2{stroke:#009e73}.f2{fill:#009e73}.s3{stroke:#0072b2}.f3{fill:#0072b2}.s4{stroke:#d55e00}.f4{fill:#d55e00}.s5{stroke:#cc79a7}.f5{fill:#cc79a7}.nd-ready{fill:#dafbe1;stroke:#1a7f37}.nd-review{fill:#ddf4ff;stroke:#0969da}.nd-blocked{fill:#fff8c5;stroke:#9a6700}.nd-owner{fill:#ffebe9;stroke:#cf222e}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px}.t{font-size:22px;font-weight:600}.h{font-size:14px;font-weight:600;paint-order:stroke;stroke:#f6f8fa;stroke-width:4px}.s{font-size:14px}.n{font-size:14px;font-weight:600}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}.fg{fill:#e6edf3}.muted{fill:#9198a1}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.key{stroke:#6e7681}.h{stroke:#161b22}.nd-ready{fill:#12261e;stroke:#3fb950}.nd-review{fill:#10294d;stroke:#4493f8}.nd-blocked{fill:#2f2408;stroke:#d29922}.nd-owner{fill:#3b1219;stroke:#f85149}}</style><defs><marker id="ah0" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f0"/></marker><marker id="ah1" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f1"/></marker><marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f2"/></marker><marker id="ah3" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f3"/></marker><marker id="ah4" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f4"/></marker><marker id="ah5" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f5"/></marker><marker id="ac0" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f0"/></marker><marker id="ac1" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f1"/></marker><marker id="ac2" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f2"/></marker><marker id="ac3" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f3"/></marker><marker id="ac4" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f4"/></marker><marker id="ac5" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f5"/></marker></defs><rect width="1152" height="972" class="bg"/>
 <text x="24" y="36" class="fg t">Open tasks and their dependencies</text>
-<text x="24" y="56" class="muted s">49 open tasks in 3 milestones. Task ids only; titles are on the status detail page.</text>
+<text x="24" y="56" class="muted s">48 open tasks in 3 milestones. Task ids only; titles are on the status detail page.</text>
 <text x="24" y="76" class="muted s">All done: M0 28/28; M0.5 35/35</text>
 <text x="24" y="96" class="muted s">Not planned yet: M3, M4, M5</text>
-<rect x="24" y="122" width="1108" height="526" rx="6" class="card"/>
-<rect x="24" y="658" width="1108" height="62" rx="6" class="card"/>
-<rect x="24" y="730" width="1108" height="92" rx="6" class="card"/>
-<path d="M216 229 H220 V244 H922 V358 H935" class="edge" data-from="M1-06" data-to="M1-48" marker-end="url(#ah)"/>
-<path d="M114 171 H122 V230 H135" class="edge" data-from="M1-10" data-to="M1-06" marker-end="url(#ah)"/>
-<path d="M114 166 H135" class="edge" data-from="M1-10" data-to="M1-12" marker-end="url(#ah)"/>
-<path d="M114 163 H118 V200 H135" class="edge" data-from="M1-10" data-to="M1-53" marker-end="url(#ah)"/>
-<path d="M420 163 H424 V224 H445" class="edge" data-from="M1-11" data-to="M1-31" marker-end="url(#ah)"/>
-<path d="M420 171 H428 V292 H445" class="edge" data-from="M1-11" data-to="M1-O6" marker-end="url(#ah)"/>
-<path d="M216 166 H241" class="edge" data-from="M1-12" data-to="M1-54" marker-end="url(#ah)"/>
-<path d="M322 540 H339" class="edge" data-from="M1-15" data-to="M1-17" marker-end="url(#ah)"/>
-<path d="M322 571 H326 V542 H339" class="edge" data-from="M1-16" data-to="M1-17" marker-end="url(#ah)"/>
-<path d="M420 535 H436 V520 H534 V438 H543" class="edge" data-from="M1-17" data-to="M1-20" marker-end="url(#ah)"/>
-<path d="M420 545 H432 V510 H445" class="edge" data-from="M1-17" data-to="M1-22" marker-end="url(#ah)"/>
-<path d="M420 541 H428 V438 H445" class="edge" data-from="M1-17" data-to="M1-39" marker-end="url(#ah)"/>
-<path d="M420 297 H424 V334 H445" class="edge" data-from="M1-18" data-to="M1-19" marker-end="url(#ah)"/>
-<path d="M420 291 H424 V234 H445" class="edge" data-from="M1-18" data-to="M1-31" marker-end="url(#ah)"/>
-<path d="M420 301 H428 V426 H445" class="edge" data-from="M1-18" data-to="M1-39" marker-end="url(#ah)"/>
-<path d="M526 337 H530 V428 H543" class="edge" data-from="M1-19" data-to="M1-20" marker-end="url(#ah)"/>
-<path d="M526 329 H530 V266 H543" class="edge" data-from="M1-19" data-to="M1-21" marker-end="url(#ah)"/>
-<path d="M624 433 H632 V456 H820 V430 H837" class="edge" data-from="M1-20" data-to="M1-47" marker-end="url(#ah)"/>
-<path d="M624 261 H628 V360 H641" class="edge" data-from="M1-21" data-to="M1-32" marker-end="url(#ah)"/>
-<path d="M526 505 H530 V488 H628 V370 H641" class="edge" data-from="M1-22" data-to="M1-32" marker-end="url(#ah)"/>
-<path d="M816 397 H820 V426 H837" class="edge" data-from="M1-23" data-to="M1-47" marker-end="url(#ah)"/>
-<path d="M322 509 H326 V524 H424 V500 H445" class="edge" data-from="M1-25" data-to="M1-22" marker-end="url(#ah)"/>
-<path d="M322 501 H326 V488 H424 V434 H445" class="edge" data-from="M1-25" data-to="M1-39" marker-end="url(#ah)"/>
-<path d="M322 473 H326 V452 H828 V440 H837" class="edge" data-from="M1-27" data-to="M1-47" marker-end="url(#ah)"/>
-<path d="M526 229 H530 V256 H543" class="edge" data-from="M1-31" data-to="M1-21" marker-end="url(#ah)"/>
-<path d="M722 365 H726 V392 H735" class="edge" data-from="M1-32" data-to="M1-23" marker-end="url(#ah)"/>
-<path d="M526 433 H530 V448 H824 V436 H837" class="edge" data-from="M1-39" data-to="M1-47" marker-end="url(#ah)"/>
-<path d="M918 433 H926 V370 H935" class="edge" data-from="M1-47" data-to="M1-48" marker-end="url(#ah)"/>
-<path d="M1016 365 H1028 V302 H1041" class="edge" data-from="M1-48" data-to="M1-FU" marker-end="url(#ah)"/>
-<path d="M216 199 H220 V182 H330 V168 H339" class="edge" data-from="M1-53" data-to="M1-11" marker-end="url(#ah)"/>
-<path d="M322 166 H339" class="edge" data-from="M1-54" data-to="M1-11" marker-end="url(#ah)"/>
-<path d="M322 167 H326 V292 H339" class="edge" data-from="M1-54" data-to="M1-18" marker-end="url(#ah)"/>
-<path d="M114 297 H118 V312 H1020 V294 H1041" class="edge" data-from="M1-61" data-to="M1-FU" marker-end="url(#ah)"/>
-<path d="M216 475 H224 V542 H241" class="edge" data-from="M1-66" data-to="M1-15" marker-end="url(#ah)"/>
-<path d="M216 479 H228 V572 H241" class="edge" data-from="M1-66" data-to="M1-16" marker-end="url(#ah)"/>
-<path d="M216 467 H220 V448 H326 V302 H339" class="edge" data-from="M1-66" data-to="M1-18" marker-end="url(#ah)"/>
-<path d="M216 471 H220 V506 H241" class="edge" data-from="M1-66" data-to="M1-25" marker-end="url(#ah)"/>
-<path d="M216 472 H241" class="edge" data-from="M1-66" data-to="M1-27" marker-end="url(#ah)"/>
-<path d="M114 472 H135" class="edge" data-from="M1-67" data-to="M1-66" marker-end="url(#ah)"/>
-<path d="M114 397 H118 V380 H922 V366 H935" class="edge" data-from="M1-68" data-to="M1-48" marker-end="url(#ah)"/>
-<path d="M114 365 H118 V348 H1032 V304 H1041" class="edge" data-from="M1-74" data-to="M1-FU" marker-end="url(#ah)"/>
-<path d="M114 333 H118 V316 H1024 V298 H1041" class="edge" data-from="M1-76" data-to="M1-FU" marker-end="url(#ah)"/>
-<path d="M114 229 H118 V266 H135" class="edge" data-from="M1-78" data-to="M1-79" marker-end="url(#ah)"/>
-<path d="M216 261 H220 V280 H1024 V288 H1041" class="edge" data-from="M1-79" data-to="M1-FU" marker-end="url(#ah)"/>
-<path d="M114 199 H126 V256 H135" class="edge" data-from="M1-80" data-to="M1-79" marker-end="url(#ah)"/>
-<path d="M114 261 H122 V276 H1020 V292 H1041" class="edge" data-from="M1-81" data-to="M1-FU" marker-end="url(#ah)"/>
-<path d="M114 437 H122 V542 H135" class="edge" data-from="M1-O1" data-to="M1-O2" marker-end="url(#ah)"/>
-<path d="M114 432 H135" class="edge" data-from="M1-O1" data-to="M1-O3" marker-end="url(#ah)"/>
-<path d="M114 433 H118 V506 H135" class="edge" data-from="M1-O1" data-to="M1-O4" marker-end="url(#ah)"/>
-<path d="M114 427 H118 V412 H432 V302 H445" class="edge" data-from="M1-O1" data-to="M1-O6" marker-end="url(#ah)"/>
-<path d="M216 541 H220 V776 H241" class="edge" data-from="M1-O2" data-to="M6-O1" marker-end="url(#ah)"/>
-<path d="M216 433 H220 V416 H726 V402 H735" class="edge" data-from="M1-O3" data-to="M1-23" marker-end="url(#ah)"/>
-<path d="M216 505 H232 V520 H330 V776 H339" class="edge" data-from="M1-O4" data-to="M6-O3" marker-end="url(#ah)"/>
-<path d="M114 702 H135" class="edge" data-from="M2-01" data-to="M2-FU" marker-end="url(#ah)"/>
-<path d="M322 774 H339" class="edge" data-from="M6-O1" data-to="M6-O3" marker-end="url(#ah)"/>
-<path d="M322 775 H326 V806 H339" class="edge" data-from="M6-O1" data-to="M6-O4" marker-end="url(#ah)"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 52/95 done, 43 open</text>
-<text x="34" y="676" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
-<text x="34" y="748" class="fg h">M6 Release: 0/4 done, 4 open</text>
+<rect x="24" y="122" width="1104" height="496" rx="6" class="card"/>
+<rect x="24" y="628" width="1104" height="62" rx="6" class="card"/>
+<rect x="24" y="700" width="1104" height="92" rx="6" class="card"/>
+<path d="M216 229 H220 V244 H922 V326 H935" class="edge s4" data-from="M1-06" data-to="M1-48" marker-end="url(#ah4)"/>
+<path d="M114 171 H122 V230 H135" class="edge s1" data-from="M1-10" data-to="M1-06" marker-end="url(#ah1)"/>
+<path d="M114 163 H118 V200 H135" class="edge s1" data-from="M1-10" data-to="M1-53" marker-end="url(#ah1)"/>
+<path d="M420 171 H428 V256 H445" class="edge s2" data-from="M1-11" data-to="M1-O6" marker-end="url(#ah2)"/>
+<path d="M322 540 H339" class="edge s3" data-from="M1-15" data-to="M1-17" marker-end="url(#ah3)"/>
+<path d="M322 571 H326 V542 H339" class="edge s5" data-from="M1-16" data-to="M1-17" marker-end="url(#ah5)"/>
+<path d="M420 535 H436 V520 H530 V406 H543" class="edge s3" data-from="M1-17" data-to="M1-20" marker-end="url(#ah3)"/>
+<path d="M420 545 H432 V510 H445" class="edge s3" data-from="M1-17" data-to="M1-22" marker-end="url(#ah3)"/>
+<path d="M420 541 H428 V442 H445" class="edge s3" data-from="M1-17" data-to="M1-39" marker-end="url(#ah3)"/>
+<path d="M420 296 H445" class="edge s1" data-from="M1-18" data-to="M1-19" marker-end="url(#ah1)"/>
+<path d="M420 293 H424 V234 H445" class="edge s1" data-from="M1-18" data-to="M1-31" marker-end="url(#ah1)"/>
+<path d="M420 301 H424 V430 H445" class="edge s1" data-from="M1-18" data-to="M1-39" marker-end="url(#ah1)"/>
+<path d="M526 301 H530 V396 H543" class="edge s1" data-from="M1-19" data-to="M1-20" marker-end="url(#ah1)"/>
+<path d="M526 293 H530 V266 H543" class="edge s1" data-from="M1-19" data-to="M1-21" marker-end="url(#ah1)"/>
+<path d="M624 401 H632 V420 H820 V398 H837" class="edge s0" data-from="M1-20" data-to="M1-47" marker-end="url(#ah0)"/>
+<path d="M526 505 H534 V488 H628 V370 H641" class="edge s5" data-from="M1-22" data-to="M1-32" marker-end="url(#ah5)"/>
+<path d="M322 509 H326 V524 H424 V500 H445" class="edge s4" data-from="M1-25" data-to="M1-22" marker-end="url(#ah4)"/>
+<path d="M322 501 H326 V488 H424 V438 H445" class="edge s4" data-from="M1-25" data-to="M1-39" marker-end="url(#ah4)"/>
+<path d="M322 473 H326 V456 H828 V408 H837" class="edge s1" data-from="M1-27" data-to="M1-47" marker-end="url(#ah1)"/>
+<path d="M526 437 H534 V416 H824 V404 H837" class="edge s4" data-from="M1-39" data-to="M1-47" marker-end="url(#ah4)"/>
+<path d="M216 199 H220 V182 H330 V168 H339" class="edge s1" data-from="M1-53" data-to="M1-11" marker-end="url(#ah1)"/>
+<path d="M322 167 H326 V292 H339" class="edge s5" data-from="M1-54" data-to="M1-18" marker-end="url(#ah5)"/>
+<path d="M114 297 H118 V312 H1020 V298 H1037" class="edge s2" data-from="M1-61" data-to="M1-FU" marker-end="url(#ah2)"/>
+<path d="M216 475 H224 V542 H241" class="edge s5" data-from="M1-66" data-to="M1-15" marker-end="url(#ah5)"/>
+<path d="M216 479 H228 V572 H241" class="edge s5" data-from="M1-66" data-to="M1-16" marker-end="url(#ah5)"/>
+<path d="M216 467 H220 V452 H326 V302 H339" class="edge s5" data-from="M1-66" data-to="M1-18" marker-end="url(#ah5)"/>
+<path d="M216 471 H220 V506 H241" class="edge s5" data-from="M1-66" data-to="M1-25" marker-end="url(#ah5)"/>
+<path d="M216 472 H241" class="edge s5" data-from="M1-66" data-to="M1-27" marker-end="url(#ah5)"/>
+<path d="M114 472 H135" class="edge s2" data-from="M1-67" data-to="M1-66" marker-end="url(#ah2)"/>
+<path d="M114 365 H118 V348 H922 V334 H935" class="edge s4" data-from="M1-68" data-to="M1-48" marker-end="url(#ah4)"/>
+<path d="M114 333 H118 V316 H1028 V304 H1037" class="edge s0" data-from="M1-74" data-to="M1-FU" marker-end="url(#ah0)"/>
+<path d="M114 229 H118 V266 H135" class="edge s2" data-from="M1-78" data-to="M1-79" marker-end="url(#ah2)"/>
+<path d="M216 261 H220 V280 H1024 V288 H1037" class="edge s2" data-from="M1-79" data-to="M1-FU" marker-end="url(#ah2)"/>
+<path d="M114 199 H126 V256 H135" class="edge s3" data-from="M1-80" data-to="M1-79" marker-end="url(#ah3)"/>
+<path d="M114 261 H122 V276 H1020 V292 H1037" class="edge s0" data-from="M1-81" data-to="M1-FU" marker-end="url(#ah0)"/>
+<path d="M114 405 H122 V542 H135" class="edge s3" data-from="M1-O1" data-to="M1-O2" marker-end="url(#ah3)"/>
+<path d="M114 400 H135" class="edge s3" data-from="M1-O1" data-to="M1-O3" marker-end="url(#ah3)"/>
+<path d="M114 401 H118 V506 H135" class="edge s3" data-from="M1-O1" data-to="M1-O4" marker-end="url(#ah3)"/>
+<path d="M114 395 H118 V380 H428 V266 H445" class="edge s3" data-from="M1-O1" data-to="M1-O6" marker-end="url(#ah3)"/>
+<path d="M216 541 H220 V746 H241" class="edge s3" data-from="M1-O2" data-to="M6-O1" marker-end="url(#ah3)"/>
+<path d="M216 401 H220 V384 H726 V366 H735" class="edge s0" data-from="M1-O3" data-to="M1-23" marker-end="url(#ah0)"/>
+<path d="M216 505 H232 V520 H330 V746 H339" class="edge s2" data-from="M1-O4" data-to="M6-O3" marker-end="url(#ah2)"/>
+<path d="M114 672 H135" class="edge s0" data-from="M2-01" data-to="M2-FU" marker-end="url(#ah0)"/>
+<path d="M322 744 H339" class="edge s4" data-from="M6-O1" data-to="M6-O3" marker-end="url(#ah4)"/>
+<path d="M322 745 H326 V776 H339" class="edge s4" data-from="M6-O1" data-to="M6-O4" marker-end="url(#ah4)"/>
+<path d="M114 166 H135" class="edge s1 crit" data-from="M1-10" data-to="M1-12" marker-end="url(#ac1)"/>
+<path d="M420 163 H424 V224 H445" class="edge s2 crit" data-from="M1-11" data-to="M1-31" marker-end="url(#ac2)"/>
+<path d="M216 166 H241" class="edge s5 crit" data-from="M1-12" data-to="M1-54" marker-end="url(#ac5)"/>
+<path d="M624 261 H628 V360 H641" class="edge s3 crit" data-from="M1-21" data-to="M1-32" marker-end="url(#ac3)"/>
+<path d="M816 365 H820 V394 H837" class="edge s4 crit" data-from="M1-23" data-to="M1-47" marker-end="url(#ac4)"/>
+<path d="M526 229 H530 V256 H543" class="edge s0 crit" data-from="M1-31" data-to="M1-21" marker-end="url(#ac0)"/>
+<path d="M722 364 H735" class="edge s5 crit" data-from="M1-32" data-to="M1-23" marker-end="url(#ac5)"/>
+<path d="M918 401 H926 V338 H935" class="edge s0 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac0)"/>
+<path d="M1016 333 H1024 V300 H1037" class="edge s1 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac1)"/>
+<path d="M322 166 H339" class="edge s5 crit" data-from="M1-54" data-to="M1-11" marker-end="url(#ac5)"/>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 53/95 done, 42 open</text>
+<text x="34" y="646" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
+<text x="34" y="718" class="fg h">M6 Release: 0/4 done, 4 open</text>
 <g data-id="M1-06" data-state="blocked"><title>M1-06: Rules fuzzing: fast-check against a TS reference model of PLAN 3.1 (P17) (blocked)</title><rect x="136" y="216" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="224" width="8" height="8" class="warn mk-blocked"/><text x="156" y="233" class="fg n">M1-06</text></g>
 <g data-id="M1-10" data-state="review"><title>M1-10: Rules: create household and member display name, allow and deny tests (transfer is M1-53) (in progress)</title><rect x="34" y="154" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,170 49,170 44,161" class="info mk-progress"/><text x="54" y="171" class="fg n">M1-10</text></g>
 <g data-id="M1-11" data-state="blocked"><title>M1-11: Rules: leave, remove member (removed marker), household soft delete and cleanup, allow and de… (blocked)</title><rect x="340" y="154" width="80" height="24" rx="4" class="nd-blocked"/><rect x="346" y="162" width="8" height="8" class="warn mk-blocked"/><text x="360" y="171" class="fg n">M1-11</text></g>
 <g data-id="M1-12" data-state="blocked"><title>M1-12: Rules: invites (create, get, list, revoke, cleanup), incl. unverified get denied (join is M1-54) (blocked)</title><rect x="136" y="154" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="162" width="8" height="8" class="warn mk-blocked"/><text x="156" y="171" class="fg n">M1-12</text></g>
-<g data-id="M1-81" data-state="ready"><title>M1-81: guards check 1: playwright and cypress test-runner options on command lines (ready)</title><rect x="34" y="248" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="260" r="4.5" class="ok mk-ready"/><text x="54" y="265" class="fg n">M1-81</text></g>
+<g data-id="M1-81" data-state="review"><title>M1-81: guards check 1: playwright and cypress test-runner options on command lines (in progress)</title><rect x="34" y="248" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,264 49,264 44,255" class="info mk-progress"/><text x="54" y="265" class="fg n">M1-81</text></g>
 <g data-id="M1-67" data-state="review"><title>M1-67: Auth data 2: Firebase session state, Google ID-token sign-in, per-session Firestore holder in :core… (in progress)</title><rect x="34" y="460" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,476 49,476 44,467" class="info mk-progress"/><text x="54" y="477" class="fg n">M1-67</text></g>
 <g data-id="M1-66" data-state="blocked"><title>M1-66: Auth wiring: Credential Manager wrapper (Google ID option), :app on :core:data with licensee, H… (blocked)</title><rect x="136" y="460" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="468" width="8" height="8" class="warn mk-blocked"/><text x="156" y="477" class="fg n">M1-66</text></g>
 <g data-id="M1-15" data-state="blocked"><title>M1-15: Auth data: email and password sign-up, sign-in, verification, reset, error mapping, collision m… (blocked)</title><rect x="242" y="528" width="80" height="24" rx="4" class="nd-blocked"/><rect x="248" y="536" width="8" height="8" class="warn mk-blocked"/><text x="262" y="545" class="fg n">M1-15</text></g>
@@ -77,52 +76,61 @@
 <g data-id="M1-17" data-state="blocked"><title>M1-17: Email UI: create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) (blocked)</title><rect x="340" y="528" width="80" height="24" rx="4" class="nd-blocked"/><rect x="346" y="536" width="8" height="8" class="warn mk-blocked"/><text x="360" y="545" class="fg n">M1-17</text></g>
 <g data-id="M1-18" data-state="blocked"><title>M1-18: Household data 1: create, invite, revoke, join, start-up self-heal (emulator) (blocked)</title><rect x="340" y="284" width="80" height="24" rx="4" class="nd-blocked"/><rect x="346" y="292" width="8" height="8" class="warn mk-blocked"/><text x="360" y="301" class="fg n">M1-18</text></g>
 <g data-id="M1-31" data-state="blocked"><title>M1-31: Household data 2: leave, remove (marker, resumable), transfer, delete with cleanup resume (em… (blocked)</title><rect x="446" y="216" width="80" height="24" rx="4" class="nd-blocked"/><rect x="452" y="224" width="8" height="8" class="warn mk-blocked"/><text x="466" y="233" class="fg n">M1-31</text></g>
-<g data-id="M1-19" data-state="blocked"><title>M1-19: Household UI: create, members, invite share sheet, revoke (HH-01, HH-02, HH-04) (blocked)</title><rect x="446" y="320" width="80" height="24" rx="4" class="nd-blocked"/><rect x="452" y="328" width="8" height="8" class="warn mk-blocked"/><text x="466" y="337" class="fg n">M1-19</text></g>
-<g data-id="M1-20" data-state="blocked"><title>M1-20: Invite link and join screen (HH-03), incl. signed-out routing through sign-in (blocked)</title><rect x="544" y="420" width="80" height="24" rx="4" class="nd-blocked"/><rect x="550" y="428" width="8" height="8" class="warn mk-blocked"/><text x="564" y="437" class="fg n">M1-20</text></g>
+<g data-id="M1-19" data-state="blocked"><title>M1-19: Household UI: create, members, invite share sheet, revoke (HH-01, HH-02, HH-04) (blocked)</title><rect x="446" y="284" width="80" height="24" rx="4" class="nd-blocked"/><rect x="452" y="292" width="8" height="8" class="warn mk-blocked"/><text x="466" y="301" class="fg n">M1-19</text></g>
+<g data-id="M1-20" data-state="blocked"><title>M1-20: Invite link and join screen (HH-03), incl. signed-out routing through sign-in (blocked)</title><rect x="544" y="388" width="80" height="24" rx="4" class="nd-blocked"/><rect x="550" y="396" width="8" height="8" class="warn mk-blocked"/><text x="564" y="405" class="fg n">M1-20</text></g>
 <g data-id="M1-21" data-state="blocked"><title>M1-21: Leave, remove, transfer and delete household UI, household-deleted dialog (HH-05, HH-06) (blocked)</title><rect x="544" y="248" width="80" height="24" rx="4" class="nd-blocked"/><rect x="550" y="256" width="8" height="8" class="warn mk-blocked"/><text x="564" y="265" class="fg n">M1-21</text></g>
 <g data-id="M1-22" data-state="blocked"><title>M1-22: Account: change password with recent sign-in (AUTH-11) (blocked)</title><rect x="446" y="492" width="80" height="24" rx="4" class="nd-blocked"/><rect x="452" y="500" width="8" height="8" class="warn mk-blocked"/><text x="466" y="509" class="fg n">M1-22</text></g>
 <g data-id="M1-32" data-state="blocked"><title>M1-32: Account: delete account (AUTH-04) with recent sign-in, resumable (blocked)</title><rect x="642" y="352" width="80" height="24" rx="4" class="nd-blocked"/><rect x="648" y="360" width="8" height="8" class="warn mk-blocked"/><text x="662" y="369" class="fg n">M1-32</text></g>
-<g data-id="M1-23" data-state="blocked"><title>M1-23: Optional TOTP two-step verification (AUTH-09) (blocked)</title><rect x="736" y="384" width="80" height="24" rx="4" class="nd-blocked"/><rect x="742" y="392" width="8" height="8" class="warn mk-blocked"/><text x="756" y="401" class="fg n">M1-23</text></g>
+<g data-id="M1-23" data-state="blocked"><title>M1-23: Optional TOTP two-step verification (AUTH-09) (blocked)</title><rect x="736" y="352" width="80" height="24" rx="4" class="nd-blocked"/><rect x="742" y="360" width="8" height="8" class="warn mk-blocked"/><text x="756" y="369" class="fg n">M1-23</text></g>
 <g data-id="M1-25" data-state="blocked"><title>M1-25: Account screen (wireframe 18) and navigation: sign-out UI (AUTH-03), Crashlytics opt-in switch, … (blocked)</title><rect x="242" y="492" width="80" height="24" rx="4" class="nd-blocked"/><rect x="248" y="500" width="8" height="8" class="warn mk-blocked"/><text x="262" y="509" class="fg n">M1-25</text></g>
 <g data-id="M1-27" data-state="review"><title>M1-27: Minimum app version: config/app.minVersionCode, schemaVersion, update screen (in progress)</title><rect x="242" y="460" width="80" height="24" rx="4" class="nd-review"/><polygon points="247,476 257,476 252,467" class="info mk-progress"/><text x="262" y="477" class="fg n">M1-27</text></g>
 <g data-id="M1-53" data-state="blocked"><title>M1-53: Rules: transfer ownership, allow and deny tests (partial transfers, plain member, non-member) (blocked)</title><rect x="136" y="186" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="194" width="8" height="8" class="warn mk-blocked"/><text x="156" y="203" class="fg n">M1-53</text></g>
 <g data-id="M1-54" data-state="blocked"><title>M1-54: Rules: the join batch with the one-household check, allow and deny tests (blocked)</title><rect x="242" y="154" width="80" height="24" rx="4" class="nd-blocked"/><rect x="248" y="162" width="8" height="8" class="warn mk-blocked"/><text x="262" y="171" class="fg n">M1-54</text></g>
 <g data-id="M1-61" data-state="ready"><title>M1-61: Java API level check: also look up classes named only in descriptors, Signature attributes, throw… (ready)</title><rect x="34" y="284" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="296" r="4.5" class="ok mk-ready"/><text x="54" y="301" class="fg n">M1-61</text></g>
-<g data-id="M1-76" data-state="review"><title>M1-76: Status graph styling: a colour-blind-safe colour per source task, thicker critical path (in progress)</title><rect x="34" y="320" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,336 49,336 44,327" class="info mk-progress"/><text x="54" y="337" class="fg n">M1-76</text></g>
-<g data-id="M1-39" data-state="blocked"><title>M1-39: Your name (AUTH-12): users/{uid}.name, name step at first Google sign-in and at start, edit in A… (blocked)</title><rect x="446" y="420" width="80" height="24" rx="4" class="nd-blocked"/><rect x="452" y="428" width="8" height="8" class="warn mk-blocked"/><text x="466" y="437" class="fg n">M1-39</text></g>
-<g data-id="M1-74" data-state="review"><title>M1-74: Hash-locked pip requirements for the lint tools (issue 189 item 5) (in progress)</title><rect x="34" y="352" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,368 49,368 44,359" class="info mk-progress"/><text x="54" y="369" class="fg n">M1-74</text></g>
-<g data-id="M1-68" data-state="ready"><title>M1-68: Root check tasks without cross-project reads: checkWarningsAsErrors, checkJdkRelease, checkJavaAp… (ready)</title><rect x="34" y="384" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="396" r="4.5" class="ok mk-ready"/><text x="54" y="401" class="fg n">M1-68</text></g>
-<g data-id="M1-47" data-state="blocked"><title>M1-47: R12 screens vs wireframes for M1 (issue 65 review catalogue) (blocked)</title><rect x="838" y="420" width="80" height="24" rx="4" class="nd-blocked"/><rect x="844" y="428" width="8" height="8" class="warn mk-blocked"/><text x="858" y="437" class="fg n">M1-47</text></g>
-<g data-id="M1-48" data-state="blocked"><title>M1-48: R8 milestone quality review for M1 (issue 65 review catalogue) (blocked)</title><rect x="936" y="352" width="80" height="24" rx="4" class="nd-blocked"/><rect x="942" y="360" width="8" height="8" class="warn mk-blocked"/><text x="956" y="369" class="fg n">M1-48</text></g>
+<g data-id="M1-39" data-state="blocked"><title>M1-39: Your name (AUTH-12): users/{uid}.name, name step at first Google sign-in and at start, edit in A… (blocked)</title><rect x="446" y="424" width="80" height="24" rx="4" class="nd-blocked"/><rect x="452" y="432" width="8" height="8" class="warn mk-blocked"/><text x="466" y="441" class="fg n">M1-39</text></g>
+<g data-id="M1-74" data-state="review"><title>M1-74: Hash-locked pip requirements for the lint tools (issue 189 item 5) (in progress)</title><rect x="34" y="320" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,336 49,336 44,327" class="info mk-progress"/><text x="54" y="337" class="fg n">M1-74</text></g>
+<g data-id="M1-68" data-state="ready"><title>M1-68: Root check tasks without cross-project reads: checkWarningsAsErrors, checkJdkRelease, checkJavaAp… (ready)</title><rect x="34" y="352" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="364" r="4.5" class="ok mk-ready"/><text x="54" y="369" class="fg n">M1-68</text></g>
+<g data-id="M1-47" data-state="blocked"><title>M1-47: R12 screens vs wireframes for M1 (issue 65 review catalogue) (blocked)</title><rect x="838" y="388" width="80" height="24" rx="4" class="nd-blocked"/><rect x="844" y="396" width="8" height="8" class="warn mk-blocked"/><text x="858" y="405" class="fg n">M1-47</text></g>
+<g data-id="M1-48" data-state="blocked"><title>M1-48: R8 milestone quality review for M1 (issue 65 review catalogue) (blocked)</title><rect x="936" y="320" width="80" height="24" rx="4" class="nd-blocked"/><rect x="942" y="328" width="8" height="8" class="warn mk-blocked"/><text x="956" y="337" class="fg n">M1-48</text></g>
 <g data-id="M1-80" data-state="review"><title>M1-80: State issue part A2: state_body.py render (short summary above the block), tasks.py --state reads… (in progress)</title><rect x="34" y="186" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,202 49,202 44,193" class="info mk-progress"/><text x="54" y="203" class="fg n">M1-80</text></g>
 <g data-id="M1-78" data-state="ready"><title>M1-78: State issue part B: rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… (ready)</title><rect x="34" y="216" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="228" r="4.5" class="ok mk-ready"/><text x="54" y="233" class="fg n">M1-78</text></g>
 <g data-id="M1-79" data-state="blocked"><title>M1-79: State issue part C: ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… (blocked)</title><rect x="136" y="248" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="256" width="8" height="8" class="warn mk-blocked"/><text x="156" y="265" class="fg n">M1-79</text></g>
-<g data-id="M1-FU" data-state="blocked"><title>M1-FU: Follow-up burn-down for M1 (planner: add each new M1 task to depends_on) (blocked)</title><rect x="1042" y="284" width="80" height="24" rx="4" class="nd-blocked"/><rect x="1048" y="292" width="8" height="8" class="warn mk-blocked"/><text x="1062" y="301" class="fg n">M1-FU</text></g>
-<g data-id="M1-O1" data-state="owner"><title>M1-O1: Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… (owner to-do)</title><rect x="34" y="420" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,432 44,427 49,432 44,437" class="bad mk-owner"/><text x="54" y="437" class="fg n">M1-O1</text></g>
+<g data-id="M1-FU" data-state="blocked"><title>M1-FU: Follow-up burn-down for M1 (planner: add each new M1 task to depends_on) (blocked)</title><rect x="1038" y="284" width="80" height="24" rx="4" class="nd-blocked"/><rect x="1044" y="292" width="8" height="8" class="warn mk-blocked"/><text x="1058" y="301" class="fg n">M1-FU</text></g>
+<g data-id="M1-O1" data-state="owner"><title>M1-O1: Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… (owner to-do)</title><rect x="34" y="388" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,400 44,395 49,400 44,405" class="bad mk-owner"/><text x="54" y="405" class="fg n">M1-O1</text></g>
 <g data-id="M1-O2" data-state="owner"><title>M1-O2: Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) (owner to-do)</title><rect x="136" y="528" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,540 146,535 151,540 146,545" class="bad mk-owner"/><text x="156" y="545" class="fg n">M1-O2</text></g>
-<g data-id="M1-O3" data-state="owner"><title>M1-O3: Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… (owner to-do)</title><rect x="136" y="420" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,432 146,427 151,432 146,437" class="bad mk-owner"/><text x="156" y="437" class="fg n">M1-O3</text></g>
+<g data-id="M1-O3" data-state="owner"><title>M1-O3: Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… (owner to-do)</title><rect x="136" y="388" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,400 146,395 151,400 146,405" class="bad mk-owner"/><text x="156" y="405" class="fg n">M1-O3</text></g>
 <g data-id="M1-O4" data-state="owner"><title>M1-O4: Enable the Play Integrity API for the Firebase project in the Google Cloud console (owner to-do)</title><rect x="136" y="492" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,504 146,499 151,504 146,509" class="bad mk-owner"/><text x="156" y="509" class="fg n">M1-O4</text></g>
-<g data-id="M1-O5" data-state="owner"><title>M1-O5: Approve the privacy text (OQ-30) before anyone but the owner installs the app (owner to-do)</title><rect x="34" y="492" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,504 44,499 49,504 44,509" class="bad mk-owner"/><text x="54" y="509" class="fg n">M1-O5</text></g>
-<g data-id="M1-O6" data-state="owner"><title>M1-O6: Deploy firestore.rules to the real project after each merged rules PR and before each tester build (owner to-do)</title><rect x="446" y="284" width="80" height="24" rx="4" class="nd-owner"/><polygon points="451,296 456,291 461,296 456,301" class="bad mk-owner"/><text x="466" y="301" class="fg n">M1-O6</text></g>
-<g data-id="M1-O8" data-state="owner"><title>M1-O8: Turn on secret scanning non-provider patterns and validity checks (repo settings) (owner to-do)</title><rect x="34" y="528" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,540 44,535 49,540 44,545" class="bad mk-owner"/><text x="54" y="545" class="fg n">M1-O8</text></g>
-<g data-id="M1-O9" data-state="owner"><title>M1-O9: Turn off CodeQL default setup when the advanced workflow of M1-73 merges (owner to-do)</title><rect x="34" y="558" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,570 44,565 49,570 44,575" class="bad mk-owner"/><text x="54" y="575" class="fg n">M1-O9</text></g>
-<g data-id="M1-O11" data-state="owner"><title>M1-O11: Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… (owner to-do)</title><rect x="34" y="588" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,600 44,595 49,600 44,605" class="bad mk-owner"/><text x="54" y="605" class="fg n">M1-O11</text></g>
-<g data-id="M1-O13" data-state="owner"><title>M1-O13: Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… (owner to-do)</title><rect x="34" y="618" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,630 44,625 49,630 44,635" class="bad mk-owner"/><text x="54" y="635" class="fg n">M1-O13</text></g>
-<g data-id="M2-01" data-state="blocked"><title>M2-01: Plan M2: docs/milestones/M2.md and PR-sized tasks in this file (blocked)</title><rect x="34" y="690" width="80" height="24" rx="4" class="nd-blocked"/><rect x="40" y="698" width="8" height="8" class="warn mk-blocked"/><text x="54" y="707" class="fg n">M2-01</text></g>
-<g data-id="M2-FU" data-state="blocked"><title>M2-FU: Follow-up burn-down for M2 (planner: add each new M2 task to depends_on) (blocked)</title><rect x="136" y="690" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="698" width="8" height="8" class="warn mk-blocked"/><text x="156" y="707" class="fg n">M2-FU</text></g>
-<g data-id="M6-O1" data-state="owner"><title>M6-O1: Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json (owner to-do)</title><rect x="242" y="762" width="80" height="24" rx="4" class="nd-owner"/><polygon points="247,774 252,769 257,774 252,779" class="bad mk-owner"/><text x="262" y="779" class="fg n">M6-O1</text></g>
-<g data-id="M6-O2" data-state="owner"><title>M6-O2: Register a free limited-distribution Android developer account when available in Denmark (owner to-do)</title><rect x="34" y="762" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,774 44,769 49,774 44,779" class="bad mk-owner"/><text x="54" y="779" class="fg n">M6-O2</text></g>
-<g data-id="M6-O3" data-state="owner"><title>M6-O3: Register App Check (Play Integrity, device integrity only) with the release key; watch metrics t… (owner to-do)</title><rect x="340" y="762" width="80" height="24" rx="4" class="nd-owner"/><polygon points="345,774 350,769 355,774 350,779" class="bad mk-owner"/><text x="360" y="779" class="fg n">M6-O3</text></g>
-<g data-id="M6-O4" data-state="owner"><title>M6-O4: Adopt Git LFS for screenshot goldens (deferred: only when the revisit trigger fires) (owner to-do)</title><rect x="340" y="792" width="80" height="24" rx="4" class="nd-owner"/><polygon points="345,804 350,799 355,804 350,809" class="bad mk-owner"/><text x="360" y="809" class="fg n">M6-O4</text></g>
-<circle cx="30" cy="836" r="4.5" class="ok mk-ready"/>
-<text x="40" y="840" class="fg s">ready</text>
-<polygon points="107,840 117,840 112,831" class="info mk-progress"/>
-<text x="122" y="840" class="fg s">in progress</text>
-<rect x="238" y="832" width="8" height="8" class="warn mk-blocked"/>
-<text x="252" y="840" class="fg s">blocked</text>
-<polygon points="335,836 340,831 345,836 340,841" class="bad mk-owner"/>
-<text x="350" y="840" class="fg s">owner to-do</text>
-<text x="24" y="864" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
-<text x="24" y="884" class="muted s">53 transitive arrows hidden.</text>
-<text x="24" y="904" class="muted s">Also not drawn: 118 dependencies on done or dropped tasks, 2 on whole milestones.</text>
+<g data-id="M1-O5" data-state="owner"><title>M1-O5: Approve the privacy text (OQ-30) before anyone but the owner installs the app (owner to-do)</title><rect x="34" y="424" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,436 44,431 49,436 44,441" class="bad mk-owner"/><text x="54" y="441" class="fg n">M1-O5</text></g>
+<g data-id="M1-O6" data-state="owner"><title>M1-O6: Deploy firestore.rules to the real project after each merged rules PR and before each tester build (owner to-do)</title><rect x="446" y="248" width="80" height="24" rx="4" class="nd-owner"/><polygon points="451,260 456,255 461,260 456,265" class="bad mk-owner"/><text x="466" y="265" class="fg n">M1-O6</text></g>
+<g data-id="M1-O8" data-state="owner"><title>M1-O8: Turn on secret scanning non-provider patterns and validity checks (repo settings) (owner to-do)</title><rect x="34" y="492" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,504 44,499 49,504 44,509" class="bad mk-owner"/><text x="54" y="509" class="fg n">M1-O8</text></g>
+<g data-id="M1-O9" data-state="owner"><title>M1-O9: Turn off CodeQL default setup when the advanced workflow of M1-73 merges (owner to-do)</title><rect x="34" y="528" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,540 44,535 49,540 44,545" class="bad mk-owner"/><text x="54" y="545" class="fg n">M1-O9</text></g>
+<g data-id="M1-O11" data-state="owner"><title>M1-O11: Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as… (owner to-do)</title><rect x="34" y="558" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,570 44,565 49,570 44,575" class="bad mk-owner"/><text x="54" y="575" class="fg n">M1-O11</text></g>
+<g data-id="M1-O13" data-state="owner"><title>M1-O13: Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… (owner to-do)</title><rect x="34" y="588" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,600 44,595 49,600 44,605" class="bad mk-owner"/><text x="54" y="605" class="fg n">M1-O13</text></g>
+<g data-id="M2-01" data-state="blocked"><title>M2-01: Plan M2: docs/milestones/M2.md and PR-sized tasks in this file (blocked)</title><rect x="34" y="660" width="80" height="24" rx="4" class="nd-blocked"/><rect x="40" y="668" width="8" height="8" class="warn mk-blocked"/><text x="54" y="677" class="fg n">M2-01</text></g>
+<g data-id="M2-FU" data-state="blocked"><title>M2-FU: Follow-up burn-down for M2 (planner: add each new M2 task to depends_on) (blocked)</title><rect x="136" y="660" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="668" width="8" height="8" class="warn mk-blocked"/><text x="156" y="677" class="fg n">M2-FU</text></g>
+<g data-id="M6-O1" data-state="owner"><title>M6-O1: Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json (owner to-do)</title><rect x="242" y="732" width="80" height="24" rx="4" class="nd-owner"/><polygon points="247,744 252,739 257,744 252,749" class="bad mk-owner"/><text x="262" y="749" class="fg n">M6-O1</text></g>
+<g data-id="M6-O2" data-state="owner"><title>M6-O2: Register a free limited-distribution Android developer account when available in Denmark (owner to-do)</title><rect x="34" y="732" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,744 44,739 49,744 44,749" class="bad mk-owner"/><text x="54" y="749" class="fg n">M6-O2</text></g>
+<g data-id="M6-O3" data-state="owner"><title>M6-O3: Register App Check (Play Integrity, device integrity only) with the release key; watch metrics t… (owner to-do)</title><rect x="340" y="732" width="80" height="24" rx="4" class="nd-owner"/><polygon points="345,744 350,739 355,744 350,749" class="bad mk-owner"/><text x="360" y="749" class="fg n">M6-O3</text></g>
+<g data-id="M6-O4" data-state="owner"><title>M6-O4: Adopt Git LFS for screenshot goldens (deferred: only when the revisit trigger fires) (owner to-do)</title><rect x="340" y="762" width="80" height="24" rx="4" class="nd-owner"/><polygon points="345,774 350,769 355,774 350,779" class="bad mk-owner"/><text x="360" y="779" class="fg n">M6-O4</text></g>
+<circle cx="30" cy="806" r="4.5" class="ok mk-ready"/>
+<text x="40" y="810" class="fg s">ready</text>
+<polygon points="107,810 117,810 112,801" class="info mk-progress"/>
+<text x="122" y="810" class="fg s">in progress</text>
+<rect x="238" y="802" width="8" height="8" class="warn mk-blocked"/>
+<text x="252" y="810" class="fg s">blocked</text>
+<polygon points="335,806 340,801 345,806 340,811" class="bad mk-owner"/>
+<text x="350" y="810" class="fg s">owner to-do</text>
+<text x="24" y="834" class="fg s">Arrow colour (one per source task):</text>
+<path d="M312 830 H336" class="edge s0"/>
+<path d="M342 830 H366" class="edge s1"/>
+<path d="M372 830 H396" class="edge s2"/>
+<path d="M402 830 H426" class="edge s3"/>
+<path d="M432 830 H456" class="edge s4"/>
+<path d="M462 830 H486" class="edge s5"/>
+<path d="M24 852 H48" class="edge crit key"/>
+<text x="56" y="856" class="fg s">critical path: the longest chain of open tasks to M1-FU (11 tasks)</text>
+<text x="24" y="880" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
+<text x="24" y="900" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
+<text x="24" y="920" class="muted s">53 transitive arrows hidden.</text>
+<text x="24" y="940" class="muted s">Also not drawn: 118 dependencies on done or dropped tasks, 2 on whole milestones.</text>
 </svg>
