@@ -1,3 +1,89 @@
-    // M1-09, the rules spike (PLAN 3.1 items a-e; docs/adr/0002-rules-spike.md). Test only:
-    // spike.test.ts inserts these blocks under the documents match of firestore.rules, and they are
-    // never deployed.
+    // M1-09, the rules spike (PLAN 3.1 items a-e, docs/adr/0002-rules-spike.md). Test only:
+    // spike.test.ts inserts these blocks under the documents match of firestore.rules; never deployed.
+    // Each rule makes every get()/exists() call of its PLAN 3.1 row and reads a document once (let),
+    // so item (e) counts real calls. The task named at a block moves it into firestore.rules, with
+    // its field validation (P4) and full allow and deny tests, and deletes it here.
+    function inviteDoc(code) { return /databases/$(database)/documents/invites/$(code); }
+    function userDoc(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function live(hid) { return get(householdDoc(hid)).data.deleted == false; }
+
+    // (a), M1-12: Query invites as the owner decided on #280 (M1-O12): a member of the live household
+    // lists the invites they created, the owner all. Rules are not filters: the query's filters must
+    // fix householdId, and createdBy for a plain member.
+    function listsInvites(data) {
+      let household = get(householdDoc(data.householdId)).data;
+      return exists(memberDoc(data.householdId, request.auth.uid)) && household.deleted == false
+        && (data.createdBy == request.auth.uid || household.ownerUid == request.auth.uid);
+    }
+
+    // (b), M1-54: Join. The caller's own member doc (P1), created with the invite's delete and the
+    // users-doc set in one batch: the invite points at hid, has not expired, its creator is still a
+    // member, it is gone after the batch; LIVE; the one-household check. A create implies !M(uid).
+    function joins(hid, uid) {
+      let doc = request.resource.data;
+      let invite = get(inviteDoc(doc.viaInvite)).data;
+      return uid == request.auth.uid && doc.role == 'member' && doc.joinedAt == request.time
+        && invite.householdId == hid && invite.expiresAt > request.time
+        && exists(memberDoc(hid, invite.createdBy))
+        && !existsAfter(inviteDoc(doc.viaInvite))
+        && live(hid) && oneHousehold(hid);
+    }
+
+    // The users doc exists and holds no household before the batch and this one after it.
+    function oneHousehold(hid) {
+      let user = userDoc(request.auth.uid);
+      return exists(user) && get(user).data.householdId == null
+        && getAfter(user).data.householdId == hid;
+    }
+
+    // (c), M1-53: Transfer ownership. The owner of the live household changes only ownerUid, to a
+    // member before and after the batch, after which the old owner's role is member and the new
+    // owner's owner.
+    function transfers(hid, before, after) {
+      return before.deleted == false && before.ownerUid == request.auth.uid
+        && after.diff(before).affectedKeys().hasOnly(['ownerUid'])
+        && exists(memberDoc(hid, after.ownerUid)) && existsAfter(memberDoc(hid, after.ownerUid))
+        && getAfter(memberDoc(hid, before.ownerUid)).data.role == 'member'
+        && getAfter(memberDoc(hid, after.ownerUid)).data.role == 'owner';
+    }
+
+    // Each role update: only role, by the owner of the live household before the batch, to the role
+    // ownerUid gives this doc after it.
+    function takesRole(hid, uid) {
+      let household = get(householdDoc(hid)).data;
+      let role = getAfter(householdDoc(hid)).data.ownerUid == uid ? 'owner' : 'member';
+      return household.deleted == false && household.ownerUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+        && request.resource.data.role == role;
+    }
+
+    // (d), M2: LIST-01's queries: the caller's own lists, or those shared with a live household the
+    // caller is a member of.
+    function readsList(data) {
+      return data.createdBy == request.auth.uid
+        || (data.sharedWith != null && exists(memberDoc(data.sharedWith, request.auth.uid))
+          && live(data.sharedWith));
+    }
+
+    match /invites/{code} {
+      allow list: if signedIn() && listsInvites(resource.data);
+      // (b): the joiner's delete in the join batch: no member before it, and the member doc after it
+      // names this code, so a member cannot burn another's invite.
+      allow delete: if signedIn()
+        && !exists(memberDoc(resource.data.householdId, request.auth.uid))
+        && getAfter(memberDoc(resource.data.householdId, request.auth.uid)).data.viaInvite == code
+        && live(resource.data.householdId);
+    }
+
+    match /households/{hid} {
+      allow update: if signedIn() && transfers(hid, resource.data, request.resource.data);
+    }
+
+    match /households/{hid}/members/{uid} {
+      allow create: if signedIn() && joins(hid, uid);
+      allow update: if signedIn() && takesRole(hid, uid);
+    }
+
+    match /lists/{lid} {
+      allow list: if signedIn() && readsList(resource.data);
+    }
