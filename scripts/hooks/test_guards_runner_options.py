@@ -23,18 +23,21 @@ DENIED = {
              "--testPathPatterns=a", "-o", "--onlyChanged", "--only-changed", "--changedSince=main", "--changedSince main",
              "--findRelatedTests a.js", "--lastCommit", "-f", "--onlyFailures", "-c jest.config.cjs -u",
              # self-review: a value letter ends a group only before a number or a non-letter; inline JSON config; a path filter module
-             "-wu", "-cu", "--config='{\"passWithNoTests\":true}'", "-c '{\"testPathIgnorePatterns\":[\"gen\"]}'", "--filter=./f.js"],
+             "-wu", "-cu", "--config='{\"passWithNoTests\":true}'", "-c '{\"testPathIgnorePatterns\":[\"gen\"]}'", "--filter=./f.js",
+             # R1-01: a group is read as yargs-parser reads it (digits and other letters are flags too); R1-02: --u is the short alias
+             "-w2u", "-i2u", "-1u", "-x9u", "-cjest.config.cjs", "-u2", "--u", "--o", "--f", "--ci --u", "--u=true", "--c='{\"a\":1}'"],
     "vitest": ["run -u", "run --update", "--update", "run --passWithNoTests", "run -t smoke", "run --testNamePattern=smoke",
-               "run --changed", "--changed HEAD~1", "run --exclude gen", "run -cu"],
+               "run --changed", "--changed HEAD~1", "run --exclude gen", "run -cu",
+               "run -w2u", "run -1u", "run -c.u", "run --u", "run --t smoke"],
     "mocha": ["--grep smoke", "-g smoke", "--fgrep smoke", "-f smoke", "--invert", "-i", "--passWithNoTests", "--ignore gen",
-              "--exclude=gen", "-tg smoke"],
+              "--exclude=gen", "-tg smoke", "--g smoke", "--i", "--f smoke", "--i --g slow", "-1g smoke"],
 }
 # runner -> forms that must pass (the --shard of the owner decision, other options and their values, redirections)
 ALLOWED = {
     "jest": ["", "--ci --coverage", "--shard 1/3", "--shard=2/3", "--testTimeout 5000", "--testTimeout=5000", "--runInBand", "-i",
              "-w 2", "-w2", "--maxWorkers=50%", "--maxWorkers 2", "-c jest.config.cjs", "--config=jest.config.cjs --ci",
              "--ci > out.log", "--reporters default", "--testSequencer=./seq.js", "--no-cache", "-w4 --ci", "-c=jest.config.cjs",
-             "--env node", "--cacheDirectory d"],
+             "--env node", "--cacheDirectory d", "-w 2u", "--w=2", "--seed -1", "-w2 --ci"],
     "vitest": ["", "run", "watch", "run --shard 1/2", "run --coverage", "--config vitest.config.ts run", "run --testTimeout=5000"],
     "mocha": ["", "'test/**/*.spec.js'", "-t 5000 test", "--timeout 5000", "-u bdd test", "--forbid-only --recursive test",
               "-R spec test", "--spec test/a.spec.js"],
@@ -44,6 +47,11 @@ POSITIONAL = ["jest src/a", "npx jest a.test.ts", "jest --ci src", "jest -- src"
               "jest $FILES", "./node_modules/.bin/jest src", "CI=1 npx jest src", "npx --yes jest src", "yarn jest src",
               "pnpm exec jest src", "node --experimental-vm-modules node_modules/jest/bin/jest.js src", "vitest run src", "vitest src",
               "vitest related a.ts", "vitest list", "vitest bench", "bunx vitest run src",
+              # R1-03: a version suffix, wrappers with option values, shell keywords and quoted assignments before the runner
+              "npx jest@30 src", "npx -y jest@29 src", "npx vitest@2 run src", "timeout 60 jest src", "timeout -s KILL 60 jest src",
+              "nice -n 5 jest src", "sudo -u bob jest src", "env -u CI jest src", "bun run jest src", "yarn run jest src",
+              'FOO="a b" jest src', "FOO='a b c' npx jest src", "if true; then jest src; fi", "for d in a; do jest src; done",
+              "{ jest src; }", "! jest src", "(jest src)", "while jest src; do :; done", "x=$(npx jest src)",
               "jest --testSequencer ./seq.js"]  # fail closed: a value of an unlisted option is read as a path filter; write it with =
 
 
@@ -90,7 +98,7 @@ class DirectTests(RunnerCase):
     def test_positional_path_filters_fail(self):
         self.put("scripts/test.sh", "\n".join(POSITIONAL) + "\n")
         self.each_line_fails("scripts/test.sh", POSITIONAL)
-        entries = [("test", "jest src"), ("v", "vitest run src")]
+        entries = [("test", "jest src"), ("v", "vitest run src"), ("j", "npx jest@30 src"), ("q", 'FOO="a b" jest src')]
         self.put("scripts/test.sh", "true\n")
         self.put("tools/package.json", self.pkg(entries))
         self.each_line_fails("tools/package.json", [v for _, v in entries], first=4)
@@ -108,7 +116,8 @@ class DirectTests(RunnerCase):
     def test_allowed_options_and_neighbouring_lines_pass(self):
         lines = [f"npx {r} {o}".rstrip() for r, opts in ALLOWED.items() for o in opts]
         lines += ["jest --ci 2>&1 | tee out.log", "grep -c jest package.json", "echo vitest", "npm i -D jest", "npm install -D vitest@2 -E",
-                  "npx eslint . && npx jest --ci", "cd firebase && npm ci"]
+                  "npx eslint . && npx jest --ci", "cd firebase && npm ci", "timeout 60 jest --ci", "npx jest@30 --ci",
+                  "sudo -u bob jest --ci", "if true; then jest --ci; fi", 'FOO="a b" jest --ci', "nice -n 5 echo jest"]
         self.put("scripts/test.sh", "\n".join(lines) + "\n")
         self.put("tools/package.json", self.pkg(
             [("test", "jest --ci"), ("v", "vitest run --shard 1/2"), ("m", "mocha 'test/**/*.spec.js'"),
@@ -132,7 +141,8 @@ class NpmTailTests(RunnerCase):
         lines += [f"npm run m -- {o}" for o in DENIED["mocha"]]
         lines += ["npm test -- src", "npm test -- --ci src", "npm test -- -- --quiet", "npm t -- -u", "npm run test -- -u",
                   "npm -s test -- -u", "npm run m -- test/a.spec.js",
-                  "npm run m -- --spec test/a.spec.js", "npm run m -- --spec=test/a.spec.js"]
+                  "npm run m -- --spec test/a.spec.js", "npm run m -- --spec=test/a.spec.js",
+                  "npm test -- -w2u", "npm test -- -1u", "npm test -- --u", "npm test -- --o", "npm run m -- --i", "npm run m -- --g=smoke"]
         self.put("scripts/test.sh", "\n".join(lines) + "\n")
         self.each_line_fails("scripts/test.sh", lines)
 
