@@ -172,12 +172,18 @@ a jest, vitest or mocha command that rewrites or skips tests, with no `justified
 
 **How it reads a command.** Long names are compared in lower case without dashes, as yargs (jest, mocha) and cac (vitest) accept
 kebab-case for camelCase (`--pass-with-no-tests`), with or without `=value`. Short options are per runner, because they clash (jest `-t` is
-the name filter, mocha `-t` is `--timeout`; jest `-i` is `--runInBand`, mocha `-i` is `--invert`), and may be grouped (`-iu`). As
-yargs-parser reads a group, a letter that takes a value takes the rest of the group only when that starts with a digit or a non-letter
-(`-w2`, `-c=x`); otherwise the rest are more flags (`-wu` is `-w -u`).
+the name filter, mocha `-t` is `--timeout`; jest `-i` is `--runInBand`, mocha `-i` is `--invert`), and may be grouped (`-iu`). A
+group is read as yargs-parser (jest, mocha) reads it (R1-01): every character is a flag, digits included, until one takes the rest of
+the group as its value, which happens only when the rest starts with `=`, is a number (after a letter: `-w2`), or starts with a
+character that is no word character. So `-wu`, `-w2u`, `-1u` and `-x9u` all set `-u`. mri (vitest, and a tail resolved to a runner
+the check does not know) reads every character before `=` as a flag. A word that starts with a dash is skipped only as a negative
+number (`--seed -1`). A one-letter long option (`--u`, mocha `--g smoke`) is that short option, as both parsers read it (R1-02).
 Positional words are path filters after jest, and after vitest except a first `run`, `watch` or `dev` (`vitest related`, `list` and
-`bench` fail), when the runner is the command: the first word after a YAML `- key:` or a package.json key, `VAR=` assignments and
-launchers with their options (`npx --yes`, `npm exec`, `yarn`, `pnpm exec`, `bunx`, `node --flag path/jest.js`, `env`, `sudo`). A mocha
+`bench` fail), when the runner is the command: the first word after a YAML `- key:` or a package.json key, `VAR=` assignments (a
+quoted value may hold blanks: `FOO="a b" jest src`), shell keywords (`if`, `then`, `do`, `while`, `until`, `else`, `!`, `{`, `(`,
+`$(`) and launchers with their options (`npx --yes`, `npm exec`, `yarn run`, `bun run`, `pnpm exec`, `bunx`, `node --flag path/jest.js`,
+`env -u X`, `sudo -u bob`, `nice -n 5`, `timeout -s KILL 60`; a one-letter option's value and a number are skipped). The runner word
+may carry a path, `@version` (`npx jest@30`) or `.js` (R1-03). A mocha
 positional word is its spec and passes. After a bare `--` every word is positional. The value of an option listed in `RVL` or `RVS`
 (`--maxWorkers 2`, `-c jest.config.cjs`, `--shard 1/3`, mocha `-t 5000`) is no positional word; the value of any other option is, so
 write it with `=` (`--testSequencer=./seq.js`): a false positive, never a miss. Redirections and their targets are skipped.
@@ -189,7 +195,9 @@ resolved is read with the long names only and fails with no escape hatch; its sh
 
 **Not covered (tripwire, F18).**
 - A runner inside a quoted command string (`firebase emulators:exec "jest src"`, `bash -c "jest src"`) has its options read but not its
-  positional words; nor does `yarn run jest src`, a runner held in a variable, or a runner run from a Python or JS file.
+  positional words; nor does a runner held in a variable (`$JEST src`), one after a launcher option whose value is not one word
+  directly after a one-letter option (`sudo --user=bob` passes, `sudo --user bob jest src` reads `bob` as the command), one after a
+  wrapper the list does not name (`xargs jest`, `watch jest`), or a runner run from a Python or JS file.
 - Options that weaken a run without filtering it: jest `--ci=false` (writes new snapshots), `--bail`, `--listTests`, `--watch` (only
   changed tests; it does not end in CI), vitest `--allowOnly`, dot options (`--coverage.*`, `--typecheck.only`), `--project`, jest
   `--selectProjects`, `--roots`, `--testMatch`, `--testRegex` (the last three are refused in config by check 1), and a command whose
