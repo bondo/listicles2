@@ -24,6 +24,8 @@ CI = ".github/workflows/ci.yml"
 STATUS = ".github/workflows/status.yml"
 VERIFY = "scripts/verify.sh"
 ADR = "docs/adr/0003-gradle-dependency-verification.md"
+REQ_CI = "scripts/requirements-ci.txt"
+INSTALL_CI = "pip install -r scripts/requirements-ci.txt"
 
 
 class Rules(unittest.TestCase):
@@ -31,7 +33,9 @@ class Rules(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, STATUS, VERIFY, ADR, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
+        for name in (CI, STATUS, VERIFY, ADR, REQ_CI, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
+            if not (ROOT / name).exists():
+                continue  # a missing file is the check's finding, not the test's crash
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / name, self.root / name)
 
@@ -93,7 +97,7 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit_yaml(CI, add), "wrapper", "setup-python")
 
     def test_the_python_version_must_be_one_exact_minor_everywhere(self):
-        for bad in ("3.11", "3.x", "3", "3.12.1", "latest"):
+        for bad in ("3.11", "3.12", "3.x", "3", "3.13.1", "latest"):
             with self.subTest(bad):
                 self.setUp()
                 self.flagged(self.edit_yaml(CI, set_with("tasks", "actions/setup-python@", "python-version", bad)), "python-version")
@@ -124,6 +128,51 @@ class Rules(unittest.TestCase):
 
     def test_a_job_that_does_not_run_node_needs_no_pin(self):
         self.assertEqual(self.edit_yaml(CI, lambda w: drop(w, "static", "actions/setup-node@")), [])
+
+    def test_python_jobs_install_pyyaml_right_after_setup_python(self):
+        """R1-01: setup-python's interpreter has no PyYAML (the runner image's had), and most gate scripts import yaml."""
+        ci = yaml.safe_load((ROOT / CI).read_text())
+        for job in ("static", "unit", "firebase", "guards", "tasks", "workflow-lint", "python-lint"):
+            with self.subTest(job):
+                self.assertTrue(any(s.get("run") == INSTALL_CI for s in ci["jobs"][job]["steps"]), f"{job}: update the test")
+                self.setUp()
+                self.flagged(self.edit_yaml(CI, lambda w, job=job: drop_run(w, job, INSTALL_CI)), job, "requirements-ci.txt")
+        self.flagged(self.edit_yaml(STATUS, lambda w: drop_run(w, "publish", INSTALL_CI)), "publish", "requirements-ci.txt")
+
+    def test_the_pyyaml_install_must_come_before_the_first_python_step(self):
+        def change(workflow):
+            steps = workflow["jobs"]["tasks"]["steps"]
+            i = next(i for i, s in enumerate(steps) if s.get("run") == INSTALL_CI)
+            steps.append(steps.pop(i))
+
+        self.flagged(self.edit_yaml(CI, change), "tasks", "before")
+
+    def test_the_ci_requirements_pin_pyyaml_exactly(self):
+        self.assertRegex((ROOT / REQ_CI).read_text(), r"(?m)^PyYAML==\d+\.\d+\.\d+$")
+        for bad in ("PyYAML>=6\n", "PyYAML\n", "PyYAML==6.*\n", "requests==2.0.0\n", ""):
+            with self.subTest(bad):
+                self.flagged(self.set_text(REQ_CI, bad), "requirements-ci.txt")
+        (self.root / REQ_CI).unlink()
+        self.flagged(c.problems(self.root), "requirements-ci.txt")
+
+    def test_a_gradle_job_that_reaches_a_python_task_needs_setup_python(self):
+        """R1-03: :app:testDebugUnitTest is finalized by an Exec of python3 (checkUnitTestResults), so the screenshots job needs it."""
+        self.flagged(self.edit_yaml(CI, lambda w: drop(w, "screenshots", "actions/setup-python@")), "screenshots", "setup-python")
+
+    def test_gradle_jobs_that_reach_no_python_task_need_no_pin(self):
+        ci = yaml.safe_load((ROOT / CI).read_text())
+        for job in ("ui", "release-smoke", "wrapper", "secrets"):
+            self.assertFalse(any(is_use(s, "actions/setup-python@") for s in ci["jobs"][job]["steps"]), job)
+        self.assertEqual(c.problems(ROOT), [])
+
+    def test_the_gradle_tasks_that_run_python_are_still_those_in_the_build_files(self):
+        app = (ROOT / "app/build.gradle.kts").read_text()
+        root = (ROOT / "build.gradle.kts").read_text()
+        self.assertIn('"python3"', app)
+        self.assertIn("checkUnitTestResults", app)
+        self.assertIn('executable = "python3"', root)
+        self.assertIn("checkJavaApiLevel", root)
+        self.assertTrue({"testDebugUnitTest", "verifyRoborazziDebug", "checkJavaApiLevel"} <= set(c.GRADLE_PYTHON_TASKS))
 
     def test_npm_ci_never_runs_install_scripts(self):
         self.flagged(self.edit(CI, "npm ci --ignore-scripts --silent", "npm ci --silent"), "npm ci", "ignore-scripts")
@@ -172,6 +221,10 @@ def set_with(job, prefix, key, value):
         setup(workflow, job, prefix).setdefault("with", {})[key] = value
 
     return change
+
+
+def drop_run(workflow, job, command):
+    workflow["jobs"][job]["steps"] = [s for s in workflow["jobs"][job]["steps"] if s.get("run") != command]
 
 
 def drop(workflow, job, prefix):
