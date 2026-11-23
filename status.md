@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 50/94 (53%) | 44 |
+| M1 | Accounts and households | 51/95 (53%) | 44 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 50/94 done (53%), 44 open.
+**Progress:** 51/95 done (53%), 44 open.
 
 ### Tasks
 
@@ -136,7 +136,8 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-62 | Start-up gates (b2 of M1-60)&#58; update (START-01), email verified (#195, Q2 A), name saved (AUTH-1… | done | M1-60 | implementer | [#323](https://github.com/bondo/listicles2/issues/323) |
 | M1-64 | guards check 2c&#58; YAML folded and multi-line values as one line, in addition to the per-line check… | done | M1-42 | implementer | [#325](https://github.com/bondo/listicles2/issues/325) |
 | M1-65 | guards check 2c&#58; npm &#96;--&#96; tail resolved through package.json scripts, fail closed by construction … | done | M1-42 | implementer | [#330](https://github.com/bondo/listicles2/issues/330) |
-| M1-71 | guards check 1&#58; test-runner options that skip or rewrite tests on command lines (jest, vitest, … | in progress | M1-65 | implementer | [#339](https://github.com/bondo/listicles2/issues/339) |
+| M1-71 | guards check 1&#58; test-runner options that skip or rewrite tests on command lines (jest, vitest, … | done | M1-65 | implementer | [#339](https://github.com/bondo/listicles2/issues/339) |
+| M1-81 | guards check 1&#58; playwright and cypress test-runner options on command lines | ready | M1-71 | implementer |  |
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/listicles2/issues/303) |
 | M1-14 | Auth data 1&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step | done | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/listicles2/issues/319) |
 | M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | in progress | M1-14 | implementer | [#348](https://github.com/bondo/listicles2/issues/348) |
@@ -185,7 +186,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-43 | prompt_rules.py&#58; sentence-level negation for the resolve-thread rule (issue 153) | done | M1-01 | implementer |  |
 | M1-44 | CI hardening nits&#58; job timeouts, pinned python and node, gitleaks download, npm install scripts … | done | M1-01 | implementer | [#331](https://github.com/bondo/listicles2/issues/331) |
 | M1-73 | Advanced CodeQL workflow&#58; java-kotlin with a Gradle build, plus actions, javascript-typescript a… | in progress | M1-01 | implementer | [#347](https://github.com/bondo/listicles2/issues/347) |
-| M1-74 | Hash-locked pip requirements for the lint tools (issue 189 item 5) | ready | M1-44 | implementer |  |
+| M1-74 | Hash-locked pip requirements for the lint tools (issue 189 item 5) | in progress | M1-44 | implementer | [#355](https://github.com/bondo/listicles2/issues/355) |
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/listicles2/issues/292) |
 | M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issue 217 items 1-3) | done | M1-02 | implementer |  |
 | M1-68 | Root check tasks without cross-project reads&#58; checkWarningsAsErrors, checkJdkRelease, checkJavaAp… | ready | M1-46 | implementer |  |
@@ -197,7 +198,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | ready | M1-77 | implementer |  |
 | M1-78 | State issue part B&#58; rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… | ready | M1-77 | implementer |  |
 | M1-79 | State issue part C&#58; ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… | blocked | M1-77, M1-78, M1-80 | process |  |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -223,7 +224,7 @@ flowchart LR
     n1["M1-10 Rules: create household and member di… (in progress)"]:::progress
     n2["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n3["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
-    n4["M1-71 guards check 1: test-runner options tha… (in progress)"]:::progress
+    n4["M1-81 guards check 1: playwright and cypress… (ready)"]:::ready
     n5["M1-67 Auth data 2: Firebase session state, Go… (in progress)"]:::progress
     n6["M1-66 Auth wiring: Credential Manager wrap… (blocked)"]:::blocked
     n7["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
@@ -245,7 +246,7 @@ flowchart LR
     n23["M1-76 Status graph styling: a colour-blind-sa… (in progress)"]:::progress
     n24["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
     n25["M1-73 Advanced CodeQL workflow: java-kotlin… (in progress)"]:::progress
-    n26["M1-74 Hash-locked pip requirements for the l… (ready)"]:::ready
+    n26["M1-74 Hash-locked pip requirements for the l… (in progress)"]:::progress
     n27["M1-68 Root check tasks without cross-project… (ready)"]:::ready
     n28["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
     n29["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
@@ -356,13 +357,13 @@ flowchart LR
     n6 --> n33
     n5 --> n33
     n27 --> n33
-    n4 --> n33
     n25 --> n33
     n26 --> n33
     n23 --> n33
     n31 --> n33
     n32 --> n33
     n30 --> n33
+    n4 --> n33
     n34 --> n35
     n34 --> n36
     n34 --> n37
