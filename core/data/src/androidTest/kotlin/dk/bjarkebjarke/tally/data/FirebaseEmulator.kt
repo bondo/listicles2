@@ -72,8 +72,24 @@ object FirebaseEmulator {
                 APP_NAME,
             )
         FirebaseAuth.getInstance(app).useEmulator(HOST, AUTH_PORT)
-        FirebaseFirestore.getInstance(app).useEmulator(HOST, FIRESTORE_PORT)
+        firestore(app)
         return app
+    }
+
+    private var configuredFirestore: FirebaseFirestore? = null
+
+    /**
+     * The app's Firestore, pointed at the emulator. A sign-out terminates the instance (M1-14 step 2) and `getInstance`
+     * then makes a new one, so each new instance is pointed at the emulator here before anything uses it.
+     */
+    @Synchronized
+    fun firestore(app: FirebaseApp): FirebaseFirestore {
+        val instance = FirebaseFirestore.getInstance(app)
+        if (instance !== configuredFirestore) {
+            instance.useEmulator(HOST, FIRESTORE_PORT)
+            configuredFirestore = instance
+        }
+        return instance
     }
 
     /** Replaces the Firestore emulator's rules with allow-all ones, for a test of the plumbing and not of the rules. */

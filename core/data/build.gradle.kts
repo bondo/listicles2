@@ -30,9 +30,12 @@ android {
 }
 
 dependencies {
+    // M1-67: implements the domain's session interfaces (M1-14) over Firebase.
+    implementation(project(":core:domain"))
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // #217 item 3: the shared test-JVM network block applies to this module's JVM unit tests too.
     testImplementation(project(":core:testing"))
