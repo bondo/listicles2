@@ -4,8 +4,9 @@ Delete in the PR's final commit; kept short because the 600-line guard counts it
 
 ## Goal / done
 PLAN 3.1 items (a)-(e) in the emulator, ADR 0002 (M1.md section 5, M1-09). Red a449b8c, 61baa3a; green 1018160; ADR
-24d0553; self-review fixes 819f0fc, bdac4a6; tasks.toml done (pr 333). Draft PR #333, awaiting review round 1. Open
-findings: none. Decisions: spike rules test-only (`firebase/test/spike.rules`); no split (reasons in the PR body).
+24d0553; self-review 819f0fc, bdac4a6; tasks.toml done (pr 333). Round 1 (R1-01..05, S1-01..02) all fixed: 6128377
+(test), then the spike layout and the ADR/PLAN recount. Open findings: none; R2 and S2 start on the push.
+Decisions: spike rules test-only (`firebase/test/spike.rules`); no split (reasons in the PR body).
 
 ## Facts that save time
 - Fast loop: start the emulator, then `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npx jest --runInBand test/spike.test.ts`
