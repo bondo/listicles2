@@ -85,5 +85,34 @@ class ReleaseGate(unittest.TestCase):
         self.assertIn("-Ptally.allowStandInRelease=true", out)
 
 
+CHECK = ":app:checkNoDebugAppCheckInRelease"
+
+
+class DebugAppCheckNeverInRelease(unittest.TestCase):
+    """M1-26 (PR 317 R1-03): firebase-appcheck-debug must not be on the release runtime classpath.
+
+    The check runs before every release build (M1-33's release-smoke job builds assembleRelease). The negative case adds
+    the debug provider to the release classpath with -Ptally.selfTestDebugAppCheckInRelease=true and must fail the check.
+    """
+
+    def test_every_release_build_runs_the_check(self):
+        self.assertIn(CHECK, planned(":app:assembleRelease"))
+        self.assertIn(CHECK, planned(":app:bundleRelease"))
+
+    def test_it_passes_on_the_real_release_classpath(self):
+        rc, out = gradle(CHECK)
+        self.assertEqual(rc, 0, out)
+
+    def test_it_fails_when_the_debug_provider_is_on_the_release_classpath(self):
+        rc, out = gradle(CHECK, "-Ptally.selfTestDebugAppCheckInRelease=true")
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("com.google.firebase:firebase-appcheck-debug", out)
+
+    def test_the_debug_build_still_has_the_debug_provider(self):
+        rc, out = gradle(":app:dependencies", "--configuration", "debugRuntimeClasspath")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("firebase-appcheck-debug", out)
+
+
 if __name__ == "__main__":
     unittest.main()
