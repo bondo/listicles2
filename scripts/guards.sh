@@ -1069,9 +1069,27 @@ if [ "$STAGED" = 0 ]; then
       function testpath(p) {
         return (p ~ /(^|\/)test_[^\/]*\.py$|_test\.py$/ || p ~ /^[ab]\/([^\/]+|core\/[^\/]+)\/src\/(test|androidTest|testFixtures|[a-z]+Test)\/.*\.(kt|java)$/)
       }
+      # Task 1b (M1-68 part B): in a line of a .py file that is no test file on either side, useJUnitPlatform and
+      # failOnNoDiscoveredTests inside a `#` comment or a plain string literal (no prefix or r, b, u, rb, br; an f-string is code)
+      # are a mention, not a setting. An unterminated string leaves the rest of the line as it is. Every other keyword still counts.
+      function pymention(s,   out, i, j, L, c, seg, p) {
+        out = ""; i = 1; L = length(s)
+        while (i <= L) {
+          c = substr(s, i, 1)
+          if (c == "#") { seg = substr(s, i); gsub(/useJUnitPlatform|failOnNoDiscoveredTests/, "mention", seg); return out seg }
+          if (c != "\"" && c != "\047") { out = out c; i++; continue }
+          for (j = i + 1; j <= L && substr(s, j, 1) != c; j++) if (substr(s, j, 1) == "\\") j++
+          if (j > L) return out substr(s, i)
+          seg = substr(s, i, j - i + 1); i = j + 1; p = out; sub(/^.*[^A-Za-z0-9_]/, "", p)
+          if (p ~ /^([rRbBuU]|[rR][bB]|[bB][rR])?$/) gsub(/useJUnitPlatform|failOnNoDiscoveredTests/, "mention", seg)
+          out = out seg
+        }
+        return out
+      }
       /^diff --git/ {
         file = $3
         istest = (NF == 4 && testpath($3) && testpath($4))   # old AND new path must be test files
+        ispy = (NF == 4 && $3 ~ /\.py$/ && $4 ~ /\.py$/ && !testpath($3) && !testpath($4))
         next
       }
       /^(---|\+\+\+)/ { next }
@@ -1100,6 +1118,12 @@ if [ "$STAGED" = 0 ]; then
         if ($0 !~ /[0-9]/ && (file ~ /\.md$/ || (file ~ /\.py$/ && lit ~ /^[-+][][ \t(){},;]*$/))) {
           while (match(kw, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
         }
+        # Task 1b (see #322): in markdown, plural `thresholds` after a letter-word and before `,`, `;`, `)`, a full stop or a
+        # letter-word is prose even when the line has a digit. A colon, `=`, `|`, a number or the line end after it still count.
+        if (file ~ /\.md$/) {
+          while (match(kw, /[A-Za-z][ \t]+thresholds([,;)]|[.]([ \t]|$)|[ \t]+[A-Za-z])/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
+        }
+        if (ispy) kw = pymention(kw)
       }
       # coverageThreshold (Jest) and fail_under / --cov-fail-under (coverage.py) are named like thresholds but not spelled `threshold`.
       # In a Jest, Vitest, nyc or c8 config the per-metric values sit on their own lines (`branches: 80,`), so those lines count too.
