@@ -1808,10 +1808,11 @@ class MovedCheckSettings(DiffCase):
         self.assertFails('guard: removed check setting: tasks.test { useJUnitPlatform { includeTags("fast") } }')
 
     def test_a_removed_line_outside_build_files_is_not_accepted(self):
-        self.base("scripts/check_x.py", "SETTING = 'failOnNoDiscoveredTests = true'\n")
+        # Task 1b: a .py file's comment or string only mentions the setting (test_guards_mentions.py), so this one is code.
+        self.base("scripts/check_x.py", "failOnNoDiscoveredTests = true\n")
         self.change("scripts/check_x.py", "SETTING = ''\n")
         self.change(self.PLUGIN, self.plugin("failOnNoDiscoveredTests = true"))
-        self.assertFails("guard: removed check setting: SETTING = 'failOnNoDiscoveredTests = true'")
+        self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
         # R1-01: a plain statement removed from a source file (not a build file) does not move either.
         self.base("app/src/main/kotlin/Fixture.kt", "fun f() {\n    tasks.test { useJUnitPlatform() }\n}\n")
         self.change("app/src/main/kotlin/Fixture.kt", "fun f() {\n}\n")
