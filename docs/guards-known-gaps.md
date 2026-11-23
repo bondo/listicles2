@@ -240,7 +240,9 @@ filter `src`). The value-taking long names are their own (`RVX`: `--workers`, `-
 `--ui` takes no value after playwright. A quoted value, or one with an escaped blank, is one word for every runner (`--project "Mobile
 Chrome"`, `--group "UI - Chrome"`, a JSON `--env '{"grep": "x"}'`; in a package.json the `\"` quotes), so its second word is no path
 filter (PR 358 R0-01). `npx @playwright/test test`, `node node_modules/{@playwright/test,playwright}/cli.js test` and `npx -p <package> playwright test`
-(the `-p` or `--package` value is no command) are playwright (PR 358 R1-01, R1-02). The denied long names join the shared list, so an unresolved tail
+(the `-p` or `--package` value of npx, pnpx, bunx, dlx, `npm exec` and `npm x` is no command; `time -p` and `command -p`
+take no value) are playwright (PR 358 R1-01, R1-02, R2-01). Accepted residual (R2-02): an extensionless cli path
+(`node node_modules/playwright/cli test -u`, which node resolves to `cli.js`) is not read as playwright and passes. The denied long names join the shared list, so an unresolved tail
 fails on them too, and so do `jest --list` and `mocha --no-deps`, which those runners refuse anyway (intended: the fail-closed side). A
 tail resolved to them is read with their own letters and positional rule (jest letters there are no longer denied: `npm run e2e -- -o`
 passes, commander refuses it). A tail resolved to two runners with different parsers is read as mri, the strictest.

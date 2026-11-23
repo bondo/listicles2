@@ -559,7 +559,7 @@ function rname(t) { t = rclean(t); sub(/^\$?[({]+/, "", t); if (t ~ /^@playwrigh
 # may hold blanks), shell keywords and launchers (npx, npm exec, yarn run, bunx, node, env, sudo, timeout, nice, ...) with their
 # options, a value after a one-letter option (sudo -u bob, nice -n 5) and a number (timeout 60), from word i0 on; 0 when there is none
 # (R1-03).
-function cmdat(w, n, i0,   i, t, l, v, q) {
+function cmdat(w, n, i0,   i, t, l, v, q, lw, pl) {
   for (i = i0; i <= n; i++) {
     t = rclean(w[i]); sub(/^\$?[({]+/, "", t)
     if (t == "" || t == "-" || w[i] ~ /:$/) continue
@@ -568,8 +568,9 @@ function cmdat(w, n, i0,   i, t, l, v, q) {
       if (q ~ /["\047]/ && (length(v) == 1 || substr(v, length(v)) != q)) for (i++; i <= n; i++) { v = w[i]; gsub(/\\/, "", v); if (index(v, q)) break }
       continue
     }
-    if (t ~ /^(sudo|env|time|timeout|exec|command|nice|nohup|node|npm|npx|pnpx|bunx|yarn|pnpm|bun|dlx|x|run|if|then|do|else|elif|while|until|!)$/) { l = 1; continue }
-    if (l && t ~ /^(-p|--package)$/ && i < n) { i++; continue }  # the npx and npm exec package, also a runner name (R1-02)
+    if (t ~ /^(sudo|env|time|timeout|exec|command|nice|nohup|node|npm|npx|pnpx|bunx|yarn|pnpm|bun|dlx|x|run|if|then|do|else|elif|while|until|!)$/) { pl = lw; lw = t; l = 1; continue }
+    # the package of npx, pnpx, bunx, dlx, npm exec and npm x, also a runner name (R1-02); `time -p`, `command -p` take no value (R2-01)
+    if (t ~ /^(-p|--package)$/ && i < n && (lw ~ /^(npx|pnpx|bunx|dlx)$/ || (lw ~ /^(exec|x)$/ && pl ~ /^(npm|pnpm|yarn|bun)$/))) { i++; continue }
     if (l && t ~ /^-/) { if (t ~ /^-[A-Za-z]$/ && i < n && rclean(w[i + 1]) !~ /^-/ && !(rname(w[i + 1]) in RDS)) i++; continue }
     if (l && t ~ /^[0-9.]+[smhd]?$/) continue
     return i
