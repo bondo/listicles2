@@ -103,6 +103,16 @@ class DirectTests(RunnerCase):
         self.put("tools/package.json", self.pkg(entries))
         self.each_line_fails("tools/package.json", [v for _, v in entries], first=4)
 
+    def test_a_json_value_ends_the_command(self):
+        """Round 1 fix: a package.json script ends at the closing quote of its value, so the next key is no path filter."""
+        self.put("firebase/package.json", '{\n  "scripts": { "test": "jest --runInBand", "format": "prettier --check ." },\n'
+                 '  "x": { "jest": "30.5.2", "y": "z" }\n}\n')
+        self.assertPasses()
+        lines = ['  "scripts": { "test": "jest src", "format": "prettier --check ." },', '  "a": { "t": "npx jest@30 -u" },',
+                 '  "b": { "t": "jest --ci", "u": "jest -- src" },']
+        self.put("firebase/package.json", "{\n" + "\n".join(lines) + "\n}\n")
+        self.each_line_fails("firebase/package.json", lines, first=2)
+
     def test_a_reason_does_not_waive_it(self):
         lines = ["npx jest -u # justified: snapshots are regenerated on purpose", "jest src # justified: only this folder runs here"]
         self.put("scripts/test.sh", "\n".join(lines) + "\n")
