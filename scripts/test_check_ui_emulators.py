@@ -102,7 +102,9 @@ class Wiring(unittest.TestCase):
             "continue-on-error": ("      - name: enable KVM\n", "      - name: enable KVM\n        continue-on-error: true\n"),
             "needs a skipped job": ("  ui:\n    name: ui\n", "  ui:\n    name: ui\n    needs: [never]\n"),
             "quoted if on the job": ("  ui:\n    name: ui\n", "  ui:\n    name: ui\n    'if': false\n"),
-            "no npm ci": ("run: npm ci --silent\n      - name: enable KVM", "run: npm install --silent\n      - name: enable KVM"),
+            "no npm ci": ("run: npm ci --ignore-scripts --silent\n      - name: enable KVM", "run: npm install --silent\n      - name: enable KVM"),
+            "npm ci runs install scripts": (
+                "run: npm ci --ignore-scripts --silent\n      - name: enable KVM", "run: npm ci --silent\n      - name: enable KVM"),
             "no ui job": ("  ui:\n    name: ui\n", "  ui2:\n    name: ui\n"),
         }
         for name, (old, new) in mutations.items():
