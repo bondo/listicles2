@@ -958,12 +958,23 @@ notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py,
 id = "M1-65"
 title = "guards check 2c: npm `--` tail resolved through package.json scripts, fail closed by construction (issue 164 item 3)"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 330
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-42"]
 issue = 164
 notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py, docs/guards-known-gaps.md). Escalation ruling PR 309 comment 7084379032: any \"scripts\" or \\u token in a package.json other than the one strict top-level layout makes every tail unknown; npm forms only; only a script whose last command is a plain [npx] <runner> <words> with no shell metacharacters is resolved. PR 309 R4-01 must be fixed here, with N1-N4 and C1-C2 from the ruling as failing tests; residual R3-03 belongs here. May reuse code from branch tooling/guards-2c-42. Owner merge: scripts/guards.sh"
+
+[[task]]
+id = "M1-71"
+title = "guards check 1: test-runner options that skip or rewrite tests on command lines (jest, vitest, mocha), direct or after an npm `--` tail"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-65"]
+notes = "Found in M1-65: check 1 reads --passWithNoTests, -t, testPathIgnorePatterns and kin in config files only, so `jest --passWithNoTests` in a script passes, and since M1-65 so does `npm test -- -u` when the test script is a plain jest. Decide with the owner which runner options count (snapshot update, name and path filters, onlyChanged, shard); tooling env, test-first with negative cases, keep it a tripwire (F18). Owner merge: scripts/guards.sh"
 
 [[task]]
 id = "M1-13"
@@ -978,13 +989,34 @@ notes = "Lengths as in docs/milestones/M1.md P4; property: a 50-code-point name 
 
 [[task]]
 id = "M1-14"
-title = "Auth data: Google sign-in via Credential Manager, session state, sign out (Auth emulator)"
+title = "Auth data 1: Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
+pr = 319
+notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState(). The check of which fields the Firebase Auth record keeps for Google sign-in (privacy Q5) needs Firebase and moved to M1-67. Split 2026-11-22 (PR 319): the whole task measured about 780 changed lines before the app wiring (guard 600), and the wiring needs licences only the owner accepts. This is part 1 (the steps in core/domain, fakes in core/testing); M1-67 is the Firebase data layer with the emulator tests, M1-66 the Credential Manager wrapper and the :app wiring"
+
+[[task]]
+id = "M1-67"
+title = "Auth data 2: Firebase session state, Google ID-token sign-in, per-session Firestore holder in :core:data (Auth and Firestore emulator tests)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-60", "M1-13", "M1-02", "M1-50"]
-notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait for pending writes online; whenever the wait does not complete (offline or timeout) always ask to confirm; then terminate, clearPersistence, Auth signOut, CredentialManager.clearCredentialState(). Also check and record which fields the Firebase Auth record keeps for Google sign-in: name, email, photo link (feeds privacy Q5)"
+depends_on = ["M1-14"]
+notes = "Split from M1-14 (PR 319). Implements the M1-14 domain interfaces: SessionState and Authentication over FirebaseAuth (signInWithCredential with GoogleAuthProvider), LocalUserData over a per-session Firestore holder (waitForPendingWrites; terminate, then clearPersistence; a new instance at the next use, step 6). Emulator tests from docs/milestones/M1.md (M1-14): a Google-style credential signs in and the token has email_verified; sign-out clears the session; Sign out anyway drops a write no listener saw; the holder makes a new instance. Also check and record which fields the Firebase Auth record keeps for Google sign-in: name, email, photo link (feeds privacy Q5; moved here from M1-14). No licence question: :core:data has no licensee gate until M1-66. A compiled, never-run draft is on PR 319"
+
+[[task]]
+id = "M1-66"
+title = "Auth wiring: Credential Manager wrapper (Google ID option), :app on :core:data with licensee, Hilt bindings for session, sign-in and sign-out"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-67", "M1-O14"]
+notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule. Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14"
 
 [[task]]
 id = "M1-15"
@@ -993,7 +1025,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-14", "M1-62"]
+depends_on = ["M1-66", "M1-62"]
 
 [[task]]
 id = "M1-16"
@@ -1002,7 +1034,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-14", "M1-03", "M1-49"]
+depends_on = ["M1-66", "M1-03", "M1-49"]
 
 [[task]]
 id = "M1-17"
@@ -1031,7 +1063,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-14", "M1-60", "M1-62", "M1-02"]
+depends_on = ["M1-54", "M1-66", "M1-60", "M1-62", "M1-02"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1108,14 +1140,14 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-60", "M1-14"]
+depends_on = ["M1-60", "M1-66"]
 notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, tested; the in-app privacy link is privacy Q10"
 
 [[task]]
 id = "M1-26"
 title = "App Check: Play Integrity in release, debug provider in debug builds (not enforced)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30"]
@@ -1127,7 +1159,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-08", "M1-60", "M1-62"]
+depends_on = ["M1-08", "M1-60", "M1-62", "M1-66"]
 
 [[task]]
 id = "M1-28"
@@ -1396,13 +1428,34 @@ notes = "Tooling env, owner merge; R3-01..R3-04 as failing tests first"
 
 [[task]]
 id = "M1-44"
-title = "CI hardening nits: job timeouts, pinned python and node, gitleaks download, npm install scripts, pip hashes (issues 189, 127)"
+title = "CI hardening nits: job timeouts, pinned python and node, gitleaks download, npm install scripts (issues 189, 127)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+pr = 331
+notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line (docs/adr/0003). Split for the size guard (600 lines, the generated hash lock alone is 287): the CodeQL workflow of Q6 A (7058176190) is M1-73, the pip hash lock (issue 189 item 5) is M1-74. npm ci --ignore-scripts needs no npm rebuild: the emulators and the rules tests pass without re2 (an optional dependency of the hosting emulator)"
+
+[[task]]
+id = "M1-73"
+title = "Advanced CodeQL workflow: java-kotlin with a Gradle build, plus actions, javascript-typescript and python (issue 189 item 7, Q6 A)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line. Q6 A (7058176190): an advanced CodeQL workflow for java-kotlin with a Gradle build, weekly and on pushes to main; it also takes over actions, javascript-typescript and python with their pull_request trigger kept, because GitHub rejects advanced uploads while default setup is on; only java-kotlin is weekly and push to main (M1-O9 at merge)"
+notes = "Tooling env (.github), owner merge. Split from M1-44. Q6 A (7058176190): java-kotlin with a Gradle build, weekly and on pushes to main only; it also takes over actions, javascript-typescript and python with their pull_request trigger kept (no build, as today), because GitHub rejects advanced uploads while default setup is on. Test-first: a workflow lint rule or test that fails without it; actions pinned by SHA; the first run's upload needs default setup off (M1-O9 at merge)"
+
+[[task]]
+id = "M1-74"
+title = "Hash-locked pip requirements for the lint tools (issue 189 item 5)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-44"]
+notes = "Tooling env (.github, scripts/), owner merge. Tested in M1-44: scripts/requirements-lint.in (top level) compiled with pip-compile --generate-hashes --allow-unsafe --strip-extras on the Python CI pins (3.13; 284-line lock from a 3.12 trial: ruff, mypy, types-PyYAML and ast-serialize, librt, mypy-extensions, pathspec, typing-extensions); CI installs with pip install --require-hashes; lint_python.sh must read the version from the hashed format (sed on the ruff==X line); test_lint_python.py's pin regex and CODEOWNERS (.in) change with it; add the lock rules to scripts/check_ci_hardening.py test-first (every entry pinned with == and at least one sha256 hash, the only pip install is the hashed one). scripts/requirements-ci.txt (PyYAML, M1-44) can be hashed the same way. Check that Dependabot (pip, /scripts) still updates the .in and recompiles the .txt"
 
 [[task]]
 id = "M1-45"
@@ -1433,7 +1486,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-46"]
-notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins (needs a tooling change first: the guards script reads a check setting moved to another file as removed; PR 320 R1: accept such a move only when the added line is in a non-test source under build-logic/src/main/, outside a comment or string, with allow and deny cases in test_guards_sh.py, or do the one move under an owner-approved record; not 'key it by line') and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin)"
+notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines. Part B split again 2026-11-23 (400-line scope): part B1 (tooling/root-checks-68-b) moves useJUnitPlatform, failOnNoDiscoveredTests and :core:testing into the plugins with checkTestSettings per module (scripts/test_test_settings_gate.py) and records PR 329 R2-01 in docs/guards-known-gaps.md; the root check tasks per module and check 4 on any allprojects/subprojects use are the next PR(s)"
 
 [[task]]
 id = "M1-69"
@@ -1490,7 +1543,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
 ]
 
 [[task]]
@@ -1573,13 +1626,13 @@ notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1"
 
 [[task]]
 id = "M1-O9"
-title = "Turn off CodeQL default setup when the advanced workflow of M1-44 merges"
+title = "Turn off CodeQL default setup when the advanced workflow of M1-73 merges"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-44"]
-notes = "Owner decisions 7003645427 and 7058176190 (Q6 A); issue 258 item 2. Done as part of the M1-44 merge, so the new workflow's first upload is accepted"
+depends_on = ["M1-73"]
+notes = "Owner decisions 7003645427 and 7058176190 (Q6 A); issue 258 item 2. Done as part of the M1-73 merge, so the new workflow's first upload is accepted"
 
 [[task]]
 id = "M1-O10"
@@ -1620,6 +1673,16 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M1-33"]
 notes = "M1-33 runs the release build with R8 in its own CI job `release-smoke`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 12. Same sitting rule as M1-O11 (BRANCH-PROTECTION.md section 6): add it right after the M1-33 PR merges, never earlier, or every other open PR waits on `Expected, waiting for status` until it takes main in. Until then no ruleset rule requires `release-smoke`, so the M1-33 merge must confirm by hand that the job is green on the head"
+
+[[task]]
+id = "M1-O14"
+title = "Decide the licences of the 17 artifacts :app needs for Firebase Auth and Credential Manager (list on PR 319)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = []
+notes = "Found by M1-14 (PR 319), measured with licensee 1.14.1: 13 artifacts under the Android SDK terms (one config/licensee/google-sdk-terms.txt line each); com.google.android.play core-common and integrity under other Google terms, which google-sdk-terms.txt cannot list (a policy.gradle change); re2j and animal-sniffer-annotations, BSD-3-Clause and MIT texts at URLs licensee does not map (a policy.gradle change). Blocks M1-66, and with it every task that puts :core:data on the :app runtime classpath"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 

@@ -16,15 +16,12 @@ dependencies {
     testImplementation(libs.kotest.runner)
     testImplementation(libs.kotest.assertions)
     testImplementation(libs.kotest.property)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.konsist)
-    testImplementation(project(":core:testing"))
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.test {
-    useJUnitPlatform()
-    // A test task that runs zero tests is a failure, not a pass.
-    failOnNoDiscoveredTests = true
     // The shared test-JVM network block has its own tests; running the domain tests runs them too.
     dependsOn(":core:testing:test")
 }

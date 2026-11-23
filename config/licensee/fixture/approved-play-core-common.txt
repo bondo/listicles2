@@ -1,0 +1,1 @@
+com.google.android.play:core-common:1.0  # fixture: approved for the gate test
