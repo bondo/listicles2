@@ -3,7 +3,9 @@ package dk.bjarkebjarke.tally.data.session
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 /**
  * The signed-in user's Firestore instance, one per session, and its copy on the phone (PLAN 3.2; steps 1 to 3 and 6 of
@@ -11,7 +13,8 @@ import kotlinx.coroutines.tasks.await
  * deletes its cache and write queue, and the first [firestore] call after that makes a new instance with [newInstance],
  * because a terminated one allows nothing but `clearPersistence`. [newInstance] is the app's only way to an instance:
  * while [clear] runs, [firestore] still answers the terminated one, so nothing opens the files again before they are
- * deleted. `SignOut` calls [awaitPendingWrites] and [clear] in turn, one sign-out at a time, so they never overlap.
+ * deleted. `SignOut` calls [awaitPendingWrites] and [clear] in turn; a second sign-out can start while the first one's
+ * [clear] still runs, and [awaitPendingWrites] meanwhile answers a failed wait.
  */
 class FirestoreSession(
     private val newInstance: () -> FirebaseFirestore,
@@ -22,14 +25,19 @@ class FirestoreSession(
     /** For the data layer only (checklist section 1): nothing outside `:core:data` touches Firestore. */
     internal fun firestore(): FirebaseFirestore = synchronized(lock) { current ?: newInstance().also { current = it } }
 
-    override suspend fun awaitPendingWrites(): Boolean =
-        try {
-            firestore().waitForPendingWrites().await()
+    override suspend fun awaitPendingWrites(): Boolean {
+        val instance = firestore()
+        return try {
+            instance.waitForPendingWrites().await()
             true
         } catch (expected: FirebaseFirestoreException) {
             // Firestore fails the wait when the signed-in user changes before the server acknowledged every write.
             false
+        } catch (expected: IllegalStateException) {
+            // A clear() still running terminated the instance: a second sign-out while the first one finishes.
+            false
         }
+    }
 
     /** No listener reports unsent writes before M2 (lists and items), so the question uses wireframe 45's text. */
     override fun unsentChangesSeen(): Boolean = false
@@ -41,9 +49,14 @@ class FirestoreSession(
     override suspend fun clear(): Boolean {
         val instance = firestore()
         return try {
-            instance.terminate().await()
-            instance.clearPersistence().await()
+            withContext(NonCancellable) {
+                instance.terminate().await()
+                instance.clearPersistence().await()
+            }
             true
+        } catch (expected: FirebaseFirestoreException) {
+            // The files could not be deleted; the next try starts from a new instance.
+            false
         } finally {
             drop(instance)
         }
