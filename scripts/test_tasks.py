@@ -762,7 +762,8 @@ class StateBodyTest(unittest.TestCase):
         variants = {
             "crlf": base.replace("\n", "\r\n"),
             "cr": base.replace("\n", "\r"),
-            "unicode line separators inside a value": sample.body(data),
+            # the raw characters (render dumps with ensure_ascii=False), so a str.splitlines() split breaks the JSON
+            "unicode line separators inside a value": state_body.render(sample.body(data)),
             "trailing blanks on the fences": base.replace("```json\n", "```json \t\n").replace("\n```\n", "\n```\t\n"),
         }
         for name, text in variants.items():
@@ -771,6 +772,24 @@ class StateBodyTest(unittest.TestCase):
                 claimed, in_review = tasks.state_ids(text)
                 self.assertEqual(claimed, [t for s in expected["sessions"] for t in s["tasks"]])
                 self.assertEqual(in_review, [t for b in expected["branches"] for t in b["in_review"]])
+
+    def test_a_fence_followed_by_a_non_fence_whitespace_char_is_no_fence_for_both_readers(self):
+        import state_body
+        import test_state_body as sample
+
+        base = state_body.render(sample.body())
+        self.assertTrue(base.endswith("\n```\n"))
+        for ch in ("\u2028", "\x85", "\x0c"):
+            texts = {
+                "closing fence": base[:-4] + "```" + ch + "\nafter\n```\n",
+                "opening fence": base.replace("```json\n", "```json" + ch + "\n", 1),
+            }
+            for name, text in texts.items():
+                with self.subTest(char=repr(ch), fence=name):
+                    with self.assertRaises(state_body.StateError):
+                        state_body.load(text)
+                    with self.assertRaises(tasks.InputError):
+                        tasks.state_ids(text)
 
 
 if __name__ == "__main__":
