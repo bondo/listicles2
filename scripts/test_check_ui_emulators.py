@@ -147,9 +147,17 @@ class Wiring(unittest.TestCase):
         for old, new in (("useJUnitPlatform()", "useJUnit()"), ("useJUnitPlatform()", "// useJUnitPlatform()")):
             with self.subTest(new):
                 shutil.copy(ROOT / PLUGIN, self.root / PLUGIN)
-                got = self.mutated(PLUGIN, old, new)
-                self.assertEqual(len(got), 1)
-                self.assertIn("JUnit Platform", got[0])
+                self.assertEqual(self.mutated(PLUGIN, old, new), [c.JUNIT_PROBLEM])
+
+    def test_a_module_level_junit_line_does_not_stand_in_for_the_plugin(self):
+        # M1-68 part B: the old :core:data form, as it was or weakened, does not count; only the plugin's call does.
+        self.mutated(PLUGIN, "        useJUnitPlatform()\n", "")
+        build = self.root / BUILD
+        build.write_text(build.read_text() + "android { testOptions { unitTests.all { it.useJUnitPlatform() } } }\n")
+        self.assertEqual(c.problems(self.root), [c.JUNIT_PROBLEM])
+        for old, new in (("useJUnitPlatform", "useJUnit"), ("unitTests.all {", "// unitTests.all {")):
+            with self.subTest(new):
+                self.assertEqual(self.mutated(BUILD, old, new), [c.JUNIT_PROBLEM])
 
     def test_the_smoke_test_must_exist_and_have_a_test(self):
         got = self.mutated(SMOKE, "@Test", "// not a test", count=3)
