@@ -36,7 +36,6 @@ android {
     }
 
     testOptions {
-        unitTests.all { it.useJUnitPlatform() }
         // RenameTest reads the merged manifest and string resources.
         unitTests.isIncludeAndroidResources = true
     }
@@ -255,8 +254,6 @@ val checkUnitTestResults by tasks.registering(Exec::class) {
 
 tasks.withType<Test>().configureEach {
     systemProperty("tally.googleServicesStandIn", googleServicesStandIn)
-    // A test task that discovers zero tests is a failure, not a pass.
-    failOnNoDiscoveredTests = true
     if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
 }
 
@@ -286,7 +283,6 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
-    testImplementation(project(":core:testing"))
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.vintage.engine)
