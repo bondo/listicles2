@@ -181,7 +181,7 @@ the name filter, mocha `-t` is `--timeout`; jest `-i` is `--runInBand`, mocha `-
 group is read as yargs-parser (jest, mocha) reads it (R1-01): every character is a flag, digits included, until one takes the rest of
 the group as its value, which happens only when the rest starts with `=`, is a number (after a letter: `-w2`), or starts with a
 character that is no word character. So `-wu`, `-w2u`, `-1u` and `-x9u` all set `-u`. mri (vitest, and a tail resolved to a runner
-the check does not know) reads every character before `=` as a flag. A word that starts with a dash is skipped only as a negative
+the check does not know) reads every character of a single-dash word before `=` as a flag. A word that starts with a dash is skipped only as a negative
 number (`--seed -1`). A one-letter long option (`--u`, mocha `--g smoke`) is that short option, as both parsers read it (R1-02).
 Positional words are path filters after jest, and after vitest except a first `run`, `watch` or `dev` (`vitest related`, `list` and
 `bench` fail), when the runner is the command: the first word after a YAML `- key:` or a package.json key, `VAR=` assignments (a
@@ -203,7 +203,12 @@ resolved is read with the long names only and fails with no escape hatch; its sh
 - A runner inside a quoted command string (`firebase emulators:exec "jest src"`, `bash -c "jest src"`) has its options read but not its
   positional words; nor does a runner held in a variable (`$JEST src`), one after a launcher option whose value is not one word
   directly after a one-letter option (`sudo --user=bob` passes, `sudo --user bob jest src` reads `bob` as the command), one after a
-  wrapper the list does not name (`xargs jest`, `watch jest`), or a runner run from a Python or JS file.
+  wrapper the list does not name (`xargs jest`, `watch jest`, `cross-env CI=1 jest src`, `nyc --reporter=lcov jest src`,
+  `c8 vitest run src`, `dotenv -e .env -- jest src`, `yarn workspace app jest src`, `pnpm --filter app exec jest src`,
+  `stdbuf -oL jest src`, a `case` arm `a) jest src;;`), or a runner run from a Python or JS file. Their options are still read (PR 339
+  R2-03, accepted residual).
+- vitest (mri) reads a word with three or more dashes as a short group: `vitest run ---u` and `---t=smoke` pass the guard, which reads
+  every `--` word as a long name (PR 339 R2-01, accepted residual). jest and mocha (yargs) do not read `---u` as `-u`.
 - Options that weaken a run without filtering it: jest `--ci=false` (writes new snapshots), `--bail`, `--listTests`, `--watch` (only
   changed tests; it does not end in CI), vitest `--allowOnly`, dot options (`--coverage.*`, `--typecheck.only`), `--project`, jest
   `--selectProjects`, `--roots`, `--testMatch`, `--testRegex` (the last three are refused in config by check 1), and a command whose

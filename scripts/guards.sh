@@ -535,14 +535,16 @@ function cmdat(w, n, i0,   i, t, l, v, q) {
   return 0
 }
 # runopt: 1 when command p passes a denied option to jest, vitest or mocha, directly or in an npm `--` tail.
-function runopt(p,   n, w, k, a, r, i, dd, ds, vs, dl, pos, tl, mr) {
+function runopt(p,   n, w, k, a, r, i, dd, ds, vs, dl, pos, tl, mr, s0) {
   if (datacmd(p)) return 0
   n = split(p, w, /[ \t]+/)
   for (k = cmdat(w, n, 1); k; k = (JSF ? cmdat(w, n, i) : 0)) {  # in a package.json, every script value on the line
     a = rname(w[k]); tl = ""; for (i = k + 1; i <= n && !jsend(w[i - 1]); i++) tl = tl " " w[i]
     if ((a in RDS) && rscan(tl, RDS[a], RVS[a], a != "mocha", a == "vitest", "", a == "vitest")) return 1
   }
-  for (r in RDS) if (has(p, r) && rscan(after(p, r), RDS[r], RVS[r], 0, 0, "", r == "vitest")) return 1
+  for (r in RDS) for (s0 = p; has(s0, r); s0 = substr(s0, 2)) {  # every mention: a package.json value ends a scan (R2-02)
+    s0 = after(s0, r); if (rscan(s0, RDS[r], RVS[r], 0, 0, "", r == "vitest")) return 1
+  }
   dd = ddseg(p); if (dd == "") return 0
   if (!ddrun(p)) return rscan(dd, "", "", 0, 0, "", 0)
   ds = vs = dl = ""; pos = mr = 0
