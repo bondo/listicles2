@@ -996,13 +996,41 @@ class NestedBuilds(unittest.TestCase):
 
     def test_gate_runs_a_case_with_another_licensee_version(self):
         # Gradle does not verify the local repo/ artifacts, so the case proves the fixture's metadata is enforced on the remote plugin:
-        # an older licensee version that is on Maven Central but not in the file must fail with Gradle's verification error.
+        # an older licensee version that is on Maven Central but not in the file must fail. The expected text is only printed when the
+        # plugin cannot be resolved (strict verification); lenient mode prints the same verification warning, resolves the plugin and
+        # fails later for another reason (policy.gradle does not fit licensee 1.0.0), so the verification text alone is not enough.
         build = (ROOT / "build.gradle.kts").read_text(encoding="utf-8")
-        case = re.search(r'licenseeCase\([^)]*message = "Dependency verification failed"[^)]*licensee = "([^"]+)"', build)
-        self.assertIsNotNone(case, "testLicenseeGate has no case with another licensee version and the verification error")
+        case = re.search(
+            r"licenseeCase\([^)]*message = \"Error resolving plugin \[id: 'app\.cash\.licensee', version: '([^']+)'\]\\n> Dependency verification failed\""
+            r'[^)]*licensee = "([^"]+)"',
+            build,
+        )
+        self.assertIsNotNone(case, "testLicenseeGate has no case with another licensee version and the strict verification error")
+        self.assertEqual(case[1], case[2])
         catalog = re.search(r'(?m)^licensee = "([^"]+)"', (ROOT / "gradle" / "libs.versions.toml").read_text(encoding="utf-8"))[1]
-        self.assertNotEqual(case[1], catalog)
-        self.assertNotIn(f'version="{case[1]}"', (ROOT / FIXTURE_META).read_text(encoding="utf-8"))
+        self.assertNotEqual(case[2], catalog)
+        self.assertNotIn(f'version="{case[2]}"', (ROOT / FIXTURE_META).read_text(encoding="utf-8"))
+
+    def test_fixture_run_must_not_use_the_attached_short_flag_to_switch_verification_off(self):
+        for mode in ("lenient", "off"):
+            with self.subTest(mode=mode):
+                self.edit("build.gradle.kts", '"-Pdeps=$deps",', f'"-Pdeps=$deps",\n                        "-F{mode}",')
+                self.assert_fails("build.gradle.kts: the licensee gate switches Gradle dependency verification off")
+                self.setUp()
+
+    def test_fixture_properties_missing_is_flagged(self):
+        (self.root / FIXTURE / "gradle.properties").unlink()
+        self.assert_fails(f"{FIXTURE.as_posix()}/gradle.properties missing")
+
+    def test_catalog_without_a_licensee_version_is_flagged(self):
+        self.edit("gradle/libs.versions.toml", 'licensee = "', 'licenseeX = "')
+        self.assert_fails("gradle/libs.versions.toml: no licensee version")
+
+    def test_nested_settings_problems_name_the_file_once(self):
+        self.edit(FIXTURE / "settings.gradle.kts", 'rootProject.name = "licensee-fixture"', 'rootProject.name = "licensee-fixture"\ngoogle()\n')
+        code, out = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"gradle-repos: {FIXTURE.as_posix()}/settings.gradle.kts: google() outside pluginManagement needs a content filter", out)
 
     def test_pure_function_good_and_bad_inputs(self):
         meta = (
