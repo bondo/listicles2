@@ -10,7 +10,10 @@
     <!-- SYNC-03: shown when an action needs the server and the phone is offline. -->
     <string name="needs_connection">Det kræver internetforbindelse</string>
     <!-- Start-up gate steps (P10) until their screens exist: update M1-27, verify email M1-17, name M1-39 (AUTH-12), household notices M1-21 (HH-06, wireframe 40). -->
-    <string name="gate_update_title">Opdatering påkrævet</string>
+    <string name="gate_update_title">Opdater appen</string>
+    <string name="gate_update_body">Denne version af Tally er for gammel til at virke. Hent den nye version, og åbn den.</string>
+    <string name="gate_update_button">Hent opdateringen</string>
+    <string name="gate_update_note">Åbner siden med udgivelser på GitHub.</string>
     <string name="gate_verify_title">Bekræft din e-mail</string>
     <string name="gate_name_title">Hvad skal vi kalde dig?</string>
     <string name="gate_notice_removed">Du er fjernet fra husstanden</string>
