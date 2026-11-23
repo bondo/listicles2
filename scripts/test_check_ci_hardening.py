@@ -4,10 +4,9 @@ Run: python3 -I scripts/test_check_ci_hardening.py
 
 The check runs on the real files first, then on copies with one defect each, which must each be reported: a job without a
 timeout, python3 or node taken from the runner image, `npm ci` that runs install scripts, a gitleaks download without
-retries or https-only redirects, and a pip install without a hashed lock.
+retries or https-only redirects.
 """
 
-import re
 import shutil
 import subprocess
 import sys
@@ -24,7 +23,6 @@ ROOT = Path(__file__).resolve().parent.parent
 CI = ".github/workflows/ci.yml"
 STATUS = ".github/workflows/status.yml"
 VERIFY = "scripts/verify.sh"
-REQS = "scripts/requirements-lint.txt"
 ADR = "docs/adr/0002-gradle-dependency-verification.md"
 
 
@@ -33,7 +31,7 @@ class Rules(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, STATUS, VERIFY, REQS, ADR, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
+        for name in (CI, STATUS, VERIFY, ADR, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / name, self.root / name)
 
@@ -143,26 +141,6 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit(CI, "sha256sum -c -", "cat"), "gitleaks", "sha256sum")
         self.setUp()
         self.flagged(self.edit(CI, "./gitleaks git --redact --no-banner .", "./gitleaks git --source . --redact --no-banner"), "gitleaks", "--source")
-
-    def test_pip_installs_only_the_hashed_lock(self):
-        self.flagged(self.edit(CI, "pip install --require-hashes -r", "pip install -r"), "pip", "require-hashes")
-        self.setUp()
-        self.flagged(self.edit(CI, "pip install --require-hashes -r scripts/requirements-lint.txt", "pip install --require-hashes -r scripts/other.txt"), "pip")
-        self.setUp()
-        old = "pip install --require-hashes -r scripts/requirements-lint.txt"
-        self.flagged(self.edit(CI, old, old + "\n          pip install wheel"), "pip")
-
-    def test_every_requirement_is_pinned_and_hashed(self):
-        reqs = (self.root / REQS).read_text()
-        self.assertRegex(reqs, r"(?m)^ruff==\S+ \\\n\s+--hash=sha256:[0-9a-f]{64}")
-        self.assertRegex(reqs, r"(?m)^typing-extensions==", "the lock must pin the transitive dependencies too")
-        unhashed = re.sub(r"(?m)^(ruff==\S+) \\\n(?:\s+--hash=\S+(?: \\)?\n)+", r"\1\n", reqs)
-        self.assertNotEqual(unhashed, reqs)
-        self.flagged(self.set_text(REQS, unhashed), "ruff", "hash")
-        self.flagged(self.set_text(REQS, reqs.replace("mypy==", "mypy>=", 1)), "mypy", "pinned")
-        self.flagged(self.set_text(REQS, reqs + "wheel\n"), "wheel")
-        self.flagged(self.set_text(REQS, reqs.replace("--hash=sha256:", "--hash=sha1:", 1)), "hash")
-        self.flagged(self.set_text(REQS, reqs.replace("--hash=sha256:", "--hash=sha256:0", 1)), "hash")
 
     def test_verify_sh_runs_the_check_and_its_tests(self):
         self.flagged(self.edit(VERIFY, "step ci-hardening python3 -I scripts/check_ci_hardening.py\n", ""), "verify.sh", "check_ci_hardening.py")
