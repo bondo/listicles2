@@ -1756,10 +1756,12 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         self.assertRegex(s11, r"the one standing exception: a merge agent merges under the standing authorization 7005366747 by the owner's "
                               r"decision 7085221356, which it reads and verifies itself on #15 \(§7\.5\); nothing is relayed")
         self.assertRegex(doc, r"role:<role>\s+orchestrator \| implementer \| merge-agent \|")
-        self.assertRegex(doc, r"\*\*sessions\*\*: one row per live worker: id, role, tags, branch,.*a `merge-agent` row whose status is not `archived` or `failed` is what names it as active \(§7\.5\)")
+        self.assertRegex(doc, r"\*\*sessions\*\*: one row per live worker: id, role, tags, branch,.*a `merge-agent` row whose status is not "
+                              r"`archived` or `failed` is what names it as active \(§7\.5\)")
         roles = self.ROLES_YAML.read_text(encoding="utf-8").split("  merge-agent:", 1)[1].split("\n  # ", 1)[0]
         self.assertIn("merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent "
-                      "session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge", roles)
+                      "session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; "
+                      "it verifies 7085221356 itself before its first merge", roles)
 
     def test_the_merge_agent_rule_flags_each_old_sentence_in_both_files(self):  # R1-01 of #322: the gate itself, not a copy of its regex
         prompt, doc = self.ORCH_MD.read_text(encoding="utf-8"), self.ORCH_DOC.read_text(encoding="utf-8")
