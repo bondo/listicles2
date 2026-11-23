@@ -79,6 +79,9 @@ class PluralThresholdsInMarkdownProse(Case):
             "guard thresholds, minBound(80)",
             "guard threshold 600, branch protection",
             "kover thresholds",
+            "thresholds, 80",
+            "kover.thresholds, 80",
+            "coverage thresholds.line 80",
         ):
             with self.subTest(line=line):
                 self.removed("agents/prompts/x.md", line)
@@ -137,13 +140,24 @@ class CheckKeywordMentionsInPython(Case):
                 self.removed(rel, UI_EMULATORS_128.rstrip("\n"))
                 self.removed(rel, '        self.assertIn("failOnNoDiscoveredTests = true", out)  # pinned')
 
-    def test_a_gate_test_renamed_to_a_plain_file_still_fails(self):
+    def test_a_rename_to_or_from_a_test_or_non_python_file_still_fails(self):
         filler = "".join(f"value_{i} = compute_something_long({i})\n" for i in range(40))
-        self.base("scripts/test_gate.py", filler + UI_EMULATORS_128)
-        self.repo.git("mv", "scripts/test_gate.py", "scripts/gate.py")
-        self.change("scripts/gate.py", filler)
-        self.assertIn("rename from scripts/test_gate.py", self.repo.git("diff", "-M", "origin/main", "HEAD"))
-        self.assertFails(REMOVED)
+        for old, new, line in (
+            ("scripts/test_gate.py", "scripts/gate.py", UI_EMULATORS_128),
+            ("scripts/gate2.py", "scripts/test_gate2.py", UI_EMULATORS_128),
+            ("scripts/gate3.sh", "scripts/gate3.py", "# failOnNoDiscoveredTests\n"),
+            ("scripts/gate4.py", "scripts/gate4.sh", "# failOnNoDiscoveredTests\n"),
+        ):
+            with self.subTest(old=old, new=new):
+                self.base(old, filler + line)
+                self.repo.git("mv", old, new)
+                self.change(new, filler)
+                self.assertIn(f"rename from {old}", self.repo.git("diff", "-M", "origin/main", "HEAD"))
+                self.assertFails(REMOVED)
+
+    def test_a_gate_test_in_a_path_with_spaces_still_fails(self):
+        # The diff header splits on spaces, so `a/scripts/dir.py` and `x/y.py` must not read as the two paths.
+        self.removed("scripts/dir.py x/y.py z/test_gate.py", UI_EMULATORS_128.rstrip("\n"))
 
     def test_a_keyword_in_code_still_fails(self):
         for line in (
