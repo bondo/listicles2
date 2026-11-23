@@ -1,0 +1,1 @@
+fixture:play-core:1.0  # fixture: approved for the gate test
