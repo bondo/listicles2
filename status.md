@@ -195,7 +195,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-62, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-68, M1-69 | process |  |
 | M1-34 | guards.sh&#58; compare line length per tool across all style files, with ruff and flake8 defaults (is… | done | none | implementer |  |
 | M1-77 | State issue part A&#58; one JSON block in the body, typed schema, scripts/state_body.py validate | done | none | implementer | [#340](https://github.com/bondo/listicles2/issues/340) |
-| M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | ready | M1-77 | implementer |  |
+| M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | in progress | M1-77 | implementer | [#356](https://github.com/bondo/listicles2/issues/356) |
 | M1-78 | State issue part B&#58; rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… | ready | M1-77 | implementer |  |
 | M1-79 | State issue part C&#58; ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… | blocked | M1-77, M1-78, M1-80 | process |  |
 | M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81 | implementer |  |
@@ -250,7 +250,7 @@ flowchart LR
     n27["M1-68 Root check tasks without cross-project… (ready)"]:::ready
     n28["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
     n29["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n30["M1-80 State issue part A2: state_body.py rend… (ready)"]:::ready
+    n30["M1-80 State issue part A2: state_body.py rend… (in progress)"]:::progress
     n31["M1-78 State issue part B: rotation (mileston… (ready)"]:::ready
     n32["M1-79 State issue part C: ORCHESTRATION.md 2… (blocked)"]:::blocked
     n33["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
