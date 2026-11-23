@@ -4,7 +4,7 @@
 <text x="24" y="76" class="muted s">All done: M0 28/28; M0.5 35/35</text>
 <text x="24" y="96" class="muted s">Not planned yet: M3, M4, M5</text>
 <rect x="24" y="122" width="1090" height="420" rx="6" class="card"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 41/82 done, 41 open</text>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 42/83 done, 41 open</text>
 <rect x="24" y="552" width="1090" height="60" rx="6" class="card"/>
 <text x="34" y="570" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
 <rect x="24" y="622" width="1090" height="90" rx="6" class="card"/>
@@ -51,8 +51,8 @@
 <path d="M384 358 C396 358 382 358 393 358" class="edge" data-from="M1-54" data-to="M1-11" marker-end="url(#ah)"/>
 <path d="M384 358 C396 358 382 328 393 328" class="edge" data-from="M1-54" data-to="M1-18" marker-end="url(#ah)"/>
 <path d="M114 253 C569 253 569 343 1023 343" class="edge" data-from="M1-61" data-to="M1-FU" marker-end="url(#ah)"/>
-<path d="M114 193 C569 193 569 343 1023 343" class="edge" data-from="M1-65" data-to="M1-FU" marker-end="url(#ah)"/>
 <path d="M114 283 C524 283 524 343 933 343" class="edge" data-from="M1-68" data-to="M1-48" marker-end="url(#ah)"/>
+<path d="M114 193 C569 193 569 343 1023 343" class="edge" data-from="M1-71" data-to="M1-FU" marker-end="url(#ah)"/>
 <path d="M204 418 C216 418 202 433 213 433" class="edge" data-from="M1-O1" data-to="M1-O2" marker-end="url(#ah)"/>
 <path d="M204 418 C216 418 202 403 213 403" class="edge" data-from="M1-O1" data-to="M1-O3" marker-end="url(#ah)"/>
 <path d="M204 418 C216 418 202 373 213 373" class="edge" data-from="M1-O1" data-to="M1-O4" marker-end="url(#ah)"/>
@@ -69,7 +69,7 @@
 <g data-id="M1-10" data-state="blocked"><title>M1-10: Rules: create household and member display name, allow and deny tests (transfer is M1-53) (blocked)</title><rect x="124" y="346" width="80" height="24" rx="4" class="nd-blocked"/><rect x="130" y="354" width="8" height="8" class="warn mk-blocked"/><text x="144" y="363" class="fg n">M1-10</text></g>
 <g data-id="M1-11" data-state="blocked"><title>M1-11: Rules: leave, remove member (removed marker), household soft delete and cleanup, allow and de… (blocked)</title><rect x="394" y="346" width="80" height="24" rx="4" class="nd-blocked"/><rect x="400" y="354" width="8" height="8" class="warn mk-blocked"/><text x="414" y="363" class="fg n">M1-11</text></g>
 <g data-id="M1-12" data-state="blocked"><title>M1-12: Rules: invites (create, get, list, revoke, cleanup), incl. unverified get denied (join is M1-54) (blocked)</title><rect x="214" y="301" width="80" height="24" rx="4" class="nd-blocked"/><rect x="220" y="309" width="8" height="8" class="warn mk-blocked"/><text x="234" y="318" class="fg n">M1-12</text></g>
-<g data-id="M1-65" data-state="review"><title>M1-65: guards check 2c: npm `--` tail resolved through package.json scripts, fail closed by construction … (in progress)</title><rect x="34" y="181" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,197 49,197 44,188" class="info mk-progress"/><text x="54" y="198" class="fg n">M1-65</text></g>
+<g data-id="M1-71" data-state="ready"><title>M1-71: guards check 1: test-runner options that skip or rewrite tests on command lines (jest, vitest, … (ready)</title><rect x="34" y="181" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="193" r="4.5" class="ok mk-ready"/><text x="54" y="198" class="fg n">M1-71</text></g>
 <g data-id="M1-14" data-state="review"><title>M1-14: Auth data: Google sign-in via Credential Manager, session state, sign out (Auth emulator) (in progress)</title><rect x="34" y="151" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,167 49,167 44,158" class="info mk-progress"/><text x="54" y="168" class="fg n">M1-14</text></g>
 <g data-id="M1-15" data-state="blocked"><title>M1-15: Auth data: email and password sign-up, sign-in, verification, reset, error mapping, collision m… (blocked)</title><rect x="124" y="256" width="80" height="24" rx="4" class="nd-blocked"/><rect x="130" y="264" width="8" height="8" class="warn mk-blocked"/><text x="144" y="273" class="fg n">M1-15</text></g>
 <g data-id="M1-16" data-state="blocked"><title>M1-16: Sign-in UI: sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) (blocked)</title><rect x="124" y="286" width="80" height="24" rx="4" class="nd-blocked"/><rect x="130" y="294" width="8" height="8" class="warn mk-blocked"/><text x="144" y="303" class="fg n">M1-16</text></g>
@@ -121,5 +121,5 @@
 <text x="350" y="740" class="fg s">owner to-do</text>
 <text x="24" y="764" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
 <text x="24" y="784" class="muted s">55 transitive arrows hidden.</text>
-<text x="24" y="804" class="muted s">Also not drawn: 102 dependencies on done or dropped tasks, 2 on whole milestones.</text>
+<text x="24" y="804" class="muted s">Also not drawn: 103 dependencies on done or dropped tasks, 2 on whole milestones.</text>
 </svg>

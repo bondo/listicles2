@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 41/82 (50%) | 41 |
+| M1 | Accounts and households | 42/83 (50%) | 41 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 41/82 done (50%), 41 open.
+**Progress:** 42/83 done (50%), 41 open.
 
 ### Tasks
 
@@ -135,7 +135,8 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-60 | Start-up root&#58; Navigation 3, M1 home (#194, Q1 A), signed-in/out routing (P10 steps 2 and 6), sig… | done | M1-30, M1-36, M1-49 | implementer | [#311](https://github.com/bondo/listicles2/issues/311) |
 | M1-62 | Start-up gates (b2 of M1-60)&#58; update (START-01), email verified (#195, Q2 A), name saved (AUTH-1… | done | M1-60 | implementer | [#323](https://github.com/bondo/listicles2/issues/323) |
 | M1-64 | guards check 2c&#58; YAML folded and multi-line values as one line, in addition to the per-line check… | done | M1-42 | implementer | [#325](https://github.com/bondo/listicles2/issues/325) |
-| M1-65 | guards check 2c&#58; npm &#96;--&#96; tail resolved through package.json scripts, fail closed by construction … | in progress | M1-42 | implementer | [#330](https://github.com/bondo/listicles2/issues/330) |
+| M1-65 | guards check 2c&#58; npm &#96;--&#96; tail resolved through package.json scripts, fail closed by construction … | done | M1-42 | implementer | [#330](https://github.com/bondo/listicles2/issues/330) |
+| M1-71 | guards check 1&#58; test-runner options that skip or rewrite tests on command lines (jest, vitest, … | ready | M1-65 | implementer |  |
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/listicles2/issues/303) |
 | M1-14 | Auth data&#58; Google sign-in via Credential Manager, session state, sign out (Auth emulator) | in progress | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/listicles2/issues/319) |
 | M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-14, M1-62 | implementer |  |
@@ -186,7 +187,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-47 | R12 screens vs wireframes for M1 (issue 65 review catalogue) | blocked | M1-16, M1-17, M1-19, M1-20, M1-21, M1-22, M1-23, M1-25, M1-27, M1-32, M1-39, M1-03, M1-04 | process |  |
 | M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-62, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-68, M1-69 | process |  |
 | M1-34 | guards.sh&#58; compare line length per tool across all style files, with ruff and flake8 defaults (is… | done | none | implementer |  |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-68, M1-69, M1-70 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-68, M1-69, M1-70, M1-71 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -212,7 +213,7 @@ flowchart LR
     n2["M1-10 Rules: create household and member di… (blocked)"]:::blocked
     n3["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n4["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
-    n5["M1-65 guards check 2c: npm #96;--#96; tail resolve… (in progress)"]:::progress
+    n5["M1-71 guards check 1: test-runner options tha… (ready)"]:::ready
     n6["M1-14 Auth data: Google sign-in via Credentia… (in progress)"]:::progress
     n7["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
     n8["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
@@ -343,8 +344,8 @@ flowchart LR
     n21 --> n29
     n22 --> n29
     n23 --> n29
-    n5 --> n29
     n26 --> n29
+    n5 --> n29
     n38 --> n30
     n30 --> n31
     n30 --> n32
@@ -453,6 +454,7 @@ flowchart LR
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
+- **PR to merge** [#319](https://github.com/bondo/listicles2/issues/319): M1-14&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes
 - **task** M1-06: waits on M1-10
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
