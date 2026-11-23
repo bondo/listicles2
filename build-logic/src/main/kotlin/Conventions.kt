@@ -16,8 +16,8 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompilerOptions
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
-// The one copy of the settings every module shares (#217 item 1). The root build's checkWarningsAsErrors and
-// checkJdkRelease check the result for every compile task.
+// The one copy of the settings every module shares (#217 item 1). Each module's own checkWarningsAsErrors and
+// checkJdkRelease (ModuleChecks.kt) check the result for every compile task.
 
 private const val COMPILE_SDK = 37
 private const val MIN_SDK = 26
@@ -27,8 +27,11 @@ private const val SPI = "-Djava.nio.channels.spi"
 private const val BLOCKING = "dk.bjarkebjarke.tally.testing.Blocking"
 private const val TEST_SETTINGS = "must run on the JUnit Platform with failOnNoDiscoveredTests on (M1-68)"
 
-/** Java and Kotlin 17, warnings as errors (M0.5-09) and the test-JVM network block for every module. */
-internal fun Project.configureKotlinModule(compilerOptions: KotlinJvmCompilerOptions) {
+/** Java and Kotlin 17, warnings as errors (M0.5-09), the test-JVM network block and the module's own checks. */
+internal fun Project.configureKotlinModule(
+    compilerOptions: KotlinJvmCompilerOptions,
+    jdkRelease: Boolean = false,
+) {
     pluginManager.apply(DependencyFloorsPlugin::class)
     // On the extension, as before: these are the conventions of every compile task of the module.
     compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
@@ -51,6 +54,7 @@ internal fun Project.configureKotlinModule(compilerOptions: KotlinJvmCompilerOpt
         dependencies.add("testImplementation", dependencies.project(mapOf("path" to TEST_SUPPORT)))
     }
     registerTestSettingsCheck()
+    registerModuleChecks(jdkRelease, TEST_SUPPORT)
 }
 
 /**
@@ -89,7 +93,7 @@ internal fun Project.configureJvmModule(jdkRelease: Boolean) {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    configureKotlinModule(extensions.getByType<KotlinJvmProjectExtension>().compilerOptions)
+    configureKotlinModule(extensions.getByType<KotlinJvmProjectExtension>().compilerOptions, jdkRelease)
     extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
         // Type-resolved tasks (detektMain, detektTest); the root task covers all sources without types.
         buildUponDefaultConfig = true
