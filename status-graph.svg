@@ -56,7 +56,7 @@
 <path d="M808 300 H825" class="edge s4 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac4)"/>
 <path d="M906 301 H910 V330 H923" class="edge s0 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac0)"/>
 <path d="M220 166 H237" class="edge s2 crit" data-from="M1-54" data-to="M1-11" marker-end="url(#ac2)"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 64/98 done, 34 open</text>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 65/99 done, 34 open</text>
 <text x="34" y="556" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
 <text x="34" y="628" class="fg h">M6 Release: 0/4 done, 4 open</text>
 <g data-id="M1-06" data-state="ready"><title>M1-06: Rules fuzzing: fast-check against a TS reference model of PLAN 3.1 (P17) (ready)</title><rect x="34" y="288" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="300" r="4.5" class="ok mk-ready"/><text x="54" y="305" class="fg n">M1-06</text></g>
@@ -119,5 +119,5 @@
 <text x="24" y="790" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
 <text x="24" y="810" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
 <text x="24" y="830" class="muted s">49 transitive arrows hidden.</text>
-<text x="24" y="850" class="muted s">Also not drawn: 125 dependencies on done or dropped tasks, 2 on whole milestones.</text>
+<text x="24" y="850" class="muted s">Also not drawn: 126 dependencies on done or dropped tasks, 2 on whole milestones.</text>
 </svg>
