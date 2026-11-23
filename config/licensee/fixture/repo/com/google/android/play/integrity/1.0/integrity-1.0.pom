@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.google.android.play</groupId>
+  <artifactId>integrity</artifactId>
+  <version>1.0</version>
+  <packaging>pom</packaging>
+  <licenses>
+    <license>
+      <name>Play Integrity terms</name>
+      <url>https://developer.android.com/google/play/integrity/overview#tos</url>
+    </license>
+  </licenses>
+</project>

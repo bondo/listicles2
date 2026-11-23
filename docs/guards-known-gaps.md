@@ -59,6 +59,18 @@ reason is true and specific (`REVIEW.md`, item 8).
   the next line (`useJUnitPlatform()` then `fast@{ includeTags("fast") }`), and a continuation after a form feed or lone CR (`= true`
   then `\f&& flag`), still count as the setting. These are not accidental forms; the guard is a tripwire (F18), and part B's per-module
   Test-task check (`checkTestSettings` in every module, `scripts/test_test_settings_gate.py`) closes the gap at build level.
+- **Mentions the threshold scan lets through (task 1b, see #322; M1-68 part B; tests in `scripts/hooks/test_guards_mentions.py`).** Plural
+  `thresholds` in markdown before `,` `;` `)`, a full stop or a word is prose even with a digit on the line, so `coverage thresholds are 80`
+  in markdown is not compared. In a `.py` file that is no test file, `useJUnitPlatform` and `failOnNoDiscoveredTests` inside a `#` comment
+  or a plain string are a mention: a gate's regex or message that pins them may be removed (the gate's own tests still count). A line
+  inside a multi-line string reads as code, the safe direction, except its closing line, where the closing quotes can pair with a later
+  quote (`doc""" if failOnNoDiscoveredTests else "x"` passes; in Python those names in code are no Gradle setting; PR 334 R1-02). Only
+  `test_*.py` and `*_test.py` are test files: a `conftest.py` or shared fixture module that pins the strings is not (R0 self-review nit).
+  Accepted residual (PR 334 R1-01, F18): Gradle runs an `apply(from = ...)` target that does not end in `.kts` as Groovy whatever its
+  extension, and the guard reads every `.py` file as Python. So removing `tasks.withType(Test).configureEach { def h = /#/;
+  useJUnitPlatform() }` from a `config/gradle/junit.py` that a build applies passes, and so do `def x = /'/; useJUnitPlatform(); def y = /'/`
+  and `/* " */ useJUnitPlatform() /* " */`. The live setting was confirmed with `gradle --offline`. No `apply(from` target here is a `.py`
+  file, and one would have to be set up on purpose. No Groovy lexer is added for it.
 
 ## Check 2c: command-line flags are an allowlist (issues 177, 174, 164)
 
@@ -107,11 +119,10 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   are being installed (`pip install ruff --upgrade`, `npm i -D eslint --save-exact`, `cargo install`, `go install`).
 
 **Still not covered, or a new cost.**
-- A flag after `--` of `npm`, `npx` and kin is always checked, also when the line names the tool (`npm run lint:eslint -- --quiet`), and passes
-  when any of eslint, prettier and tsc lists it (tsc names read case-insensitively), because the script that runs is not known.
-  So `npm test -- --coverage` or `npm run build -- --watch` now needs a `justified:` (issue 164 item 3 stays open, and is wider than under
-  the blocklist; task M1-65). Resolving the script name through `package.json` would narrow it; no such passthrough exists in the repo today.
-- YAML values over several lines (task M1-64, issue 164 item 2): see the next section for what the joined-line check leaves out.
+- A flag after `--` of `npm`, `npx` and kin is checked, also when the line names the tool (`npm run lint:eslint -- --quiet`), and passes
+  when any of eslint, prettier and tsc lists it (tsc names read case-insensitively), unless the tail is known to reach a test runner
+  (next section). So `npm run build -- --watch` with `build` running `node build.mjs` still needs a `justified:`.
+- YAML values over several lines (task M1-64, issue 164 item 2): see "Check 2c: YAML values over several lines" below for what the joined-line check leaves out.
 - Flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
 - A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
 - YAML args keys: a job-level reusable workflow (`uses: org/x/.github/workflows/ruff.yml@v1` with `with: args:`) is not a sequence item;
@@ -124,6 +135,32 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
   whole eslint, prettier and tsc union, any `@` word after an npm `--` fails too (`npm run build -- @scope/pkg`, `npm exec -- @commitlint/cli --edit`),
   and needs a `justified:`; `npx @scope/tool` without `--` passes. A segment with a `--` tail after npm, yarn, pnpm or bun is never an installer, and the
   npm script verbs (`test`, `t`, `tst`, `start`, `stop`, `restart`, `run`, `rum`, `urn`, `run-script`, `exec`, `x`) are read as runs.
+
+## Check 2c: an npm `--` tail resolved through package.json (task M1-65, issue 164 item 3)
+
+Escalation ruling on PR 309 (comment 7084379032): fail closed by construction. npm appends the tail to the last command of the script, so
+a tail that reaches a test runner skips the eslint, prettier and tsc union check, and every other tail keeps it, as before. It skips only when:
+- the command is an npm form: a bare `npm` is the first word (a path such as `./bin/npm` or a prefix such as `sudo` is not), then
+  only `-s`, `--silent`, `-q`, `--quiet`, `--if-present` or `--ignore-scripts`, and `test`, `t` or `tst` (script `test`) or `run`, `rum`, `urn` or `run-script` with a name, and nothing else before the `--`. yarn, pnpm and
+  bun forms (`yarn t` runs script `t`, not `test`: C1, C2), `npx`, `npm exec`, an npm option that takes a value (`--prefix x`,
+  `--workspace=x`), an env prefix and `npm start` are never resolved;
+- every tracked package.json (under excluded paths such as `docs/` or `node_modules/` too; one that cannot be read is unknown) that
+  defines the script reads it from the one strict layout (`pkgscripts`): the file's only `"scripts"` token on a line of its own as `"scripts": {`, then one `"name": "command",` per line up to a `}` line. Any other `"scripts"` token
+  (a split key, R4-01 and N1 to N4; a second or nested object; the word as a value), any other line in the object, and any `\u` escape
+  in any package.json make every tail unknown. The depth is not counted: a file whose only `"scripts"` object is nested has no npm
+  scripts, so npm runs none of the names read from it;
+- every definition is one plain `[npx] <runner> <words>` and nothing else, the runner one of jest, mocha, playwright and cypress: no
+  command before it (a shell function, a `PATH=` assignment or a copy over the runner's file could make the name run a linter), so
+  `tsc --noEmit && jest` is not resolved, and no `;`, `&`, `|`, quote, `$`, backtick, bracket, redirection, `#`, `~` or backslash.
+  firebase is no such runner (`emulators:exec` runs its argument as a command), and nor is vitest (its typecheck mode runs tsc).
+
+**Not covered, or a new cost.**
+- A resolved tail is not read at all, the same as a direct `jest ...` call in a script: runner options that skip or rewrite tests
+  (`-u`, `--passWithNoTests`, `-t`, a test path pattern) pass after `npm test --` when the script is jest. Check 1 reads them in config only (task M1-71).
+- A `\u` anywhere in a package.json, a value included (`"description": "caf\u00e9"`), makes every tail unknown: a false positive, never
+  a miss (PR 309 R3-03, accepted). The repo's own `firebase/package.json` `test` script (firebase, with escaped quotes) is not resolved.
+- Only tracked package.json files are read. A command run where an untracked one decides (`node_modules`, a generated file), and npm
+  settings from `.npmrc` or `npm_config_*` (`script-shell`), are not followed.
 
 ## Check 2c: YAML values over several lines (task M1-64, issue 164 item 2)
 
