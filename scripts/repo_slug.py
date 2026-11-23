@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -63,10 +64,9 @@ def origin_url(root: Path) -> str:
     return p.stdout.rstrip("\n")
 
 
-def resolve(environ: dict | None = None, root: Path = ROOT) -> str:
+def resolve(environ: Mapping[str, str] | None = None, root: Path = ROOT) -> str:
     """The repository slug, or RepoSlugError with the reason."""
-    environ = os.environ if environ is None else environ
-    env_slug = environ.get("GITHUB_REPOSITORY", "")
+    env_slug = (os.environ if environ is None else environ).get("GITHUB_REPOSITORY", "")
     if env_slug:
         if not valid(env_slug):
             raise RepoSlugError(f"GITHUB_REPOSITORY is not OWNER/NAME: {env_slug[:100]!r}")
