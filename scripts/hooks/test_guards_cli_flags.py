@@ -958,10 +958,10 @@ class NpmTailResolutionTests(CliFlagCase):
     def test_a_tail_that_reaches_a_test_runner_passes(self):
         self.write("tools/package.json", self.scripts([
             ("test", "jest"), ("e2e", "npx playwright test"), ("unit", "npx jest --ci"), ("m", "mocha --recursive"),
-            ("cy", "cypress run --spec a/b.cy.ts"), ("ci", "npm test -- --ci")]))
+            ("cy", "cypress run --browser chrome"), ("ci", "npm test -- --ci")]))
         # M1-71: runner options that skip or rewrite tests (-u, a path filter such as `-- --quiet`) now fail after the tail
         # (test_guards_runner_options.py), so these tails use options that pass.
-        for line in ["cd tools && npm test -- --ci", "npm run e2e -- -c x.ts", "npm t -- --coverage", "npm tst -- --ci",
+        for line in ["cd tools && npm test -- --ci", "npm run e2e -- -c x.config.ts", "npm t -- --coverage", "npm tst -- --ci",
                      "npm run-script unit -- --watch", "npm -s test -- --ci", "npm run --silent e2e -- --headed", "npm rum m -- --quiet",
                      "npm urn cy -- --browser chrome"]:
             with self.subTest(ok=line):
