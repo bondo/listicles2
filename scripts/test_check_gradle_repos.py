@@ -1000,6 +1000,22 @@ class NestedBuilds(unittest.TestCase):
         pom.write_text(pom.read_text(encoding="utf-8") + "<!-- edited -->\n", encoding="utf-8")
         self.assert_fails(f"{FIXTURE_META.as_posix()}: sha256 of fixture:mit:1.0 (mit-1.0.pom) does not match the file")
 
+    def test_the_unverified_fixture_artifact_is_exempt_from_the_hash_rule(self):
+        # testLicenseeGate resolves it on purpose to see Gradle refuse an artifact the metadata does not list.
+        pom = self.root / FIXTURE / "repo" / "fixture" / c.UNVERIFIED[0] / c.UNVERIFIED[1] / "unverified-1.0.pom"
+        pom.parent.mkdir(parents=True)
+        pom.write_text("<project/>\n", encoding="utf-8")
+        self.assertEqual(self.run_main(), (0, ""))
+
+    def test_the_unverified_fixture_artifact_exists_and_has_no_hash_in_the_real_repo(self):
+        pom = ROOT / FIXTURE / "repo" / "fixture" / c.UNVERIFIED[0] / c.UNVERIFIED[1] / "unverified-1.0.pom"
+        self.assertTrue(pom.is_file(), f"{pom} is missing")
+        self.assertNotIn(f'name="{c.UNVERIFIED[0]}"', (ROOT / FIXTURE_META).read_text(encoding="utf-8"))
+
+    def test_the_gate_runs_the_unverified_case(self):
+        build = (ROOT / "build.gradle.kts").read_text(encoding="utf-8")
+        self.assertRegex(build, r'licenseeCase\([^)]*fixture:unverified:1\.0[^)]*Dependency verification failed')
+
     def test_fixture_run_must_not_switch_verification_off(self):
         self.edit("build.gradle.kts", '"-Pdeps=$deps",', '"-Pdeps=$deps",\n                        "--dependency-verification=off",')
         self.assert_fails("build.gradle.kts: the licensee gate switches Gradle dependency verification off")
