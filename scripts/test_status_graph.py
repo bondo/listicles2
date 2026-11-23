@@ -631,8 +631,8 @@ class Palette(unittest.TestCase):
 
     def test_arrowhead_markers_scale_with_the_arrow_kind_not_the_stroke(self):
         svg = svg_of(tasks_text(*fu_rows(), milestones=("M1",)))
-        sizes = {p.get("marker-end"): next(m for m in ET.fromstring(svg).iter(NS + "marker") if "#" + m.get("id") + ")" in p.get("marker-end")).get("markerWidth")
-                 for p in arrows(svg).values()}
+        marker = {m.get("id"): m.get("markerWidth") for m in ET.fromstring(svg).iter(NS + "marker")}
+        sizes = {p.get("marker-end"): marker[p.get("marker-end")[len("url(#"):-1]] for p in arrows(svg).values()}
         self.assertGreater(len(set(sizes.values())), 1)  # thick arrows get a bigger head than the thin ones
 
     def test_colours_are_spread_over_the_sources(self):

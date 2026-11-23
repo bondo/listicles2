@@ -57,6 +57,13 @@ It is written next to the SVG by `status_visual.py render` (`--graph` overrides 
   apart, and the gaps grow to hold them; arrows on one side of a box leave and arrive at different heights (up to 8 bent arrows per side; with more, heights repeat and arrows run along one line). The same input gives
   the same bytes, and there is no clock in the picture, so the publisher compares it byte for byte and commits only when the graph
   really changed.
+- **Colours and the critical path** (task M1-76): the arrows of one source task share one colour, and so does their arrowhead. The colours are
+  the Okabe-Ito palette (Okabe and Ito, "Color Universal Design", 2008) without black and yellow: orange, sky blue, bluish green, blue,
+  vermillion, reddish purple. A test simulates protan, deutan and tritan vision and requires every pair to stay apart. Sources whose arrows
+  run within 6 px of each other (side by side or crossing) get different colours where six colours allow it; far-apart sources may share one.
+  The critical path, the longest chain of open tasks to M1-FU (smallest ids from the start on a tie), is drawn 3 px wide with a bigger
+  arrowhead, the other arrows 1.2 px; the legend says so. Limit: orange and sky blue are only about 2:1 against the light band (the
+  palette keeps its published values, because darker shades merge for deutan viewers); the colour is a second signal, the arrows are always drawn.
 - **Size**: the picture grows with the longest chain of open tasks (one column each) and with the arrow tracks in the gaps. GitHub
   scales it to the README column (about 830 px), so the text is drawn large enough (14 px) to stay at 9 px or more after scaling:
   the width is held to 1290 px by squeezing the tracks in the gaps (4 px apart down to 1 px) and is tested for a 13-column chain and

@@ -32,16 +32,23 @@ WORDS = {"ready": "ready", "review": "in progress", "blocked": "blocked", "owner
 MARKS = (("ready", "ok", "mk-ready"), ("review", "info", "mk-progress"), ("blocked", "warn", "mk-blocked"), ("owner", "bad", "mk-owner"))
 MARK = {state: (cls, shape) for state, cls, shape in MARKS}
 TITLE = "Open tasks and their dependencies"
+CRITICAL_END = "M1-FU"  # the critical path is the longest chain of open tasks to this task (task M1-76)
+CONFLICT = 6  # px: arrows of two sources this close (side by side or crossing) get different colours where the palette allows
+# Okabe and Ito, "Color Universal Design" (2008), without black (the text colour) and yellow (no contrast on the light band): distinct for
+# normal vision and for protan, deutan and tritan colour blindness (checked by the tests), the same values in light and dark mode.
+PALETTE = (("orange", "#e69f00"), ("sky blue", "#56b4e9"), ("bluish green", "#009e73"),
+           ("blue", "#0072b2"), ("vermillion", "#d55e00"), ("reddish purple", "#cc79a7"))
 
 CSS = (
     ".bg{fill:#ffffff}.card{fill:#f6f8fa}.fg{fill:#1f2328}.muted{fill:#59636e}.ok{fill:#1a7f37}.info{fill:#0969da}"
-    ".warn{fill:#9a6700}.bad{fill:#cf222e}.edge{stroke:#8c959f;fill:none;stroke-width:1.2}.ah{fill:#8c959f}"
+    ".warn{fill:#9a6700}.bad{fill:#cf222e}.edge{fill:none;stroke-width:1.2}.crit{stroke-width:3}.key{stroke:#8c959f}"
+    + "".join(f".s{k}{{stroke:{c}}}.f{k}{{fill:{c}}}" for k, (_, c) in enumerate(PALETTE)) +
     ".nd-ready{fill:#dafbe1;stroke:#1a7f37}.nd-review{fill:#ddf4ff;stroke:#0969da}"
     ".nd-blocked{fill:#fff8c5;stroke:#9a6700}.nd-owner{fill:#ffebe9;stroke:#cf222e}"
     "text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px}"
     ".t{font-size:22px;font-weight:600}.h{font-size:14px;font-weight:600;paint-order:stroke;stroke:#f6f8fa;stroke-width:4px}.s{font-size:14px}.n{font-size:14px;font-weight:600}"
     "@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}.fg{fill:#e6edf3}.muted{fill:#9198a1}"
-    ".ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.edge{stroke:#6e7681}.h{stroke:#161b22}.ah{fill:#6e7681}"
+    ".ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.key{stroke:#6e7681}.h{stroke:#161b22}"
     ".nd-ready{fill:#12261e;stroke:#3fb950}.nd-review{fill:#10294d;stroke:#4493f8}"
     ".nd-blocked{fill:#2f2408;stroke:#d29922}.nd-owner{fill:#3b1219;stroke:#f85149}}"
 )
@@ -188,6 +195,44 @@ def order_cells(graph, layer, sweeps=SWEEPS):
     return best
 
 
+def critical_path(graph, layer, end=CRITICAL_END):
+    """The longest chain of open tasks ending at `end` (task ids, first to last); without that task, the longest chain overall. Among equally
+    long chains the one with the smallest ids from the start wins (task M1-76). Empty for no tasks."""
+    if not layer:
+        return []
+    preds, succs = _near(graph)
+    top = layer[end] if end in layer else max(layer.values())
+    on = {i for i in layer if i == end or (end not in layer and layer[i] == top)}  # every task on some longest chain, found from the end
+    for col in range(top, 0, -1):
+        on |= {p for i in [i for i in on if layer[i] == col] for p in preds[i] if layer[p] == col - 1}
+    chain = [min(i for i in on if layer[i] == 0)]
+    while layer[chain[-1]] < top:
+        chain.append(min(i for i in succs[chain[-1]] if i in on and layer[i] == layer[chain[-1]] + 1))
+    return chain
+
+
+def source_colours(points, colours=None):
+    """Palette index per source task for {(source, target): polyline}. Two sources are neighbours when some of their arrows come within
+    CONFLICT px of each other. Sources go in order of most neighbours, then id; each takes the colour fewest of its already coloured
+    neighbours have, then the one used least so far, then the lowest, so a source with fewer neighbours than colours never shares one."""
+    colours = colours or len(PALETTE)
+    boxes = {}
+    for (a, _), pts in points.items():
+        boxes.setdefault(a, []).extend((min(p[0], q[0]) - CONFLICT, min(p[1], q[1]) - CONFLICT, max(p[0], q[0]) + CONFLICT, max(p[1], q[1]) + CONFLICT)
+                                       for p, q in zip(pts, pts[1:], strict=False) if p != q)
+    near = {a: set() for a in boxes}
+    for a, b in ((a, b) for a in boxes for b in boxes if a < b):
+        if any(p[0] <= q[2] and q[0] <= p[2] and p[1] <= q[3] and q[1] <= p[3] for p in boxes[a] for q in boxes[b]):
+            near[a].add(b)
+            near[b].add(a)
+    out, used = {}, [0] * colours
+    for a in sorted(boxes, key=lambda a: (-len(near[a]), a)):
+        taken = [sum(out.get(b) == k for b in near[a]) for k in range(colours)]
+        out[a] = min(range(colours), key=lambda k: (taken[k], used[k], k))
+        used[out[a]] += 1
+    return out
+
+
 def _tracks(spans):
     """Track number per key for {key: (lo, hi)}: spans that overlap (ends included) never share a track; first fit in a fixed order."""
     free, out = [], {}
@@ -212,7 +257,7 @@ def _route(graph, layer, cells, width_of, top):
     next column) leaves its source, runs along a track in the gap and arrives; a long one also runs along a track in the channel
     next to its source row, so it never passes behind a node. Arrows sharing a gap or channel get different tracks (TRACK px apart),
     and gaps and channels grow to hold them. An arrow between two nodes level in adjacent columns is one straight line.
-    Returns where each band starts and how tall it is, each node's (x, y), and each arrow's path data."""
+    Returns where each band starts and how tall it is, each node's (x, y), and each arrow's polyline."""
     band_of = {n["id"]: n["milestone"] for n in graph["nodes"]}
     band_no = {b["id"]: k for k, b in enumerate(graph["bands"])}
     rows = _rows(graph, layer, cells)
@@ -279,17 +324,23 @@ def _route(graph, layer, cells, width_of, top):
         g, t = track[key]
         return col_x[g] + width_of + LEAD + t * step
 
-    paths = {}
+    points = {}
     for e in edges:
-        a, b = e
-        d = f"M{col_x[layer[a]] + width_of} {y_from[e]}"
+        pts = [(col_x[layer[e[0]]] + width_of, y_from[e])]
         if e in long:
-            d += f" H{lane((e, 0))} V{y_run[e]} H{lane((e, 1))} V{y_to[e]}"
+            pts += [(lane((e, 0)), y_from[e]), (lane((e, 0)), y_run[e]), (lane((e, 1)), y_run[e]), (lane((e, 1)), y_to[e])]
         elif e not in flat:
-            d += f" H{lane((e, 0))} V{y_to[e]}"
-        paths[e] = d + f" H{col_x[layer[b]] - 1}"
+            pts += [(lane((e, 0)), y_from[e]), (lane((e, 0)), y_to[e])]
+        points[e] = [*pts, (col_x[layer[e[1]]] - 1, y_to[e])]
     return {"band_top": band_top, "band_h": band_h, "end": top - BAND_GAP, "right": col_x[-1] + width_of if columns else 0,
-            "node": {i: (col_x[layer[i]], row_y[(band_of[i], rows[i])]) for i in rows}, "paths": paths}
+            "node": {i: (col_x[layer[i]], row_y[(band_of[i], rows[i])]) for i in rows}, "points": points}
+
+
+def _d(pts):
+    d = f"M{pts[0][0]} {pts[0][1]}"
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:], strict=False):
+        d += f" H{x1}" if x1 != x0 else f" V{y1}" if y1 != y0 else ""
+    return d
 
 
 def render_graph_svg(model):
@@ -320,6 +371,8 @@ def render_graph_svg(model):
         y += 34
 
     shapes, edge_paths, node_svg, bands_svg = [], [], [], []
+    chain = critical_path(graph, layer) if nodes else []
+    thick = set(zip(chain, chain[1:], strict=False))
     if nodes:
         cells = order_cells(graph, layer)
         geo = _route(graph, layer, cells, width_of, y)
@@ -331,8 +384,11 @@ def render_graph_svg(model):
             label = f"{name}: {b['done']}/{b['total']} done, {opened} open"
             bands_svg.append(f'<rect x="{PAD}" y="{geo["band_top"][bid]}" width="{width - 2 * PAD}" height="{geo["band_h"][bid]}" rx="6" class="card"/>')
             node_svg.append(f'<text x="{PAD + 10}" y="{geo["band_top"][bid] + 18}" class="fg h">{escape(label)}</text>')
-        for (a, b), d in sorted(geo["paths"].items()):
-            edge_paths.append(f'<path d="{d}" class="edge" data-from="{attr(a)}" data-to="{attr(b)}" marker-end="url(#ah)"/>')
+        colour = source_colours(geo["points"])
+        for (a, b), pts in sorted(geo["points"].items(), key=lambda kv: ((kv[0] in thick), kv[0])):  # the thick arrows last, on top
+            kind = "c" if (a, b) in thick else "h"
+            edge_paths.append(f'<path d="{_d(pts)}" class="edge s{colour[a]}{" crit" if kind == "c" else ""}" data-from="{attr(a)}" data-to="{attr(b)}" '
+                              f'marker-end="url(#a{kind}{colour[a]})"/>')
         for n in nodes:
             x, ny = geo["node"][n["id"]]
             mid = ny + NODE_H // 2
@@ -349,7 +405,20 @@ def render_graph_svg(model):
         shapes.append(_marker(state, x + 6, legend_y - 4, cls, shape))
         shapes.append(f'<text x="{x + 16}" y="{legend_y}" class="fg s">{WORDS[state]}</text>')
         x += 24 + 8 * len(WORDS[state]) + 18
-    notes = ["Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:",
+    row = legend_y + 24  # second legend row: one swatch per palette colour, then the thick-arrow sample
+    label = "Arrow colour (one per source task):"
+    shapes.append(f'<text x="{PAD}" y="{row}" class="fg s">{label}</text>')
+    for k in range(len(PALETTE)):
+        sx = PAD + 8 * len(label) + 8 + 30 * k
+        shapes.append(f'<path d="M{sx} {row - 4} H{sx + 24}" class="edge s{k}"/>')
+    if chain[1:]:
+        row += 22
+        end = f" to {CRITICAL_END}" if CRITICAL_END in layer else ""
+        shapes.append(f'<path d="M{PAD} {row - 4} H{PAD + 24}" class="edge crit key"/>')
+        shapes.append(f'<text x="{PAD + 32}" y="{row}" class="fg s">critical path: the longest chain of open tasks{end} ({len(chain)} tasks)</text>')
+    legend_y = row
+    notes = ["Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.",
+             "Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:",
              f"{plural(graph['dropped_transitive'], 'transitive arrow', 'transitive arrows')} hidden.",
              "Also not drawn: " + plural(graph["outside_done"], "dependency", "dependencies") + " on done or dropped tasks, "
              + ("1 on a whole milestone." if graph["outside_milestone"] == 1 else f"{graph['outside_milestone']} on whole milestones.")]
@@ -359,8 +428,9 @@ def render_graph_svg(model):
     summary = f"{plural(len(nodes), 'open task', 'open tasks')}, {plural(len(edges), 'dependency', 'dependencies')}"
     head = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" '
             f'aria-labelledby="ti de"><title id="ti">{TITLE}</title><desc id="de">{escape(summary)}</desc><style>{CSS}</style>'
-            '<defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">'
-            '<path d="M0 0L8 4L0 8z" class="ah"/></marker></defs>'
+            '<defs>' + "".join(f'<marker id="a{kind}{k}" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="{size}" '
+                               f'markerHeight="{size}" orient="auto"><path d="M0 0L8 4L0 8z" class="f{k}"/></marker>'
+                               for kind, size in (("h", 8), ("c", 11)) for k in range(len(PALETTE))) + '</defs>'
             f'<rect width="{width}" height="{height}" class="bg"/>')
     return head + "\n" + "\n".join([*out, *bands_svg, *edge_paths, *node_svg, *shapes]) + "\n</svg>\n"
 
