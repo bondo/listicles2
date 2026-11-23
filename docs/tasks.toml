@@ -1489,13 +1489,23 @@ notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_sh.py, docs/g
 
 [[task]]
 id = "M1-77"
-title = "State issue part A: one JSON block in the body, scripts/state_body.py validate and render, tasks.py --state"
+title = "State issue part A: one JSON block in the body, typed schema, scripts/state_body.py validate"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
-notes = "Process PR (2a). Owner decision 7076085601 item 2: the block holds usage, sessions, branches, triggers, the owner queue and next steps; the script validates it (unknown, missing and wrongly typed fields fail) and renders a short summary above it; tasks.py reads the claimed and in-review ids from it. Tooling env (ci.yml wiring), owner merge. Test-first with negative cases"
+notes = "Process PR (2a). Owner decision 7076085601 item 2: the block holds usage, sessions, branches, triggers, the owner queue and next steps; the script validates it (unknown, missing and wrongly typed fields fail, every problem reported). Tooling env (ci.yml wiring), owner merge. Test-first with negative cases. Split 2026-11-23 for the 400-line scope: the summary renderer and tasks.py --state are M1-80"
+
+[[task]]
+id = "M1-80"
+title = "State issue part A2: state_body.py render (short summary above the block), tasks.py --state reads claims and in-review ids"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-77"]
+notes = "Process PR (2a2), split from M1-77. Code and tests already written and green: commit 5fbb552 in the M1-77 PR's history (refs/pull/N/head), removed again for size; restore it and keep the parity test (tasks.py and state_body.py read the same ids). Tooling env, owner merge"
 
 [[task]]
 id = "M1-78"
@@ -1514,7 +1524,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-77", "M1-78"]
+depends_on = ["M1-77", "M1-78", "M1-80"]
 notes = "Process PR (2c), docs and prompt text only. Owner decision 7076085601 item 1: comments on the state issue only for decisions, approvals, vetoes, handovers, takeovers, lock-lost, incidents, PAUSED/RESUMED, metrics blocks and the weekly digest; progress goes to the body (Updated: and the block). The 4.3 ready query reads the body with tasks.py --state; the template becomes prose, the generated summary and the block. Owner merge (docs/ORCHESTRATION.md, agents/prompts/). Merge origin/main first if PR 322 lands before it"
 
 [[task]]
@@ -1530,7 +1540,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70", "M1-71", "M1-77", "M1-78", "M1-79",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70", "M1-71", "M1-77", "M1-78", "M1-79", "M1-80",
 ]
 
 [[task]]
