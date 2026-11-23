@@ -37,6 +37,8 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.12" }
       - name: fetch GitHub data
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

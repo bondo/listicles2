@@ -39,7 +39,7 @@ EXPECTED_UI = {
         {
             "name": "install the Firebase CLI (the Auth and Firestore emulators the data-layer tests run against)",
             "working-directory": "firebase",
-            "run": "npm ci --silent",
+            "run": "npm ci --ignore-scripts --silent",
         },
         {
             "name": "enable KVM",

@@ -20,6 +20,7 @@ jobs:
   wrapper:
     name: wrapper
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,11 +30,14 @@ jobs:
   static:
     name: static
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.12" }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -61,11 +65,14 @@ jobs:
   unit:
     name: unit
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.12" }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -94,10 +101,13 @@ jobs:
   firebase:
     name: firebase
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.12" }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: 21 }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -107,7 +117,7 @@ jobs:
           cache-dependency-path: firebase/package-lock.json
       - name: install
         working-directory: firebase
-        run: npm ci --silent
+        run: npm ci --ignore-scripts --silent
       - name: typecheck (tsc strict)
         working-directory: firebase
         run: npm run typecheck --silent
@@ -141,7 +151,7 @@ jobs:
           cache-dependency-path: firebase/package-lock.json
       - name: install the Firebase CLI (the Auth and Firestore emulators the data-layer tests run against)
         working-directory: firebase
-        run: npm ci --silent
+        run: npm ci --ignore-scripts --silent
       - name: enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -201,11 +211,14 @@ jobs:
   guards:
     name: guards
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.12" }
       - name: guards
         env:
           GUARD_BASE: origin/${{ github.base_ref || 'main' }}
@@ -218,6 +231,7 @@ jobs:
   tasks:
     name: tasks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       issues: read
@@ -226,6 +240,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
       - name: ci scope tests (classification, merge-commit CLI, required checks keep reporting)
         run: python3 -I scripts/test_ci_scope.py
       - name: dependency floors tests (PR 224 R1-02)
@@ -302,6 +320,10 @@ jobs:
         run: python3 -I scripts/test_check_release_smoke.py
       - name: release smoke build with R8 stays wired, and the stand-in flag stays in that job only (M1-33)
         run: python3 -I scripts/check_release_smoke.py
+      - name: CI hardening check tests (M1-44)
+        run: python3 -I scripts/test_check_ci_hardening.py
+      - name: CI hardening (job timeouts, pinned python and node, npm ci --ignore-scripts, gitleaks download, hashed pip lock; M1-44)
+        run: python3 -I scripts/check_ci_hardening.py
       - name: agent_metrics.py tests
         run: python3 -I scripts/test_agent_metrics.py
       - name: docs/agent-metrics.csv is up to date
@@ -310,6 +332,7 @@ jobs:
   python-lint:
     name: python-lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -317,7 +340,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: "3.12" }
       - name: ruff and mypy (versions pinned in scripts/requirements-lint.txt)
-        run: pip install -r scripts/requirements-lint.txt
+        run: pip install --require-hashes -r scripts/requirements-lint.txt
       - name: lint tests (config, wiring, deliberate violations)
         run: python3 -I scripts/test_lint_python.py
       - name: ruff check and mypy on scripts/
@@ -326,10 +349,13 @@ jobs:
   workflow-lint:
     name: workflow-lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.12" }
       - name: lint tests (deliberate violations must fail; the pinned linters are installed by scripts/install_linters.sh, sha256-checked)
         run: python3 -I scripts/test_lint_workflows.py
       - name: shellcheck (-S warning), actionlint, zizmor (--offline)
@@ -338,6 +364,7 @@ jobs:
   secrets:
     name: secrets
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -346,7 +373,7 @@ jobs:
       - name: gitleaks (version and checksum pinned; update both by hand)
         run: |
           f=gitleaks_8.28.0_linux_x64.tar.gz
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/$f" -o "$f"
+          curl -sSfL --retry 5 --proto =https --proto-redir =https "https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/$f" -o "$f"
           echo "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  $f" | sha256sum -c -
           tar -xzf "$f" gitleaks
-          ./gitleaks detect --source . --redact --no-banner
+          ./gitleaks git --redact --no-banner .

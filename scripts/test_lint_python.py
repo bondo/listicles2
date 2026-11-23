@@ -15,7 +15,7 @@ SCRIPT = os.path.join(ROOT, "scripts", "lint_python.sh")
 RULES = ["E", "F", "W", "B", "UP", "SIM"]
 LINT_CMD = "./scripts/lint_python.sh"
 TEST_CMD = "python3 -I scripts/test_lint_python.py"
-PIN = re.compile(r"^[A-Za-z0-9_.-]+==[0-9][0-9A-Za-z.]*$")
+PIN = re.compile(r"^[A-Za-z0-9_.-]+==[0-9][0-9A-Za-z.]*( +--hash=sha256:[0-9a-f]{64})+$")
 CLEAN = 'def add(a: int, b: int) -> int:\n    return a + b\n'
 # One deliberate violation per selected rule family, and one for mypy. Each must fail the script and name its rule.
 VIOLATIONS = {
@@ -155,7 +155,8 @@ class Config(unittest.TestCase):
             self.assertRegex(ln, r"^(\[mypy\]|files\s*=\s*scripts|cache_dir\s*=\s*\S+)$", ln)
 
     def test_tools_are_pinned_exactly(self):
-        lines = active_lines(read("scripts", "requirements-lint.txt"))
+        # One entry per line: pip-compile writes the hashes on continuation lines.
+        lines = active_lines(re.sub(r"\\\n\s*", " ", read("scripts", "requirements-lint.txt")))
         for ln in lines:
             self.assertRegex(ln, PIN, ln)
         names = {ln.split("==")[0].lower() for ln in lines}
@@ -177,7 +178,7 @@ class VerifyAndCiWiring(unittest.TestCase):
         self.assertIsNotNone(body, "ci.yml needs a python-lint job")
         self.assertIn("actions/checkout", body)
         self.assertIn("actions/setup-python", body)
-        self.assertTrue(runs(body, "pip install -r scripts/requirements-lint.txt"))
+        self.assertTrue(runs(body, "pip install --require-hashes -r scripts/requirements-lint.txt"))
         self.assertTrue(runs(body, LINT_CMD))
         self.assertTrue(runs(body, TEST_CMD))
         self.assertNotRegex(body, r"(?m)^\s*if:")
@@ -185,7 +186,7 @@ class VerifyAndCiWiring(unittest.TestCase):
 
     def test_codeowners_name_the_config_files_explicitly(self):
         owners = read(".github", "CODEOWNERS")
-        for path in ("ruff.toml", "mypy.ini", "scripts/requirements-lint.txt", "scripts/lint_python.sh"):
+        for path in ("ruff.toml", "mypy.ini", "scripts/requirements-lint.txt", "scripts/requirements-lint.in", "scripts/lint_python.sh"):
             self.assertEqual(explicit_owners(owners, path), ["@bondo"], path)
 
 
@@ -209,6 +210,21 @@ class Behaviour(unittest.TestCase):
             code, out = lint(CLEAN, requirements=reqs)
         self.assertNotEqual(code, 0, out)
         self.assertIn("requirements-lint.txt", out)
+
+    def test_a_hashed_pin_file_is_read_by_its_pinned_versions(self):
+        """M1-44: requirements-lint.txt is a hash-locked pip-compile file; `ruff==X \\` plus --hash lines must still give version X."""
+        with tempfile.TemporaryDirectory() as tmp:
+            reqs = os.path.join(tmp, "reqs.txt")
+            for version, ok in ((self.installed("ruff"), True), ("0.0.1", False)):
+                with open(reqs, "w", encoding="utf-8") as f:
+                    f.write(f"ruff=={version} \\\n    --hash=sha256:{'0' * 64}\nmypy=={self.installed('mypy')} \\\n    --hash=sha256:{'1' * 64}\n")
+                code, out = lint(CLEAN, requirements=reqs)
+                self.assertEqual(code == 0, ok, out)
+
+    @staticmethod
+    def installed(tool):
+        done = subprocess.run([tool, "--version"], capture_output=True, text=True, check=True)
+        return done.stdout.split()[1]
 
     def test_missing_requirements_file_fails(self):
         code, out = lint(CLEAN, requirements="/nonexistent/requirements.txt")

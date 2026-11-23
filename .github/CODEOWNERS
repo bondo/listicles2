@@ -31,6 +31,7 @@
 /ruff.toml                   @bondo
 /mypy.ini                    @bondo
 /scripts/requirements-lint.txt @bondo
+/scripts/requirements-lint.in @bondo
 /scripts/lint_python.sh      @bondo
 # Workflow and shell lint (also covered by /scripts/; explicit so test_lint_workflows.py can assert it)
 /scripts/lint_workflows.sh   @bondo

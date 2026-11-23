@@ -15,6 +15,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import check_ci_hardening as c  # noqa: E402  # justified: must follow the sys.path insert above
 
@@ -84,14 +86,19 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit_yaml(STATUS, lambda w: drop(w, "publish", "actions/setup-python@")), "publish", "setup-python")
 
     def test_a_job_that_only_calls_a_shell_script_that_runs_python_needs_it_too(self):
-        self.assertIn("python3", (ROOT / "scripts/guards.sh").read_text())
-        self.flagged(self.edit_yaml(CI, lambda w: drop(w, "guards", "actions/setup-python@")), "guards", "setup-python")
+        self.assertIn("python3", (ROOT / "scripts/check_owner_drift.sh").read_text())
+        self.assertEqual(c.problems(self.root), [])
+
+        def add(w):
+            w["jobs"]["wrapper"]["steps"].append({"run": "scripts/check_owner_drift.sh"})
+
+        self.flagged(self.edit_yaml(CI, add), "wrapper", "setup-python")
 
     def test_the_python_version_must_be_one_exact_minor_everywhere(self):
         for bad in ("3.11", "3.x", "3", "3.12.1", "latest"):
             with self.subTest(bad):
                 self.setUp()
-                self.flagged(self.edit_yaml(CI, lambda w, bad=bad: setup(w, "tasks", "actions/setup-python@")["with"].update({"python-version": bad})), "python-version")
+                self.flagged(self.edit_yaml(CI, set_with("tasks", "actions/setup-python@", "python-version", bad)), "python-version")
         self.flagged(self.edit_yaml(CI, lambda w: setup(w, "tasks", "actions/setup-python@").pop("with")), "python-version")
 
     def test_setup_python_must_come_before_the_first_step_that_runs_python(self):
@@ -114,8 +121,8 @@ class Rules(unittest.TestCase):
         for bad in ("lts/*", "20", "22.x", "latest"):
             with self.subTest(bad):
                 self.setUp()
-                self.flagged(self.edit_yaml(CI, lambda w, bad=bad: setup(w, "tasks", "actions/setup-node@")["with"].update({"node-version": bad})), "node-version")
-        self.flagged(self.edit_yaml(CI, lambda w: setup(w, "firebase", "actions/setup-node@")["with"].update({"node-version": 24})), "node-version")
+                self.flagged(self.edit_yaml(CI, set_with("tasks", "actions/setup-node@", "node-version", bad)), "node-version")
+        self.flagged(self.edit_yaml(CI, set_with("firebase", "actions/setup-node@", "node-version", 24)), "node-version")
 
     def test_a_job_that_does_not_run_node_needs_no_pin(self):
         self.assertEqual(self.edit_yaml(CI, lambda w: drop(w, "static", "actions/setup-node@")), [])
@@ -132,12 +139,18 @@ class Rules(unittest.TestCase):
 
     def test_gitleaks_uses_the_git_command_and_keeps_its_checksum(self):
         self.flagged(self.edit(CI, "./gitleaks git ", "./gitleaks detect "), "gitleaks", "git")
+        self.setUp()
         self.flagged(self.edit(CI, "sha256sum -c -", "cat"), "gitleaks", "sha256sum")
+        self.setUp()
+        self.flagged(self.edit(CI, "./gitleaks git --redact --no-banner .", "./gitleaks git --source . --redact --no-banner"), "gitleaks", "--source")
 
     def test_pip_installs_only_the_hashed_lock(self):
         self.flagged(self.edit(CI, "pip install --require-hashes -r", "pip install -r"), "pip", "require-hashes")
+        self.setUp()
         self.flagged(self.edit(CI, "pip install --require-hashes -r scripts/requirements-lint.txt", "pip install --require-hashes -r scripts/other.txt"), "pip")
-        self.flagged(self.edit(CI, "pip install --require-hashes -r scripts/other.txt", "pip install --require-hashes -r scripts/requirements-lint.txt\n          pip install wheel"), "pip")
+        self.setUp()
+        old = "pip install --require-hashes -r scripts/requirements-lint.txt"
+        self.flagged(self.edit(CI, old, old + "\n          pip install wheel"), "pip")
 
     def test_every_requirement_is_pinned_and_hashed(self):
         reqs = (self.root / REQS).read_text()
@@ -153,7 +166,8 @@ class Rules(unittest.TestCase):
 
     def test_verify_sh_runs_the_check_and_its_tests(self):
         self.flagged(self.edit(VERIFY, "step ci-hardening python3 -I scripts/check_ci_hardening.py\n", ""), "verify.sh", "check_ci_hardening.py")
-        self.flagged(self.edit(VERIFY, "step ci-hardening-tests python3 -I scripts/test_check_ci_hardening.py\n", ""), "verify.sh", "test_check_ci_hardening.py")
+        self.setUp()
+        self.flagged(self.edit(VERIFY, f"step ci-hardening-tests {c.TESTS_CMD}\n", ""), "verify.sh", "test_check_ci_hardening.py")
 
     def test_ci_tasks_job_runs_the_check_and_its_tests(self):
         for cmd in ("python3 -I scripts/check_ci_hardening.py", "python3 -I scripts/test_check_ci_hardening.py"):
@@ -173,6 +187,13 @@ def is_use(step, prefix):
 
 def setup(workflow, job, prefix):
     return next(s for s in workflow["jobs"][job]["steps"] if is_use(s, prefix))
+
+
+def set_with(job, prefix, key, value):
+    def change(workflow):
+        setup(workflow, job, prefix).setdefault("with", {})[key] = value
+
+    return change
 
 
 def drop(workflow, job, prefix):

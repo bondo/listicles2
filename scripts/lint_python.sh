@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ruff check and mypy over scripts/ (or the paths given), with the root ruff.toml and mypy.ini.
-# The installed ruff and mypy must match scripts/requirements-lint.txt: pip install -r scripts/requirements-lint.txt
+# The installed ruff and mypy must match scripts/requirements-lint.txt: pip install --require-hashes -r scripts/requirements-lint.txt
 # Usage: scripts/lint_python.sh [path ...]   (LINT_PY_REQUIREMENTS overrides the pin file; used by the tests only)
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -11,11 +11,11 @@ REQ="${LINT_PY_REQUIREMENTS:-scripts/requirements-lint.txt}"
 
 bad=0
 for tool in ruff mypy; do
-  want=$(grep -E "^${tool}==" "$REQ" | head -1 | cut -d= -f3)
+  want=$(grep -E "^${tool}==" "$REQ" | head -1 | sed -E 's/^[^=]+==([^ ;\\]+).*/\1/')
   have=$("$tool" --version 2>/dev/null | awk '{print $2}')
   if [ -z "$want" ] || [ "$have" != "$want" ]; then
     echo "lint_python: $tool is '${have:-not installed}', requirements-lint.txt pins '${want:-nothing}'." >&2
-    echo "             run: pip install -r scripts/requirements-lint.txt" >&2
+    echo "             run: pip install --require-hashes -r scripts/requirements-lint.txt" >&2
     bad=1
   fi
 done
