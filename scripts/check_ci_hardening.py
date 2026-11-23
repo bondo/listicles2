@@ -49,7 +49,8 @@ LOCK_STEMS = ("scripts/requirements-ci", "scripts/requirements-lint")  # each ha
 INSTALL_CI = "pip install --require-hashes -r scripts/requirements-ci.txt"
 INSTALL_LINT = "pip install --require-hashes -r scripts/requirements-lint.txt"
 INSTALLS = (INSTALL_CI, INSTALL_LINT)
-PIP_INSTALL = re.compile(r"(?:(?<![\w./-])pip3?|-m\s+pip3?)\s+install\b")
+# pip, pip3, pip3.13 or -m pip / -mpip, then any options (also with values) before `install`, within one command (no pipe, `;` or `&`)
+PIP_INSTALL = re.compile(r"(?:(?<![\w./-])pip(?:3(?:\.\d+)?)?(?![\w.-])|-m\s*pip(?:3(?:\.\d+)?)?(?![\w.-]))[^\n;&|]*?(?<![\w.-])install\b")
 IN_PIN = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([0-9][A-Za-z0-9.!+_-]*)")
 LOCK_ENTRY = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([0-9][A-Za-z0-9.!+_-]*)((?: --hash=sha256:[0-9a-f]{64})+)")
 SHELL_SCRIPT = re.compile(r"scripts/[\w.-]+\.sh")
