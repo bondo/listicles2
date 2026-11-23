@@ -8,20 +8,23 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as h from "./harness";
 
-// M1-09, the rules spike (PLAN 3.1 items a-e; docs/adr/0002-rules-spike.md): the invite list query,
-// the join and transfer batches and the list query, as the blocks of spike.rules, inserted under the
-// documents match of firestore.rules and never deployed. M1-12, M1-54, M1-53 and M2 move each block
-// into firestore.rules with its full allow and deny tests; these tests stay as regression tests, so
-// every payload has the full shape of PLAN section 3. Item (e) adds blocks that only make n calls.
+// M1-09, the rules spike (PLAN 3.1 items a-e; docs/adr/0002-rules-spike.md) on the blocks of
+// spike.rules, inserted under the documents match of firestore.rules and never deployed. M1-12, M1-54,
+// M1-53 and M2 move each block into firestore.rules with its full tests; these stay as regression
+// tests, so every payload has its PLAN section 3 shape. Item (e) adds blocks that only make n calls.
+type Clients = Record<h.Client, h.Db>;
+type Query = firebase.firestore.Query;
 let env: RulesTestEnvironment;
-let alice: Record<h.Client, h.Db>;
-let bob: Record<h.Client, h.Db>;
-let carol: Record<h.Client, h.Db>;
+let alice: Clients;
+let bob: Clients;
+let carol: Clients;
+let dan: Clients;
 
 const ALICE = h.UID;
-const BOB = "bob"; // owns HOME and TOMB
-const CAROL = "carol"; // a plain member of HOME
-const EVE = "eve"; // owns AWAY
+const BOB = "bob";
+const CAROL = "carol";
+const DAN = "dan"; // joins HOME in (b)
+const EVE = "eve";
 const HOME = "household00000000001";
 const AWAY = "household00000000002";
 const TOMB = "household00000000003";
@@ -39,15 +42,18 @@ const invite = (hid: string, createdBy: string, expiresIn = DAY): object => ({
     ...{ householdId: hid, householdName: "Home", createdBy, createdAt: T0 },
     expiresAt: new Date(Date.now() + expiresIn),
 });
-const ids = async (query: Promise<firebase.firestore.QuerySnapshot>): Promise<string[]> =>
-    (await query).docs.map((d) => d.id);
+const list = (createdBy: string, sharedWith: string | null): object => ({
+    ...{ kind: "PLAIN", name: "List", createdBy, sharedWith, schemaVersion: 1 },
+    ...{ createdAt: T0, updatedAt: T0, updatedBy: createdBy },
+});
 
-// (e) blocks: n exists() calls on n distinct documents, limits/<block>-<i>.
+// (e): n exists() calls on n distinct documents, limits/<block>-<i>.
 const LIMITS: Record<string, [string, number]> = {
     get10: ["get", 10],
     get11: ["get", 11],
     writeA: ["create", 10],
     writeB: ["create", 10],
+    write11: ["create", 11],
     write1: ["create", 1],
     query20: ["list", 20],
     query21: ["list", 21],
@@ -67,18 +73,26 @@ async function seed(docs: Record<string, object>): Promise<void> {
     });
 }
 
+// A query through h.verifiedOnly, then the ids the verified client gets.
+async function listed(clients: Clients, query: (db: h.Db) => Query): Promise<string[]> {
+    await h.verifiedOnly(clients, (db) => query(db).get());
+    return (await query(clients.verified).get()).docs.map((d) => d.id);
+}
+
 beforeAll(async () => {
     env = await initializeTestEnvironment({ projectId: h.PROJECT, firestore: { rules: RULES } });
     alice = h.connect(env);
     bob = h.connect(env, BOB);
     carol = h.connect(env, CAROL);
+    dan = h.connect(env, DAN);
 });
 
 afterAll(async () => {
     await env.cleanup();
 });
 
-// HOME (bob's, carol a member) and AWAY (eve's) are live; TOMB is bob's tombstone. Each item adds alice.
+// HOME: bob owns it, alice and carol are plain members; carol once joined with JOIN's code, which a
+// member then created again (P3's residual). AWAY: eve's. TOMB: bob's tombstone, alice still in it.
 beforeEach(async () => {
     await env.clearFirestore();
     await seed({
@@ -86,9 +100,22 @@ beforeEach(async () => {
         [`households/${AWAY}`]: household(EVE),
         [`households/${TOMB}`]: household(BOB, true),
         [member(HOME, BOB)]: membership("owner"),
-        [member(HOME, CAROL)]: membership("member"),
+        [member(HOME, ALICE)]: membership("member"),
+        [member(HOME, CAROL)]: { ...membership("member"), viaInvite: JOIN },
         [member(AWAY, EVE)]: membership("owner"),
         [member(TOMB, BOB)]: membership("owner"),
+        [member(TOMB, ALICE)]: membership("member"),
+        [`users/${DAN}`]: { householdId: null },
+        [`invites/${JOIN}`]: invite(HOME, BOB),
+        [`invites/${code(HOME, "a")}`]: invite(HOME, ALICE),
+        [`invites/${code(HOME, "x")}`]: invite(HOME, BOB, -DAY),
+        [`invites/${code(HOME, "l")}`]: invite(HOME, "lee"), // lee left HOME
+        [`invites/${code(AWAY, "f")}`]: invite(AWAY, EVE),
+        [`invites/${code(TOMB, "t")}`]: invite(TOMB, ALICE),
+        "lists/home": list(BOB, HOME),
+        "lists/mine": list(ALICE, null),
+        "lists/away": list(EVE, AWAY),
+        "lists/tomb": list(BOB, TOMB),
     });
 });
 
@@ -99,37 +126,21 @@ test("every allow statement of the spike requires signedIn()", () => {
 // (a) PLAN 3.1 Query invites, as the owner decided on #280 (M1-O12, #15 comment 7081223083): a plain
 // member lists the invites they created, the owner all of the household's.
 describe("(a) the invite list query on householdId, with M(uid) and LIVE", () => {
-    beforeEach(async () => {
-        await seed({
-            [member(HOME, ALICE)]: membership("member"),
-            [member(TOMB, ALICE)]: membership("member"),
-            [`invites/${code(HOME, "a")}`]: invite(HOME, ALICE),
-            [`invites/${code(HOME, "b")}`]: invite(HOME, BOB),
-            [`invites/${code(AWAY, "e")}`]: invite(AWAY, EVE),
-            [`invites/${code(TOMB, "t")}`]: invite(TOMB, ALICE),
-        });
-    });
-    const invites = (db: h.Db): firebase.firestore.Query => db.collection("invites");
-    const mine = (db: h.Db, hid: string): firebase.firestore.Query =>
-        invites(db).where("householdId", "==", hid).where("createdBy", "==", ALICE);
+    const invites = (db: h.Db): Query => db.collection("invites");
+    const all = (db: h.Db, hid = HOME): Query => invites(db).where("householdId", "==", hid);
+    const mine = (db: h.Db, hid = HOME): Query => all(db, hid).where("createdBy", "==", ALICE);
 
     test("verified only: a plain member lists the invites she created", async () => {
-        await h.verifiedOnly(alice, (db) => mine(db, HOME).get());
-        expect(await ids(mine(alice.verified, HOME).get())).toEqual([code(HOME, "a")]);
+        expect(await listed(alice, mine)).toEqual([code(HOME, "a")]);
     });
 
     test("verified only: the owner lists all of the household's", async () => {
-        const all = (db: h.Db): firebase.firestore.Query =>
-            invites(db).where("householdId", "==", HOME);
-        await h.verifiedOnly(bob, (db) => all(db).get());
-        expect(await ids(all(bob.verified).get())).toEqual([code(HOME, "a"), code(HOME, "b")]);
+        const want = [code(HOME, "a"), JOIN, code(HOME, "l"), code(HOME, "x")];
+        expect(await listed(bob, all)).toEqual(want);
     });
 
-    test.each<[string, (db: h.Db) => firebase.firestore.Query]>([
-        [
-            "a plain member, all of the household's",
-            (db) => invites(db).where("householdId", "==", HOME),
-        ],
+    test.each<[string, (db: h.Db) => Query]>([
+        ["a plain member, all of the household's", all],
         ["no householdId filter", (db) => invites(db).where("createdBy", "==", ALICE)],
         ["no filter", invites],
         ["a household she is no member of", (db) => mine(db, AWAY)],
@@ -146,54 +157,39 @@ describe("(a) the invite list query on householdId, with M(uid) and LIVE", () =>
     });
 });
 
-// (b) PLAN 3.1 Join: one batch creates alice's member doc, deletes the invite and sets her users doc,
-// and each rule sees the others' writes through existsAfter and getAfter. Item (e): with 12 calls in
-// the worst case, M1's largest batch.
+// (b) PLAN 3.1 Join: one batch creates dan's member doc, deletes the invite and sets his users doc,
+// and each rule sees the others' writes through existsAfter and getAfter. Item (e): M1's largest batch.
 describe("(b) the join batch, with existsAfter and getAfter", () => {
-    beforeEach(async () => {
-        await seed({
-            [`users/${ALICE}`]: { householdId: null },
-            [`invites/${JOIN}`]: invite(HOME, BOB),
-            [`invites/${code(HOME, "x")}`]: invite(HOME, BOB, -DAY),
-            [`invites/${code(HOME, "l")}`]: invite(HOME, "dave"), // dave left HOME
-            [`invites/${code(AWAY, "f")}`]: invite(AWAY, EVE),
-            [`invites/${code(TOMB, "t")}`]: invite(TOMB, BOB),
-        });
-    });
-
     interface Join {
         hid?: string;
         via?: string;
-        doc?: object; // replaces fields of alice's member doc
+        doc?: object; // replaces fields of dan's member doc
         other?: boolean; // adds a member doc for another uid (#206)
         invite?: boolean;
         user?: boolean;
+        stale?: string; // dan's householdId before the batch, not yet self-healed
     }
+    const JOINER = { role: "member", displayName: "Dan", joinedAt: NOW };
     function join(db: h.Db, j: Join = {}): Promise<void> {
         const hid = j.hid ?? HOME;
         const via = j.via ?? JOIN;
-        const doc = {
-            role: "member",
-            displayName: "Alice",
-            joinedAt: NOW,
-            viaInvite: via,
-            ...j.doc,
-        };
+        const doc = { ...JOINER, viaInvite: via, ...j.doc };
         const batch = db.batch();
-        batch.set(db.doc(member(hid, ALICE)), doc);
+        batch.set(db.doc(member(hid, DAN)), doc);
         if (j.other === true) batch.set(db.doc(member(hid, "zoe")), doc);
         if (j.invite !== false) batch.delete(db.doc(`invites/${via}`));
-        if (j.user !== false) batch.update(db.doc(`users/${ALICE}`), { householdId: hid });
+        if (j.user !== false) batch.update(db.doc(`users/${DAN}`), { householdId: hid });
         return batch.commit();
     }
 
     test("verified only: the whole batch", async () => {
-        await h.verifiedOnly(alice, (db) => join(db));
+        await h.verifiedOnly(dan, (db) => join(db));
     });
 
     test.each<[string, Join]>([
         ["without the invite delete (single use)", { invite: false }],
         ["without the users-doc set (one household)", { user: false }],
+        ["with householdId still HOME, from before a removal", { stale: HOME, user: false }],
         ["with a member doc for another uid too (P1, #206)", { other: true }],
         ["as owner", { doc: { role: "owner" } }],
         ["with a joinedAt that is not the request time", { doc: { joinedAt: T0 } }],
@@ -202,30 +198,39 @@ describe("(b) the join batch, with existsAfter and getAfter", () => {
         ["with another household's invite", { via: code(AWAY, "f") }],
         ["into a tombstone", { hid: TOMB, via: code(TOMB, "t") }],
     ])("denied: %s", async (_what, j) => {
-        await assertFails(join(alice.verified, j));
+        if (j.stale !== undefined) await seed({ [`users/${DAN}`]: { householdId: j.stale } });
+        await assertFails(join(dan.verified, j));
     });
 
-    test("denied: a member deletes another's invite (burns it)", async () => {
-        await assertFails(carol.verified.doc(`invites/${JOIN}`).delete());
+    test.each<[string, () => h.Db]>([
+        ["a member whose member doc names its code (burning it)", () => carol.verified],
+        ["a non-member, outside a join batch", () => dan.verified],
+    ])("denied: the invite's delete by %s", async (_what, db) => {
+        await assertFails(db().doc(`invites/${JOIN}`).delete());
     });
 });
 
 // (c) PLAN 3.1 Transfer ownership: one batch updates ownerUid and both roles, and each rule checks the
 // others' result through getAfter, so a partial transfer is denied.
 describe("(c) the transfer batch", () => {
-    beforeEach(async () => {
-        await seed({
-            [member(HOME, ALICE)]: membership("member"),
-            [member(TOMB, ALICE)]: membership("member"),
-        });
-    });
-
-    // In `hid`: ownerUid to `to`, and the roles of `roles`, owner for `to` and member for anyone else.
-    function transfer(db: h.Db, hid: string, to: string, roles: string[]): Promise<void> {
+    // In `hid`: ownerUid to `to`, and the roles of `roles`, owner for `to` and member for anyone else;
+    // `extra` adds fields to the household update or to each role update.
+    interface Extra {
+        household?: object;
+        member?: object;
+    }
+    function transfer(
+        db: h.Db,
+        hid: string,
+        to: string,
+        roles: string[],
+        extra: Extra = {},
+    ): Promise<void> {
         const batch = db.batch();
-        batch.update(db.doc(`households/${hid}`), { ownerUid: to });
+        batch.update(db.doc(`households/${hid}`), { ownerUid: to, ...extra.household });
         for (const uid of roles) {
-            batch.update(db.doc(member(hid, uid)), { role: uid === to ? "owner" : "member" });
+            const role = uid === to ? "owner" : "member";
+            batch.update(db.doc(member(hid, uid)), { role, ...extra.member });
         }
         return batch.commit();
     }
@@ -242,53 +247,44 @@ describe("(c) the transfer batch", () => {
         ["to a non-member", BOB, HOME, "zoe", [BOB]],
         ["under a tombstone", BOB, TOMB, ALICE, [BOB, ALICE]],
     ])("denied: %s", async (_what, caller, hid, to, roles) => {
-        const db = (caller === BOB ? bob : alice).verified;
-        await assertFails(transfer(db, hid, to, roles));
+        await assertFails(transfer((caller === BOB ? bob : alice).verified, hid, to, roles));
+    });
+
+    test.each<[string, Extra]>([
+        ["another household field", { household: { name: "Away" } }],
+        ["another member field", { member: { displayName: "Owner" } }],
+    ])("denied: the owner's whole batch, changing %s too", async (_what, extra) => {
+        await assertFails(transfer(bob.verified, HOME, ALICE, [BOB, ALICE], extra));
+    });
+
+    test("denied: the owner's role update alone, a plain member to owner", async () => {
+        await assertFails(bob.verified.doc(member(HOME, CAROL)).update({ role: "owner" }));
     });
 });
 
 // (d) PLAN 3.1 list read (M2), LIST-01's two queries: createdBy == uid, and sharedWith == hid for a
 // member of that live household.
 describe("(d) the list query on sharedWith, with M(hid) and LIVE", () => {
-    const list = (createdBy: string, sharedWith: string | null): object => ({
-        ...{ kind: "PLAIN", name: "List", createdBy, sharedWith, schemaVersion: 1 },
-        ...{ createdAt: T0, updatedAt: T0, updatedBy: createdBy },
-    });
-    beforeEach(async () => {
-        await seed({
-            [member(HOME, ALICE)]: membership("member"),
-            [member(TOMB, ALICE)]: membership("member"),
-            "lists/home": list(BOB, HOME),
-            "lists/mine": list(ALICE, null),
-            "lists/away": list(EVE, AWAY),
-            "lists/tomb": list(BOB, TOMB),
-        });
-    });
-    const lists = (db: h.Db): firebase.firestore.Query => db.collection("lists");
-    const shared = (db: h.Db, hid: string): firebase.firestore.Query =>
-        lists(db).where("sharedWith", "==", hid);
-    const created = (db: h.Db): firebase.firestore.Query =>
-        lists(db).where("createdBy", "==", ALICE);
+    const lists = (db: h.Db): Query => db.collection("lists");
+    const shared = (hid: string) => (db: h.Db) => lists(db).where("sharedWith", "==", hid);
 
-    test("verified only: a member's query on sharedWith", async () => {
-        await h.verifiedOnly(alice, (db) => shared(db, HOME).get());
-        expect(await ids(shared(alice.verified, HOME).get())).toEqual(["home"]);
+    test.each<[string, (db: h.Db) => Query, string]>([
+        ["a member's query on sharedWith", shared(HOME), "home"],
+        [
+            "the creator's query on createdBy",
+            (db) => lists(db).where("createdBy", "==", ALICE),
+            "mine",
+        ],
+    ])("verified only: %s", async (_what, query, id) => {
+        expect(await listed(alice, query)).toEqual([id]);
     });
 
-    test("verified only: the creator's query on createdBy", async () => {
-        await h.verifiedOnly(alice, (db) => created(db).get());
-        expect(await ids(created(alice.verified).get())).toEqual(["mine"]);
-    });
-
-    test.each([
-        ["a household she is no member of", AWAY],
-        ["a tombstone, her member doc still there", TOMB],
-    ])("denied: sharedWith, %s", async (_what, hid) => {
-        await assertFails(shared(alice.verified, hid).get());
-    });
-
-    test("denied: no filter", async () => {
-        await assertFails(lists(alice.verified).get());
+    test.each<[string, (db: h.Db) => Query]>([
+        ["sharedWith a household she is no member of", shared(AWAY)],
+        ["sharedWith a tombstone, her member doc still there", shared(TOMB)],
+        ["no filter", lists],
+    ])("denied: %s", async (_what, query) => {
+        await assertFails(query(alice.verified).get());
     });
 });
 
@@ -316,8 +312,9 @@ describe("(e) the access-call limits in the emulator", () => {
         await overLimit(alice.verified.doc("get11/x").get());
     });
 
-    test("a batch: 10 calls a write and 20 in all allowed, 21 denied", async () => {
+    test("a batch: 10 calls a write and 20 in all allowed, 11 in a write or 21 in all denied", async () => {
         await h.verifiedOnly(alice, (db) => batch(db, ["writeA", "writeB"]));
+        await overLimit(batch(alice.verified, ["write11", "write1"]));
         await overLimit(batch(alice.verified, ["writeA", "writeB", "write1"]));
     });
 
