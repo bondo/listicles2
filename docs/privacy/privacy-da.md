@@ -20,7 +20,7 @@ bestemmer, hvilke data appen indsamler, og som har ansvaret for dem. Spørgsmål
   Tallys egen database);
 - hvis du logger ind med Google: din Google-kontos id og de profiloplysninger, Google deler, når du logger ind:
   dit navn, din e-mailadresse og et link til dit profilbillede. Appen viser eller bruger ikke billedet.
-  `[Skal bekræftes (M1-O15) med et rigtigt Google-login: på Firebase Auth-emulatoren (M1-67) gemmer login-posten dem
+  `[Skal bekræftes (M3-O3) med et rigtigt Google-login: på Firebase Auth-emulatoren (M1-67) gemmer login-posten dem
   alle og for alle login-metoder også, hvornår kontoen blev oprettet, hvornår du sidst loggede ind, og hvornår dit
   login sidst blev fornyet; M1-O5 afgør, om teksten skal nævne de tidspunkter.]`
 - hvis du slår totrinsbekræftelse til: det, der skal til for at tjekke koderne fra din godkendelsesapp;
