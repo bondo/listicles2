@@ -448,10 +448,7 @@ flowchart LR
 ## Blockers
 
 - **owner to-do** [#120](https://github.com/bondo/listicles2/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
-- **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
-- **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
-- **owner to-do** [#346](https://github.com/bondo/listicles2/issues/346): &#91;owner&#93; M1-O8&#58; Turn on secret scanning non-provider patterns and validity checks
 - **owner to-do** [#354](https://github.com/bondo/listicles2/issues/354): &#91;owner&#93; M1-O1&#58; Create the Firebase project (Spark, Firestore eur3, Google + email sign-in, googl…
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-15: waits on M1-66
