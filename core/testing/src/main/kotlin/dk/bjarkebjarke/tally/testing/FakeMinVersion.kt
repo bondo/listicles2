@@ -7,14 +7,14 @@ import java.io.IOException
 
 /** A [MinVersionRemote] the test sets up: it answers with [minVersionCode], fails (offline) or never answers. */
 class FakeMinVersionRemote private constructor(
-    private val answer: suspend () -> Long?,
+    private val answer: suspend () -> Result<Long?>,
 ) : MinVersionRemote {
-    constructor(minVersionCode: Long?) : this({ minVersionCode })
+    constructor(minVersionCode: Long?) : this({ Result.success(minVersionCode) })
 
-    override suspend fun fetch(): Long? = answer()
+    override suspend fun fetch(): Result<Long?> = answer()
 
     companion object {
-        fun offline() = FakeMinVersionRemote { throw IOException("offline") }
+        fun offline() = FakeMinVersionRemote { Result.failure(IOException("offline")) }
 
         fun hanging() = FakeMinVersionRemote { awaitCancellation() }
     }
