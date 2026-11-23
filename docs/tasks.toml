@@ -970,11 +970,22 @@ notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py,
 id = "M1-71"
 title = "guards check 1: test-runner options that skip or rewrite tests on command lines (jest, vitest, mocha), direct or after an npm `--` tail"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 339
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-65"]
 notes = "Found in M1-65: check 1 reads --passWithNoTests, -t, testPathIgnorePatterns and kin in config files only, so `jest --passWithNoTests` in a script passes, and since M1-65 so does `npm test -- -u` when the test script is a plain jest. Decide with the owner which runner options count (snapshot update, name and path filters, onlyChanged, shard); tooling env, test-first with negative cases, keep it a tripwire (F18). Owner merge: scripts/guards.sh"
+
+[[task]]
+id = "M1-81"
+title = "guards check 1: playwright and cypress test-runner options on command lines"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-71"]
+notes = "Found in M1-71: runopt reads jest, vitest and mocha only. A direct playwright or cypress call is not read, and an npm `--` tail resolved to them is read with the jest and mocha long names and short letters, without positional words, so `--update-snapshots`, `--last-failed`, `--grep-invert` and a positional test filter pass. Decide with the owner which options count (as #15 comment 7092471489 did for jest, vitest and mocha); tooling env, test-first with negative cases, keep it a tripwire (F18), list the rest in docs/guards-known-gaps.md. Owner merge: scripts/guards.sh"
 
 [[task]]
 id = "M1-13"
@@ -1507,7 +1518,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-46"]
-notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines. Part B split again 2026-11-23 (400-line scope): part B1 (tooling/root-checks-68-b) moves useJUnitPlatform, failOnNoDiscoveredTests and :core:testing into the plugins with checkTestSettings per module (scripts/test_test_settings_gate.py) and records PR 329 R2-01 in docs/guards-known-gaps.md; the root check tasks per module and check 4 on any allprojects/subprojects use are the next PR(s)"
+notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines. Part B split again 2026-11-23 (400-line scope): part B1 (tooling/root-checks-68-b) moves useJUnitPlatform, failOnNoDiscoveredTests and :core:testing into the plugins with checkTestSettings per module (scripts/test_test_settings_gate.py) and records PR 329 R2-01 in docs/guards-known-gaps.md; the root check tasks per module and check 4 on any allprojects/subprojects use are the next PR(s). Part B2 (tooling/root-checks-68-b2): checkWarningsAsErrors and checkJdkRelease per module (build-logic ModuleChecks.kt), the root runs each module's listiclesChecks by task path, check_build_guards.py keeps the root's listiclesModules equal to settings.gradle.kts. Part B3 (finishes M1-68): checkJavaApiLevel per module without project(\":app\") configuration, issue 48's flags (-Xsuppress-*, -Xdont-warn*, @argfiles), then check 4 fails on any allprojects/subprojects use"
 
 [[task]]
 id = "M1-69"
@@ -1606,7 +1617,7 @@ depends_on = [
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81",
 ]
 
 [[task]]
