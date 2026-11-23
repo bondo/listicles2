@@ -569,7 +569,7 @@ def state_ids(text: str) -> tuple[list[str], list[str]]:
     opens = [i for i, ln in enumerate(lines) if ln.rstrip(" \t") == "```json"]
     if len(opens) != 1:
         raise InputError(f"{len(opens) or 'no'} ```json blocks in the state body; exactly one holds the state")
-    close = next((i for i in range(opens[0] + 1, len(lines)) if lines[i].rstrip() == "```"), None)
+    close = next((i for i in range(opens[0] + 1, len(lines)) if lines[i].rstrip(" \t") == "```"), None)
     if close is None:
         raise InputError("the ```json block in the state body is not closed")
     try:
