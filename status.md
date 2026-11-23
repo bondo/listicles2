@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 38/80 (47%) | 42 |
+| M1 | Accounts and households | 39/82 (47%) | 43 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 38/80 done (47%), 42 open.
+**Progress:** 39/82 done (47%), 43 open.
 
 ### Tasks
 
@@ -180,11 +180,13 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-43 | prompt_rules.py&#58; sentence-level negation for the resolve-thread rule (issue 153) | done | M1-01 | implementer |  |
 | M1-44 | CI hardening nits&#58; job timeouts, pinned python and node, gitleaks download, npm install scripts,… | ready | M1-01 | implementer |  |
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/listicles2/issues/292) |
-| M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issues 217 items 1-4,… | in progress | M1-02 | implementer | [#320](https://github.com/bondo/listicles2/issues/320) |
+| M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issue 217 items 1-3) | done | M1-02 | implementer |  |
+| M1-68 | Root check tasks without cross-project reads&#58; checkWarningsAsErrors, checkJdkRelease, checkJavaAp… | ready | M1-46 | implementer |  |
+| M1-69 | Nested builds&#58; dependency verification for the licensee fixture build (issue 217 item 4), check_gr… | ready | M1-46 | implementer |  |
 | M1-47 | R12 screens vs wireframes for M1 (issue 65 review catalogue) | blocked | M1-16, M1-17, M1-19, M1-20, M1-21, M1-22, M1-23, M1-25, M1-27, M1-32, M1-39, M1-03, M1-04 | process |  |
-| M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-62, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54 | process |  |
+| M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-62, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-68, M1-69 | process |  |
 | M1-34 | guards.sh&#58; compare line length per tool across all style files, with ruff and flake8 defaults (is… | done | none | implementer |  |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-70 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-68, M1-69, M1-70 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -232,21 +234,22 @@ flowchart LR
     n24["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n25["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
     n26["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
-    n27["M1-46 build-logic convention plugins#59; no allp… (in progress)"]:::progress
-    n28["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n29["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n30["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n31["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n32["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n33["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n34["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n35["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n36["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n37["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n38["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n39["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
-    n40["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n41["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
+    n27["M1-68 Root check tasks without cross-project… (ready)"]:::ready
+    n28["M1-69 Nested builds: dependency verification … (ready)"]:::ready
+    n29["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n30["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n31["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n32["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n33["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n34["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n35["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n36["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n37["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n38["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
+    n39["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
+    n40["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
+    n41["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n42["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
     n2 --> n0
     n1 --> n2
     n23 --> n3
@@ -270,7 +273,7 @@ flowchart LR
     n16 --> n17
     n15 --> n17
     n17 --> n18
-    n33 --> n18
+    n34 --> n18
     n7 --> n19
     n2 --> n22
     n4 --> n23
@@ -278,43 +281,17 @@ flowchart LR
     n11 --> n25
     n10 --> n25
     n19 --> n25
-    n9 --> n28
-    n10 --> n28
-    n13 --> n28
-    n14 --> n28
-    n15 --> n28
-    n16 --> n28
-    n18 --> n28
-    n19 --> n28
-    n21 --> n28
-    n17 --> n28
-    n25 --> n28
-    n0 --> n29
-    n1 --> n29
-    n2 --> n29
-    n3 --> n29
-    n4 --> n29
-    n7 --> n29
-    n8 --> n29
     n9 --> n29
     n10 --> n29
-    n11 --> n29
     n13 --> n29
     n14 --> n29
     n15 --> n29
     n16 --> n29
     n18 --> n29
     n19 --> n29
-    n20 --> n29
     n21 --> n29
-    n12 --> n29
     n17 --> n29
     n25 --> n29
-    n26 --> n29
-    n27 --> n29
-    n28 --> n29
-    n22 --> n29
-    n23 --> n29
     n0 --> n30
     n1 --> n30
     n2 --> n30
@@ -337,22 +314,50 @@ flowchart LR
     n17 --> n30
     n25 --> n30
     n26 --> n30
-    n27 --> n30
-    n28 --> n30
     n29 --> n30
     n22 --> n30
     n23 --> n30
-    n24 --> n30
-    n5 --> n30
-    n6 --> n30
-    n39 --> n31
-    n31 --> n32
-    n31 --> n33
-    n31 --> n34
-    n20 --> n34
-    n31 --> n36
-    n3 --> n36
-    n26 --> n38
+    n27 --> n30
+    n28 --> n30
+    n0 --> n31
+    n1 --> n31
+    n2 --> n31
+    n3 --> n31
+    n4 --> n31
+    n7 --> n31
+    n8 --> n31
+    n9 --> n31
+    n10 --> n31
+    n11 --> n31
+    n13 --> n31
+    n14 --> n31
+    n15 --> n31
+    n16 --> n31
+    n18 --> n31
+    n19 --> n31
+    n20 --> n31
+    n21 --> n31
+    n12 --> n31
+    n17 --> n31
+    n25 --> n31
+    n26 --> n31
+    n29 --> n31
+    n30 --> n31
+    n22 --> n31
+    n23 --> n31
+    n24 --> n31
+    n5 --> n31
+    n6 --> n31
+    n27 --> n31
+    n28 --> n31
+    n40 --> n32
+    n32 --> n33
+    n32 --> n34
+    n32 --> n35
+    n20 --> n35
+    n32 --> n37
+    n3 --> n37
+    n26 --> n39
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -453,6 +458,8 @@ flowchart LR
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
+- **PR to merge** [#317](https://github.com/bondo/listicles2/issues/317): M1-26&#58; App Check&#58; Play Integrity in release, debug provider in debug (not enforced)
+- **PR to merge** [#319](https://github.com/bondo/listicles2/issues/319): M1-14&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes
 - **task** M1-06: waits on M1-10
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
@@ -473,8 +480,8 @@ flowchart LR
 - **task** M1-54: waits on M1-12
 - **task** M1-39: waits on M1-10, M1-18, M1-17 +1
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +8
-- **task** M1-48: waits on M1-06, M1-09, M1-10 +23
-- **task** M1-FU: waits on M1-06, M1-09, M1-10 +27
+- **task** M1-48: waits on M1-06, M1-09, M1-10 +24
+- **task** M1-FU: waits on M1-06, M1-09, M1-10 +28
 - **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
