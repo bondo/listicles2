@@ -657,7 +657,7 @@ assignee = "process"
 risk = "normal"
 depends_on = []
 pr = 62
-notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11). Delivered by PR #62; owner approval recorded 2026-11-15 in PR #88 (decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569)."
+notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11). Delivered by PR #62; owner approval recorded 2026-11-15 in PR #88 (decision record: https://github.com/bondo/tally/issues/15#issuecomment-6898068569)."
 
 [[task]]
 id = "M0.5-21"
@@ -1863,7 +1863,7 @@ notes = "DEFERRED, owner decision on #15, comment 6974778901 (2026-11-18): Git L
 
 [[task]]
 id = "M1-87"
-title = "Repo rename follow-up: bondo/listicles2 and /home/user/listicles2 literals in process files, docs, README and app links become bondo/tally and /home/user/tally"
+title = "Repo rename follow-up: the old repo name and checkout path in process files, docs, README and app links become bondo/tally and /home/user/tally"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"

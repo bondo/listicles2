@@ -173,7 +173,7 @@ then it only sets `status = "done"`. It also reviews every open Dependabot alert
 **Ready query** (`ORCHESTRATION.md` §4.3): add a third file and pass it as `--followups`:
 
 ```bash
-gh api -X GET search/issues -f q='repo:bondo/listicles2 is:issue is:open label:follow-up' -f per_page=100 \
+gh api -X GET search/issues -f q='repo:bondo/tally is:issue is:open label:follow-up' -f per_page=100 \
   --jq '{items: [.items[] | {number, title, state, labels: [.labels[].name]}]}' > "$T/followups.json"
 python3 -I "$T/tasks.py" … --followups "$T/followups.json" ready
 ```
