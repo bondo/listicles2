@@ -150,16 +150,19 @@ Owner decision (issue 15, comment 7092471489). `runopt` in the 2c scan (same fil
 a jest, vitest or mocha command that rewrites or skips tests, with no `justified:` escape hatch, like the rest of check 1:
 - rewrite and skip-all: `-u`, `--updateSnapshot` (vitest `--update`), `--passWithNoTests`;
 - name and path filters: `-t`, `--testNamePattern`, `--testPathIgnorePatterns`, `--testPathPattern(s)` (what a positional jest word sets),
-  positional path filters, mocha `--grep`, `-g`, `--fgrep`, `-f`, `--invert`, `-i`, and the path excludes `--exclude` (vitest, mocha) and
-  `--ignore` (mocha);
+  positional path filters, mocha `--grep`, `-g`, `--fgrep`, `-f`, `--invert`, `-i`, the path excludes `--exclude` (vitest, mocha) and
+  `--ignore` (mocha), a jest `--filter` module, and a jest config given as inline JSON (`-c` or `--config` with a value that starts with
+  `{`, which no config scan reads);
 - changed-only: jest `-o`, `--onlyChanged`, `--changedSince`, `--findRelatedTests`, `--lastCommit`, `-f`/`--onlyFailures`, vitest `--changed`.
 
 `--shard` passes (kept for CI splitting). Names past the decision's list (`--testPathPattern(s)`, `--lastCommit`, `--onlyFailures`,
-`--exclude`, `--ignore`, mocha `-f` and `-i`) are spellings or siblings of the listed ones, denied because that is the fail-closed side.
+`--exclude`, `--ignore`, `--filter`, inline JSON config, mocha `-f` and `-i`) are spellings or siblings of the listed ones, denied because that is the fail-closed side.
 
 **How it reads a command.** Long names are compared in lower case without dashes, as yargs (jest, mocha) and cac (vitest) accept
 kebab-case for camelCase (`--pass-with-no-tests`), with or without `=value`. Short options are per runner, because they clash (jest `-t` is
-the name filter, mocha `-t` is `--timeout`; jest `-i` is `--runInBand`, mocha `-i` is `--invert`), and may be grouped (`-iu`).
+the name filter, mocha `-t` is `--timeout`; jest `-i` is `--runInBand`, mocha `-i` is `--invert`), and may be grouped (`-iu`). As
+yargs-parser reads a group, a letter that takes a value takes the rest of the group only when that starts with a digit or a non-letter
+(`-w2`, `-c=x`); otherwise the rest are more flags (`-wu` is `-w -u`).
 Positional words are path filters after jest, and after vitest except a first `run`, `watch` or `dev` (`vitest related`, `list` and
 `bench` fail), when the runner is the command: the first word after a YAML `- key:` or a package.json key, `VAR=` assignments and
 launchers with their options (`npx --yes`, `npm exec`, `yarn`, `pnpm exec`, `bunx`, `node --flag path/jest.js`, `env`, `sudo`). A mocha
@@ -168,19 +171,23 @@ positional word is its spec and passes. After a bare `--` every word is position
 write it with `=` (`--testSequencer=./seq.js`): a false positive, never a miss. Redirections and their targets are skipped.
 
 **npm `--` tails.** A tail that M1-65 resolves (every definition of the script a plain `[npx] jest|mocha ...`) is read with that runner's
-short options, and its positional words fail (for mocha too: a spec in the tail may replace the configured one). A tail that is not
+short options, and its positional words fail (for mocha too, and its `--spec`: a spec in the tail may replace the configured one). A tail that is not
 resolved is read with the long names only and fails with no escape hatch; its short options are ambiguous across tools (`-t` is tsc
 `--target`, `-f` is the ESLint formatter), so 2c keeps checking them as before, waivable by a reason.
 
 **Not covered (tripwire, F18).**
 - A runner inside a quoted command string (`firebase emulators:exec "jest src"`, `bash -c "jest src"`) has its options read but not its
   positional words; nor does `yarn run jest src`, a runner held in a variable, or a runner run from a Python or JS file.
-- Options that weaken a run without filtering it: jest `--ci=false` (writes new snapshots), `--bail`, `--listTests`, vitest
-  `--allowOnly`, `--coverage.*` dot options, `--project`, `--dir`, `--root`, jest `--selectProjects`, `--roots`, `--testMatch`,
-  `--testRegex` (the last three are refused in config by check 1), and a command whose exit status is dropped (`jest || true`).
+- Options that weaken a run without filtering it: jest `--ci=false` (writes new snapshots), `--bail`, `--listTests`, `--watch` (only
+  changed tests; it does not end in CI), vitest `--allowOnly`, dot options (`--coverage.*`, `--typecheck.only`), `--project`, jest
+  `--selectProjects`, `--roots`, `--testMatch`, `--testRegex` (the last three are refused in config by check 1), and a command whose
+  exit status is dropped (`jest || true`). vitest `--dir` and `--root` and jest `--rootDir` fail only when their value is a separate
+  word (read as a path filter); written with `=` they pass.
 - playwright and cypress options (`--grep`, `--last-failed`, `--only-changed`, `--update-snapshots`): a tail resolved to them is read
   with the long names and every short letter of jest and mocha, without positional words; a direct call is not read (task M1-77).
-- yarn, pnpm and bun tails are never resolved (M1-65), so only their long runner options fail with no escape hatch.
+- yarn, pnpm and bun tails are never resolved (M1-65), so only their long runner options fail with no escape hatch. Their forms
+  that pass arguments to the script without `--` (`yarn test --passWithNoTests`, `pnpm test -u`, `pnpm run test --passWithNoTests`) are
+  not read at all, as in 2c (the repo is npm-only).
 - A runner name used as data on a command line (`echo jest -u`) fails: a false positive.
 
 ## Check 2c: YAML values over several lines (task M1-64, issue 164 item 2)

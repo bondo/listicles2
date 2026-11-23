@@ -471,8 +471,10 @@ function plainrun(c) { return (c ~ RUNRE) }
 # only, because its short options are ambiguous (-t is tsc --target): 2c keeps them, waivable as before.
 function rclean(t) { sub(/^["\047\\]+/, "", t); sub(/["\047\\,;]+$/, "", t); return t }
 # rscan: 1 when the words of s hold a denied option: ds and vs are the denied and the value-taking short letters, pos makes positional
-# words deny (vit: except a first run, watch or dev).
-function rscan(s, ds, vs, pos, vit,   n, w, i, j, t, c, nm, q, first, rest) {
+# words deny (vit: except a first run, watch or dev), dl adds denied long names. A value-taking letter takes the rest of its group only
+# when that starts with a digit or a non-letter (as yargs-parser reads it), so -wu is -w -u. A jest config given as inline JSON
+# (-c or --config with a value that starts with `{`) is denied: no config scan reads it.
+function rscan(s, ds, vs, pos, vit, dl,   n, w, i, j, t, c, nm, q, first, rest, v) {
   n = split(s, w, /[ \t]+/); first = 1; rest = 0
   for (i = 1; i <= n; i++) {
     t = rclean(w[i]); if (t == "") continue
@@ -482,15 +484,22 @@ function rscan(s, ds, vs, pos, vit,   n, w, i, j, t, c, nm, q, first, rest) {
     if (t ~ /^--./) {
       nm = substr(t, 3); q = index(nm, "="); if (q) nm = substr(nm, 1, q - 1)
       nm = tolower(nm); gsub(/-/, "", nm)
-      if (index(RDL, " " nm " ")) return 1
-      if (!q && index(RVL, " " nm " ") && i < n && rclean(w[i + 1]) !~ /^-/) i++
+      if (index(RDL dl, " " nm " ")) return 1
+      v = (q ? substr(t, q + 3) : "")
+      if (!q && index(RVL, " " nm " ") && i < n && rclean(w[i + 1]) !~ /^-/) { i++; v = w[i] }
+      if (nm == "config" && rclean(v) ~ /^\{/) return 1
       continue
     }
     if (t ~ /^-[A-Za-z]/) {
       for (j = 2; j <= length(t); j++) {
         c = substr(t, j, 1); if (c !~ /[A-Za-z]/) break
         if (index(ds, c)) return 1
-        if (index(vs, c)) { if (j == length(t) && i < n && rclean(w[i + 1]) !~ /^-/) i++; break }
+        if (index(vs, c)) {
+          v = substr(t, j + 1); sub(/^=/, "", v)
+          if (v == "" && i < n && rclean(w[i + 1]) !~ /^-/) { i++; v = w[i] }
+          if (c == "c" && rclean(v) ~ /^\{/) return 1
+          if (v == "" || substr(t, j + 1) ~ /^[^A-Za-z]/) break
+        }
       }
       continue
     }
@@ -513,22 +522,23 @@ function cmdat(w, n,   i, t, l) {
   return 0
 }
 # runopt: 1 when command p passes a denied option to jest, vitest or mocha, directly or in an npm `--` tail.
-function runopt(p,   n, w, k, a, r, i, dd, ds, vs, pos, tl) {
+function runopt(p,   n, w, k, a, r, i, dd, ds, vs, dl, pos, tl) {
   if (datacmd(p)) return 0
   n = split(p, w, /[ \t]+/); k = cmdat(w, n)
   if (k) {
     a = rclean(w[k]); sub(/^.*\//, "", a); sub(/\.[cm]?js$/, "", a)
-    if (a in RDS) { tl = ""; for (i = k + 1; i <= n; i++) tl = tl " " w[i]; if (rscan(tl, RDS[a], RVS[a], a != "mocha", a == "vitest")) return 1 }
+    if (a in RDS) { tl = ""; for (i = k + 1; i <= n; i++) tl = tl " " w[i]; if (rscan(tl, RDS[a], RVS[a], a != "mocha", a == "vitest", "")) return 1 }
   }
-  for (r in RDS) if (has(p, r) && rscan(after(p, r), RDS[r], RVS[r], 0, 0)) return 1
+  for (r in RDS) if (has(p, r) && rscan(after(p, r), RDS[r], RVS[r], 0, 0, "")) return 1
   dd = ddseg(p); if (dd == "") return 0
-  if (!ddrun(p)) return rscan(dd, "", "", 0, 0)
-  ds = vs = ""; pos = 0
+  if (!ddrun(p)) return rscan(dd, "", "", 0, 0, "")
+  ds = vs = dl = ""; pos = 0
   for (i = 1; i <= NS[DDN]; i++) {
     a = NC[DDN, i]; sub(/^[ \t]*(npx[ \t]+)?/, "", a); sub(/[ \t].*$/, "", a)
     if (a in RDS) { ds = ds RDS[a]; vs = vs RVS[a]; pos = 1 } else ds = ds RDS["jest"] RDS["mocha"]  # playwright, cypress: task M1-77
+    if (a == "mocha") dl = "spec "  # a spec in the tail, like a positional word, may replace the configured one
   }
-  return rscan(dd, ds, vs, pos, 0)
+  return rscan(dd, ds, vs, pos, 0, dl)
 }
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
@@ -656,8 +666,8 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   # runopt (check 1, task M1-71): denied long names (normalized: lower case, no dashes) and short letters per runner, and the allowed
   # options whose value may follow as the next word. jest -t, -o, -f: name filter, onlyChanged, onlyFailures; vitest -u: update;
   # mocha -g, -f, -i: grep, fgrep, invert (its -t, -u, -R are timeout, ui, reporter).
-  RDL = " updatesnapshot update passwithnotests testnamepattern testpathignorepatterns testpathpattern testpathpatterns onlychanged changedsince findrelatedtests lastcommit onlyfailures changed grep fgrep invert exclude ignore "
-  RVL = " config maxworkers shard testtimeout timeout reporters reporter reporteroption reporteroptions outputfile coveragereporters coveragedirectory seed testenvironment environment pool ui slow require spec jobs "
+  RDL = " updatesnapshot update passwithnotests testnamepattern testpathignorepatterns testpathpattern testpathpatterns onlychanged changedsince findrelatedtests lastcommit onlyfailures changed grep fgrep invert exclude ignore filter "
+  RVL = " config maxworkers shard testtimeout timeout reporters reporter reporteroption reporteroptions outputfile coveragereporters coveragedirectory seed testenvironment environment env cachedirectory pool ui slow require spec jobs "
   RDS["jest"] = "utof"; RDS["vitest"] = "ut"; RDS["mocha"] = "gfi"
   RVS["jest"] = "cw"; RVS["vitest"] = "c"; RVS["mocha"] = "tuRsrj"
   np = split(ENVIRON["NPMS"], P, "\n")  # pkgscripts: name TAB command; a bare TAB makes every tail unknown
