@@ -58,7 +58,8 @@ reason is true and specific (`REVIEW.md`, item 8).
   `thresholds` in markdown before `,` `;` `)`, a full stop or a word is prose even with a digit on the line, so `coverage thresholds are 80`
   in markdown is not compared. In a `.py` file that is no test file, `useJUnitPlatform` and `failOnNoDiscoveredTests` inside a `#` comment
   or a plain string are a mention: a gate's regex or message that pins them may be removed (the gate's own tests still count). A line
-  inside a multi-line string reads as code, the safe direction.
+  inside a multi-line string reads as code, the safe direction. Only `test_*.py` and `*_test.py` are test files: a `conftest.py` or
+  shared fixture module that pins the strings is not (R0 self-review nit).
 
 ## Check 2c: command-line flags are an allowlist (issues 177, 174, 164)
 
