@@ -4,7 +4,8 @@ Run: python3 -I scripts/test_check_ci_hardening.py
 
 The check runs on the real files first, then on copies with one defect each, which must each be reported: a job without a
 timeout, python3 or node taken from the runner image, `npm ci` that runs install scripts, a gitleaks download without
-retries or https-only redirects.
+retries or https-only redirects. M1-73 adds the CodeQL workflow rules (issue 189 item 7, Q6 A) and the rule that every `uses:` is
+a commit sha with a version tag comment.
 """
 
 import re
@@ -23,6 +24,7 @@ import check_ci_hardening as c  # noqa: E402  # justified: must follow the sys.p
 ROOT = Path(__file__).resolve().parent.parent
 CI = ".github/workflows/ci.yml"
 STATUS = ".github/workflows/status.yml"
+CODEQL = ".github/workflows/codeql.yml"
 VERIFY = "scripts/verify.sh"
 ADR = "docs/adr/0003-gradle-dependency-verification.md"
 REQ_CI = "scripts/requirements-ci.txt"
@@ -32,6 +34,8 @@ REQ_LINT_IN = "scripts/requirements-lint.in"
 INSTALL_CI = "pip install --require-hashes -r scripts/requirements-ci.txt"
 INSTALL_LINT = "pip install --require-hashes -r scripts/requirements-lint.txt"
 HASH = "--hash=sha256:" + "0123456789abcdef" * 4
+SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
+BUILD = "./gradlew --no-build-cache -q --console=plain :app:assembleDebug"
 
 
 class Rules(unittest.TestCase):
@@ -40,7 +44,7 @@ class Rules(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
         shell = (p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))
-        for name in (CI, STATUS, VERIFY, ADR, REQ_CI, REQ_CI_IN, REQ_LINT, REQ_LINT_IN, *shell):
+        for name in (CI, STATUS, CODEQL, VERIFY, ADR, REQ_CI, REQ_CI_IN, REQ_LINT, REQ_LINT_IN, *shell):
             if not (ROOT / name).exists():
                 continue  # a missing file is the check's finding, not the test's crash
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
@@ -61,6 +65,11 @@ class Rules(unittest.TestCase):
         change(workflow)
         path.write_text(yaml.safe_dump(workflow, sort_keys=False, width=10000))
         return c.problems(self.root)
+
+    def pip_problems(self, command):
+        """The problems after one more `run: command` step in the static job; the YAML dump drops the tag comments, so the pin findings are left out."""
+        found = self.edit_yaml(CI, lambda w: w["jobs"]["static"]["steps"].append({"run": command}))
+        return [p for p in found if "pinned" not in p and "unreadable" not in p]
 
     def set_text(self, name, text):
         (self.root / name).write_text(text)
@@ -134,7 +143,8 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit_yaml(CI, set_with("firebase", "actions/setup-node@", "node-version", 24)), "node-version")
 
     def test_a_job_that_does_not_run_node_needs_no_pin(self):
-        self.assertEqual(self.edit_yaml(CI, lambda w: drop(w, "static", "actions/setup-node@")), [])
+        found = self.edit_yaml(CI, lambda w: drop(w, "static", "actions/setup-node@"))
+        self.assertEqual([p for p in found if "pinned" not in p and "unreadable" not in p], [])  # the YAML dump drops the tag comments
 
     def test_python_jobs_install_pyyaml_right_after_setup_python(self):
         """R1-01: setup-python's interpreter has no PyYAML (the runner image's had), and most gate scripts import yaml."""
@@ -261,12 +271,13 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit(VERIFY, "set -uo pipefail\n", "set -uo pipefail\npip install ruff\n"), "verify.sh", "pip install")
 
     def test_a_commented_out_or_quoted_pip_install_is_not_a_command(self):
-        self.assertEqual(self.edit_yaml(CI, lambda w: w["jobs"]["static"]["steps"].append({"run": "# pip install ruff\necho done"})), [])
+        self.assertEqual(self.pip_problems("# pip install ruff\necho done"), [])
         for harmless in ("pip --version", "pip freeze", "echo pip is not installed here", "pip-compile --version", "pip list | grep install"):
             with self.subTest(harmless):
                 self.setUp()
-                self.assertEqual(self.edit_yaml(CI, lambda w, harmless=harmless: w["jobs"]["static"]["steps"].append({"run": harmless})), [])
-        self.assertEqual(self.edit_yaml(CI, lambda w: w["jobs"]["static"]["steps"].append({"run": INSTALL_LINT})), [])
+                self.assertEqual(self.pip_problems(harmless), [])
+        self.setUp()
+        self.assertEqual(self.pip_problems(INSTALL_LINT), [])
 
     def test_the_lock_files_are_owned_by_the_owner(self):
         owners = (ROOT / ".github/CODEOWNERS").read_text()
@@ -308,6 +319,150 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit(CI, "sha256sum -c -", "cat"), "gitleaks", "sha256sum")
         self.setUp()
         self.flagged(self.edit(CI, "./gitleaks git --redact --no-banner .", "./gitleaks git --source . --redact --no-banner"), "gitleaks", "--source")
+
+    def test_every_action_is_pinned_by_sha_with_a_tag_comment(self):
+        sha = "3d3c42e5aac5ba805825da76410c181273ba90b1"
+        use = f"actions/checkout@{sha} # v7.0.1"
+        for name in (CI, STATUS, CODEQL):
+            for label, bad in (("tag", "actions/checkout@v7"), ("branch", "actions/checkout@main"), ("short sha", "actions/checkout@3d3c42e # v7.0.1"),
+                               ("no comment", f"actions/checkout@{sha}"), ("comment without a version", f"actions/checkout@{sha} # latest")):
+                with self.subTest(name=name, bad=label):
+                    self.setUp()
+                    self.flagged(self.edit(name, use, bad), "actions/checkout", "pinned")
+
+    def test_the_codeql_workflow_exists(self):
+        (self.root / CODEQL).unlink()
+        self.flagged(c.problems(self.root), "codeql.yml", "missing")
+
+    def test_codeql_runs_weekly_on_pushes_to_main_and_on_pull_requests(self):
+        for label, change in (
+            ("no schedule", lambda w: w[True].pop("schedule")),
+            ("daily", lambda w: w[True].__setitem__("schedule", [{"cron": "17 4 * * *"}])),
+            ("two schedules", lambda w: w[True]["schedule"].append({"cron": "0 5 * * 3"})),
+            ("no push", lambda w: w[True].pop("push")),
+            ("push to every branch", lambda w: w[True]["push"].__setitem__("branches", ["main", "dev"])),
+            ("no pull_request", lambda w: w[True].pop("pull_request")),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit_yaml(CODEQL, change), "codeql.yml", "trigger")
+
+    def test_codeql_covers_exactly_the_four_languages_once(self):
+        self.flagged(self.edit(CODEQL, "language: [actions, javascript-typescript, python]", "language: [actions, javascript-typescript]"), "python")
+        self.setUp()
+        four = "language: [actions, javascript-typescript, python, java-kotlin]"
+        self.flagged(self.edit(CODEQL, "language: [actions, javascript-typescript, python]", four), "java-kotlin", "once")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "          languages: java-kotlin\n", "          languages: swift\n"), "java-kotlin")
+
+    def test_java_kotlin_is_not_analysed_on_pull_requests(self):
+        self.flagged(self.edit(CODEQL, "    if: github.event_name != 'pull_request'\n", ""), "java-kotlin", "pull_request")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "github.event_name != 'pull_request'", "github.event_name == 'push'"), "java-kotlin", "pull_request")
+
+    def test_the_languages_without_a_build_run_on_pull_requests_and_build_nothing(self):
+        name = "    name: analyze (${{ matrix.language }})\n"
+        self.flagged(self.edit(CODEQL, name, name + "    if: github.event_name != 'pull_request'\n"), "analyze", "pull_request")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "          build-mode: none\n", "          build-mode: autobuild\n"), "analyze", "build-mode")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "          build-mode: none\n", ""), "analyze", "build-mode")
+
+    def test_java_kotlin_builds_with_gradle_between_init_and_analyze(self):
+        self.flagged(self.edit(CODEQL, "          build-mode: manual\n", "          build-mode: none\n"), "java-kotlin", "build-mode")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, BUILD, "true"), "java-kotlin", "gradlew")
+
+        def reorder(w):
+            steps = w["jobs"]["analyze-java-kotlin"]["steps"]
+            i = next(i for i, s in enumerate(steps) if "gradlew" in str(s.get("run")))
+            steps.append(steps.pop(i))
+
+        self.setUp()
+        self.flagged(self.edit_yaml(CODEQL, reorder), "java-kotlin", "gradlew", "between")
+        self.setUp()
+        self.flagged(self.edit_yaml(CODEQL, lambda w: drop(w, "analyze-java-kotlin", "actions/setup-java@")), "java-kotlin", "setup-java")
+
+    def test_codeql_jobs_have_the_least_permissions_that_upload_results(self):
+        for label, change in (
+            ("no permissions", lambda j: j.pop("permissions")),
+            ("no security-events", lambda j: j["permissions"].pop("security-events")),
+            ("read only", lambda j: j["permissions"].__setitem__("security-events", "read")),
+            ("contents write", lambda j: j["permissions"].__setitem__("contents", "write")),
+            ("extra", lambda j: j["permissions"].__setitem__("actions", "write")),
+        ):
+            for job in ("analyze", "analyze-java-kotlin"):
+                with self.subTest(label, job=job):
+                    self.setUp()
+                    self.flagged(self.edit_yaml(CODEQL, lambda w, job=job, change=change: change(w["jobs"][job])), job, "permissions")
+
+    def test_the_codeql_steps_share_one_pinned_version_and_the_jobs_have_a_timeout(self):
+        sha = "33d7b85da1a04171e211befe2c739303b9a4c066"
+        tail = " # v4.39.3\n        with:\n          category: /language:java-kotlin"
+        self.flagged(self.edit(CODEQL, f"codeql-action/analyze@{sha}{tail}", f"codeql-action/analyze@{'a' * 40}{tail}"), "codeql-action", "one")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "    timeout-minutes: 45\n", ""), "analyze-java-kotlin", "timeout")
+
+    def test_the_traced_gradle_build_never_reads_the_build_cache(self):
+        """R1-01: a task restored FROM-CACHE starts no compiler, so CodeQL's tracer extracts nothing (gradle.properties turns the cache on)."""
+        self.assertIn("org.gradle.caching=true", (ROOT / "gradle.properties").read_text())
+        for label, run in (
+            ("flag missing", "./gradlew -q --console=plain :app:assembleDebug"),
+            ("cache turned back on", "./gradlew --no-build-cache --build-cache :app:assembleDebug"),
+            ("property turned on", "./gradlew --no-build-cache -Dorg.gradle.caching=true :app:assembleDebug"),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit(CODEQL, BUILD, run), "java-kotlin", "--no-build-cache")
+        self.setUp()
+        self.assertEqual(c.problems(self.root), [])
+
+    def test_a_flow_style_or_odd_uses_cannot_bypass_the_pin_rule(self):
+        """R1-02: `- { uses: actions/checkout@v4 }` is not a block-style line; anything the line rule cannot read fails closed."""
+        step = "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"
+        for label, text, word in (
+            ("flow style tag", "      - { uses: actions/checkout@v4 }\n", "unreadable"),
+            ("flow style pinned", f"      - {{ uses: 'actions/checkout@{SHA}' }} # v7.0.1\n", "unreadable"),
+            ("quoted", f"      - uses: 'actions/checkout@{SHA}' # v7.0.1\n", "pinned"),
+            ("value on the next line", "      - uses:\n          actions/checkout@v4\n", "unreadable"),
+            ("double-quoted key", '      - "uses": actions/checkout@v4\n', "unreadable"),
+            ("single-quoted key", "      - 'uses': actions/checkout@v4\n", "unreadable"),
+            ("hash in a flow value before uses", '      - { name: "a#b", uses: actions/checkout@v4 }\n', "unreadable"),
+            ("job-level reusable workflow", None, "unreadable"),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                if text is None:  # R2: a job that calls a reusable workflow has `uses` on the job, not on a step
+                    reuse = (self.root / STATUS).read_text() + "  reuse: { uses: o/r/.github/workflows/w.yml@v1 }\n"
+                    self.flagged(self.set_text(STATUS, reuse), "status.yml", word)
+                    continue
+                self.flagged(self.edit(STATUS, step, text + step), "status.yml", word)
+
+    def test_the_codeql_pull_request_trigger_has_no_filters(self):
+        """R1-03: a branches, paths or -ignore filter would silently skip the pull request analysis."""
+        for label, filt in (("branches", {"branches": ["no-such-branch"]}), ("paths", {"paths": ["docs/**"]}), ("ignore", {"paths-ignore": ["**"]})):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit_yaml(CODEQL, lambda w, filt=filt: w[True]["pull_request"].update(filt)), "codeql.yml", "trigger", "filter")
+
+    def test_the_codeql_pull_request_types_still_include_opened_synchronize_and_reopened(self):
+        """R2-01: `types: [closed]` would run the pull request analysis only when a PR is closed."""
+        for types in (["closed"], ["opened"], ["opened", "synchronize"], []):
+            with self.subTest(types=types):
+                self.setUp()
+                found = self.edit_yaml(CODEQL, lambda w, types=types: w[True]["pull_request"].__setitem__("types", types))
+                self.flagged(found, "codeql.yml", "trigger", "types")
+
+    def test_the_traced_build_has_no_init_script_that_could_turn_the_cache_back_on(self):
+        """R2-02: `gradle.startParameter.buildCacheEnabled = true` in an init script beats --no-build-cache."""
+        for label, old, new in (
+            ("-I", BUILD, BUILD + " -I on.init.gradle"),
+            ("--init-script", BUILD, BUILD + " --init-script on.init.gradle"),
+            ("init.d", BUILD, "cp on.init.gradle ~/.gradle/init.d/ && " + BUILD),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit(CODEQL, old, new), "java-kotlin", "init")
 
     def test_verify_sh_runs_the_check_and_its_tests(self):
         self.flagged(self.edit(VERIFY, "step ci-hardening python3 -I scripts/check_ci_hardening.py\n", ""), "verify.sh", "check_ci_hardening.py")
