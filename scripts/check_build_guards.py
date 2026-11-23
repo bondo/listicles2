@@ -31,9 +31,11 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
 
 4. Convention plugins (M1-46, issue 217). No Gradle file or build-logic/ Kotlin source reaches other projects: any use of `allprojects`,
    `subprojects` or `childProjects` (also `getAllprojects()` and the like, so a read such as `allprojects.flatMap { ... }` too; M1-68 part B3,
-   issue 48), member access on or a configure block for `project(...)`/`findProject(...)`, `evaluationDependsOn`, and
+   issue 48), member access on (also after `?` or `!!`) or a configure block for `project(...)`/`findProject(...)`, a `project(path, ...)`
+   call with an Action or lambda argument, `evaluationDependsOn`, and
    `gradle.allprojects`/`beforeProject`/`afterProject`. A project dependency (`implementation(project(":x"))`) is fine. Known gaps (M1-84):
-   `rootProject.<member>` reads, `parent`, `gradle.rootProject { }`, and a `project(...)` held in a variable or passed to `with`/`run`.
+   `rootProject.<member>` reads, `parent`, `gradle.rootProject { }`, and a `project(...)` held in a variable or passed to `with`/`run` or
+   `configure(listOf(project(...))) { }`.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
@@ -522,12 +524,14 @@ def catalog_problems(root):
 
 # -- 4. convention plugins (M1-46) -------------------------------------------------------------------------------------------------------
 
-# Reaching other projects (M1-68 part B3): any use of the project sets (Kotlin property or Groovy getter), member access on or a configure
-# block for another project, evaluationDependsOn, and the Gradle-level hooks. String contents are blanked, so `project("...")` is
-# matched with its parentheses (one level of nesting, as in `project(mapOf(...))`).
+# Reaching other projects (M1-68 part B3): any use of the project sets (Kotlin property or Groovy getter), member access on (also after
+# `?` or `!!`) or a configure block or Action/lambda argument for another project, evaluationDependsOn, and the Gradle-level hooks.
+# String contents are blanked, so `project("...")` is matched with its parentheses (one level of nesting, as in `project(mapOf(...))`).
 CROSS_PROJECT = re.compile(
     r"(?<![\w$])(?:get)?(?:[aA]llprojects|[sS]ubprojects|[cC]hildProjects)(?![\w$])"
-    r"|(?<![\w$])(?:project|findProject)\s*\((?:[^()]|\([^()]*\))*\)\s*(?:\?\s*)?[.{]"
+    r"|(?<![\w$])(?:project|findProject)\s*\((?:[^()]|\([^()]*\))*\)\s*(?:\?|!!)?\s*[.{]"
+    # PR 359 R1-01: project(path, Action { }) and project(path, { }).
+    r"|(?<![\w$])project\s*\([^(){}]*,\s*(?:Action\b|\{)"
     r"|(?<![\w$])evaluationDependsOn(?:Children)?\b"
     r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject)\b"
 )
