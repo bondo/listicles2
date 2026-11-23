@@ -167,7 +167,7 @@ class SchemaTest(unittest.TestCase):
         self.assert_error(changed("sessions", {}), "sessions: expected a list")
         self.assert_error(changed("sessions.0", "x"), "sessions[0]: expected an object")
         self.assert_error(changed("updated.after", "  "), "updated.after: expected a non-empty string")
-        # a line break would let a text value open a second ```json block once M1-80 renders it
+        # a line break would let a text value end the summary or open a second ```json block when rendered
         self.assert_error(changed("next", ["a\n```json"]), "next[0]: expected a non-empty string on one line")
 
     def test_schema_version(self):
@@ -225,6 +225,75 @@ class SchemaTest(unittest.TestCase):
         self.assertIn("usage.read_at", msg)
 
 
+class RenderTest(unittest.TestCase):
+    def test_summary_sits_above_the_block_and_prose_is_kept(self):
+        out = state_body.render(body())
+        self.assertTrue(out.startswith(PROSE.rstrip("\n")))
+        self.assertLess(out.index(state_body.BEGIN), out.index(state_body.END))
+        self.assertLess(out.index(state_body.END), out.index("```json"))
+        self.assertIn("- keep me", out)
+
+    def test_summary_is_short_and_readable(self):
+        summary = state_body.summary(STATE)
+        for line in (f"**Orchestrator:** `{S1}` since 2026-11-23T05:33Z · predecessor `{S0}` · lineage depth 4",
+                     "**Updated:** 2026-11-23T06:10Z, after check-in", "**Tasks ref:** `main`",
+                     "**Usage:** ok (read 2026-11-23T05:25Z)",
+                     "open follow-ups: 41 (blocker 0, major 0, minor 29, nit 12)",
+                     "1. #319 conflict fix, then a new owner approval", "2. #331 fix push, then R2"):
+            self.assertIn(line, summary)
+        for part in (S2, "M1-14", "running", "M1-O5", "#291", "trig_01Bak4xL", "#319", "3bb6976", "7076085601"):
+            self.assertIn(part, summary)
+        self.assertLessEqual(len(summary.splitlines()), 40)
+
+    def test_render_round_trips_and_is_idempotent(self):
+        once = state_body.render(body())
+        self.assertEqual(state_body.load(once), STATE)
+        self.assertEqual(state_body.render(once), once)
+
+    def test_render_is_idempotent_when_the_body_ends_without_a_newline_and_with_blank_lines(self):
+        for tail in ("", "\n", "\n\n\n"):
+            with self.subTest(tail=repr(tail)):
+                once = state_body.render(body(after=tail))
+                self.assertEqual(state_body.render(once), once)
+                self.assertTrue(once.endswith("```\n") and not once.endswith("\n\n"))
+
+    def test_render_keeps_prose_after_the_block_and_is_idempotent(self):
+        once = state_body.render(body(after="\n## Notes\n- after the block\n"))
+        self.assertIn("## Notes\n- after the block\n", once)
+        self.assertEqual(state_body.render(once), once)
+
+    def test_render_handles_crlf_and_cr_line_ends(self):
+        for eol in ("\r\n", "\r"):
+            with self.subTest(eol=repr(eol)):
+                once = state_body.render(body().replace("\n", eol))
+                self.assertEqual(state_body.load(once), STATE)
+                self.assertEqual(state_body.render(once), once)
+
+    def test_render_refuses_a_summary_below_the_block(self):
+        below = body(after=f"{state_body.BEGIN}\nold\n{state_body.END}\n")
+        with self.assertRaises(state_body.StateError) as cm:
+            state_body.render(below)
+        self.assertIn("above the JSON block", "\n".join(cm.exception.errors))
+
+    def test_render_replaces_a_stale_summary(self):
+        once = state_body.render(body())
+        stale = once.replace("lineage depth 4", "lineage depth 3")
+        self.assertEqual(state_body.render(stale), once)
+
+    def test_block_is_compact_one_list_item_per_line(self):
+        block = state_body.dump(STATE)
+        self.assertIn(f'    {{"id": "{S2}", "role": "implementer"', block)
+        self.assertEqual(json.loads(block), STATE)
+
+    def test_render_refuses_an_invalid_body(self):
+        with self.assertRaises(state_body.StateError):
+            state_body.render(body(changed("extra", 1)))
+
+    def test_one_marker_without_the_other_fails(self):
+        once = state_body.render(body())
+        self.assertIn("summary markers", errors(once.replace(state_body.END, "")))
+
+
 class CliTest(unittest.TestCase):
     def write(self, text):
         d = tempfile.TemporaryDirectory()
@@ -245,6 +314,16 @@ class CliTest(unittest.TestCase):
     def test_validate_from_stdin(self):
         self.assertEqual(run_cli("validate", "-", stdin=body())[0], 0)
         code, out, err = run_cli("validate", "-", stdin=PROSE)
+        self.assertEqual((code, out), (1, ""))
+        self.assertIn("no ```json block", err)
+
+    def test_render_from_stdin(self):
+        code, out, _ = run_cli("render", "-", stdin=body())
+        self.assertEqual(code, 0)
+        self.assertEqual(out, state_body.render(body()))
+
+    def test_render_failure_prints_nothing_on_stdout(self):
+        code, out, err = run_cli("render", "-", stdin=PROSE)
         self.assertEqual((code, out), (1, ""))
         self.assertIn("no ```json block", err)
 
