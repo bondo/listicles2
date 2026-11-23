@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -193,6 +194,22 @@ class SessionEmulatorTest {
             // A second "Sign out" while the first still clears (its screen went away): ask first, throw nothing.
             assertFalse(userData.awaitPendingWrites())
             assertTrue(clearing.await())
+        }
+
+    @Test
+    fun aCancelledWaitPassesTheCancellationOn() =
+        emulatorTest {
+            val firestore = userData.firestore()
+            firestore.disableNetwork().await()
+            firestore.document("sign-out/${UUID.randomUUID()}").set(mapOf("sent" to false))
+            var answer: Boolean? = null
+            // UNDISPATCHED: the wait is registered with Firestore before its caller goes away.
+            val waiting = launch(start = CoroutineStart.UNDISPATCHED) { answer = userData.awaitPendingWrites() }
+
+            waiting.cancelAndJoin()
+
+            // LocalUserData throws CancellationException and nothing else: a cancelled caller gets no answer.
+            assertNull(answer)
         }
 
     @Test
