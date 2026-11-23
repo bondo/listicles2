@@ -55,7 +55,7 @@ Stays with the owner: settings outside git (repository settings, rulesets, envir
 owner approval. An approval a session needs (a licence, a permission, a risky action) must come from the owner in that
 session itself; a relayed approval is refused. A worker that needs one stops and reports; the orchestrator files an
 ask-owner that names the worker session. Approvals of orchestrator decisions (merges of PRs that stay with the owner) are
-given in the orchestrator session and are never passed on to a worker as an approval. The one standing exception: a merge agent's authorization is the owner's decision comment 7085221356, which it reads and verifies itself on #15 (§7.5); nothing is relayed.
+given in the orchestrator session and are never passed on to a worker as an approval. The one standing exception: a merge agent merges under the standing authorization 7005366747 by the owner's decision 7085221356, which it reads and verifies itself on #15 (§7.5); nothing is relayed.
 
 **Stop condition:** two consecutive worker sessions fail or stall (§7.4). The orchestrator reads both with targeted `list_events`, logs an incident
 and retries once with a changed brief; it asks the owner after a third failure. A failure caused by a usage limit is neither (§7.7.3): it pauses and resumes instead.
@@ -143,7 +143,7 @@ goes to comments, not the body.
 * `Tasks ref:` the git ref whose `docs/tasks.toml` is canonical (§4.2).
 * `Usage:` one line, `ok | near limit (5-hour[, forecast | rateLimitType unknown]) | near limit (7-day) | near limit (overage) | paused until HH:MM UTC`, with when it was read (§7.7.1). The owner reads this line first.
 * **Sessions**: one row per live worker: id, role, tags, branch, **task ids** (the claims), spawned-at,
-  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived | interrupted (usage)`; the last is set by §7.7.2 and cleared by §7.7.4). A `merge-agent` row is what names it as active (§7.5).
+  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived | interrupted (usage)`; the last is set by §7.7.2 and cleared by §7.7.4). A `merge-agent` row whose status is not `archived` or `failed` is what names it as active (§7.5).
 * **Branches**: one row per active branch: holder (session id or `none`),
   **tasks awaiting review/merge** (committed, not yet `done` in the file),
   `reviewed_through` SHA, unreviewed commits since then and their disposition.
