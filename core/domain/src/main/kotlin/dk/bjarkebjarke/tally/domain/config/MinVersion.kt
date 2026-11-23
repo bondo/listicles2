@@ -9,7 +9,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * START-01: the minimum version code in `config/app`, read from the server. A failure (offline, denied) is a failed
  * [Result], never a throw.
  */
-interface MinVersionRemote {
+fun interface MinVersionRemote {
     /** The minimum, or a success of `null` when the document or the field is missing. */
     suspend fun fetch(): Result<Long?>
 }

@@ -1,13 +1,23 @@
 package dk.bjarkebjarke.tally.update
 
 import android.content.Context
+import androidx.core.content.edit
 import dk.bjarkebjarke.tally.domain.config.MinVersionStore
 
-/** The last minimum read, in app-private preferences (START-01 offline start). Stub until the test is green. */
-class PreferencesMinVersionStore(
-    private val context: Context,
-) : MinVersionStore {
-    override suspend fun last(): Long? = context.packageName.let { null }
+private const val FILE = "min_version"
+private const val KEY = "min_version_code"
 
-    override suspend fun save(minVersionCode: Long?) = Unit
+/** The last minimum read, in app-private preferences, so an offline start can use it (START-01). */
+class PreferencesMinVersionStore(
+    context: Context,
+) : MinVersionStore {
+    private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    override suspend fun last(): Long? = if (prefs.contains(KEY)) prefs.getLong(KEY, 0L) else null
+
+    override suspend fun save(minVersionCode: Long?) {
+        prefs.edit {
+            if (minVersionCode == null) remove(KEY) else putLong(KEY, minVersionCode)
+        }
+    }
 }
