@@ -480,6 +480,237 @@ class Ordering(unittest.TestCase):
                 self.assertEqual(ys, sorted(ys), (seed, band, col))
 
 
+OKABE_ITO = {"orange": "#e69f00", "sky blue": "#56b4e9", "bluish green": "#009e73", "blue": "#0072b2", "vermillion": "#d55e00", "reddish purple": "#cc79a7"}
+CVD = {  # Machado, Oliveira and Fernandes 2009, severity 1.0, applied to linear RGB
+    "protan": ((0.152286, 1.052583, -0.204868), (0.114503, 0.786281, 0.099216), (-0.003882, -0.048116, 1.051998)),
+    "deutan": ((0.367322, 0.860646, -0.227968), (0.280085, 0.672501, 0.047413), (-0.011820, 0.042940, 0.968881)),
+    "tritan": ((1.255528, -0.076749, -0.178779), (-0.078411, 0.930809, 0.147602), (0.004733, 0.691367, 0.303900)),
+}
+
+
+def linear(h):
+    return [((c / 255) / 12.92 if c / 255 <= 0.04045 else ((c / 255 + 0.055) / 1.055) ** 2.4) for c in (int(h[i:i + 2], 16) for i in (1, 3, 5))]
+
+
+def lab(rgb):
+    x, y, z = (sum(m * c for m, c in zip(row, rgb, strict=True)) for row in ((0.4124, 0.3576, 0.1805), (0.2126, 0.7152, 0.0722), (0.0193, 0.1192, 0.9505)))
+
+    def f(t):
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+
+    fx, fy, fz = f(x / 0.95047), f(y), f(z / 1.08883)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def simulate(h, kind):
+    return [min(1.0, max(0.0, sum(m * c for m, c in zip(row, linear(h), strict=True)))) for row in CVD[kind]]
+
+
+def css_rules(css):
+    """[(class, {property: value})] in stylesheet order for the simple `.name{...}` rules of one block."""
+    return [(m.group(1), dict(d.split(":", 1) for d in m.group(2).split(";") if ":" in d)) for m in re.finditer(r"\.([\w-]+)\{([^}]*)\}", css)]
+
+
+def css_value(svg, classes, prop, dark=False):
+    """The value of prop for an element with these classes: the last matching rule wins, the dark block over the light one."""
+    light, _, dark_css = ET.fromstring(svg).find(NS + "style").text.partition("@media (prefers-color-scheme: dark){")
+    out = None
+    for cls, decl in css_rules(light) + (css_rules(dark_css) if dark else []):
+        if cls in classes.split() and prop in decl:
+            out = decl[prop]
+    return out
+
+
+def arrows(svg):
+    return {(p.get("data-from"), p.get("data-to")): p for p in ET.fromstring(svg).iter(NS + "path") if p.get("data-from")}
+
+
+def fu_rows():
+    """M1-01 -> M1-02 -> M1-03 -> M1-FU is the longest chain to M1-FU; M1-04 -> M1-05 -> M1-FU is shorter."""
+    return (task("M1-01", "M1"), task("M1-02", "M1", deps=["M1-01"]), task("M1-03", "M1", deps=["M1-02"]), task("M1-04", "M1"),
+            task("M1-05", "M1", deps=["M1-04"]), task("M1-FU", "M1", deps=["M1-03", "M1-05"]))
+
+
+def chain_to(graph, layer, target):
+    """Brute force: every chain of edges ending at target, as lists of ids."""
+    preds = {n["id"]: [a for a, b in graph["edges"] if b == n["id"]] for n in graph["nodes"]}
+
+    def walk(i):
+        return [[i]] if not preds[i] else [c + [i] for p in preds[i] for c in walk(p)]
+
+    return walk(target)
+
+
+class CriticalPath(unittest.TestCase):
+    """Task M1-76 (4): the longest chain of open tasks to M1-FU, ties broken by task id, is drawn thicker."""
+
+    def path_of(self, text, target="M1-FU"):
+        graph, layer = graph_and_layer(text)
+        return status_graph.critical_path(graph, layer, target)
+
+    def test_it_is_the_longest_chain_to_the_end_task(self):
+        self.assertEqual(self.path_of(tasks_text(*fu_rows(), milestones=("M1",))), ["M1-01", "M1-02", "M1-03", "M1-FU"])
+
+    def test_a_tie_goes_to_the_smaller_ids_from_the_start(self):
+        rows = (task("M1-07", "M1"), task("M1-06", "M1"), task("M1-08", "M1", deps=["M1-06"]), task("M1-09", "M1", deps=["M1-07"]),
+                task("M1-FU", "M1", deps=["M1-08", "M1-09"]))
+        self.assertEqual(self.path_of(tasks_text(*rows, milestones=("M1",))), ["M1-06", "M1-08", "M1-FU"])
+
+    def test_without_the_end_task_it_is_the_longest_chain_overall(self):
+        self.assertEqual(self.path_of(TASKS), ["A-O1", "A-04", "A-05", "B-01", "B-02"])
+
+    def test_a_single_task_is_a_chain_of_one(self):
+        self.assertEqual(self.path_of(tasks_text(task("M1-FU", "M1"), milestones=("M1",))), ["M1-FU"])
+        self.assertEqual(self.path_of(Empty.ALL_DONE), [])
+
+    def test_random_dags_agree_with_brute_force(self):
+        for seed in range(30):
+            text = random_text(seed, 6 + seed % 14, density=0.25)
+            graph, layer = graph_and_layer(text)
+            target = sorted(layer, key=lambda i: (-layer[i], i))[0]
+            chains = chain_to(graph, layer, target)
+            best = min(c for c in chains if len(c) == max(map(len, chains)))
+            self.assertEqual(status_graph.critical_path(graph, layer, target), best, seed)
+
+    def test_the_end_task_is_found_in_the_drawn_picture(self):
+        svg = svg_of(tasks_text(*fu_rows(), milestones=("M1",)))
+        thick = sorted(e for e, p in arrows(svg).items() if "crit" in p.get("class").split())
+        self.assertEqual(thick, [("M1-01", "M1-02"), ("M1-02", "M1-03"), ("M1-03", "M1-FU")])
+
+    def test_the_critical_path_is_thicker_than_every_other_arrow(self):
+        svg = svg_of(tasks_text(*fu_rows(), milestones=("M1",)))
+        widths = {e: float(css_value(svg, p.get("class"), "stroke-width")) for e, p in arrows(svg).items()}
+        crit = {e for e, p in arrows(svg).items() if "crit" in p.get("class").split()}
+        self.assertTrue(crit and crit != set(widths))
+        self.assertGreater(min(widths[e] for e in crit), max(widths[e] for e in set(widths) - crit))
+
+    def test_the_legend_explains_the_thick_arrows(self):
+        self.assertIn("critical path", "\n".join(texts(svg_of(tasks_text(*fu_rows(), milestones=("M1",))))))
+
+    def test_a_graph_without_a_chain_draws_no_thick_arrow(self):
+        svg = svg_of(tasks_text(task("M1-01", "M1"), task("M1-02", "M1"), milestones=("M1",)))
+        self.assertFalse([p for p in arrows(svg).values() if "crit" in p.get("class").split()])
+
+
+class Palette(unittest.TestCase):
+    """Task M1-76 (3): one colour per source task from a colour-blind-safe palette, the arrowhead in the same colour."""
+
+    def test_the_palette_is_okabe_ito_without_black_and_yellow(self):
+        self.assertEqual({n: c.lower() for n, c in status_graph.PALETTE}, OKABE_ITO)
+
+    def test_entries_stay_apart_for_the_three_kinds_of_colour_blindness(self):
+        cols = [c for _, c in status_graph.PALETTE]
+        for kind in ("normal", *CVD):
+            seen = [lab(linear(c) if kind == "normal" else simulate(c, kind)) for c in cols]
+            lo = min(sum((a - b) ** 2 for a, b in zip(p, q, strict=True)) ** 0.5 for i, p in enumerate(seen) for q in seen[i + 1:])
+            self.assertGreaterEqual(lo, 15, kind)  # CIELAB distance; the two nearest entries
+
+    def test_every_entry_is_visible_on_the_band_in_both_schemes(self):
+        svg = svg_of()
+        for dark in (False, True):
+            card = css_value(svg, "card", "fill", dark)
+            for i in range(len(status_graph.PALETTE)):
+                colour = css_value(svg, f"s{i}", "stroke", dark)
+                hi, lo = sorted((sum(w * c for w, c in zip((0.2126, 0.7152, 0.0722), linear(h), strict=True)) for h in (colour, card)), reverse=True)
+                self.assertGreaterEqual((hi + 0.05) / (lo + 0.05), 2.0, (dark, colour, card))
+
+    def test_all_arrows_of_one_source_share_its_colour_and_arrowhead(self):
+        for text in (TASKS, random_text(4, 24)):
+            svg = svg_of(text)
+            root = ET.fromstring(svg)
+            heads = {m.get("id"): m.find(NS + "path").get("class") for m in root.iter(NS + "marker")}
+            colour_of = {}
+            for (a, b), p in arrows(svg).items():
+                cls = [c for c in p.get("class").split() if re.fullmatch(r"s\d+", c)]
+                self.assertEqual(len(cls), 1, (a, b))
+                self.assertEqual(colour_of.setdefault(a, cls[0]), cls[0], f"arrows of {a} differ in colour")
+                head = heads[p.get("marker-end")[len("url(#"):-1]]
+                self.assertEqual(head, "f" + cls[0][1:], (a, b))
+                for dark in (False, True):
+                    self.assertEqual(css_value(svg, head, "fill", dark), css_value(svg, cls[0], "stroke", dark), (a, b, dark))
+
+    def test_arrowhead_markers_scale_with_the_arrow_kind_not_the_stroke(self):
+        svg = svg_of(tasks_text(*fu_rows(), milestones=("M1",)))
+        marker = {m.get("id"): m.get("markerWidth") for m in ET.fromstring(svg).iter(NS + "marker")}
+        sizes = {p.get("marker-end"): marker[p.get("marker-end")[len("url(#"):-1]] for p in arrows(svg).values()}
+        self.assertGreater(len(set(sizes.values())), 1)  # thick arrows get a bigger head than the thin ones
+
+    def test_colours_are_spread_over_the_sources(self):
+        svg = svg_of(tasks_text(*fu_rows(), milestones=("M1",)))
+        used = {next(c for c in p.get("class").split() if re.fullmatch(r"s\d+", c)) for p in arrows(svg).values()}
+        self.assertGreaterEqual(len(used), 3)
+
+    def test_sources_sharing_a_gap_get_different_colours(self):
+        """A-01 and A-02 both feed A-03 and A-04: their arrows run side by side in one gap."""
+        rows = [task("A-01", "A"), task("A-02", "A"), task("A-03", "A", deps=["A-01", "A-02"]), task("A-04", "A", deps=["A-01", "A-02"])]
+        found = arrows(svg_of(tasks_text(*rows, milestones=("A",))))
+        colour = {a: next(c for c in p.get("class").split() if re.fullmatch(r"s\d+", c)) for (a, _), p in found.items()}
+        self.assertNotEqual(colour["A-01"], colour["A-02"])
+
+    def test_neighbouring_sources_differ_on_random_graphs(self):
+        """Two arrows of different sources that run within CONFLICT px of each other (side by side, or crossing) have different colours,
+        unless one of the two sources has as many such neighbours as there are colours."""
+        checked = 0
+        for seed in range(25):
+            text = random_text(seed, 6 + seed)
+            if not small_degree(text):
+                continue
+            svg = svg_of(text)
+            pts = paths(svg)
+            colour = {a: next(c for c in p.get("class").split() if re.fullmatch(r"s\d+", c)) for (a, _), p in arrows(svg).items()}
+            near = {a: set() for a in colour}
+            for (a, _), p1 in pts.items():
+                for (b, _), p2 in pts.items():
+                    if a < b and any(gap(s1, s2) <= status_graph.CONFLICT for s1 in segments(p1) for s2 in segments(p2)):
+                        near[a].add(b)
+                        near[b].add(a)
+            for a in colour:
+                for b in near[a]:
+                    if len(near[a]) < len(status_graph.PALETTE) and len(near[b]) < len(status_graph.PALETTE):
+                        self.assertNotEqual(colour[a], colour[b], (seed, a, b))
+                        checked += 1
+        self.assertGreater(checked, 50)
+
+    def test_a_neighbour_is_a_source_within_conflict_px_not_twice_that(self):
+        """R1-01 of PR 353: N1 runs 3 px from Z's line, N2 to N6 run 7 px or more away. Z has one neighbour, N1, so it must not take N1's colour."""
+        run = {"N1": 6, "N2": -1, "N3": 0, "N4": 1, "N5": 1, "N6": 2, "Z": 9}  # each source: one horizontal line at this y
+        self.assertEqual(status_graph.CONFLICT, 6)
+        found = status_graph.source_colours({(k, "T"): [(0, y), (100, y)] for k, y in run.items()})
+        self.assertEqual(len(set(found[k] for k in run if k != "Z")), len(status_graph.PALETTE))  # N1 to N6 use every colour
+        self.assertNotEqual(found["Z"], found["N1"])
+
+    def test_sources_exactly_conflict_px_apart_differ(self):
+        near = status_graph.source_colours({("A", "T"): [(0, 0), (50, 0)], ("B", "T"): [(0, 6), (50, 6)]}, colours=2)
+        self.assertEqual(sorted(near.values()), [0, 1])
+
+    def test_thin_arrows_are_wide_enough_for_the_pale_colours(self):
+        """R1-02 of PR 353: orange and sky blue are about 2.1:1 on the light band, so the thin arrows are at least 1.8 px (1.3 px at README width)."""
+        svg = svg_of()
+        self.assertGreaterEqual(float(css_value(svg, "edge", "stroke-width")), 1.8)
+        for p in arrows(svg).values():
+            self.assertGreaterEqual(float(css_value(svg, p.get("class"), "stroke-width")), 1.8)
+
+    def test_the_legend_says_what_the_colours_mean(self):
+        svg = svg_of()
+        joined = "\n".join(texts(svg))
+        self.assertIn("colour", joined)
+        self.assertIn("source task", joined)
+        swatches = [p for p in ET.fromstring(svg).iter(NS + "path") if not p.get("data-from") and re.search(r"\bs\d\b", p.get("class") or "")]
+        self.assertEqual(len(swatches), len(status_graph.PALETTE))
+
+    def test_the_picture_with_colours_is_deterministic(self):
+        text = random_text(8, 30)
+        self.assertEqual(svg_of(text), svg_of(text))
+        self.assertEqual(svg_of(), svg_of())
+
+
+def gap(s1, s2):
+    """Chebyshev distance between two axis-parallel segments, taken as boxes (0 when they touch or cross)."""
+    dx = max(min(s1[0][0], s1[1][0]) - max(s2[0][0], s2[1][0]), min(s2[0][0], s2[1][0]) - max(s1[0][0], s1[1][0]), 0)
+    dy = max(min(s1[0][1], s1[1][1]) - max(s2[0][1], s2[1][1]), min(s2[0][1], s2[1][1]) - max(s1[0][1], s1[1][1]), 0)
+    return max(dx, dy)
+
+
 class Labels(unittest.TestCase):
     def test_each_milestone_band_says_how_many_tasks_are_done(self):
         joined = "\n".join(texts(svg_of()))
