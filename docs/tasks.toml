@@ -883,11 +883,12 @@ pr = 333
 id = "M1-10"
 title = "Rules: create household and member display name, allow and deny tests (transfer is M1-53)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-09"]
-notes = "Includes the one-household check on the owner's member create (PLAN 3.1). Deny test: re-creating a tombstoned household id (#199). Transfer: allow on a household seeded with createdBy null; deny by a plain member (single update and full batch), by a non-member who names an existing member, and partial transfers (no role updates, only one role update); O(uid), not M(uid)"
+pr = 352
+notes = "Includes the one-household check on the owner's member create (PLAN 3.1). Deny test: re-creating a tombstoned household id (#199). Transfer (M1-53 since the refresh, docs/milestones/M1.md section 5.1): allow on a household seeded with createdBy null; deny by a plain member (single update and full batch), by a non-member who names an existing member, and partial transfers (no role updates, only one role update); O(uid), not M(uid)"
 
 [[task]]
 id = "M1-11"
@@ -1074,7 +1075,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-66", "M1-60", "M1-62", "M1-02"]
+depends_on = ["M1-54", "M1-66", "M1-60", "M1-62", "M1-02", "M1-83"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1224,6 +1225,16 @@ assignee = "implementer"
 risk = "high"
 depends_on = ["M1-12"]
 notes = "Split from M1-12 by the refresh (size); P1 deny tests; tests as in docs/milestones/M1.md section 5 (M1-12 paragraph)"
+
+[[task]]
+id = "M1-83"
+title = "Rules: members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-10"]
+notes = "Found in M1-10 (PR 352): no task owned the Reads row for the household doc and its members (M(uid), LIVE); M1-08 added the own member path and the tombstone read, M1-12 owns the invite reads. ADR 0002 layout: the household get joins the tombstone read in one allow statement. Tests: allow a member's get of the live household doc and get and list of its members; deny a non-member, an unverified member and the members under a tombstone (the owner's cleanup reads are M1-11's). M1-18 reads both"
 
 [[task]]
 id = "M1-55"
@@ -1617,7 +1628,7 @@ depends_on = [
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-83",
 ]
 
 [[task]]
