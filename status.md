@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 37/80 (46%) | 43 |
+| M1 | Accounts and households | 38/80 (47%) | 42 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 37/80 done (46%), 43 open.
+**Progress:** 38/80 done (47%), 42 open.
 
 ### Tasks
 
@@ -163,7 +163,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-56 | Java API level check&#58; also look up classes used only as class literals, annotations, checkcast, ins… | done | M1-37 | implementer | [#305](https://github.com/bondo/listicles2/issues/305) |
 | M1-61 | Java API level check&#58; also look up classes named only in descriptors, Signature attributes, throw… | ready | M1-56 | implementer |  |
 | M1-63 | Debug APK as a CI artifact on every push to main | done | M1-30 | implementer |  |
-| M1-70 | Status&#58; dependency graph of the open tasks under the README status picture (status-graph.svg) | ready | none | implementer |  |
+| M1-70 | Status&#58; dependency graph of the open tasks under the README status picture (status-graph.svg) | done | none | implementer | [#326](https://github.com/bondo/listicles2/issues/326) |
 | M1-50 | Konsist&#58; no data source in composables or ViewModels, no GlobalScope (checklist proposed follow… | done | M1-01 | implementer | [#290](https://github.com/bondo/listicles2/issues/290) |
 | M1-57 | Konsist&#58; no Context, Activity or AndroidViewModel in ViewModels, no Dispatchers outside the DI … | done | M1-50 | implementer | [#307](https://github.com/bondo/listicles2/issues/307) |
 | M1-51 | Build guards&#58; scripts/check_build_guards.py with the targetSdk floor (checklist follow-up 4; foll… | done | M1-01 | implementer | [#296](https://github.com/bondo/listicles2/issues/296) |
@@ -230,24 +230,23 @@ flowchart LR
     n22["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
     n23["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
     n24["M1-61 Java API level check: also look up clas… (ready)"]:::ready
-    n25["M1-70 Status: dependency graph of the open ta… (ready)"]:::ready
-    n26["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n27["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
-    n28["M1-46 build-logic convention plugins#59; no allp… (in progress)"]:::progress
-    n29["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n30["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n31["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n32["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n33["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n34["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n35["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n36["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n37["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n38["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n39["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n40["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
-    n41["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n42["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
+    n25["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
+    n26["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
+    n27["M1-46 build-logic convention plugins#59; no allp… (in progress)"]:::progress
+    n28["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n29["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n30["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n31["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n32["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n33["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n34["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n35["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n36["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n37["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
+    n38["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
+    n39["M1-O10 Ask the owner about the repo rename t… (owner to-do)"]:::owner
+    n40["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n41["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
     n2 --> n0
     n1 --> n2
     n23 --> n3
@@ -271,25 +270,51 @@ flowchart LR
     n16 --> n17
     n15 --> n17
     n17 --> n18
-    n34 --> n18
+    n33 --> n18
     n7 --> n19
     n2 --> n22
     n4 --> n23
-    n2 --> n26
-    n11 --> n26
-    n10 --> n26
-    n19 --> n26
+    n2 --> n25
+    n11 --> n25
+    n10 --> n25
+    n19 --> n25
+    n9 --> n28
+    n10 --> n28
+    n13 --> n28
+    n14 --> n28
+    n15 --> n28
+    n16 --> n28
+    n18 --> n28
+    n19 --> n28
+    n21 --> n28
+    n17 --> n28
+    n25 --> n28
+    n0 --> n29
+    n1 --> n29
+    n2 --> n29
+    n3 --> n29
+    n4 --> n29
+    n7 --> n29
+    n8 --> n29
     n9 --> n29
     n10 --> n29
+    n11 --> n29
     n13 --> n29
     n14 --> n29
     n15 --> n29
     n16 --> n29
     n18 --> n29
     n19 --> n29
+    n20 --> n29
     n21 --> n29
+    n12 --> n29
     n17 --> n29
+    n25 --> n29
     n26 --> n29
+    n27 --> n29
+    n28 --> n29
+    n22 --> n29
+    n23 --> n29
     n0 --> n30
     n1 --> n30
     n2 --> n30
@@ -310,51 +335,24 @@ flowchart LR
     n21 --> n30
     n12 --> n30
     n17 --> n30
+    n25 --> n30
     n26 --> n30
     n27 --> n30
     n28 --> n30
     n29 --> n30
     n22 --> n30
     n23 --> n30
-    n0 --> n31
-    n1 --> n31
-    n2 --> n31
-    n3 --> n31
-    n4 --> n31
-    n7 --> n31
-    n8 --> n31
-    n9 --> n31
-    n10 --> n31
-    n11 --> n31
-    n13 --> n31
-    n14 --> n31
-    n15 --> n31
-    n16 --> n31
-    n18 --> n31
-    n19 --> n31
-    n20 --> n31
-    n21 --> n31
-    n12 --> n31
-    n17 --> n31
-    n26 --> n31
-    n27 --> n31
-    n28 --> n31
-    n29 --> n31
-    n30 --> n31
-    n22 --> n31
-    n23 --> n31
-    n24 --> n31
-    n5 --> n31
-    n6 --> n31
-    n25 --> n31
-    n40 --> n32
-    n32 --> n33
-    n32 --> n34
-    n32 --> n35
-    n20 --> n35
-    n32 --> n37
-    n3 --> n37
-    n27 --> n39
+    n24 --> n30
+    n5 --> n30
+    n6 --> n30
+    n39 --> n31
+    n31 --> n32
+    n31 --> n33
+    n31 --> n34
+    n20 --> n34
+    n31 --> n36
+    n3 --> n36
+    n26 --> n38
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -455,7 +453,6 @@ flowchart LR
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
-- **PR to merge** [#320](https://github.com/bondo/listicles2/issues/320): M1-46&#58; build-logic convention plugins, no allprojects or subprojects configuration (see #217)
 - **task** M1-06: waits on M1-10
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
@@ -477,7 +474,7 @@ flowchart LR
 - **task** M1-39: waits on M1-10, M1-18, M1-17 +1
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +8
 - **task** M1-48: waits on M1-06, M1-09, M1-10 +23
-- **task** M1-FU: waits on M1-06, M1-09, M1-10 +28
+- **task** M1-FU: waits on M1-06, M1-09, M1-10 +27
 - **task** M1-O1: waits on M1-O10
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
