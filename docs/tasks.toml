@@ -1643,18 +1643,19 @@ depends_on = [
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-85",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-85", "M1-86",
 ]
 
 [[task]]
 id = "M1-O1"
-title = "Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.json secret"
+title = "Create the Firebase project (Spark), Firestore in eur3, email sign-in, google-services.json secret"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["milestone:M0", "M0.5-O2", "M1-29", "M1-O10"]
-notes = "Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
+issue = 354
+notes = "Without Google sign-in (split off as M1-O16, owner decision 7110501630). Done by the owner's report 7110544618: project tally-c1a15, eur3 production mode, Email/Password, enumeration protection, password policy Require/12, templates (sender and public-facing name Tally, EN/DA text), Android app registered, google-services.json secret. Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
 
 [[task]]
 id = "M1-O2"
@@ -1663,7 +1664,8 @@ milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1"]
+depends_on = ["M1-O1", "M1-O16"]
+notes = "After v1 (owner decision 7110878938): Google sign-in does not block v1. Not on the v1 path: nothing needed for v1 depends on it. The target milestone is proposed in the PR"
 
 [[task]]
 id = "M1-O3"
@@ -1693,6 +1695,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-28"]
+issue = 291
 
 [[task]]
 id = "M1-O6"
@@ -1764,6 +1767,7 @@ status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
+issue = 285
 notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU). Done: owner decision recorded on #15, comment 7081223083"
 
 [[task]]
@@ -1794,8 +1798,18 @@ milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1", "M1-O2", "M1-66", "M1-16"]
-notes = "Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M1-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M1-O15 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+depends_on = ["M1-O1", "M1-O2", "M1-O16", "M1-66", "M1-16", "M1-86"]
+notes = "After v1 (owner decision 7110878938; the switch M1-86 is on for this check). Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M1-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M1-O15 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+
+[[task]]
+id = "M1-O16"
+title = "Enable Google sign-in in Firebase (needs a public support email for Tally)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Split from M1-O1 (owner decision 7110501630): Google sign-in is postponed until Tally has a public support email. After v1 (owner decision 7110878938): then M1-O2 and M1-O15, then switch the Google button on (M1-86) in an app update. Its [owner] issue is opened after this PR merges"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
@@ -1828,8 +1842,8 @@ milestone = "M6"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O2"]
-notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 so M1 can close before the release key exists"
+depends_on = ["M1-O1"]
+notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 so M1 can close before the release key exists. No longer waits for M1-O2 (it moved after v1, owner decision 7110878938); the Google fingerprints are then added with M1-O2"
 
 [[task]]
 id = "M6-O2"
@@ -1870,3 +1884,13 @@ assignee = "implementer"
 risk = "normal"
 depends_on = []
 notes = "owner request 2026-11-23 in the orchestrator #38 chat: prepare the repo rename; see #15"
+
+[[task]]
+id = "M1-86"
+title = "Google sign-in switch in :app (off in v1): hide the Google button and the Google hint while off"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-66"]
+notes = "Owner decision 7110878938 (amends OQ-23 for v1): a build-time switch in :app, off in v1; the Google code stays. While off, the sign-in screen shows only email and password (AUTH-01) and the failed-sign-in text drops \"If you signed up with Google, use Continue with Google.\" (OQ-34(c)). Test-first for both switch states (screenshot and UI tests, en and da). M1-66 stays in M1, built and tested with fakes. Turned on after v1 once M1-O16, M1-O2 and M1-O15 are done"
