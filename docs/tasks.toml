@@ -1548,7 +1548,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-77"]
-notes = "Process PR (2a2), split from M1-77. Code and tests already written and green: commit 5fbb552 in PR 340's history (git fetch origin pull/340/head; git show 5fbb552), removed again for size; restore it and keep the parity test (tasks.py and state_body.py read the same ids). Tooling env, owner merge"
+notes = "Process PR (2a2), split from M1-77. Code and tests were written and green at 5fbb552 (PR 340), then removed by 3489524. Restore with `git fetch origin pull/340/head` and `git show 3489524 -- scripts | git apply -R --3way`, NOT by checking out 5fbb552: that predates the later fixes (11a51f4 session tags, real dates, non-UTF-8; b10df2d CommonMark line ends, ASCII digits, repeats in one row), and the 3-way reverse apply keeps them (checked on b10df2d: state_body and tasks tests pass except render idempotence). Then fix that: load() now splits with re.split, which keeps a trailing empty line, so render() adds a newline per pass; drop it before rebuilding. Keep the parity test (tasks.py and state_body.py read the same ids); tasks.py state_ids must split lines the same way. Tooling env, owner merge"
 
 [[task]]
 id = "M1-78"
