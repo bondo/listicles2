@@ -1753,19 +1753,27 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         s11 = doc.split("### 1.1 autonomy and limits", 1)[1].split("**stop condition:**", 1)[0]
         self.assertRegex(s11, r"the merge agent is described in §7\.5; once the body of #15 names it as active it merges under the owner's "
                               r"standing authorization, with no authorization in its own session \(owner decision, #15 comment 7085221356\)")
-        self.assertRegex(s11, r"the one standing exception: a merge agent's authorization is the owner's decision comment 7085221356, "
-                              r"which it reads and verifies itself on #15 \(§7\.5\); nothing is relayed")
+        self.assertRegex(s11, r"the one standing exception: a merge agent merges under the standing authorization 7005366747 by the owner's "
+                              r"decision 7085221356, which it reads and verifies itself on #15 \(§7\.5\); nothing is relayed")
         self.assertRegex(doc, r"role:<role>\s+orchestrator \| implementer \| merge-agent \|")
-        self.assertRegex(doc, r"\*\*sessions\*\*: one row per live worker: id, role, tags, branch,.*a `merge-agent` row is what names it as active \(§7\.5\)")
+        self.assertRegex(doc, r"\*\*sessions\*\*: one row per live worker: id, role, tags, branch,.*a `merge-agent` row whose status is not `archived` or `failed` is what names it as active \(§7\.5\)")
         roles = self.ROLES_YAML.read_text(encoding="utf-8").split("  merge-agent:", 1)[1].split("\n  # ", 1)[0]
         self.assertIn("merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent "
-                      "session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567", roles)
+                      "session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge", roles)
 
-    def test_a_text_with_the_old_rule_is_flagged_by_the_merge_agent_rule(self):  # the check itself can fail (7085221356)
-        old = ("A merge agent the orchestrator creates has no owner authorization in its own session: the owner authorizes it there before its "
-               "first merge, and then the merge agent merges under the owner's standing authorization.")
-        self.assertRegex(self.norm_text(old), self.OLD_RULE)
-        self.assertNotRegex(self.norm_text("A merge agent the orchestrator spawns needs no owner authorization in its own session."), self.OLD_RULE)
+    def test_the_merge_agent_rule_flags_each_old_sentence_in_both_files(self):  # R1-01 of #322: the gate itself, not a copy of its regex
+        prompt, doc = self.ORCH_MD.read_text(encoding="utf-8"), self.ORCH_DOC.read_text(encoding="utf-8")
+
+        def ids(problems):
+            return {p.split(":", 1)[0] for p in problems}
+
+        self.assertNotIn("orch-merge-agent", ids(prompt_rules.check_text("orchestrator", prompt)))
+        self.assertNotIn("orch-merge-agent", ids(prompt_rules.check_doc_text("docs/ORCHESTRATION.md", doc)))
+        self.assertTrue(prompt_rules.OLD_MERGE_AGENT_AUTH)
+        for old in prompt_rules.OLD_MERGE_AGENT_AUTH:  # every entry is plain text, so it is also the sample that must be flagged
+            with self.subTest(old=old):
+                self.assertIn("orch-merge-agent", ids(prompt_rules.check_text("orchestrator", prompt + "\n" + old)))
+                self.assertIn("orch-merge-agent", ids(prompt_rules.check_doc_text("docs/ORCHESTRATION.md", doc + "\n" + old)))
 
     @classmethod
     def norm_text(cls, text):
