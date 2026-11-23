@@ -2,9 +2,11 @@ rules_version = '2';
 
 // The Firestore rules of docs/PLAN.md section 3.1. Anything no rule below allows is denied.
 // M1-08, the base: signedIn(), the users doc, config/app, the caller's own member path and the
-// tombstone read. Every later allow statement starts `if signedIn() && ...` (rules.test.ts checks
-// it), and its allow tests go through verifiedOnly (firebase/test/harness.ts), which fails unless an
-// unverified token is denied.
+// tombstone read. M1-10: Create household + owner and the own display name. Every later allow
+// statement starts `if signedIn() && ...` (rules.test.ts checks it), and its allow tests go through
+// verifiedOnly (firebase/test/harness.ts), which fails unless an unverified token is denied.
+// Layout (docs/adr/0002-rules-spike.md): one allow statement per method of a match; in its function
+// the conditions that make no get()/exists() call come first, so the ADR's call counts hold.
 service cloud.firestore {
   match /databases/{database}/documents {
     // PLAN 3.1 "Signed in": a verified email. The own users doc and config/app are the two exceptions.
@@ -23,6 +25,10 @@ service cloud.firestore {
 
     function memberDoc(hid, uid) {
       return /databases/$(database)/documents/households/$(hid)/members/$(uid);
+    }
+
+    function userDoc(uid) {
+      return /databases/$(database)/documents/users/$(uid);
     }
 
     // A name (PLAN 3.1 field validation, P4): 1-50 code points, non-empty after trim. The regex counts
@@ -51,6 +57,54 @@ service cloud.firestore {
           && !existsAfter(memberDoc(before, request.auth.uid)));
     }
 
+    // Create household + owner, one batch (PLAN 3.1): the caller creates and owns a household whose
+    // id is a Firestore auto-id (P3), with the caller's member doc after the batch. Household docs are
+    // never deleted (#199), so an id that has existed stays taken. On create !exists always holds; it
+    // stays as the row has it.
+    function createsHousehold(hid) {
+      let data = request.resource.data;
+      return hid.matches('^[A-Za-z0-9]{20}$')
+        && data.keys().hasAll(['name', 'createdBy', 'createdAt', 'ownerUid', 'deleted'])
+        && data.keys().hasOnly(['name', 'createdBy', 'createdAt', 'ownerUid', 'deleted'])
+        && validName(data.name) && data.createdBy == request.auth.uid
+        && data.ownerUid == request.auth.uid && data.createdAt == request.time
+        && data.deleted == false
+        && !exists(householdDoc(hid)) && existsAfter(memberDoc(hid, request.auth.uid));
+    }
+
+    // A member create (PLAN 3.1): the caller's own member doc (P1). Here the owner's, in Create
+    // household: role owner, in a household that does not exist before the batch and names the
+    // caller as owner after it, with the one-household check. The joiner's is M1-54's path.
+    function createsMember(hid, uid) {
+      let doc = request.resource.data;
+      return uid == request.auth.uid && doc.role == 'owner'
+        && doc.keys().hasAll(['role', 'displayName', 'joinedAt'])
+        && doc.keys().hasOnly(['role', 'displayName', 'joinedAt'])
+        && validName(doc.displayName) && doc.joinedAt == request.time
+        && !exists(householdDoc(hid))
+        && getAfter(householdDoc(hid)).data.ownerUid == request.auth.uid
+        && oneHousehold(hid);
+    }
+
+    // The one-household check of a member create (PLAN 3.1): the caller's users doc exists and holds
+    // no household before the batch and this one after it, so the same batch must set it. A missing
+    // doc fails; a stale value must be self-healed first.
+    function oneHousehold(hid) {
+      let user = userDoc(request.auth.uid);
+      return exists(user) && get(user).data.householdId == null
+        && getAfter(user).data.householdId == hid;
+    }
+
+    // Update own member doc (PLAN 3.1): only displayName, a name (P4), while the household is live;
+    // an update implies the doc, M(uid). The transfer's role update is M1-53's path here.
+    function updatesMember(hid, uid) {
+      let household = get(householdDoc(hid)).data;
+      let doc = request.resource.data;
+      return uid == request.auth.uid && household.deleted == false
+        && doc.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+        && validName(doc.displayName);
+    }
+
     match /users/{uid} {
       allow get: if isCaller(uid);
       allow create: if isCaller(uid) && validUser(request.resource.data)
@@ -68,10 +122,13 @@ service cloud.firestore {
       // (the HH-06 dialog, the self-heal, the owner's cleanup resume). Members' reads come later.
       allow get: if signedIn() && resource.data.deleted == true
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.householdId == hid;
+      allow create: if signedIn() && createsHousehold(hid);
 
       // The caller's own member path in any household, live, a tombstone or none; it may not exist.
       match /members/{uid} {
         allow get: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && createsMember(hid, uid);
+        allow update: if signedIn() && updatesMember(hid, uid);
       }
     }
 
