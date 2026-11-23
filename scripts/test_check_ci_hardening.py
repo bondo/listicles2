@@ -301,9 +301,16 @@ class Rules(unittest.TestCase):
             ("flow style pinned", f"      - {{ uses: 'actions/checkout@{SHA}' }} # v7.0.1\n", "unreadable"),
             ("quoted", f"      - uses: 'actions/checkout@{SHA}' # v7.0.1\n", "pinned"),
             ("value on the next line", "      - uses:\n          actions/checkout@v4\n", "unreadable"),
+            ("double-quoted key", '      - "uses": actions/checkout@v4\n', "unreadable"),
+            ("single-quoted key", "      - 'uses': actions/checkout@v4\n", "unreadable"),
+            ("hash in a flow value before uses", '      - { name: "a#b", uses: actions/checkout@v4 }\n', "unreadable"),
+            ("job-level reusable workflow", None, "unreadable"),
         ):
             with self.subTest(label):
                 self.setUp()
+                if text is None:  # R2: a job that calls a reusable workflow has `uses` on the job, not on a step
+                    self.flagged(self.set_text(STATUS, (self.root / STATUS).read_text() + "  reuse: { uses: o/r/.github/workflows/w.yml@v1 }\n"), "status.yml", word)
+                    continue
                 self.flagged(self.edit(STATUS, step, text + step), "status.yml", word)
 
     def test_the_codeql_pull_request_trigger_has_no_filters(self):
@@ -312,6 +319,24 @@ class Rules(unittest.TestCase):
             with self.subTest(label):
                 self.setUp()
                 self.flagged(self.edit_yaml(CODEQL, lambda w, filt=filt: w[True]["pull_request"].update(filt)), "codeql.yml", "trigger", "filter")
+
+    def test_the_codeql_pull_request_types_still_include_opened_synchronize_and_reopened(self):
+        """R2-01: `types: [closed]` would run the pull request analysis only when a PR is closed."""
+        for types in (["closed"], ["opened"], ["opened", "synchronize"], []):
+            with self.subTest(types=types):
+                self.setUp()
+                self.flagged(self.edit_yaml(CODEQL, lambda w, types=types: w[True]["pull_request"].__setitem__("types", types)), "codeql.yml", "trigger", "types")
+
+    def test_the_traced_build_has_no_init_script_that_could_turn_the_cache_back_on(self):
+        """R2-02: `gradle.startParameter.buildCacheEnabled = true` in an init script beats --no-build-cache."""
+        for label, old, new in (
+            ("-I", BUILD, BUILD + " -I on.init.gradle"),
+            ("--init-script", BUILD, BUILD + " --init-script on.init.gradle"),
+            ("init.d", BUILD, "cp on.init.gradle ~/.gradle/init.d/ && " + BUILD),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit(CODEQL, old, new), "java-kotlin", "init")
 
     def test_verify_sh_runs_the_check_and_its_tests(self):
         self.flagged(self.edit(VERIFY, "step ci-hardening python3 -I scripts/check_ci_hardening.py\n", ""), "verify.sh", "check_ci_hardening.py")
