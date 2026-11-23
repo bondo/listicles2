@@ -32,7 +32,9 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
 4. Convention plugins (M1-46, issue 217). No Gradle file or build-logic/ Kotlin source reaches other projects: any use of `allprojects`,
    `subprojects` or `childProjects` (also `getAllprojects()` and the like, so a read such as `allprojects.flatMap { ... }` too; M1-68 part B3,
    issue 48), member access on or a configure block for `project(...)`/`findProject(...)`, `evaluationDependsOn`, and
-   `gradle.allprojects`/`beforeProject`/`afterProject`. A project dependency (`implementation(project(":x"))`) is fine. Every module in settings.gradle.kts
+   `gradle.allprojects`/`beforeProject`/`afterProject`. A project dependency (`implementation(project(":x"))`) is fine. Known gaps (M1-82):
+   `rootProject.<member>` reads, `parent`, `gradle.rootProject { }`, and a `project(...)` held in a variable or passed to `with`/`run`.
+   Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
    The root build's `val listiclesModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
