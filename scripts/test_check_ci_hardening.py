@@ -4,7 +4,8 @@ Run: python3 -I scripts/test_check_ci_hardening.py
 
 The check runs on the real files first, then on copies with one defect each, which must each be reported: a job without a
 timeout, python3 or node taken from the runner image, `npm ci` that runs install scripts, a gitleaks download without
-retries or https-only redirects.
+retries or https-only redirects. M1-73 adds the CodeQL workflow rules (issue 189 item 7, Q6 A) and the rule that every `uses:` is
+a commit sha with a version tag comment.
 """
 
 import shutil
@@ -22,6 +23,7 @@ import check_ci_hardening as c  # noqa: E402  # justified: must follow the sys.p
 ROOT = Path(__file__).resolve().parent.parent
 CI = ".github/workflows/ci.yml"
 STATUS = ".github/workflows/status.yml"
+CODEQL = ".github/workflows/codeql.yml"
 VERIFY = "scripts/verify.sh"
 ADR = "docs/adr/0003-gradle-dependency-verification.md"
 REQ_CI = "scripts/requirements-ci.txt"
@@ -33,7 +35,7 @@ class Rules(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, STATUS, VERIFY, ADR, REQ_CI, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
+        for name in (CI, STATUS, CODEQL, VERIFY, ADR, REQ_CI, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
             if not (ROOT / name).exists():
                 continue  # a missing file is the check's finding, not the test's crash
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
@@ -190,6 +192,86 @@ class Rules(unittest.TestCase):
         self.flagged(self.edit(CI, "sha256sum -c -", "cat"), "gitleaks", "sha256sum")
         self.setUp()
         self.flagged(self.edit(CI, "./gitleaks git --redact --no-banner .", "./gitleaks git --source . --redact --no-banner"), "gitleaks", "--source")
+
+    def test_every_action_is_pinned_by_sha_with_a_tag_comment(self):
+        sha = "3d3c42e5aac5ba805825da76410c181273ba90b1"
+        use = f"actions/checkout@{sha} # v7.0.1"
+        for name in (CI, STATUS, CODEQL):
+            for label, bad in (("tag", "actions/checkout@v7"), ("branch", "actions/checkout@main"), ("short sha", "actions/checkout@3d3c42e # v7.0.1"),
+                               ("no comment", f"actions/checkout@{sha}"), ("comment without a version", f"actions/checkout@{sha} # latest")):
+                with self.subTest(name=name, bad=label):
+                    self.setUp()
+                    self.flagged(self.edit(name, use, bad), "actions/checkout", "pinned")
+
+    def test_the_codeql_workflow_exists(self):
+        (self.root / CODEQL).unlink()
+        self.flagged(c.problems(self.root), "codeql.yml", "missing")
+
+    def test_codeql_runs_weekly_on_pushes_to_main_and_on_pull_requests(self):
+        for label, change in (
+            ("no schedule", lambda w: w[True].pop("schedule")),
+            ("daily", lambda w: w[True].__setitem__("schedule", [{"cron": "17 4 * * *"}])),
+            ("two schedules", lambda w: w[True]["schedule"].append({"cron": "0 5 * * 3"})),
+            ("no push", lambda w: w[True].pop("push")),
+            ("push to every branch", lambda w: w[True]["push"].__setitem__("branches", ["main", "dev"])),
+            ("no pull_request", lambda w: w[True].pop("pull_request")),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit_yaml(CODEQL, change), "codeql.yml", "trigger")
+
+    def test_codeql_covers_exactly_the_four_languages_once(self):
+        self.flagged(self.edit(CODEQL, "language: [actions, javascript-typescript, python]", "language: [actions, javascript-typescript]"), "python")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "language: [actions, javascript-typescript, python]", "language: [actions, javascript-typescript, python, java-kotlin]"), "java-kotlin", "once")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "          languages: java-kotlin\n", "          languages: swift\n"), "java-kotlin")
+
+    def test_java_kotlin_is_not_analysed_on_pull_requests(self):
+        self.flagged(self.edit(CODEQL, "    if: github.event_name != 'pull_request'\n", ""), "java-kotlin", "pull_request")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "github.event_name != 'pull_request'", "github.event_name == 'push'"), "java-kotlin", "pull_request")
+
+    def test_the_languages_without_a_build_run_on_pull_requests_and_build_nothing(self):
+        self.flagged(self.edit(CODEQL, "    name: analyze (${{ matrix.language }})\n", "    name: analyze (${{ matrix.language }})\n    if: github.event_name != 'pull_request'\n"), "analyze", "pull_request")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "          build-mode: none\n", "          build-mode: autobuild\n"), "analyze", "build-mode")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "          build-mode: none\n", ""), "analyze", "build-mode")
+
+    def test_java_kotlin_builds_with_gradle_between_init_and_analyze(self):
+        self.flagged(self.edit(CODEQL, "          build-mode: manual\n", "          build-mode: none\n"), "java-kotlin", "build-mode")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "./gradlew -q --console=plain :app:assembleDebug", "true"), "java-kotlin", "gradlew")
+
+        def reorder(w):
+            steps = w["jobs"]["analyze-java-kotlin"]["steps"]
+            i = next(i for i, s in enumerate(steps) if "gradlew" in str(s.get("run")))
+            steps.append(steps.pop(i))
+
+        self.setUp()
+        self.flagged(self.edit_yaml(CODEQL, reorder), "java-kotlin", "gradlew", "between")
+        self.setUp()
+        self.flagged(self.edit_yaml(CODEQL, lambda w: drop(w, "analyze-java-kotlin", "actions/setup-java@")), "java-kotlin", "setup-java")
+
+    def test_codeql_jobs_have_the_least_permissions_that_upload_results(self):
+        for label, change in (
+            ("no permissions", lambda j: j.pop("permissions")),
+            ("no security-events", lambda j: j["permissions"].pop("security-events")),
+            ("read only", lambda j: j["permissions"].__setitem__("security-events", "read")),
+            ("contents write", lambda j: j["permissions"].__setitem__("contents", "write")),
+            ("extra", lambda j: j["permissions"].__setitem__("actions", "write")),
+        ):
+            for job in ("analyze", "analyze-java-kotlin"):
+                with self.subTest(label, job=job):
+                    self.setUp()
+                    self.flagged(self.edit_yaml(CODEQL, lambda w, job=job, change=change: change(w["jobs"][job])), job, "permissions")
+
+    def test_the_codeql_steps_share_one_pinned_version_and_the_jobs_have_a_timeout(self):
+        sha = "33d7b85da1a04171e211befe2c739303b9a4c066"
+        self.flagged(self.edit(CODEQL, f"codeql-action/analyze@{sha} # v4.39.3\n        with:\n          category: /language:java-kotlin", f"codeql-action/analyze@{'a' * 40} # v4.39.3\n        with:\n          category: /language:java-kotlin"), "codeql-action", "one")
+        self.setUp()
+        self.flagged(self.edit(CODEQL, "    timeout-minutes: 45\n", ""), "analyze-java-kotlin", "timeout")
 
     def test_verify_sh_runs_the_check_and_its_tests(self):
         self.flagged(self.edit(VERIFY, "step ci-hardening python3 -I scripts/check_ci_hardening.py\n", ""), "verify.sh", "check_ci_hardening.py")
