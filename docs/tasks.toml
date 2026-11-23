@@ -1598,7 +1598,7 @@ notes = "Process PR (2a2), split from M1-77. Code and tests were written and gre
 id = "M1-78"
 title = "State issue part B: rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --approval accepts the previous state issue"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-77"]
@@ -1612,7 +1612,7 @@ status = "todo"
 assignee = "process"
 risk = "normal"
 depends_on = ["M1-77", "M1-78", "M1-80"]
-notes = "Process PR (2c), docs and prompt text only. Owner decision 7076085601 item 1: comments on the state issue only for decisions, approvals, vetoes, handovers, takeovers, lock-lost, incidents, PAUSED/RESUMED, metrics blocks and the weekly digest; progress goes to the body (Updated: and the block). The 4.3 ready query reads the body with tasks.py --state; the template becomes prose, the generated summary and the block. Owner merge (docs/ORCHESTRATION.md, agents/prompts/). Merge origin/main first if PR 322 lands before it"
+notes = "Process PR (2c), docs and prompt text only. Owner decision 7076085601 item 1: comments on the state issue only for decisions, approvals, vetoes, handovers, takeovers, lock-lost, incidents, PAUSED/RESUMED, metrics blocks and the weekly digest; progress goes to the body (Updated: and the block). The 4.3 ready query reads the body with tasks.py --state; the template becomes prose, the generated summary and the block. Owner merge (docs/ORCHESTRATION.md, agents/prompts/). Merge origin/main first if PR 322 lands before it. From M1-78: the rotation steps name `state_body.py validate --comments N` (the rotate: lines) and the pointer PR that sets STATE_ISSUE and PREVIOUS_STATE_ISSUE in merge_ready.py (owner merge; approvals on the new issue refuse until it lands), and the veto and 7085221356 checks read the current and the previous state issue; the places that post an approval or read the body on #15 move to the current state issue: agents/prompts/approver.md:13, docs/ORCHESTRATION.md:644, agents/prompts/orchestrator.md:104 and the 'Read the body with' line of scripts/state_body.py"
 
 [[task]]
 id = "M1-FU"

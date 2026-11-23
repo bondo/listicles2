@@ -347,5 +347,90 @@ class CliTest(unittest.TestCase):
         self.assertIn("empty", err)
 
 
+class RotationTest(unittest.TestCase):
+    """M1-78, owner decision #15 7076313976: validate reports when the state issue passes about 250 comments or a body of about 15 KB, so the
+    orchestrator rotates at the next handover boundary. A report is not an error: the body stays valid (exit 0)."""
+
+    def validate(self, text, *flags):
+        return run_cli("validate", *flags, "-", stdin=text)
+
+    def padded(self, size):
+        """A valid body of exactly `size` UTF-8 bytes (multi-byte prose, so bytes and characters differ)."""
+        short = body()
+        pad = size - len(short.encode("utf-8"))
+        self.assertGreaterEqual(pad, 0)
+        text = body(prose=PROSE + "æ" * (pad // 2) + "x" * (pad % 2))  # æ is two bytes in UTF-8
+        self.assertEqual(len(text.encode("utf-8")), size)
+        return text
+
+    def test_below_both_limits_prints_no_rotation_line(self):
+        code, out, err = self.validate(self.padded(state_body.BODY_LIMIT - 1), "--comments", str(state_body.COMMENT_LIMIT - 1))
+        self.assertEqual((code, err), (0, ""))
+        self.assertNotIn("rotate", out)
+
+    def test_the_body_limit_is_counted_in_utf8_bytes(self):
+        self.assertEqual(state_body.BODY_LIMIT, 15000)
+        code, out, _ = self.validate(self.padded(state_body.BODY_LIMIT))
+        self.assertEqual(code, 0)
+        self.assertIn(f"rotate: the body is {state_body.BODY_LIMIT} bytes (limit {state_body.BODY_LIMIT})", out)
+        self.assertIn("at the next handover boundary", out)
+        self.assertLess(len(self.padded(state_body.BODY_LIMIT)), state_body.BODY_LIMIT, "the multi-byte prose must count as bytes, not characters")
+
+    def test_the_comment_limit(self):
+        self.assertEqual(state_body.COMMENT_LIMIT, 250)
+        code, out, _ = self.validate(body(), "--comments", "250")
+        self.assertEqual(code, 0)
+        self.assertIn("rotate: the issue has 250 comments (limit 250)", out)
+        self.assertNotIn("rotate", self.validate(body(), "--comments", "249")[1])
+
+    def test_both_limits_passed_gives_two_lines_after_the_ok_line(self):
+        code, out, _ = self.validate(self.padded(state_body.BODY_LIMIT + 1), "--comments", "570")
+        lines = out.splitlines()
+        self.assertEqual(code, 0)
+        self.assertTrue(lines[0].startswith("ok: "), out)
+        self.assertEqual([ln.split(":")[0] for ln in lines[1:]], ["rotate", "rotate"], out)
+
+    def test_without_comments_only_the_body_is_checked(self):
+        code, out, _ = self.validate(body())
+        self.assertEqual((code, out.strip()), (0, "ok: 1 sessions, 1 branches, 1 claimed, 1 in review"))
+
+    def test_a_bad_comment_count_is_a_usage_error(self):
+        for bad in ("-1", "x", "", "2.5", "1e3", "\u0663"):  # \u0663 is an Arabic-Indic digit, which int() would read as 3
+            with self.subTest(bad=bad), self.assertRaises(SystemExit) as cm, redirect_stderr(io.StringIO()):
+                state_body.main(["validate", "--comments", bad, "-"])
+            self.assertEqual(cm.exception.code, 2)
+
+    def test_an_invalid_body_reports_its_errors_and_no_rotation(self):
+        code, out, err = self.validate(body(changed("extra", 1)), "--comments", "999")
+        self.assertEqual((code, out), (1, ""))
+        self.assertIn("unknown field", err)
+
+    def test_crlf_line_ends_count_as_two_bytes_from_a_file_and_from_stdin(self):  # bodies saved in the web UI carry CRLF; reading must not drop the CR
+        text = self.padded(state_body.BODY_LIMIT - 1).replace("\n", "\r\n")
+        size = len(text.encode("utf-8"))
+        self.assertGreaterEqual(size, state_body.BODY_LIMIT, "the CRLF form must pass the limit for this test to mean anything")
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        path = Path(d.name, "state.md")
+        path.write_bytes(text.encode("utf-8"))
+        code, out, _ = run_cli("validate", str(path))
+        self.assertEqual(code, 0)
+        self.assertIn(f"rotate: the body is {size} bytes", out)
+        old = sys.stdin
+        try:
+            sys.stdin = io.TextIOWrapper(io.BytesIO(text.encode("utf-8")), encoding="utf-8")  # the real stdin translates newlines too
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                self.assertEqual(state_body.main(["validate", "-"]), 0)
+        finally:
+            sys.stdin = old
+        self.assertIn(f"rotate: the body is {size} bytes", out.getvalue())
+
+    def test_render_takes_no_comment_count(self):
+        with self.assertRaises(SystemExit) as cm, redirect_stderr(io.StringIO()):
+            state_body.main(["render", "--comments", "3", "-"])
+        self.assertEqual(cm.exception.code, 2)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
