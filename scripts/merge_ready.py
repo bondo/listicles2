@@ -73,7 +73,8 @@ TASKS_FILES = ("docs/tasks.toml",)
 # The owner's batch approval lifts all of it.
 OWNER_ONLY_FILES = {f.casefold() for f in (
     "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
-    "scripts/test_merge_ready.py", "scripts/repo_slug.py", "scripts/test_repo_slug.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
+    "scripts/test_merge_ready.py", "scripts/repo_slug.py", "scripts/test_repo_slug.py", "scripts/mark-ready.sh",
+    "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
     "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md", "docs/COLLABORATING.md",
     "gradle/verification-metadata.xml", "gradlew", "gradlew.bat",
     "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")}  # the last two run through `ci_scope.py selftests` (a test keeps them in sync)
