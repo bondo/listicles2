@@ -1168,16 +1168,17 @@ class StateIssueRotationTests(unittest.TestCase):
             self.assertRegex(text, r"not on the state issue #15")
             self.assertNotIn("previous", text)
 
-    def test_an_approval_on_the_previous_issue_still_needs_the_owner_an_unedited_comment_and_the_anchored_line(self):
-        cases = {"login": approval_comment(self.OK, login="mallory", issue=15), "association": approval_comment(self.OK, assoc="NONE", issue=15),
-                 "edited": approval_comment(self.OK, edited=True, issue=15),
-                 "not anchored": approval_comment("", issue=15, line=f"asking for batch approval: {self.OK}")}
+    def test_an_approval_on_either_issue_still_needs_the_owner_an_unedited_comment_and_the_anchored_line(self):
+        cases = {"login": ({"login": "mallory"}, r"is not by the owner"), "association": ({"assoc": "NONE"}, r"is not by the owner"),
+                 "edited": ({"edited": True}, r"was edited after it was posted"),
+                 "not anchored": ({"line": f"asking for batch approval: {self.OK}"}, r"is not an anchored `batch approval:")}
         with self.rotated():
-            for name, comment in cases.items():
-                with self.subTest(name):
-                    code, text, merged = self.code(comment)
-                    self.assertEqual((code, merged), (1, []), text)
-                    self.assertRegex(text, r"approval comment.*(owner|edited|anchored)")
+            for issue in (400, 15):
+                for name, (kw, reason) in cases.items():
+                    with self.subTest(name, issue=issue):
+                        code, text, merged = self.code(approval_comment("" if "line" in kw else self.OK, issue=issue, **kw))
+                        self.assertEqual((code, merged), (1, []), text)
+                        self.assertRegex(text, reason)
 
     def test_an_issue_url_of_another_repository_or_another_shape_is_refused(self):  # endswith("/issues/15") alone would accept these
         urls = {"other repo": "https://api.github.com/repos/mallory/listicles2/issues/15",

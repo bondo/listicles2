@@ -405,6 +405,27 @@ class RotationTest(unittest.TestCase):
         self.assertEqual((code, out), (1, ""))
         self.assertIn("unknown field", err)
 
+    def test_crlf_line_ends_count_as_two_bytes_from_a_file_and_from_stdin(self):  # bodies saved in the web UI carry CRLF; reading must not drop the CR
+        text = self.padded(state_body.BODY_LIMIT - 1).replace("\n", "\r\n")
+        size = len(text.encode("utf-8"))
+        self.assertGreaterEqual(size, state_body.BODY_LIMIT, "the CRLF form must pass the limit for this test to mean anything")
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        path = Path(d.name, "state.md")
+        path.write_bytes(text.encode("utf-8"))
+        code, out, _ = run_cli("validate", str(path))
+        self.assertEqual(code, 0)
+        self.assertIn(f"rotate: the body is {size} bytes", out)
+        old = sys.stdin
+        try:
+            sys.stdin = io.TextIOWrapper(io.BytesIO(text.encode("utf-8")), encoding="utf-8")  # the real stdin translates newlines too
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                self.assertEqual(state_body.main(["validate", "-"]), 0)
+        finally:
+            sys.stdin = old
+        self.assertIn(f"rotate: the body is {size} bytes", out.getvalue())
+
     def test_render_takes_no_comment_count(self):
         with self.assertRaises(SystemExit) as cm, redirect_stderr(io.StringIO()):
             state_body.main(["render", "--comments", "3", "-"])
