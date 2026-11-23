@@ -685,5 +685,93 @@ class RetroTaskTests(unittest.TestCase):
             self.invariants(tasks.parse(self.TEXT.replace('assignee = "retro"', 'assignee = "implementer"', 1)))
 
 
+class StateBodyTest(unittest.TestCase):
+    """M1-77: --state reads the claimed and in-review ids from the state issue body's JSON block."""
+
+    TEXT = task("M0-01") + task("M0-02") + task("M0-03") + task("M0-04", deps=["M0-01"])
+
+    def state(self, sessions=(("session_01a", ["M0-01"]),), branches=(("b/x", ["M0-02"]),), schema=1):
+        data = {"schema": schema, "sessions": [{"id": sid, "tasks": ids} for sid, ids in sessions],
+                "branches": [{"name": name, "in_review": ids} for name, ids in branches]}
+        return f"Prose.\n\n```json\n{json.dumps(data)}\n```\n"
+
+    def run_state(self, body, *args):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d, "state.md")
+            f.write_text(body, encoding="utf-8")
+            return CliTest.run_cli(self, self.TEXT, "--state", str(f), *args)
+
+    def test_ready_and_review_take_their_ids_from_the_body(self):
+        code, out, _ = self.run_state(self.state(), "ready")
+        self.assertEqual((code, [ln.split()[0] for ln in out.splitlines()]), (0, ["M0-03"]))
+        code, out, _ = self.run_state(self.state(), "review")
+        self.assertEqual((code, [ln.split()[0] for ln in out.splitlines()]), (0, ["M0-02"]))
+        code, out, _ = self.run_state(self.state(), "--json", "status")
+        self.assertEqual({r["id"]: r["state"] for r in json.loads(out)},
+                         {"M0-01": "claimed", "M0-02": "in-review", "M0-03": "ready", "M0-04": "blocked", "M0-FU": "blocked"})
+
+    def test_state_and_explicit_lists_are_exclusive(self):
+        for flag in ("--claimed", "--in-review"):
+            code, _, err = self.run_state(self.state(), flag, "M0-03", "ready")
+            self.assertEqual(code, 1)
+            self.assertIn("--state", err)
+
+    def test_bad_bodies_exit_1(self):
+        cases = {
+            "Prose only.\n": "no ```json block",
+            self.state() + self.state(): "2 ```json blocks",
+            "```json\n{\"schema\": 1,\n```\n": "malformed JSON",
+            "```json\n{\"schema\": 1, \"sessions\": []}\n": "not closed",
+            "```json\n[]\n```\n": "JSON object",
+            self.state(schema=2): "schema",
+            self.state(sessions=(("session_01a", "M0-01"),)): "sessions[0].tasks",
+            self.state(branches=(("b/x", [1]),)): "branches[0].in_review",
+            "```json\n{\"schema\": 1, \"sessions\": {}, \"branches\": []}\n```\n": "sessions",
+            "```json\n{\"schema\": 1, \"sessions\": [\"x\"], \"branches\": []}\n```\n": "sessions[0]",
+            "": "empty",
+        }
+        for body, needle in cases.items():
+            with self.subTest(body=body[:40]):
+                code, out, err = self.run_state(body, "ready")
+                self.assertEqual((code, out), (1, ""))
+                self.assertIn(needle, err)
+
+    def test_unknown_ids_in_the_body_exit_1(self):
+        code, _, err = self.run_state(self.state(sessions=(("session_01a", ["M0-99"]),)), "ready")
+        self.assertEqual(code, 1)
+        self.assertIn("--state", err)
+        self.assertIn("M0-99", err)
+
+    def test_reads_the_same_ids_as_state_body_py(self):
+        import state_body
+        import test_state_body as sample
+
+        text = state_body.render(sample.body())
+        claimed, in_review = tasks.state_ids(text)
+        data = state_body.load(text)
+        self.assertEqual(claimed, [t for s in data["sessions"] for t in s["tasks"]])
+        self.assertEqual(in_review, [t for b in data["branches"] for t in b["in_review"]])
+        self.assertEqual((claimed, in_review), (["M1-14"], ["M1-44"]))
+
+    def test_splits_lines_and_matches_fences_like_state_body_py(self):
+        import state_body
+        import test_state_body as sample
+
+        base = state_body.render(sample.body())
+        data = sample.changed("next", ["line\u2028separator and next\x85line"])
+        variants = {
+            "crlf": base.replace("\n", "\r\n"),
+            "cr": base.replace("\n", "\r"),
+            "unicode line separators inside a value": sample.body(data),
+            "trailing blanks on the fences": base.replace("```json\n", "```json \t\n").replace("\n```\n", "\n```\t\n"),
+        }
+        for name, text in variants.items():
+            with self.subTest(name):
+                expected = state_body.load(text)
+                claimed, in_review = tasks.state_ids(text)
+                self.assertEqual(claimed, [t for s in expected["sessions"] for t in s["tasks"]])
+                self.assertEqual(in_review, [t for b in expected["branches"] for t in b["in_review"]])
+
+
 if __name__ == "__main__":
     unittest.main()
