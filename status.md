@@ -136,7 +136,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-62 | Start-up gates (b2 of M1-60)&#58; update (START-01), email verified (#195, Q2 A), name saved (AUTH-1… | done | M1-60 | implementer | [#323](https://github.com/bondo/listicles2/issues/323) |
 | M1-64 | guards check 2c&#58; YAML folded and multi-line values as one line, in addition to the per-line check… | done | M1-42 | implementer | [#325](https://github.com/bondo/listicles2/issues/325) |
 | M1-65 | guards check 2c&#58; npm &#96;--&#96; tail resolved through package.json scripts, fail closed by construction … | done | M1-42 | implementer | [#330](https://github.com/bondo/listicles2/issues/330) |
-| M1-71 | guards check 1&#58; test-runner options that skip or rewrite tests on command lines (jest, vitest, … | ready | M1-65 | implementer |  |
+| M1-71 | guards check 1&#58; test-runner options that skip or rewrite tests on command lines (jest, vitest, … | in progress | M1-65 | implementer | [#339](https://github.com/bondo/listicles2/issues/339) |
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/listicles2/issues/303) |
 | M1-14 | Auth data 1&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step | done | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/listicles2/issues/319) |
 | M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | ready | M1-14 | implementer |  |
@@ -216,7 +216,7 @@ flowchart LR
     n2["M1-10 Rules: create household and member di… (blocked)"]:::blocked
     n3["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n4["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
-    n5["M1-71 guards check 1: test-runner options tha… (ready)"]:::ready
+    n5["M1-71 guards check 1: test-runner options tha… (in progress)"]:::progress
     n6["M1-67 Auth data 2: Firebase session state, Go… (ready)"]:::ready
     n7["M1-66 Auth wiring: Credential Manager wrap… (blocked)"]:::blocked
     n8["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
@@ -459,7 +459,6 @@ flowchart LR
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
 - **PR to merge** [#331](https://github.com/bondo/listicles2/issues/331): M1-44&#58; CI hardening&#58; job timeouts, pinned python and node, npm ci --ignore-scripts, gitleaks do…
-- **PR to merge** [#334](https://github.com/bondo/listicles2/issues/334): Task 1b&#58; guards accept plural "thresholds" in markdown prose and useJUnitPlatform/failOnNoDiscov…
 - **task** M1-06: waits on M1-10
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
