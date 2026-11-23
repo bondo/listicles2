@@ -176,6 +176,7 @@ CI_STEPS = [
     ("unit", "python3 -I scripts/test_coverage_impact.py", "M1-07"),
     ("tasks", "python3 -I scripts/test_check_build_guards.py", "M1-51"),
     ("tasks", "python3 -I scripts/check_build_guards.py", "M1-51"),
+    ("tasks", "python3 -I scripts/test_state_body.py", "M1-77"),
 ]
 
 
