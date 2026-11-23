@@ -7,6 +7,7 @@ timeout, python3 or node taken from the runner image, `npm ci` that runs install
 retries or https-only redirects.
 """
 
+import re
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,12 @@ STATUS = ".github/workflows/status.yml"
 VERIFY = "scripts/verify.sh"
 ADR = "docs/adr/0003-gradle-dependency-verification.md"
 REQ_CI = "scripts/requirements-ci.txt"
-INSTALL_CI = "pip install -r scripts/requirements-ci.txt"
+REQ_CI_IN = "scripts/requirements-ci.in"
+REQ_LINT = "scripts/requirements-lint.txt"
+REQ_LINT_IN = "scripts/requirements-lint.in"
+INSTALL_CI = "pip install --require-hashes -r scripts/requirements-ci.txt"
+INSTALL_LINT = "pip install --require-hashes -r scripts/requirements-lint.txt"
+HASH = "--hash=sha256:" + "0123456789abcdef" * 4
 
 
 class Rules(unittest.TestCase):
@@ -33,7 +39,7 @@ class Rules(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, STATUS, VERIFY, ADR, REQ_CI, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
+        for name in (CI, STATUS, VERIFY, ADR, REQ_CI, REQ_CI_IN, REQ_LINT, REQ_LINT_IN, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
             if not (ROOT / name).exists():
                 continue  # a missing file is the check's finding, not the test's crash
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
@@ -147,13 +153,111 @@ class Rules(unittest.TestCase):
 
         self.flagged(self.edit_yaml(CI, change), "tasks", "before")
 
-    def test_the_ci_requirements_pin_pyyaml_exactly(self):
-        self.assertRegex((ROOT / REQ_CI).read_text(), r"(?m)^PyYAML==\d+\.\d+\.\d+$")
-        for bad in ("PyYAML>=6\n", "PyYAML\n", "PyYAML==6.*\n", "requests==2.0.0\n", ""):
+    def test_the_ci_requirements_input_pins_pyyaml_exactly(self):
+        """The .in holds the one top-level dependency (the other scripts use the standard library); the .txt is its hashed lock."""
+        self.assertTrue(re.search(r"(?m)^PyYAML==\d+\.\d+\.\d+$", (ROOT / REQ_CI_IN).read_text()), f"{REQ_CI_IN}: update the test")
+        for bad in ("PyYAML>=6\n", "PyYAML\n", "PyYAML==6.*\n", "requests==2.0.0\n", "PyYAML==6.0.3\nrequests==2.0.0\n", ""):
             with self.subTest(bad):
-                self.flagged(self.set_text(REQ_CI, bad), "requirements-ci.txt")
-        (self.root / REQ_CI).unlink()
-        self.flagged(c.problems(self.root), "requirements-ci.txt")
+                self.flagged(self.set_text(REQ_CI_IN, bad), "requirements-ci.in")
+        (self.root / REQ_CI_IN).unlink()
+        self.flagged(c.problems(self.root), "requirements-ci.in")
+
+    def test_the_lock_files_are_read_and_hold_what_their_input_says(self):
+        for lock, name in ((REQ_CI, "PyYAML"), (REQ_LINT, "ruff")):
+            with self.subTest(lock):
+                self.setUp()
+                text = (ROOT / lock).read_text()
+                self.assertTrue(re.search(rf"(?m)^{name}==\S+ \\$", text) and "--hash=sha256:" in text, f"{lock}: update the test")
+                self.assertTrue((self.root / lock).is_file())
+                (self.root / lock).unlink()
+                self.flagged(c.problems(self.root), lock.rsplit("/", 1)[1], "missing")
+                self.flagged(self.set_text(lock, "# nothing locked\n"), lock.rsplit("/", 1)[1], name)
+
+    def test_every_lock_entry_is_pinned_with_equals_and_has_a_sha256_hash(self):
+        for lock, name in ((REQ_CI, "PyYAML"), (REQ_LINT, "ruff")):
+            text = (ROOT / lock).read_text()
+            base = lock.rsplit("/", 1)[1]
+            entry = re.search(rf"(?m)^({name}==[^ \n]+) \\\n(?:    --hash=sha256:[0-9a-f]{{64}}(?: \\)?\n)+", text)
+            self.assertIsNotNone(entry, f"{lock}: update the test")
+            whole = entry.group(0)
+            ver = entry.group(1)
+            hashes = re.findall(r"--hash=sha256:[0-9a-f]{64}", whole)
+            for label, bad_entry in {
+                "unpinned": f"{name}>=1\n",
+                "no version": f"{name}\n",
+                "wildcard": f"{name}==1.*\n",
+                "compatible": f"{name}~=1.0\n",
+                "no hash": f"{ver}\n",
+                "md5 hash": f"{ver} \\\n    --hash=md5:{'0' * 32}\n",
+                "short sha256": f"{ver} \\\n    --hash=sha256:abc123\n",
+                "uppercase non-hex sha256": f"{ver} \\\n    --hash=sha256:{'g' * 64}\n",
+                "url": f"{name} @ https://example.com/{name}.whl \\\n    {HASH}\n",
+                "editable": f"-e . \\\n    {HASH}\n",
+                "include": f"-r other.txt\n",
+                "index url": f"--index-url https://example.com/simple\n",
+                "extra index": f"--extra-index-url https://example.com/simple\n",
+                "find links": f"--find-links https://example.com\n",
+                "no-hashes line": "--no-hashes\n",
+            }.items():
+                with self.subTest(lock=lock, defect=label):
+                    self.flagged(self.set_text(lock, text.replace(whole, bad_entry, 1)), base)
+            with self.subTest(lock=lock, defect="one bad hash among good ones"):
+                if len(hashes) > 1:
+                    self.flagged(self.set_text(lock, text.replace(hashes[1], "--hash=sha1:abc", 1)), base)
+                else:
+                    self.flagged(self.set_text(lock, text + f"extra==1.0.0 \\\n    --hash=sha1:abc\n"), base)
+        self.assertEqual(self.set_text(REQ_LINT, (ROOT / REQ_LINT).read_text()), [])
+
+    def test_every_input_entry_is_locked_at_exactly_its_version(self):
+        text = (ROOT / REQ_LINT_IN).read_text()
+        self.assertTrue(re.search(r"(?m)^ruff==\d+\.\d+\.\d+$", text), f"{REQ_LINT_IN}: update the test")
+        self.flagged(self.edit(REQ_LINT_IN, "ruff==", "ruff==9"), "ruff", "requirements-lint.txt")
+        self.setUp()
+        self.flagged(self.set_text(REQ_LINT_IN, text + "newtool==1.0.0\n"), "newtool", "requirements-lint.txt")
+        self.setUp()
+        self.flagged(self.set_text(REQ_LINT_IN, text.replace("ruff==", "ruff>=", 1)), "requirements-lint.in", "ruff")
+        self.setUp()
+        (self.root / REQ_LINT_IN).unlink()
+        self.flagged(c.problems(self.root), "requirements-lint.in", "missing")
+
+    def test_the_only_pip_install_is_a_hashed_one(self):
+        """Issue 189 item 5: pip install --require-hashes -r <lock>, nothing else, in the workflows and in verify.sh."""
+        self.assertTrue(INSTALL_LINT in (ROOT / CI).read_text(), "ci.yml: update the test")
+        for label, old, new in (
+            ("hashes off", INSTALL_LINT, "pip install -r scripts/requirements-lint.txt"),
+            ("the input file", INSTALL_LINT, "pip install --require-hashes -r scripts/requirements-lint.in"),
+            ("other lock", INSTALL_LINT, "pip install --require-hashes -r requirements.txt"),
+            ("extra argument", INSTALL_LINT, INSTALL_LINT + " ruff"),
+            ("no-deps lookalike", INSTALL_LINT, INSTALL_LINT + " --no-deps"),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit(CI, old, new), "pip install", "ci.yml")
+        for label, command in (
+            ("a bare package", "pip install ruff"),
+            ("pip3", "pip3 install ruff"),
+            ("python -m pip", "python3 -m pip install ruff"),
+            ("upgrade pip", "pip install --upgrade pip"),
+            ("no hashes", "pip install -r scripts/requirements-ci.txt"),
+            ("after a pipe", "echo x | pip install -r scripts/requirements-ci.txt"),
+            ("in a chain", "cd scripts && pip install ruff"),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.flagged(self.edit_yaml(CI, lambda w, command=command: w["jobs"]["static"]["steps"].append({"run": command})), "static", "pip install")
+        self.setUp()
+        self.flagged(self.edit_yaml(STATUS, lambda w: w["jobs"]["publish"]["steps"].append({"run": "pip install ruff"})), "publish", "pip install")
+        self.setUp()
+        self.flagged(self.edit(VERIFY, "set -uo pipefail\n", "set -uo pipefail\npip install ruff\n"), "verify.sh", "pip install")
+
+    def test_a_commented_out_or_quoted_pip_install_is_not_a_command(self):
+        self.assertEqual(self.edit_yaml(CI, lambda w: w["jobs"]["static"]["steps"].append({"run": "# pip install ruff\necho done"})), [])
+        self.assertEqual(self.edit_yaml(CI, lambda w: w["jobs"]["static"]["steps"].append({"run": INSTALL_LINT})), [])
+
+    def test_the_lock_files_are_owned_by_the_owner(self):
+        owners = (ROOT / ".github/CODEOWNERS").read_text()
+        for path in (REQ_CI, REQ_CI_IN, REQ_LINT, REQ_LINT_IN):
+            self.assertTrue(re.search(rf"(?m)^/{re.escape(path)}\s+@bondo$", owners), path)
 
     def test_a_gradle_job_that_reaches_a_python_task_needs_setup_python(self):
         """R1-03: :app:testDebugUnitTest is finalized by an Exec of python3 (checkUnitTestResults), so the screenshots job needs it."""

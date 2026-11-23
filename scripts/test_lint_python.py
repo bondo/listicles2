@@ -1,7 +1,7 @@
 """Tests for M0.5-07: ruff check (E,F,W,B,UP,SIM) and mypy (default) over scripts/, via scripts/lint_python.sh.
 Wiring (config, pinned tools, verify.sh, CI, CODEOWNERS) has negative cases; the behaviour tests run the real script on
 deliberate violations and check that it fails for the right rule, and on clean code and check that it passes.
-Needs the pinned tools installed: pip install -r scripts/requirements-lint.txt. Run: python3 -I scripts/test_lint_python.py"""
+Needs the pinned tools installed: pip install --require-hashes -r scripts/requirements-lint.txt. Run: python3 -I scripts/test_lint_python.py"""
 
 import os
 import re
@@ -16,6 +16,9 @@ RULES = ["E", "F", "W", "B", "UP", "SIM"]
 LINT_CMD = "./scripts/lint_python.sh"
 TEST_CMD = "python3 -I scripts/test_lint_python.py"
 PIN = re.compile(r"^[A-Za-z0-9_.-]+==[0-9][0-9A-Za-z.]*$")
+LOCK_PIN = re.compile(r"^([A-Za-z0-9_.-]+)==([0-9][0-9A-Za-z.]*) \\$")  # a pip-compile --generate-hashes entry: name==X.Y.Z, then the hash lines
+INSTALL_LINT = "pip install --require-hashes -r scripts/requirements-lint.txt"
+HASH = "--hash=sha256:" + "0123456789abcdef" * 4
 CLEAN = 'def add(a: int, b: int) -> int:\n    return a + b\n'
 # One deliberate violation per selected rule family, and one for mypy. Each must fail the script and name its rule.
 VIOLATIONS = {
@@ -155,11 +158,30 @@ class Config(unittest.TestCase):
             self.assertRegex(ln, r"^(\[mypy\]|files\s*=\s*scripts|cache_dir\s*=\s*\S+)$", ln)
 
     def test_tools_are_pinned_exactly(self):
-        lines = active_lines(read("scripts", "requirements-lint.txt"))
+        lines = active_lines(read("scripts", "requirements-lint.in"))
         for ln in lines:
             self.assertRegex(ln, PIN, ln)
         names = {ln.split("==")[0].lower() for ln in lines}
         self.assertTrue({"ruff", "mypy", "types-pyyaml"} <= names, names)
+
+    def test_the_lock_holds_every_input_tool_at_its_pin_with_hashes(self):
+        locked = {}
+        previous = None
+        for ln in active_lines(read("scripts", "requirements-lint.txt")):
+            m = LOCK_PIN.match(ln)
+            if m:
+                previous = m.group(1).lower()
+                locked[previous] = [m.group(2), 0]
+            elif ln.startswith("--hash=sha256:"):
+                self.assertIsNotNone(previous, ln)
+                locked[previous][1] += 1
+            else:
+                self.fail(f"not a pinned, hashed lock line: {ln}")
+        for ln in active_lines(read("scripts", "requirements-lint.in")):
+            name, version = ln.split("==")
+            self.assertEqual(locked.get(name.lower(), [None])[0], version, name)
+        self.assertEqual([n for n, (_, count) in locked.items() if count == 0], [])
+        self.assertGreater(len(locked), 3)  # the tools and what they pull in (ruff, mypy, types-PyYAML and their dependencies)
 
     def test_no_ruff_format_anywhere_in_the_wiring(self):
         for rel in (("scripts", "verify.sh"), ("scripts", "lint_python.sh"), (".github", "workflows", "ci.yml")):
@@ -177,7 +199,7 @@ class VerifyAndCiWiring(unittest.TestCase):
         self.assertIsNotNone(body, "ci.yml needs a python-lint job")
         self.assertIn("actions/checkout", body)
         self.assertIn("actions/setup-python", body)
-        self.assertTrue(runs(body, "pip install -r scripts/requirements-lint.txt"))
+        self.assertTrue(runs(body, INSTALL_LINT))
         self.assertTrue(runs(body, LINT_CMD))
         self.assertTrue(runs(body, TEST_CMD))
         self.assertNotRegex(body, r"(?m)^\s*if:")
@@ -185,7 +207,7 @@ class VerifyAndCiWiring(unittest.TestCase):
 
     def test_codeowners_name_the_config_files_explicitly(self):
         owners = read(".github", "CODEOWNERS")
-        for path in ("ruff.toml", "mypy.ini", "scripts/requirements-lint.txt", "scripts/lint_python.sh"):
+        for path in ("ruff.toml", "mypy.ini", "scripts/requirements-lint.in", "scripts/requirements-lint.txt", "scripts/lint_python.sh"):
             self.assertEqual(explicit_owners(owners, path), ["@bondo"], path)
 
 
@@ -202,13 +224,34 @@ class Behaviour(unittest.TestCase):
                 self.assertIn(rule, out)
 
     def test_a_pin_that_does_not_match_the_installed_tool_fails(self):
+        for label, text in {
+            "plain pins": "ruff==0.0.1\nmypy==0.0.1\n",
+            "hashed pins": f"ruff==0.0.1 \\\n    {HASH}\nmypy==0.0.1 \\\n    {HASH}\n",
+        }.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                reqs = os.path.join(tmp, "reqs.txt")
+                with open(reqs, "w", encoding="utf-8") as f:
+                    f.write(text)
+                code, out = lint(CLEAN, requirements=reqs)
+            self.assertNotEqual(code, 0, out)
+            self.assertIn("requirements-lint.txt", out)
+            self.assertIn("--require-hashes", out)
+
+    def test_the_version_is_read_from_the_hashed_lock_format(self):
+        """sed on the `tool==X \\` line: the installed versions in a hashed file with other entries around them pass; a dependency of the same prefix is not the tool."""
+        have = {tool: subprocess.run([tool, "--version"], capture_output=True, text=True, check=True).stdout.split()[1] for tool in ("ruff", "mypy")}
         with tempfile.TemporaryDirectory() as tmp:
             reqs = os.path.join(tmp, "reqs.txt")
+            body = f"# comment\nmypy-extensions==1.0.0 \\\n    {HASH}\n    # via mypy\nmypy=={have['mypy']} \\\n    {HASH} \\\n    {HASH}\n"
             with open(reqs, "w", encoding="utf-8") as f:
-                f.write("ruff==0.0.1\nmypy==0.0.1\n")
+                f.write(f"{body}ruff=={have['ruff']} \\\n    {HASH}\n")
             code, out = lint(CLEAN, requirements=reqs)
-        self.assertNotEqual(code, 0, out)
-        self.assertIn("requirements-lint.txt", out)
+            self.assertEqual(code, 0, out)
+            with open(reqs, "w", encoding="utf-8") as f:
+                f.write(f"{body}ruff=={have['ruff']}.1 \\\n    {HASH}\n")
+            code, out = lint(CLEAN, requirements=reqs)
+            self.assertNotEqual(code, 0, out)
+            self.assertIn("ruff", out)
 
     def test_missing_requirements_file_fails(self):
         code, out = lint(CLEAN, requirements="/nonexistent/requirements.txt")
