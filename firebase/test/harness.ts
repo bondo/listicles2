@@ -1,6 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+    assertFails,
+    assertSucceeds,
     type RulesTestContext,
     type RulesTestEnvironment,
     type TokenOptions,
@@ -8,17 +10,15 @@ import {
 
 // The default-deny harness (M1-52, see #202): every client tries every operation on one document of
 // every collection in PLAN section 3 (two for a {uid} one: the caller's own and another user's) and on
-// the unplanned paths. rules.test.ts expects each probe to be denied; mutants.test.ts shows that
-// opening any one of those collections turns that suite red.
+// the unplanned paths. rules.test.ts expects each probe to be denied, except the few that ALLOWED
+// carves out (M1-08 on), which it expects allowed; mutants.test.ts shows that opening any one of those
+// collections turns that suite red.
 // Their limit: each probe seeds at most its own document (`{ name: "seed" }`), writes a fixed generic
 // payload and queries without a filter, so both catch only a path that is open whatever the stored
 // data, payload and query filter. A rule that reads stored data (resource, get, exists), the payload
 // or a query filter can be a hole and still pass both, denied by this setup and not by its
-// authorization logic: it needs its own allow and deny tests in a seeded world (M1-08 on). So does
-// M1-08's helper that asserts each collection denies an unverified token: it must make each request
-// twice in one seeded world, first assertFails with an unverified token (a denied request writes
-// nothing), then assertSucceeds with a verified one, or it cannot fail. Verified first is vacuous for
-// a create or delete: the unverified request then meets a changed world (an update, a missing doc).
+// authorization logic: it needs its own allow and deny tests in a seeded world (M1-08 on), and each
+// allow test of a rule that needs a verified email goes through verifiedOnly (below).
 // The contexts hand out the compat Firestore type, used as is (no type casts).
 export type Db = ReturnType<RulesTestContext["firestore"]>;
 
@@ -42,7 +42,7 @@ export function planTemplates(plan: string): string[] {
 }
 
 // Ids of the planned shapes (PLAN 3.1, P3): a 20-character auto-id, `<householdId>_<22-character secret>`.
-const UID = "alice";
+export const UID = "alice";
 const HID = "household00000000001";
 const CODE = `${HID}_${"s".repeat(22)}`;
 const IDS: Record<string, string> = {
@@ -106,9 +106,22 @@ export interface Probe {
     readonly path: string;
 }
 
-export const PROBES: readonly Probe[] = PATHS.flatMap((path) =>
+const PROBED: readonly Probe[] = PATHS.flatMap((path) =>
     OPS.flatMap((op) => CLIENT_NAMES.map((client) => ({ client, op, path }))),
 );
+
+// The probes the rules allow, carved out one by one, never a whole path (#301), so the self and
+// others mutants still find their probes: anyone's get of config/app; a get of the caller's own users
+// doc, verified or not (PLAN 3.1: the own-doc exception); a verified get of the own member path.
+export const ALLOWED: readonly Probe[] = [
+    ...CLIENT_NAMES.map((client): Probe => ({ client, op: "get", path: "config/app" })),
+    { client: "unverified", op: "get", path: instantiate("users/{uid}") },
+    { client: "verified", op: "get", path: instantiate("users/{uid}") },
+    { client: "verified", op: "get", path: instantiate("households/{hid}/members/{uid}") },
+];
+const named = (p: Probe): string => `${p.client} ${p.op} ${p.path}`;
+const allowed = new Set(ALLOWED.map(named));
+export const PROBES: readonly Probe[] = PROBED.filter((p) => !allowed.has(named(p)));
 
 const collectionOf = (path: string): string => path.slice(0, path.lastIndexOf("/"));
 export const collectionIdOf = (path: string): string => collectionOf(path).split("/").at(-1) ?? "";
@@ -131,6 +144,90 @@ export async function attempt(admin: Db, db: Db, probe: Probe): Promise<unknown>
 }
 
 export type Outcome = "allowed" | "denied";
+
+// M1-08 (PLAN 3.1 "Signed in"): every rule but the own users doc's and config/app's needs a verified
+// email. One request, twice, in the world the test seeded: unverified first, which must be denied (a
+// denied request writes nothing), then verified, which must be allowed, so it cannot pass vacuously.
+// Verified first would be vacuous for a create or delete: the second request would meet a new world.
+export async function verifiedOnly(
+    clients: Record<Client, Db>,
+    request: (db: Db) => Promise<unknown>,
+): Promise<void> {
+    await assertFails(request(clients.unverified));
+    await assertSucceeds(request(clients.verified));
+}
+
+// The allow statements of a rules text, each with the path of its match blocks, and the paths of each
+// `function signedIn`. A comment becomes a space and a string (escapes included) ''. It fails closed:
+// a quote, a brace, a match path of other than plain segments or an allow statement not ended by its
+// own ; before any brace is left unread, and then it throws (R2-01 to R3-04).
+function parseRules(rules: string): {
+    allows: { path: string; condition: string }[];
+    signedIn: string[];
+} {
+    const code = rules.replace(
+        /\/\/[^\n]*|\/\*[\s\S]*?\*\/|'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g,
+        (m) => (m.startsWith("/") ? " " : "''"),
+    );
+    const stack: string[] = [];
+    const allows: { path: string; condition: string }[] = [];
+    const signedIn: string[] = [];
+    let matches = 0;
+    for (const m of code.matchAll(
+        /\bmatch\s*((?:\/(?:\{\w+(?:=\*\*)?\}|[^\s/{}]+))+)\s*\{|\ballow\b[^:;{}]*(?::\s*if\b([^;{}]*))?;|\bfunction\s+signedIn\b|[{}]/g,
+    )) {
+        if (m[1] !== undefined) {
+            stack.push(m[1]);
+            matches += 1;
+        } else if (m[0].startsWith("allow")) {
+            allows.push({
+                path: stack.join(""),
+                condition: (m[2] ?? "").replace(/\s+/g, " ").trim(),
+            });
+        } else if (m[0].startsWith("function")) signedIn.push(stack.join(""));
+        else if (m[0] === "{") stack.push("");
+        else if (stack.pop() === undefined) throw new Error("rules: a } without its {");
+    }
+    const words = (word: RegExp): number => (code.match(word) ?? []).length;
+    const unread =
+        allows.length !== words(/\ballow\b/g) ||
+        matches !== words(/\bmatch\b/g) ||
+        /['"]/.test(code.replaceAll("''", ""));
+    if (stack.length > 0 || unread) {
+        throw new Error(
+            "rules: a quote, match, allow statement or brace that parseRules cannot read",
+        );
+    }
+    return { allows, signedIn };
+}
+
+// signedIn() is a conjunct of the whole condition: its first term, and no || or ?: outside
+// parentheses (both bind more loosely than &&).
+function requiresSignedIn(condition: string): boolean {
+    if (!/^signedIn\(\)\s*(&&|$)/.test(condition)) return false;
+    let depth = 0;
+    for (const ch of condition) {
+        if (ch === "(") depth += 1;
+        else if (ch === ")") depth -= 1;
+        else if (depth === 0 && (ch === "|" || ch === "?")) return false;
+    }
+    return true;
+}
+
+// M1-08, so a new rule cannot forget signedIn(): outside the own users doc and config/app (PLAN 3.1),
+// each allow statement that does not require it, as `path: condition`; and signedIn() itself unless it
+// is declared exactly once, at the documents level, so that no match can redefine it (S1-01).
+const DOCUMENTS = "/databases/{database}/documents";
+const WITHOUT_SIGN_IN = [`${DOCUMENTS}/users/{uid}`, `${DOCUMENTS}/config/app`];
+export function withoutSignedIn(rules: string): string[] {
+    const { allows, signedIn } = parseRules(rules);
+    const missing = allows
+        .filter((s) => !WITHOUT_SIGN_IN.includes(s.path) && !requiresSignedIn(s.condition))
+        .map((s) => `${s.path}: ${s.condition}`);
+    if (signedIn.length === 1 && signedIn[0] === DOCUMENTS) return missing;
+    const found = signedIn.map((path) => path || "the service block").join(", ") || "none";
+    return [...missing, `signedIn() must be declared once, at ${DOCUMENTS}; found: ${found}`];
+}
 
 // "denied" only for a permission-denied error; any other error is thrown, so a broken probe never
 // counts as denied.

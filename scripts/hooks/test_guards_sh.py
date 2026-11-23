@@ -1613,6 +1613,219 @@ class CoverageThresholdDiffs(DiffCase):
                 self.assertFails("guard: removed check setting:")
 
 
+class MovedCheckSettings(DiffCase):
+    """M1-68 (PR 320 R1): useJUnitPlatform() and failOnNoDiscoveredTests = true may move from a module build file into the
+    build-logic convention plugins. The removal is accepted only when the diff adds the same setting to code (not a comment,
+    string, char literal or backticked name) of a regular .kt/.kts file under build-logic/src/main/kotlin/."""
+
+    MODULE = "app/build.gradle.kts"
+    PLUGIN = "build-logic/src/main/kotlin/Conventions.kt"
+    MODULE_BASE = (
+        "android {\n    testOptions {\n        unitTests.all { it.useJUnitPlatform() }\n    }\n}\n"
+        "tasks.withType<Test>().configureEach {\n    failOnNoDiscoveredTests = true\n    maxParallelForks = 2\n}\n"
+    )
+    MODULE_MOVED = "android {\n}\ntasks.withType<Test>().configureEach {\n    maxParallelForks = 2\n}\n"
+    PLUGIN_BASE = "fun Project.configureTests() {\n    tasks.withType<Test>().configureEach {\n        jvmArgs(\"-Dx=y\")\n    }\n}\n"
+
+    def plugin(self, body):
+        """The convention file with `body` (lines of the test-task block) where the settings go."""
+        lines = "".join(f"        {line}\n" for line in body.split("\n"))
+        return f"fun Project.configureTests() {{\n    tasks.withType<Test>().configureEach {{\n{lines}        jvmArgs(\"-Dx=y\")\n    }}\n}}\n"
+
+    def setUp(self):
+        super().setUp()
+        self.repo.write(self.MODULE, self.MODULE_BASE)
+        self.base(self.PLUGIN, self.PLUGIN_BASE)
+
+    def move(self, body, path=PLUGIN):
+        """The PR: both settings leave the module, and `body` goes into the test-task block of the file at `path`."""
+        self.repo.write(self.MODULE, self.MODULE_MOVED)
+        self.change(path, self.plugin(body))
+
+    def test_removing_the_settings_with_nothing_added_still_fails(self):
+        self.change(self.MODULE, self.MODULE_MOVED)
+        self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+        self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_a_move_into_build_logic_code_passes(self):
+        for body in [
+            "useJUnitPlatform()\nfailOnNoDiscoveredTests = true",
+            "useJUnitPlatform();  failOnNoDiscoveredTests.set( true )",
+            "this.useJUnitPlatform() // the JUnit Platform runs every engine\nfailOnNoDiscoveredTests = true // zero tests fail",
+            'val s = "a // b /* c"; useJUnitPlatform()\nval c = \'"\'; failOnNoDiscoveredTests = true',
+            'val t = "${"}"} \\" x"; useJUnitPlatform()\nval r = """ a """"; failOnNoDiscoveredTests = true',
+            "/* one /* nested */ block */ useJUnitPlatform()\n/*\n x\n*/ failOnNoDiscoveredTests = true",
+            "val `name with useJUnitPlatform() in it` = 1; useJUnitPlatform()\nrun { failOnNoDiscoveredTests = true }",
+            "useJUnitPlatform(/* no options */)\nfailOnNoDiscoveredTests = /* on */ true",
+            'maxParallelForks = 2\nuseJUnitPlatform()\nval s = "x"\n// a comment line\nfailOnNoDiscoveredTests = true',
+            "run { -> useJUnitPlatform() }\nthis.failOnNoDiscoveredTests = true",
+        ]:
+            with self.subTest(body=body):
+                self.move(body)
+                rc, out = self.repo.guards()
+                self.assertEqual(rc, 0, out)
+                self.assertIn("guard: note: check setting moved into build-logic: unitTests.all { it.useJUnitPlatform() }", out)
+                self.assertIn("guard: note: check setting moved into build-logic: failOnNoDiscoveredTests = true", out)
+
+    def test_a_move_into_a_precompiled_script_plugin_passes(self):
+        self.move("useJUnitPlatform()\nfailOnNoDiscoveredTests = true", "build-logic/src/main/kotlin/listicles.tests.gradle.kts")
+        self.assertPasses()
+        # The setting on the file's last code line, so nothing follows it.
+        self.change("build-logic/src/main/kotlin/listicles.tests.gradle.kts", "useJUnitPlatform()\nfailOnNoDiscoveredTests = true\n// end\n")
+        self.assertPasses()
+
+    def test_the_setting_in_a_comment_string_or_name_does_not_count(self):
+        for body in [
+            "// useJUnitPlatform()\n// failOnNoDiscoveredTests = true",
+            "/*\nuseJUnitPlatform()\nfailOnNoDiscoveredTests = true\n*/",
+            "/** KDoc\nuseJUnitPlatform()\nfailOnNoDiscoveredTests = true\n */",
+            "/* /* nested */\nuseJUnitPlatform()\nfailOnNoDiscoveredTests = true\n*/",
+            'val s = "useJUnitPlatform(); failOnNoDiscoveredTests = true"',
+            'val s = "\\" useJUnitPlatform(); failOnNoDiscoveredTests = true \\""',
+            'val s = """\nuseJUnitPlatform()\nfailOnNoDiscoveredTests = true\n"""',
+            'val s = """ x """" + " useJUnitPlatform(); failOnNoDiscoveredTests = true "',
+            'val s = "${"\\""} useJUnitPlatform(); failOnNoDiscoveredTests = true "',
+            'val s = """${"""x"""} useJUnitPlatform(); failOnNoDiscoveredTests = true """',
+            "val c = '\"'; val s = \"'; useJUnitPlatform(); failOnNoDiscoveredTests = true; '\"",
+            "val c = '\\''; val s = \"'; useJUnitPlatform(); failOnNoDiscoveredTests = true; '\"",
+            "fun `useJUnitPlatform()`() {}\nfun `failOnNoDiscoveredTests = true`() {}",
+        ]:
+            with self.subTest(body=body):
+                self.move(body)
+                self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+                self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_a_different_or_weaker_setting_does_not_count(self):
+        for body in [
+            "xuseJUnitPlatform()\nfailOnNoDiscoveredTests == true",
+            "useJUnitPlatformX()\nfailOnNoDiscoveredTestsX = true",
+            'useJUnitPlatform { excludeTags("slow") }\nfailOnNoDiscoveredTests = trueish',
+            "useJUnitPlatform(options)\nfailOnNoDiscoveredTests = true && flag",
+            "useJUnitPlatform\nfailOnNoDiscoveredTests.set(flag)",
+            "useJUnitPlatform() {}\nfailOnNoDiscoveredTests = !true",
+            "useJUnitPlatform(\"\")\nfailOnNoDiscoveredTests = `true`",
+            "useJUnitPlatform('x')\nfailOnNoDiscoveredTests.set(\"\" == \"\")",
+            "useJUnitPlatform(`x`)\nfailOnNoDiscoveredTests = \"${true}\"",
+        ]:
+            with self.subTest(body=body):
+                self.move(body)
+                self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+                self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_a_declaration_or_an_argument_is_not_the_setting(self):
+        """Self-review: only a statement sets it; `val`, `fun`, a named argument or an assignment right-hand side does not."""
+        long = "c" * 300
+        for body in [
+            "val failOnNoDiscoveredTests = true\nfun useJUnitPlatform() {}",
+            "interface I { fun useJUnitPlatform() }\ng(failOnNoDiscoveredTests = true)",
+            "fun\nuseJUnitPlatform() {}\ng(\n    failOnNoDiscoveredTests = true,\n)",
+            "val x =\n    useJUnitPlatform()\nval y = listOf(1,\nfailOnNoDiscoveredTests = true)",
+            f"val x = /* {long} */\nuseJUnitPlatform()\nval y =\n// {long}\nfailOnNoDiscoveredTests = true",
+            "other.useJUnitPlatform()\nxit.failOnNoDiscoveredTests = true",
+            "fun <T> useJUnitPlatform() {}\nvar\nfailOnNoDiscoveredTests = true",
+            "fun\nuseJUnitPlatform()\nval\nfailOnNoDiscoveredTests = true",
+            "get\nuseJUnitPlatform()\nset\nfailOnNoDiscoveredTests = true",
+            # R1-03: a line break before `&&`, `||`, `?:`, `?.`, `.`, `::`, `as` or a lambda continues the expression.
+            'useJUnitPlatform()\n    .also { }\nfailOnNoDiscoveredTests = true\n    && System.getenv("X") == null',
+            'useJUnitPlatform()\n// a comment\n{ includeTags("fast") }\nfailOnNoDiscoveredTests = true\n\n    || flag',
+            "useJUnitPlatform()\n?.let { }\nfailOnNoDiscoveredTests.set(true)\n    ?: x",
+            "useJUnitPlatform()\n::class\nfailOnNoDiscoveredTests = true\nas Any",
+        ]:
+            with self.subTest(body=body):
+                self.move(body)
+                self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+                self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_a_shebang_line_is_a_comment(self):
+        """Self-review: Kotlin reads `#!` at the start of a .kt or .kts file as a comment."""
+        for path in [self.PLUGIN, "build-logic/src/main/kotlin/listicles.tests.gradle.kts"]:
+            with self.subTest(path=path):
+                self.repo.write(self.MODULE, self.MODULE_MOVED)
+                self.change(path, "#! x; useJUnitPlatform(); failOnNoDiscoveredTests = true\n" + self.PLUGIN_BASE)
+                self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+                self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_only_code_under_build_logic_src_main_kotlin_counts(self):
+        body = "useJUnitPlatform()\nfailOnNoDiscoveredTests = true"
+        for path in [
+            "build-logic/src/test/kotlin/ConventionsTest.kt",
+            "build-logic/src/main/resources/Conventions.kt",
+            "build-logic/src/main/java/Conventions.java",
+            "build-logic/src/main/kotlin/Conventions.txt",
+            "build-logic/build.gradle.kts",
+            "app/src/main/kotlin/Conventions.kt",
+            "core/other/build.gradle.kts",
+            "scripts/test_conventions.py",
+            "elsewhere/build-logic/src/main/kotlin/Conventions.kt",
+        ]:
+            with self.subTest(path=path):
+                self.move(body, path)
+                self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+                self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_a_symlink_under_build_logic_does_not_count(self):
+        self.repo.write(self.MODULE, self.MODULE_MOVED)
+        os.symlink("useJUnitPlatform()", os.path.join(self.repo.dir, "build-logic/src/main/kotlin/A.kt"))
+        os.symlink("failOnNoDiscoveredTests = true", os.path.join(self.repo.dir, "build-logic/src/main/kotlin/B.kt"))
+        self.repo.commit()
+        self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+        self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_the_setting_must_be_added_not_already_there(self):
+        self.base(self.PLUGIN, self.plugin("useJUnitPlatform()\nfailOnNoDiscoveredTests = true"))
+        self.change(self.MODULE, self.MODULE_MOVED)
+        self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+        self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+        # R1-01: the plugin file is in the diff too, but its added line is another one (only added lines are read).
+        self.change(self.PLUGIN, self.plugin("useJUnitPlatform()\nfailOnNoDiscoveredTests = true\nmaxParallelForks = 2"))
+        self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+        self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_each_removed_setting_needs_its_own_added_setting(self):
+        self.move("useJUnitPlatform()")
+        rc, out = self.repo.guards()
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("guard: removed check setting: failOnNoDiscoveredTests = true", out)
+        self.assertNotIn("guard: removed check setting: unitTests.all", out)
+
+    def test_a_removed_line_with_another_check_setting_still_fails(self):
+        for line in [
+            "kover { minBound(80) }; tasks.test { useJUnitPlatform() }",
+            "tasks.test { useJUnitPlatform(); useJUnitPlatform { includeTags(\"fast\") } }",
+            "tasks.test { failOnNoDiscoveredTests = true; maxIssues = 0 }",
+        ]:
+            with self.subTest(line=line):
+                self.repo.write(self.PLUGIN, self.PLUGIN_BASE)
+                self.base(self.MODULE, line + "\n")
+                self.change(self.MODULE, "\n")
+                self.change(self.PLUGIN, self.plugin("useJUnitPlatform()\nfailOnNoDiscoveredTests = true\nminBound(80)\nmaxIssues = 0"))
+                self.assertFails("guard: removed check setting: " + line)
+
+    def test_a_configured_platform_does_not_move_to_a_plain_one(self):
+        self.base(self.MODULE, 'tasks.test { useJUnitPlatform { includeTags("fast") } }\n')
+        self.change(self.MODULE, "\n")
+        self.change(self.PLUGIN, self.plugin("useJUnitPlatform()"))
+        self.assertFails('guard: removed check setting: tasks.test { useJUnitPlatform { includeTags("fast") } }')
+
+    def test_a_removed_line_outside_build_files_is_not_accepted(self):
+        # Task 1b: a .py file's comment or string only mentions the setting (test_guards_mentions.py), so this one is code.
+        self.base("scripts/check_x.py", "failOnNoDiscoveredTests = true\n")
+        self.change("scripts/check_x.py", "SETTING = ''\n")
+        self.change(self.PLUGIN, self.plugin("failOnNoDiscoveredTests = true"))
+        self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+        # R1-01: a plain statement removed from a source file (not a build file) does not move either.
+        self.base("app/src/main/kotlin/Fixture.kt", "fun f() {\n    tasks.test { useJUnitPlatform() }\n}\n")
+        self.change("app/src/main/kotlin/Fixture.kt", "fun f() {\n}\n")
+        self.change(self.PLUGIN, self.plugin("useJUnitPlatform()"))
+        self.assertFails("guard: removed check setting: tasks.test { useJUnitPlatform() }")
+
+    def test_other_check_settings_do_not_move(self):
+        self.base(self.MODULE, "kover { minBound(80) }\n")
+        self.change(self.MODULE, "kover { }\n")
+        self.change(self.PLUGIN, self.plugin("kover { minBound(80) }"))
+        self.assertFails("guard: removed check setting: kover { minBound(80) }")
+
+
 class EmbeddedPackageJsonConfig(GuardsCase):
     """#46: eslintConfig, prettier, jest, nyc and c8 inside package.json are not scanned by the config checks, and JSON has no comment
     to hold a justification, so the config has to live in the dedicated file."""

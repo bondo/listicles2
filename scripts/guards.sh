@@ -80,17 +80,22 @@ out=$(gg "$PAT" -- "${EXCL[@]}" | unjust)
 # The checks above are line by line, so a justification on a TOML table header or an array opener would waive every entry after it.
 # entrycheck therefore reads the config files itself and requires the justification on every entry line of a relaxing multi-line
 # table (per-file-ignores), array/object (ignore = [, exclude_lines = [, ignores: [) or INI continuation (ignore =<newline>  E501),
-# and on the first element of an ESLint rule array that sets off/warn/0/1.
+# and on the first element of an ESLint rule array that sets off/warn/0/1, and on every `- entry` of an actionlint `ignore:` block list.
 ENTRY_AWK='
 function strip(l) { sub(/[ \t]*(#|\/\/).*$/, "", l); return l }
 function blank(l) { gsub(/"[^"]*"/, "\"\"", l); gsub(/\047[^\047]*\047/, "\047\047", l); return l }
 function nest(l,   t, o) { t = l; gsub(/[^[({]/, "", t); o = length(t); t = l; gsub(/[^])}]/, "", t); return o - length(t) }
 function check() { if (!just(line)) printf "%s:%d:%s\n", F, NR, line }
-BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/) }
+function ind(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+BEGIN { ini = (F ~ /(\.ini|\.cfg|\.flake8|\.coveragerc)$/); es = (F ~ /eslint/); yml = (F ~ /actionlint\.ya?ml$/) }
 {
   line = $0; nc = strip(line); c = blank(nc); lc = tolower(nc)
   if (c ~ /^[ \t]*$/) next
   closer = (c ~ /^[ \t]*[])},;]*[ \t]*$/)
+  if (mode == 4) { if (ind(line) > yi || (ind(line) == yi && c ~ /^[ \t]*-/)) { check(); next } mode = 0 }
+  if (yml && line ~ /(^[ \t]*(-[ \t]+)?|[{,][ \t]*)"[^"]*\\[^"]*"[ \t]*:/) { printf "%s:%d:%s\n", F, NR, line; next }  # an escaped key may spell ignore
+  if (yml && lc ~ /ignore["\047]?[ \t]*:[^#]*[][ \t,]\*[A-Za-z0-9_]/) { printf "%s:%d:%s\n", F, NR, line; next }  # an alias: 2b cannot follow it
+  if (yml && lc ~ /^[ \t]*-?[ \t]*["\047]?ignore["\047]?[ \t]*:([ \t]+(&|!)[^ \t]*)*[ \t]*$/) { mode = 4; yi = ind(line); next }  # block list (anchor, tag)
   if (mode == 1 && c ~ /^[ \t]*\[\[?[^][]+\]\]?[ \t]*$/) mode = 0
   if (mode == 3 && line !~ /^[ \t]/) mode = 0
   if (mode == 1 || mode == 3) { if (!closer) check(); next }
@@ -154,7 +159,9 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
   cfgcheck "$ESPAT" '*eslint.config.*' '*eslintrc*' '*biome.json*'
   cfgcheck "$COVPAT" '*vitest.config.*' '*jest.config.*' '*nycrc*' '*c8rc*'
   # prettier: requirePragma makes it skip every file without the pragma; ignorePath points it at another ignore file
-  cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*')
+  cfgcheck 'requirePragma["'"'"']?[[:space:]]*[:=][[:space:]]*true|ignore-?[Pp]ath' '*prettierrc*' '*prettier.config.*'
+  # actionlint: `ignore:` patterns drop its errors (issue 164 item 1)
+  cfgcheck '(^|[^A-Za-z0-9_-])["'"'"']?ignore["'"'"']?[[:space:]]*:' '*.github/actionlint.yaml' '*.github/actionlint.yml')  # a leading * (git ls-files drops a literal path next to :!)
 [ -n "$out" ] && { echo "$out"; fail=1; }
 
 # 2c. Command-line flags on tool invocation lines (issues 45 and 177): ruff, mypy, tsc, ESLint, Prettier, shellcheck and actionlint, in shell
@@ -165,8 +172,9 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # a flag only counts for the tool in its own command; only the text after the tool name is read (`grep -i shellcheck` has no flag), and a bare
 # `--` ends the flags. A tool named as the thing being installed (`pip install ruff --upgrade`, `npm i -D eslint`, `cargo install`) is not run, so datacmd skips it.
 # For npm and npx (and yarn, pnpm, bun and bunx when they use `--`) the JS tools also see what follows a bare `--` (`npm run lint -- --quiet`): a flag
-# there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known, so `npm test -- -u` needs a `justified:`
-# too (issue 164 item 3). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
+# there passes when ANY of eslint, prettier and tsc lists it, because the script that runs is not known. Only an npm form whose script is
+# known to end in a test runner (ddrun, pkgscripts below; issue 164 item 3) skips that check, so `npm test -- -u` passes when every tracked
+# `test` script is a plain `jest ...`; in every other case the check is as before (fail closed). The options of npm itself never count. Flags may be quoted, shellcheck short options may be combined (-xS warning),
 # tsc names are read case-insensitively (as tsc does), mypy and shellcheck accept unique prefixes of long options so a proper prefix of a
 # listed option counts as that option (a prefix that is ambiguous is an error in the tool itself), and SHELLCHECK_OPTS counts as
 # `SHELLCHECK_OPTS=`, `+=` or a YAML `SHELLCHECK_OPTS: value`.
@@ -178,7 +186,9 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # checked; a mypy `@argfile` fails; an empty quoted config (`--config-file ""`) disables the config, so it fails.
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
-# Not covered: action `with: args:` lines, YAML folded scalars (`run: >`), a `.github/actionlint.y*ml` config (2b does not read it), flags held in
+# In YAML the args-like keys of a step or hook (`with: args:`, `eslint_flags:`, pre-commit `args:`) are flags of the tool its `uses:`, `id:` or
+# `entry:` names (issue 164 item 2, yamlitem below). A YAML value over several lines (`run: >`, a plain or quoted scalar, a flow
+# collection) is checked once more as one line (YFOLD_AWK below). Not covered: flags held in
 # shell variables (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, tools run from Python (subprocess),
 # and yarn, pnpm and bun forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
 # is added only with a reason a reviewer can check, in scripts/hooks/test_guards_cli_flags.py too (docs/guards-known-gaps.md has the rationale).
@@ -428,6 +438,27 @@ function scan(s, tools, direct,   n, w, i, j, t, nm, eq, v, k, sb, c, body, rest
 }
 function eslintbase(s) { return hit(s, "suppress-all|suppress-rule|suppressions-location|pass-on-unpruned-suppressions") }
 function ddseg(p) { if (p ~ /(^|[^A-Za-z0-9_.-])(npm|npx|yarn|pnpm|bun|bunx)([^A-Za-z0-9_.-]|$)/ && match(p, /(^|[ \t])--([ \t]|$)/)) return substr(p, RSTART + RLENGTH); return "" }
+# ddrun: 1 when the `--` tail of p reaches a test runner, never a linter (PR 309 ruling 7084379032): a bare npm is the first word (after
+# a YAML `- key:` or a package.json key), then only -s/--silent/-q/--quiet/--if-present/--ignore-scripts, the verb test, t or tst (script
+# `test`) or run, rum, urn or run-script with a name, and nothing else up to the `--`; every tracked package.json definition of the script
+# must pass plainrun, and no package.json may be unknown.
+function ddrun(p,   n, w, i, a, v) {
+  if (NPMU) return 0
+  match(p, /(^|[ \t])--([ \t]|$)/); n = split(substr(p, 1, RSTART), w, /[ \t]+/)
+  for (i = 1; i <= n && (w[i] == "" || (F ~ /(\.ya?ml|package\.json)$/ && (w[i] == "-" || w[i] ~ /:$/))); i++) ;
+  a = w[i]; if (F ~ /package\.json$/) sub(/^"/, "", a)
+  if (a != "npm") return 0
+  for (i++; i <= n && w[i] ~ NPMBOOL; i++) ;
+  v = w[i]
+  if (v ~ /^(run|rum|urn|run-script)$/) { for (i++; i <= n && w[i] ~ NPMBOOL; i++) ; v = w[i] } else if (v ~ /^(test|t|tst)$/) v = "test"; else return 0
+  for (i++; i <= n; i++) if (w[i] != "" && w[i] !~ NPMBOOL) return 0
+  if (v == "" || !(v in NS)) return 0
+  for (i = 1; i <= NS[v]; i++) if (!plainrun(NC[v, i])) return 0
+  return 1
+}
+# plainrun: script c (npm appends the tail to it) is one plain `[npx] <runner> <words>` and nothing else: no command before it (one could
+# redefine the runner: a function, PATH=, a copy over its file), no separator, quote, `$`, backtick, bracket, redirection, `#`, `~` or `\`.
+function plainrun(c) { return (c ~ RUNRE) }
 function jsseg(p, tool) { return (has(p, tool) ? after(p, tool) : "") " " ddseg(p) }
 # baseline: ESLint suppression flags write or read a suppressions file, a baseline; no justified: waives them (check 3 has no escape hatch).
 function baseline(p) { return (has(p, "eslint") || ddseg(p) != "") && eslintbase(jsseg(p, "eslint")) }
@@ -448,7 +479,7 @@ function datacmd(p,   n, w, i, j, k, a, b, c, m) {
   return (a ~ /^(cargo|go)$/ && b == "install")
 }
 function relaxed(p,   dd, e, pr, t, ok, s) {
-  dd = ddseg(p)
+  dd = ddseg(p); if (dd != "" && ddrun(p)) dd = ""
   if (match(p, /SHELLCHECK_OPTS(\+?=|:[ \t])/) && scan(substr(p, RSTART + RLENGTH), "shellcheck", 0)) return 1
   if (datacmd(p)) return 0
   if (has(p, "ruff")) { s = after(p, "ruff"); if (scan(s, "ruff", 0) || cfg(s, "--config", "^[^= \t]*(ruff|pyproject)\\.toml$")) return 1 }
@@ -468,6 +499,71 @@ function relaxed(p,   dd, e, pr, t, ok, s) {
   if (pr || dd != "") { s = (pr ? after(p, "prettier") : "") " " dd; if ((pr && scan(s, "prettier", 0)) || cfg(s, "--config", ok)) return 1 }
   return 0
 }
+# yamlitem: one YAML sequence item is a workflow step or a pre-commit hook. Its `uses:` (an action named after the tool), or in pre-commit
+# config its `entry:` or `id:`, gives the command; its args-like keys (ARGKEY, at any depth, in any order, quoted or not: inline, a flow or
+# block list, a flow mapping, a block scalar) are flags of that command, each checked by itemend when the item ends, when the key is a
+# generic one or starts with the tool name (`eslint_flags`, not `reviewdog_flags`). Lines inside another block scalar (`run: |`) are skipped.
+function notag(v) { while (v ~ /^[&!][^ \t]*([ \t]|$)/) sub(/^[&!][^ \t]*[ \t]*/, "", v); return v }  # anchors, tags
+function keycol(l) { sub(/[^ \t-].*$/, "", l); return length(l) }
+function indent(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+function toolof(v,   i, n, tl) {
+  n = split("ruff mypy eslint prettier shellcheck actionlint tsc", tl, " ")
+  for (i = 1; i <= n; i++) if (v ~ ("(^|[^A-Za-z])" tl[i] "([^A-Za-z]|$)")) return tl[i]
+  return ""
+}
+function hookcmd(v) { v = unq(v); return (v ~ /^ruff(-check)?$/ ? "ruff check" : (v == "ruff-format" ? "ruff format" : toolof(v))) }
+# AU: the text of the lines of an args key that have no reason; a reason waives its own line only (R1-06).
+# flowsplit: a flow collection with every comma outside quotes made a blank, as YAML splits `[.,--fix]` into two items (R1-01).
+function flowsplit(a,   i, c, q, r) {
+  for (i = 1; i <= length(a); i++) {
+    c = substr(a, i, 1)
+    if (q != "") { if (c == q) q = "" } else if (c == "\"" || c == "\047") q = c; else if (c == ",") c = " "
+    r = r c
+  }
+  return r
+}
+function argadd(k, v, l) { NA++; AK[NA] = k; AF[NA] = (v ~ /^[[{]/); AU[NA] = (v ~ /^[|>][-+0-9]*$/ || just(l) ? "" : v); AL[NA] = NR; ALN[NA] = l }
+function itemend(   a, i, tool) {
+  tool = toolof(IT)
+  for (i = 1; i <= NA; i++) {
+    a = (AF[i] ? flowsplit(AU[i]) : AU[i]); gsub(/[][{}]/, " ", a); gsub(/,([ \t]|$)/, " ", a)
+    if (IT != "" && (AK[i] ~ /^(extra_)?(args|flags|options|arguments)$/ || index(AK[i], tool "_") == 1) && a ~ /[^ \t]/ && relaxed(IT " " a))
+      printf "%s:%d:%s\n", F, AL[i], ALN[i]
+  }
+  IT = ""; NA = 0; IE = 0; IK = -1; IKP = 0; AM = 0; BS = -1
+}
+function ykey(k, v) {
+  if (k == "uses" && !PC) { v = unq(v); sub(/@.*$/, "", v); IT = toolof(v) }
+  else if (k == "entry" && PC) { IT = unq(v); IE = 1 }
+  else if (k == "id" && PC && !IE) IT = hookcmd(v)
+}
+# flowmap: the keys of a flow mapping (`- {id: ruff, args: [--fix]}`, `with: {args: check}`), nested ones included.
+function flowmap(v, l,   m, k, x) {
+  while (match(v, /[{,][ \t]*["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:[ \t]*(\[[^]]*\]|[^]{},]*)/)) {
+    m = substr(v, RSTART + 1, RLENGTH - 1); v = substr(v, RSTART + RLENGTH)
+    k = m; sub(/[ \t]*:.*$/, "", k); gsub(/["\047 \t]/, "", k); k = tolower(k); x = m; sub(/^[^:]*:[ \t]*/, "", x); sub(/[ \t]+$/, "", x)
+    if (k ~ ARGKEY) argadd(k, x, l); else ykey(k, x)
+  }
+}
+function yamlitem(l,   c, key, v) {
+  if (l ~ /^[ \t]*(#|$)/) return
+  if (AM) { if (indent(l) > AC || (indent(l) == AC && l ~ /^[ \t]*-([ \t]|$)/)) { v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); if (!just(l)) AU[NA] = AU[NA] " " stripc(v); return } AM = 0 }
+  if (BS >= 0) { if (indent(l) > BS) return; BS = -1 }
+  if (l ~ /(^[ \t]*(-[ \t]+)?|[{,][ \t]*)"[^"]*\\[^"]*"[ \t]*:/ && !just(l)) printf "%s:%d:%s\n", F, NR, l  # an escaped key (R1-02)
+  if (l ~ /^[ \t]*-[ \t]+(["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:([ \t]|$)|\{)/) { itemend(); IK = keycol(l) }
+  else if (l ~ /^[ \t]*-[ \t]*(#.*)?$/) { itemend(); IKP = 1; return }  # a bare `-`: the keys of the item start on the next line
+  else if (IKP) { IK = indent(l); IKP = 0 }
+  else if (IK >= 0 && indent(l) < IK) itemend()
+  if (IK < 0) return
+  v = l; sub(/^[ \t]*(-[ \t]+)?/, "", v); c = length(l) - length(v)
+  if (v ~ /^\{/) { flowmap(v, l); return }
+  if (!match(v, /^["\047]?[A-Za-z_][A-Za-z0-9_-]*["\047]?[ \t]*:([ \t]|$)/)) return
+  key = v; sub(/[ \t]*:.*$/, "", key); gsub(/["\047]/, "", key); key = tolower(key); v = stripc(substr(v, RLENGTH + 1)); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v); v = notag(v)
+  if (v ~ /^\{/) { flowmap(v, l); return }
+  if (key ~ ARGKEY) { argadd(key, v, l); AM = 1; AC = c; return }
+  if (v ~ /^[|>][-+0-9]*$/) { BS = c; return }
+  if (c == IK) ykey(key, v)
+}
 function flush(   n, i, parts, j) {
   if (cur == "") return
   j = just(cur)
@@ -480,6 +576,13 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0
   RUFFSUB = "^(check|format|rule|config|linter|clean|server|analyze|version|help|generate-shell-completion)$"
   SRCRE = "^[^-][^=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$"; SEVOK = "^(warning|info|style)$"; COLOROK = "^(always|never|auto)$"
+  ARGKEY = "^([A-Za-z0-9-]*_)?(args|flags|options|arguments)$"; YML = (F ~ /\.ya?ml$/); PC = (F ~ /pre-commit-config\.yaml$/); IK = -1; BS = -1
+  # Test runners that are no linter and take an npm `--` tail as their own options (not firebase: emulators:exec runs its argument;
+  # not vitest: its typecheck mode runs tsc).
+  RUNRE = "^[ \t]*(npx[ \t]+)?(jest|mocha|playwright|cypress)([ \t]+[A-Za-z0-9_./:=@,+%-]+)*[ \t]*$"
+  NPMBOOL = "^(-s|--silent|-q|--quiet|--if-present|--ignore-scripts)$"
+  np = split(ENVIRON["NPMS"], P, "\n")  # pkgscripts: name TAB command; a bare TAB makes every tail unknown
+  for (i = 1; i <= np; i++) if ((j = index(P[i], "\t")) == 1) NPMU = 1; else if (j) { nm = substr(P[i], 1, j - 1); NC[nm, ++NS[nm]] = substr(P[i], j + 1) }
   nl = split(ENVIRON["CLI_ALLOW"], L, "\n")
   for (i = 1; i <= nl; i++) {
     if (L[i] ~ /^[ \t]*$/) continue
@@ -491,6 +594,7 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   } }
 {
   line = $0; sub(/\r$/, "", line)
+  if (YML) yamlitem(line)
   if (!cont && line ~ /^[ \t]*#/) next
   if (!cont) start = NR
   cont = (line ~ /\\[ \t]*$/)
@@ -498,13 +602,151 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   cur = (cur == "" ? "" : cur " ") line
   if (!cont) flush()
 }
-END { flush() }'
-cliflags() { # cliflags <pathspec>...
+END { flush(); if (YML) itemend() }'
+# YFOLD_AWK: prints a YAML file with each value that goes on over several lines joined into one line, as the runner reads it (issue 164
+# item 2). cliflags runs CLI_AWK on this text IN ADDITION to the file itself, so it can only add failures (PR 309 ruling 7084379032).
+# A group is a run of lines YAML joins with blanks: the lines of a plain or quoted scalar or a flow collection up to a blank line (a
+# line break), or the lines of equal indentation of a folded block (`>`; a more-indented line keeps its breaks). The group goes on
+# its first line and its other lines become blank, so line numbers hold. Double-quoted escapes are decoded (`\x2d` is `-`, `\n` a
+# command separator, an escaped line break joins with no blank). A reason waives a group only when every line of it has one.
+YFOLD_AWK='
+# yent: a pre-commit `entry:` (key on line h, value from line i) is split into words, so a line break is a blank there: the whole
+# value is one line on the key line, and a `#` in a block scalar is a word, not a comment.
+function yent(h, i, o, p,   j, m, g, e, w) {
+  j = yval(i, o, p); g = L[h]; sub(/[^ \t].*$/, "", g); e = h
+  for (m = h; m < j; m++) if (O[m] !~ /^[ \t]*$/) { w = O[m]; sub(/^[ \t]+/, "", w); if (YB && m > i) gsub(/#/, "\\#", w); g = g (e == h && m == h ? "" : " ") w; e = m }
+  put(h, e, g); return j
+}
+function yi(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+function hexc(h,   i, n, k) {
+  n = 0
+  for (i = 1; i <= length(h); i++) { k = index("0123456789abcdef", tolower(substr(h, i, 1))); if (!k) return "?"; n = n * 16 + k - 1 }
+  return (n == 10 ? ";" : (n == 9 ? "\t" : (n >= 32 && n < 127 ? sprintf("%c", n) : "?")))
+}
+# yscan: the text of s as YAML reads it, tracking an open quote (Q), the flow depth (D) and a node start (NS) over lines. A quoted
+# scalar loses its quotes in block context and keeps them in a flow, where 2c splits a list on commas outside quotes. A node property
+# (`&a`, `!!str`) keeps the node start; in a flow a `:` right after a closing quote is a value indicator (`{"run":"x"}`). CM is set when
+# a comment starts (its text is kept outside a flow), EB when s ends with an escaped line break.
+function yscan(s,   i, n, c, t, h, jq) {
+  t = ""; CM = 0; EB = 0; n = length(s)
+  for (i = 1; i <= n; i++) {
+    c = substr(s, i, 1)
+    if (Q == "\"") {
+      if (c == "\"") { Q = ""; jq = 1; if (KQ) t = t c; continue }
+      if (c == "\\") {
+        if (i == n) { EB = 1; break }
+        c = substr(s, ++i, 1)
+        if (c == "x" || c == "u" || c == "U") { h = (c == "x" ? 2 : (c == "u" ? 4 : 8)); c = hexc(substr(s, i + 1, h)); i += h }
+        else if (c == "n") c = ";"; else if (c == "t") c = "\t"; else if (c == "\"" || c == "\\") { if (KQ) c = "\\" c } else if (c !~ /[ \/]/) c = "?"
+      }
+      t = t c; continue
+    }
+    if (Q == "\047") { if (c == "\047") { if (substr(s, i + 1, 1) != "\047") { Q = ""; jq = 1; if (KQ) t = t c; continue } i++; if (KQ) t = t c } t = t c; continue }
+    if (c ~ /[ \t]/) { t = t c; continue }
+    if (c == "#" && (i == 1 || substr(s, i - 1, 1) ~ /[ \t]/)) { CM = 1; return (D ? t : t substr(s, i)) }
+    if (NS && (c == "&" || c == "!")) { while (i < n && substr(s, i + 1, 1) !~ (D ? "[] \t,[{}]" : "[ \t]")) { t = t c; c = substr(s, ++i, 1) } t = t c; continue }
+    if (NS && (c == "\"" || c == "\047")) { Q = c; KQ = (D > 0); NS = 0; if (KQ) t = t c; continue }
+    else if ((NS || D) && (c == "[" || c == "{")) { D++; NS = 1 }
+    else if (D && (c == "]" || c == "}")) { D--; NS = 0 }
+    else if (D && (c == "," || (c == ":" && (jq || substr(s, i + 1, 1) ~ /^[] \t,}]?$/)))) NS = 1
+    else NS = 0
+    jq = 0; t = t c
+  }
+  return t
+}
+function notag(v) { while (v ~ /^[&!][^ \t]*([ \t]|$)/) sub(/^[&!][^ \t]*[ \t]*/, "", v); return v }
+# put: the group of lines a..b (text G) on line a, the others blank; a reason on only some lines of it is no reason (R2-01, Y1).
+function put(a, b, g,   i, ok) {
+  if (a < 0) return
+  ok = 1; for (i = a; i <= b; i++) if (L[i] !~ /^[ \t]*$/ && !just(L[i])) ok = 0
+  if (!ok && a < b) gsub(/justified:/, "justified-", g)
+  O[a] = g; for (i = a + 1; i <= b; i++) O[i] = ""
+}
+# yval: the value that starts at offset o of line i, under a parent at column p; returns the line after it. A plain value goes on over
+# lines indented more than p, up to a comment; a quoted value or a flow collection goes on until it closes.
+function yval(i, o, p,   v, w, j, a, e, g, pl, eb) {
+  v = substr(L[i], o); w = v; sub(/^[ \t]+/, "", w); w = notag(w); o += length(v) - length(w); v = w; a = -1; YB = (v ~ /^[|>]/)
+  if (v ~ /^[|>]/) {
+    for (j = i + 1; j <= N && (L[j] ~ /^[ \t]*$/ || yi(L[j]) > p); j++) if (v ~ /^>/) {
+      if (a >= 0 && (L[j] ~ /^[ \t]*$/ || yi(L[j]) != yi(L[a]))) { put(a, e, g); a = -1 }
+      if (L[j] ~ /^[ \t]*$/) continue
+      w = L[j]; sub(/^[ \t]+/, "", w)
+      if (a < 0) { a = j; g = L[j] } else g = g " " w
+      e = j
+    }
+    put(a, e, g); return j
+  }
+  Q = ""; D = 0; NS = 1; pl = (v !~ /^["\047[{]/); a = i; e = i; g = substr(L[i], 1, o - 1) yscan(v); eb = EB
+  for (j = i + 1; j <= N; j++) {
+    if (Q == "" && !D && (!pl || CM)) break
+    if (L[j] ~ /^[ \t]*$/) { put(a, e, g); a = -1; continue }
+    if (Q == "" && L[j] ~ /^[ \t]*#/) { if (!D) break; O[j] = ""; continue }
+    if (Q == "" && !D && yi(L[j]) <= p) break
+    w = L[j]; sub(/^[ \t]+/, "", w); w = yscan(w)
+    if (a < 0) { a = j; g = L[j]; sub(/[^ \t].*$/, "", g); g = g w } else g = g (eb ? "" : " ") w
+    eb = EB; e = j
+  }
+  put(a, e, g); return j
+}
+{ sub(/\r$/, ""); L[++N] = $0; O[N] = $0 }
+END {
+  PK = -1
+  for (i = 1; i <= N; ) {
+    l = L[i]
+    if (l ~ /^[ \t]*(#|$)/ || l ~ /^(---|\.\.\.)([ \t]|$)/) { i++; continue }
+    r = l; sub(/^[ \t]*/, "", r); while (r ~ /^-([ \t]|$)/) sub(/^-[ \t]*/, "", r)
+    dash = (length(l) - length(r) > yi(l)); r = notag(r); c = length(l) - length(r)
+    k = 0
+    if (r ~ /^"/ && match(r, /^"([^"\\]|\\.)*"[ \t]*:([ \t]|$)/)) k = RLENGTH
+    else if (r ~ /^\047/ && match(r, /^\047[^\047]*\047[ \t]*:([ \t]|$)/)) k = RLENGTH
+    else if (r ~ /^([^]["\047 \t#&*!|>%@`{},?:-]|[-?:][^ \t])/ && match(r, /:([ \t]|$)/) && substr(r, 1, RSTART) !~ /[ \t]#/) k = RSTART + RLENGTH - 1
+    if (PK >= 0 && yi(l) > PK && !k && !dash) { p = PK; PK = -1; i = (PE ? yent(PH, i, c + 1, p) : yval(i, c + 1, p)); continue }
+    PK = -1
+    if (k) {
+      PE = (F ~ /pre-commit-config\.yaml$/ && substr(r, 1, k) ~ /^["\047]?entry["\047]?[ \t]*:/)
+      v = notag(substr(r, k + 1)); sub(/^[ \t]+/, "", v)
+      if (v ~ /^(#|$)/) { PK = c; PH = i; i++; continue }
+      i = (PE ? yent(i, i, c + k + 1, c) : yval(i, c + k + 1, c)); continue
+    }
+    if (dash && r ~ /^(#|$)/) { PK = yi(l); PH = i; PE = 0; i++; continue }  # `-` or `- &x` alone: a mapping or a value follows (R1-01)
+    if (dash) { i = yval(i, c + 1, yi(l)); continue }
+    i = (yi(l) ? yval(i, c + 1, yi(l) - 1) : i + 1)
+  }
+  for (i = 1; i <= N; i++) print O[i]
+}'
+# pkgscripts: `name TAB command` for every script of every tracked package.json (excluded paths too; one it cannot read is unknown), read
+# only from the one strict layout: the file's only
+# "scripts" token, on a line of its own as `"scripts": {`, then one `"name": "command",` per line up to a `}` line. Any other "scripts"
+# token or layout, and any \u escape (it can spell any key; also in a value, PR 309 R3-03), prints a bare TAB: every tail is then unknown.
+pkgscripts() {
   local f
   while IFS= read -r f; do
-    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
-    else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
-  done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null || echo '"scripts"'; else cat -- "$f" 2>/dev/null || echo '"scripts"'; fi | LC_ALL=C awk '
+      { sub(/\r$/, ""); t = $0; c = gsub(/"scripts"/, "", t) }
+      /\\u/ { print "\t" }
+      s { if (c) print "\t"
+          else if ($0 ~ /^[ \t]*\}[ \t]*,?[ \t]*$/) s = 0
+          else if ($0 ~ /^[ \t]*"[^"\\\t]+"[ \t]*:[ \t]*"([^"\\]|\\.)*"[ \t]*,?[ \t]*$/) {
+            n = $0; sub(/^[ \t]*"/, "", n); v = n; sub(/".*$/, "", n); sub(/^[^"]*"[ \t]*:[ \t]*"/, "", v); sub(/"[ \t]*,?[ \t]*$/, "", v); print n "\t" v }
+          else print "\t"
+          next }
+      c { if (++k > 1 || $0 !~ /^[ \t]*"scripts"[ \t]*:[ \t]*\{[ \t]*$/) print "\t"; else s = 1 }
+      END { if (s) print "\t" }'
+  done < <(git ls-files -- '*package.json')
+}
+NPMS=$(pkgscripts)
+cliflags() { # cliflags <pathspec>...
+  local f y
+  while IFS= read -r f; do
+    if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
+    else NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
+    case "$f" in *.yml | *.yaml) # the joined lines, in addition to the lines above; a fold scan that cannot run fails (no quiet gap)
+      if [ "$STAGED" = 1 ]; then y=$(git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK")
+      elif [ -f "$f" ]; then y=$(LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" "$f")
+      else continue; fi || { echo "$f:0: the YAML fold scan failed"; continue; }  # a file missing from the tree has nothing to scan (R1-02)
+      printf '%s\n' "$y" | NPMS="$NPMS" CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
+    esac
+  done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++' | sed 's/^/guard: unjustified CLI flag: /'
 }
 out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*makefile' '*.mk' '*pre-commit-config.yaml')
 [ -n "$out" ] && { echo "$out"; fail=1; }
@@ -731,6 +973,82 @@ linecheck() { # linecheck <merge-base>
   while IFS= read -r l; do [ -n "$l" ] && bad "$l"; done <<<"$out"
 }
 
+# M1-68 (PR 320 R1): useJUnitPlatform() and failOnNoDiscoveredTests = true may move from a module build file into the convention
+# plugins. A removed line whose only check settings are these (MOVE_FN: moved) is accepted when the diff adds each of them to code of
+# a regular .kt/.kts file under build-logic/src/main/kotlin/ (movedsettings). Code means outside comments (nested block comments too),
+# strings, raw strings and their templates, char literals, backticked names and a `#!` first line: MOVE_LEX reads the whole head file.
+# A setting counts only where a statement starts (stmt): not after `val`/`fun`, as a named argument or on the right of `=`.
+# What does not count: a weaker form (useJUnitPlatform { ... }, = true && x), a setting already there, any other path or check setting.
+# Known limit (part B's per-module check closes it): a text rule cannot see dead code or which modules apply the plugin.
+MOVE_FN='
+function chk(s) { return s ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ }
+function stmt(p,   nl) {  # p, the code before a setting (earlier lines first), ends where a statement starts
+  sub(/[ \t]+$/, "", p); sub(/(this|it)[ \t]*\.$/, "", p)  # a receiver; `xit.` leaves `x`, which no rule below accepts
+  if (match(p, /[ \t\n]+$/)) { nl = index(substr(p, RSTART), "\n"); p = substr(p, 1, RSTART - 1) }
+  if (p == "" || p ~ /([;{})]|->)$/) return 1
+  return nl && p ~ /[]A-Za-z0-9_$#]$/ && p !~ /(^|[^A-Za-z0-9_$])(fun|val|var|get|set)$/  # a line break ends a statement
+}
+function takes(t, ctx,   ids, id, at, post) {  # the movable settings in t, as " id id"; REST = t without them. A weaker form stops the scan.
+  t = " " t " "; ids = ""
+  while (match(t, /[^A-Za-z0-9_$]useJUnitPlatform[ \t]*\([ \t]*\)|[^A-Za-z0-9_$]failOnNoDiscoveredTests[ \t]*(=[ \t]*true|\.set\([ \t]*true[ \t]*\))/)) {
+    at = RSTART; post = substr(t, RSTART + RLENGTH)  # before stmt(), whose match() and sub() reset RSTART and RLENGTH
+    if (post !~ /^[ \t]*([;})]|$)/ || !stmt(ctx "\n" substr(t, 1, at))) break
+    id = substr(t, at + 1, 1) == "u" ? "useJUnitPlatform" : "failOnNoDiscoveredTests"
+    ids = ids " " id; t = substr(t, 1, at) ")" post
+  }
+  REST = t; return ids
+}
+function moved(f, l,   ids, n, i, a) {  # removed line l of file f (a/<path>) only held settings that the diff adds to build-logic code
+  if (f !~ /^a\/(.*\.gradle(\.kts)?|build-logic\/src\/main\/kotlin\/.*\.kts?)$/) return 0
+  ids = takes(l, ""); if (ids == "" || chk(REST)) return 0
+  n = split(ids, a, " "); for (i = 1; i <= n; i++) if (!index(" " MOVED " ", " " a[i] " ")) return 0
+  return 1
+}'
+MOVE_LEX='
+BEGIN { n = split(ADDED, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1; top = 0; md[0] = "c"; cd = 0 }
+{ # the code of each line: per lexer step a comment gives a space, a string, char or name a #, so `useJUnitPlatform("")` is no
+  # plain call. State (block comment depth, string and template stack) carries over lines, and so does ctx, the code before the line.
+  s = NR == 1 && substr($0, 1, 2) == "#!" ? "" : $0; L = length(s); out = ""; i = 1
+  while (i <= L) {
+    c = substr(s, i, 1); c2 = substr(s, i, 2); c3 = substr(s, i, 3); m = md[top]; out = out (cd > 0 || c2 == "/*" || c2 == "//" ? " " : "#")
+    if (cd > 0) { if (c2 == "/*") { cd++; i += 2 } else if (c2 == "*/") { cd--; i += 2 } else i++; continue }
+    if (m != "c" && m != "t") {  # "s" string (escapes), "r" raw string (closed by the last quote of a run of three or more)
+      if (m == "s" && c == "\\") i += 2
+      else if (m == "s" && c == "\"") { top--; i++ }
+      else if (m == "r" && c3 == "\"\"\"") { while (substr(s, i, 1) == "\"") i++; top-- }
+      else if (c2 == "${") { md[++top] = "t"; bd[top] = 1; i += 2 }
+      else i++
+      continue
+    }
+    if (c2 == "//") break
+    if (c2 == "/*") { cd = 1; i += 2 }
+    else if (c3 == "\"\"\"") { md[++top] = "r"; i += 3 }
+    else if (c == "\"") { md[++top] = "s"; i++ }
+    else if (c == "\047") { j = substr(s, i + 1, 1) == "\\" ? i + 3 : i + 2; while (j <= L && substr(s, j, 1) != "\047") j++; i = j + 1 }
+    else if (c == "`") { j = i + 1; while (j <= L && substr(s, j, 1) != "`") j++; i = j + 1 }
+    else if (m == "t") { if (c == "{") bd[top]++; else if (c == "}" && --bd[top] == 0) top--; i++ }  # template code: blanked too
+    else { out = substr(out, 1, length(out) - 1) c; i++ }
+  }
+  # R1-03: a line break before &&, ||, ?:, ?., ., ::, as or a lambda continues the expression, so the settings of an added line wait for
+  # the next line with code and are dropped when it starts with one of those.
+  w = out; sub(/^[ \t]+/, "", w)
+  if (w != "") { if (w !~ /^(&&|\|\||[?.{]|::|as([^A-Za-z0-9_$]|$))/) printf "%s", pend; pend = "" }
+  if (NR in want) pend = pend takes(out, ctx)
+  ctx = ctx "\n" out; gsub(/[ \t]*\n[ \t\n]*/, "\n", ctx); gsub(/[ \t]+/, " ", ctx); if (length(ctx) > 100) ctx = substr(ctx, length(ctx) - 99)
+}
+END { printf "%s", pend }'
+movedsettings() { # movedsettings <merge-base>: the ids of the movable settings on lines the diff adds to code in build-logic (see above)
+  local f e lines
+  git -c core.quotePath=false diff -z --name-only --no-renames --diff-filter=AMT "$1" HEAD -- \
+      ':(glob)build-logic/src/main/kotlin/**/*.kt' ':(glob)build-logic/src/main/kotlin/**/*.kts' | while IFS= read -r -d '' f; do
+    e=$(git ls-tree HEAD -- ":(literal)$f" | head -n 1)
+    case "$e" in 100644\ blob\ *|100755\ blob\ *) ;; *) continue ;; esac  # a symlink or submodule is no source
+    lines=$(git diff -U0 --no-renames "$1" HEAD -- ":(literal)$f" |
+      awk '/^@@ / { split($3, p, ","); n = (2 in p) ? p[2] : 1; for (k = 0; k < n; k++) printf "%d ", substr(p[1], 2) + k }')
+    e=${e#* blob }; git cat-file blob "${e%%$'\t'*}" | LC_ALL=C awk -v ADDED="$lines" "$MOVE_FN$MOVE_LEX"
+  done
+}
+
 if [ "$STAGED" = 1 ]; then sizecheck --cached; fi
 
 if [ "$STAGED" = 0 ]; then
@@ -744,15 +1062,34 @@ if [ "$STAGED" = 0 ]; then
     sizecheck "$MB" HEAD
     DSPEC=(. ':!docs' ':!handoff' ':!scripts/guards.sh' ':!scripts/hooks/test_guards_sh.py' ':!*package-lock.json')
     # Lowered or removed thresholds and severities.
-    git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
+    moved=$(movedsettings "$MB")
+    git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk -v MOVED="$moved" "$MOVE_FN"'
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
       function testpath(p) {
         return (p ~ /(^|\/)test_[^\/]*\.py$|_test\.py$/ || p ~ /^[ab]\/([^\/]+|core\/[^\/]+)\/src\/(test|androidTest|testFixtures|[a-z]+Test)\/.*\.(kt|java)$/)
       }
+      # Task 1b (M1-68 part B): in a line of a .py file that is no test file on either side, useJUnitPlatform and
+      # failOnNoDiscoveredTests inside a `#` comment or a plain string literal (no prefix or r, b, u, rb, br; an f-string is code)
+      # are a mention, not a setting. An unterminated string leaves the rest of the line as it is. Every other keyword still counts.
+      function pymention(s,   out, i, j, L, c, seg, p) {
+        out = ""; i = 1; L = length(s)
+        while (i <= L) {
+          c = substr(s, i, 1)
+          if (c == "#") { seg = substr(s, i); gsub(/useJUnitPlatform|failOnNoDiscoveredTests/, "mention", seg); return out seg }
+          if (c != "\"" && c != "\047") { out = out c; i++; continue }
+          for (j = i + 1; j <= L && substr(s, j, 1) != c; j++) if (substr(s, j, 1) == "\\") j++
+          if (j > L) return out substr(s, i)
+          seg = substr(s, i, j - i + 1); i = j + 1; p = out; sub(/^.*[^A-Za-z0-9_]/, "", p)
+          if (p ~ /^([rRbBuU]|[rR][bB]|[bB][rR])?$/) gsub(/useJUnitPlatform|failOnNoDiscoveredTests/, "mention", seg)
+          out = out seg
+        }
+        return out
+      }
       /^diff --git/ {
         file = $3
         istest = (NF == 4 && testpath($3) && testpath($4))   # old AND new path must be test files
+        ispy = (NF == 4 && $3 ~ /\.py$/ && $4 ~ /\.py$/ && !testpath($3) && !testpath($4))
         next
       }
       /^(---|\+\+\+)/ { next }
@@ -781,17 +1118,24 @@ if [ "$STAGED" = 0 ]; then
         if ($0 !~ /[0-9]/ && (file ~ /\.md$/ || (file ~ /\.py$/ && lit ~ /^[-+][][ \t(){},;]*$/))) {
           while (match(kw, /[A-Za-z][ \t]+threshold[ \t]+[A-Za-z]/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
         }
+        # Task 1b (see #322): in markdown, plural `thresholds` after a letter-word and before `,`, `;`, `)`, a full stop or a
+        # letter-word is prose even when the line has a digit. A colon, `=`, `|`, a number or the line end after it still count.
+        if (file ~ /\.md$/) {
+          while (match(kw, /[A-Za-z][ \t]+thresholds([,;)]|[.]([ \t]|$)|[ \t]+[A-Za-z])/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
+        }
+        if (ispy) kw = pymention(kw)
       }
       # coverageThreshold (Jest) and fail_under / --cov-fail-under (coverage.py) are named like thresholds but not spelled `threshold`.
       # In a Jest, Vitest, nyc or c8 config the per-metric values sit on their own lines (`branches: 80,`), so those lines count too.
-      kw ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ ||
+      chk(kw) ||
       (file ~ /(jest|vitest|vite)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
-        if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n } else { add[key] = l; addn[key] = n }
+        if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n; remf[key] = file } else { add[key] = l; addn[key] = n }
       }
       END {
         for (k in rem) {
-          if (!(k in add)) { print "guard: removed check setting: " rem[k]; bad = 1 }
+          if (!(k in add) && moved(remf[k], rem[k])) print "guard: note: check setting moved into build-logic: " rem[k]
+          else if (!(k in add)) { print "guard: removed check setting: " rem[k]; bad = 1 }
           else if (remn[k] >= 0 && addn[k] >= 0 && addn[k] < remn[k] && rem[k] !~ /maxIssues/) { print "guard: lowered threshold: " add[k]; bad = 1 }
         }
         exit bad

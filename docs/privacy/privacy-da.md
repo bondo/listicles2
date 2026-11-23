@@ -18,7 +18,9 @@ bestemmer, hvilke data appen indsamler, og som har ansvaret for dem. Spørgsmål
 - din e-mailadresse;
 - din adgangskode, hvis du opretter dig med e-mail og adgangskode (kun Google gemmer den; den ligger aldrig i
   Tallys egen database);
-- hvis du logger ind med Google: din Google-kontos id og det navn, Google deler, når du logger ind;
+- hvis du logger ind med Google: din Google-kontos id og de profiloplysninger, Google deler, når du logger ind:
+  dit navn, din e-mailadresse og et link til dit profilbillede. Appen viser eller bruger ikke billedet.
+  `[Skal bekræftes med M1-67: hvilke af felterne login-posten gemmer.]`
 - hvis du slår totrinsbekræftelse til: det, der skal til for at tjekke koderne fra din godkendelsesapp;
 - tekniske oplysninger, som Google logger, når du logger ind, fx din IP-adresse og hvilken slags enhed eller
   browser du bruger.
@@ -34,7 +36,8 @@ bestemmer, hvilke data appen indsamler, og som har ansvaret for dem. Spørgsmål
 
 **På din telefon:** en kopi af dine lister, så appen også virker uden net, og navnet på din husstand. Begge dele
 slettes, når du logger ud eller sletter din konto. Telefonen husker også, hvornår du sidst åbnede hver liste på den,
-så listerne kan sorteres; det forlader aldrig telefonen. `[Skal bekræftes (M2): om det slettes, når du logger ud.]`
+så listerne kan sorteres; det forlader aldrig telefonen og slettes også, når du logger ud (når du logger ud, ryddes
+alle Tallys data på telefonen for din konto).
 
 Tally har ingen reklamer og **ingen analyseværktøjer**: appen måler ikke, hvordan du bruger den.
 
@@ -55,7 +58,7 @@ Tally har ingen reklamer og **ingen analyseværktøjer**: appen måler ikke, hvo
 
 - **Login (Firebase Authentication)** behandles **i USA**: Google driver kun tjenesten fra datacentre der.
 - **Dine lister og din husstand (Cloud Firestore)** gemmes **i EU**, i Googles placering `eur3` (Belgien og
-  Holland).
+  Holland). Google kan behandle dem uden for EU efter egne vilkår.
 
 ## 5. Nedbrudsrapporter (kun hvis du slår dem til)
 
@@ -65,8 +68,8 @@ fra igen.
 Når de er slået til, og appen går ned, sendes en rapport til Googles Firebase Crashlytics. Den viser fx, hvor i
 appens kode det gik galt (nedbrudssporet), appens version, telefonmodel og Android-version, tekniske detaljer som
 ledig hukommelse og lagerplads, og om telefonen er rootet, samt tilfældige id'er for installationen, så nedbrud fra
-samme telefon kan samles. `[Skal bekræftes (M1-25): rapporten indeholder hverken
-navn, e-mailadresse eller indhold fra lister.]` Google gemmer nedbrudsrapporter i 90 dage.
+samme telefon kan samles. Appen sætter aldrig bruger-id eller egne nøgler i rapporten, så den indeholder hverken
+navn, e-mailadresse eller indhold fra lister. Google gemmer nedbrudsrapporter i 90 dage.
 
 ## 6. Tjek af enheden (App Check)
 
@@ -100,9 +103,19 @@ Google sletter de resterende login-oplysninger hos sig inden for 180 dage og log
 
 ## 8. Ændringer
 
-Hvis teksten ændres på en måde, der betyder noget for dig, står det øverst i den nye udgave sammen med datoen.
+Teksten kan blive ændret. Den gældende udgave er den, der står på denne side.
 
-## 9. Kontakt
+## 9. Dine rettigheder og kontakt
+
+*Ikke juridisk rådgivning.* Du kan bede den ansvarlige om:
+
+- **indsigt**: at se, hvad Tally har om dig;
+- **rettelse**: at få rettet det, der er forkert (dit navn kan du selv ændre under Konto);
+- **sletning**: i appen eller uden den (afsnit 7);
+- og du kan **klage** til Datatilsynet.
+
+Hvorfor Tally behandler dine data: for at levere den app, du har bedt om (en aftale), og for nedbrudsrapporter dit
+samtykke (afbryderen "Send nedbrudsrapporter" under Konto, afsnit 5).
 
 Spørgsmål om dine data eller denne tekst: `[kontakt]`.
 

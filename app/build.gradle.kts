@@ -1,8 +1,10 @@
 import com.google.gms.googleservices.GoogleServicesTask
+import org.gradle.api.artifacts.result.ResolvedComponentResult
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.process.CommandLineArgumentProvider
 
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.listicles.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
@@ -17,15 +19,12 @@ apply(from = rootProject.file("config/licensee/policy.gradle"))
 
 android {
     namespace = "dk.bjarkebjarke.tally"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "dk.bjarkebjarke.tally"
-        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "0.0.1"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -34,11 +33,6 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 
     testOptions {
@@ -139,6 +133,50 @@ if (googleServicesStandIn) {
     }
 }
 
+// M1-26 (R5, PR 317 R1-03): the debug App Check provider must never ship. It is only a debugImplementation dependency;
+// this fails every release build when it is on the release runtime classpath anyway. The self-test property puts it
+// there to prove the check fails (scripts/test_google_services_release_gate.py).
+if (providers.gradleProperty("tally.selfTestDebugAppCheckInRelease").orNull == "true") {
+    dependencies.add("releaseImplementation", libs.firebase.appcheck.debug)
+}
+
+abstract class CheckNoDebugAppCheckInRelease : DefaultTask() {
+    @get:Input abstract val releaseModules: ListProperty<String>
+
+    @TaskAction
+    fun check() {
+        val found = releaseModules.get().filter { it == "com.google.firebase:firebase-appcheck-debug" }
+        if (found.isNotEmpty()) {
+            throw GradleException(
+                "com.google.firebase:firebase-appcheck-debug is on the release runtime classpath " +
+                    "(M1-26, R5).",
+            )
+        }
+    }
+}
+
+val checkNoDebugAppCheckInRelease by tasks.registering(CheckNoDebugAppCheckInRelease::class) {
+    releaseModules.set(
+        configurations
+            .named("releaseRuntimeClasspath")
+            .flatMap { it.incoming.resolutionResult.rootComponent }
+            .map { root ->
+                val seen = mutableSetOf<ResolvedComponentResult>()
+                val pending = ArrayDeque(listOf(root))
+                while (pending.isNotEmpty()) {
+                    val next = pending.removeFirst()
+                    if (seen.add(next)) {
+                        val dependencies = next.dependencies.filterIsInstance<ResolvedDependencyResult>()
+                        pending.addAll(dependencies.map { it.selected })
+                    }
+                }
+                seen.mapNotNull { it.moduleVersion?.let { id -> "${id.group}:${id.name}" } }
+            },
+    )
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkNoDebugAppCheckInRelease) }
+
 // Issue 213: Robolectric downloads its android-all jar at test runtime unless it is told where the jar is, and the
 // test JVM blocks the network (core/testing). So Gradle resolves the jar (verified by gradle/verification-metadata.xml)
 // and copies it to a directory, and every test JVM runs Robolectric offline from there. A missing jar fails the test.
@@ -222,13 +260,6 @@ tasks.withType<Test>().configureEach {
     if (name == "testDebugUnitTest") finalizedBy(checkUnitTestResults)
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        allWarningsAsErrors.set(true)
-    }
-}
-
 dependencies {
     implementation(project(":core:domain"))
     implementation(libs.androidx.core.ktx)
@@ -241,6 +272,11 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.appcheck)
+    // M1-26 (R5): Play Integrity in release, the debug provider in debug builds; neither is enforced yet (M1-O4).
+    releaseImplementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     debugImplementation(libs.compose.ui.tooling)

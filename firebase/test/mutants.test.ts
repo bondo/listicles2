@@ -42,3 +42,21 @@ test.each(MUTANTS)("$name turns the deny suite red", async (mutant) => {
         await env.cleanup();
     }
 });
+
+// The negative case of h.verifiedOnly (M1-08): on rules whose signedIn() forgets email_verified, the
+// unverified request to the caller's own member path is allowed, so the helper must fail. On the real
+// rules it passes (base.test.ts).
+test("verifiedOnly turns red when signedIn() does not check email_verified", async () => {
+    const rules = h.RULES.replace("request.auth.token.email_verified == true", "true");
+    expect(rules).not.toBe(h.RULES);
+    const env = await initializeTestEnvironment({ projectId: h.PROJECT, firestore: { rules } });
+    try {
+        await env.clearFirestore();
+        const own = h.instantiate("households/{hid}/members/{uid}");
+        await expect(h.verifiedOnly(h.connect(env), (db) => db.doc(own).get())).rejects.toThrow(
+            "Expected request to fail",
+        );
+    } finally {
+        await env.cleanup();
+    }
+});

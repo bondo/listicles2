@@ -55,6 +55,7 @@ step merge-ready-tests python3 -I scripts/test_merge_ready.py
 step status-visual-tests python3 -I scripts/test_status_visual.py
 step status-page-tests python3 -I scripts/test_status_page.py
 step status-publish-tests python3 -I scripts/test_status_publish.py
+step status-graph-tests python3 -I scripts/test_status_graph.py
 step status-workflow-tests python3 -I scripts/test_status_workflow.py
 step prompt-rules-tests python3 -I scripts/test_prompt_rules.py
 step prompt-rules python3 -I scripts/prompt_rules.py
@@ -76,6 +77,8 @@ step screenshots-tests python3 -I scripts/test_screenshots.py
 step screenshots-wiring python3 -I scripts/check_screenshots.py
 step ui-emulators-tests python3 -I scripts/test_check_ui_emulators.py
 step ui-emulators python3 -I scripts/check_ui_emulators.py
+step debug-apk-tests python3 -I scripts/test_check_debug_apk.py
+step debug-apk python3 -I scripts/check_debug_apk.py
 step release-smoke-tests python3 -I scripts/test_check_release_smoke.py
 step release-smoke python3 -I scripts/check_release_smoke.py
 step gitignore-secrets-tests python3 -I scripts/test_gitignore_secrets.py

@@ -5,6 +5,8 @@
 // keeps failing until its retries run out, the build fails; it does not fall through to mavenCentral().
 // Checked by scripts/check_gradle_repos.py.
 pluginManagement {
+    // M1-46: convention plugins (listicles.*), so no build script configures other projects.
+    includeBuild("build-logic")
     repositories {
         google {
             content {

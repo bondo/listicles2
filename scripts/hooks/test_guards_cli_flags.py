@@ -753,5 +753,296 @@ class ReviewRound3Tests(CliFlagCase):
         self.assertPasses()
 
 
+class YamlArgsAndActionlintConfigTests(CliFlagCase):
+    """Issue 164 (split from PR 309, ruling 7084379032): the args-like keys of a workflow step or a pre-commit hook (`with: args:`,
+    `eslint_flags:`, pre-commit `args:`) are flags of the tool its `uses:`, `entry:` or `id:` names, and check 2b reads the `ignore:`
+    entries of `.github/actionlint.y*ml`. Both only add failures to main."""
+
+    WF, STEP = ".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n"
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def check(self, path, bad, good):
+        for text, n in bad:
+            with self.subTest(text=text):
+                self.write(path, text)
+                self.assertFails(f"{MARK}: {path}:{n}:")
+        for text in good:
+            with self.subTest(ok=text):
+                self.write(path, text)
+                self.assertPasses()
+
+    def fails(self, path, cases, mark=MARK):
+        for text, n in cases:
+            with self.subTest(text=text):
+                self.write(path, text)
+                self.assertFails(f"{mark}: {path}:{n}:")
+
+    def test_lint_action_args_are_the_tool_flags(self):
+        bad = [
+            ("      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check --ignore E501\n", 3),
+            ("      - name: lint\n        with:\n          args: 'check --fix'\n        uses: astral-sh/ruff-action@v3\n", 3),
+            ("      - uses: reviewdog/action-eslint@v1\n        with:\n          eslint_flags: '--quiet src'\n", 3),
+            ("      - uses: reviewdog/action-actionlint@v1\n        with:\n          actionlint_flags: -ignore SC2086\n", 3),
+            ("      - uses: astral-sh/ruff-action@v3\n        with:\n          args: >\n            check\n            --exit-zero\n", 3),
+            ("      - uses: docker://rhysd/actionlint:1.7.7\n        with:\n          args: -pyflakes= .github/workflows/ci.yml\n", 3),
+        ]
+        for text, n in bad:
+            with self.subTest(text=text):
+                self.write(".github/workflows/ci.yml", text)
+                self.assertFails(f"{MARK}: .github/workflows/ci.yml:{n}:")
+
+    def test_allowed_action_args_other_actions_and_reasons_pass(self):
+        for text in [
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check --config ruff.toml\n",
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: format --check\n",
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check\n      - uses: actions/upload-artifact@v4\n"
+            "        with:\n          args: --fix\n",
+            "      - uses: astral-sh/ruff-action@v3\n        with:\n          args: check --fix # justified: formatting job commits the result\n",
+            "      - id: ruff\n        uses: actions/upload-artifact@v4\n        with:\n          args: --fix\n",
+        ]:
+            with self.subTest(text=text):
+                self.write(".github/workflows/ci.yml", text)
+                self.assertPasses()
+
+    def test_pre_commit_args_are_the_hook_flags(self):
+        head = "repos:\n  - repo: https://github.com/astral-sh/ruff-pre-commit\n    rev: v0.8.0\n    hooks:\n"
+        bad = [
+            (head + "      - id: ruff\n        args: [--fix]\n      - id: ruff-format\n", 6),
+            (head + "      - id: ruff-check\n        args: [--target-version, py37]\n", 6),
+            (head + "      - id: mypy\n        args:\n        - --ignore-missing-imports\n", 6),
+            (head + "      - id: mypy\n        args:\n          - --strict\n          - --allow-untyped-defs\n", 6),
+            (head + "      - id: lint\n        entry: eslint\n        language: system\n        args: ['--quiet']\n", 8),
+            (head + "      - {id: ruff, args: [--fix]}\n", 5),
+            (head + "      - id: ruff-format\n        args: [--line-length=120]\n", 6),
+        ]
+        for text, n in bad:
+            with self.subTest(text=text):
+                self.write(".pre-commit-config.yaml", text)
+                self.assertFails(f"{MARK}: .pre-commit-config.yaml:{n}:")
+        for text in [
+            head + "      - id: ruff-format\n        args: [--check]\n      - id: ruff\n        args: [--config, ruff.toml]\n",
+            head + "      - id: mypy\n        args: [--strict]\n        additional_dependencies:\n          - types-requests\n",
+            head + "      - id: check-yaml\n        args: [--unsafe]\n",
+            head + "      - id: ruff\n        args: [--fix]  # justified: local hook only, CI checks again\n",
+        ]:
+            with self.subTest(ok=text):
+                self.write(".pre-commit-config.yaml", text)
+                self.assertPasses()
+
+    def test_actionlint_config_ignore_entries_need_a_reason_each(self):
+        SUP = "guard: unjustified suppression: "
+        for path in [".github/actionlint.yaml", ".github/actionlint.yml"]:
+            with self.subTest(path=path):
+                self.write(path, "paths:\n  .github/workflows/**/*.yml:\n    ignore:\n      - 'SC2086'\n")
+                self.assertFails(SUP + path + ":3:")
+                self.write(path, "paths:\n  .github/workflows/**/*.yml:\n    ignore: # justified: upstream false positive tracked\n      - 'SC2086'\n")
+                self.assertFails(SUP + path + ":4:")
+                self.write(path, "paths:\n  x.yml:\n    ignore: ['SC2086']\n")
+                self.assertFails(SUP + path + ":3:")
+                self.repo.git("rm", "-q", path)
+                self.repo.commit()
+        self.write(".github/actionlint.yaml", "paths:\n  .github/workflows/**/*.yml:\n    ignore: # justified: upstream false positive tracked\n"
+                   "      - 'SC2086' # justified: upstream false positive tracked\nself-hosted-runner:\n  labels: [big]\n")
+        self.assertPasses()
+
+    def test_workflow_args_keys(self):
+        ruff, rd = "      - uses: astral-sh/ruff-action@v3\n        with:\n", "      - uses: reviewdog/action-eslint@v1\n        with:\n"
+        self.check(".github/workflows/ci.yml", [
+            (ruff + "          args: check --ignore E501\n          x_args: ok\n", 3),
+            (rd + "          eslint_flags: --quiet\n          reviewdog_flags: ''\n", 3),
+            (ruff + '          "args": check --ignore E501\n', 3),
+            ("      - uses: astral-sh/ruff-action@v3\n        with: {args: check --ignore E501}\n", 2),
+            ('      - "uses": astral-sh/ruff-action@v3\n        with:\n          args: check --fix\n', 3),
+        ], [rd + "          reviewdog_flags: -fail-level=error\n          eslint_flags: --max-warnings 0\n"])
+
+    def test_pre_commit_args_keys(self):
+        head = "repos:\n  - repo: local\n    hooks:\n"
+        self.check(".pre-commit-config.yaml", [
+            (head + "      - id: ruff\n        args: [--ignore, E501]\n        verbose_args: []\n", 5),
+            (head + '      - "id": ruff\n        args: [--fix]\n', 5),
+        ], [])
+
+    def test_actionlint_config_quoted_and_flow_ignore(self):
+        for text, n in [('paths:\n  x.yml:\n    "ignore":\n      - SC2086\n', 3), ("paths:\n  x.yml:\n    'ignore': [SC2086]\n", 3),
+                        ("paths:\n  x.yml: {ignore: [SC2086]}\n", 2)]:
+            with self.subTest(text=text):
+                self.write(".github/actionlint.yaml", text)
+                self.assertFails(f"guard: unjustified suppression: .github/actionlint.yaml:{n}:")
+
+    def test_actionlint_ignore_anchor_tag_and_alias(self):
+        r = " # justified: upstream false positive tracked\n"
+        self.fails(".github/actionlint.yaml", [
+            ("paths:\n  x.yml:\n    ignore: &a" + r + "      - SC2086\n      - SC2046\n", 4),
+            ("paths:\n  x.yml:\n    ignore: !!seq" + r + "      - SC2086\n", 4),
+            ("x: &l\n  - SC2086\npaths:\n  x.yml:\n    ignore: *l" + r, 5),
+        ], "guard: unjustified suppression")
+
+    def test_bare_dash_items_and_key_case(self):
+        s, w = self.STEP, "        with:\n"
+        self.fails(self.WF, [
+            (s + "      -\n        uses: astral-sh/ruff-action@v3\n" + w + "          args: check --fix\n", 7),
+            (s + "      - uses: astral-sh/ruff-action@v3\n" + w + "          ARGS: check --fix\n", 6),
+            (s + "      - uses: astral-sh/ruff-action@v3\n" + w + "          Args: check --fix\n", 6),
+        ])
+
+    def test_a_reason_waives_only_its_own_line_of_an_args_key(self):
+        h = "repos:\n  - repo: x\n    hooks:\n      - id: ruff\n"
+        r = " # justified: three words here\n"
+        self.fails(".pre-commit-config.yaml", [
+            (h + "        args:\n          - --ignore=E501\n          - --config=ruff.toml" + r, 5),
+            (h + "        args:" + r + "          - --fix\n", 5),
+            (h + "        args: [--config=ruff.toml," + r + "          --fix]\n", 5),
+        ])
+        self.write(".pre-commit-config.yaml", h + "        args:\n          - --fix" + r + "          - --config=ruff.toml\n")
+        self.assertPasses()
+
+
+class PrReviewRound1SplitTests(CliFlagCase):
+    """PR 321 review round 1: R1-01 a flow list splits on every comma outside quotes, R1-02 a double-quoted YAML key written with an
+    escape fails closed in the actionlint config and in a workflow step or pre-commit hook."""
+
+    def write(self, rel, text):
+        self.repo.write(rel, text)
+        self.repo.commit()
+
+    def test_flow_lists_and_escaped_keys(self):
+        pc, h = ".pre-commit-config.yaml", "repos:\n  - repo: local\n    hooks:\n"
+        wf, step = ".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - uses: astral-sh/ruff-action@v3\n        with:\n"
+        for path, text, n, mark in [
+            (pc, h + "      - id: ruff\n        args: [.,--fix]\n", 5, MARK),
+            (pc, h + "      - id: lint\n        entry: eslint\n        args: [src,--quiet]\n", 6, MARK),
+            (pc, h + "      - {id: ruff, args: [.,--fix]}\n", 4, MARK),
+            (pc, h + '      - id: ruff\n        "ar\\x67s": [--fix]\n', 5, MARK),
+            (wf, step + '          "ar\\u0067s": check --fix\n', 6, MARK),
+            (".github/actionlint.yaml", 'paths:\n  x.yml:\n    "ign\\x6Fre":\n      - SC2086\n', 3, "guard: unjustified suppression"),
+        ]:
+            with self.subTest(text=text):
+                self.write(path, text)
+                self.assertFails(f"{mark}: {path}:{n}:")
+                self.repo.git("rm", "-q", path)
+                self.repo.commit()
+        for text in [h + "      - id: ruff\n        args: [--config,ruff.toml]\n", h + "      - id: ruff\n        args: ['--output-format=a,--b']\n"]:
+            with self.subTest(ok=text):
+                self.write(pc, text)
+                self.assertPasses()
+
+
+class NpmTailResolutionTests(CliFlagCase):
+    """Task M1-65 (issue 164 item 3, PR 309 ruling 7084379032): an npm `--` tail is resolved through the package.json scripts only for
+    the npm forms, and only when every tracked definition of the script ends in a plain `[npx] <runner> <words>`. Any other layout, any
+    `"scripts"` token outside the one strict layout and any `\\u` make every tail unknown, and an unknown tail keeps main's union check."""
+
+    JEST = '{\n  "scripts": {\n    "test": "jest"\n  }\n}\n'
+    LINE = "cd tools && npm test -- --quiet"
+
+    def write(self, rel, text):
+        self.repo.write(rel, text, raw=True)
+        self.repo.git("add", "-A")
+        self.repo.git("commit", "-q", "--allow-empty", "-m", "c")
+
+    def scripts(self, entries):
+        return '{\n  "name": "t",\n  "scripts": {\n' + ",\n".join(f'    "{k}": "{v}"' for k, v in entries) + '\n  }\n}\n'
+
+    def fails_with(self, pkg, line=LINE):
+        self.write("tools/package.json", pkg)
+        self.write("scripts/lint.sh", line + "\n")
+        self.assertFails(MARK + ": scripts/lint.sh:1:")
+
+    def setUp(self):
+        super().setUp()
+        self.write("firebase/package.json", self.JEST)
+
+    def test_a_tail_that_reaches_a_test_runner_passes(self):
+        self.write("tools/package.json", self.scripts([
+            ("test", "jest"), ("e2e", "npx playwright test"), ("unit", "npx jest --ci"), ("m", "mocha --recursive"),
+            ("cy", "cypress run --spec a/b.cy.ts"), ("ci", "npm test -- -u")]))
+        for line in ["cd tools && npm test -- -u", "npm run e2e -- -c x.ts", "npm t -- --coverage", "npm tst -- -u",
+                     "npm run-script unit -- --watch", "npm -s test -- -u", "npm run --silent e2e -- --headed", "npm rum m -- --quiet",
+                     "npm urn cy -- --browser chrome", "npm test -- -- --quiet"]:
+            with self.subTest(ok=line):
+                self.write("scripts/lint.sh", line + "\n")
+                self.assertPasses()
+        self.write("scripts/lint.sh", "true\n")
+        self.write(".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - run: cd tools && npm test -- -u\n")
+        self.assertPasses()
+        self.write("tools/package.json", self.scripts([("test", "jest")]).replace("\n", "\r\n"))
+        self.write("scripts/lint.sh", "cd tools && npm test -- -u\n")
+        self.assertPasses()
+
+    def test_r4_01_and_n1_to_n4_any_other_scripts_layout_makes_every_tail_unknown(self):
+        strict = self.JEST[:-2] + ",\n"
+        for pkg in [
+            '{\n  "name": "t",\n  "scripts"\n  : {\n    "test": "eslint ."\n  }\n}\n',  # R4-01
+            '{\n  "name": "t",\n  "scripts"\n  :\n  {\n    "test": "eslint ."\n  }\n}\n',
+            '{\n  "name": "t",\n  "scripts"\r: {\n    "test": "eslint ."\n  }\n}\n',
+            strict + '  "scripts"\n  : {\n    "test": "eslint ."\n  }\n}\n',
+            '{\n  "x": {\n    "a": 1}, "scripts": {\n    "test": "eslint ."\n  }\n}\n',  # N1
+            '{\n  "x": {\n    "a": 1}, "scr\\u0069pts": {\n    "test": "eslint ."\n  }\n}\n',  # N2
+            '{\n  "x": {\n    "a": 1\n  }, "scripts"\n  : {\n    "test": "eslint ."\n  }\n}\n',  # N3
+            '{ "scripts"\n: {\n    "test": "eslint ."\n  }\n}\n',  # N4
+            strict + '  "scripts": {\n    "test": "eslint ."\n  }\n}\n',
+            strict + '  "scr\\u0069pts": {\n    "test": "eslint ."\n  }\n}\n',
+            '{\n  "scripts": {"test": "jest"}\n}\n',
+            '{\n  "x": {\n    "scripts": {\n      "test": "jest"\n    }\n  },\n  "scripts": {\n    "test": "jest"\n  }\n}\n',
+            '{\n  "description": "scripts",\n  "scripts": {\n    "test": "jest"\n  }\n}\n',
+            '{\n  "description": "caf\\u00e9",\n  "scripts": {\n    "test": "jest"\n  }\n}\n',  # R3-03: fails closed
+            '{\n  "scripts": {\n    "test": "jest", "lint": "eslint ."\n  }\n}\n',
+            '{\n  "scripts": {\n\n    "test": "jest"\n  }\n}\n',
+            '{\n  "scripts": {\n    "test": "jest"\n',
+        ]:
+            with self.subTest(pkg=pkg):
+                self.fails_with(pkg)
+
+    def test_a_script_that_is_not_a_plain_runner_keeps_the_union_check(self):
+        for cmd in ["eslint .", "jest && eslint .", "jest; eslint .", "jest | eslint .", "jest || eslint .", "jest & eslint .",
+                    "eslint . \\\\; jest", "jest \\\"$X\\\"", "jest $(eslint)", "jest `x`", "CI=1 jest", "npx -y jest", "node jest.js",
+                    "firebase emulators:exec --only firestore", "npx", "jest;", "(jest)", "jest # x", "./node_modules/.bin/jest",
+                    "jest > out", "jest ~/x", "jest \\u0026\\u0026 eslint .", "vitest run", "npx vitest",
+                    "jest() { eslint $@ ; } ; jest", "PATH=lint:/usr/bin:/bin ; jest", "eslint . ';jest", "eslint . #;jest",
+                    "tsc --noEmit && jest", "cp lint/jest node_modules/.bin/jest ; jest",
+                    "jest \\neslint .", "jest ; eslint ."]:  # PR 330 R1-01: a JSON newline and a `;` after the runner
+            with self.subTest(cmd=cmd):
+                self.fails_with(self.scripts([("test", cmd)]))
+        self.write("firebase/package.json", self.scripts([("test", "eslint .")]))  # every definition of the name must be a runner
+        self.fails_with(self.scripts([("test", "jest")]))
+        self.write("firebase/package.json", self.JEST)
+        for path in ["docs/x/package.json", "build/package.json", "x/node_modules/y/package.json"]:  # every tracked file, excluded paths too
+            with self.subTest(path=path):
+                self.write(path, self.scripts([("test", "eslint .")]))
+                self.fails_with(self.scripts([("test", "jest")]))
+                self.repo.git("rm", "-q", path)
+
+    def test_c1_c2_npm_forms_only(self):
+        pkg = self.scripts([("t", "eslint ."), ("tst", "eslint ."), ("test", "jest")])
+        for line in ["cd tools && yarn t -- --quiet", "cd tools && yarn tst -- --quiet", "yarn test -- --quiet", "pnpm test -- --quiet",
+                     "bun test -- --quiet", "npx jest -- --quiet", "npm exec jest -- --quiet", "npm run t -- --quiet",
+                     "npm --prefix tools test -- --quiet", "npm --workspace=tools test -- --quiet", "npm start -- --quiet",
+                     "npm run -- test --quiet", "npm run --prefix x test -- --quiet", "npm it -- --quiet", "./bin/npm test -- --quiet",
+                     "scripts/npm test -- --quiet", "x: npm test -- --quiet", "- npm test -- --quiet", "sudo npm test -- --quiet",
+                     # PR 330 R1-01: a word after the name, a name no tracked package.json defines, a value option after run
+                     "npm test --prefix node_modules/x -- --quiet", "npm run lint -- --quiet", "npm run --workspace=node_modules/x test -- --quiet"]:
+            with self.subTest(line=line):
+                self.fails_with(pkg, line)
+        for line in ["cd tools && npm t -- --quiet", "npm tst -- --quiet", "npm run test -- --quiet"]:
+            with self.subTest(ok=line):
+                self.write("scripts/lint.sh", line + "\n")
+                self.assertPasses()
+
+    def test_a_reason_still_waives_an_unknown_tail_and_staged_mode_reads_the_index(self):
+        self.write("tools/package.json", self.scripts([("test", "eslint .")]))
+        self.write("scripts/lint.sh", self.LINE + " # justified: three words here\n")
+        self.assertPasses()
+        self.repo.write("scripts/lint.sh", "cd tools && npm test -- -u\n", raw=True)
+        self.repo.git("add", "scripts/lint.sh")
+        self.assertFails(MARK + ": scripts/lint.sh:1:", "--staged")
+        self.repo.write("tools/package.json", self.scripts([("test", "jest")]), raw=True)  # the worktree resolves, the index does not
+        self.assertFails(MARK + ": scripts/lint.sh:1:", "--staged")
+        self.repo.git("add", "tools/package.json")
+        self.assertPasses("--staged")
+
+
 if __name__ == "__main__":
     unittest.main()
