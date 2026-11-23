@@ -41,7 +41,7 @@ def kind(ok: Callable[[Any], bool], what: str) -> Check:
 
 
 def pattern(rx: str, what: str) -> Check:
-    return kind(lambda v: isinstance(v, str) and re.fullmatch(rx, v) is not None, what)
+    return kind(lambda v: isinstance(v, str) and re.fullmatch(rx, v, re.ASCII) is not None, what)
 
 
 def one_of(*values: str) -> Check:
@@ -85,7 +85,7 @@ TEXT = kind(lambda v: isinstance(v, str) and v.strip() != "" and not set(v) & {"
 COUNT = kind(lambda v: type(v) is int and v >= 0, "a whole number >= 0")
 NUMBER = kind(lambda v: type(v) is int and v > 0, "a PR or issue number")
 def is_time(v: Any) -> bool:
-    if not isinstance(v, str) or not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d)?Z", v):
+    if not isinstance(v, str) or not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d)?Z", v, re.ASCII):
         return False
     try:
         datetime.strptime(v, "%Y-%m-%dT%H:%M:%SZ" if v.count(":") == 2 else "%Y-%m-%dT%H:%MZ")
@@ -99,8 +99,20 @@ SESSION = pattern(r"session_[A-Za-z0-9]+", "a session id")
 TASK = pattern(r"M\d+(\.\d+)?-(\d\d|O\d+|FU)", "a task id")
 SHA = pattern(r"[0-9a-f]{7,40}", "a commit SHA")
 ROLE = pattern(r"[a-z][a-z-]*", "a role (lower case, e.g. implementer)")
-USAGE = pattern(r"ok|near limit \((5-hour(, forecast|, rateLimitType unknown)?|7-day|overage)\)|paused until \d\d:\d\d UTC",
-                "one of the ORCHESTRATION.md 3.1 usage states")
+USAGE_RX = r"ok|near limit \((5-hour(, forecast|, rateLimitType unknown)?|7-day|overage)\)|paused until (?P<hhmm>\d\d:\d\d) UTC"
+
+
+def is_usage(v: Any) -> bool:
+    m = re.fullmatch(USAGE_RX, v, re.ASCII) if isinstance(v, str) else None
+    if m is None:
+        return False
+    try:
+        return m["hhmm"] is None or bool(datetime.strptime(m["hhmm"], "%H:%M"))
+    except ValueError:
+        return False
+
+
+USAGE = kind(is_usage, "one of the ORCHESTRATION.md 3.1 usage states")
 STATUSES = ("running", "idle-with-result", "idle-no-result", "failed", "archived", "interrupted (usage)")
 
 TAG = pattern(r"[a-z][a-z-]*:\S+", "a session tag like pr:319 (ORCHESTRATION.md 2.1)")
@@ -136,7 +148,10 @@ def cross_checks(data: dict) -> list[str]:
     for key, label, name in (("sessions", "session", "id"), ("branches", "branch", "name")):
         seen = [row[name] for row in data[key]]
         errs += [f"duplicate {label} {x}" for x in sorted({x for x in seen if seen.count(x) > 1})]
-    claims = [t for row in data["sessions"] for t in row["tasks"]]
+    for key, ids in (("sessions", "tasks"), ("branches", "in_review")):
+        for i, row in enumerate(data[key]):
+            errs += [f"{key}[{i}]: {t} listed twice" for t in sorted({t for t in row[ids] if row[ids].count(t) > 1})]
+    claims = [t for row in data["sessions"] for t in set(row["tasks"])]
     errs += [f"{t} is claimed by {claims.count(t)} sessions" for t in sorted({t for t in claims if claims.count(t) > 1})]
     for i, row in enumerate(data["sessions"]):
         if row["status"] in ("archived", "failed") and row["tasks"]:
@@ -158,12 +173,12 @@ def no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict:
 
 def find_block(lines: list[str]) -> tuple[int, int]:
     """Line indexes of the opening and closing fence of the one ```json block."""
-    opens = [i for i, ln in enumerate(lines) if ln.rstrip() == FENCE_OPEN]
+    opens = [i for i, ln in enumerate(lines) if ln.rstrip(" \t") == FENCE_OPEN]
     if not opens:
         raise StateError([f"no {FENCE_OPEN} block in the body"])
     if len(opens) > 1:
         raise StateError([f"{len(opens)} {FENCE_OPEN} blocks in the body; exactly one holds the state"])
-    close = next((i for i in range(opens[0] + 1, len(lines)) if lines[i].rstrip() == FENCE_CLOSE), None)
+    close = next((i for i in range(opens[0] + 1, len(lines)) if lines[i].rstrip(" \t") == FENCE_CLOSE), None)
     if close is None:
         raise StateError([f"the {FENCE_OPEN} block is not closed with {FENCE_CLOSE}"])
     return opens[0], close
@@ -173,7 +188,7 @@ def load(text: str) -> dict:
     """The validated state; raises StateError with every problem found."""
     if not text.strip():
         raise StateError(["the body is empty (a failed gh call?); refusing to read it as no state"])
-    lines = text.splitlines()
+    lines = re.split(r"\r\n|\r|\n", text)  # CommonMark line ends only, not str.splitlines()' U+2028, U+0085 (R1-01)
     start, end = find_block(lines)
     try:
         data = json.loads("\n".join(lines[start + 1:end]), object_pairs_hook=no_duplicate_keys)
