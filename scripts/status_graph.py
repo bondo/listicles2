@@ -41,7 +41,7 @@ PALETTE = (("orange", "#e69f00"), ("sky blue", "#56b4e9"), ("bluish green", "#00
 
 CSS = (
     ".bg{fill:#ffffff}.card{fill:#f6f8fa}.fg{fill:#1f2328}.muted{fill:#59636e}.ok{fill:#1a7f37}.info{fill:#0969da}"
-    ".warn{fill:#9a6700}.bad{fill:#cf222e}.edge{fill:none;stroke-width:1.2}.crit{stroke-width:3}.key{stroke:#8c959f}"
+    ".warn{fill:#9a6700}.bad{fill:#cf222e}.edge{fill:none;stroke-width:1.8}.crit{stroke-width:3.6}.key{stroke:#8c959f}"
     + "".join(f".s{k}{{stroke:{c}}}.f{k}{{fill:{c}}}" for k, (_, c) in enumerate(PALETTE)) +
     ".nd-ready{fill:#dafbe1;stroke:#1a7f37}.nd-review{fill:#ddf4ff;stroke:#0969da}"
     ".nd-blocked{fill:#fff8c5;stroke:#9a6700}.nd-owner{fill:#ffebe9;stroke:#cf222e}"
@@ -218,11 +218,12 @@ def source_colours(points, colours=None):
     colours = colours or len(PALETTE)
     boxes = {}
     for (a, _), pts in points.items():
-        boxes.setdefault(a, []).extend((min(p[0], q[0]) - CONFLICT, min(p[1], q[1]) - CONFLICT, max(p[0], q[0]) + CONFLICT, max(p[1], q[1]) + CONFLICT)
+        boxes.setdefault(a, []).extend((min(p[0], q[0]), min(p[1], q[1]), max(p[0], q[0]), max(p[1], q[1]))
                                        for p, q in zip(pts, pts[1:], strict=False) if p != q)
     near = {a: set() for a in boxes}
     for a, b in ((a, b) for a in boxes for b in boxes if a < b):
-        if any(p[0] <= q[2] and q[0] <= p[2] and p[1] <= q[3] and q[1] <= p[3] for p in boxes[a] for q in boxes[b]):
+        if any(p[0] <= q[2] + CONFLICT and q[0] <= p[2] + CONFLICT and p[1] <= q[3] + CONFLICT and q[1] <= p[3] + CONFLICT
+               for p in boxes[a] for q in boxes[b]):
             near[a].add(b)
             near[b].add(a)
     out, used = {}, [0] * colours
