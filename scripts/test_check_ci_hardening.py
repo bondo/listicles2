@@ -244,6 +244,13 @@ class Rules(unittest.TestCase):
             ("no hashes", "pip install -r scripts/requirements-ci.txt"),
             ("after a pipe", "echo x | pip install -r scripts/requirements-ci.txt"),
             ("in a chain", "cd scripts && pip install ruff"),
+            ("global flag", "pip -q install ruff"),
+            ("global option", "pip --disable-pip-version-check install ruff"),
+            ("global option with a value", "pip --log pip.log install ruff"),
+            ("python -m pip with a flag", "python3 -m pip -q install ruff"),
+            ("versioned pip", "pip3.13 install ruff"),
+            ("-mpip", "python3 -mpip install ruff"),
+            ("flag on a hashed install", "pip -q install --require-hashes -r scripts/requirements-ci.txt"),
         ):
             with self.subTest(label):
                 self.setUp()
@@ -255,6 +262,10 @@ class Rules(unittest.TestCase):
 
     def test_a_commented_out_or_quoted_pip_install_is_not_a_command(self):
         self.assertEqual(self.edit_yaml(CI, lambda w: w["jobs"]["static"]["steps"].append({"run": "# pip install ruff\necho done"})), [])
+        for harmless in ("pip --version", "pip freeze", "echo pip is not installed here", "pip-compile --version", "pip list | grep install"):
+            with self.subTest(harmless):
+                self.setUp()
+                self.assertEqual(self.edit_yaml(CI, lambda w, harmless=harmless: w["jobs"]["static"]["steps"].append({"run": harmless})), [])
         self.assertEqual(self.edit_yaml(CI, lambda w: w["jobs"]["static"]["steps"].append({"run": INSTALL_LINT})), [])
 
     def test_the_lock_files_are_owned_by_the_owner(self):
