@@ -1,6 +1,7 @@
 package dk.bjarkebjarke.tally.start
 
 import android.content.Context
+import androidx.core.content.pm.PackageInfoCompat
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -43,7 +44,10 @@ object GateModule {
         remote: MinVersionRemote,
         store: MinVersionStore,
     ): UpdateGate {
-        val installed = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+        val installed =
+            PackageInfoCompat.getLongVersionCode(
+                context.packageManager.getPackageInfo(context.packageName, 0),
+            )
         return MinVersionGate(remote, store, installed)
     }
 
