@@ -20,7 +20,6 @@ what data the app collects and is responsible for it. Questions go to the contac
   it);
 - if you sign in with Google: your Google account's identifier and the profile data Google shares at sign-in: your
   name, your email address and a link to your profile photo. The app does not show or use the photo.
-  `[To confirm with M1-67: which of these fields the sign-in record keeps.]`
 - if you turn on two-step verification: what is needed to check your authenticator app's codes;
 - technical data that Google logs when you sign in, such as your IP address and the type of device or browser.
 

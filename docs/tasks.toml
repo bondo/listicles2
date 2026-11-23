@@ -1001,10 +1001,11 @@ notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait
 id = "M1-67"
 title = "Auth data 2: Firebase session state, Google ID-token sign-in, per-session Firestore holder in :core:data (Auth and Firestore emulator tests)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-14"]
+pr = 348
 notes = "Split from M1-14 (PR 319). Implements the M1-14 domain interfaces: SessionState and Authentication over FirebaseAuth (signInWithCredential with GoogleAuthProvider), LocalUserData over a per-session Firestore holder (waitForPendingWrites; terminate, then clearPersistence; a new instance at the next use, step 6). Emulator tests from docs/milestones/M1.md (M1-14): a Google-style credential signs in and the token has email_verified; sign-out clears the session; Sign out anyway drops a write no listener saw; the holder makes a new instance. Also check and record which fields the Firebase Auth record keeps for Google sign-in: name, email, photo link (feeds privacy Q5; moved here from M1-14). No licence question: :core:data has no licensee gate until M1-66. A compiled, never-run draft is on PR 319"
 
 [[task]]
@@ -1015,7 +1016,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-67", "M1-O14"]
-notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule. Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14"
+notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule: FirebaseAuthentication binds SessionState and Authentication, and one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc). Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14"
 
 [[task]]
 id = "M1-15"
@@ -1693,7 +1694,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da). Sign-out wording: the list and item listeners feed LocalUserData.unsentChangesSeen from hasPendingWrites (M1-67's FirestoreSession answers false until a listener exists, so the question uses wireframe 45, not 39)"
 
 [[task]]
 id = "M2-FU"

@@ -20,7 +20,6 @@ bestemmer, hvilke data appen indsamler, og som har ansvaret for dem. Spørgsmål
   Tallys egen database);
 - hvis du logger ind med Google: din Google-kontos id og de profiloplysninger, Google deler, når du logger ind:
   dit navn, din e-mailadresse og et link til dit profilbillede. Appen viser eller bruger ikke billedet.
-  `[Skal bekræftes med M1-67: hvilke af felterne login-posten gemmer.]`
 - hvis du slår totrinsbekræftelse til: det, der skal til for at tjekke koderne fra din godkendelsesapp;
 - tekniske oplysninger, som Google logger, når du logger ind, fx din IP-adresse og hvilken slags enhed eller
   browser du bruger.
