@@ -1657,6 +1657,8 @@ class MovedCheckSettings(DiffCase):
             "/* one /* nested */ block */ useJUnitPlatform()\n/*\n x\n*/ failOnNoDiscoveredTests = true",
             "val `name with useJUnitPlatform() in it` = 1; useJUnitPlatform()\nrun { failOnNoDiscoveredTests = true }",
             "useJUnitPlatform(/* no options */)\nfailOnNoDiscoveredTests = /* on */ true",
+            'maxParallelForks = 2\nuseJUnitPlatform()\nval s = "x"\n// a comment line\nfailOnNoDiscoveredTests = true',
+            "run { -> useJUnitPlatform() }\nthis.failOnNoDiscoveredTests = true",
         ]:
             with self.subTest(body=body):
                 self.move(body)
@@ -1704,6 +1706,32 @@ class MovedCheckSettings(DiffCase):
         ]:
             with self.subTest(body=body):
                 self.move(body)
+                self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+                self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_a_declaration_or_an_argument_is_not_the_setting(self):
+        """Self-review: only a statement sets it; `val`, `fun`, a named argument or an assignment right-hand side does not."""
+        long = "c" * 300
+        for body in [
+            "val failOnNoDiscoveredTests = true\nfun useJUnitPlatform() {}",
+            "interface I { fun useJUnitPlatform() }\ng(failOnNoDiscoveredTests = true)",
+            "fun\nuseJUnitPlatform() {}\ng(\n    failOnNoDiscoveredTests = true,\n)",
+            "val x =\n    useJUnitPlatform()\nval y = listOf(1,\nfailOnNoDiscoveredTests = true)",
+            f"val x = /* {long} */\nuseJUnitPlatform()\nval y =\n// {long}\nfailOnNoDiscoveredTests = true",
+            "other.useJUnitPlatform()\nxit.failOnNoDiscoveredTests = true",
+            "fun <T> useJUnitPlatform() {}\nvar\nfailOnNoDiscoveredTests = true",
+        ]:
+            with self.subTest(body=body):
+                self.move(body)
+                self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
+                self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
+
+    def test_a_shebang_line_is_a_comment(self):
+        """Self-review: Kotlin reads `#!` at the start of a .kt or .kts file as a comment."""
+        for path in [self.PLUGIN, "build-logic/src/main/kotlin/listicles.tests.gradle.kts"]:
+            with self.subTest(path=path):
+                self.repo.write(self.MODULE, self.MODULE_MOVED)
+                self.change(path, "#! useJUnitPlatform(); failOnNoDiscoveredTests = true\n" + self.PLUGIN_BASE)
                 self.assertFails("guard: removed check setting: unitTests.all { it.useJUnitPlatform() }")
                 self.assertFails("guard: removed check setting: failOnNoDiscoveredTests = true")
 
