@@ -21,7 +21,8 @@ NEW = "octo-org/renamed.repo"
 
 PARSED = {
     "https://github.com/bondo/listicles2": OLD, "https://github.com/bondo/listicles2.git": OLD, "https://github.com/bondo/listicles2/": OLD,
-    "http://github.com/bondo/listicles2": OLD, "https://www.github.com/bondo/listicles2": OLD, "https://x-access-token:t0k@github.com/bondo/listicles2.git": OLD,
+    "http://github.com/bondo/listicles2": OLD, "https://www.github.com/bondo/listicles2": OLD,
+    "https://x-access-token:t0k@github.com/bondo/listicles2.git": OLD,
     "git@github.com:bondo/listicles2.git": OLD, "git@github.com:bondo/listicles2": OLD, "ssh://git@github.com/bondo/listicles2.git": OLD,
     "ssh://git@github.com:22/bondo/listicles2": OLD, "http://local_proxy@127.0.0.1:43123/git/bondo/listicles2": OLD,
     "http://local_proxy@127.0.0.1:43123/git/bondo/listicles2.git": OLD, "http://localhost:8080/git/bondo/listicles2": OLD,
@@ -33,7 +34,8 @@ UNPARSABLE = [
     "https://github.com/bondo/..", "https://github.com/bondo/.", "https://github.com/bondo/.git", "https://github.com.evil.example/bondo/listicles2",
     "https://evil.example/github.com/bondo/listicles2", "http://127.0.0.1:1/bondo/listicles2", "http://evil.example/git/bondo/listicles2",
     "file:///srv/git/listicles2.git", "/srv/git/listicles2.git", "https://github.com/bondo/listicles2\n", " https://github.com/bondo/listicles2",
-    "https://github.com/bon do/listicles2", "https://github.com/bondo/list icles2", "https://github.com//listicles2", "git@gitlab.com:bondo/listicles2.git", "host:x@github.com:bondo/listicles2",
+    "https://github.com/bon do/listicles2", "https://github.com/bondo/list icles2", "https://github.com//listicles2", "git@gitlab.com:bondo/listicles2.git",
+    "host:x@github.com:bondo/listicles2",
 ]
 
 

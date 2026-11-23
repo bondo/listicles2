@@ -40,7 +40,8 @@ class UpdateBranch(unittest.TestCase):
         src = read_wrapper()
         self.assertEqual(len(GH_DIRS_LINE.findall(src)), 1, 'scripts/update-branch.sh needs exactly one line: gh_dirs="<absolute dirs>"')
         shutil.rmtree(os.path.join(self.tmp.name, "checkout"), ignore_errors=True)
-        root = fixture_checkout(self.tmp.name, {"update-branch.sh": GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed if dirs is None else dirs}"', src)}, remote)
+        copy = GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed if dirs is None else dirs}"', src)
+        root = fixture_checkout(self.tmp.name, {"update-branch.sh": copy}, remote)
         e = {"PATH": self.decoy + os.pathsep + "/usr/bin:/bin", "FAKE_GH_OUT": self.out, **(env or {})}
         p = subprocess.run(["bash", "scripts/update-branch.sh", *args], capture_output=True, text=True, env=e, cwd=root, timeout=30)
         return p, os.path.exists(self.out)

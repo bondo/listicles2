@@ -1,8 +1,8 @@
 """scripts/mark-ready.sh is the only thing the project permission rule lets agents run to mark a PR ready.
 It must accept exactly one PR number and make exactly one call, to the repository of its own checkout's `origin` remote (M1-85: parsed in the pinned
-wrapper itself, the same forms as scripts/repo_slug.py, never from the environment), so it works before and after a repo rename. The wrapper finds `gh` only in the directories on its `gh_dirs=` line
-(never through PATH, R5-03), so a fake `gh` records the call through a copy of the real file, in a fixture checkout, whose `gh_dirs=` line is replaced.
-A decoy `gh` in PATH must never run.
+wrapper itself, the same forms as scripts/repo_slug.py, never from the environment), so it works before and after a repo rename.
+The wrapper finds `gh` only in the directories on its `gh_dirs=` line (never through PATH, R5-03), so a fake `gh` records the call through
+a copy of the real file, in a fixture checkout, whose `gh_dirs=` line is replaced. A decoy `gh` in PATH must never run.
 Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os

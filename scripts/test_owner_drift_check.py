@@ -131,7 +131,8 @@ class OwnerDriftScriptTest(unittest.TestCase):
         self.assertTrue(calls and all("repo:acme/widgets" in c for c in calls), calls)
 
     def test_without_github_repository_it_searches_the_origin_remote_of_its_checkout(self):
-        for remote, slug in (("git@github.com:bondo/listicles2.git", "bondo/listicles2"), ("https://github.com/octo-org/renamed-repo", "octo-org/renamed-repo")):
+        for remote, slug in (("git@github.com:bondo/listicles2.git", "bondo/listicles2"),
+                             ("https://github.com/octo-org/renamed-repo", "octo-org/renamed-repo")):
             code, out, calls = self.run_script(slurp({"number": 12, "title": "", "state": "open"}), repo=None, remote=remote)
             self.assertEqual(code, 0, out)
             self.assertTrue(calls and all(f"repo:{slug} " in c for c in calls), calls)
