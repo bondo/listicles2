@@ -934,7 +934,8 @@ notes = "Second half of the M1-30 split. Gate order P10 (docs/milestones/M1.md s
 id = "M1-62"
 title = "Start-up gates (b2 of M1-60): update (START-01), email verified (#195, Q2 A), name saved (AUTH-12), household notices (HH-06); one routing test with fakes over all gates"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 323
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60"]
@@ -1235,11 +1236,12 @@ notes = "Tooling env (.github/ is protected). Owner request, #15 comment 7081546
 id = "M1-70"
 title = "Status: dependency graph of the open tasks under the README status picture (status-graph.svg)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
-notes = "Owner request, #15 comment 7086087003: open-task dependency graph under the status cards. Two PRs (split 2026-11-22, the 600-line CI limit): part A is scripts/status_graph.py with its tests (not called yet); part B is the render and publish wiring, the README picture, docs/STATUS.md and this task done"
+pr = 326
+notes = "Owner request, #15 comment 7086087003: open-task dependency graph under the status cards. Two PRs (split 2026-11-22, the 600-line CI limit): part A (#324) is scripts/status_graph.py with its tests; part B is the render and publish wiring, the README picture, docs/STATUS.md and the legibility fix"
 
 [[task]]
 id = "M1-50"

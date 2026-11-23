@@ -4,7 +4,9 @@ Run: python3 -I scripts/test_status_graph.py"""
 import json
 import random
 import re
+import subprocess
 import sys
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -205,7 +207,16 @@ class Layout(unittest.TestCase):
         width = float(root.get("width"))
         for el in root.iter(NS + "text"):
             content = "".join(el.itertext())
-            self.assertLessEqual(float(el.get("x")) + status_visual.text_width(content) * 6.6, width, content)
+            self.assertLessEqual(float(el.get("x")) + status_visual.text_width(content) * 8, width, content)
+
+    def test_text_stays_legible_when_the_picture_is_scaled_to_the_readme_column(self):
+        """R1-02: GitHub shows the image at about 830 px wide, so a 1200 px picture is scaled down; ids must stay at 9 px or more."""
+        rows = [task(f"M1-O{i}", "M1", assignee="owner", deps=[f"M1-O{i - 1}"] if i > 10 else []) for i in range(10, 23)]  # 13 columns, 6-character ids
+        svg = svg_of(tasks_text(*rows, milestones=("M1",)))
+        scale = min(1.0, 830 / float(ET.fromstring(svg).get("width")))
+        sizes = {m.group(1): float(m.group(2)) for m in re.finditer(r"\.(n|s)\{font-size:(\d+)px", status_graph.CSS)}
+        for cls, size in sizes.items():
+            self.assertGreaterEqual(size * scale, 9.0, f"class {cls}: {size}px at scale {scale:.2f}")
 
     def test_nodes_are_grouped_into_one_band_per_milestone(self):
         found = nodes(svg_of())
@@ -330,6 +341,33 @@ class Safety(unittest.TestCase):
                   for s, k in (("review", "A-02"), ("owner", "A-O1"), ("blocked", "A-04"))}
         self.assertEqual(shapes, {"review": ["info mk-progress"], "owner": ["bad mk-owner"], "blocked": ["warn mk-blocked"]})
         self.assertEqual(len({found[k].find(NS + "rect").get("class") for k in ("A-02", "A-O1", "A-04")}), 3)
+
+
+class Cli(unittest.TestCase):
+    SCRIPT = Path(__file__).resolve().parent / "status_visual.py"
+
+    def render(self, d, *extra):
+        (d / "t.toml").write_text(TASKS)
+        (d / "in.json").write_text('{"prs": [], "issues": []}')
+        return subprocess.run([sys.executable, "-I", str(self.SCRIPT), "render", "--tasks", str(d / "t.toml"), "--input", str(d / "in.json"),
+                               "--now", NOW, "--svg", str(d / "s.svg"), "--json", str(d / "s.json"), *extra], capture_output=True, text=True)
+
+    def test_render_writes_the_graph_next_to_the_svg_by_default(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.render(Path(d))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(sorted(nodes((Path(d) / "status-graph.svg").read_text())), sorted(OPEN))
+            self.assertTrue((Path(d) / "s.svg").read_text().startswith("<svg"))  # the picture itself is unchanged
+
+    def test_graph_option_overrides_the_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.render(Path(d), "--graph", str(Path(d) / "g.svg"))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue((Path(d) / "g.svg").exists())
+            self.assertFalse((Path(d) / "status-graph.svg").exists())
+
+    def test_the_status_picture_itself_has_no_graph_in_it(self):
+        self.assertNotIn("Open tasks and their dependencies", status_visual.render_svg(model()))
 
 
 if __name__ == "__main__":
