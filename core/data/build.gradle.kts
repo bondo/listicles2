@@ -20,11 +20,6 @@ tasks.configureEach {
 android {
     namespace = "dk.bjarkebjarke.tally.data"
 
-    testOptions {
-        // The :core:testing network block is a JUnit Platform listener: it never installs on Gradle's JUnit 4 runner.
-        unitTests.all { it.useJUnitPlatform() }
-    }
-
     // The tests restore the project's Firestore rules (FirebaseEmulator): they travel in the test APK's assets, synced from firebase/.
     sourceSets.getByName("androidTest").assets.srcDir(firestoreRulesAssetDir.get().asFile)
 }
@@ -36,9 +31,6 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.kotlinx.coroutines.play.services)
-
-    // #217 item 3: the shared test-JVM network block applies to this module's JVM unit tests too.
-    testImplementation(project(":core:testing"))
 
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
