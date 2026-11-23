@@ -182,5 +182,174 @@ class NpmTailTests(RunnerCase):
         self.assertPasses()
 
 
+# Task M1-81, owner decision #15 comment 7102820038 (the full proposal of PR 358 comment 7102517597). playwright and cypress use
+# commander: kebab-case long names, grouped short options (-xu), and a value letter takes the rest of its group (-j2, -gsmoke).
+PW_DENIED = ["-u", "--update-snapshots", "--update-snapshots=none", "-u missing", "-xu", "--ignore-snapshots", "--pass-with-no-tests",
+             "--list", "tests/login.spec.ts", "login", "-- tests/a.spec.ts", "--workers 2 src", "-j2 src", "--project chromium login",
+             "-g smoke", "-gsmoke", "-xg smoke", "--grep=smoke", "--grep-invert slow", "-gv slow", "--test-list t.txt",
+             "--test-list-invert=t.txt", "--no-deps", "-c tests/e2e", "--config=tests/e2e", "--config tests/e2e", "-c pw.ts",
+             "-ctests", "-c playwright.config.json", "--last-failed", "--only-changed", "--only-changed=main", "--only-changed main"]
+PW_ALLOWED = ["", "--shard 1/3", "--shard=2/3", "-j 4", "-j4", "--workers=50%", "--reporter list", "--reporter=html", "--output out",
+              "--trace on", "--timeout 0", "--global-timeout 600000", "--max-failures 1", "-x", "--repeat-each 3",
+              "--tsconfig tsconfig.e2e.json", "--update-source-method patch", "--quiet", "--headed", "--debug", "--ui",
+              "--ui-host 0.0.0.0 --ui-port 8080", "--forbid-only", "--fail-on-flaky-tests", "--fully-parallel",
+              "-c playwright.config.ts", "--config=e2e/playwright.config.mts", "-cplaywright.config.cjs", "--config pw.config.js",
+              "--project chromium", "--project=firefox", "--retries 2", "--reporter=list > out.log"]
+CY_DENIED = ["-s a.cy.ts", "--spec a.cy.ts", "--spec=cypress/e2e/**", "-qs a.cy.ts", "a.cy.ts", "--browser chrome a.cy.ts",
+             "-- a.cy.ts", "-c specPattern=x", "--config specPattern=cypress/e2e/smoke/**", "--config=e2e.specPattern=x",
+             "-c video=false,excludeSpecPattern=x", "--config '{\"e2e\":{\"specPattern\":\"x\"}}'", "-cspecPattern=x",
+             "-e grep=smoke", "--env grepTags=@smoke", "--env=grepInvert=true", "-e a=1,grepUntagged=true",
+             "--env '{\"grepFilterSpecs\":true}'", "-e GREP=x", "--env grepOmitFiltered=true", "-egrep=x"]
+CY_ALLOWED = ["", "--browser chrome", "-b firefox", "--headed", "--headless", "-C cypress.config.ts", "--config-file=cypress.ci.config.ts",
+              "-c video=false", "--config baseUrl=http://localhost:5000", "-c '{\"video\":false}'", "-e apiUrl=http://x",
+              "--env token=abc", "-p 8080", "-P e2e", "-r junit", "--reporter-options mochaFile=out.xml", "-o toConsole=true", "-q",
+              "--record --key abc", "--record false", "--parallel --group ci --ci-build-id 7", "-t nightly", "--tag a,b",
+              "--auto-cancel-after-failures 2", "--no-exit", "--runner-ui", "--no-runner-ui", "--e2e", "--component",
+              "--quiet > out.log"]
+
+
+class PlaywrightCypressTests(RunnerCase):
+    """Task M1-81: `playwright test` and `cypress run` options that rewrite or skip tests, filter them or run only changed ones fail,
+    directly, in a package.json script and after an npm `--` tail resolved to them (read with the runner's own letters and positional
+    rule), with no escape hatch. The allowed options, their values and the non-test subcommands pass."""
+
+    def lines(self, prefix, opts):
+        return [f"{prefix} {o}".rstrip() for o in opts]
+
+    def test_each_denied_option_fails_on_a_direct_call(self):
+        lines = self.lines("npx playwright test", PW_DENIED) + self.lines("npx cypress run", CY_DENIED)
+        lines += ["CI=1 npx playwright test src", "npx playwright@1.49.1 test --list", "./node_modules/.bin/cypress run --spec x.cy.ts",
+                  "playwright test -u", "cypress run -s a.cy.ts", "timeout 600 npx playwright test --last-failed",
+                  "npx playwright test --ci -u # justified: goldens are regenerated here"]
+        self.put("scripts/test.sh", "\n".join(lines) + "\n")
+        self.each_line_fails("scripts/test.sh", lines)
+
+    def test_each_denied_option_fails_in_a_package_json_script_and_a_workflow(self):
+        opts = [("playwright test", o) for o in PW_DENIED if "'" not in o] + [("cypress run", o) for o in CY_DENIED if "'" not in o]
+        entries = [(f"t{i}", f"{c} {o}") for i, (c, o) in enumerate(opts)]
+        self.put("tools/package.json", self.pkg(entries))
+        self.put(".github/workflows/e2e.yml", "jobs:\n  a:\n    steps:\n      - run: npx playwright test --update-snapshots\n"
+                 "      - run: >\n          npx cypress run\n          --spec a.cy.ts\n")
+        self.each_line_fails("tools/package.json", [v for _, v in entries], first=4)
+        rc, out = self.repo.guards()
+        for where in [".github/workflows/e2e.yml:4:", ".github/workflows/e2e.yml:6:"]:
+            with self.subTest(where=where):
+                self.assertIn(f"{MARK}: {where}", out)
+
+    def test_a_runner_inside_a_quoted_command_has_its_options_read(self):
+        lines = ['bash -c "npx playwright test --last-failed"', "sh -c 'cypress run --spec a.cy.ts'"]
+        self.put("scripts/test.sh", "\n".join(lines) + "\n")
+        self.each_line_fails("scripts/test.sh", lines)
+
+    def test_allowed_options_and_other_subcommands_pass(self):
+        lines = self.lines("npx playwright test", PW_ALLOWED) + self.lines("npx cypress run", CY_ALLOWED)
+        lines += ["npx playwright install --with-deps chromium", "npx playwright show-report out", "npx playwright --version",
+                  "npx cypress open", "npx cypress verify", "npx cypress install", "npx cypress info", "npx cypress cache clear",
+                  "npm i -D @playwright/test cypress", "npx eslint e2e && npx playwright test --forbid-only"]
+        self.put("scripts/test.sh", "\n".join(lines) + "\n")
+        self.put("tools/package.json", self.pkg(
+            [("e2e", "playwright test --forbid-only"), ("cy", "cypress run --browser chrome"), ("pw", "npx playwright test")],
+            ',\n  "devDependencies": {\n    "@playwright/test": "1.49.1",\n    "cypress": "13.17.0"\n  }'))
+        self.assertPasses()
+
+    def test_a_resolved_tail_is_read_with_the_runner_own_rules(self):
+        self.put("tools/package.json", self.pkg([("e2e", "npx playwright test"), ("cy", "cypress run")]))
+        lines = self.lines("npm run e2e --", PW_DENIED) + self.lines("npm run cy --", CY_DENIED)
+        self.put("scripts/test.sh", "\n".join(lines) + "\n")
+        self.each_line_fails("scripts/test.sh", lines)
+        ok = self.lines("npm run e2e --", [o for o in PW_ALLOWED if o]) + self.lines("npm run cy --", [o for o in CY_ALLOWED if o])
+        # jest and mocha letters are no longer read here (commander refuses them); a word after one is still a positional filter
+        ok += ["npm run e2e -- -t", "npm run e2e -- -o", "npm run cy -- -u", "npm run cy -- -f"]
+        self.put("scripts/test.sh", "\n".join(ok) + "\n")
+        self.assertPasses()
+
+    def test_an_unresolved_tail_fails_on_their_long_names_even_with_a_reason(self):
+        lines = [f"yarn e2e -- {o} # justified: three words here" for o in
+                 ["--last-failed", "--update-snapshots", "--ignore-snapshots", "--grep-invert=x", "--no-deps", "--list",
+                  "--test-list=t.txt"]]
+        self.put("scripts/test.sh", "\n".join(lines) + "\n")
+        self.each_line_fails("scripts/test.sh", lines)
+
+
+class PlaywrightCypressSelfReviewTests(RunnerCase):
+    """PR 358 self-review: a quoted value with blanks is one word, a mention of a runner is read only with its test subcommand, the
+    `@playwright/test` package name is playwright, and a tail resolved to runners with two parsers is read as mri."""
+
+    def test_a_quoted_value_with_blanks_is_one_word(self):
+        ok = ['npx playwright test --project="Mobile Chrome"', "npx playwright test --project 'Mobile Chrome'",
+              "npx playwright test --project=Mobile\\ Chrome --shard 1/2", 'npx cypress run --record --group "UI - Chrome"',
+              'npx cypress run --tag "nightly, smoke"', "npx cypress run -c '{\"video\": false}'", 'npx jest --testTimeout "5000"']
+        self.put("scripts/test.sh", "\n".join(ok) + "\n")
+        self.put("tools/package.json", self.pkg([("e2e", 'playwright test --project="Mobile Chrome"'), ("u", "jest --ci")]))
+        self.assertPasses()
+        bad = ['npx cypress run --env "grep=a b"', "npx cypress run -c '{\"e2e\": {\"specPattern\": \"x\"}}'",
+               "sh -c 'cypress run --env \"{ \\\"grep\\\": \\\"x\\\" }\"'", 'npx playwright test "tests/a b.spec.ts"',
+               'npx playwright test --grep "a b"', 'npx playwright test --project "Mobile Chrome" src', 'npx jest "src a"']
+        self.put("tools/package.json", self.pkg([("u", "jest --ci")]))
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+        entries = [("e2e", 'playwright test --project="Mobile Chrome" login'), ("cy", 'cypress run --env "grep=x y"')]
+        self.put("scripts/test.sh", "true\n")
+        self.put("tools/package.json", self.pkg(entries))
+        self.each_line_fails("tools/package.json", [v for _, v in entries], first=4)
+
+    def test_a_mention_is_read_only_with_the_test_subcommand(self):
+        ok = ["npx eslint e2e/playwright -c .eslintrc.json", "ls cypress/fixtures -s", "npx cypress open --spec x",
+              "npx playwright show-report -c x", "npx playwright test -c"]
+        self.put("scripts/test.sh", "\n".join(ok) + "\n")
+        self.assertPasses()
+
+    def test_the_playwright_package_name_is_playwright(self):
+        bad = ["npx @playwright/test test login", "npx @playwright/test@1.49.1 test -u", 'bash -c "npx @playwright/test test --list"']
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+
+    def test_a_tail_resolved_to_two_parsers_is_read_as_mri(self):
+        self.put("firebase/package.json", self.pkg([("test", "jest")]))
+        self.put("tools/package.json", self.pkg([("test", "playwright test")]))
+        bad = ["npm test -- -j2u", "npm test -- -u", "npm test -- --last-failed", "npm test -- src", "npm test -- -g smoke"]
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+        self.put("scripts/test.sh", "npm test -- --shard 1/2\n")
+        self.assertPasses()
+
+
+class PlaywrightCypressReviewRound1Tests(RunnerCase):
+    """PR 358 R1-01: playwright run through node and its cli.js is playwright; R1-02: the npx -p/--package value is no command."""
+
+    BAD = ["node node_modules/@playwright/test/cli.js test -u", "node node_modules/playwright/cli.js test --last-failed",
+           "node node_modules/playwright/cli.js test login", 'bash -c "node node_modules/playwright/cli.js test -u"',
+           "npx -p @playwright/test playwright test tests/a.spec.ts", "npx --package @playwright/test playwright test login",
+           "npx -p playwright playwright test login", "npx -p cypress cypress run a.cy.ts", "npm exec -p cypress -- cypress run a.cy.ts"]
+
+    def test_node_cli_js_and_npx_package_forms_fail(self):
+        self.put("scripts/test.sh", "\n".join(self.BAD) + "\n")
+        self.each_line_fails("scripts/test.sh", self.BAD)
+        entries = [("t", "node node_modules/@playwright/test/cli.js test -u"), ("u", "npx -p @playwright/test playwright test login")]
+        self.put("scripts/test.sh", "true\n")
+        self.put("tools/package.json", self.pkg(entries))
+        self.each_line_fails("tools/package.json", [v for _, v in entries], first=4)
+
+    def test_their_allowed_forms_pass(self):
+        ok = ["node node_modules/playwright/cli.js install chromium", "npx -p @playwright/test playwright test --shard 1/2",
+              "node node_modules/@playwright/test/cli.js test --project chromium", "npx -p cypress cypress run --browser chrome"]
+        self.put("scripts/test.sh", "\n".join(ok) + "\n")
+        self.assertPasses()
+
+
+class PlaywrightCypressReviewRound2Tests(RunnerCase):
+    """PR 358 R2-01: the -p/--package value is skipped only after a launcher that takes a package (npx, pnpx, bunx, dlx, npm exec and
+    npm x); `time -p` and `command -p` take no value, so the runner after them is the command."""
+
+    def test_time_and_command_p_keep_the_runner_as_the_command(self):
+        bad = ["time -p jest src", "command -p jest src", "time -p vitest run src", "time -p playwright test login",
+               "time -p cypress run a.cy.ts", "pnpm dlx --package @playwright/test playwright test login",
+               "npm x -p cypress -- cypress run a.cy.ts", "bunx -p @playwright/test playwright test login"]
+        self.put("scripts/test.sh", "\n".join(bad) + "\n")
+        self.each_line_fails("scripts/test.sh", bad)
+        self.put("scripts/test.sh", "time -p jest --ci\ncommand -p npx playwright test --shard 1/2\n")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()

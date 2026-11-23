@@ -982,7 +982,8 @@ notes = "Found in M1-65: check 1 reads --passWithNoTests, -t, testPathIgnorePatt
 id = "M1-81"
 title = "guards check 1: playwright and cypress test-runner options on command lines"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 358
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-71"]
@@ -1024,10 +1025,11 @@ notes = "Sign out per OQ-13 (decided 2026-11-17) and docs/milestones/M1.md: wait
 id = "M1-67"
 title = "Auth data 2: Firebase session state, Google ID-token sign-in, per-session Firestore holder in :core:data (Auth and Firestore emulator tests)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-14"]
+pr = 348
 notes = "Split from M1-14 (PR 319). Implements the M1-14 domain interfaces: SessionState and Authentication over FirebaseAuth (signInWithCredential with GoogleAuthProvider), LocalUserData over a per-session Firestore holder (waitForPendingWrites; terminate, then clearPersistence; a new instance at the next use, step 6). Emulator tests from docs/milestones/M1.md (M1-14): a Google-style credential signs in and the token has email_verified; sign-out clears the session; Sign out anyway drops a write no listener saw; the holder makes a new instance. Also check and record which fields the Firebase Auth record keeps for Google sign-in: name, email, photo link (feeds privacy Q5; moved here from M1-14). No licence question: :core:data has no licensee gate until M1-66. A compiled, never-run draft is on PR 319"
 
 [[task]]
@@ -1038,7 +1040,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-67", "M1-O14"]
-notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule. Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14"
+notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule: FirebaseAuthentication binds SessionState and Authentication, and one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc). Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14. Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-66 to-confirm marker in docs/privacy section 2 (en and da)"
 
 [[task]]
 id = "M1-15"
@@ -1506,10 +1508,11 @@ notes = "Tooling env (.github), owner merge. Split from M1-44. Q6 A (7058176190)
 id = "M1-74"
 title = "Hash-locked pip requirements for the lint tools (issue 189 item 5)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-44"]
+pr = 355
 notes = "Tooling env (.github, scripts/), owner merge. Tested in M1-44: scripts/requirements-lint.in (top level) compiled with pip-compile --generate-hashes --allow-unsafe --strip-extras on the Python CI pins (3.13; 284-line lock from a 3.12 trial: ruff, mypy, types-PyYAML and ast-serialize, librt, mypy-extensions, pathspec, typing-extensions); CI installs with pip install --require-hashes; lint_python.sh must read the version from the hashed format (sed on the ruff==X line); test_lint_python.py's pin regex and CODEOWNERS (.in) change with it; add the lock rules to scripts/check_ci_hardening.py test-first (every entry pinned with == and at least one sha256 hash, the only pip install is the hashed one). scripts/requirements-ci.txt (PyYAML, M1-44) can be hashed the same way. Check that Dependabot (pip, /scripts) still updates the .in and recompiles the .txt"
 
 [[task]]
@@ -1610,7 +1613,7 @@ notes = "Process PR (2a2), split from M1-77. Code and tests were written and gre
 id = "M1-78"
 title = "State issue part B: rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --approval accepts the previous state issue"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-77"]
@@ -1624,7 +1627,7 @@ status = "todo"
 assignee = "process"
 risk = "normal"
 depends_on = ["M1-77", "M1-78", "M1-80"]
-notes = "Process PR (2c), docs and prompt text only. Owner decision 7076085601 item 1: comments on the state issue only for decisions, approvals, vetoes, handovers, takeovers, lock-lost, incidents, PAUSED/RESUMED, metrics blocks and the weekly digest; progress goes to the body (Updated: and the block). The 4.3 ready query reads the body with tasks.py --state; the template becomes prose, the generated summary and the block. Owner merge (docs/ORCHESTRATION.md, agents/prompts/). Merge origin/main first if PR 322 lands before it"
+notes = "Process PR (2c), docs and prompt text only. Owner decision 7076085601 item 1: comments on the state issue only for decisions, approvals, vetoes, handovers, takeovers, lock-lost, incidents, PAUSED/RESUMED, metrics blocks and the weekly digest; progress goes to the body (Updated: and the block). The 4.3 ready query reads the body with tasks.py --state; the template becomes prose, the generated summary and the block. Owner merge (docs/ORCHESTRATION.md, agents/prompts/). Merge origin/main first if PR 322 lands before it. From M1-78: the rotation steps name `state_body.py validate --comments N` (the rotate: lines) and the pointer PR that sets STATE_ISSUE and PREVIOUS_STATE_ISSUE in merge_ready.py (owner merge; approvals on the new issue refuse until it lands), and the veto and 7085221356 checks read the current and the previous state issue; the places that post an approval or read the body on #15 move to the current state issue: agents/prompts/approver.md:13, docs/ORCHESTRATION.md:644, agents/prompts/orchestrator.md:104 and the 'Read the body with' line of scripts/state_body.py"
 
 [[task]]
 id = "M1-FU"
@@ -1781,6 +1784,16 @@ risk = "normal"
 depends_on = []
 notes = "Found by M1-14 (PR 319), measured with licensee 1.14.1: 13 artifacts under the Android SDK terms (one config/licensee/google-sdk-terms.txt line each); com.google.android.play core-common and integrity under other Google terms, which google-sdk-terms.txt cannot list (a policy.gradle change); re2j and animal-sniffer-annotations, BSD-3-Clause and MIT texts at URLs licensee does not map (a policy.gradle change). Blocks M1-66, and with it every task that puts :core:data on the :app runtime classpath"
 
+[[task]]
+id = "M1-O15"
+title = "Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M1-O2", "M1-66", "M1-16"]
+notes = "Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M1-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M1-O15 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
 [[task]]
@@ -1791,7 +1804,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); item writes per batch under the access-call limits, 5 when every call counts, and whether production caches calls on one document as the emulator does (ADR 0002, item e); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); item writes per batch under the access-call limits, 5 when every call counts, and whether production caches calls on one document as the emulator does (ADR 0002, item e); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da). Sign-out wording: the list and item listeners feed LocalUserData.unsentChangesSeen from hasPendingWrites (M1-67's FirestoreSession answers false until a listener exists, so the question uses wireframe 45, not 39)"
 
 [[task]]
 id = "M2-FU"

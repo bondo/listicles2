@@ -30,7 +30,10 @@
 # Python lint config and its pinned tools (also covered by /scripts/ for the last two; explicit so test_lint_python.py can assert it)
 /ruff.toml                   @bondo
 /mypy.ini                    @bondo
+/scripts/requirements-lint.in @bondo
 /scripts/requirements-lint.txt @bondo
+/scripts/requirements-ci.in   @bondo
+/scripts/requirements-ci.txt  @bondo
 /scripts/lint_python.sh      @bondo
 # Workflow and shell lint (also covered by /scripts/; explicit so test_lint_workflows.py can assert it)
 /scripts/lint_workflows.sh   @bondo
