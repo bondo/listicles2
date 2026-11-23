@@ -499,10 +499,26 @@ function rval(isc, ise, v) {
   if (isc && index(TCK, "p") && v !~ /(^|\/)[^\/]*\.config\.[cm]?[jt]s$/) return 1
   v = tolower(v)
   if (isc && index(TCK, "y") && index(v, "specpattern")) return 1
-  return ise && index(TCK, "y") && v ~ /(^|[^a-z0-9_])grep[a-z]*["\047]?[ \t]*[=:]/
+  return ise && index(TCK, "y") && v ~ /(^|[^a-z0-9_])grep[a-z]*[\\"\047]*[ \t]*[=:]/
 }
-function rscan(s, R, pos, fw, dl,   n, w, i, j, t, c, nm, n0, q, first, rest, v, r, br, st) {
-  rtab(R); n = split(s, w, /[ \t]+/); first = 1; rest = 0; st = 0
+# rqopen: 1 when word x leaves a quote open or ends in an escaped blank, so rscan joins it with the next word (`--project "Mobile
+# Chrome"`, PR 358 R0-01). In a package.json only an escaped `\"` and `\047` count: a bare `"` delimits the JSON value.
+function rqopen(x,   i, c, q, n) {
+  n = length(x); q = ""
+  for (i = 1; i <= n; i++) {
+    c = substr(x, i, 1)
+    if (c == "\\" && q != "\047") { if (i == n && !JSF) return 1; c = substr(x, ++i, 1); if (!JSF || c != "\"") continue }
+    else if (JSF && c == "\"") continue
+    if (q == "") { if (c == "\"" || c == "\047") q = c } else if (c == q) q = ""
+  }
+  return q != ""
+}
+# rsub: the words of s after the test subcommand of runner a (RSUB: playwright `test`, cypress `run`), or a newline when s does not
+# start with it (another subcommand, or a path or package that names the runner: `e2e/playwright -c x`, PR 358 R0-02).
+function rsub(s, a,   w1) { w1 = s; sub(/^[ \t]+/, "", w1); sub(/[ \t].*$/, "", w1); return (rclean(w1) ~ RSUB[a] ? substr(s, index(s, w1) + length(w1)) : "\n") }
+function rscan(s, R, pos, fw, dl,   n, w, w0, m, o, i, j, t, c, nm, n0, q, first, rest, v, r, br, st) {
+  rtab(R); m = split(s, w0, /[ \t]+/); n = o = 0; first = 1; rest = 0; st = 0
+  for (i = 1; i <= m; i++) { if (o) w[n] = w[n] " " w0[i]; else w[++n] = w0[i]; o = !jsend(w[n]) && rqopen(w[n]) }
   for (i = 1; i <= n; i++) {
     if (st) break
     st = jsend(w[i]); t = rclean(w[i]); if (t == "") continue
@@ -537,8 +553,8 @@ function rscan(s, R, pos, fw, dl,   n, w, i, j, t, c, nm, n0, q, first, rest, v,
   }
   return 0
 }
-# rname: the runner a word names, as a path, `name@version` or `name.js`, after `(`, `{` or `$(`; RDS holds the runners.
-function rname(t) { t = rclean(t); sub(/^\$?[({]+/, "", t); sub(/^.*\//, "", t); if (t ~ /^[^@]+@/) sub(/@.*$/, "", t); sub(/\.[cm]?js$/, "", t); return t }
+# rname: the runner a word names, as a path, `name@version` or `name.js`, after `(`, `{` or `$(`, and `@playwright/test`; RDS holds the runners.
+function rname(t) { t = rclean(t); sub(/^\$?[({]+/, "", t); if (t ~ /^@playwright\/test(@[^\/]*)?$/) return "playwright"; sub(/^.*\//, "", t); if (t ~ /^[^@]+@/) sub(/@.*$/, "", t); sub(/\.[cm]?js$/, "", t); return t }
 # cmdat: the index of the command word of the words w[1..n] after a YAML `- key:` or a package.json key, VAR= assignments (a quoted value
 # may hold blanks), shell keywords and launchers (npx, npm exec, yarn run, bunx, node, env, sudo, timeout, nice, ...) with their
 # options, a value after a one-letter option (sudo -u bob, nice -n 5) and a number (timeout 60), from word i0 on; 0 when there is none
@@ -561,17 +577,19 @@ function cmdat(w, n, i0,   i, t, l, v, q) {
 }
 # runopt: 1 when command p passes a denied option to jest, vitest, mocha, playwright or cypress, directly or in an npm `--` tail.
 # playwright and cypress are read only with their test subcommand (RSUB, RREQ: `playwright test`, `cypress run`) as the command.
-function runopt(p,   n, w, k, a, r, i, dd, rs, dl, tl, s0, w1) {
+function runopt(p,   n, w, k, a, r, i, dd, rs, dl, tl, s0, t1) {
   if (datacmd(p)) return 0
   n = split(p, w, /[ \t]+/)
   for (k = cmdat(w, n, 1); k; k = (JSF ? cmdat(w, n, i) : 0)) {  # in a package.json, every script value on the line
     a = rname(w[k]); tl = ""; for (i = k + 1; i <= n && !jsend(w[i - 1]); i++) tl = tl " " w[i]
     if (!(a in RDS)) continue
-    if (a in RREQ) { w1 = tl; sub(/^[ \t]+/, "", w1); sub(/[ \t].*$/, "", w1); if (rclean(w1) !~ RSUB[a]) continue; tl = substr(tl, index(tl, w1) + length(w1)) }
+    if ((a in RREQ) && (tl = rsub(tl, a)) == "\n") continue
     if (rscan(tl, a, a != "mocha", (a in RREQ) ? "" : RSUB[a], "")) return 1
   }
   for (r in RDS) for (s0 = p; has(s0, r); s0 = substr(s0, 2)) {  # every mention: a package.json value ends a scan (R2-02)
-    s0 = after(s0, r); if (rscan(s0, r, 0, "", "")) return 1
+    s0 = after(s0, r); t1 = s0; if (r == "playwright") sub(/^\/test(@[^ \t]*)?/, "", t1)  # the package @playwright/test
+    if ((r in RREQ) && (t1 = rsub(t1, r)) == "\n") continue
+    if (rscan(t1, r, 0, "", "")) return 1
   }
   dd = ddseg(p); if (dd == "") return 0
   if (!ddrun(p)) return rscan(dd, "", 0, "", "")
