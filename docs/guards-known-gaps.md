@@ -188,7 +188,8 @@ Positional words are path filters after jest, and after vitest except a first `r
 quoted value may hold blanks: `FOO="a b" jest src`), shell keywords (`if`, `then`, `do`, `while`, `until`, `else`, `!`, `{`, `(`,
 `$(`) and launchers with their options (`npx --yes`, `npm exec`, `yarn run`, `bun run`, `pnpm exec`, `bunx`, `node --flag path/jest.js`,
 `env -u X`, `sudo -u bob`, `nice -n 5`, `timeout -s KILL 60`; a one-letter option's value and a number are skipped). The runner word
-may carry a path, `@version` (`npx jest@30`) or `.js` (R1-03). A mocha
+may carry a path, `@version` (`npx jest@30`) or `.js` (R1-03). In a package.json a command ends with its JSON string value, and
+every script value on a line is read (`{ "test": "jest --ci", "e2e": "jest src" }`). A mocha
 positional word is its spec and passes. After a bare `--` every word is positional. The value of an option listed in `RVL` or `RVS`
 (`--maxWorkers 2`, `-c jest.config.cjs`, `--shard 1/3`, mocha `-t 5000`) is no positional word; the value of any other option is, so
 write it with `=` (`--testSequencer=./seq.js`): a false positive, never a miss. Redirections and their targets are skipped.

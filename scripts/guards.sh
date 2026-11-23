@@ -475,11 +475,13 @@ function rclean(t) { sub(/^["\047\\]+/, "", t); sub(/["\047\\,;]+$/, "", t); ret
 # every character is a flag, digits too, until one takes the rest as its value: the rest starts with `=`, is a number (a letter only), or
 # starts with a character that is no word character; mri (vitest, mr: and runners not known) only stops at `=`. A word is skipped only as a
 # negative number. A one-letter long option (--u) is that short option (R1-02). A jest config given as inline JSON (-c or --config with a
-# value that starts with `{`) is denied: no config scan reads it.
-function rscan(s, ds, vs, pos, vit, dl, mr,   n, w, i, j, t, c, nm, n0, q, first, rest, v, r, br) {
-  n = split(s, w, /[ \t]+/); first = 1; rest = 0
+# value that starts with `{`) is denied: no config scan reads it. In a package.json the command ends with its JSON value (jsend).
+function jsend(x) { return JSF && x ~ /(^|[^\\])"[],}]*$/ }
+function rscan(s, ds, vs, pos, vit, dl, mr,   n, w, i, j, t, c, nm, n0, q, first, rest, v, r, br, st) {
+  n = split(s, w, /[ \t]+/); first = 1; rest = 0; st = 0
   for (i = 1; i <= n; i++) {
-    t = rclean(w[i]); if (t == "") continue
+    if (st) break
+    st = jsend(w[i]); t = rclean(w[i]); if (t == "") continue
     if (t ~ /^[0-9]*(<|>|&>)/) { if (t ~ /^[0-9]*(<|>>?|&>>?|>&)$/) i++; continue }  # a redirection and its target
     if (t == "--") { rest = 1; continue }
     if (rest && pos) return 1  # after `--` every word is a path filter
@@ -514,9 +516,10 @@ function rscan(s, ds, vs, pos, vit, dl, mr,   n, w, i, j, t, c, nm, n0, q, first
 function rname(t) { t = rclean(t); sub(/^\$?[({]+/, "", t); sub(/^.*\//, "", t); if (t ~ /^[^@]+@/) sub(/@.*$/, "", t); sub(/\.[cm]?js$/, "", t); return t }
 # cmdat: the index of the command word of the words w[1..n] after a YAML `- key:` or a package.json key, VAR= assignments (a quoted value
 # may hold blanks), shell keywords and launchers (npx, npm exec, yarn run, bunx, node, env, sudo, timeout, nice, ...) with their
-# options, a value after a one-letter option (sudo -u bob, nice -n 5) and a number (timeout 60); 0 when there is none (R1-03).
-function cmdat(w, n,   i, t, l, v, q) {
-  for (i = 1; i <= n; i++) {
+# options, a value after a one-letter option (sudo -u bob, nice -n 5) and a number (timeout 60), from word i0 on; 0 when there is none
+# (R1-03).
+function cmdat(w, n, i0,   i, t, l, v, q) {
+  for (i = i0; i <= n; i++) {
     t = rclean(w[i]); sub(/^\$?[({]+/, "", t)
     if (t == "" || t == "-" || w[i] ~ /:$/) continue
     if (t ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
@@ -534,10 +537,10 @@ function cmdat(w, n,   i, t, l, v, q) {
 # runopt: 1 when command p passes a denied option to jest, vitest or mocha, directly or in an npm `--` tail.
 function runopt(p,   n, w, k, a, r, i, dd, ds, vs, dl, pos, tl, mr) {
   if (datacmd(p)) return 0
-  n = split(p, w, /[ \t]+/); k = cmdat(w, n)
-  if (k) {
-    a = rname(w[k])
-    if (a in RDS) { tl = ""; for (i = k + 1; i <= n; i++) tl = tl " " w[i]; if (rscan(tl, RDS[a], RVS[a], a != "mocha", a == "vitest", "", a == "vitest")) return 1 }
+  n = split(p, w, /[ \t]+/)
+  for (k = cmdat(w, n, 1); k; k = (JSF ? cmdat(w, n, i) : 0)) {  # in a package.json, every script value on the line
+    a = rname(w[k]); tl = ""; for (i = k + 1; i <= n && !jsend(w[i - 1]); i++) tl = tl " " w[i]
+    if ((a in RDS) && rscan(tl, RDS[a], RVS[a], a != "mocha", a == "vitest", "", a == "vitest")) return 1
   }
   for (r in RDS) if (has(p, r) && rscan(after(p, r), RDS[r], RVS[r], 0, 0, "", r == "vitest")) return 1
   dd = ddseg(p); if (dd == "") return 0
@@ -668,7 +671,7 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   SP = "(^|[ \t])[\"\047]?"; cur = ""; cont = 0
   RUFFSUB = "^(check|format|rule|config|linter|clean|server|analyze|version|help|generate-shell-completion)$"
   SRCRE = "^[^-][^=]*\\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$"; SEVOK = "^(warning|info|style)$"; COLOROK = "^(always|never|auto)$"
-  ARGKEY = "^([A-Za-z0-9-]*_)?(args|flags|options|arguments)$"; YML = (F ~ /\.ya?ml$/); PC = (F ~ /pre-commit-config\.yaml$/); IK = -1; BS = -1
+  ARGKEY = "^([A-Za-z0-9-]*_)?(args|flags|options|arguments)$"; YML = (F ~ /\.ya?ml$/); JSF = (F ~ /package\.json$/); PC = (F ~ /pre-commit-config\.yaml$/); IK = -1; BS = -1
   # Test runners that are no linter and take an npm `--` tail as their own options (not firebase: emulators:exec runs its argument;
   # not vitest: its typecheck mode runs tsc).
   RUNRE = "^[ \t]*(npx[ \t]+)?(jest|mocha|playwright|cypress)([ \t]+[A-Za-z0-9_./:=@,+%-]+)*[ \t]*$"
