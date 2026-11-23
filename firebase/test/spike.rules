@@ -1,0 +1,3 @@
+    // M1-09, the rules spike (PLAN 3.1 items a-e; docs/adr/0002-rules-spike.md). Test only:
+    // spike.test.ts inserts these blocks under the documents match of firestore.rules, and they are
+    // never deployed.
