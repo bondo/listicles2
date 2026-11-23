@@ -1,9 +1,11 @@
 """scripts/update-branch.sh is the only thing the project permission rule lets the merge agent run to update a PR branch (owner decision, #15
 comment 7008033864). It must accept exactly `<PR number> <40-hex head sha>` and make exactly one fixed PUT to the update-branch route with
-`expected_head_sha` (a moved head is refused by GitHub). Same shape as test_mark_ready.py: a fake `gh` in the wrapper's fixed directory, a decoy in PATH.
+`expected_head_sha` (a moved head is refused by GitHub), to the repository of its checkout's `origin` remote (M1-85). Same shape as test_mark_ready.py:
+a fixture checkout, a fake `gh` in the wrapper's fixed directory, a decoy in PATH.
 Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,7 +13,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gitenv  # noqa: E402, F401  # justified: after the sys.path insert, imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
-from test_mark_ready import FAKE_GH, GH_DIRS_LINE  # noqa: E402  # justified: shares the fake gh with the sibling wrapper test
+from test_mark_ready import FAKE_GH, GH_DIRS_LINE, NO_REMOTE, OLD_SLUG, REMOTE, SLUG, fixture_checkout  # noqa: E402  # justified: shares the fake gh and fixture with the sibling wrapper test
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 WRAPPER = os.path.join(ROOT, "scripts", "update-branch.sh")
@@ -34,14 +36,13 @@ class UpdateBranch(unittest.TestCase):
                 f.write(FAKE_GH.replace("$FAKE_GH_OUT", out) if d == self.decoy else FAKE_GH)
             os.chmod(os.path.join(d, "gh"), 0o755)
 
-    def run_wrapper(self, *args, env=None, dirs=None):
+    def run_wrapper(self, *args, env=None, dirs=None, remote=REMOTE):
         src = read_wrapper()
         self.assertEqual(len(GH_DIRS_LINE.findall(src)), 1, 'scripts/update-branch.sh needs exactly one line: gh_dirs="<absolute dirs>"')
-        copy = os.path.join(self.tmp.name, "copy.sh")
-        with open(copy, "w", encoding="utf-8") as f:
-            f.write(GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed if dirs is None else dirs}"', src))
+        shutil.rmtree(os.path.join(self.tmp.name, "checkout"), ignore_errors=True)
+        root = fixture_checkout(self.tmp.name, {"update-branch.sh": GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed if dirs is None else dirs}"', src)}, remote)
         e = {"PATH": self.decoy + os.pathsep + "/usr/bin:/bin", "FAKE_GH_OUT": self.out, **(env or {})}
-        p = subprocess.run(["bash", copy, *args], capture_output=True, text=True, env=e, cwd=ROOT, timeout=30)
+        p = subprocess.run(["bash", "scripts/update-branch.sh", *args], capture_output=True, text=True, env=e, cwd=root, timeout=30)
         return p, os.path.exists(self.out)
 
     def test_wrapper_exists_and_is_executable_in_git(self):
@@ -57,14 +58,29 @@ class UpdateBranch(unittest.TestCase):
             self.assertEqual((p.returncode, called), (0, True), (n, p.stderr))
             with open(self.out, encoding="utf-8") as f:
                 lines = f.read().splitlines()
-            self.assertEqual(lines[:6], ["api", "-X", "PUT", f"repos/bondo/listicles2/pulls/{n}/update-branch", "-f", f"expected_head_sha={SHA}"])
+            self.assertEqual(lines[:6], ["api", "-X", "PUT", f"repos/{SLUG}/pulls/{n}/update-branch", "-f", f"expected_head_sha={SHA}"])
             self.assertEqual(lines[6:], ["GH_HOST=unset", "GH_REPO=unset"], "no env-driven host or repo")
 
     def test_env_cannot_redirect_the_call(self):
-        p, called = self.run_wrapper("5", SHA, env={"GH_HOST": "evil.example", "GH_REPO": "other/repo"})
+        hostile = {"GH_HOST": "evil.example", "GH_REPO": "other/repo", "GITHUB_REPOSITORY": "other/repo", "GIT_DIR": "/nonexistent", "CDPATH": "/tmp"}
+        p, called = self.run_wrapper("5", SHA, env=hostile)
         self.assertEqual((p.returncode, called), (0, True), p.stderr)
         with open(self.out, encoding="utf-8") as f:
-            self.assertIn("GH_HOST=unset\nGH_REPO=unset", f.read())
+            text = f.read()
+        self.assertIn(f"repos/{SLUG}/pulls/5/update-branch", text)
+        self.assertIn("GH_HOST=unset\nGH_REPO=unset", text)
+
+    def test_the_repository_follows_the_origin_remote_and_a_missing_or_unparsable_one_never_reaches_gh(self):
+        p, called = self.run_wrapper("9", SHA, remote=f"ssh://git@github.com/{OLD_SLUG}")
+        self.assertEqual((p.returncode, called), (0, True), p.stderr)
+        with open(self.out, encoding="utf-8") as f:
+            self.assertEqual(f.read().splitlines()[3], f"repos/{OLD_SLUG}/pulls/9/update-branch")
+        for remote in (NO_REMOTE, "https://gitlab.com/x/y.git"):
+            if os.path.exists(self.out):
+                os.remove(self.out)
+            p, called = self.run_wrapper("9", SHA, remote=remote, env={"GITHUB_REPOSITORY": "other/repo"})
+            self.assertEqual((p.returncode, called), (1, False), (remote, p.stderr))
+            self.assertIn("origin", p.stderr)
 
     def test_bad_input_never_reaches_gh(self):
         bad_numbers = ["", "abc", "0", "012", "-1", "+1", "1.5", "1234567", "12 13", "12/merge", "1;id", "$(id)", "12\n", "٣"]
@@ -97,14 +113,12 @@ class UpdateBranch(unittest.TestCase):
                     f.write(f"touch {marker}\n")
                 with open(os.path.join(ROOT, "scripts", name), encoding="utf-8") as f:
                     src = f.read()
-                copy = os.path.join(self.tmp.name, "direct-" + name)
-                with open(copy, "w", encoding="utf-8") as f:
-                    f.write(GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed}"', src))
-                os.chmod(copy, 0o755)
+                shutil.rmtree(os.path.join(self.tmp.name, "checkout"), ignore_errors=True)
+                root = fixture_checkout(self.tmp.name, {name: GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{self.fixed}"', src)})
                 if os.path.exists(self.out):
                     os.remove(self.out)
                 env = {"PATH": "/usr/bin:/bin", "FAKE_GH_OUT": self.out, "BASH_ENV": rc, "ENV": rc, "BASH_FUNC_exec%%": f"() {{ touch {marker}; }}"}
-                p = subprocess.run([copy, *args], capture_output=True, text=True, env=env, cwd=ROOT, timeout=30)
+                p = subprocess.run([os.path.join(root, "scripts", name), *args], capture_output=True, text=True, env=env, cwd=self.tmp.name, timeout=30)
                 self.assertFalse(os.path.exists(marker), "injected code ran")
                 self.assertEqual((p.returncode, os.path.exists(self.out)), (0, True), p.stderr)
 
@@ -114,7 +128,8 @@ class UpdateBranch(unittest.TestCase):
         for bad in ['"$@"', "$*", "merge", "POST", "DELETE", "--input", "--hostname", "eval ", "-H ", "command -v", "which ", "env bash"]:
             self.assertNotIn(bad, src, bad)
         self.assertEqual(src.count("api -X PUT"), 1)
-        self.assertEqual(src.count('"repos/bondo/listicles2/pulls/${n}/update-branch" -f "expected_head_sha=${sha}"'), 1)
+        self.assertEqual(src.count('"repos/${repo}/pulls/${n}/update-branch" -f "expected_head_sha=${sha}"'), 1)
+        self.assertEqual(src.count('repo="$(python3 -I "$(dirname -- "$0")/repo_slug.py" --remote-only)" || exit 1'), 1, "the slug from the own checkout only")
 
 
 if __name__ == "__main__":

@@ -284,6 +284,8 @@ jobs:
         run: python3 -I scripts/issue_forms.py
       - name: collab inbox tests
         run: python3 -I scripts/test_collab_inbox.py
+      - name: repo slug tests (M1-85, one place for the repository name)
+        run: python3 -I scripts/test_repo_slug.py
       - name: merge_ready.py tests
         run: python3 -I scripts/test_merge_ready.py
       - name: status renderer and fetch tests

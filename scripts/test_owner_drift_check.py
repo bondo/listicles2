@@ -4,6 +4,7 @@ Run: python3 -I scripts/test_owner_drift_check.py"""
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -81,9 +82,21 @@ def slurp(*items, total=None, incomplete=False):
 
 
 class OwnerDriftScriptTest(unittest.TestCase):
-    def run_script(self, issues, prs="[]", fails=0, retries="3", tasks=TASKS):
+    def run_script(self, issues, prs="[]", fails=0, retries="3", tasks=TASKS, repo="acme/widgets", remote=None):
+        """repo: GITHUB_REPOSITORY (None: unset). remote: run a copy in a fixture checkout with this `origin` ("" for none), M1-85."""
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
+            script, cwd = SCRIPT, ROOT
+            if remote is not None:
+                cwd = d / "checkout"
+                (cwd / "scripts").mkdir(parents=True)
+                for name in ("check_owner_drift.sh", "repo_slug.py", "tasks.py"):
+                    shutil.copy(ROOT / "scripts" / name, cwd / "scripts" / name)
+                script = cwd / "scripts" / "check_owner_drift.sh"
+                git = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "PATH": os.environ["PATH"]}
+                subprocess.run(["git", "init", "-q", str(cwd)], check=True, env=git)
+                if remote:
+                    subprocess.run(["git", "-C", str(cwd), "remote", "add", "origin", remote], check=True, env=git)
             (d / "bin").mkdir()
             gh = d / "bin" / "gh"
             gh.write_text(FAKE_GH)
@@ -95,11 +108,12 @@ class OwnerDriftScriptTest(unittest.TestCase):
                 "PATH": f"{d / 'bin'}:{os.environ['PATH']}", "HOME": str(d),
                 "FAKE_GH_LOG": str(d / "gh.log"), "FAKE_GH_ISSUES": str(d / "issues.json"),
                 "FAKE_GH_PRS": str(d / "prs.json"), "FAKE_GH_FAILS": str(fails),
-                "GITHUB_REPOSITORY": "acme/widgets", "OWNER_DRIFT_TASKS": str(d / "tasks.toml"),
-                "OWNER_DRIFT_RETRIES": retries, "OWNER_DRIFT_SLEEP": "0",
+                "OWNER_DRIFT_TASKS": str(d / "tasks.toml"), "OWNER_DRIFT_RETRIES": retries, "OWNER_DRIFT_SLEEP": "0",
             }
+            if repo is not None:
+                env["GITHUB_REPOSITORY"] = repo
             (d / "gh.log").write_text("")
-            p = subprocess.run(["bash", str(SCRIPT)], capture_output=True, text=True, env=env, cwd=ROOT)
+            p = subprocess.run(["bash", str(script)], capture_output=True, text=True, env=env, cwd=cwd)
             return p.returncode, p.stdout + p.stderr, (d / "gh.log").read_text().splitlines()
 
     def test_open_issue_with_todo_row_passes(self):
@@ -115,6 +129,25 @@ class OwnerDriftScriptTest(unittest.TestCase):
     def test_searches_the_repository_in_github_repository(self):
         _, _, calls = self.run_script(slurp({"number": 12, "title": "", "state": "open"}))
         self.assertTrue(calls and all("repo:acme/widgets" in c for c in calls), calls)
+
+    def test_without_github_repository_it_searches_the_origin_remote_of_its_checkout(self):
+        for remote, slug in (("git@github.com:bondo/listicles2.git", "bondo/listicles2"), ("https://github.com/octo-org/renamed-repo", "octo-org/renamed-repo")):
+            code, out, calls = self.run_script(slurp({"number": 12, "title": "", "state": "open"}), repo=None, remote=remote)
+            self.assertEqual(code, 0, out)
+            self.assertTrue(calls and all(f"repo:{slug} " in c for c in calls), calls)
+
+    def test_github_repository_wins_over_the_remote(self):
+        _, _, calls = self.run_script(slurp(), remote="https://github.com/bondo/listicles2")
+        self.assertTrue(calls and all("repo:acme/widgets " in c for c in calls), calls)
+
+    def test_no_repository_from_anywhere_fails_before_any_search(self):
+        for remote in ("", "https://gitlab.com/x/y.git"):
+            code, out, calls = self.run_script(slurp(), repo=None, remote=remote)
+            self.assertEqual((code, calls), (1, []), out)
+            self.assertIn("origin", out)
+        code, out, calls = self.run_script(slurp(), repo="not a slug", remote="https://github.com/bondo/listicles2")
+        self.assertEqual((code, calls), (1, []), out)
+        self.assertIn("GITHUB_REPOSITORY", out)
 
     def test_persistent_gh_failure_fails_the_check_after_retries(self):
         code, out, calls = self.run_script(slurp(), fails=99, retries="3")

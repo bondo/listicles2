@@ -19,11 +19,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "hooks"))
 import ci_scope  # noqa: E402  # justified: its SELFTESTS are the gate self-tests CI runs without naming them
 import merge_ready  # noqa: E402  # justified: must follow the sys.path insert above
+import repo_slug  # noqa: E402  # justified: must follow the sys.path insert above
 import pretooluse_guard  # noqa: E402  # justified: its PROTECTED list is the source of the process files (R1-03)
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "merge_ready.py"
-REPO = "bondo/listicles2"
+REPO = "bondo/listicles2"  # fixtures only: main() takes the repository from scripts/repo_slug.py (M1-85), tests pass it in
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
 N = 77
@@ -127,6 +128,7 @@ def make_api(files=None, title="Update the plan", body="Refreshes section 4. See
 
 def go(api, sha=SHA, kind="working-draft-docs", resolver=None, flags=(), **kwargs):
     out, err = io.StringIO(), io.StringIO()
+    kwargs.setdefault("repo", REPO)
     code = merge_ready.main([*flags, str(N), sha, kind], api=api, out=out, err=err, resolver=resolver or fake_resolver(), **kwargs)
     return code, out.getvalue() + err.getvalue()
 
@@ -198,7 +200,7 @@ class RefusalTests(unittest.TestCase):
 
     def test_closing_keyword_in_body_title_or_commit(self):
         cases = [{"body": t} for t in ("Fixes #12", "closes #12", "This will resolve #12.", "Closed: #12", "fix owner/repo#12", "RESOLVED #12")]
-        cases += [{"body": f"fixes {host}/bondo/listicles2/issues/12"} for host in ("https://github.com", "http://github.com", "https://www.github.com")]
+        cases += [{"body": f"fixes {host}/{REPO}/issues/12"} for host in ("https://github.com", "http://github.com", "https://www.github.com")]
         cases += [{"title": "Fix #12 in the plan"}, {"commits": [{"commit": {"message": "Edit flow doc\n\nCloses #12"}}]}]
         for kwargs in cases:
             with self.subTest(**kwargs):
@@ -1181,7 +1183,7 @@ class StateIssueRotationTests(unittest.TestCase):
                         self.assertRegex(text, reason)
 
     def test_an_issue_url_of_another_repository_or_another_shape_is_refused(self):  # endswith("/issues/15") alone would accept these
-        urls = {"other repo": "https://api.github.com/repos/mallory/listicles2/issues/15",
+        urls = {"other repo": f"https://api.github.com/repos/mallory/{REPO.split('/')[1]}/issues/15",
                 "repo suffix": f"https://api.github.com/repos/{REPO}x/issues/15", "repo prefix": f"https://api.github.com/repos/x{REPO}/issues/15",
                 "trailing slash": f"https://api.github.com/repos/{REPO}/issues/15/", "pull path": f"https://api.github.com/repos/{REPO}/pulls/15",
                 "leading zero": f"https://api.github.com/repos/{REPO}/issues/015", "empty": "", "missing": None}
@@ -1459,6 +1461,31 @@ class WiringTests(unittest.TestCase):
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
+
+
+class RepositoryTests(unittest.TestCase):
+    """M1-85: no slug in the script; without a `repo` argument main() asks scripts/repo_slug.py, and a failure there refuses before any call."""
+
+    def test_without_a_repo_argument_the_slug_comes_from_repo_slug(self):
+        api = make_api()
+        with mock.patch.object(repo_slug, "resolve", return_value=REPO) as resolve:
+            code, text = go(api, repo=None)
+        resolve.assert_called_once_with()
+        self.assertEqual((code, [m[0] for m in api.merged]), (0, [f"repos/{REPO}/pulls/{N}/merge"]), text)
+        with mock.patch.object(repo_slug, "resolve", return_value="octo-org/renamed-repo"), \
+                mock.patch.object(merge_ready, "evaluate", return_value=({}, ["stop here"])) as evaluate:
+            code, text = go(make_api(), repo=None)
+        self.assertEqual((code, evaluate.call_args.args[1]), (1, "octo-org/renamed-repo"), text)
+
+    def test_an_unresolvable_repository_fails_loudly_before_any_call(self):
+        api = make_api()
+        with mock.patch.object(repo_slug, "resolve", side_effect=repo_slug.RepoSlugError("no origin remote")):
+            code, text = go(api, repo=None)
+        self.assertEqual((code, api.requested, api.merged), (1, [], []))
+        self.assertIn("merge_ready: no origin remote", text)
+
+    def test_the_module_keeps_no_repository_constant(self):
+        self.assertFalse(hasattr(merge_ready, "REPO"))
 
 
 if __name__ == "__main__":

@@ -1,10 +1,13 @@
 """scripts/mark-ready.sh is the only thing the project permission rule lets agents run to mark a PR ready.
-It must accept exactly one PR number and make exactly one fixed call. The wrapper finds `gh` only in the directories on its `gh_dirs=` line (never
-through PATH, R5-03), so a fake `gh` records the call through a copy of the real file whose `gh_dirs=` line is replaced. A decoy `gh` in PATH must never run.
+It must accept exactly one PR number and make exactly one call, to the repository of its own checkout's `origin` remote (M1-85: scripts/repo_slug.py
+--remote-only, never the environment), so it works before and after a repo rename. The wrapper finds `gh` only in the directories on its `gh_dirs=` line
+(never through PATH, R5-03), so a fake `gh` records the call through a copy of the real file, in a fixture checkout, whose `gh_dirs=` line is replaced.
+A decoy `gh` in PATH must never run.
 Run: python3 -I -m unittest discover -s scripts/hooks"""
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +25,25 @@ FAKE_GH = (
     'printf "%s" "$PATH" > "$FAKE_GH_OUT.path"\n'
 )
 GH_DIRS_LINE = re.compile(r'(?m)^gh_dirs="[^"\n]*"$')
+OLD_SLUG = "bondo/listicles2"  # the name before the rename
+SLUG = "octo-org/renamed-repo"  # fixtures only: the wrapper takes the repository from the checkout's origin remote
+REMOTE = f"https://github.com/{SLUG}.git"
+NO_REMOTE = None
+
+
+def fixture_checkout(parent, scripts, remote=REMOTE):
+    """A git checkout under `parent` with scripts/<name> = text for each item, a copy of scripts/repo_slug.py and `origin` = remote."""
+    root = os.path.join(parent, "checkout")
+    os.makedirs(os.path.join(root, "scripts"))
+    shutil.copy(os.path.join(ROOT, "scripts", "repo_slug.py"), os.path.join(root, "scripts", "repo_slug.py"))
+    for name, text in scripts.items():
+        with open(os.path.join(root, "scripts", name), "w", encoding="utf-8") as f:
+            f.write(text)
+        os.chmod(os.path.join(root, "scripts", name), 0o755)
+    subprocess.run(["git", "init", "-q", root], check=True)
+    if remote is not None:
+        subprocess.run(["git", "-C", root, "remote", "add", "origin", remote], check=True)
+    return root
 
 
 def read_wrapper():
@@ -46,20 +68,18 @@ class MarkReady(unittest.TestCase):
             f.write(body)
         os.chmod(os.path.join(d, "gh"), 0o755)
 
-    def copy_with_gh_dirs(self, dirs):
-        """A copy of the real wrapper whose gh_dirs line is replaced; fails if the real file has no such single line."""
+    def copy_with_gh_dirs(self, dirs, remote):
+        """A fixture checkout with a copy of the real wrapper whose gh_dirs line is replaced; fails if the real file has no such single line."""
         src = read_wrapper()
         self.assertEqual(len(GH_DIRS_LINE.findall(src)), 1, 'scripts/mark-ready.sh needs exactly one line: gh_dirs="<absolute dirs>"')
-        path = os.path.join(self.tmp.name, "mark-ready-copy.sh")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{dirs}"', src))
-        return path
+        shutil.rmtree(os.path.join(self.tmp.name, "checkout"), ignore_errors=True)
+        return fixture_checkout(self.tmp.name, {"mark-ready.sh": GH_DIRS_LINE.sub(lambda _: f'gh_dirs="{dirs}"', src)}, remote)
 
-    def run_wrapper(self, *args, env=None, dirs=None):
+    def run_wrapper(self, *args, env=None, dirs=None, remote=REMOTE):
         e = {"PATH": self.decoy + os.pathsep + "/usr/bin:/bin", "FAKE_GH_OUT": self.out}
         e.update(env or {})
-        script = self.copy_with_gh_dirs(self.fixed if dirs is None else dirs)
-        p = subprocess.run(["bash", script, *args], capture_output=True, text=True, env=e, cwd=ROOT, timeout=30)
+        root = self.copy_with_gh_dirs(self.fixed if dirs is None else dirs, remote)
+        p = subprocess.run(["bash", "scripts/mark-ready.sh", *args], capture_output=True, text=True, env=e, cwd=root, timeout=30)
         called = os.path.exists(self.out)
         return p, called
 
@@ -77,19 +97,38 @@ class MarkReady(unittest.TestCase):
             self.assertTrue(called, n)
             with open(self.out, encoding="utf-8") as f:
                 lines = f.read().splitlines()
-            self.assertEqual(lines[:4], ["api", "-X", "POST", f"repos/bondo/listicles2/pulls/{n}/ccr/ready_for_review"], n)
+            self.assertEqual(lines[:4], ["api", "-X", "POST", f"repos/{SLUG}/pulls/{n}/ccr/ready_for_review"], n)
             self.assertEqual(lines[4:], ["GH_HOST=unset", "GH_REPO=unset"], "no env-driven host or repo")
 
     def test_env_cannot_redirect_the_call(self):
-        p, called = self.run_wrapper("5", env={"GH_HOST": "evil.example", "GH_REPO": "other/repo"})
+        hostile = {"GH_HOST": "evil.example", "GH_REPO": "other/repo", "GITHUB_REPOSITORY": "other/repo", "GIT_DIR": "/nonexistent", "CDPATH": "/tmp"}
+        p, called = self.run_wrapper("5", env=hostile)
         self.assertEqual(p.returncode, 0, p.stderr)
         with open(self.out, encoding="utf-8") as f:
-            self.assertIn("GH_HOST=unset\nGH_REPO=unset", f.read())
+            text = f.read()
+        self.assertIn(f"repos/{SLUG}/pulls/5/", text)
+        self.assertIn("GH_HOST=unset\nGH_REPO=unset", text)
+
+    def test_the_repository_follows_the_origin_remote_old_or_new_name_and_any_owner(self):
+        for remote, slug in ((f"git@github.com:{OLD_SLUG}.git", OLD_SLUG), ("http://local_proxy@127.0.0.1:4711/git/mallory/x", "mallory/x")):
+            if os.path.exists(self.out):
+                os.remove(self.out)
+            p, called = self.run_wrapper("9", remote=remote)
+            self.assertEqual((p.returncode, called), (0, True), p.stderr)
+            with open(self.out, encoding="utf-8") as f:
+                self.assertEqual(f.read().splitlines()[3], f"repos/{slug}/pulls/9/ccr/ready_for_review")
+
+    def test_no_or_unparsable_remote_fails_loudly_without_calling_gh(self):
+        for remote in (NO_REMOTE, "https://gitlab.com/x/y.git", "/srv/git/x.git"):
+            p, called = self.run_wrapper("9", remote=remote, env={"GITHUB_REPOSITORY": "other/repo"})
+            self.assertEqual(p.returncode, 1, (remote, p.stderr))
+            self.assertFalse(called or os.path.exists(self.decoy_out), remote)
+            self.assertIn("origin", p.stderr)
 
     def test_rejects_bad_input_without_calling_gh(self):
         bad = ["", "abc", "0", "012", "-1", "+1", "1.5", "1234567", "12 13", "12/merge", "12/../../x", "1;rm -rf x", "1&&id", "1|id",
                "$(id)", "`id`", "12\n", "\n12", "12\n13", "1\n; gh api -X PUT x", "٣", "１２", "12 -X PUT", "-X", "--input", "--hostname=x",
-               "12/ccr/ready_for_review", "repos/bondo/listicles2/pulls/12/merge"]
+               "12/ccr/ready_for_review", f"repos/{OLD_SLUG}/pulls/12/merge"]
         for arg in bad:
             if os.path.exists(self.out):
                 os.remove(self.out)
@@ -110,7 +149,8 @@ class MarkReady(unittest.TestCase):
         for bad in ['"$@"', "$*", "merge", "PUT", "DELETE", "--input", "--hostname", "eval ", "-H "]:
             self.assertNotIn(bad, src, bad)
         self.assertEqual(src.count("api -X POST"), 1)
-        self.assertEqual(len(re.findall(r'exec "\$d/gh" api -X POST "repos/bondo/listicles2/pulls/\$\{n\}/ccr/ready_for_review"', src)), 1)
+        self.assertEqual(len(re.findall(r'exec "\$d/gh" api -X POST "repos/\$\{repo\}/pulls/\$\{n\}/ccr/ready_for_review"', src)), 1)
+        self.assertEqual(src.count('repo="$(python3 -I "$(dirname -- "$0")/repo_slug.py" --remote-only)" || exit 1'), 1, "the slug from the own checkout only")
 
     def test_a_decoy_gh_earlier_in_path_is_not_used(self):
         """R5-03: `gh` is resolved in fixed directories, not through PATH, so a shim planted in a PATH directory cannot run."""

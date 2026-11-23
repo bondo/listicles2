@@ -8,12 +8,13 @@ import re
 import unittest
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-IMAGE_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status.svg"
+SLUG = r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+"  # any OWNER/NAME: the README links follow a repo rename (M1-85), but all from one repository
+IMAGE_URL = "https://raw.githubusercontent.com/{slug}/status/status.svg"
 TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_status_page.py",
          "python3 -I scripts/test_status_publish.py", "python3 -I scripts/test_status_graph.py",
          "python3 -I scripts/test_status_workflow.py")
-GRAPH_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status-graph.svg"
-PAGE_URL = "https://github.com/bondo/listicles2/blob/status/status.md"
+GRAPH_URL = "https://raw.githubusercontent.com/{slug}/status/status-graph.svg"
+PAGE_URL = "https://github.com/{slug}/blob/status/status.md"
 JOB_PERMISSIONS = ["checks: read", "contents: write", "issues: read", "pull-requests: read"]
 USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)(?:\s+#\s*(\S.*))?$")
 
@@ -21,6 +22,12 @@ USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)(?:\s+#\s*(\S.*))?$")
 def read(*parts):
     with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
         return f.read()
+
+
+def status_urls(readme):
+    """(image, page, graph) URLs for the repository whose status picture the README embeds, or None without one."""
+    m = re.search(r"\]\(" + re.escape(IMAGE_URL).replace(re.escape("{slug}"), f"({SLUG})") + r"\)", readme)
+    return None if m is None else tuple(u.format(slug=m.group(1)) for u in (IMAGE_URL, PAGE_URL, GRAPH_URL))
 
 
 def active_lines(text):
@@ -241,17 +248,24 @@ class Wiring(unittest.TestCase):
         self.assertTrue(runs("step x python3 -I a.py", "python3 -I a.py"))
 
     def test_readme_embeds_the_image_from_the_status_branch(self):
-        self.assertIn(f"]({IMAGE_URL})", read("README.md"))
+        self.assertIsNotNone(status_urls(read("README.md")), "README must embed status.svg from the status branch")
+
+    def test_status_urls_needs_the_image_from_the_status_branch_of_one_repository(self):
+        self.assertEqual(status_urls("![s](https://raw.githubusercontent.com/a/b.c/status/status.svg)")[1], "https://github.com/a/b.c/blob/status/status.md")
+        for bad in ("![s](https://raw.githubusercontent.com/a/b/main/status.svg)", "![s](https://raw.githubusercontent.com/a/status/status.svg)",
+                    "![s](https://raw.githubusercontent.com/a/b/c/status/status.svg)", "![s](https://example.com/a/b/status/status.svg)"):
+            self.assertIsNone(status_urls(bad), bad)
 
     def test_readme_links_the_detail_page_on_the_status_branch(self):
-        self.assertIn(f"]({PAGE_URL})", read("README.md"))
+        self.assertIn(f"]({status_urls(read('README.md'))[1]})", read("README.md"))
 
     def test_readme_embeds_the_graph_below_the_status_picture_with_alt_text(self):
         readme = read("README.md")
-        m = re.search(rf"!\[([^\]]{{20,}})\]\({re.escape(GRAPH_URL)}\)", readme)
-        self.assertIsNotNone(m, "README must embed status-graph.svg with alt text")
+        image, _, graph = status_urls(readme)
+        m = re.search(rf"!\[([^\]]{{20,}})\]\({re.escape(graph)}\)", readme)
+        self.assertIsNotNone(m, "README must embed status-graph.svg of the same repository with alt text")
         self.assertIn("dependenc", m.group(1))
-        self.assertLess(readme.index(f"]({IMAGE_URL})"), m.start(), "the graph goes below the status picture")
+        self.assertLess(readme.index(f"]({image})"), m.start(), "the graph goes below the status picture")
 
     def test_the_workflow_needs_no_change_for_the_graph(self):
         self.assertNotIn("status-graph", read(".github", "workflows", "status.yml"))  # render writes it next to the svg, publish picks it up
