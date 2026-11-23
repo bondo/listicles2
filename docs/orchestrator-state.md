@@ -75,7 +75,8 @@ unless you are the orchestrator named in the block; comment instead.
 ## Comments on the state issue (owner decision 7076085601 item 1)
 
 Comments only for: `decision`, `batch approval:` records and `veto #N`, `handover`, `handover-ack`, `handover-released`, `takeover`,
-`lock-lost`, `incident`, `PAUSED` / `RESUMED`, `metrics:*` blocks (§6) and the weekly digest. Progress, check-ins and "no change" wakes
+`lock-lost`, `incident`, `PAUSED` / `RESUMED`, `metrics:*` blocks (§6), the weekly digest, the one-line note for a `golden-update` or `big-pr` label
+(PR, head SHA and round; owner decision 7082564807, ORCHESTRATION.md §1.1, §7.6) and the one-line design hand-off note (§7.8). Progress, check-ins and "no change" wakes
 go to the body (`updated` in the block) or onto the PR concerned, never into a comment. Metrics rows are batched into the next decision
 or metrics comment, or one metrics comment per check-in with no prose. The older log kinds (`correction`, `todo-done`) are retired:
 fix the body and say so in `updated.after`. Open questions for the owner go into the block's `owner_queue` (kind `question`, with

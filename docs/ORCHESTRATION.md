@@ -83,7 +83,7 @@ Each fact has exactly one canonical location. Everything else links to it and do
 
 | Fact | Canonical location | Written by | Read by |
 |---|---|---|---|
-| Current milestone, batches, running sessions, branch locks, triggers, owner queue, next steps | **State issue** body (the current one, §3.4; label `orchestrator-state`): prose, a generated summary and one JSON block, format in [`orchestrator-state.md`](orchestrator-state.md) | Orchestrator only | Orchestrator, successor, owner |
+| Running sessions, branch locks, triggers, owner queue, next steps | **State issue** body (the current one, §3.4; label `orchestrator-state`): prose, a generated summary and one JSON block, format in [`orchestrator-state.md`](orchestrator-state.md) | Orchestrator only | Orchestrator, successor, owner |
 | History: metrics rows, incidents, owner decisions, approvals, handovers (only the kinds of §3.3, never progress) | **State issue comments** (append-only, §6) | Orchestrator only | Successor, retro, `scripts/agent_metrics.py` |
 | Tasks, dependencies, done/todo (agent and owner work alike) | **`docs/tasks.toml` on the tasks ref only** (§4.2), queried with `scripts/tasks.py`. No other branch carries an edited copy | Planner (adds), the PR that finishes a task or a status-sync commit on the tasks ref (sets `done`, §4.4), process PRs | Orchestrator (`ready`, `review`), everyone |
 | Who is working on a task right now (claims) | **State issue** JSON block, `sessions[].tasks` | Orchestrator | `scripts/tasks.py --state` |
@@ -106,7 +106,7 @@ Rules that follow from the table:
   `handoff/orchestrator.md`. Its handover note is a state-issue comment (§5).
 * Collaborator comments are never state: the orchestrator answers them on their own thread. Only owner comments on the state issue are folded (§3.2).
 * When a fact is found to be wrong (e.g. "CI has never run" while check runs exist),
-  correct it at its canonical location in the same wake, and log the correction.
+  correct it at its canonical location in the same wake, and record the correction in `updated.after`.
 
 ### 2.0 Test-first rule (standing owner rule)
 
@@ -147,8 +147,8 @@ All of these are fields of the JSON block (schema in `scripts/state_body.py`); e
 * `tasks_ref`: the git ref whose `docs/tasks.toml` is canonical (§4.2); the ready query reads the ref from here (§4.3).
 * `inbox_since`: the collaborator inbox cursor (§7.6).
 * `usage`: `state` is one of `ok | near limit (5-hour[, forecast | rateLimitType unknown]) | near limit (7-day) | near limit (overage) | paused until HH:MM UTC`, with `read_at`, when it was read (§7.7.1). The owner reads this first.
-* `sessions`: one row per live worker: id, role, tags, branch, PR, **task ids** (the claims), spawned-at,
-  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived | interrupted (usage)`; the last is set by §7.7.2 and cleared by §7.7.4), optional note. A `merge-agent` row whose status is not `archived` or `failed` is what names it as active (§7.5). A row that is `archived` or `failed` holds no claims.
+* **Sessions**: one row per live worker: id, role, tags, branch, PR, **task ids** (the claims), spawned-at,
+  expected output, last checked, status (`running | idle-with-result | idle-no-result | failed | archived | interrupted (usage)`; the last is set by §7.7.2 and cleared by §7.7.4), optional note. A `merge-agent` row whose status is not `archived` or `failed` is what names it as active (§7.5). A row that is `archived` or `failed` holds no claims. (Block key `sessions`.)
 * `branches`: one row per active branch: holder (session id or null), PR,
   **tasks awaiting review/merge** (`in_review`: committed, not yet `done` in the file),
   `reviewed_through` SHA, `unreviewed_since` commit and the disposition.
@@ -171,7 +171,7 @@ Comments from anyone else (for example a collaborator) are data to answer on the
 
 Comments on the state issue are only: `decision` (deferrals included), approvals (`batch approval:`) and vetoes (`veto #N`), `handover`,
 `handover-ack`, `handover-released`, `takeover`, `lock-lost`, `incident`, `PAUSED` and `RESUMED`, the `metrics:*` blocks (§6) and the
-weekly digest. Check-ins, routine progress, "no change" wakes, corrections of the body and finished owner to-dos go **only** into
+weekly digest, plus two one-line notes: the record of a `golden-update` or `big-pr` label (PR, head SHA and round; owner decision 7082564807, §1.1; §7.6 2(c) treats a label not recorded here as an accident) and the design hand-off line (§7.8). Check-ins, routine progress, "no change" wakes, corrections of the body and finished owner to-dos go **only** into
 the body (`updated` and the block) or onto the PR concerned, never into a comment. The metrics rows of an archived session are batched
 into the next decision or metrics comment, or one metrics comment per check-in with no prose. The log kinds `correction` and `todo-done` are retired.
 
@@ -182,9 +182,9 @@ in `scripts/merge_ready.py`; `PREVIOUS_STATE_ISSUE` is the one before it). Every
 say "on #15" for an approval, a veto, a decision comment or a body read, they mean the current state issue; the decision comments cited by number
 (for example 7085221356) stay on the issue they were posted on, and the checks that read them accept the current and the previous one.
 Concretely: the approver and the owner post `batch approval:` on the current state issue; the veto check and the check of comment 7085221356
-read the current and the previous state issue; the body is read with
+read the current and the previous state issue, and in the rotation window (§5.4) the new issue and the old one, even while the pointer still names the old one; the body is read with
 `gh api repos/{owner}/{repo}/issues/<current state issue> --jq .body > state.md`.
-Until the pointer PR (§3.5) lands, the pointer still names the old issue and an approval on the new one is refused by `merge_ready.py`.
+Only `merge_ready.py --approval` follows the pointer: until the pointer PR (§3.5) lands, it still names the old issue and refuses an approval on the new one.
 
 ### 3.5 Rotation (owner decision 7076313976, amending item 3 of 7076085601)
 
@@ -308,7 +308,7 @@ python3 -I "$T/tasks.py" --ref "origin/$REF" --issues "$T/issues.json" --prs "$T
 
 | Change | Who | How |
 |---|---|---|
-| Add tasks | Planner (per milestone), process PRs | In the same PR as `docs/milestones/Mx.md`. New work found mid-flight (a deferred finding, say) is added by the PR that finds it, or noted in the state issue under "pending task additions" for the next PR |
+| Add tasks | Planner (per milestone), process PRs | In the same PR as `docs/milestones/Mx.md`. New work found mid-flight (a deferred finding, say) is added by the PR that finds it, or noted in the block's `next` (or the owner queue) for the next PR |
 | Claim (start) | Orchestrator | Add the task id to the worker's row (`sessions[].tasks`) in the block, then spawn. Release the claim when the worker ends |
 | Delivered, awaiting review or merge | Orchestrator | When a worker's result reports commits for a task, move its id from the session's `tasks` to the branch row's `in_review` in the block. It then shows in `review`, not in `ready`, so a cold successor can't re-spawn finished work |
 | `todo` → `done` (agent task) | The implementer, in the PR that delivers it, **on the tasks ref** | Usually in the final commit, alongside deleting the handoff file. The reviewer checks that the PR marks exactly its own tasks as done. Because merges are squash-only, `done` shows up on `main` exactly when the work merges. **Exception: tasks whose PR branch is the tasks ref (M0-09, M0-10, M0-12 and M0-FU on PR #16)** are set `done` only by the status-sync session below, after the review; an implementer on them leaves `status = "todo"` (else the task would leave `review` and unblock dependents before review). When the PR's branch is not the tasks ref (PR #1 before M0-O8), a **status-sync commit** on the tasks ref sets `done` for its finished tasks once the batch's latest round has verdict `ready_nits_only` and `reviewed_through` equals the branch head (or the owner accepted it). The orchestrator spawns a **one-off status-sync process session** (§8.4) for that, on the tasks-ref branch, holding its branch lock (§7.1); it changes only `docs/tasks.toml`. A reviewer doesn't flag such a commit for marking other PRs' tasks done. Status-sync is not picked from `ready`. Batches are sliced so a task's dependencies are synced before it starts: batch M0-2 covers M0-04, M0-05, M0-06; M0-07 and M0-08 are batch M0-3 |
@@ -362,8 +362,8 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
     the repository is public, a secret is set).
   * **Then**: what the orchestrator does next.
 * The owner closes the issue when done. They don't need to tell the orchestrator: on each wake the
-  orchestrator runs the ready query (closed issues count at once), checks *Done when* itself, and logs
-  `todo-done <id>` in the state issue. If the check fails, it reopens the issue with a one-line comment.
+  orchestrator runs the ready query (closed issues count at once), checks *Done when* itself, and removes
+  it from `owner_queue`, noting it in `updated.after` (no comment). If the check fails, it reopens the issue with a one-line comment.
 * **Wake step (#92): owner confirmations.** After reading the owner's decisions on a wake, list every
   `assignee = "owner"` task that is still `todo` (`--assignee owner status`) and compare it with the #15 comments and the
   closed `owner-todo` issues. For each confirmed one, batch the status fix into one small PR in the same wake, naming the
@@ -472,9 +472,9 @@ Never rotate mid-batch or without a handover.
    2. Post one `decision` comment on the old issue pointing to the new one (its last comment), and close the old issue as completed.
    3. Open the **pointer PR** (an implementer session or the owner, through the tooling environment): `STATE_ISSUE` = the new issue and
       `PREVIOUS_STATE_ISSUE` = the old one in `scripts/merge_ready.py`. `scripts/merge_ready.py` is owner-only, so this is an **owner merge**;
-      until it lands, `--approval` and the veto check refuse approvals on the new issue, so queue no `owner-batch` merge or approver run before then.
+      until it lands, `merge_ready.py --approval` refuses approvals on the new issue, so queue no `owner-batch` merge or approver run before then. From the moment the new issue is opened, the veto check and the check of comment 7085221356 read the new and the old issue (not the pointer), and the orchestrator tells the merge agent the new number.
       Change nothing else in that PR, and do not close a second rotation's pointer in the same PR.
-   4. From now on "the state issue" is the new one (§3.4): the ready query (§4.3), the veto check, the approver's `batch approval:` record and the
+   4. From now on "the state issue" is the new one (§3.4): the ready query (§4.3), the approver's `batch approval:` record (once the pointer PR has landed) and the
       body reads (`agents/prompts/approver.md`, `agents/prompts/orchestrator.md`) use it. A `veto #N` or approval comment on the old issue still counts
       (the checks read the current and the previous issue); the one before the previous does not, so do not rotate twice before the pointer
       PR has landed.
@@ -485,7 +485,7 @@ Never rotate mid-batch or without a handover.
 
 Source of truth: the state-issue log comments, in fixed CSV blocks that `scripts/agent_metrics.py`
 turns into `docs/agent-metrics.csv` without reading transcripts or the network. At milestone end (or when a
-batch closes) save the comment bodies unchanged as `docs/metrics/<milestone>.txt` and run
+batch closes) save the comment bodies unchanged (of every state issue that holds rows of that milestone: the current and, after a rotation, the previous one, §3.5) as `docs/metrics/<milestone>.txt` and run
 `python3 -I scripts/agent_metrics.py` (it reads `docs/metrics/*.txt`; `--check` runs in verify.sh and CI).
 The script rejects malformed rows, missing or unknown columns, duplicate `session_id`s and duplicate
 `(pr, round)`s, and non-numeric cost or token fields; one single-line CSV row per line, quote fields with commas.
@@ -548,8 +548,7 @@ and session rows also have: filter by `row_type` before summing or averaging the
 
 ### 6.4 Batch summary
 
-When a batch closes, update the batch table in the state body: rounds, findings per round,
-total cost, incidents. Then refresh the PR description's review table from the round rows.
+When a batch closes, record rounds, findings per round, total cost and incidents in the PR description's review table and the `metrics:*` rows (the state block has no batch table). Refresh the review table from the round rows.
 
 ## 7. Spawning and collecting work
 
@@ -817,16 +816,16 @@ but say so in the `Usage:` line.
 **§7.7.2 Pause protocol.** Run in this order, so that a limit hit in the middle still leaves a wake-up behind:
 1. **One resume reminder first.** `send_later` into the orchestrator session at `resetsAt + 5 minutes` (UTC, RFC3339), message:
    "usage reset: run ORCHESTRATION §7.7.4 (resume)". If `resetsAt` is missing or already past, use 60 minutes from now and re-read
-   then. Never guess a reset time. Record the trigger id in the state body's Scheduled tasks table.
+   then. Never guess a reset time. Record the trigger id in the block's `triggers`.
 2. **Interrupt running sessions** (`list_sessions` tagged `listicles:*`, status running): report-only reviewers first, then
    implementers and one-offs. `interrupt_session` each. Also **collect the sessions §7.7.3 classed as limit failures** (failed
    already, nothing to interrupt). For each one, interrupted or limit-failed, write down session id, role, branch, last pushed SHA
-   (`git ls-remote`) and whether it already posted a `WORKER-RESULT`. Set its Sessions row to `interrupted (usage)` (the branch
+   (`git ls-remote`) and whether it already posted a `WORKER-RESULT`. Set its `sessions` row to `interrupted (usage)` (the branch
    lock stays with it until §7.7.4).
 3. **Delete the pending check-ins**: the 45-minute check-in and every extra or post-spawn check (`delete_trigger`). A check-in that
    fires during the pause only burns usage or fails. Keep the resume reminder of step 1.
-4. **Post one `PAUSED` comment on the state issue** (#15), set `Usage:` to `paused until HH:MM UTC` and rewrite the body (Sessions and
-   Scheduled tasks rows). The comment reads:
+4. **Post one `PAUSED` comment on the state issue** (#15), set `Usage:` to `paused until HH:MM UTC` and rewrite the body (`sessions` and
+   `triggers`). The comment reads:
    ```
    PAUSED (usage limit)
    limit: {rateLimitType}, status {status}, resets {UTC}; resume reminder {trigger id} at {UTC}
