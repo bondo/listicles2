@@ -135,7 +135,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-60 | Start-up root&#58; Navigation 3, M1 home (#194, Q1 A), signed-in/out routing (P10 steps 2 and 6), sig… | done | M1-30, M1-36, M1-49 | implementer | [#311](https://github.com/bondo/listicles2/issues/311) |
 | M1-62 | Start-up gates (b2 of M1-60)&#58; update (START-01), email verified (#195, Q2 A), name saved (AUTH-1… | done | M1-60 | implementer | [#323](https://github.com/bondo/listicles2/issues/323) |
 | M1-64 | guards check 2c&#58; YAML folded and multi-line values as one line, in addition to the per-line check… | done | M1-42 | implementer | [#325](https://github.com/bondo/listicles2/issues/325) |
-| M1-65 | guards check 2c&#58; npm &#96;--&#96; tail resolved through package.json scripts, fail closed by construction … | ready | M1-42 | implementer |  |
+| M1-65 | guards check 2c&#58; npm &#96;--&#96; tail resolved through package.json scripts, fail closed by construction … | in progress | M1-42 | implementer | [#330](https://github.com/bondo/listicles2/issues/330) |
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/listicles2/issues/303) |
 | M1-14 | Auth data&#58; Google sign-in via Credential Manager, session state, sign out (Auth emulator) | in progress | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/listicles2/issues/319) |
 | M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-14, M1-62 | implementer |  |
@@ -178,7 +178,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-41 | check_gradle_repos.py&#58; dotted repositories.google(), raw strings and nested templates (issues 226… | done | M1-01 | implementer |  |
 | M1-42 | guards check 2c&#58; actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174) | done | M1-01 | implementer | [#309](https://github.com/bondo/listicles2/issues/309) |
 | M1-43 | prompt_rules.py&#58; sentence-level negation for the resolve-thread rule (issue 153) | done | M1-01 | implementer |  |
-| M1-44 | CI hardening nits&#58; job timeouts, pinned python and node, gitleaks download, npm install scripts,… | ready | M1-01 | implementer |  |
+| M1-44 | CI hardening nits&#58; job timeouts, pinned python and node, gitleaks download, npm install scripts,… | in progress | M1-01 | implementer | [#331](https://github.com/bondo/listicles2/issues/331) |
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/listicles2/issues/292) |
 | M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issue 217 items 1-3) | done | M1-02 | implementer |  |
 | M1-68 | Root check tasks without cross-project reads&#58; checkWarningsAsErrors, checkJdkRelease, checkJavaAp… | ready | M1-46 | implementer |  |
@@ -212,7 +212,7 @@ flowchart LR
     n2["M1-10 Rules: create household and member di… (blocked)"]:::blocked
     n3["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n4["M1-12 Rules: invites (create, get, list, revo… (blocked)"]:::blocked
-    n5["M1-65 guards check 2c: npm #96;--#96; tail resolve… (ready)"]:::ready
+    n5["M1-65 guards check 2c: npm #96;--#96; tail resolve… (in progress)"]:::progress
     n6["M1-14 Auth data: Google sign-in via Credentia… (in progress)"]:::progress
     n7["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
     n8["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
@@ -232,7 +232,7 @@ flowchart LR
     n22["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
     n23["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n24["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n25["M1-44 CI hardening nits: job timeouts, pinne… (ready)"]:::ready
+    n25["M1-44 CI hardening nits: job timeouts, pinne… (in progress)"]:::progress
     n26["M1-68 Root check tasks without cross-project… (ready)"]:::ready
     n27["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
     n28["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
@@ -453,8 +453,6 @@ flowchart LR
 - **owner to-do** [#289](https://github.com/bondo/listicles2/issues/289): &#91;owner&#93; M1-O11&#58; Add the screenshots check to the main ruleset required list
 - **owner to-do** [#291](https://github.com/bondo/listicles2/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#318](https://github.com/bondo/listicles2/issues/318): &#91;owner&#93; M1-O13&#58; add release-smoke to the main ruleset required checks
-- **PR to merge** [#317](https://github.com/bondo/listicles2/issues/317): M1-26&#58; App Check&#58; Play Integrity in release, debug provider in debug (not enforced)
-- **PR to merge** [#319](https://github.com/bondo/listicles2/issues/319): M1-14&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes
 - **task** M1-06: waits on M1-10
 - **task** M1-10: waits on M1-09
 - **task** M1-11: waits on M1-54, M1-53
