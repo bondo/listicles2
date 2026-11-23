@@ -1491,7 +1491,8 @@ notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_sh.py, docs/g
 id = "M1-77"
 title = "State issue part A: one JSON block in the body, typed schema, scripts/state_body.py validate"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 340
 assignee = "implementer"
 risk = "normal"
 depends_on = []
@@ -1505,7 +1506,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-77"]
-notes = "Process PR (2a2), split from M1-77. Code and tests already written and green: commit 5fbb552 in the M1-77 PR's history (refs/pull/N/head), removed again for size; restore it and keep the parity test (tasks.py and state_body.py read the same ids). Tooling env, owner merge"
+notes = "Process PR (2a2), split from M1-77. Code and tests already written and green: commit 5fbb552 in PR 340's history (git fetch origin pull/340/head; git show 5fbb552), removed again for size; restore it and keep the parity test (tasks.py and state_body.py read the same ids). Tooling env, owner merge"
 
 [[task]]
 id = "M1-78"
