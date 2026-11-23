@@ -8,7 +8,14 @@ class JvmLibraryConventionPlugin : Plugin<Project> {
 
 /** listicles.jvm.testsupport: a test-only JVM module (host JDK API; checkJdkRelease keeps it out of shipped code). */
 class JvmTestSupportConventionPlugin : Plugin<Project> {
-    override fun apply(target: Project) = target.configureJvmModule(jdkRelease = false)
+    override fun apply(target: Project) {
+        // PR 349 R1-01: the plugin skips the JDK 17 compile check, so only a listed test-support module may use it.
+        check(target.path in TestSupportModules.paths) {
+            "listicles.jvm.testsupport is only for the test-support modules ${TestSupportModules.paths}, " +
+                "not ${target.path} (add it to TestSupportModules in Conventions.kt, or use listicles.jvm.library)"
+        }
+        target.configureJvmModule(jdkRelease = false)
+    }
 }
 
 class AndroidLibraryConventionPlugin : Plugin<Project> {

@@ -14,6 +14,8 @@ import unittest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 TASK = ":core:domain:compileKotlin"
+APP_TASK = ":app:compileDebugKotlin"
+MODULES = (":app", ":core:data", ":core:domain", ":core:testing")
 GATE_MESSAGE = "warnings are not all errors"
 
 # Groovy init script; %s is the statement applied to the compile task's compilerOptions.
@@ -44,12 +46,12 @@ BAD = {
 }
 
 
-def gradle(*args, init=None):
+def gradle(*args, init=None, task=TASK):
     cmd = [os.path.join(ROOT, "gradlew"), "-q", "--console=plain", "--no-daemon", *args]
     tmp = None
     if init is not None:
         with tempfile.NamedTemporaryFile("w", suffix=".init.gradle", delete=False) as tmp:
-            tmp.write(INIT % (TASK, init))
+            tmp.write(INIT % (task, init))
         cmd += ["-I", tmp.name]
     try:
         # Retry only Maven/Gradle 429 (rate limit) so a throttled download is not read as a test failure.
@@ -87,6 +89,18 @@ class WarningsGateTest(unittest.TestCase):
         rc, out = gradle("detekt", "--dry-run")
         self.assertEqual(rc, 0, out)
         self.assertIn(":checkWarningsAsErrors", out)
+        # M1-68 part B2: each module checks its own compile tasks, and the root runs every module's checks by task path.
+        for module in MODULES:
+            self.assertIn(f"{module}:listiclesChecks SKIPPED", out)
+            self.assertIn(f"{module}:checkWarningsAsErrors SKIPPED", out)
+
+    def test_each_module_checks_its_own_compile_tasks(self):
+        rc, out = gradle(":app:checkWarningsAsErrors", init="compilerOptions.allWarningsAsErrors.set(false)", task=APP_TASK)
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn(GATE_MESSAGE, out)
+        self.assertIn(APP_TASK, out)
+        rc, out = gradle(":core:domain:checkWarningsAsErrors", init="compilerOptions.allWarningsAsErrors.set(false)", task=APP_TASK)
+        self.assertEqual(rc, 0, out)
 
 
 def _make(name, statement):

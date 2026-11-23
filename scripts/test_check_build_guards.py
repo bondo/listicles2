@@ -942,6 +942,53 @@ class Conventions(unittest.TestCase):
         self.assertEqual(len(cbg.module_paths(ROOT)), 4)
 
 
+ROOT_BUILD = 'val listiclesModules = listOf(":app", ":core:domain")\ntasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }\n'
+
+
+class Aggregation(unittest.TestCase):
+    """M1-68 part B2: the root runs each module's own checks by task path, so its module list must be the settings one."""
+
+    def problems(self, root_build=ROOT_BUILD, settings=SETTINGS):
+        files = {"settings.gradle.kts": settings, "build.gradle.kts": root_build}
+        return cbg.aggregation_problems(tree({k: v for k, v in files.items() if v is not None}))
+
+    def test_the_settings_modules_on_detekt_pass(self):
+        self.assertEqual(self.problems(), [])
+        self.assertEqual(self.problems(ROOT_BUILD.replace('":app", ":core:domain"', '":core:domain",\n    ":app",\n')), [])
+
+    def test_a_missing_or_extra_module_is_flagged(self):
+        self.assertEqual(self.problems(settings='include(":app", ":core:domain", ":core:data")\n'),
+                         ["build.gradle.kts: listiclesModules misses :core:data (settings.gradle.kts includes it)"])
+        self.assertEqual(self.problems(ROOT_BUILD.replace('":core:domain"', '":core:domain", ":core:gone"')),
+                         ["build.gradle.kts: listiclesModules lists :core:gone, which settings.gradle.kts does not include"])
+        self.assertEqual(self.problems(ROOT_BUILD.replace('":core:domain"', '":core:domain", ":app"')),
+                         ["build.gradle.kts: listiclesModules lists :app twice"])
+
+    def test_no_list_or_a_commented_out_one_is_flagged(self):
+        want = "build.gradle.kts: no `val listiclesModules = listOf(...)` (the root runs every module's listiclesChecks by task path)"
+        for text in (None, "", "// " + ROOT_BUILD, ROOT_BUILD.replace("val listiclesModules", "val modules")):
+            with self.subTest(text=text):
+                self.assertIn(want, self.problems(text))
+
+    def test_detekt_must_depend_on_every_listed_module_check(self):
+        want = ['build.gradle.kts: detekt does not depend on dependsOn(listiclesModules.map { "$it:listiclesChecks" })']
+        for old, new in (("listiclesChecks", "checkWarningsAsErrors"), ('tasks.named("detekt")', 'tasks.named("lint")'),
+                         ('tasks.named("detekt") {', '// tasks.named("detekt") {')):
+            with self.subTest(new=new):
+                self.assertEqual(self.problems(ROOT_BUILD.replace(old, new)), want)
+
+    def test_no_settings_file_skips_it(self):
+        self.assertEqual(self.problems(None, settings=None), [])
+
+    def test_the_real_repository_runs_every_module_check(self):
+        self.assertEqual(cbg.aggregation_problems(ROOT), [])
+
+    def test_main_reports_it(self):
+        d = tree({"settings.gradle.kts": SETTINGS, "build.gradle.kts": "", "app/build.gradle.kts": APP, "core/domain/build.gradle.kts": DOMAIN})
+        self.assertIn("listiclesModules", "".join(cbg.aggregation_problems(d)))
+        self.assertEqual(cbg.main(["x", d]), 1)
+
+
 class Wiring(unittest.TestCase):
     def read(self, *parts):
         with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
