@@ -161,9 +161,9 @@ describe("Transfer ownership (one batch)", () => {
     });
 });
 
-// Each caller check and LIVE on its own, in worlds the app never makes: the cached roles already
-// show carol as owner while ownerUid is still bob, so the role checks pass and only the named
-// check can deny.
+// Each caller check, LIVE and the type of ownerUid on its own, in worlds the app never makes: a
+// member's cached role is already owner while ownerUid is still bob, so the role checks pass and
+// only the named check can deny.
 describe("Transfer ownership: each check on its own", () => {
     test.each<[string, () => h.Db, Batch]>([
         [
@@ -193,5 +193,13 @@ describe("Transfer ownership: each check on its own", () => {
             [member(hid, CAROL)]: membership("owner", "Carol"),
         });
         await assertFails(transfer(db(), b));
+    });
+
+    // P4 types: ownerUid stays a string. A path takes the number 42 as the document id "42", so
+    // with that member's role owner already, only the type check denies.
+    test("denied: the type of ownerUid: a number that names a member doc", async () => {
+        await seed({ [member(HOME, "42")]: membership("owner", "Number") });
+        const b: Batch = { household: { ownerUid: 42 }, roles: { [BOB]: "member" } };
+        await assertFails(transfer(bob.verified, b));
     });
 });
