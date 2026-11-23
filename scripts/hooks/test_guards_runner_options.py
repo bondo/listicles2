@@ -314,5 +314,28 @@ class PlaywrightCypressSelfReviewTests(RunnerCase):
         self.assertPasses()
 
 
+class PlaywrightCypressReviewRound1Tests(RunnerCase):
+    """PR 358 R1-01: playwright run through node and its cli.js is playwright; R1-02: the npx -p/--package value is no command."""
+
+    BAD = ["node node_modules/@playwright/test/cli.js test -u", "node node_modules/playwright/cli.js test --last-failed",
+           "node node_modules/playwright/cli.js test login", 'bash -c "node node_modules/playwright/cli.js test -u"',
+           "npx -p @playwright/test playwright test tests/a.spec.ts", "npx --package @playwright/test playwright test login",
+           "npx -p playwright playwright test login", "npx -p cypress cypress run a.cy.ts", "npm exec -p cypress -- cypress run a.cy.ts"]
+
+    def test_node_cli_js_and_npx_package_forms_fail(self):
+        self.put("scripts/test.sh", "\n".join(self.BAD) + "\n")
+        self.each_line_fails("scripts/test.sh", self.BAD)
+        entries = [("t", "node node_modules/@playwright/test/cli.js test -u"), ("u", "npx -p @playwright/test playwright test login")]
+        self.put("scripts/test.sh", "true\n")
+        self.put("tools/package.json", self.pkg(entries))
+        self.each_line_fails("tools/package.json", [v for _, v in entries], first=4)
+
+    def test_their_allowed_forms_pass(self):
+        ok = ["node node_modules/playwright/cli.js install chromium", "npx -p @playwright/test playwright test --shard 1/2",
+              "node node_modules/@playwright/test/cli.js test --project chromium", "npx -p cypress cypress run --browser chrome"]
+        self.put("scripts/test.sh", "\n".join(ok) + "\n")
+        self.assertPasses()
+
+
 if __name__ == "__main__":
     unittest.main()
