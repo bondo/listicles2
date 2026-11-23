@@ -155,7 +155,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-23 | Optional TOTP two-step verification (AUTH-09) | blocked | M1-32, M1-O3 | implementer |  |
 | M1-25 | Account screen (wireframe 18) and navigation&#58; sign-out UI (AUTH-03), Crashlytics opt-in switch, … | blocked | M1-60, M1-66 | implementer |  |
 | M1-26 | App Check&#58; Play Integrity in release, debug provider in debug builds (not enforced) | done | M1-30 | implementer |  |
-| M1-27 | Minimum app version&#58; config/app.minVersionCode, schemaVersion, update screen | blocked | M1-08, M1-60, M1-62, M1-66 | implementer |  |
+| M1-27 | Minimum app version&#58; config/app.minVersionCode, schemaVersion, update screen | in progress | M1-08, M1-60, M1-62, M1-66 | implementer | [#343](https://github.com/bondo/listicles2/issues/343) |
 | M1-28 | Privacy text draft in English and Danish (OQ-30) | done | M1-01 | planner | [#286](https://github.com/bondo/listicles2/issues/286) |
 | M1-33 | Release smoke build with R8 in CI (best-practices checklist follow-up 7) | done | M1-30 | implementer |  |
 | M1-52 | Rules test harness&#58; default-deny paths from PLAN section 3, list and collection-group queries, unv… | done | M1-35 | implementer | [#301](https://github.com/bondo/listicles2/issues/301) |
@@ -233,7 +233,7 @@ flowchart LR
     n17["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
     n18["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
     n19["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
-    n20["M1-27 Minimum app version: config/app.min… (blocked)"]:::blocked
+    n20["M1-27 Minimum app version: config/app.min… (in progress)"]:::progress
     n21["M1-53 Rules: transfer ownership, allow and … (blocked)"]:::blocked
     n22["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
     n23["M1-61 Java API level check: also look up clas… (ready)"]:::ready
@@ -478,7 +478,6 @@ flowchart LR
 - **task** M1-32: waits on M1-22, M1-21
 - **task** M1-23: waits on M1-32, M1-O3
 - **task** M1-25: waits on M1-66
-- **task** M1-27: waits on M1-66
 - **task** M1-53: waits on M1-10
 - **task** M1-54: waits on M1-12
 - **task** M1-39: waits on M1-10, M1-18, M1-17 +1
