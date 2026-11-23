@@ -238,7 +238,7 @@ class Behaviour(unittest.TestCase):
             self.assertIn("--require-hashes", out)
 
     def test_the_version_is_read_from_the_hashed_lock_format(self):
-        """sed on the `tool==X \\` line: the installed versions in a hashed file with other entries around them pass; a dependency of the same prefix is not the tool."""
+        """The version is read from the `tool==X \\` line: other entries around it do not matter, and mypy-extensions is not mypy."""
         have = {tool: subprocess.run([tool, "--version"], capture_output=True, text=True, check=True).stdout.split()[1] for tool in ("ruff", "mypy")}
         with tempfile.TemporaryDirectory() as tmp:
             reqs = os.path.join(tmp, "reqs.txt")

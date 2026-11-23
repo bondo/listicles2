@@ -39,7 +39,8 @@ class Rules(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, STATUS, VERIFY, ADR, REQ_CI, REQ_CI_IN, REQ_LINT, REQ_LINT_IN, *(p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))):
+        shell = (p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts").glob("*.sh"))
+        for name in (CI, STATUS, VERIFY, ADR, REQ_CI, REQ_CI_IN, REQ_LINT, REQ_LINT_IN, *shell):
             if not (ROOT / name).exists():
                 continue  # a missing file is the check's finding, not the test's crash
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
@@ -163,18 +164,17 @@ class Rules(unittest.TestCase):
         self.flagged(c.problems(self.root), "requirements-ci.in")
 
     def test_the_lock_files_are_read_and_hold_what_their_input_says(self):
-        for lock, name in ((REQ_CI, "PyYAML"), (REQ_LINT, "ruff")):
+        for lock, locked, wanted in ((REQ_CI, "pyyaml", "PyYAML"), (REQ_LINT, "ruff", "ruff")):  # pip-compile writes the names lower case
             with self.subTest(lock):
                 self.setUp()
                 text = (ROOT / lock).read_text()
-                self.assertTrue(re.search(rf"(?m)^{name}==\S+ \\$", text) and "--hash=sha256:" in text, f"{lock}: update the test")
-                self.assertTrue((self.root / lock).is_file())
+                self.assertTrue(re.search(rf"(?m)^{locked}==\S+ \\$", text) and "--hash=sha256:" in text, f"{lock}: update the test")
                 (self.root / lock).unlink()
                 self.flagged(c.problems(self.root), lock.rsplit("/", 1)[1], "missing")
-                self.flagged(self.set_text(lock, "# nothing locked\n"), lock.rsplit("/", 1)[1], name)
+                self.flagged(self.set_text(lock, "# nothing locked\n"), lock.rsplit("/", 1)[1], wanted)
 
     def test_every_lock_entry_is_pinned_with_equals_and_has_a_sha256_hash(self):
-        for lock, name in ((REQ_CI, "PyYAML"), (REQ_LINT, "ruff")):
+        for lock, name in ((REQ_CI, "pyyaml"), (REQ_LINT, "ruff")):
             text = (ROOT / lock).read_text()
             base = lock.rsplit("/", 1)[1]
             entry = re.search(rf"(?m)^({name}==[^ \n]+) \\\n(?:    --hash=sha256:[0-9a-f]{{64}}(?: \\)?\n)+", text)
@@ -193,19 +193,22 @@ class Rules(unittest.TestCase):
                 "uppercase non-hex sha256": f"{ver} \\\n    --hash=sha256:{'g' * 64}\n",
                 "url": f"{name} @ https://example.com/{name}.whl \\\n    {HASH}\n",
                 "editable": f"-e . \\\n    {HASH}\n",
-                "include": f"-r other.txt\n",
-                "index url": f"--index-url https://example.com/simple\n",
-                "extra index": f"--extra-index-url https://example.com/simple\n",
-                "find links": f"--find-links https://example.com\n",
+                "include": "-r other.txt\n",
+                "index url": "--index-url https://example.com/simple\n",
+                "extra index": "--extra-index-url https://example.com/simple\n",
+                "find links": "--find-links https://example.com\n",
                 "no-hashes line": "--no-hashes\n",
             }.items():
                 with self.subTest(lock=lock, defect=label):
+                    self.setUp()
                     self.flagged(self.set_text(lock, text.replace(whole, bad_entry, 1)), base)
             with self.subTest(lock=lock, defect="one bad hash among good ones"):
+                self.setUp()
                 if len(hashes) > 1:
                     self.flagged(self.set_text(lock, text.replace(hashes[1], "--hash=sha1:abc", 1)), base)
                 else:
-                    self.flagged(self.set_text(lock, text + f"extra==1.0.0 \\\n    --hash=sha1:abc\n"), base)
+                    self.flagged(self.set_text(lock, text + "extra==1.0.0 \\\n    --hash=sha1:abc\n"), base)
+        self.setUp()
         self.assertEqual(self.set_text(REQ_LINT, (ROOT / REQ_LINT).read_text()), [])
 
     def test_every_input_entry_is_locked_at_exactly_its_version(self):

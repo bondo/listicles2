@@ -8,6 +8,10 @@
     emulators and the rules tests run without them, re2 is only an optional dependency of the hosting emulator),
   * the gitleaks download uses --proto =https, --proto-redir =https and --retry, the archive checksum is checked, and the scan is
     `gitleaks git` (`detect` is deprecated),
+  * the pip lock files (issue 189 item 5, M1-74): scripts/requirements-ci.in and requirements-lint.in hold the exact top-level pins, the
+    .txt next to each is the pip-compile --generate-hashes lock, every entry `name==X.Y.Z` with at least one sha256 hash and nothing
+    else (no -r, -e, URL or index line), every .in pin is locked at its version, and the only `pip install` in the workflows and
+    verify.sh is `pip install --require-hashes -r scripts/requirements-ci.txt` or the same for requirements-lint.txt,
   * verify.sh and the CI `tasks` job run this check and its tests, and docs/adr/0003-gradle-dependency-verification.md records that
     Gradle dependency verification is checksum-only (issue 189 item 6).
 Run: python3 -I scripts/check_ci_hardening.py  (exit 1 and one line per problem).
@@ -41,8 +45,13 @@ NODE_WORD = re.compile(r"(?<![\w./-])(?:node|npm|npx)(?![\w-])")
 GRADLE_PYTHON_TASKS = ("testDebugUnitTest", "verifyRoborazziDebug", "recordRoborazziDebug", "checkJavaApiLevel")
 GRADLE_PYTHON = re.compile(r"gradlew\b[\s\S]*(?<![\w])(?:" + "|".join(GRADLE_PYTHON_TASKS) + r")(?![\w])")
 # setup-python's interpreter has no PyYAML (the runner image's had) and most gate scripts import yaml.
-REQUIREMENTS_CI = "scripts/requirements-ci.txt"
-INSTALL_CI = "pip install -r scripts/requirements-ci.txt"
+LOCK_STEMS = ("scripts/requirements-ci", "scripts/requirements-lint")  # each has a .in (top-level pins) and a .txt (the hash lock)
+INSTALL_CI = "pip install --require-hashes -r scripts/requirements-ci.txt"
+INSTALL_LINT = "pip install --require-hashes -r scripts/requirements-lint.txt"
+INSTALLS = (INSTALL_CI, INSTALL_LINT)
+PIP_INSTALL = re.compile(r"(?:(?<![\w./-])pip3?|-m\s+pip3?)\s+install\b")
+IN_PIN = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([0-9][A-Za-z0-9.!+_-]*)")
+LOCK_ENTRY = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([0-9][A-Za-z0-9.!+_-]*)((?: --hash=sha256:[0-9a-f]{64})+)")
 SHELL_SCRIPT = re.compile(r"scripts/[\w.-]+\.sh")
 
 
@@ -99,21 +108,70 @@ def _setup_problems(where, steps, prefix, tool, want, version_key, needs, instal
     if install:
         found = [i for i, s in enumerate(steps) if s.get("run") == install]
         if not found:
-            problems.append(f"{where}: no step runs `{install}` (requirements-ci.txt: PyYAML, which setup-python's {tool} lacks)")
+            problems.append(f"{where}: no step runs `{install}` (requirements-ci.txt: PyYAML, hash-locked, which setup-python's {tool} lacks)")
         elif found[0] > first:
             problems.append(f"{where}: `{install}` must come before the first step that runs {tool} ({steps[first].get('name', first)})")
     return problems
 
 
-def requirements_ci_problems(root):
-    path = root / REQUIREMENTS_CI
-    if not path.is_file():
-        return [f"{REQUIREMENTS_CI} is missing (PyYAML pinned with ==, installed by every job that sets up python)"]
-    lines = [ln.split("#", 1)[0].strip() for ln in path.read_text().splitlines()]
-    lines = [ln for ln in lines if ln]
-    if lines != [ln for ln in lines if re.fullmatch(r"PyYAML==\d+\.\d+\.\d+", ln)] or len(lines) != 1:
-        return [f"{REQUIREMENTS_CI} must hold exactly one line, PyYAML==X.Y.Z (the other scripts use the standard library)"]
-    return []
+def _logical_lines(text):
+    """The requirement lines of a pip file: comments dropped, backslash continuations joined, whitespace collapsed."""
+    out, cur = [], ""
+    for raw in text.splitlines():
+        line = re.split(r"(?:^|\s)#", raw, maxsplit=1)[0].strip()
+        if not line:
+            if cur:
+                out.append(cur)
+            cur = ""
+            continue
+        cur = f"{cur} {line.removesuffix(chr(92)).strip()}".strip()
+        if not line.endswith("\\"):
+            out.append(cur)
+            cur = ""
+    return out + ([cur] if cur else [])
+
+
+def _norm(name):
+    return re.sub(r"[-_.]+", "-", name).lower()  # PEP 503: pip-compile writes PyYAML as pyyaml
+
+
+def requirements_problems(root):
+    problems = []
+    for stem in LOCK_STEMS:
+        name_in, name_txt = stem + ".in", stem + ".txt"
+        base_in, base_txt = name_in.rsplit("/", 1)[1], name_txt.rsplit("/", 1)[1]
+        pins = {}
+        if not (root / name_in).is_file():
+            problems.append(f"{name_in} is missing (the top-level pins of {base_txt}, which pip-compile --generate-hashes writes)")
+        else:
+            lines = _logical_lines((root / name_in).read_text())
+            for ln in lines:
+                m = IN_PIN.fullmatch(ln)
+                if m:
+                    pins[_norm(m.group(1))] = (m.group(1), m.group(2))
+                else:
+                    problems.append(f"{base_in}: `{ln}` must be an exact pin, name==X.Y.Z")
+            if stem.endswith("-ci") and (len(lines) != 1 or not re.fullmatch(r"PyYAML==\d+\.\d+\.\d+", lines[0])):
+                problems.append(f"{base_in} must hold exactly one line, PyYAML==X.Y.Z (the other scripts use the standard library)")
+        locked = {}
+        if not (root / name_txt).is_file():
+            problems.append(f"{name_txt} is missing (the hash lock: pip-compile --generate-hashes {base_in})")
+            continue
+        for ln in _logical_lines((root / name_txt).read_text()):
+            m = LOCK_ENTRY.fullmatch(ln)
+            if m:
+                locked[_norm(m.group(1))] = m.group(2)
+            else:
+                problems.append(f"{base_txt}: `{ln[:70]}` must be name==X.Y.Z with at least one --hash=sha256:<64 hex> and nothing else")
+        for key, (name, version) in pins.items():
+            if locked.get(key) != version:
+                problems.append(f"{base_txt}: {name}=={version} of {base_in} is not locked at that version (recompile it with pip-compile --generate-hashes)")
+    return problems
+
+
+def _pip_install_problems(where, code):
+    return [f"{where}: only `{INSTALL_CI}` or `{INSTALL_LINT}` may run pip install (hash-locked, issue 189 item 5), not `{ln.strip()}`"
+            for ln in code.splitlines() if PIP_INSTALL.search(ln) and ln.strip() not in INSTALLS]
 
 
 def workflow_problems(root):
@@ -130,6 +188,7 @@ def workflow_problems(root):
             problems += _setup_problems(where, steps, SETUP_NODE, "node", NODE_VERSION, "node-version", _needs_node)
             for step in steps:
                 code = _code(step)
+                problems += _pip_install_problems(where, code)
                 for line in code.splitlines():
                     if re.search(r"\bnpm\s+ci\b", line) and "--ignore-scripts" not in line:
                         problems.append(f"{where}: `npm ci` needs --ignore-scripts")
@@ -155,6 +214,7 @@ def _gitleaks_problems(where, code):
 def verify_problems(root):
     lines = [ln.strip() for ln in (root / "scripts/verify.sh").read_text().splitlines() if ln.strip() and not ln.strip().startswith("#")]
     problems = [f"verify.sh has no active step: {want}" for want in VERIFY_STEPS if want not in lines]
+    problems += _pip_install_problems("verify.sh", "\n".join(lines))
     problems += [f"verify.sh: `npm ci` needs --ignore-scripts: {ln}" for ln in lines if re.search(r"\bnpm\s+ci\b", ln) and "--ignore-scripts" not in ln]
     tasks = _steps((_load(root, WORKFLOWS[0]).get("jobs") or {}).get("tasks"))
     problems += [f"ci.yml tasks job has no step running: {cmd}" for cmd in (TESTS_CMD, CHECK_CMD) if not any(s.get("run") == cmd for s in tasks)]
@@ -171,7 +231,7 @@ def adr_problems(root):
 
 def problems(root=ROOT):
     root = Path(root)
-    return workflow_problems(root) + requirements_ci_problems(root) + verify_problems(root) + adr_problems(root)
+    return workflow_problems(root) + requirements_problems(root) + verify_problems(root) + adr_problems(root)
 
 
 def main(root=ROOT):
