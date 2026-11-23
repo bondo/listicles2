@@ -1427,13 +1427,34 @@ notes = "Tooling env, owner merge; R3-01..R3-04 as failing tests first"
 
 [[task]]
 id = "M1-44"
-title = "CI hardening nits: job timeouts, pinned python and node, gitleaks download, npm install scripts, pip hashes (issues 189, 127)"
+title = "CI hardening nits: job timeouts, pinned python and node, gitleaks download, npm install scripts (issues 189, 127)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-01"]
+pr = 331
+notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line (docs/adr/0003). Split for the size guard (600 lines, the generated hash lock alone is 287): the CodeQL workflow of Q6 A (7058176190) is M1-73, the pip hash lock (issue 189 item 5) is M1-74. npm ci --ignore-scripts needs no npm rebuild: the emulators and the rules tests pass without re2 (an optional dependency of the hosting emulator)"
+
+[[task]]
+id = "M1-73"
+title = "Advanced CodeQL workflow: java-kotlin with a Gradle build, plus actions, javascript-typescript and python (issue 189 item 7, Q6 A)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
-notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line. Q6 A (7058176190): an advanced CodeQL workflow for java-kotlin with a Gradle build, weekly and on pushes to main; it also takes over actions, javascript-typescript and python with their pull_request trigger kept, because GitHub rejects advanced uploads while default setup is on; only java-kotlin is weekly and push to main (M1-O9 at merge)"
+notes = "Tooling env (.github), owner merge. Split from M1-44. Q6 A (7058176190): java-kotlin with a Gradle build, weekly and on pushes to main only; it also takes over actions, javascript-typescript and python with their pull_request trigger kept (no build, as today), because GitHub rejects advanced uploads while default setup is on. Test-first: a workflow lint rule or test that fails without it; actions pinned by SHA; the first run's upload needs default setup off (M1-O9 at merge)"
+
+[[task]]
+id = "M1-74"
+title = "Hash-locked pip requirements for the lint tools (issue 189 item 5)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-44"]
+notes = "Tooling env (.github, scripts/), owner merge. Tested in M1-44: scripts/requirements-lint.in (top level) compiled with pip-compile --generate-hashes --allow-unsafe --strip-extras on the Python CI pins (3.13; 284-line lock from a 3.12 trial: ruff, mypy, types-PyYAML and ast-serialize, librt, mypy-extensions, pathspec, typing-extensions); CI installs with pip install --require-hashes; lint_python.sh must read the version from the hashed format (sed on the ruff==X line); test_lint_python.py's pin regex and CODEOWNERS (.in) change with it; add the lock rules to scripts/check_ci_hardening.py test-first (every entry pinned with == and at least one sha256 hash, the only pip install is the hashed one). scripts/requirements-ci.txt (PyYAML, M1-44) can be hashed the same way. Check that Dependabot (pip, /scripts) still updates the .in and recompiles the .txt"
 
 [[task]]
 id = "M1-45"
@@ -1562,7 +1583,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
   "M1-77", "M1-78", "M1-79", "M1-80",
 ]
 
@@ -1646,13 +1667,13 @@ notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1"
 
 [[task]]
 id = "M1-O9"
-title = "Turn off CodeQL default setup when the advanced workflow of M1-44 merges"
+title = "Turn off CodeQL default setup when the advanced workflow of M1-73 merges"
 milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-44"]
-notes = "Owner decisions 7003645427 and 7058176190 (Q6 A); issue 258 item 2. Done as part of the M1-44 merge, so the new workflow's first upload is accepted"
+depends_on = ["M1-73"]
+notes = "Owner decisions 7003645427 and 7058176190 (Q6 A); issue 258 item 2. Done as part of the M1-73 merge, so the new workflow's first upload is accepted"
 
 [[task]]
 id = "M1-O10"

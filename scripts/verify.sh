@@ -87,6 +87,8 @@ step wrapper-checksum-tests python3 -I scripts/test_check_gradle_wrapper.py
 step wrapper-checksum python3 -I scripts/check_gradle_wrapper.py
 step dependency-floors-tests python3 -I scripts/test_dependency_floors.py
 step dependency-floors python3 -I scripts/dependency_floors.py
+step ci-hardening-tests python3 -I scripts/test_check_ci_hardening.py
+step ci-hardening python3 -I scripts/check_ci_hardening.py
 step build-guards-tests python3 -I scripts/test_check_build_guards.py
 step build-guards python3 -I scripts/check_build_guards.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
@@ -110,7 +112,7 @@ else
   echo "skip  unit-tests, coverage, coverage-impact, mutation, screenshots (--fast)"; SKIPPED=1
 fi
 step build gradle :app:assembleDebug :app:assembleDebugAndroidTest :core:data:assembleDebugAndroidTest
-step firebase-install bash -c 'cd firebase && npm ci --silent'
+step firebase-install bash -c 'cd firebase && npm ci --ignore-scripts --silent'
 step firebase-typecheck bash -c 'cd firebase && npm run typecheck --silent'
 step firebase-lint bash -c 'cd firebase && npm run lint --silent'
 step firebase-format bash -c 'cd firebase && npm run format:check --silent'
