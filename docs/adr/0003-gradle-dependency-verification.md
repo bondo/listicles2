@@ -1,4 +1,4 @@
-# ADR 0002: Gradle dependency verification stays checksum-only
+# ADR 0003: Gradle dependency verification stays checksum-only
 
 Status: accepted (M1-44, issue 189 item 6). Re-evaluate before the first external tester (M2) or when a dependency starts
 publishing signatures the owner wants to trust.

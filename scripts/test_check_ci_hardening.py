@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CI = ".github/workflows/ci.yml"
 STATUS = ".github/workflows/status.yml"
 VERIFY = "scripts/verify.sh"
-ADR = "docs/adr/0002-gradle-dependency-verification.md"
+ADR = "docs/adr/0003-gradle-dependency-verification.md"
 
 
 class Rules(unittest.TestCase):
@@ -154,7 +154,7 @@ class Rules(unittest.TestCase):
                 self.flagged(self.edit(CI, f"        run: {cmd}\n", "        run: 'true'\n"), "ci.yml", cmd)
 
     def test_the_adr_records_the_checksum_only_decision(self):
-        self.flagged(self.set_text(ADR, "# ADR 0002\n"), "ADR", "verify-signatures")
+        self.flagged(self.set_text(ADR, "# ADR 0003\n"), "ADR", "verify-signatures")
         (self.root / ADR).unlink()
         self.flagged(c.problems(self.root), "ADR")
 

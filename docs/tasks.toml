@@ -1402,7 +1402,7 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-01"]
 pr = 331
-notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line (docs/adr/0002). Split for the size guard (600 lines, the generated hash lock alone is 287): the CodeQL workflow of Q6 A (7058176190) is M1-73, the pip hash lock (issue 189 item 5) is M1-74. npm ci --ignore-scripts needs no npm rebuild: the emulators and the rules tests pass without re2 (an optional dependency of the hosting emulator)"
+notes = "Tooling env (.github), owner merge. Issue 189 item 6 as an ADR line (docs/adr/0003). Split for the size guard (600 lines, the generated hash lock alone is 287): the CodeQL workflow of Q6 A (7058176190) is M1-73, the pip hash lock (issue 189 item 5) is M1-74. npm ci --ignore-scripts needs no npm rebuild: the emulators and the rules tests pass without re2 (an optional dependency of the hosting emulator)"
 
 [[task]]
 id = "M1-73"

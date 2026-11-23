@@ -8,7 +8,7 @@
     emulators and the rules tests run without them, re2 is only an optional dependency of the hosting emulator),
   * the gitleaks download uses --proto =https, --proto-redir =https and --retry, the archive checksum is checked, and the scan is
     `gitleaks git` (`detect` is deprecated),
-  * verify.sh and the CI `tasks` job run this check and its tests, and docs/adr/0002-gradle-dependency-verification.md records that
+  * verify.sh and the CI `tasks` job run this check and its tests, and docs/adr/0003-gradle-dependency-verification.md records that
     Gradle dependency verification is checksum-only (issue 189 item 6).
 Run: python3 -I scripts/check_ci_hardening.py  (exit 1 and one line per problem).
 """
@@ -28,7 +28,7 @@ SETUP_PYTHON = "actions/setup-python@"
 SETUP_NODE = "actions/setup-node@"
 # Scripts that start node themselves; a job that runs them needs the node pin although its commands never say `node`.
 NODE_SCRIPTS = ("test_wireframes_safety.py", "test_firebase_ts.py")
-ADR = "docs/adr/0002-gradle-dependency-verification.md"
+ADR = "docs/adr/0003-gradle-dependency-verification.md"
 ADR_PHRASES = ("Status: accepted", "verify-signatures", "checksum")
 CHECK_CMD = "python3 -I scripts/check_ci_hardening.py"
 TESTS_CMD = "python3 -I scripts/test_check_ci_hardening.py"
