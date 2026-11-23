@@ -1702,7 +1702,7 @@ notes = "Owner decision 7003645427 (OWNER TODO); issue 258 item 1"
 id = "M1-O9"
 title = "Turn off CodeQL default setup when the advanced workflow of M1-73 merges"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-73"]
@@ -1722,10 +1722,11 @@ notes = "Owner decision 7057951193 (#258 item 3). Any answer completes this task
 id = "M1-O11"
 title = "Add the screenshots check to the main ruleset required list (M1-03 added the job; docs list it as required)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-03"]
+issue = 289
 notes = "M1-03 runs the Roborazzi verify in its own CI job `screenshots`, not in `unit`, because test_ci_scope.py forbids `if:` in the jobs it guards and the diff artifact upload needs `if: failure()`. test_firebase_ts.py requires every CI job to be a required check, so docs/BRANCH-PROTECTION.md and docs/PLAN.md list 11. Do it right after the M1-03 PR merges, in the same sitting (BRANCH-PROTECTION.md section 6): a required check that no open PR has yet reports `Expected, waiting for status` on every other PR until it takes main in, so adding it earlier stalls them. Until then no ruleset rule requires `screenshots`, so the M1-03 merge must confirm by hand that the screenshots job is green on the head"
 
 [[task]]
