@@ -99,12 +99,13 @@ service cloud.firestore {
     // Transfer ownership, the household update (PLAN 3.1): the owner of the live household changes
     // only ownerUid, to a member before and after the batch, after which the old owner's role is
     // member and the new owner's owner, so the batch holds both role updates (no partial transfer).
-    // O(uid) is ownerUid before the batch, never M(uid). The soft delete is M1-11's path here.
+    // O(uid) is ownerUid before the batch, never M(uid). The new ownerUid is a string (P4): a path
+    // takes a number as a document id. The soft delete is M1-11's path here.
     function updatesHousehold(hid) {
       let before = resource.data;
       let after = request.resource.data;
       return before.deleted == false && before.ownerUid == request.auth.uid
-        && after.diff(before).affectedKeys().hasOnly(['ownerUid'])
+        && after.ownerUid is string && after.diff(before).affectedKeys().hasOnly(['ownerUid'])
         && exists(memberDoc(hid, after.ownerUid)) && existsAfter(memberDoc(hid, after.ownerUid))
         && getAfter(memberDoc(hid, before.ownerUid)).data.role == 'member'
         && getAfter(memberDoc(hid, after.ownerUid)).data.role == 'owner';
