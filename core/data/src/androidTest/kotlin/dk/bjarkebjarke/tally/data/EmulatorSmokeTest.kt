@@ -5,7 +5,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -60,7 +59,7 @@ class EmulatorSmokeTest {
     fun writesAndReadsADocumentOnTheFirestoreEmulator() {
         rulesReplaced = true
         FirebaseEmulator.loadAllowAllRules()
-        val document = FirebaseFirestore.getInstance(app).collection("smoke").document(UUID.randomUUID().toString())
+        val document = FirebaseEmulator.firestore(app).collection("smoke").document(UUID.randomUUID().toString())
 
         Tasks.await(document.set(mapOf("greeting" to "hello")), TIMEOUT_S, TimeUnit.SECONDS)
         val snapshot = Tasks.await(document.get(Source.SERVER), TIMEOUT_S, TimeUnit.SECONDS)
