@@ -149,7 +149,7 @@ class Selftests(unittest.TestCase):
         self.assertEqual(
             ci_scope.SELFTESTS,
             ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/test_java_api_level_gate.py",
-             "scripts/test_google_services_release_gate.py"),
+             "scripts/test_google_services_release_gate.py", "scripts/test_test_settings_gate.py"),
         )
         for p in ci_scope.SELFTESTS:
             self.assertTrue((ROOT / p).is_file(), p)
