@@ -888,7 +888,7 @@ assignee = "implementer"
 risk = "high"
 depends_on = ["M1-09"]
 pr = 352
-notes = "Includes the one-household check on the owner's member create (PLAN 3.1). Deny test: re-creating a tombstoned household id (#199). Transfer: allow on a household seeded with createdBy null; deny by a plain member (single update and full batch), by a non-member who names an existing member, and partial transfers (no role updates, only one role update); O(uid), not M(uid)"
+notes = "Includes the one-household check on the owner's member create (PLAN 3.1). Deny test: re-creating a tombstoned household id (#199). Transfer (M1-53 since the refresh, docs/milestones/M1.md section 5.1): allow on a household seeded with createdBy null; deny by a plain member (single update and full batch), by a non-member who names an existing member, and partial transfers (no role updates, only one role update); O(uid), not M(uid)"
 
 [[task]]
 id = "M1-11"

@@ -34,7 +34,11 @@ const NON_BMP = "\u{1F3E0}".repeat(50); // 50 code points, 100 UTF-16 units
 const user = (uid = ALICE): string => `users/${uid}`;
 const member = (hid: string, uid = ALICE): string => `households/${hid}/members/${uid}`;
 const household = (uid = ALICE): Fields => ({
-    ...{ name: "Home", createdBy: uid, createdAt: NOW, ownerUid: uid, deleted: false },
+    name: "Home",
+    createdBy: uid,
+    createdAt: NOW,
+    ownerUid: uid,
+    deleted: false,
 });
 const OWNER: Fields = { role: "owner", displayName: "Alice", joinedAt: NOW };
 const without = (fields: Fields, key: string): Fields =>
@@ -127,6 +131,8 @@ describe("Create household + owner (one batch)", () => {
     });
 
     // P1 (#206) and P3 (#243): the member doc is the caller's own, the id a 20-character auto-id.
+    // The first row is also denied by the household's existsAfter and the users-doc set, the third
+    // by its role; the second, an owner's doc for bob next to alice's, isolates P1.
     test.each<[string, Create]>([
         ["the owner's member doc for another uid", { ownerId: BOB }],
         ["a second member doc, an owner's, for another uid", { second: OWNER }],
@@ -182,7 +188,9 @@ describe("Create household + owner (one batch)", () => {
     });
 
     // The one-household check (PLAN 3.1): the users doc exists and holds null before the batch, the
-    // new household after it; a stale value must be self-healed first.
+    // new household after it; a stale value must be self-healed first. The users-doc rule also denies
+    // the rows with a users-doc write (hid1 -> hid2, or a create with a household): only the last
+    // row isolates householdId == null before the batch.
     test.each<[string, Record<string, Fields | null>, Create]>([
         ["without the users-doc write", {}, { users: null }],
         ["with no users doc, the batch creating it", { [user()]: null }, { users: "set" }],
