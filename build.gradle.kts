@@ -332,15 +332,16 @@ val checkJavaApiLevel =
 // M0.5-10: the licensee policy (config/licensee/policy.gradle) is tested against a fixture build whose
 // artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's
 // allowlist and fail, naming the artifact, for any other licence. Wired into detekt, so verify.sh and CI run it.
-// A case is one string, "name|deps|approved|pass or fail|text the output must contain", so the task stays
-// configuration-cache friendly (no script object references).
+// A case is one string, "name|deps|approved|pass or fail|text the output must contain|licensee version or empty", so the
+// task stays configuration-cache friendly (no script object references).
 fun licenseeCase(
     name: String,
     deps: String,
     approved: String = "",
     passes: Boolean,
     message: String = "",
-) = listOf(name, deps, approved, if (passes) "pass" else "fail", message).joinToString("|")
+    licensee: String = "",
+) = listOf(name, deps, approved, if (passes) "pass" else "fail", message, licensee).joinToString("|")
 
 val testLicenseeGate =
     tasks.register("testLicenseeGate") {
@@ -437,6 +438,19 @@ val testLicenseeGate =
                     message = coordinates,
                 ),
                 licenseeCase("allowed plus one bad", "$allowed,fixture:gpl3:1.0", passes = false, message = "gpl-3.0"),
+                // Issue 217 item 4: the fixture build verifies dependencies (config/licensee/fixture/gradle). An older licensee
+                // version that is on Maven Central but not in that file must be refused by Gradle, whatever its licences. The expected
+                // text appears only when strict verification stops the plugin from resolving; lenient mode prints the same warning,
+                // resolves the plugin and fails later for another reason.
+                licenseeCase(
+                    "dependency verification is on in the fixture build",
+                    allowed,
+                    passes = false,
+                    message =
+                        "Error resolving plugin [id: 'app.cash.licensee', version: '1.0.0']\n" +
+                            "> Dependency verification failed",
+                    licensee = "1.0.0",
+                ),
             ) +
                 listOf(
                     "gpl3" to "gpl-3.0",
@@ -458,7 +472,9 @@ val testLicenseeGate =
         doLast {
             val problems = mutableListOf<String>()
             for (line in cases) {
-                val (name, deps, approved, expected, message) = line.split('|')
+                val fields = line.split('|')
+                val (name, deps, approved, expected, message) = fields
+                val licensee = fields[5]
                 val passes = expected == "pass"
                 val command =
                     mutableListOf(
@@ -468,7 +484,7 @@ val testLicenseeGate =
                         "--no-daemon",
                         "-p",
                         fixture.path,
-                        "-Dlicensee.version=$pluginVersion",
+                        "-Dlicensee.version=${licensee.ifEmpty { pluginVersion }}",
                         "-Pdeps=$deps",
                     )
                 if (approved.isNotEmpty()) command += "-Papproved=$approved"
