@@ -973,6 +973,82 @@ linecheck() { # linecheck <merge-base>
   while IFS= read -r l; do [ -n "$l" ] && bad "$l"; done <<<"$out"
 }
 
+# M1-68 (PR 320 R1): useJUnitPlatform() and failOnNoDiscoveredTests = true may move from a module build file into the convention
+# plugins. A removed line whose only check settings are these (MOVE_FN: moved) is accepted when the diff adds each of them to code of
+# a regular .kt/.kts file under build-logic/src/main/kotlin/ (movedsettings). Code means outside comments (nested block comments too),
+# strings, raw strings and their templates, char literals, backticked names and a `#!` first line: MOVE_LEX reads the whole head file.
+# A setting counts only where a statement starts (stmt): not after `val`/`fun`, as a named argument or on the right of `=`.
+# What does not count: a weaker form (useJUnitPlatform { ... }, = true && x), a setting already there, any other path or check setting.
+# Known limit (part B's per-module check closes it): a text rule cannot see dead code or which modules apply the plugin.
+MOVE_FN='
+function chk(s) { return s ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ }
+function stmt(p,   nl) {  # p, the code before a setting (earlier lines first), ends where a statement starts
+  sub(/[ \t]+$/, "", p); sub(/(this|it)[ \t]*\.$/, "", p)  # a receiver; `xit.` leaves `x`, which no rule below accepts
+  if (match(p, /[ \t\n]+$/)) { nl = index(substr(p, RSTART), "\n"); p = substr(p, 1, RSTART - 1) }
+  if (p == "" || p ~ /([;{})]|->)$/) return 1
+  return nl && p ~ /[]A-Za-z0-9_$#]$/ && p !~ /(^|[^A-Za-z0-9_$])(fun|val|var|get|set)$/  # a line break ends a statement
+}
+function takes(t, ctx,   ids, id, at, post) {  # the movable settings in t, as " id id"; REST = t without them. A weaker form stops the scan.
+  t = " " t " "; ids = ""
+  while (match(t, /[^A-Za-z0-9_$]useJUnitPlatform[ \t]*\([ \t]*\)|[^A-Za-z0-9_$]failOnNoDiscoveredTests[ \t]*(=[ \t]*true|\.set\([ \t]*true[ \t]*\))/)) {
+    at = RSTART; post = substr(t, RSTART + RLENGTH)  # before stmt(), whose match() and sub() reset RSTART and RLENGTH
+    if (post !~ /^[ \t]*([;})]|$)/ || !stmt(ctx "\n" substr(t, 1, at))) break
+    id = substr(t, at + 1, 1) == "u" ? "useJUnitPlatform" : "failOnNoDiscoveredTests"
+    ids = ids " " id; t = substr(t, 1, at) ")" post
+  }
+  REST = t; return ids
+}
+function moved(f, l,   ids, n, i, a) {  # removed line l of file f (a/<path>) only held settings that the diff adds to build-logic code
+  if (f !~ /^a\/(.*\.gradle(\.kts)?|build-logic\/src\/main\/kotlin\/.*\.kts?)$/) return 0
+  ids = takes(l, ""); if (ids == "" || chk(REST)) return 0
+  n = split(ids, a, " "); for (i = 1; i <= n; i++) if (!index(" " MOVED " ", " " a[i] " ")) return 0
+  return 1
+}'
+MOVE_LEX='
+BEGIN { n = split(ADDED, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1; top = 0; md[0] = "c"; cd = 0 }
+{ # the code of each line: per lexer step a comment gives a space, a string, char or name a #, so `useJUnitPlatform("")` is no
+  # plain call. State (block comment depth, string and template stack) carries over lines, and so does ctx, the code before the line.
+  s = NR == 1 && substr($0, 1, 2) == "#!" ? "" : $0; L = length(s); out = ""; i = 1
+  while (i <= L) {
+    c = substr(s, i, 1); c2 = substr(s, i, 2); c3 = substr(s, i, 3); m = md[top]; out = out (cd > 0 || c2 == "/*" || c2 == "//" ? " " : "#")
+    if (cd > 0) { if (c2 == "/*") { cd++; i += 2 } else if (c2 == "*/") { cd--; i += 2 } else i++; continue }
+    if (m != "c" && m != "t") {  # "s" string (escapes), "r" raw string (closed by the last quote of a run of three or more)
+      if (m == "s" && c == "\\") i += 2
+      else if (m == "s" && c == "\"") { top--; i++ }
+      else if (m == "r" && c3 == "\"\"\"") { while (substr(s, i, 1) == "\"") i++; top-- }
+      else if (c2 == "${") { md[++top] = "t"; bd[top] = 1; i += 2 }
+      else i++
+      continue
+    }
+    if (c2 == "//") break
+    if (c2 == "/*") { cd = 1; i += 2 }
+    else if (c3 == "\"\"\"") { md[++top] = "r"; i += 3 }
+    else if (c == "\"") { md[++top] = "s"; i++ }
+    else if (c == "\047") { j = substr(s, i + 1, 1) == "\\" ? i + 3 : i + 2; while (j <= L && substr(s, j, 1) != "\047") j++; i = j + 1 }
+    else if (c == "`") { j = i + 1; while (j <= L && substr(s, j, 1) != "`") j++; i = j + 1 }
+    else if (m == "t") { if (c == "{") bd[top]++; else if (c == "}" && --bd[top] == 0) top--; i++ }  # template code: blanked too
+    else { out = substr(out, 1, length(out) - 1) c; i++ }
+  }
+  # R1-03: a line break before &&, ||, ?:, ?., ., ::, as or a lambda continues the expression, so the settings of an added line wait for
+  # the next line with code and are dropped when it starts with one of those.
+  w = out; sub(/^[ \t]+/, "", w)
+  if (w != "") { if (w !~ /^(&&|\|\||[?.{]|::|as([^A-Za-z0-9_$]|$))/) printf "%s", pend; pend = "" }
+  if (NR in want) pend = pend takes(out, ctx)
+  ctx = ctx "\n" out; gsub(/[ \t]*\n[ \t\n]*/, "\n", ctx); gsub(/[ \t]+/, " ", ctx); if (length(ctx) > 100) ctx = substr(ctx, length(ctx) - 99)
+}
+END { printf "%s", pend }'
+movedsettings() { # movedsettings <merge-base>: the ids of the movable settings on lines the diff adds to code in build-logic (see above)
+  local f e lines
+  git -c core.quotePath=false diff -z --name-only --no-renames --diff-filter=AMT "$1" HEAD -- \
+      ':(glob)build-logic/src/main/kotlin/**/*.kt' ':(glob)build-logic/src/main/kotlin/**/*.kts' | while IFS= read -r -d '' f; do
+    e=$(git ls-tree HEAD -- ":(literal)$f" | head -n 1)
+    case "$e" in 100644\ blob\ *|100755\ blob\ *) ;; *) continue ;; esac  # a symlink or submodule is no source
+    lines=$(git diff -U0 --no-renames "$1" HEAD -- ":(literal)$f" |
+      awk '/^@@ / { split($3, p, ","); n = (2 in p) ? p[2] : 1; for (k = 0; k < n; k++) printf "%d ", substr(p[1], 2) + k }')
+    e=${e#* blob }; git cat-file blob "${e%%$'\t'*}" | LC_ALL=C awk -v ADDED="$lines" "$MOVE_FN$MOVE_LEX"
+  done
+}
+
 if [ "$STAGED" = 1 ]; then sizecheck --cached; fi
 
 if [ "$STAGED" = 0 ]; then
@@ -986,7 +1062,8 @@ if [ "$STAGED" = 0 ]; then
     sizecheck "$MB" HEAD
     DSPEC=(. ':!docs' ':!handoff' ':!scripts/guards.sh' ':!scripts/hooks/test_guards_sh.py' ':!*package-lock.json')
     # Lowered or removed thresholds and severities.
-    git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk '
+    moved=$(movedsettings "$MB")
+    git diff -U0 "$MB" HEAD -- "${DSPEC[@]}" | awk -v MOVED="$moved" "$MOVE_FN"'
       function norm(l,   n) { sub(/^[-+]/, "", l); gsub(/^[ \t]+|[ \t]+$/, "", l); return l }
       function num(l) { if (match(l, /[0-9]+/)) return substr(l, RSTART, RLENGTH) + 0; return -1 }
       function testpath(p) {
@@ -1026,14 +1103,15 @@ if [ "$STAGED" = 0 ]; then
       }
       # coverageThreshold (Jest) and fail_under / --cov-fail-under (coverage.py) are named like thresholds but not spelled `threshold`.
       # In a Jest, Vitest, nyc or c8 config the per-metric values sit on their own lines (`branches: 80,`), so those lines count too.
-      kw ~ /(minBound|mutationThreshold|threshold|coverageThreshold|fail[-_]under|failOnNoDiscoveredTests|useJUnitPlatform|error *\+?=|fatal *\+?=|warningsAsErrors|maxIssues|failOnSeverity)/ ||
+      chk(kw) ||
       (file ~ /(jest|vitest|vite)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
-        if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n } else { add[key] = l; addn[key] = n }
+        if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n; remf[key] = file } else { add[key] = l; addn[key] = n }
       }
       END {
         for (k in rem) {
-          if (!(k in add)) { print "guard: removed check setting: " rem[k]; bad = 1 }
+          if (!(k in add) && moved(remf[k], rem[k])) print "guard: note: check setting moved into build-logic: " rem[k]
+          else if (!(k in add)) { print "guard: removed check setting: " rem[k]; bad = 1 }
           else if (remn[k] >= 0 && addn[k] >= 0 && addn[k] < remn[k] && rem[k] !~ /maxIssues/) { print "guard: lowered threshold: " add[k]; bad = 1 }
         }
         exit bad
