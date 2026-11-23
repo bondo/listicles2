@@ -9,9 +9,10 @@ blocked, owner to-do), the same states and marker shapes as status.svg.
 
 Task M1-70 (written by `status_visual.py render` next to status.svg, published by `status_publish.py`). Offline, standard library
 only, deterministic: the same model gives the same bytes, and there is no clock in the picture. A pure layered layout: a task's column
-is the length of its longest chain of open dependencies; the boxes inside a column are ordered by barycentre sweeps (the order with the
-fewest crossings wins, never worse than the model order); arrows are orthogonal polylines in the gaps between columns and the
-channels between rows, never through a box, one track per arrow where they share a gap (task M1-75).
+is the length of its longest chain of open dependencies; the boxes inside a column are ordered by barycentre sweeps (the order with
+the fewest crossings, counted as straight lines between the boxes' column and row, wins; never worse than the model order); arrows are
+orthogonal polylines in the gaps between columns and the channels between rows, never through a box, one track per arrow where they
+share a gap (task M1-75).
 Every title is untrusted text: stripped of control characters, clipped and escaped (it only appears in the node tooltips).
 """
 
@@ -22,7 +23,7 @@ from xml.sax.saxutils import escape
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import status_visual  # noqa: E402  # justified: must follow the sys.path insert above
 
-PAD, MIN_WIDTH = 24, 960
+PAD, MIN_WIDTH, MAX_WIDTH = 24, 960, 1290  # 14 px text is 9 px or more at the 830 px README column up to 1291 px
 NODE_H, HEADER, BAND_GAP = 24, 26, 10
 CHAR, NODE_PAD = 8, 24  # node width = id width * CHAR + NODE_PAD (marker and padding)
 SWEEPS = 4
@@ -160,7 +161,7 @@ def crossings(graph, layer, cells):
 def order_cells(graph, layer, sweeps=SWEEPS):
     """Cells (band id, column) -> task ids top to bottom. Starts from the model order; each sweep reorders the columns left to
     right by the average position of the dependencies, then right to left by the dependents (barycentre). The order with the
-    fewest crossings seen, the first one on a tie, is kept, so the result never has more crossings than the model order."""
+    fewest crossings seen (counted as in crossings()), the first one on a tie, is kept, so the result never has more crossings than the model order."""
     cells = {}
     for n in graph["nodes"]:
         cells.setdefault((n["milestone"], layer[n["id"]]), []).append(n["id"])
@@ -263,13 +264,20 @@ def _route(graph, layer, cells, width_of, top):
         tracks, gap_count[g] = _tracks(verticals[g])
         track.update({k: (g, t) for k, t in tracks.items()})
     columns = max(layer.values(), default=-1) + 1
-    col_x = [PAD + 10]
-    for g in range(columns - 1):
-        col_x.append(col_x[-1] + width_of + LEAD + max(0, gap_count.get(g, 0) - 1) * TRACK + TAIL)
+
+    def columns_at(step):
+        xs = [PAD + 10]
+        for g in range(columns - 1):
+            xs.append(xs[-1] + width_of + LEAD + max(0, gap_count.get(g, 0) - 1) * step + TAIL)
+        return xs
+
+    # the gaps grow with their tracks; squeeze the tracks (never below 1 px apart) so the picture stays within MAX_WIDTH
+    step = next((t for t in range(TRACK, 1, -1) if columns_at(t)[-1] + width_of + 10 + PAD <= MAX_WIDTH), 1)
+    col_x = columns_at(step)
 
     def lane(key):
         g, t = track[key]
-        return col_x[g] + width_of + LEAD + t * TRACK
+        return col_x[g] + width_of + LEAD + t * step
 
     paths = {}
     for e in edges:
