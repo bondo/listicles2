@@ -29,9 +29,11 @@ fi
 # The host is fixed and the repository is the origin remote of this script's own checkout (M1-85). It is parsed here, not by a helper, so the
 # pinned content is all that runs; git gets no environment and no global config, so neither GITHUB_REPOSITORY nor git variables redirect the call.
 # The guard does not deny `git remote set-url`, so the owner is pinned here too: a rename keeps the owner, another owner is refused.
+# git starts at the checkout root (a planted scripts/.git is never read), and LC_ALL=C makes the bracket ranges below ASCII, as in repo_slug.py.
 owner="bondo"
 unset GH_HOST GH_REPO
-remote="$(env -i PATH="$PATH" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$(dirname -- "$0")" remote get-url origin)" || remote=""
+LC_ALL=C
+remote="$(env -i PATH="$PATH" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$(dirname -- "$0")/.." remote get-url origin)" || remote=""
 # slug-parse: begin (the forms of scripts/repo_slug.py; test_mark_ready.py checks both wrappers carry this block and that it agrees with it)
 u='([^@/[:space:]]+@)?'
 c='([^@/:[:space:]]+@)?'

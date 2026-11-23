@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import repo_slug  # noqa: E402  # justified: must follow the sys.path insert above; the repository comes from one place (M1-85)
 
 BASE = "main"
+OWNER = "bondo"  # the repository comes from repo_slug.py; the owner is pinned, as in the wrappers (`git remote set-url` is not denied), a rename keeps it
 RETRIES = 5
 # Rate limit and server flakes, the merge PUT included: a retry after a lost answer fails because the PR is merged already, it never merges twice.
 RETRY_STATUSES = {"429", "500", "502", "503", "504"}
@@ -72,7 +73,7 @@ TASKS_FILES = ("docs/tasks.toml",)
 # The owner's batch approval lifts all of it.
 OWNER_ONLY_FILES = {f.casefold() for f in (
     "CLAUDE.md", "REVIEW.md", "scripts/guards.sh", "scripts/install-hooks.sh", "scripts/install_linters.sh", "scripts/linters.pins", "scripts/merge_ready.py",
-    "scripts/test_merge_ready.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
+    "scripts/test_merge_ready.py", "scripts/repo_slug.py", "scripts/test_repo_slug.py", "scripts/mark-ready.sh", "docs/ORCHESTRATION.md", "docs/BRANCH-PROTECTION.md", "docs/ANDROID-BEST-PRACTICES.md",
     "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md", "docs/COLLABORATING.md",
     "gradle/verification-metadata.xml", "gradlew", "gradlew.bat",
     "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")}  # the last two run through `ci_scope.py selftests` (a test keeps them in sync)
@@ -628,7 +629,7 @@ def main(argv, api=None, out=sys.stdout, err=sys.stderr, resolver=None, sleep=ti
         print("merge_ready: --approval <comment-id> goes with kind owner-batch, and only with it", file=err)
         return 2
     try:
-        repo = repo or repo_slug.resolve()
+        repo = repo or repo_slug.resolve(owner=OWNER)
     except repo_slug.RepoSlugError as e:
         print(f"merge_ready: {e}", file=err)
         return 1

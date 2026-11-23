@@ -39,6 +39,8 @@ PROTECTED = (
     "scripts/install-hooks.sh",
     "scripts/merge_ready.py",  # the merge agent runs it
     "scripts/test_merge_ready.py",
+    "scripts/repo_slug.py",  # merge_ready.py imports it (M1-85)
+    "scripts/test_repo_slug.py",
     "scripts/mark-ready.sh",  # the project allow rules approve these paths; see PINNED_WRAPPERS below
     "scripts/update-branch.sh",
     "scripts/hooks/",
@@ -52,8 +54,8 @@ PROTECTED = (
 # Writes to the file cannot all be caught by name (sed -i scripts/*.sh, cp -t scripts, tar, git apply), so its content is checked when it runs:
 # the wrapper must be a regular file, not a symlink, with exactly its SHA-256. A legitimate edit of a wrapper updates its pin in the same
 # reviewed tooling PR (test_guard_mark_ready.py and test_guard_update_branch.py fail until it does).
-MARK_READY_SHA256 = "cf4a506224a669efe6769b532e636e079f31507546ed68b4260fa64a6a33b684"
-UPDATE_BRANCH_SHA256 = "90f952456172fd5e7c20e050227f3d0573845ea29b4721cb5dee59d178f1f47b"
+MARK_READY_SHA256 = "46d5fd1175334beb5fd02e7c9b2028127b51f2867ddb8a69cb6cf7adca9ff17a"
+UPDATE_BRANCH_SHA256 = "8fbb1e07e55c3ae4522daa907b06373fb7d55f11924cb6936a39055b184ad8be"
 MARK_READY = "mark-ready.sh"
 PR_NUMBER = re.compile(r"[1-9][0-9]{0,5}")
 HEX40 = re.compile(r"[0-9a-f]{40}")

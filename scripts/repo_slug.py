@@ -22,13 +22,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SLUG = r"(?P<slug>[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100})"
 USER = r"(?:[^@/\s]+@)?"
 SCP_USER = r"(?:[^@/:\s]+@)?"  # in git@github.com:O/N a colon before the @ would make the text before it the host
-FORMS = [re.compile(p + SLUG + r"/?") for p in (
+FORMS = [re.compile(p + SLUG + r"/?", re.ASCII) for p in (
     rf"https?://{USER}(?:www\.)?github\.com/",
     rf"{SCP_USER}github\.com:",
     rf"ssh://{USER}github\.com(?::\d{{1,5}})?/",
     rf"https?://{USER}(?:127\.0\.0\.1|localhost)(?::\d{{1,5}})?/git/",
 )]
-SLUG_RE = re.compile(SLUG)
+SLUG_RE = re.compile(SLUG, re.ASCII)  # ASCII \d and \s, as the wrappers' bracket ranges under LC_ALL=C
 REPO_GIT_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_CEILING_DIRECTORIES",
                  "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_OBJECT_DIRECTORY", "GIT_INDEX_FILE", "GIT_NAMESPACE")
 
@@ -64,8 +64,15 @@ def origin_url(root: Path) -> str:
     return p.stdout.rstrip("\n")
 
 
-def resolve(environ: Mapping[str, str] | None = None, root: Path = ROOT) -> str:
-    """The repository slug, or RepoSlugError with the reason."""
+def resolve(environ: Mapping[str, str] | None = None, root: Path = ROOT, owner: str | None = None) -> str:
+    """The repository slug, or RepoSlugError with the reason. With `owner`, a slug of any other owner (exact spelling) is an error too."""
+    slug = _resolve(environ, root)
+    if owner is not None and slug.split("/")[0] != owner:
+        raise RepoSlugError(f"{slug} is a repository of another owner than {owner}; refused")
+    return slug
+
+
+def _resolve(environ: Mapping[str, str] | None, root: Path) -> str:
     env_slug = (os.environ if environ is None else environ).get("GITHUB_REPOSITORY", "")
     if env_slug:
         if not valid(env_slug):
