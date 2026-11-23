@@ -22,6 +22,7 @@ FIREBASE = "firebase/firebase.json"
 HELPER = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/FirebaseEmulator.kt"
 SMOKE = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/EmulatorSmokeTest.kt"
 BUILD = "core/data/build.gradle.kts"
+PLUGIN = "build-logic/src/main/kotlin/Conventions.kt"
 EXEC = "firebase emulators:exec --only auth,firestore --project demo-tally"
 
 
@@ -30,7 +31,7 @@ class Wiring(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        for name in (CI, VERIFY, FIREBASE, HELPER, SMOKE, BUILD):
+        for name in (CI, VERIFY, FIREBASE, HELPER, SMOKE, BUILD, PLUGIN):
             (self.root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / name, self.root / name)
 
@@ -101,7 +102,9 @@ class Wiring(unittest.TestCase):
             "continue-on-error": ("      - name: enable KVM\n", "      - name: enable KVM\n        continue-on-error: true\n"),
             "needs a skipped job": ("  ui:\n    name: ui\n", "  ui:\n    name: ui\n    needs: [never]\n"),
             "quoted if on the job": ("  ui:\n    name: ui\n", "  ui:\n    name: ui\n    'if': false\n"),
-            "no npm ci": ("run: npm ci --silent\n      - name: enable KVM", "run: npm install --silent\n      - name: enable KVM"),
+            "no npm ci": ("run: npm ci --ignore-scripts --silent\n      - name: enable KVM", "run: npm install --silent\n      - name: enable KVM"),
+            "npm ci runs install scripts": (
+                "run: npm ci --ignore-scripts --silent\n      - name: enable KVM", "run: npm ci --silent\n      - name: enable KVM"),
             "no ui job": ("  ui:\n    name: ui\n", "  ui2:\n    name: ui\n"),
         }
         for name, (old, new) in mutations.items():
@@ -125,18 +128,38 @@ class Wiring(unittest.TestCase):
         got = self.mutated(CI, "run: python3 -I scripts/check_ui_emulators.py", "run: true")
         self.assertEqual(got, ["ci.yml tasks job has no step running: python3 -I scripts/check_ui_emulators.py"])
 
-    def test_the_data_module_must_have_the_test_support_module_on_its_unit_test_classpath(self):
-        got = self.mutated(BUILD, 'testImplementation(project(":core:testing"))', "")
-        self.assertEqual(got, [":core:data must have testImplementation(project(\":core:testing\")) (#217 item 3)"])
-
-    def test_the_data_module_must_run_unit_tests_on_the_junit_platform(self):
-        # R1-02: the :core:testing network block is a JUnit Platform listener; on Gradle's JUnit 4 runner it never installs.
-        for old, new in (("useJUnitPlatform", "useJUnit"), ("unitTests.all {", "// unitTests.all {")):
+    def test_the_data_module_must_apply_the_android_library_convention(self):
+        # M1-68 part B: :core:testing and the JUnit Platform come from the convention plugin, not the module build file.
+        for new in ("alias(libs.plugins.android.library)", "// alias(libs.plugins.listicles.android.library)"):
             with self.subTest(new):
                 shutil.copy(ROOT / BUILD, self.root / BUILD)
-                got = self.mutated(BUILD, old, new)
-                self.assertEqual(len(got), 1)
-                self.assertIn("JUnit Platform", got[0])
+                got = self.mutated(BUILD, "alias(libs.plugins.listicles.android.library)", new)
+                self.assertEqual(got, [c.CONVENTION_PROBLEM])
+
+    def test_the_plugin_must_put_the_test_support_module_on_every_unit_test_classpath(self):
+        for old, new in (('dependencies.add("testImplementation", ', '// dependencies.add("testImplementation", '),
+                         ('dependencies.add("testImplementation", ', 'dependencies.add("implementation", '),
+                         ('TEST_SUPPORT = ":core:testing"', 'TEST_SUPPORT = ":core:other"')):
+            with self.subTest(new):
+                shutil.copy(ROOT / PLUGIN, self.root / PLUGIN)
+                self.assertEqual(self.mutated(PLUGIN, old, new), [c.CLASSPATH_PROBLEM])
+
+    def test_the_plugin_must_run_unit_tests_on_the_junit_platform(self):
+        # R1-02: the :core:testing network block is a JUnit Platform listener; on Gradle's JUnit 4 runner it never installs.
+        for old, new in (("useJUnitPlatform()", "useJUnit()"), ("useJUnitPlatform()", "// useJUnitPlatform()")):
+            with self.subTest(new):
+                shutil.copy(ROOT / PLUGIN, self.root / PLUGIN)
+                self.assertEqual(self.mutated(PLUGIN, old, new), [c.JUNIT_PROBLEM])
+
+    def test_a_module_level_junit_line_does_not_stand_in_for_the_plugin(self):
+        # M1-68 part B: the old :core:data form, as it was or weakened, does not count; only the plugin's call does.
+        self.mutated(PLUGIN, "        useJUnitPlatform()\n", "")
+        build = self.root / BUILD
+        build.write_text(build.read_text() + "android { testOptions { unitTests.all { it.useJUnitPlatform() } } }\n")
+        self.assertEqual(c.problems(self.root), [c.JUNIT_PROBLEM])
+        for old, new in (("useJUnitPlatform", "useJUnit"), ("unitTests.all {", "// unitTests.all {")):
+            with self.subTest(new):
+                self.assertEqual(self.mutated(BUILD, old, new), [c.JUNIT_PROBLEM])
 
     def test_the_smoke_test_must_exist_and_have_a_test(self):
         got = self.mutated(SMOKE, "@Test", "// not a test", count=3)
