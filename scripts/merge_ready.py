@@ -5,7 +5,7 @@ Usage: python3 -I scripts/merge_ready.py [--wait] [--approval <comment-id>] <N> 
   kind: working-draft-docs | tasks-sync | dependabot   (the owner-authorized merge-agent kinds)
         general      a PR whose every path is on the allowlist (GENERAL_ALLOW), under the owner's standing authorization (#15 comment 7005366747);
                      fail-closed since #15 comment 7058755858: any other path is owner-only
-        owner-batch  any paths, but only a PR the owner's batch approval lists (--approval, the id of that comment on #15; D1 and D2 of #229)
+        owner-batch  any paths, but only a PR the owner's batch approval lists (--approval, the id of that comment on the state issue; D1 and D2 of #229)
   --wait  while required checks are pending or not reported yet, poll (WAIT_POLL s, up to WAIT_SECONDS) instead of refusing; anything else still refuses at once
 
 Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
@@ -22,7 +22,8 @@ Refuses (exit 1, one reason per line, nothing merged) unless ALL hold:
     empty one, cannot be checked and refuses (R5-01).
   * for dependabot, every new `uses: owner/repo@<sha> # <tag>` pin has a tag comment and its sha equals the commit that tag points to
     in owner/repo (`git ls-remote`, annotated tags dereferenced; R2-06, an imposter or fork commit is refused). A failed lookup refuses (fail closed).
-  * for owner-batch, the comment is the owner's account (it cannot tell the person from an agent), on #15 and unedited, its first non-empty line is
+  * for owner-batch, the comment is the owner's account (it cannot tell the person from an agent), unedited and on the current or the previous state
+    issue (STATE_ISSUE, PREVIOUS_STATE_ISSUE; nothing else, owner decision #15 7076313976, M1-78), its first non-empty line is
     `batch approval: #N@sha, ...` (only entries and (notes)) and lists this PR once with a sha (7+ hex) of one of its commits; earlier listed PRs are
     merged; the head is that commit or only adds update-branch merges of main (second parent in main) whose tree equals git's automatic merge of their
     two parents (`git merge-tree --write-tree`, no conflicts, run in this checkout after fetching main and pull/N/head, deepening a shallow checkout;
@@ -49,7 +50,11 @@ RETRIES = 5
 RETRY_STATUSES = {"429", "500", "502", "503", "504"}
 # gh prints `gh: <message> (HTTP 502)` for a JSON error body and a line of its own, `gh: HTTP 502`, for an HTML or empty one (R1-01).
 GH_STATUS_RE = re.compile(r"\(HTTP (\d{3})\)|^gh: HTTP (\d{3})$", re.M)
-STATE_ISSUE = 15  # the issue that holds owner decisions and batch approvals
+# The state issue that holds owner decisions and batch approvals, and the one before it (None until the first rotation). At a rotation (milestone end,
+# about 250 comments or a 15 KB body, at a handover boundary) the successor opens the new issue and a PR moves this pointer: STATE_ISSUE = the new one,
+# PREVIOUS_STATE_ISSUE = the old one. This file is owner-only, so that PR is an owner merge; until it lands, approvals on the new issue refuse.
+STATE_ISSUE = 15
+PREVIOUS_STATE_ISSUE = None
 WAIT_SECONDS, WAIT_POLL = 900, 30  # --wait: how long to wait for required checks, and the poll interval
 MERGE_TREE_TIMEOUT = 120  # seconds for one git fetch or merge-tree
 
@@ -500,13 +505,29 @@ def update_branch_problems(api, repo, base, head, approved, commits, merge_tree)
     return []
 
 
+def state_issues():
+    """(current,) or (current, previous): the state issues a batch approval may sit on. Raises ValueError on a pointer that is not one or two
+    different positive issue numbers, so a typo in the rotation PR refuses every approval instead of widening the check."""
+    cur, prev = STATE_ISSUE, PREVIOUS_STATE_ISSUE
+    number = lambda x: type(x) is int and x > 0  # noqa: E731  # justified: two-use local helper; type() keeps out True
+    if not number(cur) or not (prev is None or number(prev) and prev != cur):
+        raise ValueError(f"bad state issue pointer STATE_ISSUE={cur!r}, PREVIOUS_STATE_ISSUE={prev!r}")
+    return (cur,) if prev is None else (cur, prev)
+
+
 def batch_problems(api, repo, n, head, base, commits, approval_id, merge_tree):
     """Reasons PR n is not covered by the owner's batch approval (the comment on the state issue), see the module header."""
+    try:
+        issues = state_issues()
+    except ValueError as e:
+        return [f"{e}: cannot tell which issue an approval must be on"]
     comment = api.get(f"repos/{repo}/issues/comments/{approval_id}")
     if (comment.get("user") or {}).get("login") != repo.split("/")[0] or comment.get("author_association") != "OWNER":
         return [f"approval comment {approval_id} is not by the owner"]
-    if not str(comment.get("issue_url") or "").endswith(f"/issues/{STATE_ISSUE}"):
-        return [f"approval comment {approval_id} is not on issue #{STATE_ISSUE}"]
+    on = re.fullmatch(rf"https://api\.github\.com/repos/{re.escape(repo)}/issues/([1-9][0-9]*)", str(comment.get("issue_url") or ""))
+    if not on or int(on.group(1)) not in issues:
+        where = f"the state issue #{issues[0]}" + (f" or the previous state issue #{issues[1]}" if len(issues) > 1 else "")
+        return [f"approval comment {approval_id} is not on {where}"]
     if comment.get("created_at") != comment.get("updated_at"):
         return [f"approval comment {approval_id} was edited after it was posted (post a new batch approval)"]
     entries = approval_entries(comment.get("body") or "")

@@ -1,0 +1,4 @@
+# PyYAML for the gate scripts (setup-python's interpreter has none; M1-44): the top level of the hash lock requirements-ci.txt (M1-74).
+# Recompile from scripts/ with Python 3.13: pip-compile --allow-unsafe --generate-hashes --strip-extras requirements-ci.in
+# CI installs the lock with: pip install --require-hashes -r scripts/requirements-ci.txt
+PyYAML==6.0.3
