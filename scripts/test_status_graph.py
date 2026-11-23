@@ -671,6 +671,25 @@ class Palette(unittest.TestCase):
                         checked += 1
         self.assertGreater(checked, 50)
 
+    def test_a_neighbour_is_a_source_within_conflict_px_not_twice_that(self):
+        """R1-01 of PR 353: N1 runs 3 px from Z's line, N2 to N6 run 7 px or more away. Z has one neighbour, N1, so it must not take N1's colour."""
+        run = {"N1": 6, "N2": -1, "N3": 0, "N4": 1, "N5": 1, "N6": 2, "Z": 9}  # each source: one horizontal line at this y
+        self.assertEqual(status_graph.CONFLICT, 6)
+        found = status_graph.source_colours({(k, "T"): [(0, y), (100, y)] for k, y in run.items()})
+        self.assertEqual(len(set(found[k] for k in run if k != "Z")), len(status_graph.PALETTE))  # N1 to N6 use every colour
+        self.assertNotEqual(found["Z"], found["N1"])
+
+    def test_sources_exactly_conflict_px_apart_differ(self):
+        near = status_graph.source_colours({("A", "T"): [(0, 0), (50, 0)], ("B", "T"): [(0, 6), (50, 6)]}, colours=2)
+        self.assertEqual(sorted(near.values()), [0, 1])
+
+    def test_thin_arrows_are_wide_enough_for_the_pale_colours(self):
+        """R1-02 of PR 353: orange and sky blue are about 2.1:1 on the light band, so the thin arrows are at least 1.8 px (1.3 px at README width)."""
+        svg = svg_of()
+        self.assertGreaterEqual(float(css_value(svg, "edge", "stroke-width")), 1.8)
+        for p in arrows(svg).values():
+            self.assertGreaterEqual(float(css_value(svg, p.get("class"), "stroke-width")), 1.8)
+
     def test_the_legend_says_what_the_colours_mean(self):
         svg = svg_of()
         joined = "\n".join(texts(svg))
