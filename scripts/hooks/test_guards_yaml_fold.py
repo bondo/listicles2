@@ -155,6 +155,41 @@ class SelfReviewTests(FoldCase):
         self.assertFails(f"{MARK}: {WF}:0: the YAML fold scan failed", PATH=d + os.pathsep + os.environ["PATH"])
 
 
+class ReviewRound1Tests(FoldCase):
+    """PR 325 review round 1: R1-01 an item with nothing after its dash (or only an anchor) holds a block mapping, R1-02 a tracked
+    YAML file missing from the working tree has nothing to scan, R1-03 the per-line scan of YAML files still runs beside the joined one."""
+
+    def fake_awk(self, fold_body):
+        d = os.path.join(self.repo.dir, ".fakebin")
+        os.makedirs(d, exist_ok=True)
+        real = base.shutil.which("awk")
+        with open(os.path.join(d, "awk"), "w") as f:
+            f.write(f'#!/bin/sh\ncase "$*" in *"function yent"*) {fold_body} ;; esac\nexec "{real}" "$@"\n')
+        os.chmod(os.path.join(d, "awk"), stat.S_IRWXU)
+        return d + os.pathsep + os.environ["PATH"]
+
+    def test_a_bare_dash_item_holds_a_mapping(self):
+        self.passes([
+            (WF, STEPS + "      -\n        run: |\n          ruff check .\n          echo --fix\n"),
+            (WF, STEPS + "      -\n        name: ruff check\n        run: echo --fix\n"),
+            (WF, STEPS + "      - &x\n        run: |\n          ruff check .\n          echo --fix\n"),
+        ])
+        self.fails_at([
+            (WF, STEPS + "      -\n        run: ruff check\n          --ignore E501 .\n", 5),
+            (WF, STEPS + "      - &x\n        run: ruff check\n          --ignore E501 .\n", 5),
+            (WF, STEPS + "      -\n        ruff check\n        --ignore E501 .\n", 5),
+        ])
+
+    def test_a_tracked_yaml_file_missing_from_the_tree_passes(self):
+        self.write(WF, STEPS + "      - run: echo ok\n")
+        os.remove(os.path.join(self.repo.dir, WF))
+        self.assertPasses()
+
+    def test_the_per_line_scan_still_runs_when_the_joined_one_finds_nothing(self):
+        self.write(WF, STEPS + "      - run: ruff check --ignore E501 .\n")
+        self.assertFails(f"{MARK}: {WF}:4:", PATH=self.fake_awk("cat >/dev/null; exit 0"))
+
+
 class NeighbourTests(FoldCase):
     def test_allowed_or_separate_lines_pass(self):
         self.passes([
