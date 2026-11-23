@@ -261,7 +261,7 @@ def paths(svg):
 
 
 def segments(pts):
-    return [(a, b) for a, b in zip(pts, pts[1:]) if a != b]
+    return [(a, b) for a, b in zip(pts, pts[1:], strict=False) if a != b]
 
 
 def hits_interior(seg, rect):
@@ -355,15 +355,16 @@ class Routing(unittest.TestCase):
                             self.assertFalse(overlap(s1, s2), f"{e1} and {e2} overlap: {s1} {s2}")
 
     def test_arrows_that_share_a_gap_get_different_offsets(self):
-        """P1 and P2 both feed Q1 and Q2: four arrows through one gap, each with a track of its own."""
+        """A-01 and A-02 both feed A-03 and A-04: two arrows run level, the two that change row cover the same rows in one gap."""
         rows = [task("A-01", "A"), task("A-02", "A"), task("A-03", "A", deps=["A-01", "A-02"]), task("A-04", "A", deps=["A-01", "A-02"])]
         svg = svg_of(tasks_text(*rows, milestones=("A",)))
         xs = []
         for pts in paths(svg).values():
             verticals = [s for s in segments(pts) if s[0][0] == s[1][0]]
-            self.assertEqual(len(verticals), 1)
-            xs.append(verticals[0][0][0])
-        self.assertEqual(len(set(xs)), 4, xs)
+            self.assertLessEqual(len(verticals), 1)  # an arrow level with its target needs no vertical piece
+            xs += [v[0][0] for v in verticals]
+        self.assertEqual(len(xs), 2)
+        self.assertEqual(len(set(xs)), 2, xs)
 
     def test_a_chain_is_drawn_as_straight_lines(self):
         rows = [task(f"A-{i:02d}", "A", deps=[f"A-{i - 1:02d}"] if i > 1 else []) for i in range(1, 6)]

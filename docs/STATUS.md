@@ -48,9 +48,15 @@ It is written next to the SVG by `status_visual.py render` (`--graph` overrides 
 - **Not drawn**: a dependency on a done or dropped task (no node to point from), and a `milestone:Mx` dependency ("all of Mx", which
   has no single node). The legend counts both (like "80 dependencies on done or dropped tasks, 2 on whole milestones").
 - **Layout** is a deterministic layered layout in plain Python (no layout tool, no network): a task's column is the length of its
-  longest chain of open dependencies, so arrows run left to right; rows inside a band are ordered by a few barycentre sweeps.
-  The same input gives the same bytes, and there is no clock in the picture, so the publisher compares it byte for byte and
-  commits only when the graph really changed. A long arrow can pass behind the nodes it skips.
+  longest chain of open dependencies, so arrows run left to right. Inside a column the boxes are ordered by a few barycentre
+  sweeps (task M1-75), so connected tasks sit near each other; the order with the fewest arrow crossings wins, and it is never worse
+  than the order in `docs/tasks.toml`. A task sits level with its dependencies where it can, so a chain is one straight line.
+- **Arrow routing** (task M1-75): arrows are straight horizontal and vertical pieces that run in the gaps between columns and the
+  channels between rows, never through a box. A short arrow (to the next column) leaves its source, runs along a track in the gap and
+  arrives; a long one also runs along a track in the channel beside its source row. Arrows that share a gap or channel get tracks 4 px
+  apart, and the gaps grow to hold them; arrows on one side of a box leave and arrive at different heights. The same input gives the
+  same bytes, and there is no clock in the picture, so the publisher compares it byte for byte and commits only when the graph really
+  changed.
 - **Size**: the picture grows with the longest chain of open tasks (one column each). GitHub scales it to the README column (about
   830 px), so the text is drawn large enough (14 px) to stay at 9 px or more after scaling (tested for a 13-column chain with 6-character
   ids); click the image to open it at full size.
