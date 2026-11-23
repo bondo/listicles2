@@ -1415,13 +1415,33 @@ notes = "Tooling env, owner merge. Start only after PRs 248 and 245 have merged;
 
 [[task]]
 id = "M1-46"
-title = "build-logic convention plugins; no allprojects or subprojects configuration (issues 217 items 1-4, 48)"
+title = "build-logic convention plugins; no allprojects or subprojects configuration (issue 217 items 1-3)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-02"]
+notes = "After M1-02, so :core:data is the fourth module it covers. Issue 217 item 5 is M1-49. Split for the 600-line guard: the allprojects reads of issue 48 are M1-68, item 4 is M1-69"
+
+[[task]]
+id = "M1-68"
+title = "Root check tasks without cross-project reads: checkWarningsAsErrors, checkJdkRelease, checkJavaApiLevel per module from build-logic (issue 48)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-02"]
-notes = "After M1-02, so :core:data is the fourth module it covers. Issue 217 item 5 is M1-49"
+depends_on = ["M1-46"]
+notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins (needs a tooling change first: the guards script reads a check setting moved to another file as removed; PR 320 R1: accept such a move only when the added line is in a non-test source under build-logic/src/main/, outside a comment or string, with allow and deny cases in test_guards_sh.py, or do the one move under an owner-approved record; not 'key it by line') and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin)"
+
+[[task]]
+id = "M1-69"
+title = "Nested builds: dependency verification for the licensee fixture build (issue 217 item 4), check_gradle_repos.py over build-logic/settings.gradle.kts"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-46"]
+notes = "Split from M1-46. build-logic is an included build, so the root verification metadata already covers it; the fixture is a separate build run by testLicenseeGate"
 
 [[task]]
 id = "M1-47"
@@ -1440,7 +1460,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54"]
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-68", "M1-69"]
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]
@@ -1467,7 +1487,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-64", "M1-65", "M1-70",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70",
 ]
 
 [[task]]

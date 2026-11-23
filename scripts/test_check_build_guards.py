@@ -836,6 +836,106 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(self.run_cli(tree({})).returncode, 1)
 
 
+SETTINGS = 'include(":app", ":core:domain")\n'
+APP = 'plugins {\n    alias(libs.plugins.listicles.android.application)\n}\nandroid { defaultConfig { targetSdk = 37 } }\n'
+DOMAIN = 'plugins {\n    id("listicles.jvm.library")\n}\n'
+
+
+class Conventions(unittest.TestCase):
+    def problems(self, override=None):
+        files = {"settings.gradle.kts": SETTINGS, "app/build.gradle.kts": APP, "core/domain/build.gradle.kts": DOMAIN, **(override or {})}
+        return cbg.convention_problems(tree({k: v for k, v in files.items() if v is not None}))
+
+    def test_modules_on_one_convention_plugin_pass(self):
+        self.assertEqual(self.problems(), [])
+
+    def test_cross_project_configuration_is_flagged(self):
+        for code in (
+            "allprojects { repositories {} }",
+            "subprojects {\n    tasks.withType<Test>().configureEach {}\n}",
+            "rootProject.subprojects { }",
+            "allprojects(Action { })",
+            "configure(subprojects.filter { true }) { }",
+            "gradle.allprojects { }",
+            "gradle.beforeProject { }",
+            "gradle.lifecycle.beforeProject { }",
+            "gradle.afterProject { }",
+        ):
+            with self.subTest(code=code):
+                found = self.problems({"build.gradle.kts": code + "\n"})
+                self.assertEqual(len(found), 1, found)
+                self.assertRegex(found[0], r"^build\.gradle\.kts:\d+: configures other projects")
+
+    def test_build_logic_kotlin_must_not_configure_other_projects_or_set_target_sdk(self):
+        for src, want in (("fun f(p: Project) { p.allprojects { } }", "configures other projects"),
+                          ("fun f(a: ApplicationExtension) { a.defaultConfig.targetSdk = 30 }", "targetSdk in build-logic")):
+            with self.subTest(want=want):
+                found = self.problems({"build-logic/src/main/kotlin/P.kt": src + "\n"})
+                self.assertEqual(len(found), 1, found)
+                self.assertIn(f"build-logic/src/main/kotlin/P.kt:1: {want}", found[0])
+
+    def test_comments_strings_and_lookalikes_are_not_flagged(self):
+        code = (
+            "// allprojects { } minSdk\n/* subprojects { } jvmTarget */\nval s = \"allprojects { }\"\nval myallprojects = 1\n"
+            "fun mysubprojects(f: () -> Unit) = f()\nval n = allprojects.size\n"
+        )
+        self.assertEqual(self.problems({"build.gradle.kts": code, "core/domain/build.gradle.kts": DOMAIN + code}), [])
+
+    def test_a_module_without_a_convention_plugin_is_flagged(self):
+        found = self.problems({"core/domain/build.gradle.kts": 'plugins {\n    alias(libs.plugins.kotlin.jvm)\n}\n'})
+        self.assertEqual(found, ["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"])
+
+    def test_two_convention_plugins_or_a_commented_out_one_are_flagged(self):
+        for text, n in ((DOMAIN.replace("}", '    id("listicles.android.library")\n}'), 2), ('plugins {\n    // id("listicles.jvm.library")\n}\n', 0)):
+            with self.subTest(n=n):
+                self.assertEqual([f"core/domain/build.gradle.kts: applies {n} listicles convention plugins; apply exactly one (build-logic/)"],
+                                 self.problems({"core/domain/build.gradle.kts": text}))
+
+    def test_the_dependency_floors_plugin_is_not_a_module_convention(self):
+        # R1-03 (PR 320): a module with only listicles.dependency.floors gets none of the module conventions.
+        for text in ('plugins {\n    alias(libs.plugins.listicles.dependency.floors)\n}\n', 'plugins {\n    id("listicles.dependency.floors")\n}\n'):
+            with self.subTest(text=text):
+                self.assertEqual(["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"],
+                                 self.problems({"core/domain/build.gradle.kts": text}))
+
+    def test_a_module_without_a_build_file_is_flagged(self):
+        found = self.problems({"core/domain/build.gradle.kts": None})
+        self.assertEqual(found, [":core:domain: no build file at core/domain/build.gradle.kts"])
+
+    def test_a_groovy_build_file_counts(self):
+        self.assertEqual(self.problems({"core/domain/build.gradle.kts": None, "core/domain/build.gradle": DOMAIN}), [])
+
+    def test_settings_without_modules_is_flagged(self):
+        found = self.problems({"settings.gradle.kts": 'rootProject.name = "x"\n'})
+        self.assertEqual(found, ["settings.gradle.kts includes no module (the convention plugin check would pass vacuously)"])
+
+    def test_owned_settings_repeated_in_a_module_are_flagged(self):
+        for line, name in (
+            ("kotlin { compilerOptions { allWarningsAsErrors.set(true) } }", "allWarningsAsErrors"),
+            ("kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }", "jvmTarget"),
+            ("java { sourceCompatibility = JavaVersion.VERSION_17 }", "sourceCompatibility"),
+            ("android { compileOptions { targetCompatibility = JavaVersion.VERSION_17 } }", "targetCompatibility"),
+            ("kotlin { jvmToolchain(17) }", "jvmToolchain"),
+            ("android { compileSdk = 37 }", "compileSdk"),
+            ("android { defaultConfig { minSdk = 26 } }", "minSdk"),
+            ('kotlin { compilerOptions { freeCompilerArgs.add("-Xjdk-release=17") } }', "-Xjdk-release"),
+        ):
+            with self.subTest(name=name):
+                found = self.problems({"core/domain/build.gradle.kts": DOMAIN + line + "\n"})
+                self.assertEqual(len(found), 1, found)
+                self.assertRegex(found[0], rf"^core/domain/build\.gradle\.kts:4: {re.escape(name)} is set by the convention plugins")
+
+    def test_the_root_build_file_is_not_a_module(self):
+        self.assertEqual(self.problems({"build.gradle.kts": 'tasks.withType<Detekt>().configureEach { jvmTarget = "17" }\n'}), [])
+
+    def test_no_settings_file_skips_the_module_part(self):
+        self.assertEqual(cbg.convention_problems(tree({"app/build.gradle.kts": "android { compileSdk = 37 }\n"})), [])
+
+    def test_the_real_repository_has_four_modules_on_convention_plugins(self):
+        self.assertEqual(cbg.convention_problems(ROOT), [])
+        self.assertEqual(len(cbg.module_paths(ROOT)), 4)
+
+
 class Wiring(unittest.TestCase):
     def read(self, *parts):
         with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
