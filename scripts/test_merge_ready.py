@@ -1506,6 +1506,16 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual((code, api.requested, api.merged), (1, [], []))
         self.assertIn("merge_ready: no origin remote", text)
 
+    def test_the_fixtures_do_not_depend_on_github_repository(self):
+        """CI sets GITHUB_REPOSITORY to the real slug after a rename; tests pass `repo`, so any value (or none) gives the same result."""
+        for env in ({"GITHUB_REPOSITORY": "bondo/tally"}, {"GITHUB_REPOSITORY": "octo-org/other"}, {}):
+            api = make_api()
+            with self.subTest(env=env), mock.patch.dict(os.environ, env):  # restores the environment afterwards
+                if not env:
+                    os.environ.pop("GITHUB_REPOSITORY", None)
+                self.assertEqual(go(api)[0], 0)
+                self.assertEqual([m[0] for m in api.merged], [f"repos/{REPO}/pulls/{N}/merge"])
+
     def test_the_module_keeps_no_repository_constant(self):
         self.assertFalse(hasattr(merge_ready, "REPO"))
 
