@@ -31,9 +31,9 @@ private const val TEST_SETTINGS = "must run on the JUnit Platform with failOnNoD
  * The test-support modules: they run only on the host JDK (21), never on Android, and use its newer API on purpose
  * (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18). The one list (PR 349 R1-01):
  * only these may apply listicles.jvm.testsupport, every module's checkJdkRelease keeps them out of its non-test
- * configurations, and the root's checkJavaApiLevel skips them. Public, so the root build script reads it too.
+ * configurations, and they get no checkJavaApiLevel.
  */
-object TestSupportModules {
+internal object TestSupportModules {
     val paths: Set<String> = setOf(TEST_SUPPORT)
 }
 
@@ -131,4 +131,5 @@ internal fun Project.configureAndroidModule(pluginId: String) {
         compileOptions.targetCompatibility = JavaVersion.VERSION_17
     }
     configureKotlinModule(extensions.getByType<KotlinAndroidProjectExtension>().compilerOptions)
+    if (pluginId == "com.android.application") registerJavaApiLevelInputs()
 }

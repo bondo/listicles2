@@ -35,7 +35,7 @@ TESTS_CMD = "python3 -I scripts/test_check_ci_hardening.py"
 VERIFY_STEPS = (f"step ci-hardening-tests {TESTS_CMD}", f"step ci-hardening {CHECK_CMD}")
 PYTHON_WORD = re.compile(r"(?<![\w./-])(?:python3?|pip3?)(?![\w-])")
 NODE_WORD = re.compile(r"(?<![\w./-])(?:node|npm|npx)(?![\w-])")
-# Gradle tasks that run python3 in an Exec (checkUnitTestResults finalizes the unit-test tasks, checkJavaApiLevel in build.gradle.kts):
+# Gradle tasks that run python3 in an Exec (checkUnitTestResults finalizes the unit-test tasks, checkJavaApiLevel in build-logic ModuleChecks.kt):
 # a job that runs one of them needs the python pin although its commands never say `python3`. A fixed list, held to the build files by
 # the tests; `check` and `build` stay out (they would match build/ paths).
 GRADLE_PYTHON_TASKS = ("testDebugUnitTest", "verifyRoborazziDebug", "recordRoborazziDebug", "checkJavaApiLevel")

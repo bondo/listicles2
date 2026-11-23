@@ -29,11 +29,12 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    No Gradle file, or no dependency declaration in any `dependencies { }` block, fails too. Known gaps (it reads text, not the build):
    a coordinate held in a variable or with an interpolated group (`"$g:a:1"`), and a declaration made through a helper function.
 
-4. Convention plugins (M1-46, issue 217). No Gradle file or build-logic/ Kotlin source configures other projects (`allprojects`/`subprojects`
-   blocks or calls, `configure(allprojects ...)`, `gradle.allprojects`/`beforeProject`/`afterProject`). Every module in settings.gradle.kts
+4. Convention plugins (M1-46, issue 217). No Gradle file or build-logic/ Kotlin source reaches other projects: any use of `allprojects`,
+   `subprojects` or `childProjects` (also `getAllprojects()` and the like, so a read such as `allprojects.flatMap { ... }` too; M1-68 part B3,
+   issue 48), member access on or a configure block for `project(...)`/`findProject(...)`, `evaluationDependsOn`, and
+   `gradle.allprojects`/`beforeProject`/`afterProject`. A project dependency (`implementation(project(":x"))`) is fine. Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
-   Known gap: a read of other projects (`allprojects.flatMap { ... }`) is not caught (issue 48, M1-68).
    The root build's `val listiclesModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
    `listiclesChecks` by task path (aggregation_problems; M1-68 part B2: each module runs its own checks, the root reads none).
 
@@ -519,9 +520,13 @@ def catalog_problems(root):
 
 # -- 4. convention plugins (M1-46) -------------------------------------------------------------------------------------------------------
 
-# Configuration of other projects: an `allprojects`/`subprojects` block or call, `configure(allprojects ...)`, and the Gradle-level hooks.
+# Reaching other projects (M1-68 part B3): any use of the project sets (Kotlin property or Groovy getter), member access on or a configure
+# block for another project, evaluationDependsOn, and the Gradle-level hooks. String contents are blanked, so `project("...")` is
+# matched with its parentheses (one level of nesting, as in `project(mapOf(...))`).
 CROSS_PROJECT = re.compile(
-    r"(?<![\w$])(?:allprojects|subprojects)\s*[{(]|(?<![\w$])configure\s*\(\s*(?:allprojects|subprojects)\b"
+    r"(?<![\w$])(?:get)?(?:[aA]llprojects|[sS]ubprojects|[cC]hildProjects)(?![\w$])"
+    r"|(?<![\w$])(?:project|findProject)\s*\((?:[^()]|\([^()]*\))*\)\s*(?:\?\s*)?[.{]"
+    r"|(?<![\w$])evaluationDependsOn(?:Children)?\b"
     r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject)\b"
 )
 # What the convention plugins own; a module build file that sets one again makes a second copy that can drift. Since M1-68 part B
@@ -551,7 +556,7 @@ def convention_problems(root):
         text = strip(read(root, p), blank_strings=True)
         for m in CROSS_PROJECT.finditer(text):
             where = f"{p}:{line_of(text, m.start())}"
-            problems.append(f"{where}: configures other projects ({m.group().strip()}); move it into a convention plugin in build-logic/")
+            problems.append(f"{where}: reaches other projects ({m.group().strip()}); move it into a convention plugin in build-logic/")
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
                 problems.append(f"{p}:{line_of(text, m.start())}: {m.group()} in build-logic; set it in the module build file, where the floor guard reads it")
