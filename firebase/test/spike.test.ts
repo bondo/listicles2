@@ -72,13 +72,20 @@ const BLOCKS: [string, string, string][] = [
     ]),
     // An || operand that fails after 10 calls, then one that makes 10 calls on other documents.
     ["orFails", "get", `(${calls("get10", 10)} && false) || (${calls("writeA", 10)})`],
+    ["letCharged", "get", `unusedLet() || (${calls("writeB", 10)})`],
+    ["argCharged", "get", `unusedArg(${calls("writeA", 10)}) || (${calls("writeB", 10)})`],
+    ["andStops", "get", `(false && ${calls("writeA", 10)}) || (${calls("writeB", 10)})`],
 ];
 const LIMIT_RULES = BLOCKS.map(
     ([block, method, condition]) =>
         `\n    match /${block}/{id} {\n      allow ${method}: if signedIn() && (${condition});\n    }`,
 );
+// (e): a function whose unused let makes 10 calls, and one that never uses its argument.
+const EVALUATION = `
+    function unusedLet() { let x = ${calls("writeA", 10)}; return false; }
+    function unusedArg(x) { return false; }`;
 const SPIKE = fs.readFileSync(path.join(__dirname, "spike.rules"), "utf8");
-const RULES = h.underDocuments(h.RULES, `\n${SPIKE}${LIMIT_RULES.join("")}`);
+const RULES = h.underDocuments(h.RULES, `\n${SPIKE}${EVALUATION}${LIMIT_RULES.join("")}`);
 
 async function seed(docs: Record<string, object>): Promise<void> {
     await env.withSecurityRulesDisabled(async (admin) => {
@@ -172,7 +179,8 @@ describe("(a) the invite list query on householdId, with M(uid) and LIVE", () =>
 });
 
 // (b) PLAN 3.1 Join: one batch creates dan's member doc, deletes the invite and sets his users doc,
-// and each rule sees the others' writes through existsAfter and getAfter. Item (e): M1's largest batch.
+// and each rule sees the others' writes through existsAfter and getAfter. Item (e): M1's largest fixed
+// batch.
 describe("(b) the join batch, with existsAfter and getAfter", () => {
     interface Join {
         hid?: string;
@@ -342,9 +350,17 @@ describe("(e) the access-call limits in the emulator", () => {
         await h.verifiedOnly(alice, (db) => batch(db, Array<string>(21).fill("write1")));
     });
 
-    // So a rule's calls depend on its layout: ADR 0002 puts the path a batch takes first.
+    // So a rule's calls depend on its layout: ADR 0002 orders the paths so that those tried before a
+    // batch's own fail without a call.
     test("the calls of an || operand that fails count: 10 there and 10 after it, denied", async () => {
         await overLimit(alice.verified.doc("orFails/x").get());
+    });
+
+    // ADR 0002's layout rests on these, so a path's calls come after its call-free conditions.
+    test("charged: an unused let's calls and an unused argument's; not: those after false &&", async () => {
+        await overLimit(alice.verified.doc("letCharged/x").get());
+        await overLimit(alice.verified.doc("argCharged/x").get());
+        await h.verifiedOnly(alice, (db) => db.doc("andStops/x").get());
     });
 
     // Not the documented 10: an emulator test of a query proves nothing between 11 and 20 calls.
