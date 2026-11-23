@@ -24,6 +24,7 @@ const BOB = "bob";
 const CAROL = "carol";
 const DAN = "dan";
 const NEW = "Kq3ZtW9xLm2RbV7nPc4D"; // a Firestore auto-id: 20 of [A-Za-z0-9] (P3)
+const NEW2 = "Pz8YwV2nQs5TxK1mRc7B";
 const HOME = "household00000000001";
 const AWAY = "household00000000002";
 const TOMB = "household00000000003";
@@ -52,6 +53,7 @@ interface Create {
     owner?: Fields | null;
     ownerId?: string; // the owner member doc's id: the caller's unless named (P1)
     second?: Fields; // a member doc for bob as well (P1)
+    twin?: string; // a second household, with the caller's owner member doc, in the same batch
     users?: "update" | "set" | null; // set: a create when there is no users doc
 }
 
@@ -61,6 +63,10 @@ function create(db: h.Db, c: Create = {}, uid = ALICE): Promise<void> {
     if (c.household !== null) batch.set(db.doc(`households/${hid}`), c.household ?? household(uid));
     if (c.owner !== null) batch.set(db.doc(member(hid, c.ownerId ?? uid)), c.owner ?? OWNER);
     if (c.second !== undefined) batch.set(db.doc(member(hid, BOB)), c.second);
+    if (c.twin !== undefined) {
+        batch.set(db.doc(`households/${c.twin}`), household(uid));
+        batch.set(db.doc(member(c.twin, uid)), OWNER);
+    }
     if (c.users === "set") batch.set(db.doc(user(uid)), { householdId: hid });
     else if (c.users !== null) batch.update(db.doc(user(uid)), { householdId: hid });
     return batch.commit();
@@ -189,10 +195,12 @@ describe("Create household + owner (one batch)", () => {
 
     // The one-household check (PLAN 3.1): the users doc exists and holds null before the batch, the
     // new household after it; a stale value must be self-healed first. The users-doc rule also denies
-    // the rows with a users-doc write (hid1 -> hid2, or a create with a household): only the last
-    // row isolates householdId == null before the batch.
+    // the rows with a users-doc write (hid1 -> hid2, or a create with a household). The second row
+    // isolates householdId == hid after the batch (not just a value), the last householdId == null
+    // before it.
     test.each<[string, Record<string, Fields | null>, Create]>([
         ["without the users-doc write", {}, { users: null }],
+        ["with a second household and her owner member doc in it (HH-01)", {}, { twin: NEW2 }],
         ["with no users doc, the batch creating it", { [user()]: null }, { users: "set" }],
         ["with no users doc and no users-doc write", { [user()]: null }, { users: null }],
         [

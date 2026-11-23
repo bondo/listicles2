@@ -124,7 +124,9 @@ service cloud.firestore {
         && get(userDoc(request.auth.uid)).data.householdId == hid;
       allow create: if signedIn() && createsHousehold(hid);
 
-      // The caller's own member path in any household, live, a tombstone or none; it may not exist.
+      // get: the caller's own member path in any household, live, a tombstone or none; it may not
+      // exist. create and update: only as createsMember and updatesMember allow (the owner's doc
+      // before the household exists, the own displayName while it is live).
       match /members/{uid} {
         allow get: if signedIn() && request.auth.uid == uid;
         allow create: if signedIn() && createsMember(hid, uid);
