@@ -17,12 +17,12 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 GATE_MESSAGE = "JVM modules must compile against the JDK 17 API"
 KOTLIN_TASK = ":core:domain:compileKotlin"
 JAVA_TASK = ":core:domain:compileJava"
-
+# Groovy init script; the first %s is a project path, the second the statement run for that project after it is evaluated.
 # Groovy init script; %s is the statement run for the project with path ':core:domain' after it is evaluated.
 INIT = """
 allprojects {
     afterEvaluate { p ->
-        if (p.path == ':core:domain') {
+        if (p.path == '%s') {
             %s
         }
     }
@@ -46,12 +46,12 @@ JAVA_BAD = {
 }
 
 
-def gradle(*args, init=None):
+def gradle(*args, init=None, project=":core:domain"):
     cmd = [os.path.join(ROOT, "gradlew"), "-q", "--console=plain", "--no-daemon", *args]
     tmp = None
     if init is not None:
         with tempfile.NamedTemporaryFile("w", suffix=".init.gradle", delete=False) as tmp:
-            tmp.write(INIT % init)
+            tmp.write(INIT % (project, init))
         cmd += ["-I", tmp.name]
     try:
         # Retry only Maven/Gradle 429 (rate limit) so a throttled download is not read as a test failure.
@@ -89,6 +89,16 @@ class JdkReleaseGateTest(unittest.TestCase):
         rc, out = gradle("detekt", "--dry-run")
         self.assertEqual(rc, 0, out)
         self.assertIn(":checkJdkRelease", out)
+        # M1-68 part B2: every module checks its own configurations (and a JVM library its compile tasks), run by task path.
+        for module in (":app", ":core:data", ":core:domain", ":core:testing"):
+            self.assertIn(f"{module}:checkJdkRelease SKIPPED", out)
+
+    def test_every_module_checks_its_own_configurations(self):
+        for module in (":app", ":core:data"):
+            with self.subTest(module=module):
+                rc, out = gradle(f"{module}:checkJdkRelease", init="p.dependencies.add('implementation', p.project(':core:testing'))", project=module)
+                self.assertNotEqual(rc, 0, f"gate accepted a main dependency on :core:testing in {module}:\n{out}")
+                self.assertIn(f"{module}:implementation -> :core:testing", out)
 
     def test_non_test_dependency_on_test_support_module_fails(self):
         rc, out = gradle("checkJdkRelease", init="p.dependencies.add('implementation', p.project(':core:testing'))")
