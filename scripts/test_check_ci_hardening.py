@@ -168,11 +168,16 @@ class Rules(unittest.TestCase):
     def test_the_gradle_tasks_that_run_python_are_still_those_in_the_build_files(self):
         app = (ROOT / "app/build.gradle.kts").read_text()
         checks = (ROOT / "build-logic/src/main/kotlin/ModuleChecks.kt").read_text()
+        root = (ROOT / "build.gradle.kts").read_text()
         self.assertIn('"python3"', app)
         self.assertIn("checkUnitTestResults", app)
         self.assertIn('executable = "python3"', checks)
         self.assertIn('"checkJavaApiLevel"', checks)
         self.assertTrue({"testDebugUnitTest", "verifyRoborazziDebug", "checkJavaApiLevel"} <= set(c.GRADLE_PYTHON_TASKS))
+        # M1-68 part B3: checkJavaApiLevel is in each JVM library module's listiclesChecks, which the root's detekt runs.
+        self.assertIn('dependsOn(warnings, release, "checkTestSettings", apiLevel)', checks)
+        self.assertIn('tasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }', root)
+        self.assertTrue({"detekt", "listiclesChecks"} <= set(c.GRADLE_PYTHON_TASKS))
 
     def test_npm_ci_never_runs_install_scripts(self):
         self.flagged(self.edit(CI, "npm ci --ignore-scripts --silent", "npm ci --silent"), "npm ci", "ignore-scripts")

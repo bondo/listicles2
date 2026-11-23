@@ -87,6 +87,14 @@ class WarningsGateTest(unittest.TestCase):
         )
         self.assertEqual(rc, 0, out)
 
+    def test_flags_that_only_mention_warnings_are_accepted(self):
+        # Issue 48's rules match prefixes (-Xsuppress-, -Xdont-warn, @), not any flag naming warnings or suppression.
+        rc, out = gradle(
+            "checkWarningsAsErrors",
+            init="compilerOptions.freeCompilerArgs.addAll(['-Xreport-all-warnings', '-Xno-suppress-x', '-Xwarn@x'])",
+        )
+        self.assertEqual(rc, 0, out)
+
     def test_broken_injection_is_not_mistaken_for_gate_rejection(self):
         # An injection that fails on its own (rc != 0, task path in the error) must not satisfy the negative tests.
         rc, out = gradle("checkWarningsAsErrors", init="compilerOptions.nope.set(true)")
