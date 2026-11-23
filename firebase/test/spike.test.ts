@@ -182,6 +182,7 @@ describe("(b) the join batch, with existsAfter and getAfter", () => {
         invite?: boolean;
         user?: boolean;
         stale?: string; // dan's householdId before the batch, not yet self-healed
+        burn?: string; // deletes this other invite too
     }
     const JOINER = { role: "member", displayName: "Dan", joinedAt: NOW };
     function join(db: h.Db, j: Join = {}): Promise<void> {
@@ -192,6 +193,7 @@ describe("(b) the join batch, with existsAfter and getAfter", () => {
         batch.set(db.doc(member(hid, DAN)), doc);
         if (j.other === true) batch.set(db.doc(member(hid, "zoe")), doc);
         if (j.invite !== false) batch.delete(db.doc(`invites/${via}`));
+        if (j.burn !== undefined) batch.delete(db.doc(`invites/${j.burn}`));
         if (j.user !== false) batch.update(db.doc(`users/${DAN}`), { householdId: hid });
         return batch.commit();
     }
@@ -205,6 +207,7 @@ describe("(b) the join batch, with existsAfter and getAfter", () => {
         ["without the users-doc set (one household)", { user: false }],
         ["with householdId still HOME, from before a removal", { stale: HOME, user: false }],
         ["with a member doc for another uid too (P1, #206)", { other: true }],
+        ["deleting another invite of the household too", { burn: code(HOME, "a") }],
         ["as owner", { doc: { role: "owner" } }],
         ["with a joinedAt that is not the request time", { doc: { joinedAt: T0 } }],
         ["with an expired invite", { via: code(HOME, "x") }],
@@ -339,12 +342,12 @@ describe("(e) the access-call limits in the emulator", () => {
         await h.verifiedOnly(alice, (db) => batch(db, Array<string>(21).fill("write1")));
     });
 
-    // Not the documented 10: an emulator test of a query proves nothing between 11 and 20 calls.
     // So a rule's calls depend on its layout: ADR 0002 puts the path a batch takes first.
     test("the calls of an || operand that fails count: 10 there and 10 after it, denied", async () => {
         await overLimit(alice.verified.doc("orFails/x").get());
     });
 
+    // Not the documented 10: an emulator test of a query proves nothing between 11 and 20 calls.
     test("a query: 20 calls allowed, 21 denied", async () => {
         await h.verifiedOnly(alice, (db) => db.collection("query20").get());
         await overLimit(alice.verified.collection("query21").get());
