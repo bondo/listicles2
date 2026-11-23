@@ -181,6 +181,10 @@ counting the reads added by P2 (household name on invite create) and P5 (tombsto
 fails, the fallback is to nest invites under the household, with a top-level
 `inviteCodes/{code} → hid` index used only for `get`; that index keeps P2 and P3 (it holds `householdName` with the
 same equality check, and its create rule has the same code check), with the Create invite row's allow and deny tests.
+**Spike result** ([ADR 0002](adr/0002-rules-spike.md)): (a) to (d) work in the emulator, so invites stay top level, and the
+invite list works in the shape decided on #280. (e), with every call counted (the emulator caches calls on one document, so
+it cannot show this): the join is the largest batch, 12 calls; Leave keeps at most 18 invite deletes in its batch and Remove
+member at most 14, any more go first in pages of up to 20; a cleanup page holds up to 20 deletes.
 
 [^calls]: https://firebase.google.com/docs/firestore/security/rules-conditions#access_call_limits
 
