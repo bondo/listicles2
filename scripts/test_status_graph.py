@@ -167,6 +167,15 @@ class Reduce(unittest.TestCase):
                 self.assertNotIn(b, closure(rest).get(a, set()))
 
 
+def dense_rows():
+    """12 columns of 4 owner tasks with 6-character ids (M1-O10 to M1-O57), each waiting on 3 of the previous column."""
+    def tid(c, k):
+        return f"M1-O{10 + 4 * c + k}"
+
+    return [task(tid(c, k), "M1", assignee="owner", deps=[tid(c - 1, (k + j) % 4) for j in range(3)] if c else [])
+            for c in range(12) for k in range(4)]
+
+
 class Layout(unittest.TestCase):
     def test_a_dependent_sits_to_the_right_of_its_dependency(self):
         found = nodes(svg_of())
@@ -217,6 +226,27 @@ class Layout(unittest.TestCase):
         sizes = {m.group(1): float(m.group(2)) for m in re.finditer(r"\.(n|s)\{font-size:(\d+)px", status_graph.CSS)}
         for cls, size in sizes.items():
             self.assertGreaterEqual(size * scale, 9.0, f"class {cls}: {size}px at scale {scale:.2f}")
+
+    def test_text_stays_legible_when_the_gaps_are_full_of_arrows(self):
+        """R1-02 of PR 338: gaps grow with the number of arrow tracks. 12 columns of 4 tasks with 6-character ids, each waiting on
+        3 of the previous column, must still scale to at least 9 px of text at the README width."""
+        rows = dense_rows()
+        svg = svg_of(tasks_text(*rows, milestones=("M1",)))
+        self.assertEqual(len(edges(svg)), 11 * 12)
+        width = float(ET.fromstring(svg).get("width"))
+        self.assertGreaterEqual(14 * min(1.0, 830 / width), 9.0, f"width {width}")
+        for pts in paths(svg).values():  # squeezing the tracks must keep the arrowhead room
+            self.assertGreaterEqual(pts[-1][0] - pts[-2][0], 8)
+
+    def test_squeezed_tracks_still_differ_and_never_overlap(self):
+        rows = dense_rows()
+        svg = svg_of(tasks_text(*rows, milestones=("M1",)))
+        found = list(paths(svg).items())
+        for i, (e1, p1) in enumerate(found):
+            for e2, p2 in found[i + 1:]:
+                for s1 in segments(p1):
+                    for s2 in segments(p2):
+                        self.assertFalse(overlap(s1, s2), f"{e1} and {e2}")
 
     def test_nodes_are_grouped_into_one_band_per_milestone(self):
         found = nodes(svg_of())
@@ -433,11 +463,21 @@ class Ordering(unittest.TestCase):
         graph, layer = graph_and_layer(random_text(9, 30))
         self.assertEqual(status_graph.order_cells(graph, layer), status_graph.order_cells(graph, layer))
 
-    def test_the_drawn_picture_has_fewer_crossings_than_the_input_order_would_give(self):
-        text = random_text(11, 30, density=0.2)
-        graph, layer = graph_and_layer(text)
-        shown = status_graph.crossings(graph, layer, status_graph.order_cells(graph, layer))
-        self.assertLessEqual(shown, status_graph.crossings(graph, layer, status_graph.order_cells(graph, layer, sweeps=0)))
+    def test_the_drawn_picture_uses_the_crossing_reduced_order(self):
+        """R1-01 of PR 338: render the fixture whose model order crosses (A-03 waits on A-02, A-04 on A-01); A-04 must be drawn above A-03."""
+        rows = [task("A-01", "A"), task("A-02", "A"), task("A-03", "A", deps=["A-02"]), task("A-04", "A", deps=["A-01"])]
+        found = nodes(svg_of(tasks_text(*rows, milestones=("A",))))
+        self.assertLess(box(found["A-04"])[1], box(found["A-03"])[1])
+        self.assertLess(box(found["A-01"])[1], box(found["A-02"])[1])
+
+    def test_every_column_is_drawn_in_the_order_order_cells_gives(self):
+        for seed in (11, 12, 13):
+            text = random_text(seed, 30, density=0.2)
+            graph, layer = graph_and_layer(text)
+            found = nodes(svg_of(text))
+            for (band, col), cell in status_graph.order_cells(graph, layer).items():
+                ys = [box(found[i])[1] for i in cell]
+                self.assertEqual(ys, sorted(ys), (seed, band, col))
 
 
 class Labels(unittest.TestCase):
