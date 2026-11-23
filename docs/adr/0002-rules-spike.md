@@ -11,9 +11,9 @@ accepted, and (e) every batch stays within the access-call limits: 10 `get`/`exi
 or write in a batch, and 20 per batch[^calls]. If (a) failed, invites would move under the household.
 
 ## How
-`firebase/test/spike.rules` holds one block per item, written from the PLAN 3.1 row with every access call of the row and
-each document read once per rule (`let`). `firebase/test/spike.test.ts` inserts the blocks under the documents match of
-`firebase/firestore.rules` and runs 45 allow and deny tests in one seeded world; item (e) adds blocks that only make n calls
+`firebase/test/spike.rules` holds one block per item, written from the PLAN 3.1 row with every access call of the row, in
+the layout of the Decision. `firebase/test/spike.test.ts` inserts the blocks under the documents match of
+`firebase/firestore.rules` and runs 46 allow and deny tests in one seeded world; item (e) adds blocks that only make n calls
 on n documents. The blocks are never deployed: `firestore.rules` is unchanged. A scratch mutation pass (each condition of the
 blocks dropped in turn), the self-review and review round 1 found five conditions no test caught; each now has a test.
 
@@ -24,7 +24,7 @@ blocks dropped in turn), the self-review and review round 1 found five condition
 | (b) | Works: in one batch the member create sees the invite deleted (`existsAfter`) and the users doc set (`getAfter`), the joiner's invite delete sees the new member doc (`getAfter`). Denied: either write missing, a stale `householdId` of the same household (rejoin before the self-heal, OQ-5), a second member doc (#206), another invite of the household deleted in the same batch, role `owner`, `joinedAt` not the request time, an expired invite, a creator who left, another household's invite, a tombstone; the invite's delete by a member whose doc names the code (P3's re-created code) and by a non-member outside a join. |
 | (c) | Works: the household update checks both roles after the batch, each role update the `ownerUid` after it. Denied: the household update alone, only one of the role updates, a plain member's whole batch, a non-member as new owner, a tombstone, another field on either document, the owner's role update alone. |
 | (d) | Works: `sharedWith == hid` for a member of the live household, and the creator's `createdBy == uid`. Denied: another household, a tombstone, `createdBy` another user, no filter. |
-| (e) | The emulator enforces 10 calls per single-document request and per write in a batch, and 20 per batch (permission denied, "Service call error"), and it charges the calls of an `||` operand that fails before the one that grants (a scratch run showed the same for allow statements, in source order). But it caches calls on one document, also across the writes of a batch (21 writes reading one document pass), and it allows a query 20 calls, not 10. So emulator tests prove counts of distinct documents only, and nothing for a query between 11 and 20 calls. The documentation says only that "some document access calls may be cached"[^calls]; the worst case, every call counted, is counted by hand below. |
+| (e) | The emulator enforces 10 calls per single-document request and per write in a batch, and 20 per batch (permission denied, "Service call error"), and it charges the calls of an `||` operand that fails before the one that grants (a scratch run showed the same for allow statements, in source order). A `let` is evaluated, and its calls charged, when its function runs, and an argument when its function is called, used or not (only an error in an unused one is ignored); `&&` skips its right operand. But it caches calls on one document, also across the writes of a batch (21 writes reading one document pass), and it allows a query 20 calls, not 10. So emulator tests prove counts of distinct documents only, and nothing for a query between 11 and 20 calls. The documentation says only that "some document access calls may be cached"[^calls]; the worst case, every call counted, is counted by hand below. |
 
 ### (e) Calls per batch, worst case
 Every call counted, no caching, from the PLAN 3.1 rows as the blocks write them. A write is charged its own path and every
@@ -35,7 +35,7 @@ spare (the join's member create: 7 of 10).
 | Batch (task) | Calls | Fits 10 / 20 |
 |---|---|---|
 | Join (M1-54) | member create 7, invite delete 3, users-doc set 2 (P5) = 12 | yes, the largest fixed batch |
-| Create household (M1-10) | household 2, owner member doc 5, users-doc set 2 = 9 | yes |
+| Create household (M1-10) | household 2, owner member doc 6 (the household `let`, then the row's `!exists`), users-doc set 2 = 10 | yes |
 | Transfer (M1-53) | household update 4, each role update 2 = 8 | yes |
 | Create invite (M1-12); query invites (M1-12) or lists (M2) | membership 1, household 1 (LIVE, P2's name or `O(uid)`) = 2 | yes |
 | Delete an invite (M1-12) | creator's, owner's or tombstone cleanup's 1, a member's expired cleanup 2, the joiner's 3 | yes |
@@ -60,12 +60,13 @@ spare (the join's member create: 7 of 10).
   and full allow and deny tests, delete it from `spike.rules` and keep `spike.test.ts` green; with the last block, the file
   and its insertion go and the tests run on `firestore.rules` alone.
 * Layout, which the counts rely on (M1-10 to M1-12, M1-53, M1-54, M2): each method of a match has one allow statement,
-  which reads the household at most once (`let`). Inside each path the conditions that make no call (document ids and the
-  caller, `createdBy`, `role`, `expiresAt`, the changed keys, and `ownerUid` and `deleted` from the `let`) come before its
-  `get`/`exists` calls. The paths go in this order, so each path tried before a batch's own fails without a call. Invite
-  delete: creator, owner, tombstone cleanup, a member's expired cleanup (`expiresAt` first), joiner. Member delete: Leave,
-  P6, tombstone cleanup, Remove. Member create: the owner's and the joiner's, told apart by `role`. Batches are sized to the
-  worst case above.
+  whose function reads the household once, in a `let` at its top: every path needs it, and a `let` is charged when its
+  function runs. Inside each path the conditions that make no call (document ids and the caller, `createdBy`, `role`,
+  `expiresAt`, the changed keys, and `ownerUid` and `deleted` from the `let`) come first; its `get`/`exists` calls follow in
+  its `&&` chain, inline or in an argument of a function called there, never in a `let`. The paths go in this order, so
+  each path tried before a batch's own fails without a call. Invite delete: creator, owner, tombstone cleanup, a member's
+  expired cleanup (`expiresAt` first), joiner. Member delete: Leave, P6, tombstone cleanup, Remove. Member create: the
+  owner's and the joiner's, told apart by `role`. Batches are sized to the worst case above.
 
 ## Consequences
 * M1-31: Leave keeps at most 8 of the leaver's invite deletes in its batch and Remove member at most 6 of the removed
