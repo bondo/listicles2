@@ -196,7 +196,7 @@ resolved is read with the long names only and fails with no escape hatch; its sh
   exit status is dropped (`jest || true`). vitest `--dir` and `--root` and jest `--rootDir` fail only when their value is a separate
   word (read as a path filter); written with `=` they pass.
 - playwright and cypress options (`--grep`, `--last-failed`, `--only-changed`, `--update-snapshots`): a tail resolved to them is read
-  with the long names and every short letter of jest and mocha, without positional words; a direct call is not read (task M1-77).
+  with the long names and every short letter of jest and mocha, without positional words; a direct call is not read (task M1-81).
 - yarn, pnpm and bun tails are never resolved (M1-65), so only their long runner options fail with no escape hatch. Their forms
   that pass arguments to the script without `--` (`yarn test --passWithNoTests`, `pnpm test -u`, `pnpm run test --passWithNoTests`) are
   not read at all, as in 2c (the repo is npm-only).

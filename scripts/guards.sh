@@ -535,7 +535,7 @@ function runopt(p,   n, w, k, a, r, i, dd, ds, vs, dl, pos, tl) {
   ds = vs = dl = ""; pos = 0
   for (i = 1; i <= NS[DDN]; i++) {
     a = NC[DDN, i]; sub(/^[ \t]*(npx[ \t]+)?/, "", a); sub(/[ \t].*$/, "", a)
-    if (a in RDS) { ds = ds RDS[a]; vs = vs RVS[a]; pos = 1 } else ds = ds RDS["jest"] RDS["mocha"]  # playwright, cypress: task M1-77
+    if (a in RDS) { ds = ds RDS[a]; vs = vs RVS[a]; pos = 1 } else ds = ds RDS["jest"] RDS["mocha"]  # playwright, cypress: task M1-81
     if (a == "mocha") dl = "spec "  # a spec in the tail, like a positional word, may replace the configured one
   }
   return rscan(dd, ds, vs, pos, 0, dl)
