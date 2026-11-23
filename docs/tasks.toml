@@ -957,12 +957,23 @@ notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py,
 id = "M1-65"
 title = "guards check 2c: npm `--` tail resolved through package.json scripts, fail closed by construction (issue 164 item 3)"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 330
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-42"]
 issue = 164
 notes = "Tooling env (scripts/guards.sh, scripts/hooks/test_guards_cli_flags.py, docs/guards-known-gaps.md). Escalation ruling PR 309 comment 7084379032: any \"scripts\" or \\u token in a package.json other than the one strict top-level layout makes every tail unknown; npm forms only; only a script whose last command is a plain [npx] <runner> <words> with no shell metacharacters is resolved. PR 309 R4-01 must be fixed here, with N1-N4 and C1-C2 from the ruling as failing tests; residual R3-03 belongs here. May reuse code from branch tooling/guards-2c-42. Owner merge: scripts/guards.sh"
+
+[[task]]
+id = "M1-71"
+title = "guards check 1: test-runner options that skip or rewrite tests on command lines (jest, vitest, mocha), direct or after an npm `--` tail"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-65"]
+notes = "Found in M1-65: check 1 reads --passWithNoTests, -t, testPathIgnorePatterns and kin in config files only, so `jest --passWithNoTests` in a script passes, and since M1-65 so does `npm test -- -u` when the test script is a plain jest. Decide with the owner which runner options count (snapshot update, name and path filters, onlyChanged, shard); tooling env, test-first with negative cases, keep it a tripwire (F18). Owner merge: scripts/guards.sh"
 
 [[task]]
 id = "M1-13"
@@ -1114,7 +1125,7 @@ notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose t
 id = "M1-26"
 title = "App Check: Play Integrity in release, debug provider in debug builds (not enforced)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-30"]
@@ -1432,7 +1443,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-46"]
-notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins (needs a tooling change first: the guards script reads a check setting moved to another file as removed; PR 320 R1: accept such a move only when the added line is in a non-test source under build-logic/src/main/, outside a comment or string, with allow and deny cases in test_guards_sh.py, or do the one move under an owner-approved record; not 'key it by line') and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin)"
+notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines"
 
 [[task]]
 id = "M1-69"
@@ -1489,7 +1500,7 @@ depends_on = [
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
-  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70",
+  "M1-62", "M1-63", "M1-64", "M1-65", "M1-68", "M1-69", "M1-70", "M1-71",
 ]
 
 [[task]]
