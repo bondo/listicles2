@@ -21,7 +21,7 @@ STATE = {
     "tasks_ref": "main",
     "usage": {"state": "ok", "read_at": "2026-11-23T05:25Z"},
     "sessions": [
-        {"id": S2, "role": "implementer", "branch": "m1/auth-data-14", "pr": 319, "tasks": ["M1-14"],
+        {"id": S2, "role": "implementer", "tags": ["batch:M1-14", "pr:319"], "branch": "m1/auth-data-14", "pr": 319, "tasks": ["M1-14"],
          "spawned": "2026-11-23T01:00Z", "expects": "WORKER-RESULT + push", "checked": "2026-11-23T06:00Z",
          "status": "running", "note": "fixing the conflict"},
     ],
@@ -143,11 +143,13 @@ class SchemaTest(unittest.TestCase):
         self.assert_error(changed("next", DELETE), "missing field 'next'")
         self.assert_error(changed("branches.0.reviewed_through", DELETE), "branches[0]: missing field 'reviewed_through'")
         self.assert_error(changed("orchestrator.depth", DELETE), "orchestrator: missing field 'depth'")
+        self.assert_error(changed("sessions.0.tags", DELETE), "sessions[0]: missing field 'tags'")
 
     def test_wrong_types(self):
         self.assert_error(changed("orchestrator.depth", "4"), "orchestrator.depth: expected a whole number")
         self.assert_error(changed("sessions.0.pr", True), "sessions[0].pr: expected a PR or issue number")
         self.assert_error(changed("sessions.0.tasks", "M1-14"), "sessions[0].tasks: expected a list")
+        self.assert_error(changed("sessions.0.tags", "pr:319"), "sessions[0].tags: expected a list")
         self.assert_error(changed("subscriptions", [319.0]), "subscriptions[0]: expected a PR or issue number")
         self.assert_error(changed("next", "do it"), "next: expected a list")
         self.assert_error(changed("sessions", {}), "sessions: expected a list")
@@ -161,6 +163,8 @@ class SchemaTest(unittest.TestCase):
 
     def test_formats(self):
         self.assert_error(changed("updated.at", "2026-11-23 06:10"), "updated.at: expected a UTC time")
+        self.assert_error(changed("updated.at", "2026-13-45T99:99Z"), "updated.at: expected a UTC time")
+        self.assert_error(changed("sessions.0.tags", ["pr 319"]), "sessions[0].tags[0]: expected a session tag")
         self.assert_error(changed("orchestrator.session", "sess_1"), "orchestrator.session: expected a session id")
         self.assert_error(changed("sessions.0.tasks", ["m1-14"]), "sessions[0].tasks[0]: expected a task id")
         self.assert_error(changed("branches.0.reviewed_through", "zzz"), "reviewed_through: expected a commit SHA")
@@ -171,6 +175,7 @@ class SchemaTest(unittest.TestCase):
         self.assert_error(changed("sessions.0.role", "Implementer!"), "sessions[0].role: expected a role")
 
     def test_next_holds_one_to_three_actions(self):
+        self.assertEqual(errors(body(changed("next", ["a", "b", "c"]))), "")
         self.assert_error(changed("next", []), "next: expected 1 to 3 items")
         self.assert_error(changed("next", ["a", "b", "c", "d"]), "next: expected 1 to 3 items")
 
@@ -224,6 +229,15 @@ class CliTest(unittest.TestCase):
         code, _, err = run_cli("validate", "/nonexistent/state.md")
         self.assertEqual(code, 1)
         self.assertIn("cannot read", err)
+
+    def test_a_body_that_is_not_utf8_is_an_error_not_a_traceback(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        path = Path(d.name, "state.md")
+        path.write_bytes(b"\xff\xfe```json\n")
+        code, _, err = run_cli("validate", str(path))
+        self.assertEqual(code, 1)
+        self.assertIn(f"error: cannot read {path}: not UTF-8", err)
 
     def test_empty_input_is_an_error_not_an_empty_state(self):
         code, _, err = run_cli("validate", "-", stdin="")
