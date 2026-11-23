@@ -20,9 +20,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SLUG = r"(?P<slug>[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100})"
 USER = r"(?:[^@/\s]+@)?"
+SCP_USER = r"(?:[^@/:\s]+@)?"  # in git@github.com:O/N a colon before the @ would make the text before it the host
 FORMS = [re.compile(p + SLUG + r"/?") for p in (
     rf"https?://{USER}(?:www\.)?github\.com/",
-    rf"{USER}github\.com:",
+    rf"{SCP_USER}github\.com:",
     rf"ssh://{USER}github\.com(?::\d{{1,5}})?/",
     rf"https?://{USER}(?:127\.0\.0\.1|localhost)(?::\d{{1,5}})?/git/",
 )]
