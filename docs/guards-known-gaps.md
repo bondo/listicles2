@@ -146,10 +146,14 @@ or as a folded block with the reason on each line.
   block) leaves the tool and the flag on two lines; the same holds in a shell script. The line scan has no shell parser.
 - A reason on one line of a folded block does not waive it, even when its `#` makes the shell drop the rest (`ruff check --ignore E501 .
   # justified: ...` and then `&& echo ok`): a false positive the per-line check did not have; put the reason on each line.
-- A folded block whose lines are all more indented than its explicit indentation indicator (`run: >1` with the lines at +3) is joined
-  although YAML keeps the breaks: a false positive, never a miss. A flow mapping joined over lines lets a flag in another entry count for
+- A run of equally indented lines of a folded block that are more indented than the block's own lines (`echo a` and then
+  `  ruff check` and `  --ignore E501 .`, or every line with an explicit indicator such as `run: >1` at +3) is joined although YAML
+  keeps the breaks: a false positive, never a miss. A flow mapping joined over lines lets a flag in another entry count for
   the tool (`- {run: ruff check, name: x` and `--fix}`), as on one line.
 - The single-line forms that the per-line check reads as before still pass there; the joined run reads them decoded, so a double-quoted
   `"ruff check \x2d-fix"` now fails.
-- Complex keys (`? run` and `: value` over lines) and keys with an anchor or tag before them are read as plain lines.
+- Complex keys (`? run` and `: value` over lines) are read as plain lines.
+- A one-line double-quoted value whose reason exists only after escape decoding (`"ruff check \x2d-fix \x6austified: three words here"`)
+  passes: a reason is cleared only from a value joined over several lines. It takes two deliberate escapes; accepted residual of
+  PR 325 review round 1 (R1-04, the guard is a tripwire, F18), not a regression from main, which does not decode at all.
 

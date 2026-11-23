@@ -667,7 +667,7 @@ END {
     l = L[i]
     if (l ~ /^[ \t]*(#|$)/ || l ~ /^(---|\.\.\.)([ \t]|$)/) { i++; continue }
     r = l; sub(/^[ \t]*/, "", r); while (r ~ /^-([ \t]|$)/) sub(/^-[ \t]*/, "", r)
-    c = length(l) - length(r); dash = (c > yi(l))
+    dash = (length(l) - length(r) > yi(l)); r = notag(r); c = length(l) - length(r)
     k = 0
     if (r ~ /^"/ && match(r, /^"([^"\\]|\\.)*"[ \t]*:([ \t]|$)/)) k = RLENGTH
     else if (r ~ /^\047/ && match(r, /^\047[^\047]*\047[ \t]*:([ \t]|$)/)) k = RLENGTH
@@ -680,6 +680,7 @@ END {
       if (v ~ /^(#|$)/) { PK = c; PH = i; i++; continue }
       i = (PE ? yent(i, i, c + k + 1, c) : yval(i, c + k + 1, c)); continue
     }
+    if (dash && r ~ /^(#|$)/) { PK = yi(l); PH = i; PE = 0; i++; continue }  # `-` or `- &x` alone: a mapping or a value follows (R1-01)
     if (dash) { i = yval(i, c + 1, yi(l)); continue }
     i = (yi(l) ? yval(i, c + 1, yi(l) - 1) : i + 1)
   }
@@ -692,7 +693,8 @@ cliflags() { # cliflags <pathspec>...
     else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
     case "$f" in *.yml | *.yaml) # the joined lines, in addition to the lines above; a fold scan that cannot run fails (no quiet gap)
       if [ "$STAGED" = 1 ]; then y=$(git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK")
-      else y=$(LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" "$f"); fi || { echo "$f:0: the YAML fold scan failed"; continue; }
+      elif [ -f "$f" ]; then y=$(LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" "$f")
+      else continue; fi || { echo "$f:0: the YAML fold scan failed"; continue; }  # a file missing from the tree has nothing to scan (R1-02)
       printf '%s\n' "$y" | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
     esac
   done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++' | sed 's/^/guard: unjustified CLI flag: /'
