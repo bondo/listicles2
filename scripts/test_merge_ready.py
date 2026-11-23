@@ -1131,6 +1131,86 @@ class OwnerBatchTests(unittest.TestCase):
         self.refused(api, r"closing keyword")
 
 
+class StateIssueRotationTests(unittest.TestCase):
+    """M1-78, owner decision #15 7076313976: after a rotation an approval on the current or the previous state issue counts, nothing else; the owner,
+    unedited and anchored-line checks still hold on both. The pointer (STATE_ISSUE, PREVIOUS_STATE_ISSUE) moves in an owner-merged PR."""
+
+    OK = f"#{N}@{C1[:7]}"
+
+    def rotated(self, current=400, previous=15):
+        return mock.patch.multiple(merge_ready, STATE_ISSUE=current, PREVIOUS_STATE_ISSUE=previous)
+
+    def code(self, comment):
+        api = batch_api(comment=comment)
+        code, text = go_batch(api)
+        return code, text, api.merged
+
+    def test_after_a_rotation_the_current_and_the_previous_issue_are_accepted(self):
+        with self.rotated():
+            for issue in (400, 15):
+                with self.subTest(issue=issue):
+                    code, text, merged = self.code(approval_comment(self.OK, issue=issue))
+                    self.assertEqual((code, len(merged)), (0, 1), text)
+
+    def test_after_a_rotation_any_other_issue_is_refused(self):
+        with self.rotated():
+            for issue in (16, 150, 115, 1, 40, 401, 4000, 399):
+                with self.subTest(issue=issue):
+                    code, text, merged = self.code(approval_comment(self.OK, issue=issue))
+                    self.assertEqual((code, merged), (1, []), text)
+                    self.assertRegex(text, r"not on the state issue #400 or the previous state issue #15")
+
+    def test_before_the_first_rotation_only_the_current_issue_counts(self):
+        with self.rotated(current=15, previous=None):
+            self.assertEqual(self.code(approval_comment(self.OK, issue=15))[0], 0)
+            code, text, merged = self.code(approval_comment(self.OK, issue=16))
+            self.assertEqual((code, merged), (1, []), text)
+            self.assertRegex(text, r"not on the state issue #15")
+            self.assertNotIn("previous", text)
+
+    def test_an_approval_on_either_issue_still_needs_the_owner_an_unedited_comment_and_the_anchored_line(self):
+        cases = {"login": ({"login": "mallory"}, r"is not by the owner"), "association": ({"assoc": "NONE"}, r"is not by the owner"),
+                 "edited": ({"edited": True}, r"was edited after it was posted"),
+                 "not anchored": ({"line": f"asking for batch approval: {self.OK}"}, r"is not an anchored `batch approval:")}
+        with self.rotated():
+            for issue in (400, 15):
+                for name, (kw, reason) in cases.items():
+                    with self.subTest(name, issue=issue):
+                        code, text, merged = self.code(approval_comment("" if "line" in kw else self.OK, issue=issue, **kw))
+                        self.assertEqual((code, merged), (1, []), text)
+                        self.assertRegex(text, reason)
+
+    def test_an_issue_url_of_another_repository_or_another_shape_is_refused(self):  # endswith("/issues/15") alone would accept these
+        urls = {"other repo": "https://api.github.com/repos/mallory/listicles2/issues/15",
+                "repo suffix": f"https://api.github.com/repos/{REPO}x/issues/15", "repo prefix": f"https://api.github.com/repos/x{REPO}/issues/15",
+                "trailing slash": f"https://api.github.com/repos/{REPO}/issues/15/", "pull path": f"https://api.github.com/repos/{REPO}/pulls/15",
+                "leading zero": f"https://api.github.com/repos/{REPO}/issues/015", "empty": "", "missing": None}
+        with self.rotated(current=15, previous=None):
+            for name, url in urls.items():
+                with self.subTest(name):
+                    comment = approval_comment(self.OK)
+                    if url is None:
+                        del comment["issue_url"]
+                    else:
+                        comment["issue_url"] = url
+                    code, text, merged = self.code(comment)
+                    self.assertEqual((code, merged), (1, []), text)
+                    self.assertRegex(text, r"not on the state issue")
+
+    def test_the_pointer_names_two_different_issues_or_only_the_current_one(self):
+        cur, prev = merge_ready.STATE_ISSUE, merge_ready.PREVIOUS_STATE_ISSUE
+        self.assertTrue(type(cur) is int and cur > 0, cur)
+        self.assertTrue(prev is None or (type(prev) is int and 0 < prev != cur), prev)
+        self.assertEqual(merge_ready.state_issues(), (cur,) if prev is None else (cur, prev))
+
+    def test_a_bad_pointer_refuses_every_approval(self):  # a typo in the rotation PR must fail closed, not open
+        for cur, prev in ((15, 15), (0, None), (None, 15), ("15", None), (True, None), (400, "15"), (400, 0), (-1, 15)):
+            with self.subTest(cur=cur, prev=prev), self.rotated(current=cur, previous=prev):
+                code, text, merged = self.code(approval_comment(self.OK, issue=15))
+                self.assertEqual((code, merged), (1, []), text)
+                self.assertRegex(text, r"state issue pointer")
+
+
 class MergeTreeGitTests(unittest.TestCase):
     """R1-02 of #245 with real git: the merge agent's clean checkout fetches main and pull/N/head, and a merge of main after the approved
     sha is accepted only if its tree equals `git merge-tree --write-tree` of its two parents with no conflicts."""
@@ -1370,6 +1450,12 @@ class WiringTests(unittest.TestCase):
         doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md")).lower()
         self.assertNotRegex(doc.replace("is owner-only by default", "may merge as `general`"), self.R6_ALLOWLIST)
         self.assertNotRegex(doc.replace("is fail-closed", "is open"), self.R6_ALLOWLIST)
+
+    def test_docs_say_an_approval_may_sit_on_the_current_or_the_previous_state_issue(self):  # M1-78
+        doc = re.sub(r"\s+", " ", self.read("docs/ORCHESTRATION.md"))
+        self.assertIn("it must be the owner's account, on the current or the previous state issue (#15 until the first rotation; "
+                      "`STATE_ISSUE` and `PREVIOUS_STATE_ISSUE` in the script, moved by an owner-merged PR) and unedited", doc)
+        self.assertNotIn("it must be the owner's account, on #15 and unedited", doc)
 
     def test_wiring_helper_ignores_commented_lines(self):
         self.assertEqual(self.active("# step x\n  run: y\n"), ["run: y"])
