@@ -2,9 +2,12 @@
 .github/), --cache-dir; the guard denies them in every spelling and wrapper, and shell syntax that could expand into them
 (reviews R1-01, R2-01, R3-01..R3-04)."""
 
+import os
 import unittest
 
 from test_pretooluse_guard import repo, run
+
+ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))  # an absolute checkout path, wherever it is
 
 A = ".tools/bin/actionlint"
 Z = ".tools/bin/zizmor --offline"
@@ -14,7 +17,7 @@ HOSTILE = [
     f"{A} -shellcheck= -shellcheck=./x.sh f.yml", f"{A} -shellcheck=.tools/bin/shellcheck -pyflakes= -pyflakes=./x f.yml",
     f"{A} f.yml -shellcheck=./x.sh", f"{A} -color -shellcheck=./x.sh f.yml", f"{A} '-shellcheck=./x.sh' f.yml",
     f'{A} "-pyflakes=./x" f.yml', f'{A} -shell""check=./x f.yml', f"{A} -shell\\check=./x f.yml", f"{A} -init-config", f"{A} --init-config",
-    "actionlint -shellcheck=./x.sh f.yml", f"/home/user/listicles2/{A} -shellcheck=./x f.yml", f"./{A} -pyflakes=./x f.yml",
+    "actionlint -shellcheck=./x.sh f.yml", f"{ROOT}/{A} -shellcheck=./x f.yml", f"./{A} -pyflakes=./x f.yml",
     f"env X=1 {A} -shellcheck=./x f.yml", f"timeout 5 {A} -pyflakes=./x f.yml", f"nohup {A} -shellcheck=./x f.yml",
     f"echo f.yml | xargs {A} -shellcheck=./x", f"bash -c '{A} -shellcheck=./x f.yml'", f'sh -c "{A} -pyflakes=./x f.yml"',
     f"cd /tmp && {A} -pyflakes=./x f.yml", f"true; {A} -shellcheck=./x f.yml", f"find . -name '*.yml' -exec {A} -shellcheck=./x {{}} +",

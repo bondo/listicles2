@@ -104,7 +104,7 @@ class Guard(unittest.TestCase):
     def test_process_files(self):
         for t in ["Edit", "Write"]:
             for p in ["CLAUDE.md", "REVIEW.md", "agents/roles.yaml", ".claude/settings.json", ".github/workflows/ci.yml",
-                      "scripts/guards.sh", "scripts/hooks/pretooluse_guard.py", "scripts/merge_ready.py", "scripts/test_merge_ready.py",
+                      "scripts/guards.sh", "scripts/hooks/pretooluse_guard.py", "scripts/merge_ready.py", "scripts/test_merge_ready.py", "scripts/repo_slug.py",
                       "sub/../CLAUDE.md", os.path.join(self.d, "CLAUDE.md")]:
                 self.assertEqual(run(t, {"file_path": p}, self.d), 2, (t, p))
             for p in ["README.md", "app/src/Main.kt", "docs/PLAN.md", "scripts/verify.sh", "/tmp/x"]:
