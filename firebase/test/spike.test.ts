@@ -60,12 +60,25 @@ const LIMITS: Record<string, [string, number]> = {
 };
 const limitDocs = (block: string, n: number): string[] =>
     Array.from({ length: n }, (_, i) => `limits/${block}-${String(i)}`);
-const BLOCKS = Object.entries(LIMITS).map(([block, [method, n]]) => {
-    const calls = limitDocs(block, n).map((p) => `exists(/databases/$(database)/documents/${p})`);
-    return `\n    match /${block}/{id} {\n      allow ${method}: if signedIn() && ${calls.join(" && ")};\n    }`;
-});
+const calls = (block: string, n: number): string =>
+    limitDocs(block, n)
+        .map((p) => `exists(/databases/$(database)/documents/${p})`)
+        .join(" && ");
+const BLOCKS: [string, string, string][] = [
+    ...Object.entries(LIMITS).map(([b, [method, n]]): [string, string, string] => [
+        b,
+        method,
+        calls(b, n),
+    ]),
+    // An || operand that fails after 10 calls, then one that makes 10 calls on other documents.
+    ["orFails", "get", `(${calls("get10", 10)} && false) || (${calls("writeA", 10)})`],
+];
+const LIMIT_RULES = BLOCKS.map(
+    ([block, method, condition]) =>
+        `\n    match /${block}/{id} {\n      allow ${method}: if signedIn() && (${condition});\n    }`,
+);
 const SPIKE = fs.readFileSync(path.join(__dirname, "spike.rules"), "utf8");
-const RULES = h.underDocuments(h.RULES, `\n${SPIKE}${BLOCKS.join("")}`);
+const RULES = h.underDocuments(h.RULES, `\n${SPIKE}${LIMIT_RULES.join("")}`);
 
 async function seed(docs: Record<string, object>): Promise<void> {
     await env.withSecurityRulesDisabled(async (admin) => {
@@ -141,6 +154,7 @@ describe("(a) the invite list query on householdId, with M(uid) and LIVE", () =>
 
     test.each<[string, (db: h.Db) => Query]>([
         ["a plain member, all of the household's", all],
+        ["a plain member, another's", (db) => all(db).where("createdBy", "==", BOB)],
         ["no householdId filter", (db) => invites(db).where("createdBy", "==", ALICE)],
         ["no filter", invites],
         ["a household she is no member of", (db) => mine(db, AWAY)],
@@ -282,6 +296,7 @@ describe("(d) the list query on sharedWith, with M(hid) and LIVE", () => {
     test.each<[string, (db: h.Db) => Query]>([
         ["sharedWith a household she is no member of", shared(AWAY)],
         ["sharedWith a tombstone, her member doc still there", shared(TOMB)],
+        ["createdBy another user", (db) => lists(db).where("createdBy", "==", BOB)],
         ["no filter", lists],
     ])("denied: %s", async (_what, query) => {
         await assertFails(query(alice.verified).get());
@@ -293,7 +308,8 @@ describe("(d) the list query on sharedWith, with M(hid) and LIVE", () => {
 describe("(e) the access-call limits in the emulator", () => {
     beforeEach(async () => {
         const docs = Object.entries(LIMITS).flatMap(([block, [, n]]) => limitDocs(block, n));
-        await seed(Object.fromEntries([...docs, "get10/x", "get11/x"].map((p) => [p, {}])));
+        const targets = ["get10/x", "get11/x", "orFails/x"];
+        await seed(Object.fromEntries([...docs, ...targets].map((p) => [p, {}])));
     });
     let created = 0; // a new document id for every create
     const batch = (db: h.Db, blocks: string[]): Promise<void> => {
@@ -324,6 +340,11 @@ describe("(e) the access-call limits in the emulator", () => {
     });
 
     // Not the documented 10: an emulator test of a query proves nothing between 11 and 20 calls.
+    // So a rule's calls depend on its layout: ADR 0002 puts the path a batch takes first.
+    test("the calls of an || operand that fails count: 10 there and 10 after it, denied", async () => {
+        await overLimit(alice.verified.doc("orFails/x").get());
+    });
+
     test("a query: 20 calls allowed, 21 denied", async () => {
         await h.verifiedOnly(alice, (db) => db.collection("query20").get());
         await overLimit(alice.verified.collection("query21").get());
