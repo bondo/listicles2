@@ -860,14 +860,26 @@ class Conventions(unittest.TestCase):
             "gradle.beforeProject { }",
             "gradle.lifecycle.beforeProject { }",
             "gradle.afterProject { }",
+            # M1-68 part B3 (issue 48): any use, a read too, and another project's configuration through project(...).
+            "val n = allprojects.size",
+            "val dirs = rootProject.allprojects.flatMap { it.layout.buildDirectory.get() }",
+            "subprojects.forEach { println(it) }",
+            "val kids = rootProject.getSubprojects()",
+            "val all = getAllprojects()",
+            "val kids = rootProject.childProjects",
+            "project(\":app\").pluginManager.withPlugin(\"x\") { }",
+            "project(\":app\") { }",
+            "project(path = \":app\").extensions",
+            "rootProject.findProject(\":app\")?.tasks",
+            "evaluationDependsOn(\":app\")",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
                 self.assertEqual(len(found), 1, found)
-                self.assertRegex(found[0], r"^build\.gradle\.kts:\d+: configures other projects")
+                self.assertRegex(found[0], r"^build\.gradle\.kts:\d+: reaches other projects")
 
     def test_build_logic_kotlin_must_not_configure_other_projects_or_set_target_sdk(self):
-        for src, want in (("fun f(p: Project) { p.allprojects { } }", "configures other projects"),
+        for src, want in (("fun f(p: Project) { p.allprojects { } }", "reaches other projects"),
                           ("fun f(a: ApplicationExtension) { a.defaultConfig.targetSdk = 30 }", "targetSdk in build-logic")):
             with self.subTest(want=want):
                 found = self.problems({"build-logic/src/main/kotlin/P.kt": src + "\n"})
@@ -877,7 +889,10 @@ class Conventions(unittest.TestCase):
     def test_comments_strings_and_lookalikes_are_not_flagged(self):
         code = (
             "// allprojects { } minSdk\n/* subprojects { } jvmTarget */\nval s = \"allprojects { }\"\nval myallprojects = 1\n"
-            "fun mysubprojects(f: () -> Unit) = f()\nval n = allprojects.size\n"
+            "fun mysubprojects(f: () -> Unit) = f()\nval allprojectsCount = 1\n"
+            # A project dependency is not a read of the other project's configuration.
+            "dependencies { implementation(project(\":core:domain\")) }\nval d = dependencies.project(mapOf(\"path\" to \":x\"))\n"
+            "dependencies { kover(project(path = \":app\")) }\nval subproject = project.path\n"
         )
         self.assertEqual(self.problems({"build.gradle.kts": code, "core/domain/build.gradle.kts": DOMAIN + code}), [])
 

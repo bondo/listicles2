@@ -43,6 +43,14 @@ BAD = {
     "warning-level-bare-last": "compilerOptions.freeCompilerArgs.add('-Xwarning-level')",
     "warning-level-uppercase-error": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:ERROR')",
     "xsuppress-warning": "compilerOptions.freeCompilerArgs.add('-Xsuppress-warning=DEPRECATION')",
+    # Issue 48 (PR 47 R2-03, R4-01, R4-02; M1-68 part B3): every -Xsuppress-* and -Xdont-warn* flag, and any @argfile, whose
+    # contents the gate cannot see (args.txt could hold -Xwarning-level=DEPRECATION:disabled).
+    "xsuppress-version-warnings": "compilerOptions.freeCompilerArgs.add('-Xsuppress-version-warnings')",
+    "xsuppress-other-flag": "compilerOptions.freeCompilerArgs.add('-Xsuppress-deprecated-jvm-target-warning')",
+    "xdont-warn-on-error-suppression": "compilerOptions.freeCompilerArgs.add('-Xdont-warn-on-error-suppression')",
+    "xdont-warn-other-flag": "compilerOptions.freeCompilerArgs.add('-Xdont-warn-anything')",
+    "argfile": "compilerOptions.freeCompilerArgs.add('@args.txt')",
+    "argfile-as-value": "compilerOptions.freeCompilerArgs.addAll(['-Xwarning-level', '@levels.txt'])",
 }
 
 
