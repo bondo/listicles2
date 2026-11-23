@@ -186,7 +186,8 @@ out=$(cfgcheck "$PYPAT" '*pyproject.toml' '*ruff.toml' '*mypy.ini' '*setup.cfg' 
 # ESLint --suppress-all, --suppress-rule, --suppressions-location and --pass-on-unpruned-suppressions write or read a suppressions file,
 # which is a baseline: no `justified:` waives them (check 3 has no escape hatch either).
 # In YAML the args-like keys of a step or hook (`with: args:`, `eslint_flags:`, pre-commit `args:`) are flags of the tool its `uses:`, `id:` or
-# `entry:` names (issue 164 item 2, yamlitem below). Not covered: YAML folded scalars (`run: >`), flags held in
+# `entry:` names (issue 164 item 2, yamlitem below). A YAML value over several lines (`run: >`, a plain or quoted scalar, a flow
+# collection) is checked once more as one line (YFOLD_AWK below). Not covered: flags held in
 # shell variables (`FLAGS="--ignore E501"; ruff check $FLAGS`), because a line scan cannot follow a variable, tools run from Python (subprocess),
 # and yarn, pnpm and bun forms that forward arguments without `--` (`yarn lint --quiet`; the repo is npm-only). Keep the list small: a flag
 # is added only with a reason a reviewer can check, in scripts/hooks/test_guards_cli_flags.py too (docs/guards-known-gaps.md has the rationale).
@@ -574,12 +575,129 @@ BEGIN { TSOK = "((^|/)(\\.\\.?|[^./= \t]+)/?$)|((tsconfig|jsconfig)[^/= \t]*\\.j
   if (!cont) flush()
 }
 END { flush(); if (YML) itemend() }'
+# YFOLD_AWK: prints a YAML file with each value that goes on over several lines joined into one line, as the runner reads it (issue 164
+# item 2). cliflags runs CLI_AWK on this text IN ADDITION to the file itself, so it can only add failures (PR 309 ruling 7084379032).
+# A group is a run of lines YAML joins with blanks: the lines of a plain or quoted scalar or a flow collection up to a blank line (a
+# line break), or the lines of equal indentation of a folded block (`>`; a more-indented line keeps its breaks). The group goes on
+# its first line and its other lines become blank, so line numbers hold. Double-quoted escapes are decoded (`\x2d` is `-`, `\n` a
+# command separator, an escaped line break joins with no blank). A reason waives a group only when every line of it has one.
+YFOLD_AWK='
+# yent: a pre-commit `entry:` (key on line h, value from line i) is split into words, so a line break is a blank there: the whole
+# value is one line on the key line, and a `#` in a block scalar is a word, not a comment.
+function yent(h, i, o, p,   j, m, g, e, w) {
+  j = yval(i, o, p); g = L[h]; sub(/[^ \t].*$/, "", g); e = h
+  for (m = h; m < j; m++) if (O[m] !~ /^[ \t]*$/) { w = O[m]; sub(/^[ \t]+/, "", w); if (YB && m > i) gsub(/#/, "\\#", w); g = g (e == h && m == h ? "" : " ") w; e = m }
+  put(h, e, g); return j
+}
+function yi(l) { sub(/[^ \t].*$/, "", l); return length(l) }
+function hexc(h,   i, n, k) {
+  n = 0
+  for (i = 1; i <= length(h); i++) { k = index("0123456789abcdef", tolower(substr(h, i, 1))); if (!k) return "?"; n = n * 16 + k - 1 }
+  return (n == 10 ? ";" : (n == 9 ? "\t" : (n >= 32 && n < 127 ? sprintf("%c", n) : "?")))
+}
+# yscan: the text of s as YAML reads it, tracking an open quote (Q), the flow depth (D) and a node start (NS) over lines. A quoted
+# scalar loses its quotes in block context and keeps them in a flow, where 2c splits a list on commas outside quotes. A node property
+# (`&a`, `!!str`) keeps the node start; in a flow a `:` right after a closing quote is a value indicator (`{"run":"x"}`). CM is set when
+# a comment starts (its text is kept outside a flow), EB when s ends with an escaped line break.
+function yscan(s,   i, n, c, t, h, jq) {
+  t = ""; CM = 0; EB = 0; n = length(s)
+  for (i = 1; i <= n; i++) {
+    c = substr(s, i, 1)
+    if (Q == "\"") {
+      if (c == "\"") { Q = ""; jq = 1; if (KQ) t = t c; continue }
+      if (c == "\\") {
+        if (i == n) { EB = 1; break }
+        c = substr(s, ++i, 1)
+        if (c == "x" || c == "u" || c == "U") { h = (c == "x" ? 2 : (c == "u" ? 4 : 8)); c = hexc(substr(s, i + 1, h)); i += h }
+        else if (c == "n") c = ";"; else if (c == "t") c = "\t"; else if (c == "\"" || c == "\\") { if (KQ) c = "\\" c } else if (c !~ /[ \/]/) c = "?"
+      }
+      t = t c; continue
+    }
+    if (Q == "\047") { if (c == "\047") { if (substr(s, i + 1, 1) != "\047") { Q = ""; jq = 1; if (KQ) t = t c; continue } i++; if (KQ) t = t c } t = t c; continue }
+    if (c ~ /[ \t]/) { t = t c; continue }
+    if (c == "#" && (i == 1 || substr(s, i - 1, 1) ~ /[ \t]/)) { CM = 1; return (D ? t : t substr(s, i)) }
+    if (NS && (c == "&" || c == "!")) { while (i < n && substr(s, i + 1, 1) !~ (D ? "[] \t,[{}]" : "[ \t]")) { t = t c; c = substr(s, ++i, 1) } t = t c; continue }
+    if (NS && (c == "\"" || c == "\047")) { Q = c; KQ = (D > 0); NS = 0; if (KQ) t = t c; continue }
+    else if ((NS || D) && (c == "[" || c == "{")) { D++; NS = 1 }
+    else if (D && (c == "]" || c == "}")) { D--; NS = 0 }
+    else if (D && (c == "," || (c == ":" && (jq || substr(s, i + 1, 1) ~ /^[] \t,}]?$/)))) NS = 1
+    else NS = 0
+    jq = 0; t = t c
+  }
+  return t
+}
+function notag(v) { while (v ~ /^[&!][^ \t]*([ \t]|$)/) sub(/^[&!][^ \t]*[ \t]*/, "", v); return v }
+# put: the group of lines a..b (text G) on line a, the others blank; a reason on only some lines of it is no reason (R2-01, Y1).
+function put(a, b, g,   i, ok) {
+  if (a < 0) return
+  ok = 1; for (i = a; i <= b; i++) if (L[i] !~ /^[ \t]*$/ && !just(L[i])) ok = 0
+  if (!ok && a < b) gsub(/justified:/, "justified-", g)
+  O[a] = g; for (i = a + 1; i <= b; i++) O[i] = ""
+}
+# yval: the value that starts at offset o of line i, under a parent at column p; returns the line after it. A plain value goes on over
+# lines indented more than p, up to a comment; a quoted value or a flow collection goes on until it closes.
+function yval(i, o, p,   v, w, j, a, e, g, pl, eb) {
+  v = substr(L[i], o); w = v; sub(/^[ \t]+/, "", w); w = notag(w); o += length(v) - length(w); v = w; a = -1; YB = (v ~ /^[|>]/)
+  if (v ~ /^[|>]/) {
+    for (j = i + 1; j <= N && (L[j] ~ /^[ \t]*$/ || yi(L[j]) > p); j++) if (v ~ /^>/) {
+      if (a >= 0 && (L[j] ~ /^[ \t]*$/ || yi(L[j]) != yi(L[a]))) { put(a, e, g); a = -1 }
+      if (L[j] ~ /^[ \t]*$/) continue
+      w = L[j]; sub(/^[ \t]+/, "", w)
+      if (a < 0) { a = j; g = L[j] } else g = g " " w
+      e = j
+    }
+    put(a, e, g); return j
+  }
+  Q = ""; D = 0; NS = 1; pl = (v !~ /^["\047[{]/); a = i; e = i; g = substr(L[i], 1, o - 1) yscan(v); eb = EB
+  for (j = i + 1; j <= N; j++) {
+    if (Q == "" && !D && (!pl || CM)) break
+    if (L[j] ~ /^[ \t]*$/) { put(a, e, g); a = -1; continue }
+    if (Q == "" && L[j] ~ /^[ \t]*#/) { if (!D) break; O[j] = ""; continue }
+    if (Q == "" && !D && yi(L[j]) <= p) break
+    w = L[j]; sub(/^[ \t]+/, "", w); w = yscan(w)
+    if (a < 0) { a = j; g = L[j]; sub(/[^ \t].*$/, "", g); g = g w } else g = g (eb ? "" : " ") w
+    eb = EB; e = j
+  }
+  put(a, e, g); return j
+}
+{ sub(/\r$/, ""); L[++N] = $0; O[N] = $0 }
+END {
+  PK = -1
+  for (i = 1; i <= N; ) {
+    l = L[i]
+    if (l ~ /^[ \t]*(#|$)/ || l ~ /^(---|\.\.\.)([ \t]|$)/) { i++; continue }
+    r = l; sub(/^[ \t]*/, "", r); while (r ~ /^-([ \t]|$)/) sub(/^-[ \t]*/, "", r)
+    dash = (length(l) - length(r) > yi(l)); r = notag(r); c = length(l) - length(r)
+    k = 0
+    if (r ~ /^"/ && match(r, /^"([^"\\]|\\.)*"[ \t]*:([ \t]|$)/)) k = RLENGTH
+    else if (r ~ /^\047/ && match(r, /^\047[^\047]*\047[ \t]*:([ \t]|$)/)) k = RLENGTH
+    else if (r ~ /^([^]["\047 \t#&*!|>%@`{},?:-]|[-?:][^ \t])/ && match(r, /:([ \t]|$)/) && substr(r, 1, RSTART) !~ /[ \t]#/) k = RSTART + RLENGTH - 1
+    if (PK >= 0 && yi(l) > PK && !k && !dash) { p = PK; PK = -1; i = (PE ? yent(PH, i, c + 1, p) : yval(i, c + 1, p)); continue }
+    PK = -1
+    if (k) {
+      PE = (F ~ /pre-commit-config\.yaml$/ && substr(r, 1, k) ~ /^["\047]?entry["\047]?[ \t]*:/)
+      v = notag(substr(r, k + 1)); sub(/^[ \t]+/, "", v)
+      if (v ~ /^(#|$)/) { PK = c; PH = i; i++; continue }
+      i = (PE ? yent(i, i, c + k + 1, c) : yval(i, c + k + 1, c)); continue
+    }
+    if (dash && r ~ /^(#|$)/) { PK = yi(l); PH = i; PE = 0; i++; continue }  # `-` or `- &x` alone: a mapping or a value follows (R1-01)
+    if (dash) { i = yval(i, c + 1, yi(l)); continue }
+    i = (yi(l) ? yval(i, c + 1, yi(l) - 1) : i + 1)
+  }
+  for (i = 1; i <= N; i++) print O[i]
+}'
 cliflags() { # cliflags <pathspec>...
-  local f
+  local f y
   while IFS= read -r f; do
     if [ "$STAGED" = 1 ]; then git show ":$f" 2>/dev/null | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK"
     else CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" "$f" 2>/dev/null; fi
-  done < <(git ls-files -- "$@" "${EXCL[@]}") | sed 's/^/guard: unjustified CLI flag: /'
+    case "$f" in *.yml | *.yaml) # the joined lines, in addition to the lines above; a fold scan that cannot run fails (no quiet gap)
+      if [ "$STAGED" = 1 ]; then y=$(git show ":$f" 2>/dev/null | LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK")
+      elif [ -f "$f" ]; then y=$(LC_ALL=C awk -v F="$f" "$JUSTFN$YFOLD_AWK" "$f")
+      else continue; fi || { echo "$f:0: the YAML fold scan failed"; continue; }  # a file missing from the tree has nothing to scan (R1-02)
+      printf '%s\n' "$y" | CLI_ALLOW="$CLI_ALLOW" LC_ALL=C awk -v F="$f" "$JUSTFN$CLI_AWK" ;;
+    esac
+  done < <(git ls-files -- "$@" "${EXCL[@]}") | awk '!seen[$0]++' | sed 's/^/guard: unjustified CLI flag: /'
 }
 out=$(cliflags '*.sh' '.githooks/*' '.github/workflows/*' '.github/actions/*' '*package.json' '*Makefile' '*makefile' '*.mk' '*pre-commit-config.yaml')
 [ -n "$out" ] && { echo "$out"; fail=1; }
