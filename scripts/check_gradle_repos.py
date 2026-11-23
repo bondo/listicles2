@@ -13,7 +13,6 @@ Settings it cannot read with confidence (an unterminated string or template) are
 Run: python3 -I scripts/check_gradle_repos.py  (exit 1 and one line per problem when the setup is off).
 """
 
-import hashlib
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -400,7 +399,6 @@ def check_verification(meta, props_text, verify_text=""):
 
 
 FIXTURE = "config/licensee/fixture"
-FIXTURE_GROUP = "fixture"
 LICENSEE = ("app.cash.licensee", "licensee-gradle-plugin")
 # Any way to tell Gradle to skip verification in the testLicenseeGate command: --dependency-verification, -F, -Dorg.gradle.dependency.verification.
 GATE_OFF = re.compile(r"dependency[-.]verification|\"-F\"")
@@ -410,31 +408,21 @@ def _relabel(problems, old, new):
     return [new + p[len(old) :] if p.startswith(old) else p for p in problems]
 
 
-def check_fixture_metadata(meta, poms, licensee_version):
+def check_fixture_metadata(meta, licensee_version):
     """Problems with the licensee fixture build's verification metadata (text, or None if missing).
 
     The fixture is a separate build run by testLicenseeGate, so the root metadata does not cover it. The file must pass the same
-    checks as the root one, hold the licensee plugin version of the catalog (a bump needs it regenerated, and this says so before
-    the gate does), and a sha256 equal to the file's for every POM under repo/ (poms maps (artifact, version) to its sha256)."""
+    checks as the root one and hold the licensee plugin version of the catalog (a bump needs it regenerated; this says so before
+    the gate does). Gradle verifies remote artifacts only, so the fixture's own repo/ POMs need no entries."""
     where = f"{FIXTURE}/gradle/{META}"
     problems = _relabel(check_verification(meta, ""), META, where)
     try:
         root = ET.fromstring(meta or "")
     except ET.ParseError:
         return problems  # missing or not XML, already reported
-    found = {}
-    for comp in (e for e in root.iter() if e.tag.rsplit("}", 1)[-1] == "component"):
-        names = {a.get("name"): [h.get("value") for h in a if h.tag.rsplit("}", 1)[-1] == "sha256"] for a in comp if a.tag.rsplit("}", 1)[-1] == "artifact"}
-        found[(comp.get("group"), comp.get("name"), comp.get("version"))] = names
-    if not any(g == LICENSEE[0] and n == LICENSEE[1] and v == licensee_version for g, n, v in found):
+    components = [e.attrib for e in root.iter() if e.tag.rsplit("}", 1)[-1] == "component"]
+    if not any((c.get("group"), c.get("name"), c.get("version")) == (*LICENSEE, licensee_version) for c in components):
         problems.append(f"{where}: no component {LICENSEE[0]}:{LICENSEE[1]} for licensee {licensee_version}")
-    for (artifact, version), digest in sorted(poms.items()):
-        pom = f"{artifact}-{version}.pom"
-        recorded = found.get((FIXTURE_GROUP, artifact, version), {}).get(pom)
-        if recorded is None:
-            problems.append(f"{where}: no sha256 for {FIXTURE_GROUP}:{artifact}:{version} ({pom})")
-        elif digest not in recorded:
-            problems.append(f"{where}: sha256 of {FIXTURE_GROUP}:{artifact}:{version} ({pom}) does not match the file")
     return problems
 
 
@@ -478,13 +466,10 @@ def main(root):
         off = [p for p in check_verification(None, fixture_props) if p.startswith("gradle.properties")]
         problems += _relabel(off, "gradle.properties", f"{FIXTURE}/gradle.properties")
     catalog = re.search(r'(?m)^licensee\s*=\s*"([^"]+)"', _read(root / "gradle" / "libs.versions.toml") or "")
-    poms = {}
-    for pom in sorted((root / FIXTURE / "repo" / FIXTURE_GROUP).glob("*/*/*.pom")):
-        poms[(pom.parent.parent.name, pom.parent.name)] = hashlib.sha256(pom.read_bytes()).hexdigest()
     if catalog is None:
         problems.append("gradle/libs.versions.toml: no licensee version")
     else:
-        problems += check_fixture_metadata(_read(root / FIXTURE / "gradle" / META), poms, catalog[1])
+        problems += check_fixture_metadata(_read(root / FIXTURE / "gradle" / META), catalog[1])
     problems += check_gate_command((root / "build.gradle.kts").read_text(encoding="utf-8"))
     for p in problems:
         print(f"gradle-repos: {p}")
