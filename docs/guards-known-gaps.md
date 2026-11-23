@@ -105,7 +105,7 @@ To add a flag: a line in `CLI_ALLOW` with its kind and reason, one allowed and o
 - A flag after `--` of `npm`, `npx` and kin is checked, also when the line names the tool (`npm run lint:eslint -- --quiet`), and passes
   when any of eslint, prettier and tsc lists it (tsc names read case-insensitively), unless the tail is known to reach a test runner
   (next section). So `npm run build -- --watch` with `build` running `node build.mjs` still needs a `justified:`.
-- YAML values over several lines (task M1-64, issue 164 item 2): see the next section for what the joined-line check leaves out.
+- YAML values over several lines (task M1-64, issue 164 item 2): see "Check 2c: YAML values over several lines" below for what the joined-line check leaves out.
 - Flags held in shell variables, tools run from Python (subprocess), and yarn, pnpm or bun forms without `--` (`bun run lint --quiet`).
 - A tool named as an argument of an installer is skipped by its first words; `xargs pip install` style wrappers are not recognised.
 - YAML args keys: a job-level reusable workflow (`uses: org/x/.github/workflows/ruff.yml@v1` with `with: args:`) is not a sequence item;
