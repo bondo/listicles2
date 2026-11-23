@@ -1714,20 +1714,72 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     # Owner decision on #15, comment 7005366747: a standing authorization replaces the per-window one of 7002904192 (R2-01 of #179).
     # R3-01 of #179: the record is a condition on merging, not a per-agent action.
+    # Owner decision on #15, comment 7085221356: a merge agent the orchestrator spawns and #15 names as active merges under it without
+    # an authorization in its own session, after checking the decision comment itself.
     STANDING = (r"merges under the owner's standing authorization \(#15 comment 7005366747, replacing the per-window rule of comment 7002904192\) "
-                r"until the owner revokes it there")
+                r"until the owner revokes it on #15")
+    ACTIVE = (r"when it carries the tag `role:merge-agent`, its `parent_session_id` is that orchestrator and the body of #15 names it as active, "
+              r"the merge agent " + STANDING)
+    VERIFY = (r"before its first merge it reads comment 7085221356 itself on #15 and checks that it is the owner's account, unedited, and that "
+              r"its first line starts with `decision \(owner` \(the same check as for a batch approval; the check proves the account, not the person\)")
+    OLD_RULE = r"owner authorizes it there|has no owner authorization in its own session|authorizing each new merge agent"
 
-    def test_standing_authorization_is_stated_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179, updated for 7005366747
+    def test_standing_authorization_is_stated_in_7_5_and_agrees_with_the_prompt(self):  # R1-02 of #179, updated for 7085221356
         doc = self.norm(self.ORCH_DOC).split("### 7.5 pull requests and the merge request", 1)[1].split("### 7.6", 1)[0]
-        self.assertRegex(doc, r"the owner authorizes it there before its first merge, and then the merge agent " + self.STANDING)
-        self.assertEqual(len(re.findall(r"owner authorizes it there", self.norm(self.ORCH_DOC))), 1)
+        self.assertRegex(doc, r"a merge agent the orchestrator spawns needs no owner authorization in its own session "
+                              r"\(owner decision, #15 comment 7085221356\): " + self.ACTIVE)
+        self.assertRegex(doc, self.VERIFY + r"; the orchestrator never passes an approval on to it; owner-only prs still need a batch approval, "
+                              r"`veto #n` still stops a merge and `scripts/merge_ready\.py` still runs every check")
         # orchestrator.md line 98 holds "guard thresholds", so the process guard rejects an edit of that line; the #15 record is the next line
         prompt = self.norm(self.ORCH_MD)
-        self.assertRegex(prompt, r"the owner authorizes it there before its first merge, and you never pass an approval on to it\.")
+        self.assertRegex(prompt, r"a merge agent you spawn needs no owner authorization in its own session \(#15 comment 7085221356\): "
+                                 r"it carries the tag `role:merge-agent`, its `parent_session_id` is you and the body of #15 names it as active; "
+                                 + self.VERIFY + r"; you never pass an approval on to it\.")
         self.assertRegex(prompt, r"the merge agent " + self.STANDING)
-        self.assertEqual(len(re.findall(r"owner authorizes it there", prompt)), 1)
-        for text in (doc, prompt):  # the per-window form is gone
-            self.assertNotRegex(text, r"one authorization covers exactly the time window|records a new authorization")
+        for text in (doc, prompt):  # the per-window form and the per-session one are gone
+            self.assertNotRegex(text, r"one authorization covers exactly the time window|records a new authorization|" + self.OLD_RULE)
+        self.assertNotRegex(self.norm(self.ORCH_DOC), self.OLD_RULE)
+
+    def test_the_old_per_session_rule_is_gone_from_every_process_file(self):  # 7085221356
+        for path in (self.ORCH_MD, self.ORCH_DOC, self.ROLES_YAML, ROOT / "docs" / "PLAN.md", ROOT / "REVIEW.md"):
+            with self.subTest(path=path.name):
+                self.assertNotRegex(self.norm(path), self.OLD_RULE)
+        for path in sorted((ROOT / "docs" / "reviews").glob("*.md")) + sorted(PROMPTS.glob("*.md")):
+            with self.subTest(path=path.name):
+                self.assertNotRegex(self.norm(path), self.OLD_RULE)
+
+    def test_the_other_places_state_the_new_rule(self):  # 7085221356: 1.1, 2.1 tags, roles.yaml
+        doc = self.norm(self.ORCH_DOC)
+        s11 = doc.split("### 1.1 autonomy and limits", 1)[1].split("**stop condition:**", 1)[0]
+        self.assertRegex(s11, r"the merge agent is described in §7\.5; once the body of #15 names it as active it merges under the owner's "
+                              r"standing authorization, with no authorization in its own session \(owner decision, #15 comment 7085221356\)")
+        self.assertRegex(s11, r"the one standing exception: a merge agent merges under the standing authorization 7005366747 by the owner's "
+                              r"decision 7085221356, which it reads and verifies itself on #15 \(§7\.5\); nothing is relayed")
+        self.assertRegex(doc, r"role:<role>\s+orchestrator \| implementer \| merge-agent \|")
+        self.assertRegex(doc, r"\*\*sessions\*\*: one row per live worker: id, role, tags, branch,.*a `merge-agent` row whose status is not "
+                              r"`archived` or `failed` is what names it as active \(§7\.5\)")
+        roles = self.ROLES_YAML.read_text(encoding="utf-8").split("  merge-agent:", 1)[1].split("\n  # ", 1)[0]
+        self.assertIn("merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent "
+                      "session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; "
+                      "it verifies 7085221356 itself before its first merge", roles)
+
+    def test_the_merge_agent_rule_flags_each_old_sentence_in_both_files(self):  # R1-01 of #322: the gate itself, not a copy of its regex
+        prompt, doc = self.ORCH_MD.read_text(encoding="utf-8"), self.ORCH_DOC.read_text(encoding="utf-8")
+
+        def ids(problems):
+            return {p.split(":", 1)[0] for p in problems}
+
+        self.assertNotIn("orch-merge-agent", ids(prompt_rules.check_text("orchestrator", prompt)))
+        self.assertNotIn("orch-merge-agent", ids(prompt_rules.check_doc_text("docs/ORCHESTRATION.md", doc)))
+        self.assertTrue(prompt_rules.OLD_MERGE_AGENT_AUTH)
+        for old in prompt_rules.OLD_MERGE_AGENT_AUTH:  # every entry is plain text, so it is also the sample that must be flagged
+            with self.subTest(old=old):
+                self.assertIn("orch-merge-agent", ids(prompt_rules.check_text("orchestrator", prompt + "\n" + old)))
+                self.assertIn("orch-merge-agent", ids(prompt_rules.check_doc_text("docs/ORCHESTRATION.md", doc + "\n" + old)))
+
+    @classmethod
+    def norm_text(cls, text):
+        return prompt_rules.normalize(text).lower()
 
     def test_no_per_merge_agent_unit_of_authorization_is_left(self):  # R2-01 of #179: no owner source states it
         for path in (self.ORCH_MD, self.ORCH_DOC, ROOT / "scripts" / "prompt_rules.py"):

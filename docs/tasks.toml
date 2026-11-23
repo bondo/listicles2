@@ -873,10 +873,11 @@ notes = "PLAN as amended by M1-35 (P4, P5, P9); the test harness rewrite is M1-5
 id = "M1-09"
 title = "Rules spike: PLAN 3.1 items a-e in the emulator, ADR 0002 with the results"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-08"]
+pr = 333
 
 [[task]]
 id = "M1-10"
@@ -1506,7 +1507,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-46"]
-notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines"
+notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines. Part B split again 2026-11-23 (400-line scope): part B1 (tooling/root-checks-68-b) moves useJUnitPlatform, failOnNoDiscoveredTests and :core:testing into the plugins with checkTestSettings per module (scripts/test_test_settings_gate.py) and records PR 329 R2-01 in docs/guards-known-gaps.md; the root check tasks per module and check 4 on any allprojects/subprojects use are the next PR(s)"
 
 [[task]]
 id = "M1-69"
@@ -1715,7 +1716,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); item writes per batch under the access-call limits, 5 when every call counts, and whether production caches calls on one document as the emulator does (ADR 0002, item e); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da)"
 
 [[task]]
 id = "M2-FU"

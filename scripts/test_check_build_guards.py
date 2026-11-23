@@ -919,6 +919,12 @@ class Conventions(unittest.TestCase):
             ("android { compileSdk = 37 }", "compileSdk"),
             ("android { defaultConfig { minSdk = 26 } }", "minSdk"),
             ('kotlin { compilerOptions { freeCompilerArgs.add("-Xjdk-release=17") } }', "-Xjdk-release"),
+            # M1-68 part B: the test settings and the test-support classpath come from the plugins too.
+            ("tasks.test { useJUnitPlatform() }", "useJUnitPlatform"),
+            ("android { testOptions { unitTests.all { it.useJUnitPlatform() } } }", "useJUnitPlatform"),
+            ("tasks.withType<Test>().configureEach { failOnNoDiscoveredTests = true }", "failOnNoDiscoveredTests"),
+            ('dependencies { testImplementation(project(":core:testing")) }', 'testImplementation(project(":core:testing"'),
+            ('dependencies { testImplementation(project(path = ":core:testing")) }', 'testImplementation(project(path = ":core:testing"'),
         ):
             with self.subTest(name=name):
                 found = self.problems({"core/domain/build.gradle.kts": DOMAIN + line + "\n"})
