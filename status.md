@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 51/95 (53%) | 44 |
+| M1 | Accounts and households | 52/95 (54%) | 43 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 51/95 done (53%), 44 open.
+**Progress:** 52/95 done (54%), 43 open.
 
 ### Tasks
 
@@ -185,7 +185,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-42 | guards check 2c&#58; actionlint flags and ruff --fix/--target-version, deferred nits (issues 164, 174) | done | M1-01 | implementer | [#321](https://github.com/bondo/listicles2/issues/321) |
 | M1-43 | prompt_rules.py&#58; sentence-level negation for the resolve-thread rule (issue 153) | done | M1-01 | implementer |  |
 | M1-44 | CI hardening nits&#58; job timeouts, pinned python and node, gitleaks download, npm install scripts … | done | M1-01 | implementer | [#331](https://github.com/bondo/listicles2/issues/331) |
-| M1-73 | Advanced CodeQL workflow&#58; java-kotlin with a Gradle build, plus actions, javascript-typescript a… | in progress | M1-01 | implementer | [#347](https://github.com/bondo/listicles2/issues/347) |
+| M1-73 | Advanced CodeQL workflow&#58; java-kotlin with a Gradle build, plus actions, javascript-typescript a… | done | M1-01 | implementer |  |
 | M1-74 | Hash-locked pip requirements for the lint tools (issue 189 item 5) | in progress | M1-44 | implementer | [#355](https://github.com/bondo/listicles2/issues/355) |
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/listicles2/issues/292) |
 | M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issue 217 items 1-3) | done | M1-02 | implementer |  |
@@ -245,25 +245,24 @@ flowchart LR
     n22["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n23["M1-76 Status graph styling: a colour-blind-sa… (in progress)"]:::progress
     n24["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n25["M1-73 Advanced CodeQL workflow: java-kotlin… (in progress)"]:::progress
-    n26["M1-74 Hash-locked pip requirements for the l… (in progress)"]:::progress
-    n27["M1-68 Root check tasks without cross-project… (ready)"]:::ready
-    n28["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n29["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n30["M1-80 State issue part A2: state_body.py rend… (in progress)"]:::progress
-    n31["M1-78 State issue part B: rotation (mileston… (ready)"]:::ready
-    n32["M1-79 State issue part C: ORCHESTRATION.md 2… (blocked)"]:::blocked
-    n33["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n34["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n35["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n36["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n37["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n38["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n39["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n40["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
-    n41["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
-    n42["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
-    n43["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
+    n25["M1-74 Hash-locked pip requirements for the l… (in progress)"]:::progress
+    n26["M1-68 Root check tasks without cross-project… (ready)"]:::ready
+    n27["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n28["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n29["M1-80 State issue part A2: state_body.py rend… (in progress)"]:::progress
+    n30["M1-78 State issue part B: rotation (mileston… (ready)"]:::ready
+    n31["M1-79 State issue part C: ORCHESTRATION.md 2… (blocked)"]:::blocked
+    n32["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n33["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n34["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n35["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n36["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n37["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n38["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n39["M1-O8 Turn on secret scanning non-provider pa… (owner to-do)"]:::owner
+    n40["M1-O9 Turn off CodeQL default setup when the… (owner to-do)"]:::owner
+    n41["M1-O11 Add the screenshots check to the main … (owner to-do)"]:::owner
+    n42["M1-O13 Add the release-smoke check to the ma… (owner to-do)"]:::owner
     n1 --> n0
     n21 --> n2
     n20 --> n2
@@ -287,7 +286,7 @@ flowchart LR
     n15 --> n16
     n14 --> n16
     n16 --> n17
-    n36 --> n17
+    n35 --> n17
     n6 --> n18
     n6 --> n19
     n1 --> n20
@@ -296,8 +295,25 @@ flowchart LR
     n10 --> n24
     n9 --> n24
     n18 --> n24
+    n8 --> n27
+    n9 --> n27
+    n12 --> n27
+    n13 --> n27
+    n14 --> n27
+    n15 --> n27
+    n17 --> n27
+    n18 --> n27
+    n19 --> n27
+    n16 --> n27
+    n24 --> n27
+    n0 --> n28
+    n1 --> n28
+    n2 --> n28
+    n3 --> n28
+    n7 --> n28
     n8 --> n28
     n9 --> n28
+    n10 --> n28
     n12 --> n28
     n13 --> n28
     n14 --> n28
@@ -305,71 +321,52 @@ flowchart LR
     n17 --> n28
     n18 --> n28
     n19 --> n28
+    n11 --> n28
     n16 --> n28
     n24 --> n28
-    n0 --> n29
-    n1 --> n29
-    n2 --> n29
-    n3 --> n29
-    n7 --> n29
-    n8 --> n29
-    n9 --> n29
-    n10 --> n29
-    n12 --> n29
-    n13 --> n29
-    n14 --> n29
-    n15 --> n29
-    n17 --> n29
-    n18 --> n29
-    n19 --> n29
-    n11 --> n29
-    n16 --> n29
-    n24 --> n29
-    n28 --> n29
-    n20 --> n29
-    n21 --> n29
-    n27 --> n29
-    n31 --> n32
+    n27 --> n28
+    n20 --> n28
+    n21 --> n28
+    n26 --> n28
+    n30 --> n31
+    n29 --> n31
+    n0 --> n32
+    n1 --> n32
+    n2 --> n32
+    n3 --> n32
+    n7 --> n32
+    n8 --> n32
+    n9 --> n32
+    n10 --> n32
+    n12 --> n32
+    n13 --> n32
+    n14 --> n32
+    n15 --> n32
+    n17 --> n32
+    n18 --> n32
+    n19 --> n32
+    n11 --> n32
+    n16 --> n32
+    n24 --> n32
+    n27 --> n32
+    n28 --> n32
+    n20 --> n32
+    n21 --> n32
+    n22 --> n32
+    n6 --> n32
+    n5 --> n32
+    n26 --> n32
+    n25 --> n32
+    n23 --> n32
     n30 --> n32
-    n0 --> n33
-    n1 --> n33
-    n2 --> n33
-    n3 --> n33
-    n7 --> n33
-    n8 --> n33
-    n9 --> n33
-    n10 --> n33
-    n12 --> n33
-    n13 --> n33
-    n14 --> n33
-    n15 --> n33
-    n17 --> n33
-    n18 --> n33
-    n19 --> n33
-    n11 --> n33
-    n16 --> n33
-    n24 --> n33
-    n28 --> n33
-    n29 --> n33
-    n20 --> n33
-    n21 --> n33
-    n22 --> n33
-    n6 --> n33
-    n5 --> n33
-    n27 --> n33
-    n25 --> n33
-    n26 --> n33
-    n23 --> n33
-    n31 --> n33
-    n32 --> n33
-    n30 --> n33
-    n4 --> n33
-    n34 --> n35
-    n34 --> n36
-    n34 --> n37
-    n34 --> n39
-    n2 --> n39
-    n25 --> n41
+    n31 --> n32
+    n29 --> n32
+    n4 --> n32
+    n33 --> n34
+    n33 --> n35
+    n33 --> n36
+    n33 --> n38
+    n2 --> n38
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -494,9 +491,8 @@ flowchart LR
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +8
 - **task** M1-48: waits on M1-06, M1-10, M1-11 +19
 - **task** M1-79: waits on M1-78, M1-80
-- **task** M1-FU: waits on M1-06, M1-10, M1-11 +30
+- **task** M1-FU: waits on M1-06, M1-10, M1-11 +29
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
 - **task** M1-O4: waits on M1-O1
 - **task** M1-O6: waits on M1-O1, M1-11
-- **task** M1-O9: waits on M1-73
