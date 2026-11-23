@@ -8,7 +8,8 @@ is the source; the summary is derived from it, so edit the block and run `render
 Usage:
   scripts/state_body.py validate [--comments N] BODY   exit 1 with every problem on stderr; BODY is a file or - for stdin.
       A valid body also gets one `rotate:` line per rotation limit it has passed (exit 0): a body of BODY_LIMIT bytes or more,
-      or N >= COMMENT_LIMIT comments (N from: gh api repos/bondo/listicles2/issues/15 --jq .comments). Owner decision 7076313976:
+      or N >= COMMENT_LIMIT comments (N from: gh api repos/bondo/listicles2/issues/<state issue> --jq .comments; #15 until the first
+      rotation, merge_ready.py STATE_ISSUE). Owner decision 7076313976:
       rotate then (or at milestone end) at the next handover boundary.
   scripts/state_body.py render BODY     print the body with the summary regenerated and the block in canonical form
 
@@ -291,10 +292,12 @@ def render(text: str) -> str:
 
 
 def read(path: str) -> str:
-    if path == "-":
-        return sys.stdin.read()
+    """The body as bytes decoded, line ends untouched (newline translation would drop the CR of a CRLF body and undercount its size)."""
     try:
-        return Path(path).read_text(encoding="utf-8")
+        if path == "-":
+            raw = getattr(sys.stdin, "buffer", None)
+            return raw.read().decode("utf-8") if raw is not None else sys.stdin.read()
+        return Path(path).read_bytes().decode("utf-8")
     except OSError as e:
         raise StateError([f"cannot read {path}: {e.strerror}"]) from None
     except UnicodeDecodeError:
