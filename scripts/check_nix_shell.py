@@ -6,9 +6,11 @@
 must equal the lockfile's. Two entry points share the definition in shell.nix: `nix develop` (flake.nix imports it) and `nix-shell` (no
 experimental features; the owner's workstation has flakes disabled), and shell.nix reads the nixpkgs pin from flake.lock.
 
-Static (default, no network): flake.nix has devShells.default for x86_64-linux, x86_64-darwin and aarch64-darwin, built from shell.nix,
+Static (default, no network): flake.nix has devShells.default for x86_64-linux, aarch64-linux, x86_64-darwin and aarch64-darwin, built from shell.nix,
 which installs from the lockfile and fetches the tarball flake.lock pins; flake.lock pins the nixpkgs URL in flake.nix by hash; verify.sh
-and ci.yml run this check and its tests.
+and ci.yml run this check and its tests, and the ci.yml step that downloads and runs the Nix installer keeps its https-only curl flags and a
+sha256 check before the install (the way the gitleaks download is guarded in scripts/check_ci_hardening.py). The deploy docs in
+docs/milestones/M1.md must not claim there is no firebase/.firebaserc while one exists (it names only the demo project).
 --live: runs both entry points (`firebase --version`) and compares each with the lockfile (needs nix and the nixpkgs and npm hosts; the CI
 `firebase` job runs it, verify.sh runs it when nix is installed).
 """
@@ -20,7 +22,7 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-SYSTEMS = ("x86_64-linux", "x86_64-darwin", "aarch64-darwin")
+SYSTEMS = ("x86_64-linux", "aarch64-linux", "x86_64-darwin", "aarch64-darwin")
 # Flakes are enabled per call, so the check does not depend on the machine's nix.conf; nix-shell needs no experimental feature.
 LIVE_CMDS = (
     ["nix", "--extra-experimental-features", "nix-command flakes", "develop", "-c", "firebase", "--version"],
@@ -99,6 +101,52 @@ def shell_problems(shell, pinned):
     return out
 
 
+def installer_problems(ci):
+    """The CI step that downloads the Nix release tarball and runs its installer (M1-96 review R1-01)."""
+    steps = re.split(r"(?m)^\s*- (?=\w+:)", active(ci))
+    step = next((t for t in steps if "/nix/nix-" in t and "install" in t), None)
+    if step is None:
+        return ["ci.yml has no step that installs Nix from the pinned release tarball (releases.nixos.org/nix/nix-X.Y.Z/...)"]
+    out = []
+    m = re.search(r"curl\b[^\n]*", step)
+    curl = m.group(0) if m else ""
+    if not re.search(r'https://releases\.nixos\.org/nix/nix-(\d+\.\d+\.\d+)/', curl):
+        out.append("ci.yml: the Nix installer must be downloaded with curl from https://releases.nixos.org/nix/nix-X.Y.Z/")
+    for flag in ("--proto", "--proto-redir"):
+        if not re.search(rf"{flag}\s+'?=https'?(?=\s)", curl):
+            out.append(f"ci.yml: the Nix installer download needs curl {flag} =https")
+    if not re.search(r"--retry\s+\d+", curl):
+        out.append("ci.yml: the Nix installer download needs curl --retry")
+    sha = re.search(r'(?m)^[^#\n]*echo\s+"[0-9a-f]{64}\s+\S+"\s*\|\s*sha256sum\s+(?:-c|--check)\b[^\n]*$', step)
+    if sha is None:
+        out.append("ci.yml: the Nix installer archive must be checked with `echo \"<64 hex sha256>  <file>\" | sha256sum --check`")
+    else:
+        if "||" in sha.group(0):
+            out.append("ci.yml: the Nix installer checksum result must not be ignored (|| ...)")
+        run = re.search(r"(?m)^[^#\n]*\binstall\b", step[sha.end():])
+        before = re.search(r"(?m)^[^#\n]*\bsh\b[^\n]*/install\b", step[: sha.start()])
+        if run is None or before:
+            out.append("ci.yml: the Nix installer must run after its sha256 check")
+    version = re.search(r"nix-(\d+\.\d+\.\d+)/", curl)
+    name = re.search(r"(?m)^\s*f=nix-(\d+\.\d+\.\d+)-", step)
+    if version and (name is None or name.group(1) != version.group(1)):
+        out.append("ci.yml: the Nix installer file name (f=nix-X.Y.Z-...) and the download URL version differ")
+    return out
+
+
+def deploy_docs_problems(m1, firebaserc_exists):
+    """docs/milestones/M1.md R7 (M1-96 review R1-02): firebase/.firebaserc names only the demo project, so the project is always passed."""
+    out = []
+    if "--project tally-c1a15" not in m1:
+        out.append("docs/milestones/M1.md: the deploy command must pass --project tally-c1a15")
+    if firebaserc_exists:
+        if re.search(r"no\W{0,4}`\.firebaserc`", m1):
+            out.append("docs/milestones/M1.md says there is no .firebaserc, but firebase/.firebaserc exists")
+        if "demo-tally" not in m1:
+            out.append("docs/milestones/M1.md: say that firebase/.firebaserc defaults to demo-tally, which is why --project is required")
+    return out
+
+
 def problems(flake, shell, lock, package_lock, verify, ci):
     out = []
     pinned = pinned_version(package_lock)
@@ -124,7 +172,7 @@ def problems(flake, shell, lock, package_lock, verify, ci):
     for script in CI_RUNS:
         if not re.search(rf"(?m)^\s*(?:-\s+)?run:\s+python3 -I {re.escape(script)}\s*$", w):
             out.append(f"ci.yml does not run `python3 -I {script}`")
-    return out
+    return out + installer_problems(ci)
 
 
 def live_problems(pinned, run):
@@ -170,6 +218,7 @@ def main(argv):
             read("scripts", "verify.sh"),
             read(".github", "workflows", "ci.yml"),
         )
+        found += deploy_docs_problems(read("docs", "milestones", "M1.md"), os.path.exists(os.path.join(ROOT, "firebase", ".firebaserc")))
     for p in found:
         print(f"nix-shell: {p}")
     return 1 if found else 0
