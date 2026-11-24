@@ -1,3 +1,4 @@
+import com.android.build.api.artifact.SingleArtifact
 import com.google.gms.googleservices.GoogleServicesTask
 import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
@@ -211,6 +212,19 @@ class TokensArgs(
     @get:InputFile @get:PathSensitive(PathSensitivity.NONE) val tokensFile: RegularFile,
 ) : CommandLineArgumentProvider {
     override fun asArguments() = listOf("-Dtally.tokensFile=${tokensFile.asFile.absolutePath}")
+}
+
+// PR 368 R1-01: ManifestSurfaceTest pins the merged release manifest, the one that ships. Release unit tests are off, so
+// every test task gets its path; the provider carries the merge task, and the file is an input by content.
+class ReleaseManifestArgs(
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) val manifest: Provider<RegularFile>,
+) : CommandLineArgumentProvider {
+    override fun asArguments() = listOf("-Dtally.releaseManifest=${manifest.get().asFile.absolutePath}")
+}
+
+androidComponents.onVariants(androidComponents.selector().withBuildType("release")) { variant ->
+    val manifest = variant.artifacts.get(SingleArtifact.MERGED_MANIFEST)
+    tasks.withType<Test>().configureEach { jvmArgumentProviders.add(ReleaseManifestArgs(manifest)) }
 }
 
 tasks.withType<Test>().configureEach {
