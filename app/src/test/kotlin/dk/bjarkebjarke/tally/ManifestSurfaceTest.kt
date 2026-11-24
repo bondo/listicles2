@@ -11,8 +11,9 @@ import javax.xml.parsers.DocumentBuilderFactory
 /**
  * PR 368 R1-01, S1-03 (checklist section 9: the fewest permissions, no component exported unless needed): the merged
  * release manifest, the one that ships, asks for exactly these permissions and exports exactly these components, each
- * with its reason. A dependency that brings another one fails here until app/src/main/AndroidManifest.xml removes it
- * or this test takes it with a reason. Release unit tests are off, so Gradle hands this test the release manifest.
+ * with its reason. A dependency that brings another one fails here until a manifest removes it (core/data's, for the
+ * libraries that module brings) or this test takes it with a reason. Release unit tests are off, so Gradle hands this
+ * test the release manifest.
  */
 class ManifestSurfaceTest {
     private val manifest: Element =
