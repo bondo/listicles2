@@ -1142,7 +1142,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-97"]
-notes = "Split from M1-18 (PR 395), with its former notes: adds deleting the app's household-name copy (M1-97's store) to the M1-14 sign-out (step 3), and on acknowledgement, and implements HouseholdNotices (the M1-62 stand-in) with the copy's name when its householdId matches (PLAN 3.1 HH-06 household name, P8). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The tombstone's own owner: no HH-06 state, householdId untouched (M1-31 resumes the cleanup). The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
+notes = "Split from M1-18 (PR 395), with its former notes: adds deleting the app's household-name copy (M1-97's store) to the M1-14 sign-out (step 3), and on acknowledgement, and implements HouseholdNotices (the M1-62 stand-in) with the copy's name when its householdId matches (PLAN 3.1 HH-06 household name, P8). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The tombstone's own owner: no HH-06 state, householdId untouched (M1-31 resumes the cleanup). The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5). Estimated about 500 lines, so it may need its own split"
 
 [[task]]
 id = "M1-31"
