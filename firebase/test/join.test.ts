@@ -182,11 +182,15 @@ describe("Join (one batch)", () => {
         await assertFails(join(frank.verified, {}, FRANK));
     });
 
-    // P1 (#206): the member doc is the caller's own. The first row isolates it: zoe's doc meets
-    // every other condition (the one-household check reads the caller's users doc).
+    // P1 (#206): the batch creates a member doc, the caller's own. The first row isolates P1: zoe's
+    // doc meets every other condition (the one-household check reads the caller's users doc).
     test.each<[string, Join]>([
         ["the #206 batch, a member doc for another uid next to his own", { members: [DAN, "zoe"] }],
         ["a batch whose only member doc is for another uid", { members: ["zoe"] }],
+        [
+            "a batch with no member doc, the invite delete and the users-doc set alone",
+            { members: [] },
+        ],
     ])("denied: %s", async (_what, j) => {
         await assertFails(join(dan.verified, j));
     });
