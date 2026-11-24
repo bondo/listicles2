@@ -147,17 +147,31 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
     },
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
     // dan joins bob's household through carol's invite (M1-54): his member doc, the invite's delete
-    // and his users doc in one batch. By n % 16: the base case (0, 7 to 15); the invite expired (1);
+    // and his users doc in one batch. By n % 16: the base case (0, 11 to 15); the invite expired (1);
     // its creator, carol, no longer a member (2); the invite kept (3); dan's doc with role owner, an
-    // earlier joinedAt or an unknown key (4 to 6).
+    // earlier joinedAt or an unknown key (4 to 6); an invite to H2, which dan owns, so he may delete
+    // it (7); the household a tombstone that keeps its name (8); dan already a member (9); his doc
+    // naming another code (10).
     join: (n) => {
         const v = n % 16;
-        const doc: m.Doc = { ...MEMBER, joinedAt: m.NOW, viaInvite: CODE, ...JOINED[v] };
-        const invite = { ...INVITE, expiresAt: v === 1 ? m.T0 : LATER };
-        const world = { ...(v === 2 ? HOME : CAROLS), [`invites/${CODE}`]: invite };
-        const deletes = v === 3 ? [] : [del(`invites/${CODE}`)];
-        const writes = [set(m.member(H1, DAN), doc), ...deletes, up(m.user(DAN), points(H1))];
-        return draft(DAN, { ...world, [m.user(DAN)]: points(null) }, ...writes);
+        const code = v === 7 ? CODE2 : CODE;
+        const doc: m.Doc = { ...MEMBER, joinedAt: m.NOW, viaInvite: v === 10 ? CODE2 : code };
+        const expiresAt = v === 1 ? m.T0 : LATER;
+        const world: Record<string, m.Doc> = {
+            ...(v === 2 ? HOME : CAROLS),
+            [m.household(H1)]: { ...LIVE, deleted: v === 8 },
+            [`invites/${code}`]: { ...INVITE, householdId: v === 7 ? H2 : H1, expiresAt },
+        };
+        if (v === 7) world[m.household(H2)] = { ...LIVE, ownerUid: DAN };
+        if (v === 9) world[m.member(H1, DAN)] = MEMBER;
+        const deletes = v === 3 ? [] : [del(`invites/${code}`)];
+        const writes = [set(m.member(H1, DAN), { ...doc, ...JOINED[v] }), ...deletes];
+        return draft(
+            DAN,
+            { ...world, [m.user(DAN)]: points(null) },
+            ...writes,
+            up(m.user(DAN), points(H1)),
+        );
     },
     // Extension points that add a path to an allow statement the rules have (one with an allow
     // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
