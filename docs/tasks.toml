@@ -1257,11 +1257,12 @@ notes = "Split from M1-10 by the refresh (size); tests as in docs/milestones/M1.
 id = "M1-54"
 title = "Rules: the join batch with the one-household check, allow and deny tests"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-12"]
-notes = "Split from M1-12 by the refresh (size); P1 deny tests; tests as in docs/milestones/M1.md section 5 (M1-12 paragraph)"
+pr = 382
+notes ="Split from M1-12 by the refresh (size); P1 deny tests; tests as in docs/milestones/M1.md section 5 (M1-12 paragraph)"
 
 [[task]]
 id = "M1-83"
