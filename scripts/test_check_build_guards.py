@@ -909,6 +909,21 @@ class Conventions(unittest.TestCase):
             'dependencies { p = project(":app") }',
             'dependencies { with(project(":app")) { } }',
             "def app = project(':app')",
+            # Self-review: an allowlist, not a list of banned wrappers; the template code of a string; this/getProject() receivers.
+            'dependencies { (project(":app")).pluginManager.apply("x") }',
+            'dependencies { id(project(":app")).version = "x" }',
+            'dependencies { arrayListOf(project(":app")).forEach { it.version = "1" } }',
+            'dependencies { ps.add(project(":app")) }',
+            'dependencies { implementation(Pair(project(":a"), 1).first) }',
+            'dependencies { project(":app") }',
+            "dependencies { ps = [null, project(':app')] }",
+            'val d = "${rootProject.projectDir}/x"',
+            'val d = "$rootProject/x"',
+            "def d = \"${rootProject.projectDir}/x\"",
+            "val v = this.parent?.version",
+            "val v = getProject().parent",
+            "gradle.projectsLoaded { }",
+            "gradle.projectsEvaluated { }",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
@@ -932,13 +947,19 @@ class Conventions(unittest.TestCase):
 
     def test_settings_files_may_name_the_root_project_but_not_configure_it(self):
         # In a settings file rootProject is the ProjectDescriptor (rootProject.name), not a Project; gradle.rootProject { } is a hook.
-        for name in ("settings.gradle.kts", "build-logic/settings.gradle.kts", "x/settings.gradle", "build-logic/src/main/kotlin/a.settings.gradle.kts"):
+        names = ("settings.gradle.kts", "build-logic/settings.gradle.kts", "x/settings.gradle", "build-logic/src/main/kotlin/a.settings.gradle.kts",
+                 "build-logic/src/main/groovy/a.settings.gradle")
+        for name in names:
+            ok = SETTINGS if name == "settings.gradle.kts" else ""
             with self.subTest(name=name):
-                ok = SETTINGS if name == "settings.gradle.kts" else ""
-                self.assertEqual(self.problems({name: ok + 'rootProject.name = "x"\nrootProject.buildFileName = "b.kts"\n'}), [])
-                found = self.problems({name: ok + "gradle.rootProject { }\n"})
-                self.assertEqual(len(found), 1, found)
-                self.assertRegex(found[0], rf"^{re.escape(name)}:\d+: reaches other projects \(rootProject")
+                text = 'rootProject.name = "x"\nrootProject.buildFileName = "b.kts"\nsettings.rootProject.projectDir = file("r")\n'
+                self.assertEqual(self.problems({name: ok + text}), [])
+            for code in ("gradle.rootProject { }", "val r = rootProject", "f(rootProject)", "it.rootProject.name = \"x\"",
+                         "rootProject.children.forEach { }", "gradle.projectsLoaded { rootProject.extensions }"):
+                with self.subTest(name=name, code=code):
+                    found = self.problems({name: ok + code + "\n"})
+                    self.assertEqual(len(found), 1, found)
+                    self.assertRegex(found[0], rf"^{re.escape(name)}:\d+: reaches other projects")
 
     def test_isolated_reads_and_project_dependencies_pass(self):
         code = (
@@ -954,6 +975,9 @@ class Conventions(unittest.TestCase):
             "    testImplementation(testFixtures(project(\":core:domain\")))\n"
             "    implementation(\n        project(\":core:domain\"),\n    )\n}\n"
             "dependencies.implementation(project(\":core:domain\"))\n"
+            "dependencies {\n    implementation(project(\":core:domain\")) { exclude(group = \"x\") }\n"
+            "    testImplementation(platform(project(\":core:domain\")));\n}\n"
+            "val s = \"${layout.projectDirectory}/$version: parent rootProject\"\n"
             "val d2 = dependencies.project(mapOf(\"path\" to \":x\"))\n"
         )
         groovy = "dependencies {\n    implementation project(':core:domain')\n    api project(path: ':core:domain')\n}\n"
@@ -1043,7 +1067,8 @@ class Conventions(unittest.TestCase):
         # M1-84: not vacuous: the module build files and the licensee policy do read root files, through isolated.rootProject.
         for rel in ("app/build.gradle.kts", "core/data/build.gradle.kts", "core/domain/build.gradle.kts", "config/licensee/policy.gradle"):
             with self.subTest(rel=rel):
-                self.assertIn("isolated.rootProject.projectDirectory", cbg.read(ROOT, rel))
+                code = cbg.strip(cbg.read(ROOT, rel), blank_strings=True)
+                self.assertRegex(code, r"isolated\s*\.\s*rootProject\s*\.\s*projectDirectory\s*\.\s*file\(", rel)
 
 
 ROOT_BUILD = 'val listiclesModules = listOf(":app", ":core:domain")\ntasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }\n'
