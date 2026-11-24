@@ -1300,13 +1300,13 @@ if [ "$STAGED" = 0 ]; then
       chk(kw) ||
       (file ~ /(jest|vitest|vite)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
-        if (mkey != "") { key = file "|" mkey; n = -1 }
+        if (mkey != "") { key = file "|" mkey; n = -1; mc[key] += substr($0, 1, 1) == "-" ? 1 : -1 }  # each copy counts (PR 379 R1-01)
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n; remf[key] = file } else { add[key] = l; addn[key] = n }
       }
       END {
         for (k in rem) {
           if (!(k in add) && moved(remf[k], rem[k])) print "guard: note: check setting moved into build-logic: " rem[k]
-          else if (!(k in add)) { print "guard: removed check setting: " rem[k]; bad = 1 }
+          else if (!(k in add) || mc[k] > 0) { print "guard: removed check setting: " rem[k]; bad = 1 }
           else if (remn[k] >= 0 && addn[k] >= 0 && addn[k] < remn[k] && rem[k] !~ /maxIssues/) { print "guard: lowered threshold: " add[k]; bad = 1 }
         }
         exit bad
