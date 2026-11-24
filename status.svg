@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="2042" viewBox="0 0 880 2042" role="img" aria-labelledby="ti de"><title id="ti">Tally status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 83/114; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/3; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 6 PRs waiting, 24 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="2042" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="2020" viewBox="0 0 880 2020" role="img" aria-labelledby="ti de"><title id="ti">Tally status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 84/115; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/3; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 5 PRs waiting, 24 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="2020" class="bg"/>
 <text x="24" y="36" class="fg t">Tally status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-24 21:59 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-24 22:10 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 46. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -22,13 +22,13 @@
 <text x="60" y="308" class="ok">35 done</text>
 <rect x="24" y="332" width="832" height="442" rx="6" class="card"/>
 <text x="40" y="356" class="fg h">M1 Accounts and households</text>
-<text x="840" y="356" class="fg" text-anchor="end">72%  83/114</text>
+<text x="840" y="356" class="fg" text-anchor="end">73%  84/115</text>
 <text x="840" y="374" class="info s" text-anchor="end">current</text>
 <text x="40" y="374" class="muted s">Google and email sign-in, households, invite links, members and ownership, with rules tests.</text>
 <rect x="40" y="386" width="640" height="8" rx="3" class="track"/>
-<rect x="40" y="386" width="465" height="8" rx="3" class="bar"/>
+<rect x="40" y="386" width="467" height="8" rx="3" class="bar"/>
 <polyline points="40,414 43,417 48,410" class="tick mk-done"/>
-<text x="60" y="418" class="ok">83 done</text>
+<text x="60" y="418" class="ok">84 done</text>
 <polygon points="39,438 49,438 44,429" class="info mk-progress"/>
 <text x="60" y="438" class="info">in progress #401</text>
 <text x="180" y="438" class="fg h">M1-11</text>
@@ -167,60 +167,57 @@
 <text x="24" y="1618" class="fg h">#393</text>
 <text x="80" y="1618" class="fg">M1-97: handover messages between orchestrators</text>
 <text x="856" y="1618" class="ok" text-anchor="end">CI passing</text>
-<text x="24" y="1640" class="fg h">#394</text>
-<text x="80" y="1640" class="fg">M1-96: Tooling: Nix dev shell with the pinned firebase-to…</text>
-<text x="856" y="1640" class="warn" text-anchor="end">CI pending</text>
-<text x="24" y="1674" class="fg h">BLOCKERS</text>
-<text x="856" y="1674" class="muted s" text-anchor="end">24 open</text>
-<line x1="24" y1="1682" x2="856" y2="1682" class="rule"/>
+<text x="24" y="1652" class="fg h">BLOCKERS</text>
+<text x="856" y="1652" class="muted s" text-anchor="end">24 open</text>
+<line x1="24" y1="1660" x2="856" y2="1660" class="rule"/>
+<text x="24" y="1684" class="bad">owner to-do</text>
+<text x="120" y="1684" class="fg h">#120</text>
+<text x="190" y="1684" class="fg">[owner] Register a free limited-distribution Android deve…</text>
+<text x="856" y="1684" class="muted" text-anchor="end">7d</text>
 <text x="24" y="1706" class="bad">owner to-do</text>
-<text x="120" y="1706" class="fg h">#120</text>
-<text x="190" y="1706" class="fg">[owner] Register a free limited-distribution Android deve…</text>
-<text x="856" y="1706" class="muted" text-anchor="end">7d</text>
+<text x="120" y="1706" class="fg h">#291</text>
+<text x="190" y="1706" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
+<text x="856" y="1706" class="muted" text-anchor="end">2d</text>
 <text x="24" y="1728" class="bad">owner to-do</text>
-<text x="120" y="1728" class="fg h">#291</text>
-<text x="190" y="1728" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
-<text x="856" y="1728" class="muted" text-anchor="end">2d</text>
+<text x="120" y="1728" class="fg h">#374</text>
+<text x="190" y="1728" class="fg">[owner] M1-O3: Check the Identity Platform upgrade needs…</text>
+<text x="856" y="1728" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1750" class="bad">owner to-do</text>
-<text x="120" y="1750" class="fg h">#374</text>
-<text x="190" y="1750" class="fg">[owner] M1-O3: Check the Identity Platform upgrade needs…</text>
+<text x="120" y="1750" class="fg h">#375</text>
+<text x="190" y="1750" class="fg">[owner] M1-O4: Enable the Play Integrity API for the Fire…</text>
 <text x="856" y="1750" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1772" class="bad">owner to-do</text>
-<text x="120" y="1772" class="fg h">#375</text>
-<text x="190" y="1772" class="fg">[owner] M1-O4: Enable the Play Integrity API for the Fire…</text>
+<text x="120" y="1772" class="fg h">#376</text>
+<text x="190" y="1772" class="fg">[owner] M3-O1: Enable Google sign-in in Firebase (needs a…</text>
 <text x="856" y="1772" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1794" class="bad">owner to-do</text>
-<text x="120" y="1794" class="fg h">#376</text>
-<text x="190" y="1794" class="fg">[owner] M3-O1: Enable Google sign-in in Firebase (needs a…</text>
+<text x="120" y="1794" class="fg h">#377</text>
+<text x="190" y="1794" class="fg">[owner] M6-O1: Create the GitHub release key; register it…</text>
 <text x="856" y="1794" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1816" class="bad">owner to-do</text>
-<text x="120" y="1816" class="fg h">#377</text>
-<text x="190" y="1816" class="fg">[owner] M6-O1: Create the GitHub release key; register it…</text>
+<text x="120" y="1816" class="fg h">#392</text>
+<text x="190" y="1816" class="fg">[owner] M1-O17: add TALLY_TASK=tooling to the Tally tooli…</text>
 <text x="856" y="1816" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1838" class="bad">owner to-do</text>
-<text x="120" y="1838" class="fg h">#392</text>
-<text x="190" y="1838" class="fg">[owner] M1-O17: add TALLY_TASK=tooling to the Tally tooli…</text>
-<text x="856" y="1838" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1860" class="info">PR to merge</text>
-<text x="120" y="1860" class="fg h">#393</text>
-<text x="190" y="1860" class="fg">M1-97: handover messages between orchestrators</text>
+<text x="24" y="1838" class="info">PR to merge</text>
+<text x="120" y="1838" class="fg h">#393</text>
+<text x="190" y="1838" class="fg">M1-97: handover messages between orchestrators</text>
+<text x="24" y="1860" class="warn">task</text>
+<text x="120" y="1860" class="fg h">M1-17</text>
+<text x="190" y="1860" class="fg">waits on M1-15, M1-16</text>
 <text x="24" y="1882" class="warn">task</text>
-<text x="120" y="1882" class="fg h">M1-17</text>
-<text x="190" y="1882" class="fg">waits on M1-15, M1-16</text>
+<text x="120" y="1882" class="fg h">M1-31</text>
+<text x="190" y="1882" class="fg">waits on M1-11, M1-18</text>
 <text x="24" y="1904" class="warn">task</text>
-<text x="120" y="1904" class="fg h">M1-31</text>
-<text x="190" y="1904" class="fg">waits on M1-11, M1-18</text>
+<text x="120" y="1904" class="fg h">M1-19</text>
+<text x="190" y="1904" class="fg">waits on M1-18</text>
 <text x="24" y="1926" class="warn">task</text>
-<text x="120" y="1926" class="fg h">M1-19</text>
-<text x="190" y="1926" class="fg">waits on M1-18</text>
+<text x="120" y="1926" class="fg h">M1-20</text>
+<text x="190" y="1926" class="fg">waits on M1-19, M1-17</text>
 <text x="24" y="1948" class="warn">task</text>
-<text x="120" y="1948" class="fg h">M1-20</text>
-<text x="190" y="1948" class="fg">waits on M1-19, M1-17</text>
+<text x="120" y="1948" class="fg h">M1-21</text>
+<text x="190" y="1948" class="fg">waits on M1-19, M1-31</text>
 <text x="24" y="1970" class="warn">task</text>
-<text x="120" y="1970" class="fg h">M1-21</text>
-<text x="190" y="1970" class="fg">waits on M1-19, M1-31</text>
-<text x="24" y="1992" class="warn">task</text>
-<text x="120" y="1992" class="fg h">M1-22</text>
-<text x="190" y="1992" class="fg">waits on M1-17, M1-25</text>
-<text x="24" y="2014" class="muted">+10 more</text>
+<text x="120" y="1970" class="fg h">M1-22</text>
+<text x="190" y="1970" class="fg">waits on M1-17, M1-25</text>
+<text x="24" y="1992" class="muted">+10 more</text>
 </svg>
