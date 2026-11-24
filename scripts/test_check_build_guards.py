@@ -943,11 +943,52 @@ class Conventions(unittest.TestCase):
             "val v = (this).parent",
             "val v = ( project )?.parent?.version",
             "val v = (getProject()).parent",
+            # PR 384 R2-02, R2-03: a dynamic call, and a backticked, doubly parenthesized, `!!` or cast receiver of parent.
+            "this.invokeMethod(\"project\", \":app\")",
+            "val v = `project`.parent",
+            "val v = `project`.getParent()",
+            "val v = `getProject`().parent",
+            "val v = ((project)).parent",
+            "val v = (project!!).parent",
+            "val v = (project as Project).parent",
+            "val v = (project as Project?)?.parent?.version",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
                 self.assertEqual(len(found), 1, found)
                 self.assertRegex(found[0], r"^build\.gradle\.kts:\d+: reaches other projects")
+
+    def test_groovy_command_syntax_and_dynamic_method_names_are_flagged(self):
+        # PR 384 R2-01, R2-02: Groovy calls project(...) without parentheses, and by a method name in any kind of string.
+        for code in (
+            "project ':app', { apply plugin: 'x' }",
+            "def app = project ':app'",
+            "findProject ':app'",
+            "def app = owner.project \":app\"",
+            "owner.'project' ':app', { }",
+            "def f = delegate.&\"project\"",
+            "def f = delegate.&'findProject'",
+            "owner.'''project'''(':app')",
+            'owner."""project"""(\':app\')',
+            "owner./project/(':app')",
+            "owner.$/project/$(':app')",
+            "owner.\"${'project'}\"(':app')",
+            "owner.\"${name}\"",
+            "this.invokeMethod('project', ':app')",
+        ):
+            with self.subTest(code=code):
+                found = self.problems({"config/licensee/policy.gradle": code + "\n"})
+                self.assertEqual(len(found), 1, found)
+                self.assertRegex(found[0], r"^config/licensee/policy\.gradle:1: reaches other projects")
+
+    def test_groovy_reads_of_the_own_project_and_plain_strings_pass(self):
+        code = (
+            "def terms = project.ext.has('x') ? project.ext.get('x') : null\nif (project instanceof Project) { }\n"
+            "def ok = project in [null]\ndef p = project as Object\ndef s = 'project'\ndef t = \"project\" + 'findProject'\n"
+            "def n = \"${project.name}: ${version}\"\ndef m = owner.'other'(1)\ndef r = /project/\n"
+            "dependencies {\n    implementation project(':core:domain')\n}\n"
+        )
+        self.assertEqual(self.problems({"config/licensee/policy.gradle": code}), [])
 
     def test_isolated_project_reads_are_flagged_in_module_build_files_and_build_logic(self):
         # M1-84: the module build files read the root through isolated.rootProject; so do the convention plugins.
