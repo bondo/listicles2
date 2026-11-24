@@ -143,7 +143,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-14 | Auth data 1&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step | done | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/tally/issues/319) |
 | M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | done | M1-14 | implementer | [#348](https://github.com/bondo/tally/issues/348) |
 | M1-66 | Auth wiring 1&#58; Credential Manager wrapper (Sign in with Google button flow) in &#58;core&#58;data, &#58;ap… | done | M1-67, M1-O14 | implementer | [#368](https://github.com/bondo/tally/issues/368) |
-| M1-88 | Auth wiring 2&#58; Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in Sessio… | ready | M1-66 | implementer |  |
+| M1-88 | Auth wiring 2&#58; Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in Sessio… | in progress | M1-66 | implementer | [#381](https://github.com/bondo/tally/issues/381) |
 | M1-89 | Clear the local data on every change to signed out, also when Firebase signs the user out itself (… | blocked | M1-88 | implementer |  |
 | M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-88, M1-62 | implementer |  |
 | M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | blocked | M1-88, M1-03, M1-49 | implementer |  |
@@ -234,7 +234,7 @@ flowchart LR
     n1["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n2["M1-12 Rules: invites (create, get, list, revo… (in progress)"]:::progress
     n3["M1-82 Firestore source for the minimum app… (blocked)"]:::blocked
-    n4["M1-88 Auth wiring 2: Hilt bindings for sessi… (ready)"]:::ready
+    n4["M1-88 Auth wiring 2: Hilt bindings for sessi… (in progress)"]:::progress
     n5["M1-89 Clear the local data on every change to… (blocked)"]:::blocked
     n6["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
     n7["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
@@ -474,6 +474,7 @@ flowchart LR
 - **owner to-do** [#375](https://github.com/bondo/tally/issues/375): &#91;owner&#93; M1-O4&#58; Enable the Play Integrity API for the Firebase project in the Google Cloud console
 - **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
+- **PR to merge** [#371](https://github.com/bondo/tally/issues/371): M1-12&#58; rules for invites (create, get, list as decided on #280, revoke, expired cleanup), allow a…
 - **task** M1-11: waits on M1-54
 - **task** M1-82: waits on M1-88
 - **task** M1-89: waits on M1-88
