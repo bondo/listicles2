@@ -8,6 +8,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.Codepoint
+import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.int
@@ -23,7 +24,7 @@ private val EMAILS = setOf("sendEmailVerification", "sendPasswordReset")
 private val anyCodePoints = Arb.int(0x20..0x1F64F).filter { it !in 0xD800..0xDFFF }.map { Codepoint(it) }
 private val padding = Arb.string(0..4, Arb.element(' ', '\t', '\n', '\u00A0', '\u3000').map { Codepoint(it.code) })
 private val addresses = Arb.string(1..40, anyCodePoints).filter { it.isNotBlank() && it == it.trim() }
-private val passwords = Arb.string(12..40, anyCodePoints)
+private val passwords = Arb.bind(padding, Arb.string(12..40, anyCodePoints), padding) { a, core, b -> a + core + b }
 
 /** A fake Firebase that answers [answer] to every call. */
 private fun firebase(answer: PasswordAnswer = PasswordAnswer.Done) =

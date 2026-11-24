@@ -27,7 +27,7 @@ class PasswordAccount(
             else -> created(authentication.createUser(Validation.normalizedEmail(email), password))
         }
 
-    /** "Sign in" (AUTH-07): one answer for every refusal, whatever was wrong (OQ-34(c)). */
+    /** "Sign in" (AUTH-07): one answer for every failed sign-in, whatever went wrong (OQ-34(c)). */
     suspend fun signIn(
         email: String,
         password: String,
@@ -122,7 +122,7 @@ private fun verified(answer: PasswordAnswer): VerificationResult =
 /**
  * How "Create account" ended (AUTH-05). [CheckYourEmail]: the "check your email" screen (AUTH-06), the same for a new
  * account and for an email that has one (AUTH-10). [InvalidEmail] and [PasswordTooShort] (under 12 characters, OQ-26)
- * are field errors. [Failed]: anything else; no account was created.
+ * are field errors. [Failed]: anything else; the user can try again.
  */
 enum class SignUpResult { CheckYourEmail, InvalidEmail, PasswordTooShort, TooManyAttempts, NeedsConnection, Failed }
 

@@ -7,7 +7,7 @@ fun interface UpdateGate {
     fun updateRequired(): Flow<Boolean>
 }
 
-/** AUTH-06: whether the signed-in account's email is verified. M1-15 implements it. Asked while signed in. */
+/** AUTH-06: whether the signed-in account's email is verified. M1-95 implements it. Asked while signed in. */
 fun interface EmailVerification {
     fun verified(): Flow<Boolean>
 }
