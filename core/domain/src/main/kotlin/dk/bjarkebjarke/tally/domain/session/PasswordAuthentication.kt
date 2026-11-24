@@ -1,7 +1,7 @@
 package dk.bjarkebjarke.tally.domain.session
 
 /**
- * Firebase Authentication's email and password calls (M1.md, M1-15); M1-95 implements them. Throws nothing but
+ * Firebase Authentication's email and password calls (M1.md, M1-15); M1-99 implements them. Throws nothing but
  * `CancellationException`. [PasswordAccount] never passes a blank email or an empty password: Firebase throws on those.
  */
 interface PasswordAuthentication {
@@ -35,7 +35,7 @@ interface PasswordAuthentication {
 }
 
 /**
- * What Firebase answered, as far as the app tells answers apart; M1-95 maps Firebase's exceptions to it. [EmailInUse]:
+ * What Firebase answered, as far as the app tells answers apart; M1-99 maps Firebase's exceptions to it. [EmailInUse]:
  * sign-up for an email that has an account (`EMAIL_EXISTS`, which enumeration protection does not hide).
  * [WeakPassword]: the project's password policy refused the password (M1.md R1). [Refused]: a refused sign-in (a wrong
  * password or an email with no password account, one `INVALID_LOGIN_CREDENTIALS` under enumeration protection, or a

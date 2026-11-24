@@ -3,10 +3,10 @@
 Delete this file in the PR's final commit (squash merge keeps it off `main`).
 
 ## Goal
-docs/milestones/M1.md section 5, M1-15: the email and password steps in `core/domain` with fakes; M1-95 is the Firebase part.
+docs/milestones/M1.md section 5, M1-15: the email and password steps in `core/domain` with fakes; M1-99 is the Firebase part.
 
 ## Done / next
-- PR #396: red tests 75255dc, steps eb50337, split ec7505d (M1-95; M1-15 done), self-review fixes cbf5db3.
+- PR #396: red tests 75255dc, steps eb50337, split ec7505d (M1-99; M1-15 done), self-review fixes cbf5db3.
 - Next: review rounds (fix or dispute; stay near 450 counted lines), then delete this file.
 
 ## Facts that save time
