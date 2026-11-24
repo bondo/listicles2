@@ -258,7 +258,8 @@ class RolesYaml(unittest.TestCase):
     @staticmethod
     def second_reviewer_row_names_the_max_cases(row):
         """The PLAN role-table row of the second reviewer carries the roles.yaml max cases (risk:high, area:security-rules), and not sync-merge's."""
-        return "max for" in row and "risk:high" in row.split("max for", 1)[1] and "area:security-rules" in row.split("max for", 1)[1] and "sync-merge" not in row
+        cases = row.split("max for", 1)[1] if "max for" in row else ""
+        return "risk:high" in cases and "area:security-rules" in cases and "sync-merge" not in row
 
     def test_the_plan_role_table_gives_the_second_reviewer_the_roles_yaml_max_cases(self):  # R2-01 of #385, owner decision #15 comment 7123360368
         row = next(line for line in read("docs", "PLAN.md").splitlines() if line.startswith("| **Second reviewer**"))
