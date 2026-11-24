@@ -6,14 +6,21 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import dagger.hilt.android.AndroidEntryPoint
+import dk.bjarkebjarke.tally.session.StartedActivity
 import dk.bjarkebjarke.tally.start.StartViewModel
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val start: StartViewModel by viewModels()
 
+    @Inject
+    lateinit var startedActivity: StartedActivity
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // M1-88: Credential Manager opens Google's account picker in this activity while it is started.
+        lifecycle.addObserver(startedActivity)
         enableEdgeToEdge()
         setContent { TallyApp(start) }
     }
