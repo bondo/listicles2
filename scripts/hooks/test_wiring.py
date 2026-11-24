@@ -233,26 +233,41 @@ class RolesYaml(unittest.TestCase):
         return found
 
     def test_a_security_rules_pr_without_risk_high_gets_a_max_effort_reviewer(self):  # owner decision, #134 comment 6989468926
-        self.assertEqual(self.max_effort_roles(["area:security-rules"]), {"reviewer"})
-        self.assertEqual(self.max_effort_roles(["area:sync-merge"]), {"reviewer"})
+        self.assertEqual(self.max_effort_roles(["area:security-rules"]), {"reviewer", "second-reviewer"})  # the second one: #15 comment 7123360368
+        self.assertEqual(self.max_effort_roles(["area:sync-merge"]), {"reviewer"})  # no approver delegation there: not raised for the second reviewer
 
     def test_risk_high_still_raises_the_reviewer_and_the_implementer_to_max(self):
-        self.assertEqual(self.max_effort_roles(["risk:high"]), {"implementer", "reviewer"})
-        self.assertEqual(self.max_effort_roles(["area:security-rules", "risk:high"]), {"implementer", "reviewer"})
+        self.assertEqual(self.max_effort_roles(["risk:high"]), {"implementer", "reviewer", "second-reviewer"})
+        self.assertEqual(self.max_effort_roles(["area:security-rules", "risk:high"]), {"implementer", "reviewer", "second-reviewer"})
 
     def test_a_plain_pr_gets_no_max_effort_role(self):
         for labels in ([], ["area:ui"], ["area:release"], ["area:process"], ["area:security-rules-docs"], ["area:sync-merge-ui"]):
             self.assertEqual(self.max_effort_roles(labels), set(), labels)
 
-    def test_the_security_rules_label_does_not_raise_anyone_but_the_reviewer(self):
-        for role in ("implementer", "second-reviewer", "planner", "design-reviewer"):
+    def test_the_security_rules_label_raises_only_the_reviewer_and_the_second_reviewer(self):
+        for role in ("implementer", "planner", "design-reviewer"):
             self.assertNotIn(role, self.max_effort_roles(["area:security-rules", "area:sync-merge"]), role)
+        self.assertNotIn("second-reviewer", self.max_effort_roles(["area:sync-merge", "area:release"]))
 
     def test_the_process_docs_state_the_same_reviewer_rule(self):
         for path in (("docs", "ORCHESTRATION.md"), ("docs", "PLAN.md")):
             row = next(line for line in read(*path).splitlines() if line.startswith("| **Reviewer**"))
             for needle in ("risk:high", "area:security-rules", "area:sync-merge"):
                 self.assertIn(needle, row, f"{'/'.join(path)}: {needle}")
+
+    @staticmethod
+    def second_reviewer_row_names_the_max_cases(row):
+        """The PLAN role-table row of the second reviewer carries the roles.yaml max cases (risk:high, area:security-rules), and not sync-merge's."""
+        cases = row.split("max for", 1)[1] if "max for" in row else ""
+        return "risk:high" in cases and "area:security-rules" in cases and "sync-merge" not in row
+
+    def test_the_plan_role_table_gives_the_second_reviewer_the_roles_yaml_max_cases(self):  # R2-01 of #385, owner decision #15 comment 7123360368
+        row = next(line for line in read("docs", "PLAN.md").splitlines() if line.startswith("| **Second reviewer**"))
+        self.assertTrue(self.second_reviewer_row_names_the_max_cases(row), row)
+        for stale in ("| **Second reviewer** | Opus / high | Fresh session in the same round |",  # the row before the decision
+                      "| **Second reviewer** | Opus / high (max for `risk:high` and `area:sync-merge`) | x |",  # the wrong case
+                      "| **Second reviewer** | Opus / high (max for `risk:high`) | x |"):  # security-rules missing
+            self.assertFalse(self.second_reviewer_row_names_the_max_cases(stale), stale)
 
     def test_fallback_set_keeps_the_pre_pilot_values(self):
         fallback = roles_file()["fallback"]
