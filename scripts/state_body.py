@@ -13,7 +13,7 @@ Usage:
       rotate then (or at milestone end) at the next handover boundary.
   scripts/state_body.py render BODY     print the body with the summary regenerated and the block in canonical form
 
-Read the body with: gh api repos/{owner}/{repo}/issues/15 --jq .body > state.md
+Read the body with: gh api repos/{owner}/{repo}/issues/<current state issue> --jq .body > state.md   (#15 until the first rotation, ORCHESTRATION.md 3.4)
 scripts/tasks.py --state state.md reads the claimed and in-review task ids from the same block.
 """
 
