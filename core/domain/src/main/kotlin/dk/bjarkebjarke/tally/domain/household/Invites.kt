@@ -2,18 +2,33 @@ package dk.bjarkebjarke.tally.domain.household
 
 import java.security.SecureRandom
 
-/** Test-first draft (M1-18): InvitesTest fails against it until the next commit. */
+/**
+ * Invite codes and their expiry (PLAN 3.1 Create invite, P3, #243). A code is `<householdId>_<secret>`: the household's
+ * 20-character auto-id and 22 characters of `[A-Za-z0-9_-]` from a secure random source (132 bits). The rules accept
+ * an expiry up to 7 days after the server's time; the app stays a margin inside, so a phone clock up to an hour fast
+ * is not refused.
+ */
 object Invites {
-    const val LIFETIME_MS = 0L
+    /** 7 days minus the 1-hour margin. */
+    const val LIFETIME_MS = (7 * 24 - 1) * 60 * 60 * 1000L
+
+    private const val SECRET_LENGTH = 22
+    private const val SECRET_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    private val codeForm = Regex("[A-Za-z0-9]{20}_[A-Za-z0-9_-]{22}")
 
     fun newCode(
         householdId: String,
         random: SecureRandom,
-    ): String = householdId + random.nextInt()
+    ): String {
+        val secret = CharArray(SECRET_LENGTH) { SECRET_ALPHABET[random.nextInt(SECRET_ALPHABET.length)] }
+        return "${householdId}_${String(secret)}"
+    }
 
-    fun isWellFormed(code: String): Boolean = code.isNotEmpty()
+    /** The rules' form; a code from a link that is not well formed names no invite and is never a document path. */
+    fun isWellFormed(code: String): Boolean = codeForm.matches(code)
 
-    fun householdId(code: String): String = code
+    /** The household of a well-formed code: the rules tie the prefix to the invite's `householdId`. */
+    fun householdId(code: String): String = code.substringBefore('_')
 
-    fun expiresAt(nowMs: Long): Long = nowMs
+    fun expiresAt(nowMs: Long): Long = nowMs + LIFETIME_MS
 }
