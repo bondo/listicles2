@@ -1445,6 +1445,19 @@ class ThresholdProse(GuardsCase):
                     self.change(rel, changed)
                     self.assertFails("guard: removed check setting:")
 
+    def test_each_copy_of_a_threshold_mention_in_a_file_counts(self):
+        # PR 379 R1-01: two lines with the same mention; rewording one must not excuse lowering or dropping the other.
+        old = "A guard thresholds (600/1500) one.\nB guard thresholds (600/1500) two.\n"
+        for new in ("A guard thresholds (500/1500) one.\nB guard thresholds (600/1500) reworded.\n",
+                    "B guard thresholds (600/1500) reworded.\n", "A guard limits one.\nB guard thresholds (600/1500) reworded.\n"):
+            with self.subTest(new=new):
+                self.base("agents/p.md", old)
+                self.change("agents/p.md", new)
+                self.assertFails("guard: removed check setting:")
+        self.base("agents/p.md", old)
+        self.change("agents/p.md", "A guard thresholds (600/1500) reworded.\nB guard thresholds (600/1500) also reworded.\n")
+        self.assertPasses()
+
     def test_a_threshold_mention_moved_to_another_file_still_fails(self):
         self.base("agents/prompts/approver.md", self.OWNER_OLD)
         self.repo.write("agents/prompts/orchestrator.md", self.OWNER_NEW)
