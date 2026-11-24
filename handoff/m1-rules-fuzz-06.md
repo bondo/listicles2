@@ -17,8 +17,19 @@ Round 5 (reviewer and second reviewer at max) starts on the push.
   naming another code). Emulator on a09f2f4: fuzz.test.ts 41/41 (126 s); the new mutant 99, 2865, 528 (seeds 1-3, equal to
   the proxies); the unmutated rules agree with the model on seeds 1, 2, 3 for 9000 cases each (R4-01's check).
 - Not done: the PR body, verify.sh on the new head, the WORKER-RESULT for this step.
+- Session session_013srDQj8AHv6sByuzJoV48J (from this file): the verifier self-review found one major: join variant 10
+  was denied by the member create too (no invite at CODE2), so the delete's `viaInvite == code` was never reached alone.
+  ecca9e7 (red: emulator, seed 1, 9000 cases) adds the mutant `.data.viaInvite == code` -> `!= null`; the next commit
+  makes v10 a valid join that also deletes CODE3, another of carol's invites, and v9 dan's doc set again unchanged (only
+  the delete's !M(uid) denies; verifier nit). Emulator: new mutant 522, 1070, 581; burn 555, 109, 246 (seeds 1-3, equal
+  to the proxies); the unmutated rules agree with the model on seeds 1-3 for 9000 cases each.
+- Proxies on the fix (seeds 1-100; they reproduce the round 3 table and the join table exactly on the old generators):
+  new mutant 99 / 100 / 3312 (0 before); burn worst 1022 (2439); the whole viaInvite term 1094 (1740); invite delete by
+  any member before expiry worst 756 (979); users-doc set without membership 98 / 100 / 3148. Every other row as before.
 
 ## Next (in order)
+0. Add to the PR body below: the verifier finding (self-review table, round 5 prep), the new mutant (twenty-four), the
+   join table rows above, v9 and v10 as now; the round 3 table's two changed rows.
 1. PR body (REST: `gh api -X PATCH repos/bondo/tally/pulls/372 -F body=@file`; read the live body first):
    - Review rounds table: row `| 4 (reviewer R4, second reviewer S4) | 0 | 1 | 0 | 0 | 0 | changes_requested |` (R4-01 =
      S4-01, one major) and the escalation ruling (7132111440: fix; R4-01 and S4-01 fixed by 751011f..a09f2f4; round 5 next).
