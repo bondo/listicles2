@@ -55,7 +55,7 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    declares no project dependency either: a closure can pose as a configuration (`ok project(':b')`). A project dependency
    (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: check 4 reads text, so
    a Kotlin API it does not list that returns a Project, or a Project reached through a helper function, passes; Gradle's isolated projects
-   mode is what enforces this in the build (M1-95). Fails closed on: a Kotlin parameter or named argument called `parent`, File.parent, a
+   mode is what enforces this in the build (M1-98). Fails closed on: a Kotlin parameter or named argument called `parent`, File.parent, a
    settings plugin in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf project(':a'), project(':b')` list.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
