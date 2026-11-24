@@ -75,8 +75,10 @@ class CredentialManagerGoogleCredentials(
 
         /**
          * The web client id from google-services.json: the Google Services plugin generates the app's own
-         * `default_web_client_id`, which overrides this module's empty default. Empty while Firebase has no web client
-         * (Google sign-in not enabled there).
+         * `default_web_client_id`, which overrides this module's empty default. Only a google-services.json downloaded
+         * after Google sign-in is enabled in Firebase has the web client, so the copies a release build reads (the
+         * owner's app/google-services.json and the GitHub secret, docs/milestones/M1.md R1 step 5) must then be
+         * replaced with that file. Until then this is empty and Google sign-in answers Failed.
          */
         fun webClientId(context: Context): String = context.getString(R.string.default_web_client_id)
     }

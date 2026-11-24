@@ -1034,7 +1034,7 @@ notes = "Split from M1-14 (PR 319). Implements the M1-14 domain interfaces: Sess
 
 [[task]]
 id = "M1-66"
-title = "Auth wiring 1: Credential Manager wrapper (Google ID option) in :core:data, :app on :core:data with licensee"
+title = "Auth wiring 1: Credential Manager wrapper (Sign in with Google button flow) in :core:data, :app on :core:data with licensee"
 milestone = "M1"
 status = "done"
 assignee = "implementer"

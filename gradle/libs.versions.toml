@@ -35,7 +35,7 @@ hilt = "2.60.1"
 ksp = "2.3.14"
 # M1-60: Navigation 3 (owner decision, checklist section 3) for the start-up root.
 navigation3 = "1.2.2"
-# M1-66: Credential Manager with the Google ID option (checklist section 9); licences in config/licensee (M1-O14).
+# M1-66: Credential Manager, Sign in with Google button flow (checklist section 9); licences in config/licensee (M1-O14).
 credentials = "1.6.0"
 googleid = "1.2.1"
 

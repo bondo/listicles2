@@ -37,8 +37,9 @@ import org.robolectric.annotation.Config
 import java.util.Base64
 
 /**
- * M1-66: Credential Manager with the Google ID option, against a fake Credential Manager (Google sign-in is not enabled
- * in Firebase yet, and unit tests have no network). Here in `:app`, the only module with the offline Robolectric setup.
+ * M1-66: Credential Manager with the Sign in with Google button flow, against a fake Credential Manager (Google sign-in
+ * is not enabled in Firebase yet, and unit tests have no network). Here in `:app`, the only module with the offline
+ * Robolectric setup.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class)
