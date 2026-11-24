@@ -657,7 +657,7 @@ assignee = "process"
 risk = "normal"
 depends_on = []
 pr = 62
-notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11). Delivered by PR #62; owner approval recorded 2026-11-15 in PR #88 (decision record: https://github.com/bondo/listicles2/issues/15#issuecomment-6898068569)."
+notes = "Tooling env (REVIEW.md). Effort S. Owner approves the checklist before M1 (issue #15 standing rule); workers cite it in prompts, reviewers check against it (REVIEW.md item 11). Delivered by PR #62; owner approval recorded 2026-11-15 in PR #88 (decision record: https://github.com/bondo/tally/issues/15#issuecomment-6898068569)."
 
 [[task]]
 id = "M0.5-21"
@@ -1643,7 +1643,7 @@ depends_on = [
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-85",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-85", "M1-87",
 ]
 
 [[task]]
@@ -1870,3 +1870,13 @@ assignee = "implementer"
 risk = "normal"
 depends_on = []
 notes = "owner request 2026-11-23 in the orchestrator #38 chat: prepare the repo rename; see #15"
+
+[[task]]
+id = "M1-87"
+title = "Repo rename follow-up: the old repo name and checkout path in process files, docs, README and app links become bondo/tally and /home/user/tally"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "rename checklist item 5 (#15 comment 7107080653) and the after-rename checklist item 2 (#15 comment 7111328399); owner-approved merge (process files). The name-agnostic scripts are M1-85"

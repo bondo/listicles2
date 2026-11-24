@@ -1,4 +1,4 @@
-# Tally (repo: listicles2) – Implementation Plan
+# Tally (repo: bondo/tally) – Implementation Plan
 
 Status: working draft, matched to the owner-approved stories and flow and to the decisions of 2026-11-15 to 2026-11-19
 (task OQ-15; OQ-15 decided 2026-11-18, issue #15 comment 6991933333); the plan itself is not owner-approved (see issue #15).

@@ -67,7 +67,7 @@ class UpdateScreenTest {
         opened shouldBe emptyList()
         compose.onNodeWithText("Get the update").performClick()
         opened shouldBe listOf(RELEASES_URL)
-        RELEASES_URL shouldBe "https://github.com/bondo/listicles2/releases"
+        RELEASES_URL shouldBe "https://github.com/bondo/tally/releases"
     }
 
     /** R1-03: with no browser the handler throws IllegalArgumentException; the screen stays up instead of crashing. */

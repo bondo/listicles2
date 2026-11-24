@@ -8,12 +8,12 @@ import re
 import unittest
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-IMAGE_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status.svg"
+IMAGE_URL = "https://raw.githubusercontent.com/bondo/tally/status/status.svg"
 TESTS = ("python3 -I scripts/test_status_visual.py", "python3 -I scripts/test_status_page.py",
          "python3 -I scripts/test_status_publish.py", "python3 -I scripts/test_status_graph.py",
          "python3 -I scripts/test_status_workflow.py")
-GRAPH_URL = "https://raw.githubusercontent.com/bondo/listicles2/status/status-graph.svg"
-PAGE_URL = "https://github.com/bondo/listicles2/blob/status/status.md"
+GRAPH_URL = "https://raw.githubusercontent.com/bondo/tally/status/status-graph.svg"
+PAGE_URL = "https://github.com/bondo/tally/blob/status/status.md"
 JOB_PERMISSIONS = ["checks: read", "contents: write", "issues: read", "pull-requests: read"]
 USES = re.compile(r"^\s*-?\s*uses:\s*([\w./-]+)@(\S+)(?:\s+#\s*(\S.*))?$")
 
