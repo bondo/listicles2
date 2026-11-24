@@ -72,7 +72,18 @@ class HouseholdsEmulatorTest {
             assertEquals(now + Invites.LIFETIME_MS, read("invites/$code").getDate("expiresAt")?.time)
 
             signIn("Bob")
-            assertNull(households.createInvite(home)) // not a member
+            assertNull(households.createInvite(home)) // not a member: the household read is refused
+        }
+
+    @Test
+    fun aCallWhileASignOutTerminatesTheInstanceFailsAndThrowsNothing() =
+        emulatorTest {
+            signIn("Ann")
+            val home = member(households.create("Home"))
+            session.firestore().terminate().await() // the first step of a sign-out's clear(), not finished yet
+
+            assertEquals(Membership.Failed, households.create("Second"))
+            assertNull(households.createInvite(home))
         }
 
     @Test
