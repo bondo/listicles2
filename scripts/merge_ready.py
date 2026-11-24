@@ -56,8 +56,8 @@ GH_STATUS_RE = re.compile(r"\(HTTP (\d{3})\)|^gh: HTTP (\d{3})$", re.M)
 # The state issue that holds owner decisions and batch approvals, and the one before it (None until the first rotation). At a rotation (milestone end,
 # about 250 comments or a 15 KB body, at a handover boundary) the successor opens the new issue and a PR moves this pointer: STATE_ISSUE = the new one,
 # PREVIOUS_STATE_ISSUE = the old one. This file is owner-only, so that PR is an owner merge; until it lands, approvals on the new issue refuse.
-STATE_ISSUE = 373
-PREVIOUS_STATE_ISSUE = 15
+STATE_ISSUE = 399
+PREVIOUS_STATE_ISSUE = 373
 WAIT_SECONDS, WAIT_POLL = 900, 30  # --wait: how long to wait for required checks, and the poll interval
 MERGE_TREE_TIMEOUT = 120  # seconds for one git fetch or merge-tree
 

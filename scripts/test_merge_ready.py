@@ -992,7 +992,8 @@ def fake_merge_tree(result=TREE, calls=None, fail=None):
     return merge_tree
 
 
-def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=False, line="batch approval: "):
+def approval_comment(listed, login="bondo", assoc="OWNER", issue=None, edited=False, line="batch approval: "):
+    issue = merge_ready.STATE_ISSUE if issue is None else issue  # the current state issue, whatever the pointer says at call time
     return {"user": {"login": login}, "author_association": assoc, "issue_url": f"https://api.github.com/repos/{REPO}/issues/{issue}",
             "body": f"{line}{listed}\nThanks.", "created_at": "2026-11-19T12:00:00Z",
             "updated_at": "2026-11-19T12:05:00Z" if edited else "2026-11-19T12:00:00Z"}
@@ -1091,7 +1092,7 @@ class OwnerBatchTests(unittest.TestCase):
                  "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True), "#150": approval_comment(f"#{N}@{C1[:7]}", issue=150)}
         for name, comment in cases.items():
             with self.subTest(name):
-                self.refused(batch_api(comment=comment), r"approval comment.*(owner|#15|edited)")
+                self.refused(batch_api(comment=comment), r"approval comment.*(owner|not on the state issue #399|edited)")
 
     def test_anything_but_update_branch_merges_of_main_after_the_approved_sha_is_refused(self):
         merge = commit(M2, [M1, MAIN2], "Merge branch 'main' into x")
