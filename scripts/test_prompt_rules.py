@@ -2555,7 +2555,7 @@ class DelegatedDecisionsTests(unittest.TestCase):
 
     RETAINED = (
         "settings outside git (repository settings, rulesets, environments, collaborator access)",
-        "`.claude` permissions and settings", "network allowlists", "licence and permission acceptances", "guard thresholds (600/1500)",
+        "`.claude` permissions and settings", "network allowlists", "licence and permission acceptances", "guard thresholds of 600 and 1500",
         "design and product sign-off",
         "merges of PRs with sync-merge content (sync and merge logic)",
         "the owner task M1-O5 (approving the privacy text before anyone but the owner installs the app)",
@@ -2693,7 +2693,7 @@ class DelegatedDecisionsTests(unittest.TestCase):
         ("the approver also approves (a) PRs with security-rules content (`firebase/` rules and their tests)", "the approver also approves (a) PRs"),
         ("(b) changes to the privacy docs (`docs/privacy/**`)", "(b) changes to docs"),
         ("only after a clean final review round, with green CI and no veto", "after the owner looks"),
-        ("a clean independent second-reviewer pass at max effort", "a second look"),
+        ("a clean independent second-reviewer pass (§7.2.2), with effort per `agents/roles.yaml`", "a second look"),
     )
 
     def test_the_widened_scope_is_pinned_in_orchestration(self):
@@ -2722,11 +2722,24 @@ class DelegatedDecisionsTests(unittest.TestCase):
             else:
                 self.assertIn("delegated-decisions" if label == "orchestrator" else "approver-role", ids(prompt_rules.check_text(label, stale)))
 
+    def test_the_second_reviewer_pass_has_no_effort_of_its_own_here(self):
+        # roles.yaml sets the effort (second-reviewer: high); the scope wording must not promise another one (orchestrator ruling, no roles.yaml change).
+        stale = "a clean independent second-reviewer pass at max effort"
+        for label, norm in (("ORCHESTRATION", prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))),
+                            ("orchestrator", prompt_rules.normalize(real("orchestrator"))), ("approver", prompt_rules.normalize(real("approver")))):
+            with self.subTest(text=label):
+                self.assertNotIn("second-reviewer pass at max effort", norm)
+                bad = norm + "\n" + stale + "\n"
+                if label == "ORCHESTRATION":
+                    self.assertIn("orch-delegated-decisions", self.doc_ids("docs/ORCHESTRATION.md", bad))
+                else:
+                    self.assertIn("delegated-decisions" if label == "orchestrator" else "approver-role", ids(prompt_rules.check_text(label, bad)))
+
     def test_the_orchestrator_sends_security_rules_and_privacy_prs_to_the_approver_only_inside_the_scope(self):
         for old, new in (
             ("or with an owner-only path outside the approver's scope (§1.1), is not approver work",
              "or with an owner-only path outside tooling, build, CI and gate files, is not approver work"),
-            ("a security-rules or `risk:high` PR only after its clean second-reviewer pass at max effort",
+            ("a security-rules or `risk:high` PR only after its clean second-reviewer pass, §7.2.2",
              "a security-rules PR at any time"),
         ):
             with self.subTest(old=old[:40]):
@@ -2757,7 +2770,7 @@ class DelegatedDecisionsTests(unittest.TestCase):
             "refuse if one fails",
             "a design or product doc, is not yours to approve",
             "security-rules content (`firebase/` rules and their tests)", "or a privacy doc (`docs/privacy/**`)",
-            "a `risk:high` or security-rules PR also has a clean independent second-reviewer pass at max effort",
+            "a `risk:high` or security-rules PR also has a clean independent second-reviewer pass (§7.2.2)",
             "whose first line is `batch approval: #N@<full head sha> (approver session <your session id>)`",
             "post one PR comment `approval refused` with the failed items and their evidence",
             "Then post the WORKER-RESULT block",
