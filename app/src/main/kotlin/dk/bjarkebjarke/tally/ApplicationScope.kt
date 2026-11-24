@@ -18,7 +18,7 @@ import javax.inject.Singleton
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope
 
-/** Its own module, so a test that replaces the session (SignedOutStartTest) keeps it (M1-88). */
+/** Its own module, so a test that replaces the session (SignInAndSignOutWiringTest) keeps it (M1-88). */
 @Module
 @InstallIn(SingletonComponent::class)
 object ApplicationScopeModule {
