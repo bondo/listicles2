@@ -7,6 +7,7 @@ import unittest
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 import pretooluse_guard
 from test_guard_round1 import PUSH, Base
+from test_pretooluse_guard import TOOLING
 
 P = "'core.hooksPath'='/x'"
 
@@ -15,7 +16,7 @@ class Round4(Base):
     def deny_git(self, cmds):
         """A .git form, judged as in a real session (CLAUDE_PROJECT_DIR set), in default and tooling sessions."""
         for c in cmds:
-            for env in ({"CLAUDE_PROJECT_DIR": self.d}, {"CLAUDE_PROJECT_DIR": self.d, "LISTICLES_TASK": "tooling"}):
+            for env in ({"CLAUDE_PROJECT_DIR": self.d}, {"CLAUDE_PROJECT_DIR": self.d, **TOOLING}):
                 with self.subTest(c=c, env=env):
                     self.assertEqual(self.bash(c, env), 2)
 

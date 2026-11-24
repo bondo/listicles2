@@ -2,7 +2,7 @@
 
 import unittest
 
-from test_pretooluse_guard import repo, run
+from test_pretooluse_guard import TOOLING, repo, run
 
 PROTECTED_PATHS = [".tools/bin/shellcheck", ".tools/bin/actionlint", ".tools/bin/zizmor", ".tools/x", "scripts/install_linters.sh",
                    "scripts/linters.pins", "sub/../.tools/bin/shellcheck", ".tools"]
@@ -23,8 +23,8 @@ class LinterDir(unittest.TestCase):
 
     def test_tooling_sessions_may_write(self):
         for p in PROTECTED_PATHS:
-            self.assertEqual(run("Write", {"file_path": p}, self.d, {"LISTICLES_TASK": "tooling"}), 0, p)
-        self.assertEqual(run("Bash", {"command": "echo x > .tools/bin/shellcheck"}, self.d, {"LISTICLES_TASK": "tooling"}), 0)
+            self.assertEqual(run("Write", {"file_path": p}, self.d, TOOLING), 0, p)
+        self.assertEqual(run("Bash", {"command": "echo x > .tools/bin/shellcheck"}, self.d, TOOLING), 0)
 
     def test_reading_and_running_stay_allowed(self):
         for c in ["cat scripts/linters.pins", "cat scripts/install_linters.sh", "ls .tools/bin", "scripts/install_linters.sh",

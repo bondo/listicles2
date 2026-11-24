@@ -5,11 +5,9 @@ import os
 import tempfile
 import unittest
 
-from test_pretooluse_guard import repo, run
+from test_pretooluse_guard import TOOLING, repo, run
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
-
-TOOLING = {"LISTICLES_TASK": "tooling"}
 
 
 class Forms(unittest.TestCase):

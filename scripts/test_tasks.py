@@ -115,6 +115,19 @@ class ValidateTest(unittest.TestCase):
         g = tasks.parse(path.read_text(encoding="utf-8"))  # strict: burn-down tasks required
         self.assertGreater(len(g.tasks), 0)
 
+    def test_agent_ids_take_two_or_three_digits(self):
+        # M1-99 was used, so M1-100 and up must validate; the pattern is pinned at two or three digits.
+        for tid in ("M1-03", "M1-99", "M1-100", "M1-999", "M1-001"):
+            self.assertIn(tid, graph(task(tid, milestone="M1")).by_id)
+        for tid in ("M1-1", "M1-1000", "M1-0100", "M1-ABC", "M1-1O0", "M1-10x", "M1-O", "M1-FU1", "M1-1 00"):
+            self.assertIn("id must look like", errors_of(task(tid, milestone="M1")), tid)
+
+    def test_three_digit_ids_keep_file_order_and_owner_ids(self):
+        g = graph(task("M1-100", milestone="M1"), task("M1-99", milestone="M1"), task("M1-O1", milestone="M1", assignee="owner"))
+        self.assertEqual(ready_ids(g), ["M1-100", "M1-99", "M1-O1"])  # position in the file, not id order
+        self.assertIn("owner tasks (and only they)", errors_of(task("M1-100", milestone="M1", assignee="owner")))
+        self.assertIn("id must look like", errors_of(task("M1-O100x", milestone="M1", assignee="owner")))
+
     def test_rejects_duplicate_ids(self):
         self.assertIn("duplicate id", errors_of(task("M0-01"), task("M0-01")))
 

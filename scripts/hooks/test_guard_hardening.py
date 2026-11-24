@@ -8,9 +8,8 @@ import unittest
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 import pretooluse_guard
 from test_guard_wrapper_forms import ROOT, WRAPPERS, dirty_repo
-from test_pretooluse_guard import repo, run
+from test_pretooluse_guard import TOOLING, repo, run
 
-TOOLING = {"LISTICLES_TASK": "tooling"}
 ESC = "\\"
 PUSH = "git push --force origin work"
 

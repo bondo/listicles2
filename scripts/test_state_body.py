@@ -37,7 +37,7 @@ STATE = {
     "next": ["#319 conflict fix, then a new owner approval", "#331 fix push, then R2"],
     "decisions": [{"comment": 7076085601, "what": "structured state body"}],
 }
-PROSE = "Living state for the Listicles orchestrator. Process: docs/ORCHESTRATION.md.\n\n## Standing rules\n- keep me\n"
+PROSE = "Living state for the Tally orchestrator. Process: docs/ORCHESTRATION.md.\n\n## Standing rules\n- keep me\n"
 
 
 def body(data=STATE, prose=PROSE, after=""):
@@ -85,6 +85,10 @@ def run_cli(*args, stdin=None):
 
 
 class ValidTest(unittest.TestCase):
+    def test_prose_mirrors_the_template_first_line(self):  # M1-92: the fixture and docs/orchestrator-state.md say the same name
+        template = (Path(__file__).resolve().parent.parent / "docs" / "orchestrator-state.md").read_text(encoding="utf-8")
+        self.assertIn(PROSE.splitlines()[0], template)
+
     def test_sample_state_is_valid(self):
         self.assertEqual(errors(body()), "")
         self.assertEqual(state_body.load(body()), STATE)
@@ -189,6 +193,12 @@ class SchemaTest(unittest.TestCase):
         self.assert_error(changed("sessions.0.status", "parked"), "sessions[0].status: expected one of")
         self.assert_error(changed("owner_queue.0.kind", "chore"), "owner_queue[0].kind: expected one of")
         self.assert_error(changed("sessions.0.role", "Implementer!"), "sessions[0].role: expected a role")
+
+    def test_task_ids_take_two_or_three_digits(self):
+        for ok in ("M1-99", "M1-100", "M1-999", "M1-O2", "M1-FU", "M0.5-100"):
+            self.assertEqual(errors(body(changed("sessions.0.tasks", [ok]))), "", ok)
+        for bad in ("M1-1", "M1-1000", "M1-0100", "M1-ABC", "M1-10x", "M1-\u0661\u0660\u0660", "M1-100\n"):
+            self.assert_error(changed("sessions.0.tasks", [bad]), "sessions[0].tasks[0]: expected a task id")
 
     def test_next_holds_one_to_three_actions(self):
         self.assertEqual(errors(body(changed("next", ["a", "b", "c"]))), "")
