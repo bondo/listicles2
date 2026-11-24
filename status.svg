@@ -163,7 +163,7 @@
 <text x="856" y="1574" class="warn" text-anchor="end">CI passing  behind main</text>
 <text x="24" y="1596" class="fg h">#384</text>
 <text x="80" y="1596" class="fg">M1-84: isolated projects, module build files read the roo…</text>
-<text x="856" y="1596" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="856" y="1596" class="warn" text-anchor="end">CI pending  behind main</text>
 <text x="24" y="1618" class="fg h">#393</text>
 <text x="80" y="1618" class="fg">M1-97: handover messages between orchestrators</text>
 <text x="856" y="1618" class="warn" text-anchor="end">CI passing  behind main</text>
