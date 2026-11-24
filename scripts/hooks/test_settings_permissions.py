@@ -174,7 +174,7 @@ class WrapperRule(unittest.TestCase):
         rx = rule_regex(MERGE_RULE)
         for cmd in [f"python3 -I scripts/merge_ready.py 12 {SHA} general", f"python3 -I scripts/merge_ready.py --wait --approval 7 12 {SHA} owner-batch"]:
             self.assertTrue(rx.fullmatch(cmd), cmd)
-        for cmd in [f"python3 scripts/merge_ready.py 12 {SHA} general", f"python3 -I scripts/test_merge_ready.py 12", "python3 -I scripts/merge_ready.py",
+        for cmd in [f"python3 scripts/merge_ready.py 12 {SHA} general", "python3 -I scripts/test_merge_ready.py 12","python3 -I scripts/merge_ready.py",
                     f"python3 -I scripts/merge_ready.pyx 12 {SHA} general", f"scripts/merge_ready.py 12 {SHA} general", "python3 -c 'import os'",
                     f"python3 -I ./scripts/merge_ready.py 12 {SHA} general", f"python3.13 -I scripts/merge_ready.py 12 {SHA} general",
                     f"PYTHONPATH=x python3 -I scripts/merge_ready.py 12 {SHA} general", "gh api -X PUT repos/bondo/tally/pulls/12/merge", "gh pr merge 12"]:
