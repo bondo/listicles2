@@ -1068,24 +1068,24 @@ notes = "Split from M1-66 (PR 368). Burns down #357 (PR 348 S1-01, owner-ok): cl
 
 [[task]]
 id = "M1-15"
-title = "Auth data: email and password steps in core/domain (sign-up, sign-in, verification, reset, error mapping, collision result), fakes for every step"
+title = "Auth data: email and password steps in core/domain (sign-up, sign-in, verification, reset, error mapping), fakes for every step"
 milestone = "M1"
 status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-88", "M1-62"]
 pr = 396
-notes = "Split (PR 396): with the Firebase data layer, its Auth emulator tests and the Hilt bindings the task measured about 700 changed lines (guard 600). This is part 1, as for M1-14: PasswordAuthentication and the PasswordAccount steps in core/domain (useAppLanguage right before every email, tested with a fake; answers that reveal nothing, AUTH-10; sign-up for an email that has an account signs nobody in and sends nothing, R3-01; GoogleSignInResult.EmailHasPasswordAccount for the non-Gmail collision), FakePasswordAuthentication in core/testing. M1-95 is the Firebase data layer, the emulator tests and the bindings"
+notes = "Split (PR 396): with the Firebase data layer, its Auth emulator tests and the Hilt bindings the task measured about 700 changed lines (guard 600). This is part 1, as for M1-14: PasswordAuthentication and the PasswordAccount steps in core/domain (useAppLanguage right before every email, tested with a fake; answers that reveal nothing, AUTH-10; sign-up for an email that has an account signs nobody in and sends nothing, R3-01), FakePasswordAuthentication in core/testing. M1-95 is the Firebase data layer, the emulator tests, the collision message and the bindings"
 
 [[task]]
 id = "M1-95"
-title = "Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), the email-verified gate, Hilt bindings"
+title = "Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), the collision message, the email-verified gate, Hilt bindings"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-15"]
-notes = "Split from M1-15 (PR 396). FirebaseAuthentication implements PasswordAuthentication (createUserWithEmailAndPassword, signInWithEmailAndPassword, useAppLanguage, sendEmailVerification, sendPasswordResetEmail, reload with a forced ID-token refresh once verified, so the rules see email_verified) and EmailVerification (the M1-62 gate) from the ID-token listener, maps Firebase's exceptions to PasswordAnswer and the non-Gmail collision to GoogleSignInResult.EmailHasPasswordAccount. Auth emulator tests with enumeration protection on, as in the real project (M1-O1), for each case of docs/milestones/M1.md (M1-15): sign-up for a new email and for one with a password or a Google-only account (no account, session or email), wrong password, unknown and Google-only email, a reset for each, the verification link (oobCodes) and the gate, the collision, and the reverse case of OQ-34(b) (a reset for a Google-only email: record what the emulator does). Bindings: PasswordAuthentication, PasswordAccount and EmailVerification (replacing the GateModule stand-in). Adds the owner task to check the recorded behaviour once in the real project (R1) before relying on it"
+notes = "Split from M1-15 (PR 396). FirebaseAuthentication implements PasswordAuthentication (createUserWithEmailAndPassword, signInWithEmailAndPassword, useAppLanguage, sendEmailVerification, sendPasswordResetEmail, reload with a forced ID-token refresh once verified, so the rules see email_verified) and EmailVerification (the M1-62 gate) from the ID-token listener, maps Firebase's exceptions to PasswordAnswer, and adds GoogleSignInResult.EmailHasPasswordAccount for the non-Gmail collision (wireframe 44; the Authentication KDoc and FirebaseAuthentication's comment point here). Auth emulator tests with enumeration protection on, as in the real project (M1-O1), for each case of docs/milestones/M1.md (M1-15): sign-up for a new email and for one with a password or a Google-only account (no account, session or email), wrong password, unknown and Google-only email, a reset for each, the verification link (oobCodes) and the gate, the collision, and the reverse case of OQ-34(b) (a reset for a Google-only email: record what the emulator does). Bindings: PasswordAuthentication, PasswordAccount and EmailVerification (replacing the GateModule stand-in). Adds the owner task to check the recorded behaviour once in the real project (R1) before relying on it"
 
 [[task]]
 id = "M1-16"

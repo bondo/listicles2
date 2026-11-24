@@ -40,7 +40,7 @@ class FirebaseAuthentication(
             GoogleSignInResult.SignedIn
         } catch (expected: FirebaseException) {
             // A refused token, no network, too many attempts or a disabled account. M1-95 tells the email collision
-            // (AUTH-10) apart: GoogleSignInResult.EmailHasPasswordAccount.
+            // (AUTH-10) apart.
             GoogleSignInResult.Failed
         }
     }
