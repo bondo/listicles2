@@ -1122,7 +1122,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-18"]
-notes = "Split from M1-18 (PR 395). The join screen's lookup of a code from a link (the invite's householdName, P2; expired checked on the client, used, revoked or never made denied by the rules) and the join batch of PLAN 3.1 (single use, displayName copied as in create, P9), with emulator tests for two and three users. A compiled, never-run draft of both (a code check before any document path, InviteUnusable for a refused batch) is in PR 395's commit b428104"
+notes = "Split from M1-18 (PR 395). The join screen's lookup of a code from a link (the invite's householdName, P2; expired checked on the client, used, revoked or never made denied by the rules) and the join batch of PLAN 3.1 (single use, displayName copied as in create, P9), with emulator tests for two and three users. A compiled, never-run draft of the join (a code check before any document path, InviteUnusable for a refused batch) with its emulator tests is in PR 395's commit b428104"
 
 [[task]]
 id = "M1-97"
