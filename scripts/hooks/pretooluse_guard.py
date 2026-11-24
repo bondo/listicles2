@@ -67,6 +67,18 @@ WRAPPER_WORD = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)) 
 # R2-01 of #237: a program is routed to the exact-call check by the START of its name (no boundary), because quotes and a line continuation make bash
 # run `scripts/mark-ready.sh12` for `scripts/mark-ready.sh""<backslash-newline>12`, a file the boundary form above does not recognise.
 WRAPPER_PREFIX = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")")
+# Owner request, 2026-11-24: the allow rule `Bash(python3 -I scripts/merge_ready.py *)` approves any command that starts with that text. So a
+# command that runs a merge_ready.py is allowed only as the whole command, exactly MERGE_READY_WHOLE, from the project root, while
+# scripts/merge_ready.py and scripts/repo_slug.py (which it imports) are regular files with these SHA-256 pins and no name in scripts/ is a standard
+# library module (merge_ready.py puts scripts/ first on sys.path, so scripts/pathlib.py would run). A legitimate edit of either file updates its pin
+# in the same reviewed tooling PR (test_guard_merge_ready.py fails until it does).
+MERGE_READY_SHA256 = "6be73624e01999ed3f2db2f6441f658f4e7c28350953704f9b7ee5cbfc961d9f"
+REPO_SLUG_SHA256 = "65666ea6c13c20c0f2530c60357913e0cd2c4a71e877d0b9890566774d3f9ead"
+MERGE_READY_PINS = {"merge_ready.py": MERGE_READY_SHA256, "repo_slug.py": REPO_SLUG_SHA256}
+MERGE_KINDS = ("working-draft-docs", "tasks-sync", "dependabot", "general")  # merge_ready.KINDS without owner-batch, which takes --approval
+MERGE_READY_WHOLE = re.compile(r"python3 -I scripts/merge_ready\.py(?: --wait)?(?: --approval [1-9][0-9]{0,19} " + PR_NUMBER.pattern + " "
+                               + HEX40.pattern + r" owner-batch| " + PR_NUMBER.pattern + " " + HEX40.pattern + " (?:" + "|".join(MERGE_KINDS) + "))")
+MERGE_READY_NAME = re.compile(r"(^|/)merge_ready\.py")  # the start of the name, as WRAPPER_PREFIX: `merge_ready.py""<backslash-newline>12` runs too
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -1086,6 +1098,75 @@ def check_mark_ready(cmd, assigns, words, wrappers, state):
              "only a tooling session may change the wrapper, together with the pin")
 
 
+def runs_merge_ready(words):
+    """True when the command runs a file whose name starts with merge_ready.py: directly, or as the script operand of an interpreter (the first
+    argument that is not an option; -c and -m run something else)."""
+    if MERGE_READY_NAME.search(words[0]):
+        return True
+    if not INTERPRETERS.match(os.path.basename(words[0])):
+        return False
+    args = iter(words[1:])
+    for a in args:
+        if a in ("-W", "-X", "--check-hash-based-pycs"):
+            next(args, None)
+        elif a.startswith("-") and not a.startswith("--") and re.search("[cm]", a[1:]):
+            return False
+        elif not a.startswith("-") or a == "-":
+            return bool(MERGE_READY_NAME.search(a))
+    return False
+
+
+def merge_ready_shadow(root):
+    """The first name in scripts/ that is a standard library module (pathlib.py, json/, _strptime.pyc, x.cpython-313-....so), or None."""
+    try:
+        names = sorted(os.listdir(os.path.join(root, "scripts")))
+    except OSError:
+        return None  # the pin check denies a missing directory
+    return next((n for n in names if n.split(".")[0] in sys.stdlib_module_names), None)
+
+
+def merge_ready_is_pinned(root):
+    """scripts/ is not a symlink, merge_ready.py and repo_slug.py are regular files (not symlinks) with their pinned SHA-256."""
+    scripts = os.path.join(root, "scripts")
+    try:
+        if os.path.islink(scripts):
+            return False
+        for name, pin in MERGE_READY_PINS.items():
+            path = os.path.join(scripts, name)
+            if not stat.S_ISREG(os.lstat(path).st_mode):
+                return False
+            with open(path, "rb") as f:
+                if hashlib.sha256(f.read()).hexdigest() != pin:
+                    return False
+    except OSError:
+        return False
+    return True
+
+
+def check_merge_ready(cmd, assigns, words, wrappers, state):
+    """The exact merge agent call only (owner request, 2026-11-24), as the whole command, from the project root, with the pinned files. Raw words
+    are judged, so $(...), backticks, $VAR, globs and braces never match."""
+    here = os.path.realpath(state["cwd"])
+    shape = ("`python3 -I scripts/merge_ready.py [--wait] [--approval <comment id>] <PR number> <40-hex sha> <kind>` "
+             "(--approval with kind owner-batch and only with it)")
+    if MERGE_READY_WHOLE.fullmatch(state.get("whole", "").strip(" \t\n")) is None:
+        deny(f"run merge_ready.py only as the whole command, exactly {shape}: nothing before, after or beside it "
+             "(no ; && || | & newline, group, subshell, wrapper, env prefix, redirect or nesting), because the guard checks the files before the rest "
+             "of the line runs")
+    exact = (MERGE_READY_WHOLE.fullmatch(" ".join(words)) is not None and not any(re.search(r"\s", w) for w in words)
+             and not assigns and not wrappers and not (cmd.writes or cmd.heredocs or cmd.subs)
+             and state["known"] and here in project_roots(state["cwd"]))
+    if not exact:
+        deny(f"run merge_ready.py only as exactly {shape} from the project root: no other path or interpreter, no cd or env prefix, "
+             "no wrapper, redirect or substitution (the project allow rule approves that text, so the guard narrows it)")
+    shadow = merge_ready_shadow(here)
+    if shadow:
+        deny(f"scripts/{shadow} has the name of a standard library module, and merge_ready.py puts scripts/ first on sys.path; remove it")
+    if not merge_ready_is_pinned(here):
+        deny("scripts/merge_ready.py or scripts/repo_slug.py is missing, a symlink, or not the pinned version (SHA-256 in pretooluse_guard.py); "
+             "only a tooling session may change them, together with the pins")
+
+
 def split_value(v, ifs):
     """Bash's field splitting of the value v of an unquoted expansion: (fields, lead, trail). IFS blanks collapse and are trimmed, every other IFS
     character ends a field (so a leading or doubled one leaves an empty field); lead says that leading blanks end the text before the value, trail
@@ -1225,6 +1306,9 @@ def check_simple(cmd, state, depth):
         check_command_string(s, child(state), depth + 1)
     if words and WRAPPER_PREFIX.search(words[0]):
         check_mark_ready(cmd, assigns, words, wrappers, state)
+        return
+    if words and runs_merge_ready(words):
+        check_merge_ready(cmd, assigns, words, wrappers, state)
         return
     if len(words) > 1 and INDEXED.match(words[0]):  # R4-04: FOO[a[1]]=1 git push ... runs git; the subscript cannot be parsed reliably
         deny("an indexed assignment such as NAME[k]=v in front of a command is not an assignment in bash, but the command still runs; remove it")

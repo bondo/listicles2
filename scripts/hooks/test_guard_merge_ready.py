@@ -75,10 +75,11 @@ class MergeReadyGuard(unittest.TestCase):
         self.denied([
             f"python3 scripts/merge_ready.py {args}", f"python3 -I -u scripts/merge_ready.py {args}", f"python3 -IS scripts/merge_ready.py {args}",
             f"python3 -I -W ignore scripts/merge_ready.py {args}", f"python3.13 -I scripts/merge_ready.py {args}", f"python -I scripts/merge_ready.py {args}",
-            f"/usr/bin/python3 -I scripts/merge_ready.py {args}", f"python3 -I ./scripts/merge_ready.py {args}", f"python3 -I app/scripts/merge_ready.py {args}",
-            f"python3 -I {self.d}/scripts/merge_ready.py {args}", f"scripts/merge_ready.py {args}", f"./scripts/merge_ready.py {args}",
-            f"python3 -I 'scripts/merge_ready.py' {args}", f'"{CALL}"', f"python3 -I scripts/merge_ready.py\\ {args}",
-            f'python3 -I scripts/merge_ready.py""\\\n{args}', f"python3 -I scripts/merge_ready.py\\\n{args}", f"python3 -I scripts/merge_ready.py12 {SHA} general",
+            f"/usr/bin/python3 -I scripts/merge_ready.py {args}", f"python3 -I ./scripts/merge_ready.py {args}",
+            f"python3 -I app/scripts/merge_ready.py {args}", f"python3 -I {self.d}/scripts/merge_ready.py {args}", f"scripts/merge_ready.py {args}",
+            f"./scripts/merge_ready.py {args}", f"python3 -I 'scripts/merge_ready.py' {args}", f'"{CALL}"', f"python3 -I scripts/merge_ready.py\\ {args}",
+            f'python3 -I scripts/merge_ready.py""\\\n{args}', f"python3 -I scripts/merge_ready.py\\\n{args}",
+            f"python3 -I scripts/merge_ready.py12 {SHA} general",
         ])
         self.assertEqual(self.bash(CALL, os.path.join(self.d, "app")), 2, "from a subdirectory")
 
