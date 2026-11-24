@@ -10,40 +10,38 @@ review R1 (comment 7120462121) and S1 (comment 7120410680), both changes_request
 
 ## Done
 - Everything up to 1bcf75d: verify.sh all 77 steps passed, CI green; WORKER-RESULT comment 7120207727; M1-88 draft comment
-  7119090146 (Hilt bindings, do not apply here). Handed off at 60% context before any fix-round commit (this file only).
+  7119090146 (Hilt bindings, do not apply here).
+- Round 1 fix round (second implementer session), pushed:
+  - ddfe7d5 failing `ManifestSurfaceTest` (JUnit 5, reads the merged RELEASE manifest; `app/build.gradle.kts`
+    `ReleaseManifestArgs` passes its path, `SingleArtifact.MERGED_MANIFEST`); 4 of 4 failed for the right reasons.
+  - 450352d R1-01 = S1-03: new `core/data/src/main/AndroidManifest.xml` removes USE_BIOMETRIC, USE_FINGERPRINT,
+    GenericIdpActivity, RecaptchaActivity (`tools:node="remove"`); app manifest declares INTERNET. Test 4/4 green, lint ok.
+  - 6718237 R1-02 text, nits R1-03 = S1-01, S1-02.
 
 ## Next (in order)
-1. R1-01 = S1-03 (minor, fix now), test first. New Robolectric test in `app/src/test/kotlin/dk/bjarkebjarke/tally/`
-   (for example `ManifestSurfaceTest`) that pins with exact sets:
-   - requested permissions: `packageManager.getPackageInfo(packageName, GET_PERMISSIONS).requestedPermissions`;
-   - exported components: activities, services, receivers and providers with `exported == true`.
-   Commit it red, then edit `app/src/main/AndroidManifest.xml` (add `xmlns:tools`):
-   - `tools:node="remove"` for `android.permission.USE_BIOMETRIC` and `android.permission.USE_FINGERPRINT`;
-   - `<activity android:name="com.google.firebase.auth.internal.GenericIdpActivity" tools:node="remove" />`;
-   - RecaptchaActivity and READ_GSERVICES only if email and password sign-in does not need them (see Facts), else keep each
-     with a one-line reason;
-   - declare `android.permission.INTERNET` with a one-line reason (Firebase), like ACCESS_NETWORK_STATE. Keep INTERNET.
-2. R1-02 (minor): in `core/data/src/main/res/values/google_sign_in.xml` (comment) and the companion KDoc of
-   `CredentialManagerGoogleCredentials`, say that the value only comes from a google-services.json downloaded after Google
-   sign-in is enabled, so the release secret must be replaced then. Do not edit PR #367 (the orchestrator carries the step).
-3. Nits R1-03 = S1-01 and S1-02, same commit if trivial: "Google ID option" becomes "Sign in with Google" in
-   `gradle/libs.versions.toml` (the credentials comment), the class KDoc of `CredentialManagerGoogleCredentialsTest`, the M1-66
-   title in `docs/tasks.toml`, `core/domain/.../session/GoogleCredentials.kt` line 4, and `docs/milestones/M1.md` (M1-14
-   paragraph, "Credential Manager with the Google ID option"). `config/licensee/policy.gradle` line 1: add `:core:data`.
-4. Plain `git push` (foreign-commit check first), `scripts/verify.sh` (about 50 minutes; gate tests run), no loop-wait for CI,
-   keep the PR draft. Refresh the PR body (decision lines for the manifest), delete this file in the last commit, then send
-   orchestrator #40 a one-line WORKER-RESULT with the new head and the lines changed.
+1. `scripts/verify.sh` at 6718237 (about 50 minutes). Guarded diff is 538 lines without this file (618 with it: CI's
+   guards job fails until this file is deleted).
+2. Refresh the PR body (see Decisions made), delete this file in the last commit, push, post the WORKER-RESULT comment,
+   send orchestrator #40 a one-line WORKER-RESULT (fix commits: 163 changed lines in 12 files).
 
 ## Decisions made
 - Button flow (`GetSignInWithGoogleOption`), not the two-step Google ID option: both reviewers agree (R1, S1).
 - Split M1-88 (bindings) and M1-89 (#357): both reviewers agree; 389 guarded lines.
 - `credentials-play-services-auth` is `api` in `:core:data` (lint CredentialDependency).
+- Removals live in `:core:data`'s manifest, not the app's: lint MissingClass (`:app:lintDebug`) fails on the activity names,
+  because firebase-auth is only on `:core:data`'s compile classpath; no suppression. The library `<application>` carries
+  `allowBackup="false"` for the build guard (M1-58). The merger report shows the library entries REJECTED.
+- Kept with reasons in the test: READ_GSERVICES (reCAPTCHA SDK reads the GSF android_id, no catch at that level, once
+  reCAPTCHA protection is on: a console switch), RevocationBoundService and ProfileInstallReceiver (signature/DUMP).
+- RecaptchaActivity is started only from `FirebaseAuth.zzQ/zzR(PhoneAuthOptions)` (firebase-auth 25.0.0 bytecode);
+  GenericIdpActivity only from `OAuthProvider`. Propose to the orchestrator: M3-O1 (PR #367) replaces the release
+  google-services.json copies after enabling Google sign-in (R1-02).
 
 ## Open findings
-- R1-01 = S1-03, minor, open: unused permissions and exported Firebase Auth activities in the merged manifest.
-- R1-02, minor, open: web client id needs a re-downloaded google-services.json; say so.
-- R1-03 = S1-01, nit, open (accepted, fix if trivial): "Google ID option" wording.
-- S1-02, nit, open (accepted, fix if trivial): policy.gradle header.
+- R1-01 = S1-03, minor, fixed (ddfe7d5 test, 450352d fix).
+- R1-02, minor, fixed (6718237).
+- R1-03 = S1-01, nit, fixed (6718237).
+- S1-02, nit, fixed (6718237).
 
 ## Commands to resume
 ```
@@ -68,13 +66,15 @@ scripts/verify.sh
   - RevocationBoundService (play-services-auth, protected by REVOCATION_NOTIFICATION);
   - ProfileInstallReceiver (protected by DUMP).
 - Debug also exports `androidx.compose.ui.tooling.PreviewActivity` and `androidx.activity.ComponentActivity`
-  (debugImplementation ui-tooling and ui-test-manifest). Unit tests see the debug manifest; say so in the test.
+  (debugImplementation ui-tooling and ui-test-manifest). Robolectric sees the debug manifest, so ManifestSurfaceTest
+  parses the release one (path from Gradle) instead.
 - GenericIdpActivity serves only browser sign-in with an OAuthProvider (Tally has none).
 - RecaptchaActivity: the reviewers believe it serves only phone auth's browser reCAPTCHA. Check the firebase-auth 25.0.0
   classes in `~/.gradle/caches/modules-2` before removing it.
 - READ_GSERVICES: used by the reCAPTCHA SDK, which Firebase Auth runs for email and password only when the project turns on
   reCAPTCHA protection (off in tally-c1a15). If you cannot show it is unneeded, keep it with that reason.
-- Maven Central answers 429 now and then: retry. A verify run takes about 50 minutes (the gate self-tests run).
+- Maven Central answers 429 now and then (a plugin can then show as "not found"): retry. A verify run takes about 50
+  minutes (the gate self-tests run). A push runs the pre-push hook (guards, hook tests, unit tests): about 10 minutes.
 
 ## Waiting on the owner
 - none
