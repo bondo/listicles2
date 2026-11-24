@@ -11,11 +11,11 @@ import * as h from "./harness";
 // decided on #280 (M1-O12): a plain member lists the invites they created, the owner all of the
 // household's; delete invite: its creator's or the owner's revoke, any member's cleanup of an
 // expired one; no updates. The joiner's delete is M1-54's (join.test.ts); the owner's cleanup
-// under a tombstone is M1-11's (tombstone.test.ts), so no test here reads or deletes as that owner.
+// under a tombstone is M1-95's (tombstone.test.ts), so no test here reads or deletes as that owner.
 // Each test seeds its world with rules off; every allow test goes through h.verifiedOnly.
 // No test can isolate these (a scratch mutation pass dropped each condition in turn): on create,
 // hasAll (each key's value has its own check) and `expiresAt is timestamp` (any other type fails the
-// comparison with request.time); LIVE on the owner's delete path (M1-11's cleanup allows the owner
+// comparison with request.time); LIVE on the owner's delete path (M1-95's cleanup allows the owner
 // the same delete under a tombstone).
 type Fields = Record<string, unknown>;
 type Clients = Record<h.Client, h.Db>;

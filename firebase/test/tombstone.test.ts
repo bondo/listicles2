@@ -7,18 +7,19 @@ import {
 import firebase from "firebase/compat/app";
 import * as h from "./harness";
 
-// M1-11, first part (PLAN 3.1 Delete household; #199, #205): the owner's soft delete, which must
-// clear the name; no rule deletes a household doc, live or a tombstone; under a tombstone the
+// M1-95, split from M1-11 (PLAN 3.1 Delete household; #199, #205): the owner's soft delete, which
+// must clear the name; no rule deletes a household doc, live or a tombstone; under a tombstone the
 // owner's cleanup (get, list and delete of the members, the removed markers and the household's
 // invites, one rule each) and a member's delete of her own member doc (P6), and no other write.
-// Leave, Remove member and its marker writes come in a later PR; the transfer, the join, a member's
+// Leave, Remove member and its marker writes are M1-11's; the transfer, the join, a member's
 // invite create and the own display name under a tombstone are denied in their own files. Each
 // test seeds its world with rules off; every allow test goes through h.verifiedOnly.
-// No test can isolate these: `deleted == true` on the cleanup paths of the invite get, list and
-// delete and of the member reads (in a live household a member, the owner too, may make them), and
-// LIVE on the owner's revoke (the cleanup allows the same delete). Not pinned: `deleted == true` on
-// the markers' get, list and delete, since Remove member lets the owner of a live household make
-// them.
+// No test can isolate these: `deleted == true` on the cleanup paths of the invite get and delete
+// (a live household's invite is anyone's to get and its owner's to revoke), and LIVE on the
+// owner's revoke (the cleanup allows the same delete). On the member reads and the invite list it
+// is isolated only in a world the app never makes (the last describe). Not pinned: `deleted ==
+// true` on the markers' get, list and delete, since M1-11's Remove member lets the owner of a live
+// household make them.
 type Fields = Record<string, unknown>;
 type Clients = Record<h.Client, h.Db>;
 type Request = (db: h.Db) => Promise<unknown>;
@@ -232,7 +233,7 @@ describe("Delete household: the owner's cleanup under the tombstone", () => {
     });
 
     // The cleanup needs deleted == true: in a live household the owner deletes a member doc only
-    // through Remove member (a later PR), never his own.
+    // through Remove member (M1-11), never his own.
     test.each<[string, string]>([
         ["a plain member's, without the removed marker", ALICE],
         ["his own", BOB],
@@ -284,4 +285,31 @@ test.each<[string, () => h.Db, Request]>([
     ],
 ])("denied under the tombstone: %s", async (_what, db, request) => {
     await assertFails(request(db()));
+});
+
+// The cleanup reads on their own, in a world the app never makes: frank owns NEST, which is live,
+// with no member doc there, so only the cleanup's `deleted == true` can deny his reads; a rule that
+// let the owner read without it would let him in.
+describe("The cleanup reads need deleted == true", () => {
+    const NEST = "household00000000004";
+
+    beforeEach(async () => {
+        await seed({
+            [household(NEST)]: { ...LIVE, createdBy: FRANK, ownerUid: FRANK },
+            [member(NEST, ALICE)]: membership("member"),
+            [invite(code(NEST, "a"))]: {
+                ...stored(ALICE),
+                householdId: NEST,
+                householdName: "Home",
+            },
+        });
+    });
+
+    test.each<[string, Request]>([
+        ["a member doc", get(member(NEST, ALICE))],
+        ["the members", membersOf(NEST)],
+        ["the invites, by householdId", invitesOf(NEST)],
+    ])("denied: the owner of a live household, no member there, reads %s", async (_what, read) => {
+        await assertFails(read(frank.verified));
+    });
 });
