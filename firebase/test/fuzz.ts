@@ -44,6 +44,7 @@ const INVITE = { householdId: H1, householdName: "Home", createdBy: CAROL, expir
 const ASKED: m.Doc = { ...INVITE, createdAt: m.NOW, expiresAt: SOON }; // carol's invite create
 // The invite readers: each user with a verified email, and bob without one.
 const UNVERIFIED: m.Caller = { uid: BOB, auth: "unverified" };
+const JOINED: m.Doc[] = [{}, {}, {}, {}, { role: "owner" }, { joinedAt: m.T0 }, { color: 1 }];
 const READERS = [...UIDS.map((uid): m.Caller => ({ uid, auth: "verified" })), UNVERIFIED];
 const points = (householdId: string | null): m.Doc => ({ householdId });
 // For reads: bob's household with carol (alice, removed, still names it) and dan's tombstone (his
@@ -139,21 +140,25 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         const v = n % 16;
         const invite = { ...INVITE, expiresAt: [2, 4, 5].includes(v) ? m.T0 : LATER };
         const home = { ...LIVE, deleted: v === 5 || v === 6 };
-        const world = { ...CAROLS, [m.member(H1, DAN)]: MEMBER, [m.household(H1)]: home };
+        const dans = { ...MEMBER, viaInvite: CODE }; // he joined through it; it was made again (P3)
+        const world = { ...CAROLS, [m.member(H1, DAN)]: dans, [m.household(H1)]: home };
         const uid = [CAROL, BOB, DAN, DAN, ALICE, CAROL, BOB][v] ?? CAROL;
         return draft(uid, { ...world, [`invites/${CODE}`]: invite }, del(`invites/${CODE}`));
     },
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
     // dan joins bob's household through carol's invite (M1-54): his member doc, the invite's delete
-    // and his users doc, in one batch.
-    join: () =>
-        draft(
-            DAN,
-            { ...CAROLS, [`invites/${CODE}`]: INVITE, [m.user(DAN)]: points(null) },
-            set(m.member(H1, DAN), { ...MEMBER, joinedAt: m.NOW, viaInvite: CODE }),
-            del(`invites/${CODE}`),
-            up(m.user(DAN), points(H1)),
-        ),
+    // and his users doc in one batch. By n % 16: the base case (0, 7 to 15); the invite expired (1);
+    // its creator, carol, no longer a member (2); the invite kept (3); dan's doc with role owner, an
+    // earlier joinedAt or an unknown key (4 to 6).
+    join: (n) => {
+        const v = n % 16;
+        const doc: m.Doc = { ...MEMBER, joinedAt: m.NOW, viaInvite: CODE, ...JOINED[v] };
+        const invite = { ...INVITE, expiresAt: v === 1 ? m.T0 : LATER };
+        const world = { ...(v === 2 ? HOME : CAROLS), [`invites/${CODE}`]: invite };
+        const deletes = v === 3 ? [] : [del(`invites/${CODE}`)];
+        const writes = [set(m.member(H1, DAN), doc), ...deletes, up(m.user(DAN), points(H1))];
+        return draft(DAN, { ...world, [m.user(DAN)]: points(null) }, ...writes);
+    },
     // Extension points that add a path to an allow statement the rules have (one with an allow
     // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
     "M1-11 soft delete": () => draft(BOB, HOME, up(m.household(H1), { deleted: true, name: "" })),
