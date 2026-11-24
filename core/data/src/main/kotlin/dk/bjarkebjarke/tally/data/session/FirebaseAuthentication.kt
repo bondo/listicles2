@@ -21,6 +21,9 @@ class FirebaseAuthentication(
     private val auth: FirebaseAuth,
 ) : SessionState,
     Authentication {
+    /** The app's session (M1-88): the default Firebase app's Auth. */
+    constructor() : this(FirebaseAuth.getInstance())
+
     /** Firebase reports the state as soon as the flow is collected, then every sign-in and sign-out. */
     override fun signedIn(): Flow<Boolean> =
         callbackFlow {
