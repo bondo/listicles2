@@ -997,6 +997,8 @@ class Conventions(unittest.TestCase):
             "def r = 'project' ':b'",
             "def m = project.class.getMethod('project', String)",
             "evaluate('project(\":b\")')",
+            "def p = project.@parent",
+            "def p = project?.@'parent'",
         ):
             with self.subTest(code=code):
                 found = self.problems({"config/licensee/policy.gradle": code + "\n"})
