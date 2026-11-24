@@ -99,6 +99,11 @@ const MUTANTS: [string, string, string][] = [
         "&& true",
     ],
     [
+        "Invite delete: a joiner burns another invite in the join batch",
+        ".data.viaInvite == code",
+        ".data.viaInvite != null",
+    ],
+    [
         "Invite list: by a non-member who created them or owns the household",
         "uid)\n        && exists(memberDoc(invite.householdId, request.auth.uid))",
         "uid)",
