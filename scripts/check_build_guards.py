@@ -40,13 +40,16 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `target`, `this` or `getProject()` (also backticked, in parentheses, after `!!` or a cast). A `project(...)`/`findProject(...)` that is
    not a direct argument of a dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block,
    `"conf"(...)`, Groovy `conf project(...)`, or `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in
-   between), so one held in a variable or in `configure(listOf(project(...))) { }` fails; so do a callable reference (`::project`, Groovy
-   `.&project`), a Groovy method name in any string (`'project'(...)`, triple-quoted, slashy, `.&"project"`) or built by a GString
-   (`owner."${n}"`), Groovy command syntax (`project ':app', { }`) and `invokeMethod`; a backticked name counts as the plain one (PR 384
-   R1, R2). A project dependency (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known
-   gaps: `.parent` on another receiver (File.parent has the same name), and a Project reached through a helper function. Fails closed on: a
-   Kotlin parameter, named argument or Groovy map key called `parent`, a settings plugin in build-logic/ Kotlin that reads
-   `settings.rootProject`, and a Groovy `conf project(':a'), project(':b')` list.
+   between), so one held in a variable or in `configure(listOf(project(...))) { }` fails; so does a callable reference (`::project`, Groovy
+   `.&project`) and a quoted `project`/`findProject` call. A backticked name counts as the plain one. Groovy resolves names at run time, so
+   in a .gradle file the class is denied, not the names: a string literal used as a name (after `.`, `.&` or `.@`, called, in command
+   syntax, as a subscript key), Groovy command syntax (`project ':app', { }`, `project':b'`), a dynamic member `.(expr)`, a slashy name or
+   call, `\\uXXXX` in code, `invokeMethod` and the meta and reflection API (`getMetaMethod`, `metaClass`, `getProperty`, `property`,
+   `getMethod`, `forName`, `evaluate` and the like; PR 384 R1 to R3). A project dependency (`implementation(project(":x"))`,
+   `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the same
+   name), and a Project reached through a helper function or a reflection API not in that list. Fails closed on: a Kotlin parameter, named
+   argument or Groovy map key called `parent`, a settings plugin in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy
+   `conf project(':a'), project(':b')` list.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
@@ -614,14 +617,14 @@ PROJECT_CALL = re.compile(r"(?<![\w$])`?(?:project|findProject)`?\s*\(")  # also
 # the names it knows: a string literal used as a name (after `.` or `.&`, called, in command syntax, as a subscript key), a dynamic
 # member `.(expr)`, a slashy string in a name or call position, `\uXXXX` in code, and the meta and reflection API.
 PROJECT_NAMES = {"project", "findProject"}
-MEMBER_BEFORE = re.compile(r"\.\s*&?\s*$")
+MEMBER_BEFORE = re.compile(r"\.\s*[&@]?\s*$")  # also Groovy method pointer .& and direct field access .@
 CALL_AFTER = re.compile(r"\s*\(")
 # Groovy command syntax after a name (an argument, not `in`, `instanceof` or `as`; PR 384 R2-01), with no space before a quote (R3-01).
 COMMAND_AFTER = re.compile(r"""[ \t]+(?!(?:in|instanceof|as)\b)['"\w$]|['"]""")
 GROOVY_COMMAND = re.compile(r"""(?<![\w$])`?(?:project|findProject)`?(?:[ \t]+(?!(?:in|instanceof|as)\b)(?=['"\w$/\[])|(?=['"]))""")
 SUBSCRIPT_BEFORE = re.compile(r"[\w$)\]]\s*\[\s*$")
 GROOVY_DYNAMIC = re.compile(
-    r"[?*]?\.\s*&?\s*(?:\(|\$?/)"  # project.(expr), project.&(expr), owner./name/, owner.$/name/$
+    r"[?*]?\.\s*[&@]?\s*(?:\(|\$?/)"  # project.(expr), project.&(expr), owner./name/, owner.$/name/$
     r"|\\u[0-9a-fA-F]{4}"
     r"|(?<![\w$])(?:getMetaMethod|getMetaClass|metaClass|getProperty|setProperty|property|getMethod|getMethods|getDeclaredMethod"
     r"|getDeclaredMethods|forName|evaluate|Eval|GroovyShell|respondsTo|methodMissing|propertyMissing)(?![\w$])"
@@ -654,9 +657,8 @@ def string_names(raw, text, starts, groovy):
     found = []
     for q, e, contents in literals(raw, starts):
         before = text[max(0, q - WINDOW) : q]
-        if MEMBER_BEFORE.search(before) or (contents in PROJECT_NAMES and CALL_AFTER.match(text, e)):
-            found.append(q)
-        elif groovy and (CALL_AFTER.match(text, e) or COMMAND_AFTER.match(text, e) or SUBSCRIPT_BEFORE.search(before)):
+        named = MEMBER_BEFORE.search(before) or (contents in PROJECT_NAMES and CALL_AFTER.match(text, e))
+        if named or (groovy and (CALL_AFTER.match(text, e) or COMMAND_AFTER.match(text, e) or SUBSCRIPT_BEFORE.search(before))):
             found.append(q)
     return found
 
