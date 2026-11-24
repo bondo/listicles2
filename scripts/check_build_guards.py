@@ -33,14 +33,17 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `subprojects` or `childProjects` (also `getAllprojects()` and the like, so a read such as `allprojects.flatMap { ... }` too; M1-68 part B3,
    issue 48), member access on (also after `?` or `!!`) or a configure block for `project(...)`/`findProject(...)`, a `project(path, ...)`
    call with an Action or lambda argument, `evaluationDependsOn`, and
-   `gradle.allprojects`/`beforeProject`/`afterProject`. M1-84 (isolated projects): any `rootProject` (also `getRootProject()`, passed or
-   held in a variable, `gradle.rootProject { }`) other than `isolated.rootProject`, which reads the root's directory; in a settings file
-   `rootProject` is the project descriptor (`rootProject.name`), so there only `gradle.rootProject` fails. `parent` (also `getParent()`)
-   with the implicit receiver or on `project`/`target`. A `project(...)`/`findProject(...)` that is not a direct argument of a dependency
-   declaration (a call in a `dependencies { }` block or `dependencies.<conf>(...)`, not `listOf`, `with`, `run`, `configure` or the like),
-   so one held in a variable or in `configure(listOf(project(...))) { }` fails. A project dependency (`implementation(project(":x"))`,
-   `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the
-   same name), and a Project reached through a helper function.
+   `gradle.allprojects`/`beforeProject`/`afterProject`/`projectsLoaded`/`projectsEvaluated`. M1-84 (isolated projects): any `rootProject`
+   (also `getRootProject()`, passed, held in a variable or in string template code, `gradle.rootProject { }`) other than
+   `isolated.rootProject`, which reads the root's directory; in a settings file `rootProject` is the project descriptor, so there only
+   `rootProject.name`, `.buildFileName` and `.projectDir` pass. `parent` (also `getParent()`) with the implicit receiver or on `project`,
+   `target`, `this` or `getProject()`. A `project(...)`/`findProject(...)` that is not a direct argument of a dependency declaration
+   (an allowlist: a call that is a whole statement in a `dependencies { }` block, `"conf"(...)`, Groovy `conf project(...)`, or
+   `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in between), so one held in a variable or in
+   `configure(listOf(project(...))) { }` fails. A project dependency (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`)
+   is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the same name), and a Project reached
+   through a helper function. Fails closed on: a Kotlin parameter, named argument or Groovy map key called `parent`, a settings plugin
+   in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf project(':a'), project(':b')` list.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
@@ -81,10 +84,14 @@ def read(root, rel):
 
 # -- source text without comments --------------------------------------------------------------------------------------------------
 
-def strip(text, blank_strings=False, strings=None):
+TEMPLATE_NAME = re.compile(r"\$[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")  # `$name`, Groovy `$a.b.c`
+
+
+def strip(text, blank_strings=False, strings=None, templates=False):
     """The text with every comment replaced by spaces (newlines kept, so offsets and lines stay); with blank_strings also the
     contents of string literals. Reads Kotlin (`"..."` with `${...}`, `\"\"\"...\"\"\"`) and Groovy (`'...'`) strings. A list passed
-    as strings receives the offset where the contents of each string literal start."""
+    as strings receives the offset where the contents of each string literal start. With templates, blank_strings keeps the code of
+    `${...}` and `$name` templates (`$a.b.c` for Groovy), so check 4 reads `"${rootProject.projectDir}"`."""
     out = list(text)
     n = len(text)
 
@@ -124,6 +131,7 @@ def strip(text, blank_strings=False, strings=None):
     def string(i):
         start = i
         q = text[i]
+        keep = []  # template code spans kept with templates
         triple = text.startswith(q * 3, i)
         i += 3 if triple else 1
         if strings is not None:
@@ -142,11 +150,22 @@ def strip(text, blank_strings=False, strings=None):
             if not triple and c == "\n":  # an unterminated string ends at the line
                 break
             if q == '"' and c == "$" and text.startswith("{", i + 1):
-                i = code(i + 2, True)
+                j = code(i + 2, True)
+                keep.append((i, j))
+                i = j
+                continue
+            m = TEMPLATE_NAME.match(text, i) if q == '"' else None
+            if m:
+                keep.append((i + 1, m.end()))  # without the `$`, so the name reads as code
+                i = m.end()
                 continue
             i += 1
         if blank_strings:
-            blank(start + 1, max(start + 1, i - 1))
+            a = start + 1
+            for k0, k1 in (keep if templates else []):
+                blank(a, k0)
+                a = k1
+            blank(a, max(a, i - 1))
         return i
 
     code(0, False)
@@ -538,7 +557,7 @@ CROSS_PROJECT = re.compile(
     # PR 359 R1-01: project(path, Action { }) and project(path, { }).
     r"|(?<![\w$])project\s*\([^(){}]*,\s*(?:Action\b|\{)"
     r"|(?<![\w$])evaluationDependsOn(?:Children)?\b"
-    r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject)\b"
+    r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject|projectsLoaded|projectsEvaluated)\b"
 )
 # What the convention plugins own; a module build file that sets one again makes a second copy that can drift. Since M1-68 part B
 # that includes the JUnit Platform, failOnNoDiscoveredTests (checkTestSettings checks the result per module) and :core:testing.
@@ -562,40 +581,88 @@ def module_paths(root):
 
 
 # M1-84, isolated projects: the root project is read only through `isolated.rootProject` (an IsolatedProject: its directory, name and
-# path); in a settings file `rootProject` is the ProjectDescriptor (`rootProject.name`), so there only `gradle.rootProject` counts.
+# path). In a settings file `rootProject` is the ProjectDescriptor: there only `rootProject.name`, `.buildFileName` and `.projectDir`
+# (also on `settings.`) pass.
 ROOT_PROJECT = re.compile(r"(?<![\w$])(?:rootProject|getRootProject\s*\(\s*\))(?![\w$])")
 ISOLATED_BEFORE = re.compile(r"(?<![\w$])(?:isolated|getIsolated\s*\(\s*\))\s*(?:\?|!!)?\s*\.\s*$")
-GRADLE_BEFORE = re.compile(r"(?<![\w$])(?:gradle|getGradle\s*\(\s*\))\s*(?:\?|!!)?\s*\.\s*$")
-# The parent project: with the implicit receiver (`parent`, `getParent()`) or on `project`/`target`. A `.parent` on any other receiver is
-# not read: File.parent and Path.parent have the same name (a known gap).
+DESCRIPTOR = re.compile(r"\s*\.\s*(?:name|buildFileName|projectDir)(?![\w$])")
+SETTINGS_RECEIVER = re.compile(r"(?:^|[^\w$.\s])\s*(?:settings\s*\.\s*)?$")
+# The parent project: with the implicit receiver (`parent`, `getParent()`) or on `project`, `target`, `this` or `getProject()`. A
+# `.parent` on any other receiver is not read: File.parent and Path.parent have the same name (a known gap).
 PARENT = re.compile(
     r"(?<![\w$.])(?:parent|getParent\s*\(\s*\))(?![\w$])"
-    r"|(?<![\w$])(?:project|target)\s*(?:\?|!!)?\s*\.\s*(?:parent|getParent\s*\(\s*\))(?![\w$])"
+    r"|(?<![\w$])(?:project|target|this|getProject\s*\(\s*\))\s*(?:\?|!!)?\s*\.\s*(?:parent|getParent\s*\(\s*\))(?![\w$])"
 )
 # project(...)/findProject(...) on any receiver but `dependencies.` (DependencyHandler.project, a dependency). It passes only as a direct
-# argument of a dependency declaration: a call in a `dependencies { }` block or `dependencies.<conf>(...)` that is not one of these.
+# argument of a dependency declaration (an allowlist): a call that is a whole statement in a `dependencies { }` block (`conf(...)`,
+# `"conf"(...)`, `add("conf", ...)`, Groovy `conf project(...)`, optionally with a configuration block) or `dependencies.<conf>(...)`,
+# with only testFixtures, platform or enforcedPlatform between it and project(...).
 PROJECT_CALL = re.compile(r"(?<![\w$])(?:project|findProject)\s*\(")
 DEPENDENCIES_BEFORE = re.compile(r"(?<![\w$])dependencies\s*\.\s*(?:constraints\s*\.\s*)?$")
-NOT_DEPENDENCY_CALLS = KEYWORDS | {
-    "with", "run", "apply", "also", "let", "takeIf", "takeUnless", "configure", "listOf", "setOf", "arrayOf", "mutableListOf",
-    "mutableSetOf", "listOfNotNull", "setOfNotNull", "sequenceOf", "project", "findProject", "requireNotNull", "checkNotNull",
-}
+WRAPPERS = {"testFixtures", "platform", "enforcedPlatform"}
+NOT_DEPENDENCY_CALLS = KEYWORDS | {"with", "run", "apply", "also", "let", "configure", "project", "findProject"}
+STATEMENT_START = re.compile(r"(?:^|[\n;{])[ \t]*$")
+STATEMENT_END = re.compile(r"[ \t]*(?:$|[\n;}]|\{)")
+WINDOW = 400  # how far back a receiver is looked for
 
 
 def is_settings(p):
     name = p.rsplit("/", 1)[-1]
-    return name in ("settings.gradle.kts", "settings.gradle") or name.endswith(".settings.gradle.kts")
+    return name in ("settings.gradle.kts", "settings.gradle") or name.endswith((".settings.gradle.kts", ".settings.gradle"))
 
 
-def dependency_argument(blank, pos, deps):
+def opener(blank, pos):
+    """The offset of the innermost bracket that is open at pos, or -1."""
+    depth = 0
+    for i in range(pos - 1, -1, -1):
+        c = blank[i]
+        if c in ")]}":
+            depth += 1
+        elif c in "([{":
+            if not depth:
+                return i
+            depth -= 1
+    return -1
+
+
+def closer(blank, i):
+    """The offset just after the bracket that closes the one at i."""
+    depth = 0
+    for j in range(i, len(blank)):
+        depth += {"(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1}.get(blank[j], 0)
+        if not depth:
+            return j + 1
+    return len(blank)
+
+
+def declaration(blank, start, end, deps, name):
+    """True when the call from start to end is a whole dependency declaration statement (see PROJECT_CALL)."""
+    if name in NOT_DEPENDENCY_CALLS or not STATEMENT_END.match(blank, end):
+        return False
+    head = blank[max(0, start - WINDOW) : start]
+    return bool(DEPENDENCIES_BEFORE.search(head) or (within(deps, start) and STATEMENT_START.search(head)))
+
+
+def dependency_argument(blank, pos, deps, wrapped=0):
     """True when the project(...) call at pos is a direct argument of a dependency declaration (see PROJECT_CALL)."""
-    name, at = enclosing_call(blank, pos)
-    before = blank[:pos].rstrip()
-    direct = before.endswith(("(", ",")) or re.search(r"[(,]\s*[A-Za-z_]\w*\s*=$", before) or (
-        name and re.search(rf"(?<![\w$]){name}$", before) and blank[at + len(name) : pos].strip() == ""
-    )
-    in_declaration = within(deps, at) or DEPENDENCIES_BEFORE.search(blank[:at])
-    return bool(direct and in_declaration and name not in NOT_DEPENDENCY_CALLS)
+    o = opener(blank, pos)
+    before = blank[max(0, pos - WINDOW) : pos]
+    if o >= 0 and blank[o] == "(":
+        if not re.search(r"[(,]\s*$|[(,]\s*[A-Za-z_]\w*\s*=\s*$", before):
+            return False
+        m = re.search(r"(?:([A-Za-z_]\w*)|\"[ \t]*\")[ \t]*$", blank[max(0, o - WINDOW) : o])
+        if not m:
+            return False
+        name, start = m.group(1) or "", o - (len(blank[max(0, o - WINDOW) : o]) - m.start())
+        if name in WRAPPERS:
+            return wrapped < 2 and dependency_argument(blank, start, deps, wrapped + 1)
+        return declaration(blank, start, closer(blank, o), deps, name)
+    # Groovy without parentheses: `conf project(':x')` at the start of a statement.
+    m = re.search(r"(?:^|(?<=[\n;{]))[ \t]*([A-Za-z_]\w*)[ \t]+$", before)
+    if not m or wrapped:
+        return False
+    start = pos - (len(before) - m.start(1))
+    return declaration(blank, start, closer(blank, blank.index("(", pos)), deps, m.group(1))
 
 
 def cross_project(text, settings):
@@ -604,14 +671,14 @@ def cross_project(text, settings):
     for m in CROSS_PROJECT.finditer(text):
         found.append((m.start(), m.group().strip(), "move it into a convention plugin in build-logic/"))
     for m in ROOT_PROJECT.finditer(text):
-        before = text[: m.start()]
-        if (GRADLE_BEFORE.search(before) if settings else not ISOLATED_BEFORE.search(before)):
+        before = text[max(0, m.start() - WINDOW) : m.start()]
+        if (not (DESCRIPTOR.match(text, m.end()) and SETTINGS_RECEIVER.search(before)) if settings else not ISOLATED_BEFORE.search(before)):
             found.append((m.start(), "rootProject", "read root files through isolated.rootProject.projectDirectory"))
     for m in PARENT.finditer(text):
         found.append((m.start(), "parent", "a project reads only its own and isolated.rootProject's state"))
     deps = blocks(text)
     for m in PROJECT_CALL.finditer(text):
-        if not DEPENDENCIES_BEFORE.search(text[: m.start()]) and not dependency_argument(text, m.start(), deps):
+        if not DEPENDENCIES_BEFORE.search(text[max(0, m.start() - WINDOW) : m.start()]) and not dependency_argument(text, m.start(), deps):
             call = "findProject" if m.group().startswith("findProject") else "project"
             found.append((m.start(), f"{call}(...)", "use project(...) only as a dependency, e.g. implementation(project(...))"))
     lines = {}
@@ -623,7 +690,7 @@ def cross_project(text, settings):
 def convention_problems(root):
     problems = []
     for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
-        text = strip(read(root, p), blank_strings=True)
+        text = strip(read(root, p), blank_strings=True, templates=True)
         problems += [f"{p}:{line}: reaches other projects ({what}); {hint}" for line, what, hint in cross_project(text, is_settings(p))]
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
