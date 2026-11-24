@@ -255,6 +255,19 @@ class RolesYaml(unittest.TestCase):
             for needle in ("risk:high", "area:security-rules", "area:sync-merge"):
                 self.assertIn(needle, row, f"{'/'.join(path)}: {needle}")
 
+    @staticmethod
+    def second_reviewer_row_names_the_max_cases(row):
+        """The PLAN role-table row of the second reviewer carries the roles.yaml max cases (risk:high, area:security-rules), and not sync-merge's."""
+        return "max for" in row and "risk:high" in row.split("max for", 1)[1] and "area:security-rules" in row.split("max for", 1)[1] and "sync-merge" not in row
+
+    def test_the_plan_role_table_gives_the_second_reviewer_the_roles_yaml_max_cases(self):  # R2-01 of #385, owner decision #15 comment 7123360368
+        row = next(line for line in read("docs", "PLAN.md").splitlines() if line.startswith("| **Second reviewer**"))
+        self.assertTrue(self.second_reviewer_row_names_the_max_cases(row), row)
+        for stale in ("| **Second reviewer** | Opus / high | Fresh session in the same round |",  # the row before the decision
+                      "| **Second reviewer** | Opus / high (max for `risk:high` and `area:sync-merge`) | x |",  # the wrong case
+                      "| **Second reviewer** | Opus / high (max for `risk:high`) | x |"):  # security-rules missing
+            self.assertFalse(self.second_reviewer_row_names_the_max_cases(stale), stale)
+
     def test_fallback_set_keeps_the_pre_pilot_values(self):
         fallback = roles_file()["fallback"]
         self.assertEqual(set(fallback), set(FALLBACK))
