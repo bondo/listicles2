@@ -75,6 +75,18 @@ const MUTANTS: [string, string, string][] = [
         "true ||",
     ],
     ["Invite create: another household's code (P3)", "[0] == invite.householdId", "[0] != ''"],
+    ["Invite create: a secret of 21 or 23 characters (P3)", "_-]{22}", "_-]{21,23}"],
+    ["Invite create: an expiry up to 9 days ahead (HH-02)", "value(7, 'd')", "value(9, 'd')"],
+    [
+        "Invite delete: the expired cleanup by a non-member",
+        "exists(memberDoc(invite.householdId, request.auth.uid)))",
+        "true)",
+    ],
+    [
+        "Invite list: by a non-member who created them or owns the household",
+        "uid)\n        && exists(memberDoc(invite.householdId, request.auth.uid))",
+        "uid)",
+    ],
 ];
 
 test.each(MUTANTS)("the fuzz finds the mutant: %s", async (_what, from, to) => {
