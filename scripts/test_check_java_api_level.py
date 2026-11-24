@@ -542,12 +542,13 @@ class WiringTest(unittest.TestCase):
         self.assertIn("test_java_api_level_gate.py", read("scripts", "verify.sh"))
 
     def test_the_gradle_task_checks_the_jvm_modules_against_min_sdk_from_the_app(self):
-        build = re.sub(r"(?m)^\s*//.*$", "", read("build.gradle.kts"))
-        self.assertRegex(build, r'tasks\.register[^\n]*"checkJavaApiLevel"')
-        self.assertIn("check_java_api_level.py", build)
-        self.assertRegex(build, r"api-versions\.xml")
-        self.assertRegex(build, r"minSdk")
-
+        # M1-68 part B3: each JVM library module's own task (build-logic), fed by the app through a consumable configuration.
+        checks = re.sub(r"(?m)^\s*//.*$", "", read("build-logic", "src", "main", "kotlin", "ModuleChecks.kt"))
+        self.assertRegex(checks, r'tasks\.register<Exec>\("checkJavaApiLevel"\)')
+        self.assertIn("check_java_api_level.py", checks)
+        self.assertRegex(checks, r"api-versions\.xml")
+        self.assertRegex(checks, r"minSdk")
+        self.assertNotIn("checkJavaApiLevel", re.sub(r"(?m)^\s*//.*$", "", read("build.gradle.kts")))
 
 if __name__ == "__main__":
     unittest.main()

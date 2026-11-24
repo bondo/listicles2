@@ -904,10 +904,11 @@ notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and
 id = "M1-12"
 title = "Rules: invites (create, get, list, revoke, cleanup), incl. unverified get denied (join is M1-54)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-10", "M1-O12"]
+pr = 371
 notes = "Join includes the one-household check (PLAN 3.1): deny a join without the users-doc write. Starts after the owner decides #280 (M1-O12; R1-A-04 of PR #265, #15 comment 7064886556): implement the Query invites row as decided, and this PR writes the decision into PLAN 3.1"
 
 [[task]]
@@ -1563,11 +1564,22 @@ notes = "After M1-02, so :core:data is the fourth module it covers. Issue 217 it
 id = "M1-68"
 title = "Root check tasks without cross-project reads: checkWarningsAsErrors, checkJdkRelease, checkJavaApiLevel per module from build-logic (issue 48)"
 milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+pr = 359
+depends_on = ["M1-46"]
+notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines. Part B split again 2026-11-23 (400-line scope): part B1 (tooling/root-checks-68-b) moves useJUnitPlatform, failOnNoDiscoveredTests and :core:testing into the plugins with checkTestSettings per module (scripts/test_test_settings_gate.py) and records PR 329 R2-01 in docs/guards-known-gaps.md; the root check tasks per module and check 4 on any allprojects/subprojects use are the next PR(s). Part B2 (tooling/root-checks-68-b2): checkWarningsAsErrors and checkJdkRelease per module (build-logic ModuleChecks.kt), the root runs each module's listiclesChecks by task path, check_build_guards.py keeps the root's listiclesModules equal to settings.gradle.kts. Part B3 (finishes M1-68): checkJavaApiLevel per module without project(\":app\") configuration, issue 48's flags (-Xsuppress-*, -Xdont-warn*, @argfiles), then check 4 fails on any allprojects/subprojects use. Done (part B3): each JVM library module runs its own checkJavaApiLevel (build-logic ModuleChecks.kt) with the app's minSdk and api-versions.xml from a consumable configuration on :app; checkWarningsAsErrors denies -Xsuppress-*, -Xdont-warn* and @argfiles; check 4 fails on any allprojects/subprojects/childProjects use, project(...) member access and evaluationDependsOn. Left for M1-84: rootProject.<member> reads in module build files"
+
+[[task]]
+id = "M1-84"
+title = "Isolated projects: module build files read the root through isolated.rootProject, check 4 denies other rootProject/parent reads"
+milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-46"]
-notes = "Split from M1-46. Each convention plugin registers the module's own check; the root aggregates by task path or a consumable configuration (no allprojects read, no project(\":app\") configuration). Then check 4 of check_build_guards.py fails on any allprojects/subprojects use. Gate self-tests (test_warnings_gate.py and the others) keep passing; issue 48's comments (-Xsuppress-version-warnings, argfiles) are in scope. Also from M1-46: move useJUnitPlatform and failOnNoDiscoveredTests into the plugins and drop the modules' own testImplementation of :core:testing (the plugin adds it; check_ui_emulators.py then reads the plugin). Split 2026-11-23 for the 400-line scope: part A (tooling/root-checks-68) is the guards.sh rule PR 320 R1 asked for (a removed useJUnitPlatform()/failOnNoDiscoveredTests = true line is accepted only when the diff adds the same setting to code of a .kt/.kts file under build-logic/src/main/kotlin/; allow and deny cases in test_guards_sh.py); part B is the rest. PR 320 R2-01: the text guard cannot see which modules apply the plugin, so part B adds a build-side check that every module's Test tasks run on the JUnit Platform with failOnNoDiscoveredTests on, before it removes the module lines. Part B split again 2026-11-23 (400-line scope): part B1 (tooling/root-checks-68-b) moves useJUnitPlatform, failOnNoDiscoveredTests and :core:testing into the plugins with checkTestSettings per module (scripts/test_test_settings_gate.py) and records PR 329 R2-01 in docs/guards-known-gaps.md; the root check tasks per module and check 4 on any allprojects/subprojects use are the next PR(s). Part B2 (tooling/root-checks-68-b2): checkWarningsAsErrors and checkJdkRelease per module (build-logic ModuleChecks.kt), the root runs each module's listiclesChecks by task path, check_build_guards.py keeps the root's listiclesModules equal to settings.gradle.kts. Part B3 (finishes M1-68): checkJavaApiLevel per module without project(\":app\") configuration, issue 48's flags (-Xsuppress-*, -Xdont-warn*, @argfiles), then check 4 fails on any allprojects/subprojects use"
+depends_on = ["M1-68"]
+notes = "Found in the M1-68 part B3 self-review. Isolated projects rejects rootProject.<member> reads: rootProject.file in app/build.gradle.kts (policy.gradle, check_test_results.py), core/data (firestore.rules) and core/domain (policy.gradle), rootProject.layout in app. Move them to isolated.rootProject.projectDirectory, then add check 4 deny cases for rootProject.<member> (not isolated.rootProject), parent, gradle.rootProject { }, a project(...) held in a variable and configure(listOf(project(...))) { } (scripts/check_build_guards.py known gaps). Tooling env, test-first with negative cases"
 
 [[task]]
 id = "M1-69"
@@ -1663,32 +1675,35 @@ risk = "normal"
 depends_on = [
   "M1-88", "M1-89",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
+  "M1-91", "M1-92", "M1-93", "M1-94",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-85", "M1-87",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-84", "M1-85", "M1-86", "M1-87",
 ]
 
 [[task]]
 id = "M1-O1"
-title = "Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.json secret"
+title = "Create the Firebase project (Spark), Firestore in eur3, email sign-in, google-services.json secret"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["milestone:M0", "M0.5-O2", "M1-29", "M1-O10"]
-notes = "Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
+issue = 354
+notes = "Without Google sign-in (split off as M1-O16, now M3-O1, owner decision 7110501630). Done by the owner's report 7110544618: project tally-c1a15, eur3 production mode, Email/Password, enumeration protection, password policy Require/12, templates (sender and public-facing name Tally, EN/DA text), Android app registered, google-services.json secret. Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
 
 [[task]]
 id = "M1-O2"
 title = "Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in)"
 milestone = "M1"
-status = "todo"
+status = "dropped"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1"]
+depends_on = ["M1-O1", "M1-O16"]
+notes = "Dropped 2026-11-23: moved off the v1 path to M3-O2 in M3 (owner decision 7110878938, #15 comment). Do not reuse this id"
 
 [[task]]
 id = "M1-O3"
@@ -1718,6 +1733,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-28"]
+issue = 291
 
 [[task]]
 id = "M1-O6"
@@ -1789,6 +1805,7 @@ status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
+issue = 285
 notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU). Done: owner decision recorded on #15, comment 7081223083"
 
 [[task]]
@@ -1816,11 +1833,21 @@ notes = "Found by M1-14 (PR 319), measured with licensee 1.14.1: 13 artifacts un
 id = "M1-O15"
 title = "Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5)"
 milestone = "M1"
-status = "todo"
+status = "dropped"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1", "M1-O2", "M1-66", "M1-16"]
-notes = "Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M1-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M1-O15 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+depends_on = ["M1-O1", "M1-O2", "M1-O16", "M1-66", "M1-16", "M1-86"]
+notes = "Dropped 2026-11-23: moved off the v1 path to M3-O3 in M3 (owner decision 7110878938, #15 comment). Do not reuse this id"
+
+[[task]]
+id = "M1-O16"
+title = "Enable Google sign-in in Firebase (needs a public support email for Tally)"
+milestone = "M1"
+status = "dropped"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Dropped 2026-11-23: moved off the v1 path to M3-O1 in M3 (owner decision 7110878938, #15 comment). Do not reuse this id"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
@@ -1844,6 +1871,38 @@ risk = "normal"
 depends_on = ["M2-01"]
 notes = "docs/FOLLOW-UPS.md section 8"
 
+# ---------------------------------------------------------------- M3 owner tasks (Google sign-in after v1; owner decisions 7110501630, 7110878938)
+
+[[task]]
+id = "M3-O1"
+title = "Enable Google sign-in in Firebase (needs a public support email for Tally)"
+milestone = "M3"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Re-homed from M1-O16 (owner decision 7110878938; ids are never reused). Split from M1-O1 (owner decision 7110501630): Google sign-in is postponed until Tally has a public support email. After v1 (owner decision 7110878938): then M3-O2 and M3-O3, then switch the Google button on (M1-86) in an app update. Its [owner] issue is opened after this PR merges"
+
+[[task]]
+id = "M3-O2"
+title = "Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in)"
+milestone = "M3"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M3-O1"]
+notes = "Re-homed from M1-O2 (owner decision 7110878938; ids are never reused). After v1 (owner decision 7110878938): Google sign-in does not block v1. Not on the v1 path"
+
+[[task]]
+id = "M3-O3"
+title = "Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5)"
+milestone = "M3"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M3-O2", "M3-O1", "M1-66", "M1-16", "M1-86"]
+notes = "Re-homed from M1-O15 (owner decision 7110878938; ids are never reused). After v1 (owner decision 7110878938; the switch M1-86 is on for this check). Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M3-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M3-O3 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+
 # ---------------------------------------------------------------- M6 owner tasks (from the M1 plan)
 
 [[task]]
@@ -1853,8 +1912,8 @@ milestone = "M6"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O2"]
-notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 so M1 can close before the release key exists"
+depends_on = ["M1-O1"]
+notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 (now M3-O2) so M1 can close before the release key exists. No longer waits for M3-O2 (it moved after v1, owner decision 7110878938); the Google fingerprints are then added with M3-O2"
 
 [[task]]
 id = "M6-O2"
@@ -1897,6 +1956,16 @@ depends_on = []
 notes = "owner request 2026-11-23 in the orchestrator #38 chat: prepare the repo rename; see #15"
 
 [[task]]
+id = "M1-86"
+title = "Google sign-in switch in :app (off in v1): hide the Google button and the Google hint while off"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-66", "M1-16"]
+notes = "Owner decision 7110878938 (amends OQ-23 for v1): a build-time switch in :app, off in v1; the Google code stays. While off, the sign-in screen shows only email and password (AUTH-01) and the failed-sign-in text drops \"If you signed up with Google, use Continue with Google.\" (OQ-34(c)). Test-first for both switch states (screenshot and UI tests, en and da). M1-66 stays in M1, built and tested with fakes. Turned on after v1 once M3-O1, M3-O2 and M3-O3 are done"
+
+[[task]]
 id = "M1-87"
 title = "Repo rename follow-up: the old repo name and checkout path in process files, docs, README and app links become bondo/tally and /home/user/tally"
 milestone = "M1"
@@ -1905,3 +1974,69 @@ assignee = "implementer"
 risk = "normal"
 depends_on = []
 notes = "rename checklist item 5 (#15 comment 7107080653) and the after-rename checklist item 2 (#15 comment 7111328399); owner-approved merge (process files). The name-agnostic scripts are M1-85"
+
+# ---- Tally rename sweep (owner decision 7124795794 on #15: "change to tally everywhere"; reopens the rename deferred in
+# 7095943127). Plan: PR for this block. Order: M1-93 (build names, after #359) and M1-91 (TALLY_* env names accepted) and
+# M1-92 (process docs, prompts, session tags) in parallel; then the owner adds TALLY_TASK (M1-O17); then M1-94 drops the old
+# names; then the owner removes LISTICLES_TASK (M1-O18). History stays: #15 comments, merged PR text, done tasks' notes,
+# docs/FOLLOW-UPS.md M0-11, docs/reviews/, naming.md sections 1 to 6, old-slug fixtures, past sessions' listicles:* tags.
+
+[[task]]
+id = "M1-91"
+title = "Tooling: hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICLES_TASK"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "Tooling env (scripts/hooks/). Implementer profile Opus (guard/hook change). Start after the tooling/permission-rules and tooling/guard-threshold-prose PRs merge (they touch the PreToolUse guard and the hook tests). Step 1 of the LISTICLES_TASK transition. Files: scripts/hooks/pretooluse_guard.py (tooling = TALLY_TASK when set, else LISTICLES_TASK; refusal text names TALLY_TASK), scripts/hooks/session_end_metrics.py (TALLY_ROLE, TALLY_PR, TALLY_METRICS_DIR; task from TALLY_TASK, else LISTICLES_TASK), scripts/hooks/context_guard.py and scripts/statusline.sh (TALLY_CONTEXT_WINDOW, TALLY_CONTEXT_THRESHOLD; the shared temp dir listicles-ctx becomes tally-ctx in both files in this one PR), scripts/verify.sh (log dir tally-verify), and their tests: test_pretooluse_guard.py, the eleven test_guard_*.py files that set LISTICLES_TASK, test_context_guard.py, test_session_end_metrics.py. Only LISTICLES_TASK gets the both-names read: no environment and no spawn template sets the other LISTICLES_* variables, so they are renamed outright. Test-first with negative cases: each name alone, both, neither, TALLY_TASK=normal with LISTICLES_TASK=tooling (not tooling), and every hook test clears both names from the inherited env (tooling sessions run the suite with LISTICLES_TASK=tooling set). Docs keep LISTICLES_TASK until M1-94 (the environment still sets it). About 200 changed lines"
+
+[[task]]
+id = "M1-92"
+title = "Tooling: process docs, prompts and status output say Tally; new sessions get tally:* tags"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+notes = "Tooling env (agents/, CLAUDE.md). Start after the tooling/approver-scope PR merges (approver.md, ORCHESTRATION.md and prompt_rules.py overlap). Wording: CLAUDE.md line 1, README.md, docs/COLLABORATING.md, docs/ORCHESTRATION.md (intro, 8.1 and 8.4 templates), docs/orchestrator-state.md template line, line 1 of all nine agents/prompts/*.md, scripts/prompt_rules.py pins (implementer and approver first lines) with scripts/test_prompt_rules.py, scripts/status_page.py and status_visual.py titles with their tests, scripts/tasks.py docstring, docs/tasks.toml header comment, scripts/test_state_body.py PROSE (mirrors the state template line), scripts/test_gitignore_secrets.py fixture name, docs/product/naming.md status and decision lines (sections 1 to 6 stay as history). Session tags: ORCHESTRATION 2.1 says tally:<milestone or task>; the live-worker reads (5.3 table, 7.x interrupt step) and orchestrator.md (2) match tally:* and listicles:* until no running session carries listicles:*, and 2.1 notes that sessions spawned before this merge carry listicles:* (metrics over history match both). No script filters by the prefix (state_body.py checks only the tag shape). The orchestrator may add tally:* to running sessions with set_session_tags and refreshes the state body's environment names and title line at its next rewrite. Leaves LISTICLES_TASK text alone (M1-94). About 80 changed lines"
+
+[[task]]
+id = "M1-93"
+title = "Build names: rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks and tallyModules"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-68"]
+notes = "Normal env (no process file); owner-only merge (build scripts and scripts/), approver-eligible as a build PR. After M1-68 (#359) merges: it rewrites the same ModuleChecks.kt, Conventions.kt, build.gradle.kts and check_build_guards.py lines. One atomic PR (the ids, the catalog accessors libs.plugins.listicles.* and the module scripts must change together): settings.gradle.kts (rootProject.name, comment), build-logic/build.gradle.kts (5 ids), build-logic/src/main/kotlin ConventionPlugins.kt, Conventions.kt, DependencyFloorsPlugin.kt, ModuleChecks.kt (listiclesChecks becomes tallyChecks; from #359 also the configurations listiclesJavaApiLevel, listiclesJavaApiLevelFromApp and listiclesJavaApiLevelElements, the task listiclesJavaApiLevelInputs, the attribute value listicles-java-api-level and the build path listicles/java-api-level.txt), build.gradle.kts (tallyModules, wiring, alias), gradle/libs.versions.toml (5 aliases tally-*), app/ and core/*/build.gradle.kts aliases, scripts/check_build_guards.py and check_ui_emulators.py regexes and messages, scripts/check_ci_hardening.py GRADLE_PYTHON_TASKS (listiclesChecks) and its comment, their tests and test_check_ci_hardening.py, test_jdk_release_gate.py, test_java_api_level_gate.py, test_warnings_gate.py, docs/ANDROID-BEST-PRACTICES.md. The list is as of #359 (head 4981dd3); done check: after the PR, `git grep -i listicles` lists only the history the block header keeps and the names M1-91, M1-92 and M1-94 own. Test-first: the guard tests expect tally.* and fail on a listicles.* id. Risks: gradle/verification-metadata.xml has no project or included-build entry, so it should not change; if Gradle asks for a metadata change, stop and ask (owner file). The configuration cache and CI Gradle caches miss once (first static job after merge is cold). The licensee and warnings gate self-tests run (build-logic and catalog are their inputs, M1-38). Kotlin module names follow each project name, not the root, so no class or artifact changes. About 200 changed lines"
+
+[[task]]
+id = "M1-94"
+title = "Tooling: drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-O17", "M1-91", "M1-92"]
+notes = "Tooling env (CLAUDE.md, scripts/hooks/). Implementer profile Opus (guard/hook change). Step 3 of the LISTICLES_TASK transition; after M1-O17 (the tooling environment sets TALLY_TASK), else main's guard would refuse tooling sessions. Start once no tooling session spawned before M1-O17 is still running (the orchestrator checks the state body's spawn times), or restart such sessions. After M1-92 (same CLAUDE.md, ORCHESTRATION.md, orchestrator.md and prompt_rules.py). Files: scripts/hooks/pretooluse_guard.py and session_end_metrics.py read TALLY_TASK only (tests: LISTICLES_TASK=tooling alone is now not tooling); CLAUDE.md line 16, ORCHESTRATION 7.1, agents/prompts/orchestrator.md and the scripts/prompt_rules.py pin with its test name TALLY_TASK=tooling; scripts/merge_ready.py ROOT and docs/ORCHESTRATION.md 7.5 drop dev/listicles (no file is left under it since M1-55; this narrows general merges, test: a Kotlin file under dev/listicles is owner-only) with scripts/test_merge_ready.py (its REPO fixture becomes bondo/tally, the dev/listicles general-path fixtures move to dk/bjarkebjarke/tally, and the R7_RISK pin follows the 7.5 text); scripts/hooks/test_guards_sh.py fixture paths (listicles.tests.gradle.kts, dev/listicles/app). Keeps the old-slug fixtures in test_repo_slug.py, test_owner_drift_check.py and test_mark_ready.py (they test the renamed repo's old remotes). About 150 changed lines"
+
+[[task]]
+id = "M1-O17"
+title = "Owner: add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-91"]
+notes = "Step 2 of the LISTICLES_TASK transition, after M1-91 merges. Environment settings for Tally tooling (env_0129uioPQNmr2zrhgxpqMdhG): add TALLY_TASK=tooling, keep LISTICLES_TASK=tooling (tooling branches older than M1-91 read only the old name). Then the orchestrator runs the 7.1 smoke task on Tally tooling (fresh session: TALLY_TASK is set; the PreToolUse guard reports a Write to CLAUDE.md as allowed, without writing it; verify.sh --fast passes). Running sessions keep their old variables until restart; both names work meanwhile"
+
+[[task]]
+id = "M1-O18"
+title = "Owner: remove LISTICLES_TASK from the Tally tooling environment; drop the listicles2 path in the setup scripts"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-94"]
+notes = "Step 4 of the LISTICLES_TASK transition, after M1-94 merges and once every open tooling branch has main with M1-91 merged in (the orchestrator checks; a fresh session on an older branch would lose tooling rights). Environment settings: remove LISTICLES_TASK from Tally tooling; optionally drop the listicles2/scripts/requirements-lint.txt fallback line from the setup scripts of Tally and Tally tooling (the checkout is tally since 2026-11-23). Then the 7.1 smoke task on Tally tooling"
