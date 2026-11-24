@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.Credential
 import androidx.credentials.CredentialManager
+import androidx.credentials.CredentialOption
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
@@ -16,11 +17,12 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialProviderConfigurationException
 import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.exceptions.NoCredentialException
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import dk.bjarkebjarke.tally.domain.session.GoogleIdToken
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.awaitCancellation
@@ -54,39 +56,50 @@ class CredentialManagerGoogleCredentialsTest {
     private fun idToken(manager: FakeCredentialManager) = runBlocking { credentials(manager).idToken() }
 
     @Test
-    fun aReturningUserIsPickedFromTheAccountsThatSignedInBefore() {
-        val manager = FakeCredentialManager({ googleIdToken("returning") })
+    fun theButtonShowsEveryGoogleAccountAndAnswersThePickedIdToken() {
+        val manager = FakeCredentialManager({ googleIdToken("someone") })
 
-        idToken(manager) shouldBe GoogleIdToken.Picked(jwt("returning"))
+        idToken(manager) shouldBe GoogleIdToken.Picked(jwt("someone"))
 
-        val request = manager.requests.single()
-        listOf(request.filterByAuthorizedAccounts, request.autoSelectEnabled, request.serverClientId) shouldBe
-            listOf(true, true, WEB_CLIENT_ID)
+        // Google's flow for a button: every account on the phone, not only those that signed in to the app before.
+        manager.requests
+            .single()
+            .shouldBeInstanceOf<GetSignInWithGoogleOption>()
+            .serverClientId shouldBe WEB_CLIENT_ID
         manager.contexts.single() shouldBeSameInstanceAs activity
     }
 
+    /** A sign-out keeps an account's permission for the app: a picker of only such accounts would lock others out. */
     @Test
-    fun withNoSuchAccountItAsksAgainWithEveryAccountOnThePhone() {
-        val manager = FakeCredentialManager(none, { googleIdToken("new") })
+    fun afterAClosedPickerTheNextTapShowsEveryAccountAgain() {
+        val manager = FakeCredentialManager(closed, { googleIdToken("other") })
+        val credentials = credentials(manager)
 
-        idToken(manager) shouldBe GoogleIdToken.Picked(jwt("new"))
-
-        manager.requests.map { listOf(it.filterByAuthorizedAccounts, it.autoSelectEnabled, it.serverClientId) } shouldBe
-            listOf(listOf(true, true, WEB_CLIENT_ID), listOf(false, false, WEB_CLIENT_ID))
+        runBlocking { credentials.idToken() } shouldBe GoogleIdToken.Cancelled
+        runBlocking { credentials.idToken() } shouldBe GoogleIdToken.Picked(jwt("other"))
+        manager.requests.forEach { it.shouldBeInstanceOf<GetSignInWithGoogleOption>() }
     }
 
-    /** The fake fails a request it has no answer for, so a closed picker is never shown again. */
+    /** The fake fails a request it has no answer for: each tap asks once. */
     @Test
     fun noAccountAClosedPickerAProviderErrorOrAnotherCredentialAreAnswers() {
-        idToken(FakeCredentialManager(none, none)) shouldBe GoogleIdToken.NoAccount
+        idToken(FakeCredentialManager(none)) shouldBe GoogleIdToken.NoAccount
         idToken(FakeCredentialManager(closed)) shouldBe GoogleIdToken.Cancelled
-        idToken(FakeCredentialManager(none, closed)) shouldBe GoogleIdToken.Cancelled
         idToken(FakeCredentialManager({ throw GetCredentialUnknownException() })) shouldBe GoogleIdToken.Failed
-        idToken(FakeCredentialManager(none, { throw GetCredentialProviderConfigurationException() })) shouldBe
+        idToken(FakeCredentialManager({ throw GetCredentialProviderConfigurationException() })) shouldBe
             GoogleIdToken.Failed
         // Another type with a Google ID token's data, and the right type with unreadable data.
         idToken(FakeCredentialManager({ CustomCredential("x", googleIdToken("x").data) })) shouldBe GoogleIdToken.Failed
         idToken(FakeCredentialManager({ CustomCredential(GOOGLE_ID_TOKEN, Bundle()) })) shouldBe GoogleIdToken.Failed
+    }
+
+    /** The Google ID library names a Sign in with Google subtype too; its data is a Google ID token all the same. */
+    @Test
+    fun theSignInWithGoogleSubtypeIsAGoogleIdTokenToo() {
+        val siwg = GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL
+
+        idToken(FakeCredentialManager({ CustomCredential(siwg, googleIdToken("subtype").data) })) shouldBe
+            GoogleIdToken.Picked(jwt("subtype"))
     }
 
     @Test
@@ -151,7 +164,7 @@ class CredentialManagerGoogleCredentialsTest {
         vararg answers: suspend () -> Credential,
     ) : CredentialManager by CredentialManager.create(RuntimeEnvironment.getApplication()) {
         private val answers = ArrayDeque(answers.toList())
-        val requests = mutableListOf<GetGoogleIdOption>()
+        val requests = mutableListOf<CredentialOption>()
         val contexts = mutableListOf<Context>()
         var clearError: ClearCredentialException? = null
         var cleared = 0
@@ -161,7 +174,7 @@ class CredentialManagerGoogleCredentialsTest {
             request: GetCredentialRequest,
         ): GetCredentialResponse {
             contexts += context
-            requests += request.credentialOptions.single() as GetGoogleIdOption
+            requests += request.credentialOptions.single()
             val answer = checkNotNull(answers.removeFirstOrNull()) { "asked once more than expected" }
             return GetCredentialResponse(answer())
         }
