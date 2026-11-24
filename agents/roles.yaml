@@ -46,7 +46,7 @@ roles:
     effort: medium
     session: long-lived, started by the orchestrator; merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge
     definition: docs/ORCHESTRATION.md section 7.5
-  # Owner decision, #15 comment 7075812943: approves owner-only tooling, build, CI and gate PRs in the owner's place (ORCHESTRATION 7.5); never merges, edits or pushes.
+  # Owner decision, #15 comment 7075812943: approves owner-only PRs in its scope (tooling, build, CI, gate, security rules, privacy docs; #15 comment 7123360368) in the owner's place (ORCHESTRATION 1.1, 7.5); never merges, edits or pushes.
   approver:
     model: opus
     effort: high
