@@ -1,5 +1,6 @@
 package dk.bjarkebjarke.tally
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -16,7 +17,10 @@ import org.objectweb.asm.Opcodes
  * total report, the one koverVerify checks (the root copy is not read; follow-up #386).
  */
 class KoverExclusionsTest {
-    private val configured = KoverFilters(KoverFilters.SETS.associateWith { configured("tally.kover.$it") })
+    private val configured =
+        KoverFilters(
+            KoverFilters.SETS.associateWith { configured("tally.kover.$it").split(',').filter(String::isNotEmpty) },
+        )
 
     @Test
     fun whatDaggerGeneratesIsLeftOut() {
@@ -36,13 +40,20 @@ class KoverExclusionsTest {
     @Test
     fun aFilterThatReachesHandWrittenCodeCounts() {
         REACHING
-            .filterNot { (set, value, name) -> KoverFilters(mapOf(set to value)).partlyLeftOut(name) }
+            .filterNot { (set, value, name) -> filter(set, value).partlyLeftOut(name) }
             .shouldBeEmpty()
         // An annotation on a function leaves out that function, not its class.
-        KoverFilters(mapOf("excludes.annotatedBy" to "dagger.Provides")).whollyLeftOut(GATE_MODULE) shouldBe false
+        filter("excludes.annotatedBy", "dagger.Provides").whollyLeftOut(GATE_MODULE) shouldBe false
+        // A listed class that is gone fails, whatever the patterns.
+        shouldThrow<IllegalStateException> { filter("excludes.classes", "*").whollyLeftOut(GONE) }
     }
 
     private fun configured(key: String) = checkNotNull(System.getProperty(key)) { "$key is not set" }
+
+    private fun filter(
+        set: String,
+        value: String,
+    ) = KoverFilters(mapOf(set to listOf(value)))
 
     private companion object {
         const val GATE_MODULE = "dk.bjarkebjarke.tally.start.GateModule"
@@ -50,6 +61,8 @@ class KoverExclusionsTest {
         const val STARTED_ACTIVITY = "dk.bjarkebjarke.tally.session.StartedActivity"
         const val START_VIEW_MODEL = "dk.bjarkebjarke.tally.start.StartViewModel"
         const val READY = "dk.bjarkebjarke.tally.start.StartUiState\$Ready"
+        const val START_FUNCTIONS = "dk.bjarkebjarke.tally.start.StartViewModelKt"
+        const val GONE = "dk.bjarkebjarke.tally.start.GoneFactory\$InstanceHolder"
 
         val DAGGER_GENERATED =
             listOf(
@@ -69,6 +82,7 @@ class KoverExclusionsTest {
                 GATE_MODULE,
                 START_VIEW_MODEL,
                 READY,
+                START_FUNCTIONS,
             )
         val REACHING =
             listOf(
@@ -78,8 +92,13 @@ class KoverExclusionsTest {
                 Triple("excludes.annotatedBy", "javax.inject.Inj?ct", STARTED_ACTIVITY),
                 Triple("excludes.inheritedFrom", "androidx.lifecycle.ViewModel", START_VIEW_MODEL),
                 Triple("excludes.classes", "dk.bjarkebjarke.tally.*\$*", READY),
+                // Lambdas Kotlin compiles to classes of their own: StartViewModel$uiState$1, StartViewModelKt$orElse$1.
+                Triple("excludes.inheritedFrom", "kotlin.coroutines.jvm.internal.SuspendLambda", START_VIEW_MODEL),
+                Triple("excludes.annotatedBy", "kotlin.coroutines.jvm.internal.DebugMetadata", START_VIEW_MODEL),
+                Triple("excludes.classes", "*\$*\$*", START_FUNCTIONS),
                 Triple("excludes.projects", ":app", SESSION_MODULE),
                 Triple("includes.classes", "dk.bjarkebjarke.tally.start.*", SESSION_MODULE),
+                Triple("includes.classes", "", SESSION_MODULE),
             )
     }
 }
@@ -90,16 +109,12 @@ class KoverExclusionsTest {
  * function or constructor by an annotation on it (KoverReportFilter's KDoc).
  */
 private class KoverFilters(
-    private val sets: Map<String, String>,
+    private val sets: Map<String, List<String>>,
 ) {
     private fun matches(
         set: String,
         names: List<String>,
-    ) = sets[set]
-        .orEmpty()
-        .split(',')
-        .filter(String::isNotEmpty)
-        .any { glob -> names.any(globRegex(glob)::matches) }
+    ) = sets[set].orEmpty().any { glob -> names.any(globRegex(glob)::matches) }
 
     /** All of it: by its name, or by an annotation on the class itself. */
     fun whollyLeftOut(name: String) =
