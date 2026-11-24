@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Task graph for Listicles: validate docs/tasks.toml and list ready tasks deterministically.
+"""Task graph for Tally: validate docs/tasks.toml and list ready tasks deterministically.
 
 Process: docs/ORCHESTRATION.md section 4. Standard library only (Python 3.11+ for tomllib).
 
