@@ -19,7 +19,9 @@ review R1 (comment 7120462121) and S1 (comment 7120410680), both changes_request
   - 6718237 R1-02 text, nits R1-03 = S1-01, S1-02.
 
 ## Next (in order)
-1. `scripts/verify.sh` at 6718237 (about 50 minutes). Guarded diff is 538 lines without this file (618 with it: CI's
+0. Self-review (verifier subagent) of the fix round: RevocationBoundService's reason corrected (it stays: a removal entry
+   fails lint MissingClass, play-services-auth is runtime-only), checklist section 9 status names ManifestSurfaceTest.
+1. `scripts/verify.sh` at the head (about 50 minutes). Guarded diff is 538 lines without this file (618 with it: CI's
    guards job fails until this file is deleted).
 2. Refresh the PR body (see Decisions made), delete this file in the last commit, push, post the WORKER-RESULT comment,
    send orchestrator #40 a one-line WORKER-RESULT (fix commits: 163 changed lines in 12 files).

@@ -71,7 +71,9 @@ class ManifestSurfaceTest {
                 "dk.bjarkebjarke.tally.MainActivity" to "",
                 // androidx.profileinstaller: only the shell may ask it to install or save the baseline profile.
                 "androidx.profileinstaller.ProfileInstallReceiver" to "android.permission.DUMP",
-                // play-services-auth: Google Play services tells it when the user revokes the app's Google access.
+                // play-services-auth, for legacy GoogleSignIn, which no Tally flow uses: it never starts here. It stays
+                // because only Google Play services gets in (this permission and a caller check), and a removal entry
+                // needs a lint suppression (MissingClass: play-services-auth is on no module's compile classpath).
                 "com.google.android.gms.auth.api.signin.RevocationBoundService" to
                     "com.google.android.gms.auth.api.signin.permission.REVOCATION_NOTIFICATION",
             )
