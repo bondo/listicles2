@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 76/105 (72%) | 29 |
+| M1 | Accounts and households | 76/111 (68%) | 35 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 76/105 done (72%), 29 open.
+**Progress:** 76/111 done (68%), 35 open.
 
 ### Tasks
 
@@ -203,7 +203,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | done | M1-77 | implementer |  |
 | M1-78 | State issue part B&#58; rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… | done | M1-77 | implementer |  |
 | M1-79 | State issue part C&#58; ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… | done | M1-77, M1-78, M1-80 | process | [#365](https://github.com/bondo/tally/issues/365) |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-84, M1-85, M1-86, M1-87 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-91, M1-92, M1-93, M1-94, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-84, M1-85, M1-86, M1-87 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, email sign-in, google-services.json secret | done | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | dropped | M1-O1, M1-O16 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -223,6 +223,12 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-85 | Repo name and checkout path from one place, so the scripts work before and after the repo rename | done | none | implementer |  |
 | M1-86 | Google sign-in switch in &#58;app (off in v1)&#58; hide the Google button and the Google hint while off | blocked | M1-66, M1-16 | implementer |  |
 | M1-87 | Repo rename follow-up&#58; the old repo name and checkout path in process files, docs, README and a… | done | none | implementer |  |
+| M1-91 | Tooling&#58; hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICL… | ready | none | implementer |  |
+| M1-92 | Tooling&#58; process docs, prompts and status output say Tally; new sessions get tally&#58;* tags | ready | none | implementer |  |
+| M1-93 | Build names&#58; rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks … | ready | M1-68 | implementer |  |
+| M1-94 | Tooling&#58; drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling | blocked | M1-O17, M1-91, M1-92 | implementer |  |
+| M1-O17 | Owner&#58; add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now) | owner to-do | M1-91 | owner |  |
+| M1-O18 | Owner&#58; remove LISTICLES_TASK from the Tally tooling environment; drop the listicles2 path in th… | owner to-do | M1-94 | owner |  |
 
 ### Open tasks and what blocks them
 
@@ -259,6 +265,12 @@ flowchart LR
     n26["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
     n27["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
     n28["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::blocked
+    n29["M1-91 Tooling: hooks and status line read TAL… (ready)"]:::ready
+    n30["M1-92 Tooling: process docs, prompts and sta… (ready)"]:::ready
+    n31["M1-93 Build names: rootProject.name tally, … (ready)"]:::ready
+    n32["M1-94 Tooling: drop LISTICLES_TASK and the de… (blocked)"]:::blocked
+    n33["M1-O17 Owner: add TALLY_TASK=tooling to the T… (owner to-do)"]:::owner
+    n34["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
     n17 --> n1
     n3 --> n2
     n3 --> n4
@@ -317,6 +329,10 @@ flowchart LR
     n4 --> n23
     n0 --> n23
     n1 --> n23
+    n29 --> n23
+    n30 --> n23
+    n31 --> n23
+    n32 --> n23
     n5 --> n23
     n6 --> n23
     n7 --> n23
@@ -339,6 +355,11 @@ flowchart LR
     n28 --> n23
     n1 --> n27
     n6 --> n28
+    n33 --> n32
+    n29 --> n32
+    n30 --> n32
+    n29 --> n33
+    n32 --> n34
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -488,6 +509,9 @@ flowchart LR
 - **task** M1-39: waits on M1-18, M1-17, M1-25
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +7
 - **task** M1-48: waits on M1-06, M1-11, M1-15 +15
-- **task** M1-FU: waits on M1-88, M1-89, M1-06 +21
+- **task** M1-FU: waits on M1-88, M1-89, M1-06 +25
 - **task** M1-O6: waits on M1-11
 - **task** M1-86: waits on M1-16
+- **task** M1-94: waits on M1-O17, M1-91, M1-92
+- **task** M1-O17: waits on M1-91
+- **task** M1-O18: waits on M1-94
