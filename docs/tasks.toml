@@ -1105,13 +1105,44 @@ pr = 287
 
 [[task]]
 id = "M1-18"
-title = "Household data 1: create, invite, revoke, join, start-up self-heal (emulator)"
+title = "Household data 1: create household, create invite (emulator)"
+milestone = "M1"
+status = "done"
+pr = 395
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-54", "M1-88", "M1-60", "M1-62", "M1-02", "M1-83"]
+notes = "Split 2026-11-24 (PR 395): the whole task measured about 1300 changed lines (guard 600). This is part 1: the create-household batch (P1, P3; displayName copied from users/{uid}.name, P9) and create invite (P2, P3, expiry 7 days minus 1 hour), with emulator tests. The rest: M1-96, M1-97, M1-98"
+
+[[task]]
+id = "M1-96"
+title = "Household data 1b: invite lookup and join (HH-03) (emulator)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-88", "M1-60", "M1-62", "M1-02", "M1-83"]
-notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
+depends_on = ["M1-18"]
+notes = "Split from M1-18 (PR 395). The join screen's lookup of a code from a link (the invite's householdName, P2; expired checked on the client, used, revoked or never made denied by the rules) and the join batch of PLAN 3.1 (single use, displayName copied as in create, P9), with emulator tests for two and three users. A compiled, never-run draft of both (a code check before any document path, InviteUnusable for a refused batch) is in PR 395's commit b428104"
+
+[[task]]
+id = "M1-97"
+title = "Household data 1c: household and member reads with the household-name copy, revoke, expired-invite cleanup (emulator)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-96"]
+notes = "Split from M1-18 (PR 395). For M1-19's screen: reads of the live household doc and its members (PLAN 3.1 Reads, M1-83); each read of the live household doc writes the household-name copy, an app-private {householdId, name} replacing a copy of another household (PLAN 3.1 HH-06 household name); revoke by the invite's creator or the owner (HH-02); expired invites cleaned when the household screen opens (PLAN 3.1 Expired invites, #280). Emulator tests with two and three users"
+
+[[task]]
+id = "M1-98"
+title = "Household data 1d: start-up self-heal (removed, tombstone), HH-06 and removal notices with the household name (P8), the copy's deletion (emulator)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-97"]
+notes = "Split from M1-18 (PR 395), with its former notes: adds deleting the app's household-name copy (M1-97's store) to the M1-14 sign-out (step 3), and on acknowledgement, and implements HouseholdNotices (the M1-62 stand-in) with the copy's name when its householdId matches (PLAN 3.1 HH-06 household name, P8). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The tombstone's own owner: no HH-06 state, householdId untouched (M1-31 resumes the cleanup). The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
 id = "M1-31"
@@ -1120,8 +1151,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-11", "M1-18"]
-notes = "Deletes the app's household-name copy (M1-18's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name). P6: a plain member's self-heal under a tombstone deletes their own member doc before the clear, test incl. a crash between the two (PLAN 3.1)"
+depends_on = ["M1-11", "M1-98"]
+notes = "Deletes the app's household-name copy (M1-97's store) in Leave and in the owner's clear once the Delete household cleanup has finished, with a test each; a crash before that clear resumes the cleanup, test: the next start clears householdId and raises no HH-06 state (PLAN 3.1, Delete household and HH-06 household name). P6: a plain member's self-heal under a tombstone deletes their own member doc before the clear, test incl. a crash between the two (PLAN 3.1)"
 
 [[task]]
 id = "M1-19"
@@ -1130,7 +1161,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-18"]
+depends_on = ["M1-97"]
 notes = "Adds the household icon to the M1 home top bar (Q1 A, see #194), leading to this screen; M1-60 left it out until the screen exists"
 
 [[task]]
@@ -1684,6 +1715,7 @@ depends_on = [
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
   "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-84", "M1-85", "M1-86", "M1-87",
+  "M1-96", "M1-97", "M1-98",
 ]
 
 [[task]]
