@@ -8,8 +8,10 @@ Run: python3 -I -m unittest discover -s scripts/hooks"""
 import ast
 import hashlib
 import os
+import py_compile
 import re
 import shutil
+import subprocess
 import sys
 import unittest
 
@@ -170,6 +172,102 @@ class MergeReadyGuard(unittest.TestCase):
         for c in forms:
             self.assertEqual(self.bash(c), 2, c)
             self.assertEqual(self.bash(c, env=TOOLING), 2, c + " (tooling)")
+
+
+TAG = sys.implementation.cache_tag
+PAYLOAD = "import sys\nsys.exit(42)\n"
+
+
+def write(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(data)
+
+
+def pyc(d, mode, source=None, name=None):
+    """Compile `source` (the payload by default) to scripts/__pycache__/<name> with the given invalidation mode. For TIMESTAMP the fake source gets
+    the size and mtime of the real repo_slug.py, so the header Python checks matches it (a forged cache file)."""
+    real = os.path.join(d, "scripts", "repo_slug.py")
+    if source is None:
+        size = os.path.getsize(real)
+        source = (PAYLOAD + "#" * size)[:size - 1] + "\n"
+    fake = os.path.join(d, "fake_src", "repo_slug.py")
+    write(fake, source.encode("utf-8") if isinstance(source, str) else source)
+    st = os.stat(real)
+    os.utime(fake, ns=(st.st_atime_ns, st.st_mtime_ns))
+    target = os.path.join(d, "scripts", "__pycache__", name or f"repo_slug.{TAG}.pyc")
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    py_compile.compile(fake, cfile=target, doraise=True, invalidation_mode=mode)
+    return target
+
+
+def merge_run(d):
+    """Really run the merge call in d (no guard): the planted payload exits 42 when `import repo_slug` loads it."""
+    return subprocess.run([sys.executable, "-I", "scripts/merge_ready.py", "12", SHA, "general"], cwd=d, capture_output=True, timeout=60).returncode
+
+
+class RepoSlugShadowing(unittest.TestCase):
+    """R1-01 of #387: merge_ready.py runs `import repo_slug` with scripts/ first on sys.path, so a package directory, an extension module, a
+    sourceless .pyc or a cached .pyc in scripts/__pycache__ runs in place of the pinned repo_slug.py. The guard denies the call unless what
+    Python would load is the pinned source; a cache file compiled from the pinned source stays allowed (running the script or the tests writes one)."""
+
+    def assert_denied(self, d, what):
+        self.assertEqual(run("Bash", {"command": CALL}, d), 2, what)
+        self.assertEqual(run("Bash", {"command": CALL}, d, TOOLING), 2, what + " (tooling)")
+
+    def test_planted_modules_next_to_repo_slug_are_denied(self):
+        d = fresh()
+        write(os.path.join(d, "scripts", "repo_slug", "__init__.py"), PAYLOAD.encode())
+        self.assertEqual(merge_run(d), 42, "the package directory really runs instead of repo_slug.py (the scenario is real)")
+        self.assert_denied(d, "package directory")
+        d = fresh()
+        os.makedirs(os.path.join(d, "scripts", "repo_slug"))
+        self.assert_denied(d, "bare directory")
+        for name in (f"repo_slug.{TAG}-x86_64-linux-gnu.so", "repo_slug.abi3.so", "repo_slug.so", "repo_slug.pyc"):
+            d = fresh()
+            write(os.path.join(d, "scripts", name), b"\x7fELF not really")
+            self.assert_denied(d, name)
+
+    def test_forged_cache_files_are_denied(self):
+        for mode in (py_compile.PycInvalidationMode.UNCHECKED_HASH, py_compile.PycInvalidationMode.TIMESTAMP):
+            d = fresh()
+            pyc(d, mode)
+            self.assertEqual(merge_run(d), 42, f"the forged {mode.name} cache file really runs (the scenario is real)")
+            self.assert_denied(d, mode.name)
+        for name, data in ((f"repo_slug.{TAG}.pyc", b"garbage"), (f"repo_slug.{TAG}.pyc", b""), ("repo_slug.cpython-312.pyc", b"x" * 40),
+                           (f"repo_slug.{TAG}.opt-1.pyc", b"x" * 40)):
+            d = fresh()
+            write(os.path.join(d, "scripts", "__pycache__", name), data)
+            self.assert_denied(d, name + " " + repr(data[:8]))
+        d = fresh()
+        os.makedirs(os.path.join(d, "scripts", "__pycache__", f"repo_slug.{TAG}.pyc"))
+        self.assert_denied(d, "a directory with the cache file's name")
+
+    def test_cache_files_of_the_pinned_source_stay_allowed(self):
+        d = fresh()
+        subprocess.run([sys.executable, "-I", "-c", "import sys; sys.path.insert(0, 'scripts'); import repo_slug"], cwd=d, check=True)
+        self.assertTrue(os.path.exists(os.path.join(d, "scripts", "__pycache__", f"repo_slug.{TAG}.pyc")), "Python wrote its own cache file")
+        self.assertEqual(run("Bash", {"command": CALL}, d), 0, "the cache file Python writes for the pinned source")
+        real = read_bytes(os.path.join(ROOT, "scripts", "repo_slug.py"))
+        for mode in py_compile.PycInvalidationMode:
+            d = fresh()
+            pyc(d, mode, source=real)
+            self.assertEqual(run("Bash", {"command": CALL}, d), 0, f"{mode.name} cache file of the pinned source")
+        d = fresh()  # merge_ready.py runs as a script, so Python never reads a cache file for it; other modules' cache files are not loaded either
+        for name in (f"merge_ready.{TAG}.pyc", f"tasks.{TAG}.pyc", "test_repo_slug.cpython-313.pyc"):
+            write(os.path.join(d, "scripts", "__pycache__", name), b"garbage")
+        self.assertEqual(run("Bash", {"command": CALL}, d), 0, "cache files of other modules")
+
+    def test_writes_of_names_that_shadow_repo_slug_are_denied_unless_tooling(self):
+        d = fresh()
+        for p in ("scripts/repo_slug/__init__.py", f"scripts/__pycache__/repo_slug.{TAG}.pyc", "scripts/repo_slug.abi3.so", "scripts/repo_slug.pyc"):
+            self.assertEqual(run("Write", {"file_path": p}, d), 2, p)
+            self.assertEqual(run("Write", {"file_path": p}, d, TOOLING), 0, p + " (tooling)")
+        for c in (f"cp /tmp/x scripts/__pycache__/repo_slug.{TAG}.pyc", "echo x > scripts/repo_slug.so", "echo x > scripts/repo_slug/__init__.py"):
+            self.assertEqual(run("Bash", {"command": c}, d), 2, c)
+            self.assertEqual(run("Bash", {"command": c}, d, TOOLING), 0, c + " (tooling)")
+        for p in ("docs/repo_slug.md", f"scripts/__pycache__/tasks.{TAG}.pyc", "scripts/repo_slugs.txt", "app/repo_slug/x.kt"):
+            self.assertEqual(run("Write", {"file_path": p}, d), 0, p)
 
 
 if __name__ == "__main__":
