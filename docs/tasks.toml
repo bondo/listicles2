@@ -996,7 +996,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-27", "M1-66"]
+depends_on = ["M1-27", "M1-88"]
 notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee)"
 
 [[task]]
@@ -1034,13 +1034,33 @@ notes = "Split from M1-14 (PR 319). Implements the M1-14 domain interfaces: Sess
 
 [[task]]
 id = "M1-66"
-title = "Auth wiring: Credential Manager wrapper (Google ID option), :app on :core:data with licensee, Hilt bindings for session, sign-in and sign-out"
+title = "Auth wiring 1: Credential Manager wrapper (Google ID option) in :core:data, :app on :core:data with licensee"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-67", "M1-O14"]
+notes = "Split from M1-14 (PR 319). Split again 2026-11-24: the whole task measured about 620 changed lines without the #357 cleanup (guard 600), and :app on :core:data needs the Credential Manager artifacts with it (without them firebase-auth pulls older versions that no licence line lists). This part: GoogleCredentials over androidx.credentials 1.6.0 and googleid 1.2.1 (cancel; no account: NoCredentialException, then a retry without the authorized-accounts filter), the activity it opens the picker in as a ForegroundActivity, the web client id (default_web_client_id: google-services.json's web client overrides the empty default of :core:data; the stand-in has one now), config/licensee/policy.gradle on :core:data. M1-88 has the Hilt bindings, M1-89 the #357 cleanup"
+
+[[task]]
+id = "M1-88"
+title = "Auth wiring 2: Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in SessionModule), MainActivity for the account picker"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-67", "M1-O14"]
-notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule: FirebaseAuthentication binds SessionState and Authentication, and one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc). Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14. Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-66 to-confirm marker in docs/privacy section 2 (en and da)"
+depends_on = ["M1-66"]
+notes = "Split from M1-66 (its PR has a compiled, tested draft). FirebaseAuthentication binds SessionState and Authentication; one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc); CredentialManagerGoogleCredentials with CredentialManager.create, its companion's web client id and a ForegroundActivity that MainActivity observes itself (application-wide activity callbacks would also see the picker's translucent activity, whose stop would clear it while MainActivity stays started); GoogleSignIn; SignOut with an application CoroutineScope (SupervisorJob). Tests: AppGraphTest, the started activity, SignedOutStartTest (it uninstalls SessionModule)"
+
+[[task]]
+id = "M1-89"
+title = "Clear the local data on every change to signed out, also when Firebase signs the user out itself (#357)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-88"]
+notes = "Split from M1-66. Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-89 to-confirm marker in docs/privacy section 2 (en and da)"
 
 [[task]]
 id = "M1-15"
@@ -1049,7 +1069,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-66", "M1-62"]
+depends_on = ["M1-88", "M1-62"]
 
 [[task]]
 id = "M1-16"
@@ -1058,7 +1078,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-66", "M1-03", "M1-49"]
+depends_on = ["M1-88", "M1-03", "M1-49"]
 
 [[task]]
 id = "M1-17"
@@ -1087,7 +1107,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-66", "M1-60", "M1-62", "M1-02", "M1-83"]
+depends_on = ["M1-54", "M1-88", "M1-60", "M1-62", "M1-02", "M1-83"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1164,7 +1184,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-60", "M1-66"]
+depends_on = ["M1-60", "M1-88"]
 notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, tested; the in-app privacy link is privacy Q10"
 
 [[task]]
@@ -1637,6 +1657,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = [
+  "M1-88", "M1-89",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
