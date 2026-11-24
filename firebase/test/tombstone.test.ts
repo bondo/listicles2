@@ -10,7 +10,7 @@ import * as h from "./harness";
 // M1-95, split from M1-11 (PLAN 3.1 Delete household; #199, #205): the owner's soft delete, which
 // must clear the name; no rule deletes a household doc, live or a tombstone; under a tombstone the
 // owner's cleanup (get, list and delete of the members, the removed markers and the household's
-// invites, one rule each) and a member's delete of her own member doc (P6), and no other write.
+// invites, one rule each) and a member's delete of their own member doc (P6), and no other write.
 // Leave, Remove member and its marker writes are M1-11's; the transfer, the join, a member's
 // invite create and the own display name under a tombstone are denied in their own files. Each
 // test seeds its world with rules off; every allow test goes through h.verifiedOnly.
@@ -87,9 +87,13 @@ function deleteAll(db: h.Db, paths: string[]): Promise<void> {
     return batch.commit();
 }
 
-async function seed(docs: Record<string, Fields>): Promise<void> {
+// Documents set, or deleted where null, with rules off.
+async function seed(docs: Record<string, Fields | null>): Promise<void> {
     await env.withSecurityRulesDisabled(async (admin) => {
-        for (const [p, data] of Object.entries(docs)) await admin.firestore().doc(p).set(data);
+        for (const [p, data] of Object.entries(docs)) {
+            const ref = admin.firestore().doc(p);
+            await (data === null ? ref.delete() : ref.set(data));
+        }
     });
 }
 
@@ -209,7 +213,7 @@ describe("Delete household: the owner's cleanup under the tombstone", () => {
         await assertFails(remove(household(TOMB))(dan.verified));
     });
 
-    // Nobody but the owner: a plain member of the tombstone (her own member doc is P6's) and a
+    // Nobody but the owner: a plain member of the tombstone (their own member doc is P6's) and a
     // signed-in non-member.
     test.each<[string, () => h.Db, Request]>([
         [
@@ -242,16 +246,20 @@ describe("Delete household: the owner's cleanup under the tombstone", () => {
     });
 });
 
-describe("P6: a member deletes her own member doc under the tombstone", () => {
-    test("verified only: alone", async () => {
-        await h.verifiedOnly(erin, remove(member(TOMB, ERIN)));
-    });
-
-    test("verified only: in one batch with her users-doc clear", async () => {
+// A delete of no doc is allowed too: after the owner's cleanup, or in a resumed self-heal, the
+// member's app sends the same batch (S1-01).
+describe("P6: a member deletes their own member doc under the tombstone", () => {
+    test.each<[string, boolean, boolean]>([
+        ["alone", false, false],
+        ["in one batch with the users-doc clear", true, false],
+        ["alone, the doc already gone", false, true],
+        ["in one batch with the users-doc clear, the doc already gone", true, true],
+    ])("verified only: %s", async (_what, clear, gone) => {
+        if (gone) await seed({ [member(TOMB, ERIN)]: null });
         await h.verifiedOnly(erin, (db) => {
             const batch = db.batch();
             batch.delete(db.doc(member(TOMB, ERIN)));
-            batch.update(db.doc(user(ERIN)), { householdId: null });
+            if (clear) batch.update(db.doc(user(ERIN)), { householdId: null });
             return batch.commit();
         });
     });
@@ -282,6 +290,11 @@ test.each<[string, () => h.Db, Request]>([
         "the owner overwrites a removed marker",
         () => dan.verified,
         (db) => db.doc(marker(TOMB, GUS)).set({ removedAt: NOW }),
+    ],
+    [
+        "the owner creates a removed marker",
+        () => dan.verified,
+        (db) => db.doc(marker(TOMB, FRANK)).set({ removedAt: NOW }),
     ],
 ])("denied under the tombstone: %s", async (_what, db, request) => {
     await assertFails(request(db()));

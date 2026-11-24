@@ -110,9 +110,10 @@ const MUTANTS: [string, string, string][] = [
     ],
 ];
 
+// Each mutant's `from` occurs once in the rules, so a later rules edit cannot retarget it unseen.
 test.each(MUTANTS)("the fuzz finds the mutant: %s", async (_what, from, to) => {
+    expect(h.RULES.split(from)).toHaveLength(2);
     const rules = h.RULES.replace(from, to);
-    expect(rules).not.toBe(h.RULES);
     const run = fuzz(rules, { seed: 1, numRuns: 3 * RUNS, endOnFailure: true });
     await expect(run).rejects.toThrow("the emulator says allowed, the model denied");
 });
