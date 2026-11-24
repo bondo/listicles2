@@ -21,8 +21,8 @@ EXACT = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 COOLDOWN_ECOSYSTEMS = ("gradle", "npm", "pip", "github-actions")
 COOLDOWN_DAYS = 7
 REQUIRED_DEV = {
-    "@eslint/js", "@firebase/rules-unit-testing", "@types/jest", "@types/node", "eslint", "firebase", "firebase-tools", "jest",
-    "prettier", "semver", "ts-jest", "typescript", "typescript-eslint",
+    "@eslint/js", "@firebase/rules-unit-testing", "@types/jest", "@types/node", "eslint", "fast-check", "firebase", "firebase-tools",
+    "jest", "prettier", "semver", "ts-jest", "typescript", "typescript-eslint",
 }
 SCRIPTS = {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -496,6 +496,9 @@ class Config(unittest.TestCase):
             "mutants.test.ts": ("...h.methodMutants(h.UNPLANNED_ROOT),", "h.mutate(h.RULES, mutant)", "expect(got).toEqual(want);",
                                 "expect(want).toContainEqual(expect.stringMatching(/: allowed$/));"),
             "harness.test.ts": ("planTemplates throws on %s", "expected: %s", "a collection no probe touches"),
+            # M1-06 (P17): the row check, the fuzz with the base cases first, its run count, the seeded mutants it must find.
+            "fuzz.test.ts": ("expect(ROWS).toEqual(h.allowedMethods(h.RULES));", "const RUNS = 1000;", "examples, ...(seed",
+                             'rejects.toThrow("the emulator says allowed, the model denied")'),
         }
         for name, needles in parts.items():
             lines = [ln for ln in read("firebase", "test", name).splitlines() if not ln.strip().startswith("//")]
