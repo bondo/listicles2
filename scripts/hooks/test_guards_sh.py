@@ -1413,6 +1413,71 @@ class ThresholdProse(GuardsCase):
         self.change("scripts/tool.py", "\n")
         self.assertPasses()
 
+    # Owner decision (orchestrator #40 chat): a reworded prose line that keeps the same `threshold(s) (N/N)` mention, with the
+    # same numbers, in the same file is no removed check setting. Prose is the same as above: markdown, or a .py line of only
+    # string literals. Changed numbers, a dropped mention, another file, another keyword on the line and non-prose files still fail.
+    OWNER_OLD = "Stays with the owner: guard thresholds (600/1500), merges of PRs with security-rules or sync-merge content.\n"
+    OWNER_NEW = "Stays with the owner: guard thresholds (600/1500), merges of PRs with sync-merge content.\n"
+    OWNER_LINES = (
+        ("agents/prompts/approver.md", OWNER_OLD, OWNER_NEW),
+        ("scripts/prompt_rules.py", '    "guard thresholds (600/1500), merges of PRs with security-rules or "\n',
+         '    "guard thresholds (600/1500), merges of PRs with "\n'),
+        ("scripts/test_prompt_rules.py", '        "licence acceptances", "guard thresholds (600/1500)", "security-rules",\n',
+         '        "licence acceptances", "guard thresholds (600/1500)", "sync-merge content",\n'),
+    )
+
+    def test_a_reworded_prose_line_that_keeps_the_threshold_mention_passes(self):
+        for rel, old, new in self.OWNER_LINES + (
+            ("agents/prompts/orchestrator.md", "Intro.\n" + self.OWNER_OLD + "End.\n", "Intro.\nEnd.\nMoved: " + self.OWNER_NEW),
+            ("agents/x.md", "a threshold (5) here and thresholds (600/1500) there\n", "b threshold (5) and thresholds (600/1500)\n"),
+        ):
+            with self.subTest(rel=rel):
+                self.base(rel, old)
+                self.change(rel, new)
+                self.assertPasses()
+
+    def test_a_prose_line_whose_threshold_numbers_change_or_go_still_fails(self):
+        for rel, old, new in self.OWNER_LINES:
+            for changed in (new.replace("600/1500", "700/1500"), new.replace("600/1500", "500/1500"),
+                            new.replace("600/1500", "600"), new.replace("thresholds (600/1500)", "limits"), "\n"):
+                with self.subTest(rel=rel, new=changed):
+                    self.base(rel, old)
+                    self.change(rel, changed)
+                    self.assertFails("guard: removed check setting:")
+
+    def test_a_threshold_mention_moved_to_another_file_still_fails(self):
+        self.base("agents/prompts/approver.md", self.OWNER_OLD)
+        self.repo.write("agents/prompts/orchestrator.md", self.OWNER_NEW)
+        self.change("agents/prompts/approver.md", "\n")
+        self.assertFails("guard: removed check setting:")
+
+    def test_a_prose_line_with_another_keyword_still_fails(self):
+        for rel, old, new in (
+            ("agents/x.md", "guard thresholds (600/1500) and maxIssues 0, old\n", "guard thresholds (600/1500) and maxIssues 0, new\n"),
+            ("agents/x.md", "guard thresholds (600/1500) and threshold = 5, old\n", "guard thresholds (600/1500) and threshold = 5, new\n"),
+            ("scripts/tool.py", '    "guard thresholds (600/1500)", "error = 1 old",\n', '    "guard thresholds (600/1500)", "error = 1 new",\n'),
+        ):
+            with self.subTest(rel=rel, old=old):
+                self.base(rel, old)
+                self.change(rel, new)
+                self.assertFails("guard: removed check setting:")
+
+    def test_a_reworded_non_prose_line_with_a_threshold_mention_still_fails(self):
+        for rel, old, new in (
+            ("scripts/x.sh", 'echo "guard thresholds (600/1500) old"\n', 'echo "guard thresholds (600/1500) new"\n'),
+            ("scripts/x.sh", "# guard thresholds (600/1500) old\n", "# guard thresholds (600/1500) new\n"),
+            ("config/x.yml", "note: guard thresholds (600/1500) old\n", "note: guard thresholds (600/1500) new\n"),
+            ("app/build.gradle.kts", 'val note = "guard thresholds (600/1500) old"\n', 'val note = "guard thresholds (600/1500) new"\n'),
+            ("scripts/tool.py", 'NOTE = "guard thresholds (600/1500) old"\n', 'NOTE = "guard thresholds (600/1500) new"\n'),
+            ("scripts/tool.py", '    f"guard thresholds (600/1500) {old}",\n', '    f"guard thresholds (600/1500) {new}",\n'),
+            ("scripts/gate.txt", "guard thresholds (600/1500) old\n", "guard thresholds (600/1500) new\n"),
+            (".github/workflows/ci.yml", "      # guard thresholds (600/1500) old\n", "      # guard thresholds (600/1500) new\n"),
+        ):
+            with self.subTest(rel=rel, old=old):
+                self.base(rel, old)
+                self.change(rel, new)
+                self.assertFails("guard: removed check setting:")
+
 
 class StagedMode(GuardsCase):
     def test_staged_flags_only_the_index(self):
