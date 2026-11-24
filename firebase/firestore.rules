@@ -3,7 +3,8 @@ rules_version = '2';
 // The Firestore rules of docs/PLAN.md section 3.1. Anything no rule below allows is denied.
 // M1-08, the base: signedIn(), the users doc, config/app, the caller's own member path and the
 // tombstone read. M1-10: Create household + owner and the own display name. M1-53: Transfer
-// ownership (the household update and the role update of a member doc). Every later allow
+// ownership (the household update and the role update of a member doc). M1-12: the invite rows
+// (create, get, list as the owner decided on #280, revoke and expired cleanup). Every later allow
 // statement starts `if signedIn() && ...` (rules.test.ts checks it), and its allow tests go through
 // verifiedOnly (firebase/test/harness.ts), which fails unless an unverified token is denied.
 // Layout (docs/adr/0002-rules-spike.md): one allow statement per method of a match; in its function
@@ -144,6 +145,58 @@ service cloud.firestore {
             && doc.role == (getAfter(householdDoc(hid)).data.ownerUid == uid ? 'owner' : 'member')));
     }
 
+    // Create invite (PLAN 3.1): a member of the live household, as createdBy, the household's name
+    // copied (P2), expiring within 7 days. The code is <householdId>_<22-character secret>, checked
+    // on its own (no data goes into the pattern), so a deleted code can be created again only for
+    // its own household (P3, #243).
+    function createsInvite(code) {
+      let invite = request.resource.data;
+      let household = get(householdDoc(invite.householdId)).data;
+      return code.matches('^[A-Za-z0-9]{20}_[A-Za-z0-9_-]{22}$')
+        && code.split('_')[0] == invite.householdId
+        && invite.keys().hasAll(['householdId', 'householdName', 'createdBy', 'createdAt', 'expiresAt'])
+        && invite.keys().hasOnly(['householdId', 'householdName', 'createdBy', 'createdAt', 'expiresAt'])
+        && invite.createdBy == request.auth.uid && invite.createdAt == request.time
+        && invite.expiresAt is timestamp
+        && invite.expiresAt <= request.time + duration.value(7, 'd')
+        && household.deleted == false && invite.householdName == household.name
+        && exists(memberDoc(invite.householdId, request.auth.uid));
+    }
+
+    // Read one invite (PLAN 3.1): any verified user (they need the code, HH-03) while the household
+    // is live; the join screen shows its householdName (P2). A code that does not exist has no
+    // household to check, so its get is denied as well. The owner's cleanup read under a tombstone
+    // is M1-11's path here.
+    function readsInvite() {
+      let household = get(householdDoc(resource.data.householdId)).data;
+      return household.deleted == false;
+    }
+
+    // Query invites (PLAN 3.1, as the owner decided on #280, M1-O12): a member of the live household
+    // lists the invites they created, the owner all of the household's. Rules are not filters: the
+    // query must fix householdId, and createdBy for a plain member. The owner's cleanup list under a
+    // tombstone is M1-11's path here.
+    function listsInvites() {
+      let invite = resource.data;
+      let household = get(householdDoc(invite.householdId)).data;
+      return household.deleted == false
+        && (invite.createdBy == request.auth.uid || household.ownerUid == request.auth.uid)
+        && exists(memberDoc(invite.householdId, request.auth.uid));
+    }
+
+    // Delete invite (PLAN 3.1) while the household is live: the revoke by its creator or the owner
+    // (HH-02), or any member's cleanup once it has expired. Paths in ADR 0002's order: creator,
+    // owner, then M1-11's cleanup under a tombstone, the expired cleanup (expiresAt first), then
+    // M1-54's joiner (spike.rules (b) until then).
+    function deletesInvite() {
+      let invite = resource.data;
+      let household = get(householdDoc(invite.householdId)).data;
+      return (invite.createdBy == request.auth.uid && household.deleted == false)
+        || (household.ownerUid == request.auth.uid && household.deleted == false)
+        || (invite.expiresAt < request.time && household.deleted == false
+          && exists(memberDoc(invite.householdId, request.auth.uid)));
+    }
+
     match /users/{uid} {
       allow get: if isCaller(uid);
       allow create: if isCaller(uid) && validUser(request.resource.data)
@@ -172,6 +225,14 @@ service cloud.firestore {
         allow create: if signedIn() && createsMember(hid, uid);
         allow update: if signedIn() && updatesMember(hid, uid);
       }
+    }
+
+    // Invites (PLAN 3.1): top level, the code is the document id (ADR 0002 (a)). No updates.
+    match /invites/{code} {
+      allow get: if signedIn() && readsInvite();
+      allow list: if signedIn() && listsInvites();
+      allow create: if signedIn() && createsInvite(code);
+      allow delete: if signedIn() && deletesInvite();
     }
 
     // The app config document (PLAN 3, START-01): anyone reads it, even signed out, so an old app
