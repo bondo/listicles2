@@ -14,7 +14,8 @@ import * as h from "./harness";
 // hasAll (each key's value has its own check), the invite's householdId == hid (the joiner's
 // delete reads the member doc in the invite's household after the batch), LIVE in the member
 // create and in the joiner's delete (the users-doc set's P5 check) and exists(users/uid) (a get()
-// of no document fails).
+// of no document fails). Nor can a test tell expiresAt > request.time from >=: the server sets the
+// request time.
 type Fields = Record<string, unknown>;
 type Clients = Record<h.Client, h.Db>;
 let env: RulesTestEnvironment;
