@@ -1000,12 +1000,18 @@ class Pr2CheckTests(unittest.TestCase):
             with self.subTest(role=role, clause=clause):
                 self.assertIn(rid, self.mutate(role, clause))
 
-    def test_the_second_reviewer_has_no_effort_escalation_that_roles_yaml_does_not_back(self):  # R1-06 of #128
-        self.assertNotIn("max_effort_when", (ROOT / "agents" / "roles.yaml").read_text().split("  escalation-reviewer:")[0]
-                         .split("  second-reviewer:")[1])
-        text = real("second-reviewer") + " Opus, high effort (max for risk:high PRs when `agents/roles.yaml` says so)."
-        self.assertIn("second-reviewer-role", ids(prompt_rules.check_text("second-reviewer", text)))
-        self.assertNotIn("max for", real("second-reviewer"))
+    def test_the_second_reviewer_is_max_effort_only_where_roles_yaml_and_the_owner_decision_say(self):  # #15 comment 7123360368 (replaces R1-06 of #128)
+        block = (ROOT / "agents" / "roles.yaml").read_text().split("  escalation-reviewer:")[0].split("  second-reviewer:")[1]
+        self.assertIn("max_effort_when:", block)
+        self.assertIn("- the PR is tagged risk:high in the milestone doc", block)
+        self.assertIn("- the PR is labelled area:security-rules, even without the risk:high tag", block)
+        self.assertNotIn("sync-merge", block)  # the decision names security-rules and risk:high only
+        pin = ("Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`, even without `risk:high`, "
+               "per `agents/roles.yaml`; you do not raise your own effort)")
+        self.assertIn(pin.lower(), prompt_rules.normalize(real("second-reviewer")).lower())
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, "Opus, high effort (`agents/roles.yaml`; you do not raise your own effort)"))
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, pin.replace("`risk:high` PRs and for PRs labelled `area:security-rules`",
+                                                                                              "`risk:high` PRs and for PRs labelled `area:sync-merge`")))
 
     def test_second_reviewer_ids_never_collide_with_the_reviewers(self):  # R2-01 of #128 (was R1-03)
         norm = prompt_rules.normalize(real("second-reviewer"))
@@ -2693,7 +2699,7 @@ class DelegatedDecisionsTests(unittest.TestCase):
         ("the approver also approves (a) PRs with security-rules content (`firebase/` rules and their tests)", "the approver also approves (a) PRs"),
         ("(b) changes to the privacy docs (`docs/privacy/**`)", "(b) changes to docs"),
         ("only after a clean final review round, with green CI and no veto", "after the owner looks"),
-        ("a clean independent second-reviewer pass (§7.2.2), with effort per `agents/roles.yaml`", "a second look"),
+        ("a clean independent second-reviewer pass at max effort (§7.2.2)", "a second look"),
     )
 
     def test_the_widened_scope_is_pinned_in_orchestration(self):
@@ -2722,24 +2728,32 @@ class DelegatedDecisionsTests(unittest.TestCase):
             else:
                 self.assertIn("delegated-decisions" if label == "orchestrator" else "approver-role", ids(prompt_rules.check_text(label, stale)))
 
-    def test_the_second_reviewer_pass_has_no_effort_of_its_own_here(self):
-        # roles.yaml sets the effort (second-reviewer: high); the scope wording must not promise another one (orchestrator ruling, no roles.yaml change).
-        stale = "a clean independent second-reviewer pass at max effort"
-        for label, norm in (("ORCHESTRATION", prompt_rules.normalize(self.doc("docs/ORCHESTRATION.md"))),
-                            ("orchestrator", prompt_rules.normalize(real("orchestrator"))), ("approver", prompt_rules.normalize(real("approver")))):
-            with self.subTest(text=label):
-                self.assertNotIn("second-reviewer pass at max effort", norm)
-                bad = norm + "\n" + stale + "\n"
-                if label == "ORCHESTRATION":
-                    self.assertIn("orch-delegated-decisions", self.doc_ids("docs/ORCHESTRATION.md", bad))
-                else:
-                    self.assertIn("delegated-decisions" if label == "orchestrator" else "approver-role", ids(prompt_rules.check_text(label, bad)))
+    def test_the_max_effort_and_the_protected_areas_of_the_second_reviewer_pass_are_pinned(self):  # R1-01, R1-02 of #385
+        # The decision (#15 comment 7123360368) says "at max effort"; the effort itself is set by roles.yaml max_effort_when. The release area
+        # stays gated on the pass as before the decision (second-reviewer.md, REVIEW.md).
+        for old, new in (
+            (", at max effort for a `risk:high` or security-rules PR", ""),
+            ("or another protected area (release) ", ""),
+            ("a `risk:high` PR, a security-rules PR", "a `risk:high` PR"),
+        ):
+            with self.subTest(text="approver", old=old):
+                self.assertIn("approver-role", self.role_replace("approver", old, new))
+        for old, new in (("at max effort for `risk:high` and security-rules, ", ""), ("security-rules or release-area PR", "security-rules PR")):
+            with self.subTest(text="orchestrator", old=old):
+                self.assertIn("delegated-decisions", self.role_replace("orchestrator", old, new))
+        self.assertIn("orch-delegated-decisions", self.doc_replace(
+            "docs/ORCHESTRATION.md", "The second reviewer runs at max effort for `risk:high` and `area:security-rules` PRs (`agents/roles.yaml`).", ""))
+        self.assertIn("roles-second-reviewer", self.doc_replace(
+            "agents/roles.yaml", "- the PR is labelled area:security-rules, even without the risk:high tag (owner decision, #15 comment 7123360368",
+            "- the PR is labelled area:sync-merge, even without the risk:high tag (owner decision, #15 comment 7123360368"))
+        self.assertIn("roles-second-reviewer", self.doc_replace("agents/roles.yaml", "session: fresh, same round as the reviewer, for risk:high PRs and protected areas\n    prompt: agents/prompts/second-reviewer.md\n    max_effort_when:",
+                                                               "session: fresh, same round as the reviewer, for risk:high PRs and protected areas\n    prompt: agents/prompts/second-reviewer.md\n    notes:"))
 
     def test_the_orchestrator_sends_security_rules_and_privacy_prs_to_the_approver_only_inside_the_scope(self):
         for old, new in (
             ("or with an owner-only path outside the approver's scope (§1.1), is not approver work",
              "or with an owner-only path outside tooling, build, CI and gate files, is not approver work"),
-            ("a security-rules or `risk:high` PR only after its clean second-reviewer pass, §7.2.2",
+            ("a `risk:high`, security-rules or release-area PR only after its clean second-reviewer pass, at max effort for `risk:high` and security-rules, §7.2.2",
              "a security-rules PR at any time"),
         ):
             with self.subTest(old=old[:40]):
@@ -2770,7 +2784,8 @@ class DelegatedDecisionsTests(unittest.TestCase):
             "refuse if one fails",
             "a design or product doc, is not yours to approve",
             "security-rules content (`firebase/` rules and their tests)", "or a privacy doc (`docs/privacy/**`)",
-            "a `risk:high` or security-rules PR also has a clean independent second-reviewer pass (§7.2.2)",
+            "a `risk:high` PR, a security-rules PR or another protected area (release) also has a clean independent second-reviewer pass (§7.2.2)",
+            ", at max effort for a `risk:high` or security-rules PR",
             "whose first line is `batch approval: #N@<full head sha> (approver session <your session id>)`",
             "post one PR comment `approval refused` with the failed items and their evidence",
             "Then post the WORKER-RESULT block",
