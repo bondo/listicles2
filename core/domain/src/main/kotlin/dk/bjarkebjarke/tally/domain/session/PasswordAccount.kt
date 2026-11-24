@@ -7,15 +7,25 @@ import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
  * Email and password sign-in (AUTH-05..08; M1.md, M1-15). No answer tells whether an email has an account or by which
  * method (AUTH-10). Each action checks its input, then the connection (SYNC-03), then asks Firebase; every email goes
  * out in the app's language, set right before it, as the user can change it in between (OQ-29).
+ *
+ * Send again is "Try again later", without asking Firebase, within [RESEND_COOLDOWN_MS] of the last email and after
+ * [MAX_EMAILS_PER_WINDOW] in [EMAIL_WINDOW_MS], the sign-up's email included (AUTH-06). The sign-up counts for an email
+ * that had an account too, which got none, so both get the same answers (AUTH-10, R1-01). Firebase states no per-user
+ * limit (docs/auth/limits: per project only), so the app keeps its own, meant to be stricter. [nowMs] is a monotonic
+ * clock in milliseconds; the count lives in this instance, so the app keeps one for both screens (M1-99: a singleton).
  */
 class PasswordAccount(
     private val connectivity: Connectivity,
     private val authentication: PasswordAuthentication,
     private val nowMs: () -> Long,
 ) {
+    /** When the sign-up's email and each Send again went out (or, with nobody signed in, would have), oldest first. */
+    private val emails = ArrayDeque<Long>()
+
     /**
-     * "Create account" (AUTH-05; M1-17 saves the name): a new account is signed in, not verified, and gets the
-     * verification email. An email that has an account ends the same with no email and nobody signed in (R3-01).
+     * "Create account" (AUTH-05): a new account is signed in, not verified, runs [saveName] (the name, M1-17 and M1-39)
+     * and gets the verification email. An email that has an account ends the same with no name saved, no email and
+     * nobody signed in (R3-01): only a new account has somewhere to save the name (R1-02).
      */
     suspend fun createAccount(
         email: String,
@@ -52,11 +62,15 @@ class PasswordAccount(
         }
     }
 
-    /** "Send again" (AUTH-06). With nobody signed in nothing is sent, and the answer is the same (AUTH-10). */
+    /**
+     * "Send again" (AUTH-06), within the limits above; offline it asks nothing and uses none of them. With nobody
+     * signed in nothing is sent, and the answer is the same (AUTH-10).
+     */
     suspend fun sendVerificationAgain(): VerificationResult =
         when {
             !connectivity.isOnline() -> VerificationResult.NeedsConnection
-            else -> verificationSent(inAppLanguage { authentication.sendEmailVerification() }).also { nowMs() }
+            !tookEmail(nowMs()) -> VerificationResult.TryAgainLater
+            else -> verificationSent(inAppLanguage { authentication.sendEmailVerification() })
         }
 
     /** "Continue" (AUTH-06): verified once the link was opened; with nobody signed in, not yet (AUTH-10). */
@@ -70,24 +84,40 @@ class PasswordAccount(
         answer: PasswordAnswer,
         saveName: suspend () -> Unit,
     ): SignUpResult {
-        saveName() // naive draft so the tests compile and fail; R1-02 follows
-        // Whatever this answers, the user checks their email: the verify screen has "Send again" (AUTH-06).
-        if (answer == PasswordAnswer.Done) inAppLanguage { authentication.sendEmailVerification() }
-        return when (answer) {
-            PasswordAnswer.Done, PasswordAnswer.EmailInUse -> SignUpResult.CheckYourEmail
-            PasswordAnswer.InvalidEmail -> SignUpResult.InvalidEmail
-            PasswordAnswer.WeakPassword -> SignUpResult.PasswordTooShort
-            PasswordAnswer.TooManyAttempts -> SignUpResult.TooManyAttempts
-            PasswordAnswer.NoConnection -> SignUpResult.NeedsConnection
-            else -> SignUpResult.Failed
+        if (answer == PasswordAnswer.Done) {
+            saveName()
+            // Whatever this answers, the user checks their email: the verify screen has "Send again" (AUTH-06).
+            inAppLanguage { authentication.sendEmailVerification() }
         }
+        val result =
+            when (answer) {
+                PasswordAnswer.Done, PasswordAnswer.EmailInUse -> SignUpResult.CheckYourEmail
+                PasswordAnswer.InvalidEmail -> SignUpResult.InvalidEmail
+                PasswordAnswer.WeakPassword -> SignUpResult.PasswordTooShort
+                PasswordAnswer.TooManyAttempts -> SignUpResult.TooManyAttempts
+                PasswordAnswer.NoConnection -> SignUpResult.NeedsConnection
+                else -> SignUpResult.Failed
+            }
+        if (result == SignUpResult.CheckYourEmail) synchronized(emails) { emails.addLast(nowMs()) }
+        return result
     }
+
+    /** Counts one more email at [now] and answers true, or answers false when that would break the limits. */
+    private fun tookEmail(now: Long): Boolean =
+        synchronized(emails) {
+            while (emails.isNotEmpty() && emails.first() <= now - EMAIL_WINDOW_MS) emails.removeFirst()
+            val spaced = emails.lastOrNull()?.let { now - it >= RESEND_COOLDOWN_MS } ?: true
+            val free = spaced && emails.size < MAX_EMAILS_PER_WINDOW
+            if (free) emails.addLast(now)
+            free
+        }
 
     private suspend fun inAppLanguage(send: suspend () -> PasswordAnswer): PasswordAnswer {
         authentication.useAppLanguage()
         return send()
     }
 
+    /** The limits of Send again (see the class). */
     companion object {
         const val RESEND_COOLDOWN_MS = 60_000L
         const val MAX_EMAILS_PER_WINDOW = 5

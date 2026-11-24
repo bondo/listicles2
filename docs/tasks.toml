@@ -1085,7 +1085,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-15"]
-notes = "Split from M1-15 (PR 396). FirebaseAuthentication implements PasswordAuthentication (createUserWithEmailAndPassword, signInWithEmailAndPassword, useAppLanguage, sendEmailVerification, sendPasswordResetEmail, reload with a forced ID-token refresh once verified, so the rules see email_verified) and EmailVerification (the M1-62 gate) from the ID-token listener, maps Firebase's exceptions to PasswordAnswer, and adds GoogleSignInResult.EmailHasPasswordAccount for the non-Gmail collision (wireframe 44; FirebaseAuthentication's comment points here). Auth emulator tests with enumeration protection on, as in the real project (M1-O1), for each case of docs/milestones/M1.md (M1-15): sign-up for a new email and for one with a password or a Google-only account (no account, session or email), wrong password, unknown and Google-only email, a reset for each, the verification link (oobCodes) and the gate, the collision, and the reverse case of OQ-34(b) (a reset for a Google-only email: record what the emulator does). Bindings: PasswordAuthentication, PasswordAccount and EmailVerification (replacing the GateModule stand-in). Adds the owner task to check the recorded behaviour once in the real project (R1) before relying on it"
+notes = "Split from M1-15 (PR 396). FirebaseAuthentication implements PasswordAuthentication (createUserWithEmailAndPassword, signInWithEmailAndPassword, useAppLanguage, sendEmailVerification, sendPasswordResetEmail, reload with a forced ID-token refresh once verified, so the rules see email_verified) and EmailVerification (the M1-62 gate) from the ID-token listener, maps Firebase's exceptions to PasswordAnswer, and adds GoogleSignInResult.EmailHasPasswordAccount for the non-Gmail collision (wireframe 44; FirebaseAuthentication's comment points here). Auth emulator tests with enumeration protection on, as in the real project (M1-O1), for each case of docs/milestones/M1.md (M1-15): sign-up for a new email and for one with a password or a Google-only account (no account, session or email), wrong password, unknown and Google-only email, a reset for each, the verification link (oobCodes) and the gate, the collision, and the reverse case of OQ-34(b) (a reset for a Google-only email: record what the emulator does). Bindings: PasswordAuthentication, PasswordAccount (one instance with a monotonic clock, SystemClock.elapsedRealtime: its Send again limits span both screens) and EmailVerification (replacing the GateModule stand-in). Adds the owner task to check the recorded behaviour once in the real project (R1) before relying on it"
 
 [[task]]
 id = "M1-16"
@@ -1104,7 +1104,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-15", "M1-99", "M1-16", "M1-62"]
-notes = "The name field calls a ProfileRepository interface with a fake (M1-39 implements it). Screen 24: one error under the form; show/hide password button en/da (P12, #198 item 6)"
+notes = "The name field calls a ProfileRepository interface with a fake (M1-39 implements it), as createAccount's saveName step, which only a new account runs (M1-15, R1-02). Screen 24: one error under the form; show/hide password button en/da (P12, #198 item 6)"
 
 [[task]]
 id = "M1-24"
