@@ -982,6 +982,27 @@ class Conventions(unittest.TestCase):
             'val p = (project as org.gradle.internal.extensibility.DynamicObjectAware).asDynamicObject',
             'val h = java.lang.invoke.MethodHandles.lookup()',
             'val p = properties["parent"]',
+            # PR 384 R4-02 (ran in Gradle 8.14.3): reflection fails as a class, by package and by the bean and field lookups.
+            "import java.beans.Introspector",
+            'val p = Introspector.getBeanInfo(Project::class.java).propertyDescriptors.first { it.name == "par" + "ent" }'
+            '.readMethod.invoke(project) as Project',
+            'val f = Project::class.java.getDeclaredField("x")',
+            "val f = Project::class.java.getFields()",
+            "val f = Project::class.java.declaredFields",
+            "val f = Project::class.java.fields",
+            "import java.beans.Expression",
+            'val p = Expression(project, "get" + "Parent", arrayOf()).value as Project',
+            "val m: java.lang.reflect.Method? = null",
+            "import kotlin.reflect.KProperty1",
+            "val h: java.lang.invoke.MethodHandle? = null",
+            "val d = PropertyDescriptor(\"parent\", Project::class.java).getReadMethod()",
+            # PR 384 R4-03 (ran in Gradle 8.14.3): ::getProject, and the APIs that hand out another project's tasks.
+            'val p = configurations.getByName("runtimeClasspath").buildDependencies.getDependencies(null).map(Task::getProject)',
+            'configurations.getByName("runtimeClasspath").buildDependencies.getDependencies(null).first().run { println(project.path) }',
+            'val t = tasks.named("x").get().taskDependencies.getDependencies(null)',
+            "val f = Task::getProject",
+            "val f = Task::`getProject`",
+            "val f = Task::getTaskDependencies",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
@@ -1131,6 +1152,7 @@ class Conventions(unittest.TestCase):
             "dependencies { testImplementation(libs.kotest.property) }\n"
             "val op = objects.property(String::class.java)\nval props = java.util.Properties()\nval home = System.getProperty(\"user.home\")\n"
             "/* a /* nested */ comment */ val own = project.name\nval `my name` = 1\n"
+            "val fields = \"a|b\".split('|')\nval (name, other) = fields\nval first = fields[0]\n"
             "val d2 = dependencies.project(mapOf(\"path\" to \":x\"))\n"
         )
         groovy = "plugins {\n    id 'com.example'\n}\n"  # a project dependency fails in Groovy (see the Groovy deny cases)
