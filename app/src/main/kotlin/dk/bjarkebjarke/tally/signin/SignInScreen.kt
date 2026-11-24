@@ -1,27 +1,17 @@
 package dk.bjarkebjarke.tally.signin
 
-import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,10 +21,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.takeOrElse
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -42,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewFontScale
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dk.bjarkebjarke.tally.R
 import dk.bjarkebjarke.tally.Sizes
@@ -85,94 +70,40 @@ fun SignInScreen(
         }
     }
     Scaffold(modifier.fillMaxSize(), snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-        // The Scaffold's padding is the one source of the system bars' insets (R1-01).
-        SignInContent(state, onGoogle, onEmail, Modifier.padding(padding))
-    }
-}
-
-/** The mark, the name, the two buttons and the note, centred. */
-@Composable
-private fun SignInContent(
-    state: SignInUiState,
-    onGoogle: () -> Unit,
-    onEmail: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier.fillMaxSize().padding(Sizes.screenGutter),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Surface(
-            Modifier.size(MarkSize).testTag(SIGN_IN_MARK_TAG),
-            shape = RoundedCornerShape(MarkCorner),
-            color = MaterialTheme.colorScheme.primary,
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(Sizes.screenGutter),
+            verticalArrangement = Arrangement.spacedBy(Spacing.l, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(painterResource(R.drawable.ic_tally_mark), null, tint = MaterialTheme.colorScheme.onPrimary)
-            }
-        }
-        Text(
-            stringResource(R.string.app_name),
-            Modifier.padding(top = Spacing.l).semantics { heading() },
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(
-            stringResource(R.string.app_tag),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-        )
-        // One group, as wireframe 01's `.stack`: the buttons' 48 dp touch targets meet, so the buttons are 8 dp apart.
-        Column(Modifier.padding(top = Spacing.l)) {
+            Text(
+                stringResource(R.string.app_name),
+                Modifier.semantics { heading() },
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Text(
+                stringResource(R.string.app_tag),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+            )
             Button(onGoogle, Modifier.fillMaxWidth(), enabled = !state.busy) {
-                ButtonLabel(R.drawable.ic_login, R.string.signin_google, SIGN_IN_GOOGLE_ICON_TAG)
+                Text(stringResource(R.string.signin_google), textAlign = TextAlign.Center)
             }
             OutlinedButton(onEmail, Modifier.fillMaxWidth()) {
-                ButtonLabel(
-                    R.drawable.ic_mail,
-                    R.string.signin_email,
-                    SIGN_IN_EMAIL_ICON_TAG,
-                    MaterialTheme.colorScheme.primary,
-                )
+                Text(stringResource(R.string.signin_email), textAlign = TextAlign.Center)
             }
+            Text(
+                stringResource(R.string.signin_note),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
         }
-        Text(
-            stringResource(R.string.signin_note),
-            Modifier.padding(top = Spacing.s),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-        )
     }
 }
-
-/** A button's leading icon and its label, centred also when the label wraps (200 % font scale). */
-@Composable
-private fun RowScope.ButtonLabel(
-    @DrawableRes icon: Int,
-    @StringRes label: Int,
-    iconTag: String,
-    color: Color = Color.Unspecified,
-) {
-    Icon(
-        painterResource(icon),
-        null,
-        Modifier.size(ButtonIconSize).testTag(iconTag),
-        color.takeOrElse { LocalContentColor.current },
-    )
-    Spacer(Modifier.width(Spacing.s))
-    Text(stringResource(label), color = color, textAlign = TextAlign.Center)
-}
-
-const val SIGN_IN_MARK_TAG = "signin_mark"
-const val SIGN_IN_GOOGLE_ICON_TAG = "signin_google_icon"
-const val SIGN_IN_EMAIL_ICON_TAG = "signin_email_icon"
-
-/** Wireframe 01's `.logo` (72 dp, 20 dp corners) and `.btn .ms` (18 dp); not design tokens. */
-private val MarkSize = 72.dp
-private val MarkCorner = 20.dp
-private val ButtonIconSize = 18.dp
 
 @StringRes
 private fun SignInMessage.text(): Int =
