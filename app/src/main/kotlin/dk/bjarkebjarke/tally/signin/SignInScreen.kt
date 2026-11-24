@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -31,6 +32,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -153,7 +155,12 @@ private fun RowScope.ButtonLabel(
     iconTag: String,
     color: Color = Color.Unspecified,
 ) {
-    Icon(painterResource(icon), null, Modifier.size(ButtonIconSize).testTag(iconTag))
+    Icon(
+        painterResource(icon),
+        null,
+        Modifier.size(ButtonIconSize).testTag(iconTag),
+        color.takeOrElse { LocalContentColor.current },
+    )
     Spacer(Modifier.width(Spacing.s))
     Text(stringResource(label), color = color, textAlign = TextAlign.Center)
 }
