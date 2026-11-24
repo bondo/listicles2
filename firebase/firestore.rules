@@ -4,7 +4,8 @@ rules_version = '2';
 // M1-08, the base: signedIn(), the users doc, config/app, the caller's own member path and the
 // tombstone read. M1-10: Create household + owner and the own display name. M1-53: Transfer
 // ownership (the household update and the role update of a member doc). M1-12: the invite rows
-// (create, get, list as the owner decided on #280, revoke and expired cleanup). Every later allow
+// (create, get, list as the owner decided on #280, revoke and expired cleanup). M1-54: Join (the
+// joiner's member doc and invite delete, in one batch with the users-doc set). Every later allow
 // statement starts `if signedIn() && ...` (rules.test.ts checks it), and its allow tests go through
 // verifiedOnly (firebase/test/harness.ts), which fails unless an unverified token is denied.
 // Layout (docs/adr/0002-rules-spike.md): one allow statement per method of a match; in its function
@@ -31,6 +32,10 @@ service cloud.firestore {
 
     function userDoc(uid) {
       return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function inviteDoc(code) {
+      return /databases/$(database)/documents/invites/$(code);
     }
 
     // A name (PLAN 3.1 field validation, P4): 1-50 code points, non-empty after trim. The regex counts
@@ -92,18 +97,43 @@ service cloud.firestore {
         && !exists(householdDoc(hid)) && existsAfter(memberDoc(hid, request.auth.uid));
     }
 
-    // A member create (PLAN 3.1): the caller's own member doc (P1). Here the owner's, in Create
-    // household: role owner, in a household that does not exist before the batch and names the
-    // caller as owner after it, with the one-household check. The joiner's is M1-54's path.
+    // A member create (PLAN 3.1): the caller's own member doc (P1), a name (P4), joined at the
+    // request time, with the one-household check; the owner's in Create household or the joiner's
+    // in Join, told apart by role, which makes no call (ADR 0002).
     function createsMember(hid, uid) {
       let doc = request.resource.data;
-      return uid == request.auth.uid && doc.role == 'owner'
-        && doc.keys().hasAll(['role', 'displayName', 'joinedAt'])
-        && doc.keys().hasOnly(['role', 'displayName', 'joinedAt'])
-        && validName(doc.displayName) && doc.joinedAt == request.time
-        && !exists(householdDoc(hid))
-        && getAfter(householdDoc(hid)).data.ownerUid == request.auth.uid
+      return uid == request.auth.uid && validName(doc.displayName) && doc.joinedAt == request.time
+        && ((doc.role == 'owner' && createsOwner(hid, doc))
+          || (doc.role == 'member' && joins(hid, doc)))
         && oneHousehold(hid);
+    }
+
+    // The owner's member doc (Create household): its keys (P4), in a household that does not exist
+    // before the batch and names the caller as owner after it.
+    function createsOwner(hid, doc) {
+      return doc.keys().hasAll(['role', 'displayName', 'joinedAt'])
+        && doc.keys().hasOnly(['role', 'displayName', 'joinedAt'])
+        && !exists(householdDoc(hid))
+        && getAfter(householdDoc(hid)).data.ownerUid == request.auth.uid;
+    }
+
+    // The joiner's member doc (Join): its keys (P4) and viaInvite, a string (P4), the code of the
+    // invite joinsVia checks. A create implies !M(uid) before the batch. The invite is read in an
+    // argument, after the checks that make no call (ADR 0002).
+    function joins(hid, doc) {
+      return doc.keys().hasAll(['role', 'displayName', 'joinedAt', 'viaInvite'])
+        && doc.keys().hasOnly(['role', 'displayName', 'joinedAt', 'viaInvite'])
+        && doc.viaInvite is string
+        && joinsVia(hid, doc.viaInvite, get(inviteDoc(doc.viaInvite)).data);
+    }
+
+    // The invite of a join (PLAN 3.1): it exists (a get() of no document fails), points at the
+    // household and has not expired, its creator is still a member, and the same batch deletes it
+    // (single use); the household is live.
+    function joinsVia(hid, code, invite) {
+      return invite.householdId == hid && invite.expiresAt > request.time
+        && exists(memberDoc(hid, invite.createdBy)) && !existsAfter(inviteDoc(code))
+        && get(householdDoc(hid)).data.deleted == false;
     }
 
     // The one-household check of a member create (PLAN 3.1): the caller's users doc exists and holds
@@ -185,16 +215,20 @@ service cloud.firestore {
     }
 
     // Delete invite (PLAN 3.1) while the household is live: the revoke by its creator or the owner
-    // (HH-02), or any member's cleanup once it has expired. Paths in ADR 0002's order: creator,
-    // owner, then M1-11's cleanup under a tombstone, the expired cleanup (expiresAt first), then
-    // M1-54's joiner (spike.rules (b) until then).
-    function deletesInvite() {
+    // (HH-02), any member's cleanup once it has expired, or the joiner's in the join batch: no
+    // member before the batch, and the member doc after it names this code, so a member cannot burn
+    // another's invite. Paths in ADR 0002's order: creator, owner, then M1-11's cleanup under a
+    // tombstone, the expired cleanup (expiresAt first), the joiner.
+    function deletesInvite(code) {
       let invite = resource.data;
       let household = get(householdDoc(invite.householdId)).data;
       return (invite.createdBy == request.auth.uid && household.deleted == false)
         || (household.ownerUid == request.auth.uid && household.deleted == false)
         || (invite.expiresAt < request.time && household.deleted == false
-          && exists(memberDoc(invite.householdId, request.auth.uid)));
+          && exists(memberDoc(invite.householdId, request.auth.uid)))
+        || (household.deleted == false
+          && !exists(memberDoc(invite.householdId, request.auth.uid))
+          && getAfter(memberDoc(invite.householdId, request.auth.uid)).data.viaInvite == code);
     }
 
     match /users/{uid} {
@@ -217,7 +251,8 @@ service cloud.firestore {
 
       // get: the caller's own member path in any household, live, a tombstone or none; it may not
       // exist. create and update: only as createsMember and updatesMember allow (the owner's doc
-      // before the household exists; while it is live, the own displayName and the transfer's role).
+      // before the household exists, the joiner's while it is live; while it is live, the own
+      // displayName and the transfer's role).
       match /members/{uid} {
         // get, besides the own path, and list: a member of the live household (readsMembers).
         allow get: if signedIn() && (request.auth.uid == uid || readsMembers(hid));
@@ -232,7 +267,7 @@ service cloud.firestore {
       allow get: if signedIn() && readsInvite();
       allow list: if signedIn() && listsInvites();
       allow create: if signedIn() && createsInvite(code);
-      allow delete: if signedIn() && deletesInvite();
+      allow delete: if signedIn() && deletesInvite(code);
     }
 
     // The app config document (PLAN 3, START-01): anyone reads it, even signed out, so an old app
