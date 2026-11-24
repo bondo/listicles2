@@ -20,7 +20,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * when the screen that asked goes away, which signing out itself causes. M1-32 ends account deletion through
  * [discardingUnsentChanges]. The screen disables "Sign out" while one runs (M1-25); a new screen can still start one
  * while the previous one's steps 2 and 3 run, and [LocalUserData.awaitPendingWrites] then answers a failed wait. One
- * started after step 3 runs the steps again, on a new Firestore instance.
+ * started after step 3 runs the steps again, on a new Firestore instance. [SignedOutCleanup] clears again after step 4,
+ * and is what clears when Firebase signs out by itself (M1-89).
  */
 class SignOut(
     private val connectivity: Connectivity,
@@ -66,7 +67,11 @@ interface LocalUserData {
     /** Whether an active listener's latest snapshot had a write not yet sent. Picks the question's wording only. */
     fun unsentChangesSeen(): Boolean
 
-    /** Deletes the cache and the write queue (Firestore terminate, then clearPersistence); false when it could not. */
+    /**
+     * Deletes the cache and the write queue (Firestore terminate, then clearPersistence); false when it could not.
+     * [SignOut] calls it, and [SignedOutCleanup] whenever nobody is signed in: also with nothing left to delete, and
+     * while another clear runs.
+     */
     suspend fun clear(): Boolean
 }
 

@@ -18,6 +18,7 @@ import dk.bjarkebjarke.tally.domain.session.GoogleSignIn
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
+import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
@@ -64,7 +65,10 @@ object SessionModule {
         )
 }
 
-/** Google sign-in and sign-out over the graph's session bindings: [SessionModule]'s, or a test's fakes. */
+/**
+ * Google sign-in, sign-out and the signed-out cleanup over the graph's session bindings: [SessionModule]'s, or a test's
+ * fakes.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object SignInAndSignOutModule {
@@ -84,4 +88,16 @@ object SignInAndSignOutModule {
         credentials: GoogleCredentials,
         @ApplicationScope scope: CoroutineScope,
     ): SignOut = SignOut(connectivity, userData, authentication, credentials, scope)
+
+    /**
+     * One a process, in the application scope: MainActivity starts it at every creation, and only the first start
+     * watches (M1-89).
+     */
+    @Provides
+    @Singleton
+    fun signedOutCleanup(
+        session: SessionState,
+        userData: LocalUserData,
+        @ApplicationScope scope: CoroutineScope,
+    ): SignedOutCleanup = SignedOutCleanup(session, userData, scope)
 }

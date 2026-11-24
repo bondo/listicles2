@@ -1,0 +1,43 @@
+package dk.bjarkebjarke.tally.domain.session
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * Deletes the copy on the phone ([LocalUserData.clear]) whenever nobody is signed in (#357, privacy section 2), whoever
+ * ended the session. [SignOut] deletes it before it signs out of Firebase, so this clear then finds nothing left; but
+ * Firebase also signs out by itself when it cannot refresh the session's token (the account was disabled or deleted,
+ * or its password changed on another phone), and without this the copy would stay, shared with the next account that
+ * signs in on the phone.
+ *
+ * A signed-out start clears too: a copy that a stopped process or a failed clear left behind goes before anyone signs
+ * in. One clear at a time, in order; the states that come while one runs wait, none dropped, so a sign-in and a
+ * sign-out during a clear clear again. A failing session counts as signed out, as at the start-up root, and ends the
+ * watch.
+ */
+class SignedOutCleanup(
+    private val session: SessionState,
+    private val userData: LocalUserData,
+    private val externalScope: CoroutineScope,
+) {
+    private val started = AtomicBoolean(false)
+
+    /**
+     * Watches in [externalScope], an application-wide scope, for the rest of the process. Only the first call starts
+     * it: MainActivity calls it at every creation (M1-89).
+     */
+    fun start() {
+        if (started.compareAndSet(false, true)) externalScope.launch { watch() }
+    }
+
+    private suspend fun watch() =
+        session
+            .signedIn()
+            .catch { emit(false) }
+            .buffer(Channel.UNLIMITED)
+            .collect { signedIn -> if (!signedIn) userData.clear() }
+}
