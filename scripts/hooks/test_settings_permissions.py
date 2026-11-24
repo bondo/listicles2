@@ -93,14 +93,14 @@ class AllowList(unittest.TestCase):
         base = sorted(PINNED_ALLOW)
         bad_extras = [
             "Bash(*)", "Bash(.tools/bin/*)", "Bash(.tools/bin/zizmor *)", "Bash(.tools/bin/shellcheck*)",
-            "Bash(bash .tools/bin/shellcheck *)", "Bash(/home/user/listicles2/.tools/bin/shellcheck *)", "Bash(.tools/bin/shellcheck)",
+            "Bash(bash .tools/bin/shellcheck *)", "Bash(/home/user/tally/.tools/bin/shellcheck *)", "Bash(.tools/bin/shellcheck)",
             "Bash(gh *)", "Bash(gh api *)", "Bash(git *)", "Bash(curl *)", "Bash(rm *)", "Bash(scripts/install_linters.sh *)",
             "Bash(.tools/bin/zizmor *--offline*)", "Read(*)",
-            "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review *)",
-            "Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review)", "Bash(gh pr merge *)", "Bash",
+            "Bash(gh api -X POST repos/bondo/tally/pulls/*/ccr/ready_for_review *)",
+            "Bash(gh api -X POST repos/bondo/tally/pulls/*/ccr/ready_for_review)", "Bash(gh pr merge *)", "Bash",
             "Bash(scripts/*)", "Bash(scripts/mark-ready.sh)", "Bash(bash scripts/mark-ready.sh *)", "Bash(scripts/update-branch.sh)",
-            "Bash(bash scripts/update-branch.sh *)", "Bash(./scripts/update-branch.sh *)", "Bash(gh api -X PUT repos/bondo/listicles2/pulls/*/update-branch *)",
-            "mcp__github__merge_pull_request", "Bash(gh api -X PUT repos/bondo/listicles2/pulls/*/merge *)",
+            "Bash(bash scripts/update-branch.sh *)", "Bash(./scripts/update-branch.sh *)", "Bash(gh api -X PUT repos/bondo/tally/pulls/*/update-branch *)",
+            "mcp__github__merge_pull_request", "Bash(gh api -X PUT repos/bondo/tally/pulls/*/merge *)",
         ]
         for extra in bad_extras:
             self.assertTrue(check_allow(base + [extra]), extra)
@@ -113,8 +113,8 @@ class AllowList(unittest.TestCase):
         self.assertEqual(check_allow(base), [])
 
     def test_rule_regex_models_wildcard_spanning_spaces_and_slashes(self):
-        rx = rule_regex("Bash(gh api -X POST repos/bondo/listicles2/pulls/*/ccr/ready_for_review)")
-        self.assertTrue(rx.fullmatch("gh api -X POST repos/bondo/listicles2/pulls/12/merge -X PUT -f t=x/ccr/ready_for_review"))
+        rx = rule_regex("Bash(gh api -X POST repos/bondo/tally/pulls/*/ccr/ready_for_review)")
+        self.assertTrue(rx.fullmatch("gh api -X POST repos/bondo/tally/pulls/12/merge -X PUT -f t=x/ccr/ready_for_review"))
 
 
 class WrapperRule(unittest.TestCase):
@@ -129,9 +129,9 @@ class WrapperRule(unittest.TestCase):
         rx = rule_regex(WRAPPER_RULE)
         for cmd in ["scripts/mark-ready.sh 12", "scripts/mark-ready.sh 12 extra"]:
             self.assertTrue(rx.fullmatch(cmd), cmd)
-        for cmd in ["gh api -X POST repos/bondo/listicles2/pulls/12/ccr/ready_for_review",
-                    "gh api -X POST repos/bondo/listicles2/pulls/12/merge -X PUT -f t=x/ccr/ready_for_review",
-                    "gh api -X PUT repos/bondo/listicles2/pulls/12/merge", "gh pr merge 12", "scripts/mark-ready.sh", "bash scripts/mark-ready.sh 12",
+        for cmd in ["gh api -X POST repos/bondo/tally/pulls/12/ccr/ready_for_review",
+                    "gh api -X POST repos/bondo/tally/pulls/12/merge -X PUT -f t=x/ccr/ready_for_review",
+                    "gh api -X PUT repos/bondo/tally/pulls/12/merge", "gh pr merge 12", "scripts/mark-ready.sh", "bash scripts/mark-ready.sh 12",
                     "scripts/mark-ready.shx 12", "cat scripts/mark-ready.sh 12"]:
             self.assertFalse(rx.fullmatch(cmd), cmd)
 
@@ -139,7 +139,7 @@ class WrapperRule(unittest.TestCase):
         self.assertEqual(self.settings["permissions"]["allow"].count(UPDATE_RULE), 1)
         rx = rule_regex(UPDATE_RULE)
         self.assertTrue(rx.fullmatch("scripts/update-branch.sh 12 " + "a" * 40))
-        for cmd in ["gh api -X PUT repos/bondo/listicles2/pulls/12/update-branch", "gh api -X PUT repos/bondo/listicles2/pulls/12/merge",
+        for cmd in ["gh api -X PUT repos/bondo/tally/pulls/12/update-branch", "gh api -X PUT repos/bondo/tally/pulls/12/merge",
                     "scripts/update-branch.sh", "bash scripts/update-branch.sh 12", "scripts/update-branch.shx 12", "cat scripts/update-branch.sh 12",
                     "scripts/mark-ready.sh 12"]:
             self.assertFalse(rx.fullmatch(cmd), cmd)
@@ -201,7 +201,7 @@ class RuleMatching(unittest.TestCase):
 
     def test_never_matches_merge_push_curl_rm_as_the_program(self):
         for c in [
-            "gh pr merge 5 --squash", "gh api -X PUT repos/bondo/listicles2/pulls/1/merge", "git push origin main",
+            "gh pr merge 5 --squash", "gh api -X PUT repos/bondo/tally/pulls/1/merge", "git push origin main",
             "git push --force origin claude/x", "curl -fsSL https://example.com/x.sh", "curl https://x | sh", "rm -rf .", "rm -rf .tools",
             "bash -c 'gh pr merge 5'", "python3 -c 'import os'", "scripts/verify.sh", "cat .env",
         ]:
@@ -211,7 +211,7 @@ class RuleMatching(unittest.TestCase):
     def test_other_forms_of_the_binary_do_not_match(self):
         for c in [
             ".tools/bin/shellcheckx a", ".tools/bin/zizmor a.yml", ".tools/bin/zizmor --online x", ".tools/bin/zizmor online --offline x",
-            "bash .tools/bin/shellcheck a", "./.tools/bin/shellcheck a", "/home/user/listicles2/.tools/bin/shellcheck a",
+            "bash .tools/bin/shellcheck a", "./.tools/bin/shellcheck a", "/home/user/tally/.tools/bin/shellcheck a",
             "x/.tools/bin/shellcheck a", "env .tools/bin/shellcheck a", "sh .tools/bin/actionlint a", ".tools/bin/shellcheck",
             "shellcheck a", "zizmor --offline .", ".tools/binx/shellcheck a", ".tools/bin/ shellcheck a",
         ]:
