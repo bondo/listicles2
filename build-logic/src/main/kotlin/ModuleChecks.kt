@@ -1,18 +1,33 @@
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ProjectDependency
+import org.gradle.api.attributes.Usage
+import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.kotlin.dsl.getByType
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.property
+import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
+import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 // M1-68 part B2 (issue 48): every module checks its own compile tasks and configurations, so the root reads no other
 // project. listiclesChecks groups a module's checks; the root build names `<module>:listiclesChecks` by task path for
 // each module in its listiclesModules (check_build_guards.py keeps that list equal to settings.gradle.kts).
-// Tested by scripts/test_warnings_gate.py and scripts/test_jdk_release_gate.py.
+// Tested by scripts/test_warnings_gate.py, scripts/test_jdk_release_gate.py and scripts/test_java_api_level_gate.py.
 
 private const val JDK_RELEASE = "17"
 private const val WARNINGS =
-    "warnings are not all errors (allWarningsAsErrors off, suppressWarnings, -nowarn, " +
-        "-Xsuppress-warning, -Xwarning-level=...:disabled/warning/info) for: "
+    "warnings are not all errors (allWarningsAsErrors off, suppressWarnings, -nowarn, -Xsuppress-*, -Xdont-warn*, " +
+        "an @argfile, -Xwarning-level=...:disabled/warning/info) for: "
+
+// M1-68 part B3: the app hands its minSdk and api-versions.xml to the JVM modules' checkJavaApiLevel as an artifact
+// with this Usage, which no other variant has. A dependency on the app, not a read of its configuration.
+private const val JAVA_API_LEVEL = "listicles-java-api-level"
+private const val APP = ":app"
 
 /** Registers checkWarningsAsErrors, checkJdkRelease and listiclesChecks; [jdkRelease]: the JDK 17 API applies. */
 internal fun Project.registerModuleChecks(
@@ -21,24 +36,28 @@ internal fun Project.registerModuleChecks(
 ) {
     val warnings = registerWarningsCheck()
     val release = registerJdkReleaseCheck(jdkRelease, testSupport)
+    // A JVM module that may reach the app; lint's NewApi covers the Android modules, and test support never ships.
+    val apiLevel = if (jdkRelease) listOf(registerJavaApiLevelCheck()) else emptyList()
     tasks.register("listiclesChecks") {
         group = "verification"
         description = "Runs this module's own checks (the root's detekt runs it for every module)."
-        dependsOn(warnings, release, "checkTestSettings")
+        dependsOn(warnings, release, "checkTestSettings", apiLevel)
     }
 }
 
 /**
  * Flags that turn warnings off or hide them, which would bypass allWarningsAsErrors (M0.5-09). A bare flag takes
  * the next element as its value, so the list is read as a sequence; every entry of a comma-separated value must
- * raise its diagnostic to an error.
+ * raise its diagnostic to an error. Issue 48: every -Xsuppress-* and -Xdont-warn* flag, and any @argfile (its
+ * contents are not checked here), counts too.
  */
 internal fun hidesWarnings(args: List<String>): Boolean =
     args.withIndex().any { (i, arg) ->
         val value = if (arg.contains('=')) arg.substringAfter('=') else args.getOrNull(i + 1).orEmpty()
         val entries = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
         val allErrors = entries.isNotEmpty() && entries.all { it.endsWith(":error") }
-        arg == "-nowarn" || arg.startsWith("-Xsuppress-warning") || (arg.startsWith("-Xwarning-level") && !allErrors)
+        arg == "-nowarn" || arg.startsWith("@") || arg.startsWith("-Xsuppress-") || arg.startsWith("-Xdont-warn") ||
+            (arg.startsWith("-Xwarning-level") && !allErrors)
     }
 
 /** M0.5-09: every Kotlin compile task of this module (all variants, tests included) treats warnings as errors. */
@@ -156,5 +175,75 @@ private fun Project.registerJdkReleaseCheck(
                 "API (for example List.removeFirst) only from API 35 and minSdk is 26. " +
                 "Offenders: ${offenders.joinToString()}"
         }
+    }
+}
+
+/**
+ * M1-37 (issue 228): checkJdkRelease closes the JDK 18 to 21 gap only. A Java 9 to 17 member that is newer than minSdk
+ * (Stream.toList is API 34, Objects.requireNonNullElse is API 30) still compiles in a JVM module, and Android lint's
+ * NewApi skips pure JVM modules. This runs scripts/check_java_api_level.py over the module's main classes against the
+ * api-versions.xml of the app's compileSdk platform, with the app's minSdk: both come from the app
+ * (registerJavaApiLevelInputs) through a dependency, so they cannot drift from it. A missing or unreadable
+ * api-versions.xml fails the build.
+ */
+private fun Project.registerJavaApiLevelCheck(): TaskProvider<Exec> {
+    val declared = configurations.dependencyScope("listiclesJavaApiLevel")
+    val fromApp =
+        configurations.resolvable("listiclesJavaApiLevelFromApp") {
+            extendsFrom(declared.get())
+            attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(JAVA_API_LEVEL))
+        }
+    dependencies.add(declared.name, dependencies.project(mapOf("path" to APP)))
+    val appFiles = files(fromApp)
+    val checker = isolated.rootProject.projectDirectory.file("scripts/check_java_api_level.py")
+    val classDirs =
+        extensions
+            .getByType<SourceSetContainer>()
+            .getByName("main")
+            .output.classesDirs
+    return tasks.register<Exec>("checkJavaApiLevel") {
+        group = "verification"
+        description = "Fails if this module's main classes use a java/ or android/ member above the app's minSdk."
+        inputs.file(checker)
+        inputs.files(classDirs).withPropertyName("classDirs")
+        inputs.files(appFiles).withPropertyName("fromApp")
+        executable = "python3"
+        argumentProviders.add(
+            CommandLineArgumentProvider {
+                // Two lines from the app: its minSdk and the api-versions.xml path (missing file: the checker fails).
+                val (minSdk, apiVersions) = appFiles.singleFile.readLines()
+                listOf("-I", checker.asFile.path, "--api-versions", apiVersions, "--min-sdk", minSdk) +
+                    classDirs.files.filter { it.exists() }.map { it.path }
+            },
+        )
+    }
+}
+
+/** The app's side of checkJavaApiLevel: its debug minSdk and the api-versions.xml of its compileSdk platform. */
+internal fun Project.registerJavaApiLevelInputs() {
+    val components = extensions.getByType<ApplicationAndroidComponentsExtension>()
+    val minSdk = objects.property<Int>()
+    components.onVariants(components.selector().withName("debug")) { minSdk.set(it.minSdk.apiLevel) }
+    // Resolving the boot classpath makes AGP install the compileSdk platform when it is missing.
+    val apiVersions =
+        components.sdkComponents.bootClasspath.map { jars ->
+            jars
+                .first { it.asFile.name == "android.jar" }
+                .asFile
+                .resolveSibling("data/api-versions.xml")
+                .path
+        }
+    val output = layout.buildDirectory.file("listicles/java-api-level.txt")
+    val write =
+        tasks.register("listiclesJavaApiLevelInputs") {
+            description = "Writes the app's minSdk and api-versions.xml path for the JVM modules' checkJavaApiLevel."
+            inputs.property("minSdk", minSdk)
+            inputs.property("apiVersions", apiVersions)
+            outputs.file(output)
+            doLast { output.get().asFile.writeText("${minSdk.get()}\n${apiVersions.get()}\n") }
+        }
+    configurations.consumable("listiclesJavaApiLevelElements") {
+        attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(JAVA_API_LEVEL))
+        outgoing.artifact(output) { builtBy(write) }
     }
 }
