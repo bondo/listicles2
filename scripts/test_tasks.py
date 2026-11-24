@@ -124,7 +124,7 @@ class ValidateTest(unittest.TestCase):
 
     def test_three_digit_ids_keep_file_order_and_owner_ids(self):
         g = graph(task("M1-100", milestone="M1"), task("M1-99", milestone="M1"), task("M1-O1", milestone="M1", assignee="owner"))
-        self.assertEqual(ready_ids(g), ["M1-100", "M1-99"])  # position in the file, not id order
+        self.assertEqual(ready_ids(g), ["M1-100", "M1-99", "M1-O1"])  # position in the file, not id order
         self.assertIn("owner tasks (and only they)", errors_of(task("M1-100", milestone="M1", assignee="owner")))
         self.assertIn("id must look like", errors_of(task("M1-O100x", milestone="M1", assignee="owner")))
 
