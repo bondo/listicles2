@@ -44,6 +44,7 @@ const member = (uid: string): string => `${household}/members/${uid}`;
 const marker = (uid: string): string => `${household}/removed/${uid}`;
 const invite = (c: string): string => `invites/${c}`;
 const user = (uid: string): string => `users/${uid}`;
+const HOUSEHOLD = { name: "Home", createdBy: ALICE, createdAt: T0, ownerUid: BOB, deleted: false };
 const membership = (role: string): Fields => ({ role, displayName: "Name", joinedAt: T0 });
 const stored = (createdBy: string): Fields => ({
     householdId: HOME,
@@ -128,13 +129,7 @@ afterAll(async () => {
 beforeEach(async () => {
     await env.clearFirestore();
     await seed({
-        [household]: {
-            name: "Home",
-            createdBy: ALICE,
-            createdAt: T0,
-            ownerUid: BOB,
-            deleted: false,
-        },
+        [household]: HOUSEHOLD,
         [member(BOB)]: membership("owner"),
         [member(ALICE)]: membership("member"),
         [member(CAROL)]: membership("member"),
@@ -158,11 +153,7 @@ describe("Leave (one batch)", () => {
     // the caller's own member doc, and only while there is one (M(uid)): gus was removed.
     test.each<[string, () => h.Db, Request]>([
         ["the owner's Leave batch", () => bob.verified, (db) => leave(db, BOB)],
-        [
-            "a plain member deletes another's member doc",
-            () => alice.verified,
-            remove(member(CAROL)),
-        ],
+        ["a plain member deletes carol's member doc", () => alice.verified, remove(member(CAROL))],
         ["a non-member deletes a member doc", () => frank.verified, remove(member(CAROL))],
         ["a removed member's Leave batch", () => gus.verified, (db) => leave(db, GUS)],
     ])("denied: %s", async (_what, db, request) => {
