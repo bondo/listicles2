@@ -1283,12 +1283,24 @@ if [ "$STAGED" = 0 ]; then
           while (match(kw, /[A-Za-z][ \t]+thresholds([,;)]|[.]([ \t]|$)|[ \t]+[A-Za-z])/)) kw = substr(kw, 1, RSTART) " prose " substr(kw, RSTART + RLENGTH - 1)
         }
         if (ispy) kw = pymention(kw)
+        # Owner decision (orchestrator #40 chat): on a changed prose line (as above: markdown, or a .py line of only string literals)
+        # whose only keyword is `threshold(s) (N/N...)`, the key is that mention with its numbers, not the line. A reworded line that
+        # keeps it in the same file passes; other numbers, another file or a dropped mention still fail.
+        mkey = ""
+        if ($0 ~ /^[-+]/ && (file ~ /\.md$/ || (file ~ /\.py$/ && lit ~ /^[-+][][ \t(){},;]*$/))) {
+          pr = kw
+          while (match(pr, /[^A-Za-z0-9_]thresholds?[ \t]*\([ \t]*[0-9]+([ \t]*[\/,][ \t]*[0-9]+)*[ \t]*\)/)) {
+            mkey = mkey SUBSEP substr(pr, RSTART + 1, RLENGTH - 1); pr = substr(pr, 1, RSTART - 1) " " substr(pr, RSTART + RLENGTH)
+          }
+          if (chk(pr)) mkey = ""
+        }
       }
       # coverageThreshold (Jest) and fail_under / --cov-fail-under (coverage.py) are named like thresholds but not spelled `threshold`.
       # In a Jest, Vitest, nyc or c8 config the per-metric values sit on their own lines (`branches: 80,`), so those lines count too.
       chk(kw) ||
       (file ~ /(jest|vitest|vite)\.config\.[^\/]*$|nycrc[^\/]*$|c8rc[^\/]*$/ && kw ~ /^[-+][ \t]*["\047]?(branches|functions|lines|statements)["\047]?[ \t]*:[ \t]*[0-9]/) {
         l = norm($0); key = file "|" l; gsub(/[0-9]+/, "N", key); n = num(norm(body))
+        if (mkey != "") { key = file "|" mkey; n = -1 }
         if (substr($0, 1, 1) == "-") { rem[key] = l; remn[key] = n; remf[key] = file } else { add[key] = l; addn[key] = n }
       }
       END {
