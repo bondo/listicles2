@@ -2555,7 +2555,7 @@ class DelegatedDecisionsTests(unittest.TestCase):
 
     RETAINED = (
         "settings outside git (repository settings, rulesets, environments, collaborator access)",
-        "`.claude` permissions and settings", "network allowlists", "licence and permission acceptances", "guard thresholds of 600 and 1500",
+        "`.claude` permissions and settings", "network allowlists", "licence and permission acceptances", "guard thresholds (600/1500)",
         "design and product sign-off",
         "merges of PRs with sync-merge content (sync and merge logic)",
         "the owner task M1-O5 (approving the privacy text before anyone but the owner installs the app)",

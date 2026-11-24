@@ -129,7 +129,7 @@ _DELEGATED = tuple(re.escape(t) for t in (
 ))
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
-    "settings, network allowlists, licence and permission acceptances, guard thresholds of 600 and 1500, design and product sign-off, merges of PRs "
+    "settings, network allowlists, licence and permission acceptances, guard thresholds (600/1500), design and product sign-off, merges of PRs "
     "with sync-merge content (sync and merge logic), the owner task M1-O5 (approving the privacy text before anyone but the owner installs the "
     "app), and changes to the process files that define these authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, "
     "agents/roles.yaml, agents/prompts/)."
