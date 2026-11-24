@@ -1667,7 +1667,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         self.assertNotRegex(text, r"depth (?:is )?(?:≥|>=) ?7")
 
     def test_effort_is_medium_everywhere_the_orchestrator_is_described(self):
-        self.assertRegex(self.norm(self.ORCH_MD), r"^you are the orchestrator for listicles \(repo bondo/listicles2\)\. opus, medium effort")
+        self.assertRegex(self.norm(self.ORCH_MD), r"^you are the orchestrator for listicles \(repo bondo/tally\)\. opus, medium effort")
         self.assertRegex(self.norm(self.ORCH_DOC), r"\| \*\*orchestrator\*\* \| opus / medium \|")
 
     RECIPE_HEADING = "repo access and worker-prompt recipes"

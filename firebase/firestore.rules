@@ -58,6 +58,24 @@ service cloud.firestore {
           && !existsAfter(memberDoc(before, request.auth.uid)));
     }
 
+    // Get the household doc (PLAN 3.1 Reads): a member of the live household, M(uid) and LIVE
+    // (M1-83); or the tombstone read (M1-08), the household deleted and the caller's householdId
+    // pointing at it (the HH-06 dialog, the self-heal, the owner's cleanup resume). Each path tests
+    // deleted, which makes no call, first, so a get makes one call (ADR 0002).
+    function readsHousehold(hid) {
+      let household = resource.data;
+      return (household.deleted == false && exists(memberDoc(hid, request.auth.uid)))
+        || (household.deleted == true && get(userDoc(request.auth.uid)).data.householdId == hid);
+    }
+
+    // Get any member doc or list the members (PLAN 3.1 Reads, M1-83): a member of the live
+    // household, M(uid) and LIVE; two calls. The owner's cleanup reads under a tombstone are M1-11's
+    // path here.
+    function readsMembers(hid) {
+      let household = get(householdDoc(hid)).data;
+      return household.deleted == false && exists(memberDoc(hid, request.auth.uid));
+    }
+
     // Create household + owner, one batch (PLAN 3.1): the caller creates and owns a household whose
     // id is a Firestore auto-id (P3), with the caller's member doc after the batch. Household docs are
     // never deleted (#199), so an id that has existed stays taken. On create !exists always holds; it
@@ -139,10 +157,8 @@ service cloud.firestore {
     }
 
     match /households/{hid} {
-      // The tombstone read: the household is deleted and the caller's householdId points at it
-      // (the HH-06 dialog, the self-heal, the owner's cleanup resume). Members' reads come later.
-      allow get: if signedIn() && resource.data.deleted == true
-        && get(userDoc(request.auth.uid)).data.householdId == hid;
+      // A member's read of the live household, or the tombstone read (readsHousehold).
+      allow get: if signedIn() && readsHousehold(hid);
       allow create: if signedIn() && createsHousehold(hid);
       allow update: if signedIn() && updatesHousehold(hid);
 
@@ -150,7 +166,9 @@ service cloud.firestore {
       // exist. create and update: only as createsMember and updatesMember allow (the owner's doc
       // before the household exists; while it is live, the own displayName and the transfer's role).
       match /members/{uid} {
-        allow get: if signedIn() && request.auth.uid == uid;
+        // get, besides the own path, and list: a member of the live household (readsMembers).
+        allow get: if signedIn() && (request.auth.uid == uid || readsMembers(hid));
+        allow list: if signedIn() && readsMembers(hid);
         allow create: if signedIn() && createsMember(hid, uid);
         allow update: if signedIn() && updatesMember(hid, uid);
       }

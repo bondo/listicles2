@@ -3,7 +3,7 @@
 The R6 retro log (PLAN 9.4, `docs/reviews/README.md` R6). Each retro adds a section, and the next retro checks the expected
 effect of the changes before it. Changes to `agents/roles.yaml`, thresholds and protected files are owner merges.
 
-Comment ids below are on issue #15 (`https://github.com/bondo/listicles2/issues/15#issuecomment-<id>`) unless a PR is named.
+Comment ids below are on issue #15 (`https://github.com/bondo/tally/issues/15#issuecomment-<id>`) unless a PR is named.
 
 ## 2026-11-18: M0.5 retro (task M0.5-28), Agent Usage Redesign pilot against its baseline
 
