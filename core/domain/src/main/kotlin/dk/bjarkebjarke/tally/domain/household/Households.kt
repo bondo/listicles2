@@ -34,9 +34,17 @@ sealed interface Membership {
     data object Failed : Membership
 }
 
-/** Test-first draft (M1-18): HouseholdsTest fails against it until the next commit. */
+/**
+ * A create or join as the caller's `users/{uid}` allows it: a set [householdId] stops it (one household per user), and
+ * so does a missing [name] (AUTH-12); otherwise [batch] runs with the name as the new member doc's `displayName` (P9).
+ */
 suspend fun membership(
     householdId: String?,
     name: String?,
     batch: suspend (displayName: String) -> Membership,
-): Membership = if (householdId == null) batch(name.orEmpty()) else Membership.Failed
+): Membership =
+    when {
+        householdId != null -> Membership.AlreadyInHousehold
+        name == null -> Membership.Failed
+        else -> batch(name)
+    }
