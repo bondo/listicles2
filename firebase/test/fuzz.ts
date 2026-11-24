@@ -17,6 +17,7 @@ const [H1, H2, H3] = ["Kq3ZtW9xLm2RbV7nPc4D", "Pz8YwV2nQs5TxK1mRc7B", "Mx4UvB6tR
 const HIDS = [H1, H2, H3, H1.slice(1), `${H1}x`, `${H1.slice(1)}_`, `${H1.slice(1)}-`];
 const CODE = `${H1}_${"s".repeat(22)}`;
 const CODE2 = CODE.replace(H1, H2); // an invite to dan's tombstone in the read world
+const CODE3 = `${H1}_${"t".repeat(22)}`; // another of carol's invites, in the join
 // The codes of the id and rename tweaks: P3's, and with a secret of 21 or 23 characters or a `.`.
 const CODES = [CODE, CODE2, CODE.slice(0, -1), `${CODE}s`, `${CODE.slice(0, -1)}.`];
 
@@ -150,12 +151,14 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
     // and his users doc in one batch. By n % 16: the base case (0, 11 to 15); the invite expired (1);
     // its creator, carol, no longer a member (2); the invite kept (3); dan's doc with role owner, an
     // earlier joinedAt or an unknown key (4 to 6); an invite to H2, which dan owns, so he may delete
-    // it (7); the household a tombstone that keeps its name (8); dan already a member (9); his doc
-    // naming another code (10).
+    // it (7); the household a tombstone that keeps its name (8); dan already a member, his doc set
+    // again unchanged, so only the delete's !M(uid) denies (9); another of carol's invites deleted
+    // too, which his doc does not name (10).
     join: (n) => {
         const v = n % 16;
         const code = v === 7 ? CODE2 : CODE;
-        const doc: m.Doc = { ...MEMBER, joinedAt: m.NOW, viaInvite: v === 10 ? CODE2 : code };
+        const joinedAt = v === 9 ? m.T0 : m.NOW; // 9: a stored time, as his doc already has it
+        const doc: m.Doc = { ...MEMBER, joinedAt, viaInvite: code, ...JOINED[v] };
         const expiresAt = v === 1 ? m.T0 : LATER;
         const world: Record<string, m.Doc> = {
             ...(v === 2 ? HOME : CAROLS),
@@ -163,9 +166,10 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
             [`invites/${code}`]: { ...INVITE, householdId: v === 7 ? H2 : H1, expiresAt },
         };
         if (v === 7) world[m.household(H2)] = { ...LIVE, ownerUid: DAN };
-        if (v === 9) world[m.member(H1, DAN)] = MEMBER;
-        const deletes = v === 3 ? [] : [del(`invites/${code}`)];
-        const writes = [set(m.member(H1, DAN), { ...doc, ...JOINED[v] }), ...deletes];
+        if (v === 9) world[m.member(H1, DAN)] = doc;
+        if (v === 10) world[`invites/${CODE3}`] = INVITE;
+        const deleted: string[] = v === 3 ? [] : v === 10 ? [code, CODE3] : [code];
+        const writes = [set(m.member(H1, DAN), doc), ...deleted.map((c) => del(`invites/${c}`))];
         return draft(
             DAN,
             { ...world, [m.user(DAN)]: points(null) },
