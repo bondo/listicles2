@@ -6,7 +6,7 @@ rules_version = '2';
 // ownership (the household update and the role update of a member doc). M1-12: the invite rows
 // (create, get, list as the owner decided on #280, revoke and expired cleanup). M1-54: Join (the
 // joiner's member doc and invite delete, in one batch with the users-doc set). M1-95, split from
-// M1-11: the soft delete, the owner's tombstone cleanup and P6 (a member's delete of her own
+// M1-11: the soft delete, the owner's tombstone cleanup and P6 (a member's delete of their own
 // member doc under a tombstone). Every later allow statement starts `if signedIn() && ...`
 // (rules.test.ts checks it), and its allow tests go through verifiedOnly
 // (firebase/test/harness.ts), which fails unless an unverified token is denied.
@@ -93,9 +93,11 @@ service cloud.firestore {
     }
 
     // Delete a member doc (PLAN 3.1) under a tombstone, one call; paths in ADR 0002's order. P6:
-    // the caller's own, which the self-heal deletes before it clears householdId. The owner's
-    // cleanup: any. M1-11 adds Leave and Remove member, while the household is live, as paths here
-    // (Leave before P6, Remove last).
+    // the caller's own, which the self-heal deletes before it clears householdId. A delete of no
+    // doc is allowed, so a self-heal after the cleanup, or a resumed one, sends the same batch;
+    // so whoever knows a household id can tell whether it is a tombstone. The owner's cleanup:
+    // any. M1-11 adds Leave and Remove member, while the household is live, as paths here (Leave
+    // before P6, Remove last).
     function deletesMember(hid, uid) {
       let household = get(householdDoc(hid)).data;
       return (uid == request.auth.uid && household.deleted == true) || cleansUp(household);

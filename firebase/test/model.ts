@@ -2,9 +2,8 @@
 // the PLAN rows, not from firestore.rules, so that fuzz.test.ts can compare the two on random
 // cases. ROWS has a row for each allow statement of the rules (fuzz.test.ts checks it). The PLAN
 // rows the rules lack are extension points, denied here until their task adds the rule and its row:
-// leave, remove member, the removed markers, the soft delete, its cleanup and P6 (M1-11). A new
-// allow statement fails that check until its row is in; a new path of an existing one (the soft
-// delete) fails the fuzz on its base case (fuzz.ts).
+// leave, remove member and the marker writes (M1-11). A new allow statement fails that check until
+// its row is in; a new path of an existing one fails the fuzz on its base case (fuzz.ts).
 
 export const NOW = Symbol("request.time"); // FieldValue.serverTimestamp() in a write
 export const T0 = new Date(0); // every stored timestamp, never request.time
@@ -56,6 +55,11 @@ const live = (w: World, hid: string): boolean => w.get(household(hid))?.deleted 
 // PLAN 3.1 Reads: a member of the live household, M(uid) and LIVE.
 const reader = (x: Ctx, hid: string): boolean =>
     x.signedIn && live(x.before, hid) && isMember(x.before, hid, x.uid);
+// Delete household (M1-95): the owner's cleanup reads and deletes under the tombstone, O(uid).
+const cleanup = (x: Ctx, hid: string): boolean => {
+    const home = x.before.get(household(hid));
+    return x.signedIn && home?.deleted === true && home.ownerUid === x.uid;
+};
 
 // householdId (P5): unchanged; set (null -> hid) with the caller's member doc in a live household
 // after the request; cleared (hid -> null) once that member doc is gone after it; never hid1 -> hid2.
@@ -177,12 +181,20 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
                 d.createdBy === x.uid && d.ownerUid === x.uid && isMember(x.after, hid, x.uid);
             return x.signedIn && /^[A-Za-z0-9]{20}$/.test(hid) && shape && values && own;
         },
-        update: (x, hid) => transfers(x, x.old, x.doc, hid),
+        // Transfer ownership, or the soft delete (M1-95): the owner of the live household sets
+        // deleted and clears the name (#205), nothing else.
+        update: (x, hid) => {
+            const owner = x.signedIn && x.old?.deleted === false && x.old.ownerUid === x.uid;
+            const soft = x.doc.deleted === true && x.doc.name === "";
+            const softDelete = owner && soft && only(x.old, x.doc, ["deleted", "name"]);
+            return softDelete || transfers(x, x.old, x.doc, hid);
+        },
     },
     "households/{hid}/members/{uid}": {
-        // The caller's own member path in any household (it may not exist), or a member's read.
-        get: (x, hid, uid) => (x.signedIn && uid === x.uid) || reader(x, hid),
-        list: (x, hid) => reader(x, hid),
+        // The caller's own member path in any household (it may not exist), a member's read, or
+        // the owner's cleanup.
+        get: (x, hid, uid) => (x.signedIn && uid === x.uid) || reader(x, hid) || cleanup(x, hid),
+        list: (x, hid) => reader(x, hid) || cleanup(x, hid),
         create: (x, hid, uid) => createsOwner(x, x.doc, hid, uid) || joins(x, x.doc, hid, uid),
         // While the household is live: the caller's own displayName (P4), or, by the owner before
         // the request, the role ownerUid gives the doc after it (Transfer ownership).
@@ -197,25 +209,31 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
                 home?.ownerUid === x.uid && only(x.old, x.doc, ["role"]) && x.doc.role === role;
             return x.signedIn && home?.deleted === false && (name || transfer);
         },
+        // Under a tombstone (M1-95): the caller's own, even when it is gone (P6), or the cleanup.
+        delete: (x, hid, uid) =>
+            (x.signedIn && uid === x.uid && x.before.get(household(hid))?.deleted === true) ||
+            cleanup(x, hid),
     },
+    // The removed markers: here only the tombstone's cleanup (M1-95).
+    "households/{hid}/removed/{uid}": { get: cleanup, list: cleanup, delete: cleanup },
     // Invites (M1-12), each while the household is live: get, any signed-in user (verified; they
     // need the code, HH-03); list, a member whose query fixes householdId and, unless the owner,
     // createdBy as the caller (#280); create (below); delete, its creator or the owner, any member
-    // once it has expired, or the joiner in the join batch.
+    // once it has expired, or the joiner in the join batch. Under a tombstone the owner's cleanup gets,
+    // lists (on householdId) and deletes them (M1-95).
     "invites/{code}": {
-        get: (x) => x.signedIn && live(x.before, String(x.old?.householdId)),
+        get: (x) => {
+            const hid = String(x.old?.householdId);
+            return (x.signedIn && live(x.before, hid)) || cleanup(x, hid);
+        },
         list: (x) => {
             const hid = x.where.householdId;
             const own =
                 x.where.createdBy === x.uid ||
                 x.before.get(household(String(hid)))?.ownerUid === x.uid;
-            return (
-                x.signedIn &&
-                typeof hid === "string" &&
-                live(x.before, hid) &&
-                isMember(x.before, hid, x.uid) &&
-                own
-            );
+            if (typeof hid !== "string") return false;
+            const mine = live(x.before, hid) && isMember(x.before, hid, x.uid) && own;
+            return (x.signedIn && mine) || cleanup(x, hid);
         },
         create: (x, code) => createsInvite(x, x.doc, code),
         delete: (x, code) => {
@@ -232,7 +250,7 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
                 x.before.get(household(hid))?.ownerUid === x.uid ||
                 expired ||
                 joiner;
-            return x.signedIn && live(x.before, hid) && who;
+            return (x.signedIn && live(x.before, hid) && who) || cleanup(x, hid);
         },
     },
     // Anyone, even signed out (START-01); no client writes.

@@ -51,34 +51,21 @@ const membership = (role: string): Fields => ({ role, displayName: "Name", joine
 const LIVE: Fields = { name: "Home", createdBy: BOB, createdAt: T0, ownerUid: BOB, deleted: false };
 // The soft delete as the app sends it (#205: the name cleared).
 const SOFT: Fields = { deleted: true, name: "" };
-// A stored invite of the tombstone, open for a day or (a negative expiresIn) expired.
-const stored = (createdBy: string, expiresIn = DAY): Fields => ({
-    householdId: TOMB,
+// A stored invite of the tombstone (or `householdId`), open for a day or (expiresIn < 0) expired.
+const stored = (createdBy: string, expiresIn = DAY, householdId = TOMB): Fields => ({
+    householdId,
     householdName: "Old home", // the name outlives the household until the cleanup (#281)
     createdBy,
     createdAt: T0,
     expiresAt: new Date(Date.now() + expiresIn),
 });
-const get =
-    (p: string): Request =>
-    (db) =>
-        db.doc(p).get();
-const remove =
-    (p: string): Request =>
-    (db) =>
-        db.doc(p).delete();
-const membersOf =
-    (hid: string): Request =>
-    (db) =>
-        db.collection(`${household(hid)}/members`).get();
-const markersOf =
-    (hid: string): Request =>
-    (db) =>
-        db.collection(`${household(hid)}/removed`).get();
-const invitesOf =
-    (hid: string): Request =>
-    (db) =>
-        db.collection("invites").where("householdId", "==", hid).get();
+const get = (p: string) => (db: h.Db) => db.doc(p).get();
+const set = (p: string, data: Fields) => (db: h.Db) => db.doc(p).set(data);
+const remove = (p: string) => (db: h.Db) => db.doc(p).delete();
+const membersOf = (hid: string) => (db: h.Db) => db.collection(`${household(hid)}/members`).get();
+const markersOf = (hid: string) => (db: h.Db) => db.collection(`${household(hid)}/removed`).get();
+const invitesOf = (hid: string) => (db: h.Db) =>
+    db.collection("invites").where("householdId", "==", hid).get();
 
 // One batch deleting each path.
 function deleteAll(db: h.Db, paths: string[]): Promise<void> {
@@ -215,23 +202,17 @@ describe("Delete household: the owner's cleanup under the tombstone", () => {
 
     // Nobody but the owner: a plain member of the tombstone (their own member doc is P6's) and a
     // signed-in non-member.
+    const plain = (): h.Db => erin.verified;
+    const outsider = (): h.Db => frank.verified;
     test.each<[string, () => h.Db, Request]>([
-        [
-            "a plain member deletes the owner's member doc",
-            () => erin.verified,
-            remove(member(TOMB, DAN)),
-        ],
-        [
-            "a plain member deletes the removed marker",
-            () => erin.verified,
-            remove(marker(TOMB, GUS)),
-        ],
-        ["a plain member gets the removed marker", () => erin.verified, get(marker(TOMB, GUS))],
-        ["a plain member lists the removed markers", () => erin.verified, markersOf(TOMB)],
-        ["a plain member lists the invites by householdId", () => erin.verified, invitesOf(TOMB)],
-        ["a non-member deletes a member doc", () => frank.verified, remove(member(TOMB, ERIN))],
-        ["a non-member deletes an invite", () => frank.verified, remove(invite(code(TOMB, "e")))],
-        ["a non-member lists the members", () => frank.verified, membersOf(TOMB)],
+        ["a plain member deletes the owner's member doc", plain, remove(member(TOMB, DAN))],
+        ["a plain member deletes the removed marker", plain, remove(marker(TOMB, GUS))],
+        ["a plain member gets the removed marker", plain, get(marker(TOMB, GUS))],
+        ["a plain member lists the removed markers", plain, markersOf(TOMB)],
+        ["a plain member lists the invites by householdId", plain, invitesOf(TOMB)],
+        ["a non-member deletes a member doc", outsider, remove(member(TOMB, ERIN))],
+        ["a non-member deletes an invite", outsider, remove(invite(code(TOMB, "e")))],
+        ["a non-member lists the members", outsider, membersOf(TOMB)],
     ])("denied: %s", async (_what, db, request) => {
         await assertFails(request(db()));
     });
@@ -267,37 +248,15 @@ describe("P6: a member deletes their own member doc under the tombstone", () => 
 
 // PLAN 3.1: under a tombstone nothing is written but the cleanup deletes and P6; the cleanup only
 // reads, lists and deletes. LIVE alone denies the invite, which names the tombstone's name.
-test.each<[string, () => h.Db, Request]>([
-    [
-        "the owner creates a member doc",
-        () => dan.verified,
-        (db) => db.doc(member(TOMB, FRANK)).set({ ...membership("member"), joinedAt: NOW }),
-    ],
-    [
-        "the owner updates a member doc",
-        () => dan.verified,
-        (db) => db.doc(member(TOMB, ERIN)).update({ displayName: "Erin" }),
-    ],
-    [
-        "the owner creates an invite",
-        () => dan.verified,
-        (db) =>
-            db
-                .doc(invite(code(TOMB, "n")))
-                .set({ ...stored(DAN), householdName: "", createdAt: NOW }),
-    ],
-    [
-        "the owner overwrites a removed marker",
-        () => dan.verified,
-        (db) => db.doc(marker(TOMB, GUS)).set({ removedAt: NOW }),
-    ],
-    [
-        "the owner creates a removed marker",
-        () => dan.verified,
-        (db) => db.doc(marker(TOMB, FRANK)).set({ removedAt: NOW }),
-    ],
-])("denied under the tombstone: %s", async (_what, db, request) => {
-    await assertFails(request(db()));
+const ASKED: Fields = { ...stored(DAN), householdName: "", createdAt: NOW };
+test.each<[string, Request]>([
+    ["creates a member doc", set(member(TOMB, FRANK), { ...membership("member"), joinedAt: NOW })],
+    ["updates a member doc", (db) => db.doc(member(TOMB, ERIN)).update({ displayName: "Erin" })],
+    ["creates an invite", set(invite(code(TOMB, "n")), ASKED)],
+    ["overwrites a removed marker", set(marker(TOMB, GUS), { removedAt: NOW })],
+    ["creates a removed marker", set(marker(TOMB, FRANK), { removedAt: NOW })],
+])("denied under the tombstone: the owner %s", async (_what, request) => {
+    await assertFails(request(dan.verified));
 });
 
 // The cleanup reads on their own, in a world the app never makes: frank owns NEST, which is live,
@@ -310,11 +269,7 @@ describe("The cleanup reads need deleted == true", () => {
         await seed({
             [household(NEST)]: { ...LIVE, createdBy: FRANK, ownerUid: FRANK },
             [member(NEST, ALICE)]: membership("member"),
-            [invite(code(NEST, "a"))]: {
-                ...stored(ALICE),
-                householdId: NEST,
-                householdName: "Home",
-            },
+            [invite(code(NEST, "a"))]: stored(ALICE, DAY, NEST),
         });
     });
 
