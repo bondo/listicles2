@@ -8,16 +8,16 @@ import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.Opcodes
 
 /**
- * Owner decision 7127528405 (PR 381): coverage leaves out what Dagger marks generated (its factories and members
- * injectors) and counts the hand-written classes below, so their uncovered lines still count against the 80% gate.
- * Judged on the app's compiled classes against app/build.gradle.kts's Kover exclusions; the root copy is not read.
+ * Owner decisions 7127528405 and 7129260438 (PR 381): coverage leaves out what Dagger generates (factories, their
+ * nested instance holders, members injectors) and counts the hand-written classes below, so their uncovered lines
+ * still count against the 80% gate. Judged on the app's compiled classes against app/build.gradle.kts's exclusions.
  */
 class KoverExclusionsTest {
     private val patterns = configured("tally.koverExcludedClasses").map(::globRegex)
     private val annotations = configured("tally.koverExcludedAnnotations").map { "L${it.replace('.', '/')};" }
 
     @Test
-    fun daggersFactoriesAndMembersInjectorsAreLeftOut() {
+    fun whatDaggerGeneratesIsLeftOut() {
         DAGGER_GENERATED.filterNot(::excluded).shouldBeEmpty()
     }
 
@@ -56,6 +56,7 @@ class KoverExclusionsTest {
                 "dk.bjarkebjarke.tally.MainActivity_MembersInjector",
                 "dk.bjarkebjarke.tally.ApplicationScopeModule_ApplicationScopeFactory",
                 "dk.bjarkebjarke.tally.session.SessionModule_GoogleCredentialsFactory",
+                "dk.bjarkebjarke.tally.session.SessionModule_FirebaseAuthenticationFactory\$InstanceHolder",
                 "dk.bjarkebjarke.tally.session.SignInAndSignOutModule_SignOutFactory",
                 "dk.bjarkebjarke.tally.start.GateModule_UpdateGateFactory",
             )
@@ -67,6 +68,7 @@ class KoverExclusionsTest {
                 "dk.bjarkebjarke.tally.session.StartedActivity",
                 "dk.bjarkebjarke.tally.start.GateModule",
                 "dk.bjarkebjarke.tally.start.StartViewModel",
+                "dk.bjarkebjarke.tally.start.StartUiState\$Ready",
             )
     }
 }
