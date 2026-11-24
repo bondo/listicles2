@@ -9,8 +9,8 @@ import org.objectweb.asm.Opcodes
 
 /**
  * Owner decision 7127528405 (PR 381): coverage leaves out what Dagger marks generated (its factories and members
- * injectors) and counts every hand-written class, so an uncovered hand-written line still counts against the 80% gate.
- * Judged on the app's compiled classes against the Kover exclusions of app/build.gradle.kts (repeated at the root).
+ * injectors) and counts the hand-written classes below, so their uncovered lines still count against the 80% gate.
+ * Judged on the app's compiled classes against app/build.gradle.kts's Kover exclusions; the root copy is not read.
  */
 class KoverExclusionsTest {
     private val patterns = configured("tally.koverExcludedClasses").map(::globRegex)
