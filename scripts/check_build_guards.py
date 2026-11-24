@@ -33,9 +33,14 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `subprojects` or `childProjects` (also `getAllprojects()` and the like, so a read such as `allprojects.flatMap { ... }` too; M1-68 part B3,
    issue 48), member access on (also after `?` or `!!`) or a configure block for `project(...)`/`findProject(...)`, a `project(path, ...)`
    call with an Action or lambda argument, `evaluationDependsOn`, and
-   `gradle.allprojects`/`beforeProject`/`afterProject`. A project dependency (`implementation(project(":x"))`) is fine. Known gaps (M1-84):
-   `rootProject.<member>` reads, `parent`, `gradle.rootProject { }`, and a `project(...)` held in a variable or passed to `with`/`run` or
-   `configure(listOf(project(...))) { }`.
+   `gradle.allprojects`/`beforeProject`/`afterProject`. M1-84 (isolated projects): any `rootProject` (also `getRootProject()`, passed or
+   held in a variable, `gradle.rootProject { }`) other than `isolated.rootProject`, which reads the root's directory; in a settings file
+   `rootProject` is the project descriptor (`rootProject.name`), so there only `gradle.rootProject` fails. `parent` (also `getParent()`)
+   with the implicit receiver or on `project`/`target`. A `project(...)`/`findProject(...)` that is not a direct argument of a dependency
+   declaration (a call in a `dependencies { }` block or `dependencies.<conf>(...)`, not `listOf`, `with`, `run`, `configure` or the like),
+   so one held in a variable or in `configure(listOf(project(...))) { }` fails. A project dependency (`implementation(project(":x"))`,
+   `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the
+   same name), and a Project reached through a helper function.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
@@ -556,13 +561,70 @@ def module_paths(root):
     return [p for m in INCLUDE_CALL.finditer(text) for p in re.findall(r"\"(:[^\"]+)\"", m.group(1))]
 
 
+# M1-84, isolated projects: the root project is read only through `isolated.rootProject` (an IsolatedProject: its directory, name and
+# path); in a settings file `rootProject` is the ProjectDescriptor (`rootProject.name`), so there only `gradle.rootProject` counts.
+ROOT_PROJECT = re.compile(r"(?<![\w$])(?:rootProject|getRootProject\s*\(\s*\))(?![\w$])")
+ISOLATED_BEFORE = re.compile(r"(?<![\w$])(?:isolated|getIsolated\s*\(\s*\))\s*(?:\?|!!)?\s*\.\s*$")
+GRADLE_BEFORE = re.compile(r"(?<![\w$])(?:gradle|getGradle\s*\(\s*\))\s*(?:\?|!!)?\s*\.\s*$")
+# The parent project: with the implicit receiver (`parent`, `getParent()`) or on `project`/`target`. A `.parent` on any other receiver is
+# not read: File.parent and Path.parent have the same name (a known gap).
+PARENT = re.compile(
+    r"(?<![\w$.])(?:parent|getParent\s*\(\s*\))(?![\w$])"
+    r"|(?<![\w$])(?:project|target)\s*(?:\?|!!)?\s*\.\s*(?:parent|getParent\s*\(\s*\))(?![\w$])"
+)
+# project(...)/findProject(...) on any receiver but `dependencies.` (DependencyHandler.project, a dependency). It passes only as a direct
+# argument of a dependency declaration: a call in a `dependencies { }` block or `dependencies.<conf>(...)` that is not one of these.
+PROJECT_CALL = re.compile(r"(?<![\w$])(?:project|findProject)\s*\(")
+DEPENDENCIES_BEFORE = re.compile(r"(?<![\w$])dependencies\s*\.\s*(?:constraints\s*\.\s*)?$")
+NOT_DEPENDENCY_CALLS = KEYWORDS | {
+    "with", "run", "apply", "also", "let", "takeIf", "takeUnless", "configure", "listOf", "setOf", "arrayOf", "mutableListOf",
+    "mutableSetOf", "listOfNotNull", "setOfNotNull", "sequenceOf", "project", "findProject", "requireNotNull", "checkNotNull",
+}
+
+
+def is_settings(p):
+    name = p.rsplit("/", 1)[-1]
+    return name in ("settings.gradle.kts", "settings.gradle") or name.endswith(".settings.gradle.kts")
+
+
+def dependency_argument(blank, pos, deps):
+    """True when the project(...) call at pos is a direct argument of a dependency declaration (see PROJECT_CALL)."""
+    name, at = enclosing_call(blank, pos)
+    before = blank[:pos].rstrip()
+    direct = before.endswith(("(", ",")) or re.search(r"[(,]\s*[A-Za-z_]\w*\s*=$", before) or (
+        name and re.search(rf"(?<![\w$]){name}$", before) and blank[at + len(name) : pos].strip() == ""
+    )
+    in_declaration = within(deps, at) or DEPENDENCIES_BEFORE.search(blank[:at])
+    return bool(direct and in_declaration and name not in NOT_DEPENDENCY_CALLS)
+
+
+def cross_project(text, settings):
+    """(line, what, hint) for each line of text (comments and string contents blanked) that reaches other projects, first finding only."""
+    found = []
+    for m in CROSS_PROJECT.finditer(text):
+        found.append((m.start(), m.group().strip(), "move it into a convention plugin in build-logic/"))
+    for m in ROOT_PROJECT.finditer(text):
+        before = text[: m.start()]
+        if (GRADLE_BEFORE.search(before) if settings else not ISOLATED_BEFORE.search(before)):
+            found.append((m.start(), "rootProject", "read root files through isolated.rootProject.projectDirectory"))
+    for m in PARENT.finditer(text):
+        found.append((m.start(), "parent", "a project reads only its own and isolated.rootProject's state"))
+    deps = blocks(text)
+    for m in PROJECT_CALL.finditer(text):
+        if not DEPENDENCIES_BEFORE.search(text[: m.start()]) and not dependency_argument(text, m.start(), deps):
+            call = "findProject" if m.group().startswith("findProject") else "project"
+            found.append((m.start(), f"{call}(...)", "use project(...) only as a dependency, e.g. implementation(project(...))"))
+    lines = {}
+    for start, what, hint in sorted(found):
+        lines.setdefault(line_of(text, start), (what, hint))
+    return [(line, what, hint) for line, (what, hint) in sorted(lines.items())]
+
+
 def convention_problems(root):
     problems = []
     for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
         text = strip(read(root, p), blank_strings=True)
-        for m in CROSS_PROJECT.finditer(text):
-            where = f"{p}:{line_of(text, m.start())}"
-            problems.append(f"{where}: reaches other projects ({m.group().strip()}); move it into a convention plugin in build-logic/")
+        problems += [f"{p}:{line}: reaches other projects ({what}); {hint}" for line, what, hint in cross_project(text, is_settings(p))]
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
                 problems.append(f"{p}:{line_of(text, m.start())}: {m.group()} in build-logic; set it in the module build file, where the floor guard reads it")
