@@ -42,21 +42,26 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `"conf"(...)`, Groovy `conf project(...)`, or `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in
    between), so one held in a variable or in `configure(listOf(project(...))) { }` fails; so does a callable reference (`::project`, Groovy
    `.&project`) and a quoted `project`/`findProject` call. A backticked name counts as the plain one. Kotlin reaches a name at run time
-   only through Gradle's property lookup, the Groovy builder and reflection, so those fail as a class: `withGroovyBuilder`, `properties`,
-   the KClass members API, `javaClass`, `getMethod` and the like (DYNAMIC_API), and `property`/`findProperty`/`hasProperty` with anything
-   but a plain string literal that is not a denied name. So do the APIs that hand out a Project without naming it:
-   `.project`/`getProject()` on a task or any other receiver, `findByPath`, `getByPath`, `dependencyProject`, `taskGraph`
-   (PROJECT_GETTERS), and `GroovyObject`, `InvokerHelper`, `asDynamicObject` and `MethodHandles`. Kotlin text is lexed as Kotlin: block
-   comments nest and a backticked name is one token. Groovy resolves every name at run time, so a .gradle file is read by allowlist: it
-   uses only the identifiers in GROOVY_IDENTIFIERS (what the licensee policy needs, keywords and the plugins and dependencies DSL), and
-   none of the forms that name something without an identifier: a string literal used as a name (after `.`, `.&` or `.@`, called, in
-   command syntax such as `project ':app', { }` or `project':b'`), a method pointer, field access or dynamic member (`.&`, `.@`,
-   `.(expr)`), a subscript whose key is not an integer, a slashy string, and a `\\uXXXX` escape anywhere (PR 384 R1 to R3). A .gradle file
-   declares no project dependency either: a closure can pose as a configuration (`ok project(':b')`). A project dependency
-   (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: check 4 reads text, so
-   a Kotlin API it does not list that returns a Project, or a Project reached through a helper function, passes; Gradle's isolated projects
-   mode is what enforces this in the build (M1-98). Fails closed on: a Kotlin parameter or named argument called `parent`, File.parent, a
-   settings plugin in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf project(':a'), project(':b')` list.
+   only through Gradle's property lookup, the Groovy builder and reflection, so those fail as a class (DYNAMIC_API): `withGroovyBuilder`,
+   `properties`, the KClass members API, `javaClass`, method lookups (`getMethod`, `methods` and the like), field lookups (`getField(s)`,
+   `getDeclaredField(s)`, a `.fields` or `.declaredFields` member), bean lookups (`Introspector`, `BeanInfo`, `PropertyDescriptor`,
+   `propertyDescriptors`, `readMethod`, `writeMethod`, `Expression`), and the packages `java.beans`, `java.lang.reflect`,
+   `java.lang.invoke` and `kotlin.reflect` by name, and `property`/`findProperty`/`hasProperty` with anything but a plain string literal
+   that is not a denied name. So do the APIs that hand out a Project without naming it: `.project`/`getProject()` on a task or any other
+   receiver and `::getProject`, `findByPath`, `getByPath`, `dependencyProject`, `taskGraph`, and the APIs that hand out another project's
+   tasks: `buildDependencies`, `taskDependencies` and `getDependencies` (PROJECT_GETTERS), and `GroovyObject`, `InvokerHelper`,
+   `asDynamicObject` and `MethodHandles`. Kotlin text is lexed as Kotlin: block comments nest and a backticked name is one token. Groovy
+   resolves every name at run time, so a .gradle file is read by allowlist: it uses only the identifiers in GROOVY_IDENTIFIERS (what the
+   licensee policy needs, keywords and the plugins and dependencies DSL), and none of the forms that name something without an identifier:
+   a string literal used as a name (after `.`, `.&` or `.@`, called, in command syntax such as `project ':app', { }` or `project':b'`), a
+   method pointer, field access or dynamic member (`.&`, `.@`, `.(expr)`), a subscript whose key is not an integer, a slashy string, and a
+   `\\uXXXX` escape anywhere (PR 384 R1 to R3). A .gradle file declares no project dependency either: a closure can pose as a configuration
+   (`ok project(':b')`). A project dependency (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding
+   per line. Known gaps: check 4 reads text, so a Kotlin API it does not list that returns a Project or another project's task, a Project
+   behind an implicit receiver (`otherTask.run { project }`), or a Project reached through a helper function, passes; Gradle's isolated
+   projects mode is what enforces this in the build (M1-98). Fails closed on: a Kotlin parameter or named argument called `parent`,
+   File.parent, a settings plugin in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf project(':a'),
+   project(':b')` list.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
@@ -670,7 +675,12 @@ DYNAMIC_API = re.compile(
     r"|getDeclaredMethods|methods|declaredMethods|members|declaredMembers|memberFunctions|memberProperties|declaredMemberFunctions"
     r"|declaredMemberProperties|memberExtensionFunctions|memberExtensionProperties|staticProperties|staticFunctions|functions"
     r"|declaredFunctions|callBy|forName|getAt|evaluate|GroovyShell|Eval|GroovyObject|InvokerHelper|asDynamicObject|getAsDynamicObject"
-    r"|DynamicObject|DynamicObjectAware|MethodHandles|findVirtual|findGetter)(?![\w$])"
+    r"|DynamicObject|DynamicObjectAware|MethodHandles|findVirtual|findGetter"
+    # PR 384 R4-02: bean and field lookups, and the reflective packages by name (an import or a qualified name).
+    r"|Introspector|BeanInfo|getBeanInfo|PropertyDescriptor|propertyDescriptors|getPropertyDescriptors|readMethod|getReadMethod"
+    r"|writeMethod|getWriteMethod|Expression|getField|getFields|getDeclaredField|getDeclaredFields)(?![\w$])"
+    r"|\.\s*`?(?:fields|declaredFields)`?(?![\w$])"  # a member, not a local `val fields`
+    r"|(?<![\w$])(?:java\s*\.\s*beans|java\s*\.\s*lang\s*\.\s*(?:reflect|invoke)|kotlin\s*\.\s*reflect)(?![\w$])"
 )
 # A property lookup by name passes only with a plain string literal that is not a denied name: inputs.property("taskCount", x).
 PROPERTY_CALL = re.compile(r"(?<![\w$])(?:property|findProperty|hasProperty|getProperty|setProperty)\s*\(\s*")
@@ -678,7 +688,10 @@ CLASS_ARGUMENT = re.compile(r"[\w.]+\s*::\s*class(?:\s*\.\s*java)?\s*[,)]")  # o
 # APIs that hand out a Project without naming it: a task's project, a project dependency's project, the task graph (R3 second
 # self-review). `.project` as a property on any receiver; `dependencies.project(...)` and `x.project(...)` are calls (PROJECT_CALL).
 PROJECT_GETTERS = re.compile(
-    r"(?<![\w$])(?:findByPath|getByPath|dependencyProject|getDependencyProject|taskGraph|getTaskGraph)(?![\w$])"
+    r"(?<![\w$])(?:findByPath|getByPath|dependencyProject|getDependencyProject|taskGraph|getTaskGraph"
+    # PR 384 R4-03: the APIs that hand out another project's tasks.
+    r"|buildDependencies|getBuildDependencies|taskDependencies|getTaskDependencies|getDependencies)(?![\w$])"
+    r"|::\s*`?getProject`?(?![\w$])"
     r"|\.\s*`?project`?(?![\w$`])(?!\s*\()|\.\s*`?getProject`?\s*\("
 )
 PROPERTIES_USE = re.compile(r"(?<![\w$])(?:properties|getProperties)(?=\s*[\[.(])|\.\s*(?:properties|getProperties)(?![\w$])")
