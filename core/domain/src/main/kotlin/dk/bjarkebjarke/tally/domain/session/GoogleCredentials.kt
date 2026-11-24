@@ -1,8 +1,8 @@
 package dk.bjarkebjarke.tally.domain.session
 
 /**
- * The phone's Credential Manager with the Google ID option (docs/milestones/M1.md, M1-14), wrapped so tests can fake
- * it. An implementation throws nothing but `CancellationException`: every failure is an answer.
+ * The phone's Credential Manager with the Sign in with Google button flow (docs/milestones/M1.md, M1-14), wrapped so
+ * tests can fake it. An implementation throws nothing but `CancellationException`: every failure is an answer.
  */
 interface GoogleCredentials {
     /** Shows the system account picker and answers with the picked Google account's ID token (AUTH-01). */

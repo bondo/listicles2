@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PR 368 (checklist section 9): this module brings Firebase Auth and Credential Manager into the app, and removes what
+     their libraries add that no Tally flow uses. Here, not in the app manifest: lint (MissingClass) looks the activities
+     up on this module's classpath. ManifestSurfaceTest in :app pins what ships, with a reason for each entry that stays. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- androidx.credentials brings androidx.biometric for credential provider apps, which Tally is not. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
+
+    <!-- Backup stays off, as in the app manifest. -->
+    <application android:allowBackup="false">
+        <!-- firebase-auth's exported browser entry points, for sign-in with an OAuthProvider and for phone number
+             verification. Tally has neither: it signs in with Credential Manager and with email and password. -->
+        <activity
+            android:name="com.google.firebase.auth.internal.GenericIdpActivity"
+            tools:node="remove" />
+        <activity
+            android:name="com.google.firebase.auth.internal.RecaptchaActivity"
+            tools:node="remove" />
+    </application>
+
+</manifest>

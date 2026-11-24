@@ -20,7 +20,7 @@ bestemmer, hvilke data appen indsamler, og som har ansvaret for dem. Spørgsmål
   Tallys egen database);
 - hvis du logger ind med Google: din Google-kontos id og de profiloplysninger, Google deler, når du logger ind:
   dit navn, din e-mailadresse og et link til dit profilbillede. Appen viser eller bruger ikke billedet.
-  `[Skal bekræftes (M1-O15) med et rigtigt Google-login: på Firebase Auth-emulatoren (M1-67) gemmer login-posten dem
+  `[Skal bekræftes (M3-O3) med et rigtigt Google-login: på Firebase Auth-emulatoren (M1-67) gemmer login-posten dem
   alle og for alle login-metoder også, hvornår kontoen blev oprettet, hvornår du sidst loggede ind, og hvornår dit
   login sidst blev fornyet; M1-O5 afgør, om teksten skal nævne de tidspunkter.]`
 - hvis du slår totrinsbekræftelse til: det, der skal til for at tjekke koderne fra din godkendelsesapp;
@@ -39,8 +39,8 @@ bestemmer, hvilke data appen indsamler, og som har ansvaret for dem. Spørgsmål
 **På din telefon:** en kopi af dine lister, så appen også virker uden net, og navnet på din husstand. Begge dele
 slettes, når du logger ud eller sletter din konto. Telefonen husker også, hvornår du sidst åbnede hver liste på den,
 så listerne kan sorteres; det forlader aldrig telefonen og slettes også, når du logger ud (når du logger ud, ryddes
-alle Tallys data på telefonen for din konto). `[Skal bekræftes (M1-66, #357): det sker også, når Firebase selv logger
-dig ud, fx efter at kontoen er blevet slettet eller adgangskoden ændret på en anden telefon. Indtil M1-66 gør det,
+alle Tallys data på telefonen for din konto). `[Skal bekræftes (M1-89, #357): det sker også, når Firebase selv logger
+dig ud, fx efter at kontoen er blevet slettet eller adgangskoden ændret på en anden telefon. Indtil M1-89 gør det,
 bliver dataene liggende på telefonen, også når en anden konto logger ind på den, til nogen logger ud på den.]`
 
 Tally har ingen reklamer og **ingen analyseværktøjer**: appen måler ikke, hvordan du bruger den.

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- M1-66: the Firebase project's web client id for Google sign-in. The Google Services plugin generates the app's own
+         default_web_client_id from the web client in google-services.json, and the app's value overrides this empty
+         default. Only a google-services.json downloaded after Google sign-in is enabled in Firebase has that web
+         client, so the copies a release build reads (the owner's app/google-services.json and the GitHub secret,
+         docs/milestones/M1.md R1 step 5) must then be replaced with that file. Until then the value is empty and
+         Google sign-in answers Failed without asking. -->
+    <string name="default_web_client_id" translatable="false"></string>
+</resources>

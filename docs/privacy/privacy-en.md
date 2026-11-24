@@ -20,7 +20,7 @@ what data the app collects and is responsible for it. Questions go to the contac
   it);
 - if you sign in with Google: your Google account's identifier and the profile data Google shares at sign-in: your
   name, your email address and a link to your profile photo. The app does not show or use the photo.
-  `[To confirm (M1-O15) with a real Google sign-in: on the Firebase Auth emulator (M1-67) the sign-in record keeps all
+  `[To confirm (M3-O3) with a real Google sign-in: on the Firebase Auth emulator (M1-67) the sign-in record keeps all
   of these and, for every sign-in method, also when the account was created, when you last signed in and when your
   sign-in was last renewed; M1-O5 decides whether this text names those times.]`
 - if you turn on two-step verification: what is needed to check your authenticator app's codes;
@@ -37,8 +37,8 @@ what data the app collects and is responsible for it. Questions go to the contac
 **On your phone:** a copy of your lists so the app also works offline, and the name of your household. Both are
 removed when you sign out or delete your account. The phone also keeps when you last opened each list on it, to
 sort your lists; this never leaves the phone and is removed too when you sign out (signing out clears all of
-Tally's data on the phone for your account). `[To confirm (M1-66, #357): this also happens when Firebase signs you
-out by itself, for example after the account was deleted or its password changed on another phone. Until M1-66 does
+Tally's data on the phone for your account). `[To confirm (M1-89, #357): this also happens when Firebase signs you
+out by itself, for example after the account was deleted or its password changed on another phone. Until M1-89 does
 this, the data stays on the phone, also when another account signs in on it, until the next sign-out there.]`
 
 Tally has no ads and **no analytics**: the app does not measure how you use it.
