@@ -33,8 +33,8 @@ def comment(cid, login, uid, assoc, body, created=AFTER, updated=None, issue=12)
         "body": body,
         "created_at": created,
         "updated_at": updated or created,
-        "html_url": f"https://github.com/bondo/listicles2/issues/{issue}#issuecomment-{cid}",
-        "issue_url": f"https://api.github.com/repos/bondo/listicles2/issues/{issue}",
+        "html_url": f"https://github.com/bondo/tally/issues/{issue}#issuecomment-{cid}",
+        "issue_url": f"https://api.github.com/repos/bondo/tally/issues/{issue}",
     }
 
 
@@ -47,10 +47,10 @@ def issue(number, login, uid, assoc, title, body, created=AFTER, updated=None, p
         "author_association": assoc,
         "created_at": created,
         "updated_at": updated or created,
-        "html_url": f"https://github.com/bondo/listicles2/{'pull' if pr else 'issues'}/{number}",
+        "html_url": f"https://github.com/bondo/tally/{'pull' if pr else 'issues'}/{number}",
     }
     if pr:
-        d["pull_request"] = {"url": f"https://api.github.com/repos/bondo/listicles2/pulls/{number}"}
+        d["pull_request"] = {"url": f"https://api.github.com/repos/bondo/tally/pulls/{number}"}
     return d
 
 
@@ -63,8 +63,8 @@ def review(rid, login, uid, assoc, body, submitted=AFTER, pr=30, state="COMMENTE
         "body": body,
         "state": state,
         "submitted_at": submitted,
-        "html_url": f"https://github.com/bondo/listicles2/pull/{pr}#pullrequestreview-{rid}",
-        "pull_request_url": f"https://api.github.com/repos/bondo/listicles2/pulls/{pr}",
+        "html_url": f"https://github.com/bondo/tally/pull/{pr}#pullrequestreview-{rid}",
+        "pull_request_url": f"https://api.github.com/repos/bondo/tally/pulls/{pr}",
     }
 
 
@@ -78,8 +78,8 @@ def review_comment(cid, login, uid, assoc, body, created=AFTER, updated=None, pr
         "created_at": created,
         "updated_at": updated or created,
         "diff_hunk": "@@ -1 +1 @@",
-        "html_url": f"https://github.com/bondo/listicles2/pull/{pr}#discussion_r{cid}",
-        "pull_request_url": f"https://api.github.com/repos/bondo/listicles2/pulls/{pr}",
+        "html_url": f"https://github.com/bondo/tally/pull/{pr}#discussion_r{cid}",
+        "pull_request_url": f"https://api.github.com/repos/bondo/tally/pulls/{pr}",
     }
 
 
@@ -93,7 +93,7 @@ class FilterTests(unittest.TestCase):
         self.assertIn("Make the buttons bigger", out)
         self.assertIn("alex", out)
         self.assertIn("#12", out)
-        self.assertIn("https://github.com/bondo/listicles2/issues/12#issuecomment-1", out)
+        self.assertIn("https://github.com/bondo/tally/issues/12#issuecomment-1", out)
 
     def test_member_is_write_or_better(self):
         out = digest([comment(1, "alex", 7, "MEMBER", "hello from a member")])
@@ -375,8 +375,8 @@ class KindTests(unittest.TestCase):
         """A PR object as GET /repos/{o}/{r}/pulls returns it: it also carries issue_url."""
         d = issue(number, login, uid, assoc, title, body, created=created, updated=updated, pr=True)
         del d["pull_request"]
-        d["issue_url"] = f"https://api.github.com/repos/bondo/listicles2/issues/{number}"
-        d["diff_url"] = f"https://github.com/bondo/listicles2/pull/{number}.diff"
+        d["issue_url"] = f"https://api.github.com/repos/bondo/tally/issues/{number}"
+        d["diff_url"] = f"https://github.com/bondo/tally/pull/{number}.diff"
         d["head"] = {"ref": "feature", "sha": "abc"}
         return d
 
