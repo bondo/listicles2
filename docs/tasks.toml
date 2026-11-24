@@ -1244,10 +1244,11 @@ notes = "Split from M1-12 by the refresh (size); P1 deny tests; tests as in docs
 id = "M1-83"
 title = "Rules: members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-10"]
+pr = 366
 notes = "Found in M1-10 (PR 352): no task owned the Reads row for the household doc and its members (M(uid), LIVE); M1-08 added the own member path and the tombstone read, M1-12 owns the invite reads. ADR 0002 layout: the household get joins the tombstone read in one allow statement. Tests: allow a member's get of the live household doc and get and list of its members; deny a non-member, an unverified member and the members under a tombstone (the owner's cleanup reads are M1-11's). M1-18 reads both"
 
 [[task]]
