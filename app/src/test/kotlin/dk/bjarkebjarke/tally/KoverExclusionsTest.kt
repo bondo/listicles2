@@ -9,17 +9,21 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
+import java.io.File
+import java.net.JarURLConnection
 
 /**
  * Owner decisions 7127528405 and 7129260438 (PR 381): coverage leaves out what Dagger generates (factories, their
- * nested instance holders, members injectors) and counts the hand-written classes below, so their uncovered lines
- * still count against the 80% gate. Judged on the app's compiled classes against every filter of app/build.gradle.kts's
- * total report, the one koverVerify checks (the root copy is not read; follow-up #386).
+ * nested instance holders, members injectors) and counts the hand-written classes below, with every class Kotlin
+ * compiles from them (lambdas, say), so their uncovered lines still count against the 80% gate. Judged on the app's
+ * compiled classes against every filter of app/build.gradle.kts's total report, the one koverVerify checks (the root
+ * copy is not read; follow-up #386).
  */
 class KoverExclusionsTest {
     private val configured =
         KoverFilters(
-            KoverFilters.SETS.associateWith { configured("tally.kover.$it").split(',').filter(String::isNotEmpty) },
+            // Each value ends with a comma (KoverExclusionArgs), so a blank value is not an empty set.
+            KoverFilters.SETS.associateWith { configured("tally.kover.$it").split(',').dropLast(1) },
         )
 
     @Test
@@ -96,6 +100,8 @@ class KoverExclusionsTest {
                 Triple("excludes.inheritedFrom", "kotlin.coroutines.jvm.internal.SuspendLambda", START_VIEW_MODEL),
                 Triple("excludes.annotatedBy", "kotlin.coroutines.jvm.internal.DebugMetadata", START_VIEW_MODEL),
                 Triple("excludes.classes", "*\$*\$*", START_FUNCTIONS),
+                // The app's classes come in a jar, this test's own in a directory: both are searched.
+                Triple("excludes.classes", "*\$Companion", KoverExclusionsTest::class.java.name),
                 Triple("excludes.projects", ":app", SESSION_MODULE),
                 Triple("includes.classes", "dk.bjarkebjarke.tally.start.*", SESSION_MODULE),
                 Triple("includes.classes", "", SESSION_MODULE),
@@ -104,9 +110,11 @@ class KoverExclusionsTest {
 }
 
 /**
- * Kover's report filters, as comma-separated `*` and `?` patterns per set, such as "excludes.classes". Kover 0.9.11
- * leaves out a class by its name, by an annotation on it or by a supertype at any depth (not the class itself), and a
- * function or constructor by an annotation on it (KoverReportFilter's KDoc).
+ * Kover's report filters: the patterns of each set, such as "excludes.classes". Kover 0.9.11 (its KoverReportFilter
+ * KDoc) matches every name with `*` and `?`, and leaves out a class by its name, by an annotation on it or by a
+ * supertype (not the class itself), and a function or constructor by an annotation on it. A supertype counts here at
+ * any depth, where Kover counts one from outside the app only if an app class extends it directly: the safe side for
+ * hand-written code.
  */
 private class KoverFilters(
     private val sets: Map<String, List<String>>,
@@ -116,26 +124,55 @@ private class KoverFilters(
         names: List<String>,
     ) = sets[set].orEmpty().any { glob -> names.any(globRegex(glob)::matches) }
 
-    /** All of it: by its name, or by an annotation on the class itself. */
-    fun whollyLeftOut(name: String) =
-        matches("excludes.classes", listOf(name)) || matches("excludes.annotatedBy", annotations(name).first)
+    /**
+     * All of it: by its name, or by an annotation on the class itself. Nothing Kover may leave out along with an
+     * annotated class (its lambdas, say) counts: the safe side for the Dagger case.
+     */
+    fun whollyLeftOut(name: String): Boolean {
+        val (onClass, _) = annotations(name)
+        return matches("excludes.classes", listOf(name)) || matches("excludes.annotatedBy", onClass)
+    }
 
     /**
-     * Any of its code, by an annotation on one of its functions or by a supertype too. Fails closed: a set this does
-     * not judge (includes, which leave out what they do not name, and projects) counts as leaving out every class.
+     * Any of its code, in the class or in a class Kotlin compiled from it, by an annotation on a function or by a
+     * supertype too. Fails closed: a set this does not judge (includes, which leave out what they do not name, and
+     * projects) counts as leaving out every class.
      */
     fun partlyLeftOut(name: String) =
-        UNJUDGED.any { sets[it].orEmpty().isNotEmpty() } ||
-            whollyLeftOut(name) ||
-            matches("excludes.annotatedBy", annotations(name).second) ||
+        UNJUDGED.any { sets[it].orEmpty().isNotEmpty() } || compiledFrom(name).any(::ownCodeLeftOut)
+
+    private fun ownCodeLeftOut(name: String): Boolean {
+        val (onClass, onFunctions) = annotations(name)
+        return matches("excludes.classes", listOf(name)) ||
+            matches("excludes.annotatedBy", onClass + onFunctions) ||
             matches("excludes.inheritedFrom", supertypes(Class.forName(name, false, javaClass.classLoader)))
+    }
+
+    /** The class and the classes next to it named after it: its nested classes and lambdas, `$$inlined` copies too. */
+    private fun compiledFrom(name: String): List<String> {
+        val path = name.replace('.', '/')
+        val url = classFile(name)
+        val files =
+            if (url.protocol == "jar") {
+                val jar = (url.openConnection() as JarURLConnection).jarFile
+                jar.entries().toList().map { it.name }
+            } else {
+                val directory = checkNotNull(File(url.toURI()).parentFile)
+                directory.list().orEmpty().map { path.substringBeforeLast('/') + '/' + it }
+            }
+        val nested = files.filter { it.startsWith("$path\$") && it.endsWith(".class") }
+        return listOf(name) + nested.map { it.removeSuffix(".class").replace('/', '.') }
+    }
+
+    private fun classFile(name: String) =
+        checkNotNull(javaClass.getResource("/" + name.replace('.', '/') + ".class")) { "no $name" }
 
     private fun supertypes(type: Class<*>): List<String> =
         (listOfNotNull(type.superclass) + type.interfaces).flatMap { listOf(it.name) + supertypes(it) }
 
     /** The annotations on the class and on its functions and constructors, named as Kover names them. */
     private fun annotations(className: String): Pair<List<String>, List<String>> {
-        val file = checkNotNull(javaClass.getResource("/" + className.replace('.', '/') + ".class")) { "no $className" }
+        val file = classFile(className)
         val onClass = mutableListOf<String>()
         val onFunctions = mutableListOf<String>()
 

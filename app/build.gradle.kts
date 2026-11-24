@@ -223,11 +223,13 @@ class ReleaseManifestArgs(
 }
 
 // PR 381 (owner decision 7127528405): KoverExclusionsTest judges the Kover filters below on the app's classes, as the
-// total report applies them (koverVerify's: the common filters and any total block's). It gets every set (R1-01).
+// total report applies them (koverVerify's: the common filters and any total block's). It gets every set (R1-01), each
+// value ending with a comma, so one blank value is not an empty set.
 class KoverExclusionArgs(
     @get:Input val sets: Provider<Map<String, Set<String>>>,
 ) : CommandLineArgumentProvider {
-    override fun asArguments() = sets.get().map { (set, values) -> "-Dtally.kover.$set=${values.joinToString(",")}" }
+    override fun asArguments() =
+        sets.get().map { (set, values) -> "-Dtally.kover.$set=${values.joinToString("") { "$it," }}" }
 }
 
 val koverFilterSets =
