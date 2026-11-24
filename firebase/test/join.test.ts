@@ -11,11 +11,12 @@ import * as h from "./harness";
 // rule sees the others' writes through existsAfter and getAfter. Each test seeds its world with
 // rules off; every allow test goes through h.verifiedOnly. Spike (b) stays in spike.test.ts.
 // No test can isolate these (a scratch mutation pass dropped each condition in turn; ADR 0002):
-// hasAll (each key's value has its own check), the invite's householdId == hid (the joiner's
-// delete reads the member doc in the invite's household after the batch), LIVE in the member
-// create and in the joiner's delete (the users-doc set's P5 check) and exists(users/uid) (a get()
-// of no document fails). Nor can a test tell expiresAt > request.time from >=: the server sets the
-// request time.
+// hasAll (each key's value has its own check), LIVE in the member create and in the joiner's delete
+// (the users-doc set's P5 check) and exists(users/uid) (a get() of no document fails). Nor can a
+// test tell expiresAt > request.time from >=: the server sets the request time. The invite's
+// householdId == hid and viaInvite's type are isolated only in a world the app never makes (the
+// last describe): elsewhere the joiner's delete, which reads the member doc in the invite's
+// household after the batch, denies the same batches.
 type Fields = Record<string, unknown>;
 type Clients = Record<h.Client, h.Db>;
 let env: RulesTestEnvironment;
@@ -128,9 +129,10 @@ afterAll(async () => {
 // HOME: bob owns it, alice and carol are plain members; carol joined with JOIN's code, which a
 // member then created again (P3's accepted residual). Gus was removed and has self-healed; his
 // invite is left over. Open invites: JOIN by bob, alice's, gus's and one by lee, who left; one by
-// bob that expired a minute ago, so a grace period on the expiry fails. AWAY: eve's, with her open
-// invite. TOMB: erin's tombstone, its cleanup not done, so her member doc and her open invite are
-// still there. Dan and frank, who join, are in no household; their users docs hold a name (P9).
+// bob that expired a minute ago, so a grace of more than a minute on the expiry fails (R1-02).
+// AWAY: eve's, with her open invite. TOMB: erin's tombstone, its cleanup not done, so her member
+// doc and her open invite are still there. Dan and frank, who join, are in no household; their
+// users docs hold a name (P9).
 beforeEach(async () => {
     await env.clearFirestore();
     await seed({
@@ -273,18 +275,34 @@ describe("Join (one batch)", () => {
     ])("denied: the joiner's member doc with %s", async (_what, j) => {
         await assertFails(join(dan.verified, j));
     });
+});
 
-    // P4 types, in a world the app never makes: frank owns NEST without a member doc there, so the
-    // owner's path of Delete invite deletes the invite with the id "42", and only the type check
-    // denies a viaInvite of the number 42 (a path takes it as the id "42").
-    test("denied: the type of viaInvite, a number that names an invite", async () => {
-        const NEST = "household00000000004";
+// Each check on its own, in a world the app never makes: frank owns NEST without a member doc
+// there, so the owner's path of Delete invite deletes NEST's invites in his batch, where in any
+// other world the joiner's delete would deny the batch too. Alice, a member of HOME and of NEST,
+// created them.
+describe("Join: each check on its own", () => {
+    const NEST = "household00000000004";
+
+    beforeEach(async () => {
         await seed({
             [`households/${NEST}`]: household(FRANK),
             [member(NEST, ALICE)]: membership("member"),
             [inviteDoc("42")]: stored(NEST, ALICE),
+            [inviteDoc(code(NEST, "n"))]: stored(NEST, ALICE),
         });
+    });
+
+    // P4 types: only the type check denies a viaInvite of the number 42 (a path takes it as the id
+    // "42").
+    test("denied: the type of viaInvite, a number that names an invite", async () => {
         const j: Join = { hid: NEST, via: "42", doc: { viaInvite: 42 } };
         await assertFails(join(frank.verified, j, FRANK));
+    });
+
+    // The invite points at the household joined: frank joins HOME with NEST's invite, whose creator
+    // is a member of HOME, so only the invite's householdId == hid denies it (S1-01).
+    test("denied: a join of HOME with NEST's invite, which NEST's owner deletes", async () => {
+        await assertFails(join(frank.verified, { via: code(NEST, "n") }, FRANK));
     });
 });
