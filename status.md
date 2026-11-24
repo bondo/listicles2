@@ -470,6 +470,7 @@ flowchart LR
 
 - **owner to-do** [#120](https://github.com/bondo/tally/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
 - **owner to-do** [#291](https://github.com/bondo/tally/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
+- **PR to merge** [#359](https://github.com/bondo/tally/issues/359): M1-68 part B3&#58; checkJavaApiLevel per JVM module fed by the app, issue 48's warning flags, check…
 - **task** M1-11: waits on M1-54
 - **task** M1-82: waits on M1-88
 - **task** M1-89: waits on M1-88
