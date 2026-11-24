@@ -89,6 +89,14 @@ const MUTANTS: [string, string, string][] = [
         "exists(memberDoc(invite.householdId, request.auth.uid)))",
         "true)",
     ],
+    ["Join: through an expired invite", "invite.expiresAt > request.time", "true"],
+    ["Join: the invite not deleted (single use)", "&& !existsAfter(inviteDoc(code))", "&& true"],
+    ["Join: through a former member's invite", "exists(memberDoc(hid, invite.createdBy))", "true"],
+    [
+        "Invite delete: a member whose doc names the code burns it",
+        "&& !exists(memberDoc(invite.householdId, request.auth.uid))",
+        "&& true",
+    ],
     [
         "Invite list: by a non-member who created them or owns the household",
         "uid)\n        && exists(memberDoc(invite.householdId, request.auth.uid))",
