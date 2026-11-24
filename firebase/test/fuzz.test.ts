@@ -3,12 +3,11 @@ import { BASES, build, cases, EXTENSIONS, fuzz, type Case } from "./fuzz";
 import * as h from "./harness";
 import * as m from "./model";
 
-// M1-06 (P17): the rules fuzz (fuzz.ts) against the reference model of PLAN 3.1 (model.ts). The
-// fuzz runs the base case of every template, then RUNS random cases on a new seed each time. To
-// replay a failure, set FUZZ_SEED and FUZZ_PATH to the seed and path it prints; FUZZ_RUNS raises
-// the number of random cases (never below RUNS).
-const RUNS = 1000;
-jest.setTimeout(300_000);
+// M1-06 (P17): the rules fuzz (fuzz.ts) against the model of PLAN 3.1 (model.ts): the base case of
+// every template, then RUNS random cases on a new seed each time. Replay a failure with FUZZ_SEED
+// and FUZZ_PATH (it prints both); FUZZ_RUNS raises the number of random cases, never below RUNS.
+const RUNS = 3000;
+jest.setTimeout(Math.max(300_000, 50 * (Number(process.env.FUZZ_RUNS) || 0))); // 50 ms a case
 
 const ROWS = Object.entries(m.ROWS)
     .flatMap(([path, row]) => Object.keys(row).map((method) => `${path} ${method}`))
@@ -57,8 +56,8 @@ test("the emulator and the model agree on every case", async () => {
 });
 
 // The negative case (P17): each mutant weakens one condition of firestore.rules, so the rules
-// allow a case the model denies, which the fuzz must find. The fixed seed keeps it stable: on seed 1
-// each is found within 782 cases (3 * RUNS is the cap); another seed may need more than the cap.
+// allow a case the model denies, which the fuzz must find. Seed 1 finds each within 2416 cases;
+// measured on seeds 1 to 100, each is found within 5110 (cap 3 * RUNS), within RUNS on 91 or more.
 const MUTANTS: [string, string, string][] = [
     ["Signed in without a verified email", "token.email_verified == true", "token != null"],
     ["Create household: an id of 21 characters (P3)", "{20}$", "{20,21}$"],

@@ -87,7 +87,7 @@ function transfers(x: Ctx, old: Doc | undefined, d: Doc, hid: string): boolean {
 
 export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
     // Only that user, verified or not (AUTH-06, HH-03); created holding no household; deleted only
-    // holding none, or when there is no doc (P7: a resumed account deletion repeats the delete).
+    // holding none, or when there is no doc (M1-08's rule, not in PLAN 3.1 yet: a repeated delete).
     "users/{uid}": {
         get: (x, uid) => x.authed && x.uid === uid,
         create: (x, uid) =>

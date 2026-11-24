@@ -497,7 +497,7 @@ class Config(unittest.TestCase):
                                 "expect(want).toContainEqual(expect.stringMatching(/: allowed$/));"),
             "harness.test.ts": ("planTemplates throws on %s", "expected: %s", "a collection no probe touches"),
             # M1-06 (P17): the row check, the fuzz with the base cases first, its run count, the seeded mutants it must find.
-            "fuzz.test.ts": ("expect(ROWS).toEqual(h.allowedMethods(h.RULES));", "const RUNS = 1000;", "examples, ...(seed",
+            "fuzz.test.ts": ("expect(ROWS).toEqual(h.allowedMethods(h.RULES));", "const RUNS = 3000;", "examples, ...(seed",
                              'rejects.toThrow("the emulator says allowed, the model denied")'),
         }
         for name, needles in parts.items():

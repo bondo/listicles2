@@ -37,13 +37,14 @@ const OWNER: m.Doc = { role: "owner", displayName: "Ann", joinedAt: m.NOW };
 const LATER = new Date("2999-01-01T00:00:00Z"); // after any request time: an unexpired invite
 const INVITE = { householdId: H1, householdName: "Home", createdBy: CAROL, expiresAt: LATER };
 const points = (householdId: string | null): m.Doc => ({ householdId });
-// For reads: carol's live household of bob's, and dan's tombstone, which his householdId names.
+// For reads: bob's household with carol (alice, removed, still names it) and dan's tombstone.
 const TOMB = { ...LIVE, ownerUid: DAN, name: "", deleted: true };
 const SEEN = {
     ...CAROLS,
     [m.user(CAROL)]: points(H1),
     [m.household(H2)]: TOMB,
     [m.user(DAN)]: points(H2),
+    [m.user(ALICE)]: points(H1),
 };
 
 // The n-th variant of a document: users doc holding null or an id, member doc of either role,
@@ -90,6 +91,7 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
     "users doc: clear": () =>
         draft(DAN, { ...HOME, [m.user(DAN)]: points(H1) }, up(m.user(DAN), points(null))),
     "users doc: create": () => draft(BOB, {}, set(m.user(BOB), { householdId: null, name: "B" })),
+    "users doc: name": () => draft(CAROL, SEEN, up(m.user(CAROL), { name: "C" })),
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
     // Extension points that add a path to an allow statement the rules have (one with an allow
     // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
@@ -111,6 +113,7 @@ const CHARS = ["a", " ", "\t", "\n", "\u0001", "\u{a0}", "\u{3000}", "\u{1F3E0}"
 const NAME = fc.oneof(
     fc.constantFrom("Ann", "a".repeat(50), "a".repeat(51), "\u{1F3E0}".repeat(50), "", "  "),
     fc.string({ unit: fc.constantFrom(...CHARS), maxLength: 3 }),
+    fc.string({ unit: fc.constantFrom(...CHARS.slice(1, 5)), minLength: 1, maxLength: 3 }),
     fc.string({ unit: fc.constantFrom(...CHARS), minLength: 49, maxLength: 51 }),
 );
 const VALUES: m.Value[] = [...UIDS, ...HIDS, "owner", "member", m.T0, m.NOW, true, false, null, 42];
@@ -125,19 +128,21 @@ const STORED: Record<string, m.Value[]> = {
     name: ["Home", ""],
     expiresAt: [m.T0, LATER],
 };
-// The key an `extra` tweak adds: one of the collection's in PLAN section 3 (P4) or an unknown one.
+// An `extra` key: one of PLAN section 3 for the collection that the write lacks (P4), or unknown.
 const KEYS: Record<string, string[]> = {
-    users: ["householdId", "name", "color"],
-    households: [...Object.keys(LIVE), "color"],
-    members: [...Object.keys(MEMBER), "viaInvite", "color"],
+    users: ["householdId", "name"],
+    households: Object.keys(LIVE),
+    members: [...Object.keys(MEMBER), "viaInvite"],
 };
 
-const KINDS = "value value value field field field rename rename clone drop extra op id omit";
+const KINDS = "value value value field field field rename rename clone clone drop extra op id omit";
 const tweak = fc.record({
-    kind: fc.constantFrom(...`${KINDS} gone add auth caller`.split(" ")),
+    kind: fc.constantFrom(...`${KINDS} name name alone tomb gone add auth caller`.split(" ")),
     at: fc.nat(),
     key: fc.nat(),
     value: fc.oneof(NAME, fc.constantFrom(...VALUES)),
+    name: NAME,
+    v: fc.nat(),
 });
 type Tweak = typeof tweak extends fc.Arbitrary<infer T> ? T : never;
 
@@ -150,9 +155,9 @@ const swap = (path: string, from: string, to: string): string =>
 const swapped = (d: m.Doc, from: string, to: string): m.Doc =>
     Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v === from ? to : v]));
 
-// One tweak. A write: a field's value, a field left out or added, its operation, an id of its path,
-// a copy under another id, the write left out. A template document: a stored field, the document
-// gone or added; an id renamed in all of them, the writes and the caller. The caller's auth or uid.
+// One tweak. A write: a field's value, its name, a field dropped or added, its op, an id of its
+// path, a copy under another id, the write left out or alone. A template document: a stored
+// field, gone or added; an id renamed everywhere; households tombstoned; the caller's auth or uid.
 function change(d: Draft, t: Tweak, paths: string[]): void {
     const w = pick(d.writes, t.at);
     const path = pick(paths, t.at) ?? "";
@@ -160,12 +165,17 @@ function change(d: Draft, t: Tweak, paths: string[]): void {
     const key = (data: m.Doc): string => pick(Object.keys(data), t.key) ?? "color";
     const reid = (p: string, id = pick(ids(p), t.key) ?? ""): string =>
         swap(p, id, other(id, t.at));
-    const value = doc && pick(STORED[key(doc)] ?? [], t.at);
-    const extra = pick(KEYS[w?.path.split("/").at(-2) ?? ""] ?? [], t.key) ?? "color";
+    const value = doc && pick(STORED[key(doc)] ?? [], t.v);
+    const data = w?.data ?? {};
+    const absent = (KEYS[w?.path.split("/").at(-2) ?? ""] ?? []).filter((k) => !(k in data));
+    const extra = pick([...absent, "color"], t.key) ?? "color";
+    const named = Object.keys(data).find((k) => k.endsWith("ame")); // name, displayName
     if (t.kind === "value" && w) w.data = { ...w.data, [key(w.data)]: t.value };
+    if (t.kind === "name" && w && named) w.data = { ...w.data, [named]: t.name };
     if (t.kind === "drop" && w)
         w.data = Object.fromEntries(Object.entries(w.data).filter(([k]) => k !== key(w.data)));
     if (t.kind === "extra" && w) w.data = { ...w.data, [extra]: t.value };
+    if (t.kind === "alone" && w) d.writes = [w];
     if (t.kind === "op" && w) w.op = pick<Op>(["set", "update", "delete"], t.key) ?? "set";
     if (t.kind === "id" && w) w.path = reid(w.path);
     if (t.kind === "clone" && w) d.writes.push({ ...w, path: reid(w.path) });
@@ -176,25 +186,26 @@ function change(d: Draft, t: Tweak, paths: string[]): void {
     if (t.kind === "add" && !doc && path) d.world.set(path, variant(path, t.key));
     if (t.kind === "auth") d.caller = { ...d.caller, auth: t.key % 2 ? "unverified" : "anonymous" };
     if (t.kind === "caller") d.caller = { ...d.caller, uid: pick(UIDS, t.key) ?? ALICE };
+    for (const [p, x] of t.kind === "tomb" ? d.world : [])
+        if (x.deleted === false) d.world.set(p, { ...x, deleted: true, name: "" });
     if (t.kind !== "rename") return;
     const from = pick([...new Set(paths.flatMap(ids))], t.at) ?? "";
     const to = other(from, t.key);
+    const re = (p: string): string => swap(p, from, to);
     const moved = [...d.world].map(([p, x]): [string, m.Doc] =>
-        paths.includes(p) ? [swap(p, from, to), swapped(x, from, to)] : [p, x],
+        paths.includes(p) ? [re(p), swapped(x, from, to)] : [p, x],
     );
     d.world = new Map(moved);
-    d.writes = d.writes.map((x) => ({
-        ...x,
-        path: swap(x.path, from, to),
-        data: swapped(x.data, from, to),
-    }));
+    d.writes = d.writes.map((x) => ({ ...x, path: re(x.path), data: swapped(x.data, from, to) }));
     if (d.caller.uid === from) d.caller = { ...d.caller, uid: to };
 }
 
+// Row templates; Create household (most conditions: P1, P3, P4) is drawn 3x as often, read 2x.
 const ROWS = Object.keys(TEMPLATES).filter((t) => !EXTENSIONS.includes(t));
+const DRAWN = [...ROWS, "create household", "create household", "read"];
 export const cases = fc.record({
     template: fc.oneof(
-        { weight: 8, arbitrary: fc.constantFrom(...ROWS) },
+        { weight: 8, arbitrary: fc.constantFrom(...DRAWN) },
         { weight: 1, arbitrary: fc.constantFrom(...EXTENSIONS) },
     ),
     n: fc.nat(),
@@ -230,12 +241,10 @@ function send(db: h.Db, r: m.Request): Promise<unknown> {
     if (r.op !== "commit")
         return r.op === "get" ? db.doc(r.path).get() : db.collection(r.path).get();
     const batch = db.batch();
-    for (const w of r.writes) {
-        const ref = db.doc(w.path);
-        if (w.op === "delete") batch.delete(ref);
-        else if (w.op === "set") batch.set(ref, sdk(w.data));
-        else batch.update(ref, sdk(w.data));
-    }
+    for (const { op, path, data } of r.writes)
+        if (op === "delete") batch.delete(db.doc(path));
+        else if (op === "set") batch.set(db.doc(path), sdk(data));
+        else batch.update(db.doc(path), sdk(data));
     return batch.commit();
 }
 
@@ -244,6 +253,7 @@ const symbols = (_k: string, v: unknown): unknown => (typeof v === "symbol" ? v.
 // The fuzz on `rules`: for every case the emulator's verdict must be the model's. A failure names
 // both, the case built and fast-check's seed and path, which replay it.
 export async function fuzz(rules: string, params: fc.Parameters<[Case]>): Promise<void> {
+    firebase.firestore.setLogLevel("error"); // no SDK warning per denied request in the CI log
     const env = await initializeTestEnvironment({ projectId: h.PROJECT, firestore: { rules } });
     try {
         const clients = new Map(UIDS.map((u) => [u, h.connect(env, u)]));
