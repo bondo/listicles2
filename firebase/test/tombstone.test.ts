@@ -11,15 +11,15 @@ import * as h from "./harness";
 // must clear the name; no rule deletes a household doc, live or a tombstone; under a tombstone the
 // owner's cleanup (get, list and delete of the members, the removed markers and the household's
 // invites, one rule each) and a member's delete of their own member doc (P6), and no other write.
-// Leave, Remove member and its marker writes are M1-11's; the transfer, the join, a member's
-// invite create and the own display name under a tombstone are denied in their own files. Each
-// test seeds its world with rules off; every allow test goes through h.verifiedOnly.
+// Leave and Remove member are M1-11's (leave.test.ts), but for its marker write under a tombstone;
+// the transfer, the join, a member's invite create and the own display name under a tombstone are
+// denied in their own files. Each test seeds its world with rules off; every allow test goes
+// through h.verifiedOnly.
 // No test can isolate these: `deleted == true` on the cleanup paths of the invite get and delete
 // (a live household's invite is anyone's to get and its owner's to revoke), and LIVE on the
 // owner's revoke (the cleanup allows the same delete). On the member reads and the invite list it
-// is isolated only in a world the app never makes (the last describe). Not pinned: `deleted ==
-// true` on the markers' get, list and delete, since M1-11's Remove member lets the owner of a live
-// household make them.
+// is isolated only in a world the app never makes (the last describe). Nor on the markers' get,
+// list and delete: the owner of a live household gets, lists and deletes them too (M1-11).
 type Fields = Record<string, unknown>;
 type Clients = Record<h.Client, h.Db>;
 type Request = (db: h.Db) => Promise<unknown>;
@@ -247,14 +247,22 @@ describe("P6: a member deletes their own member doc under the tombstone", () => 
 });
 
 // PLAN 3.1: under a tombstone nothing is written but the cleanup deletes and P6; the cleanup only
-// reads, lists and deletes. LIVE alone denies the invite, which names the tombstone's name.
+// reads, lists and deletes. LIVE alone denies the invite, which names the tombstone's name, and
+// Remove member's marker of erin, whose member doc the cleanup deletes in the same batch (M1-11).
 const ASKED: Fields = { ...stored(DAN), householdName: "", createdAt: NOW };
+const removes = (uid: string) => (db: h.Db) =>
+    db
+        .batch()
+        .delete(db.doc(member(TOMB, uid)))
+        .set(db.doc(marker(TOMB, uid)), { removedAt: NOW })
+        .commit();
 test.each<[string, Request]>([
     ["creates a member doc", set(member(TOMB, FRANK), { ...membership("member"), joinedAt: NOW })],
     ["updates a member doc", (db) => db.doc(member(TOMB, ERIN)).update({ displayName: "Erin" })],
     ["creates an invite", set(invite(code(TOMB, "n")), ASKED)],
     ["overwrites a removed marker", set(marker(TOMB, GUS), { removedAt: NOW })],
     ["creates a removed marker", set(marker(TOMB, FRANK), { removedAt: NOW })],
+    ["removes erin: her member doc and her marker", removes(ERIN)],
 ])("denied under the tombstone: the owner %s", async (_what, request) => {
     await assertFails(request(dan.verified));
 });

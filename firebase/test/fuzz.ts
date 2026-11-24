@@ -201,6 +201,48 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         if (gone !== undefined) return draft(DAN, world, del(gone));
         return draft(CAROL, world, del(m.member(H2, CAROL)), up(m.user(CAROL), points(null)));
     },
+    // M1-11, Leave: carol, a plain member of bob's H1, deletes her member doc and her invite and
+    // clears her users doc (the base case). By n % 8: bob, the owner, leaves (1); carol's member
+    // doc already gone (2); she deletes dan's alone (3); she writes her own marker in the batch (4).
+    leave: (n) => {
+        const v = n % 8;
+        const by = v === 1 ? BOB : CAROL;
+        const carols = v === 2 ? {} : { [m.member(H1, CAROL)]: MEMBER };
+        const dans = { [m.member(H1, DAN)]: MEMBER, [`invites/${CODE}`]: INVITE };
+        const world = { ...HOME, ...carols, ...dans, [m.user(by)]: points(H1) };
+        if (v === 3) return draft(CAROL, world, del(m.member(H1, DAN)));
+        const mark = v === 4 ? [set(m.marker(H1, CAROL), { removedAt: m.NOW })] : [];
+        const invites = by === CAROL ? [del(`invites/${CODE}`)] : [];
+        const writes = [del(m.member(H1, by)), ...invites, ...mark];
+        return draft(by, world, ...writes, up(m.user(by), points(null)));
+    },
+    // M1-11, Remove member: bob deletes carol's member doc and her invite and writes her marker
+    // (the base case). By n % 8: an overwrite of her leftover marker (1); the member delete with
+    // the leftover marker and no marker write (2), or with neither (3); bob removes himself (4);
+    // the marker alone, carol staying a member (5); carol's member doc already gone (6).
+    "remove member": (n) => {
+        const v = n % 8;
+        const target = v === 4 ? BOB : CAROL;
+        const leftover = v === 1 || v === 2 ? { [m.marker(H1, CAROL)]: { removedAt: m.T0 } } : {};
+        const carols = v === 6 ? {} : { [m.member(H1, CAROL)]: MEMBER };
+        const world = { ...HOME, ...carols, ...leftover, [`invites/${CODE}`]: INVITE };
+        const member = v === 5 ? [] : [del(m.member(H1, target))];
+        const mark = v === 2 || v === 3 ? [] : [set(m.marker(H1, target), { removedAt: m.NOW })];
+        return draft(BOB, world, ...member, ...mark, del(`invites/${CODE}`));
+    },
+    // M1-11: in his live household bob gets, lists or deletes (n % 3) alice's marker (the base
+    // case); carol, a plain member, tries the same (n % 6 > 2).
+    markers: (n) => {
+        const marker = m.marker(H1, ALICE);
+        const d = draft(n % 6 > 2 ? CAROL : BOB, { ...CAROLS, [marker]: { removedAt: m.T0 } });
+        const list = `${m.household(H1)}/removed`;
+        const reads: m.Request[] = [
+            { op: "get", path: marker },
+            { op: "list", path: list },
+        ];
+        const read = reads[n % 3];
+        return read ? { ...d, read } : { ...d, writes: [del(marker)] };
+    },
 };
 export const EXTENSIONS = Object.keys(TEMPLATES).filter((t) => t.startsWith("M1-"));
 
@@ -302,9 +344,9 @@ function change(d: Draft, t: Tweak, paths: string[]): void {
 }
 
 // Row templates; Create household (most conditions: P1, P3, P4) is drawn 3x as often, read 2x.
-// Former extension points (the tombstone's soft delete, the join) keep their share of the ninth
-// weight, in their places, so the other templates' draws stay as #372 measured them.
-const FORMER = ["tombstone", "join"];
+// Former extension points (the tombstone's soft delete, the join, M1-11's leave, remove member
+// and markers) share the ninth weight, so the other templates' draws stay as #372 measured them.
+const FORMER = ["tombstone", "join", "leave", "remove member", "markers"];
 const ROWS = Object.keys(TEMPLATES).filter((t) => !EXTENSIONS.includes(t) && !FORMER.includes(t));
 const DRAWN = [...ROWS, "create household", "create household", "read"];
 export const cases = fc.record({

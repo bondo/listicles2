@@ -120,6 +120,42 @@ const MUTANTS: [string, string, string][] = [
         "uid)\n          && exists(memberDoc(invite.householdId, request.auth.uid)))",
         "uid))",
     ],
+    ["Leave: by the owner (!O(uid))", "household.ownerUid != request.auth.uid", "true"],
+    ["Leave: another member's doc", "(uid == request.auth.uid && resource", "(resource"],
+    ["Leave: no member doc of the caller (M(uid))", "resource != null &&", ""],
+    [
+        "Remove member: the member delete without the marker",
+        "getAfter(markerDoc(hid, uid)).data.removedAt == request.time",
+        "true",
+    ],
+    [
+        "Remove member: with a leftover marker",
+        "getAfter(markerDoc(hid, uid)).data.removedAt == request.time",
+        "getAfter(markerDoc(hid, uid)).data.removedAt != null",
+    ],
+    [
+        "Remove member: the owner removes himself",
+        "\n          && uid != household.ownerUid\n          && uid != getAfter(householdDoc(hid)).data.ownerUid",
+        "",
+    ],
+    [
+        "Marker: by a plain member (O(uid))",
+        "household.ownerUid == request.auth.uid\n        && keys.hasOnly",
+        "true\n        && keys.hasOnly",
+    ],
+    [
+        "Marker: under a tombstone (LIVE)",
+        "return household.deleted == false && household.ownerUid == request.auth.uid\n        && keys",
+        "return household.ownerUid == request.auth.uid\n        && keys",
+    ],
+    ["Marker: another field (P4)", "keys.hasOnly(['removedAt'])", "true"],
+    ["Marker: of a non-member (M(target))", "&& exists(memberDoc(hid, uid)) &&", "&&"],
+    ["Marker: the target still a member", "&& !existsAfter(memberDoc(hid, uid))", ""],
+    [
+        "Markers: any member of the live household reads them (O(uid))",
+        "(household.deleted == false && household.ownerUid == request.auth.uid)\n        || cleansUp",
+        "(household.deleted == false)\n        || cleansUp",
+    ],
 ];
 
 // Each mutant's `from` occurs once in the rules, so a later rules edit cannot retarget it unseen.
