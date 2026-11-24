@@ -9,7 +9,7 @@ with Firestore emulator tests (`ui` job).
 
 ## Done
 - Test first: 230d2e9 (domain and emulator tests against drafts), d40c841 and 0bfe685 (the users-doc check). Green steps:
-  4830a71 (Invites), 2858fab (`membership`), b428104 (FirestoreHouseholds, with a join draft kept for M1-96), a2e7f31
+  4830a71 (Invites), 2858fab (`membership`), b428104 (FirestoreHouseholds, with a join draft kept for M1-100), a2e7f31
   (narrowed to create and invite), 2aed3cc (split recorded; M1-18 done, pr 395).
 - Self-review (verifier subagent): no blocker or major; minors fixed (74c237a failing emulator test, 4b5b9ba fix: a
   call on an instance a sign-out terminated fails instead of throwing; KDocs on queued writes), nits in 03f8c00.
@@ -26,8 +26,8 @@ with Firestore emulator tests (`ui` job).
 3. Before READY: delete this file in the final commit; refresh the PR body (review table, test evidence).
 
 ## Decisions made
-- Split of M1-18 (implementer proposal, ids for the orchestrator to confirm): M1-18 create and invite; M1-96 lookup and
-  join; M1-97 reads with the household-name copy, revoke, expired cleanup; M1-98 self-heal, notices, the copy's deletion.
+- Split of M1-18 (implementer proposal; ids M1-100 to M1-102 assigned by orchestrator #44, M1-96 to M1-99 being taken): M1-18 create and invite; M1-100 lookup and
+  join; M1-101 reads with the household-name copy, revoke, expired cleanup; M1-102 self-heal, notices, the copy's deletion.
 - `membership()` in `core/domain` decides from `users/{uid}` (one household, P9 name) and runs the batch with the name,
   so the domain result types are covered (`:core:domain` line floor 95 %).
 - Reads before a write use `Source.SERVER`: a call made offline fails at its read; a write that loses the connection
@@ -36,7 +36,7 @@ with Firestore emulator tests (`ui` job).
 - Emulator tests switch users through `FirestoreSession.clear()`, as the app's sign-out does, so no write goes out under
   the previous user (Firestore takes a user change asynchronously).
 - KDocs that name M1-18 for moved work (StartGates `HouseholdNotices`, GateModule, SignOut `LocalUserData`, AppGraphTest)
-  stay for M1-98 to rewrite; the M1.md split note points readers there (line budget).
+  stay for M1-102 to rewrite; the M1.md split note points readers there (line budget).
 
 ## Open findings
 - none yet
@@ -57,6 +57,11 @@ scripts/verify.sh
   self-tests, about 50 minutes); `git fetch --unshallow origin main` fixed it here.
 - PR size: about 454 changed lines against main (this file aside), at the task's limit; review fixes should stay small.
 - The constructor's `clock` is its last parameter on purpose: the test passes it as a trailing lambda.
+
+## Gated
+- `scripts/tasks.py validate` (verify.sh step tasks-validate, CI job `tasks`) accepts two-digit ids only until the
+  process PR on branch tooling/task-ids-3-digits lands; then take `main` in with a merge commit. Do not change the
+  validators here (orchestrator #45).
 
 ## Waiting on the owner
 - none
