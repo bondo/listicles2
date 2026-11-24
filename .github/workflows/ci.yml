@@ -139,29 +139,6 @@ jobs:
         working-directory: firebase
         run: npm test --silent
 
-  nix:
-    name: nix
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: { python-version: "3.13" }
-      - name: PyYAML for the gate scripts (setup-python has none; M1-44)
-        run: pip install --require-hashes -r scripts/requirements-ci.txt
-      - name: Nix (release tarball, version and checksum pinned; update both by hand)
-        run: |
-          f=nix-2.34.6-x86_64-linux
-          curl -sSfL --retry 5 --proto =https --proto-redir =https "https://releases.nixos.org/nix/nix-2.34.6/$f.tar.xz" -o "$f.tar.xz"
-          echo "311b9f406f0239ef640a1e3fbea1df1bac9d3a7c316c4def30df3206dd964960  $f.tar.xz" | sha256sum -c -
-          tar -xJf "$f.tar.xz"
-          sh "$f/install" --no-daemon --yes --no-channel-add
-          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
-      - name: the Nix shell runs the firebase-tools pinned in firebase/package-lock.json, with and without flakes (M1-96)
-        run: python3 -I scripts/check_nix_shell.py --live
-
   ui:
     name: ui
     runs-on: ubuntu-latest
@@ -426,3 +403,26 @@ jobs:
           echo "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  $f" | sha256sum -c -
           tar -xzf "$f" gitleaks
           ./gitleaks git --redact --no-banner .
+
+  nix:
+    name: nix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "3.13" }
+      - name: PyYAML for the gate scripts (setup-python has none; M1-44)
+        run: pip install --require-hashes -r scripts/requirements-ci.txt
+      - name: Nix (release tarball, version and checksum pinned; update both by hand)
+        run: |
+          f=nix-2.34.6-x86_64-linux
+          curl -sSfL --retry 5 --proto =https --proto-redir =https "https://releases.nixos.org/nix/nix-2.34.6/$f.tar.xz" -o "$f.tar.xz"
+          echo "311b9f406f0239ef640a1e3fbea1df1bac9d3a7c316c4def30df3206dd964960  $f.tar.xz" | sha256sum -c -
+          tar -xJf "$f.tar.xz"
+          sh "$f/install" --no-daemon --yes --no-channel-add
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+      - name: the Nix shell runs the firebase-tools pinned in firebase/package-lock.json, with and without flakes (M1-96)
+        run: python3 -I scripts/check_nix_shell.py --live
