@@ -140,7 +140,7 @@ _SCOPE = tuple(re.escape(t) for t in (
     "Approver scope, widened (owner decision, #15 comment 7123360368, 2026-11-24): the approver also approves (a) PRs with security-rules "
     "content (`firebase/` rules and their tests) and (b) changes to the privacy docs (`docs/privacy/**`), in both cases only after a clean "
     "final review round, with green CI and no veto; for a security-rules or `risk:high` PR it also needs a clean independent second-reviewer "
-    "pass (§7.2.2), with effort per `agents/roles.yaml`. The record, the merge as `owner-batch` and the owner's veto are those of (1).",
+    "pass at max effort (§7.2.2). The record, the merge as `owner-batch` and the owner's veto are those of (1).",
 ))
 # Wording the decision replaced: the owner is no longer asked for these.
 _STALE_ASKS = (r"the escalation reviewer's `owner` ruling", r"`risk:high` work(?: before starting it| \(before starting it\))",
@@ -853,9 +853,11 @@ RULES = (
             r"you are not given the first reviewer's findings", r"risk:high", r"security-rules, sync-merge and release",
             r"never edit or push the pr branch: report only", r"marked ready only after your pass",
             r"ids `s<round>-<nn>`", r"never `r<round>-<nn>`",  # own id prefix: no same-round collision (R2-01 of #128)
+            r"opus, high effort \(max for `risk:high` prs and for prs labelled `area:security-rules`, even without `risk:high`, per "
+            r"`agents/roles\.yaml`; you do not raise your own effort\)",  # roles.yaml max_effort_when backs it (#15 comment 7123360368)
         ),
         "the second reviewer works independently on risk:high and protected areas and never edits the PR branch",
-        forbidden=(r"effort \(max",),  # roles.yaml gives it no max_effort_when (R1-06 of #128)
+        forbidden=(r"effort \(max for `risk:high` prs and for prs labelled `area:sync-merge`",),  # the decision names security-rules and risk:high only
     ),
     Rule(
         "verifier-handoff", ("implementer", "reviewer", "second-reviewer"),
@@ -1090,8 +1092,8 @@ RULES = (
         "delegated-decisions", ("orchestrator",),
         _DELEGATED + (
             RETAINED,
-            r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round \(a security-rules or `risk:high` pr only after its "
-            r"clean second-reviewer pass, §7\.2\.2\), with the pr number, the head sha, the round "
+            r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round \(a `risk:high`, security-rules or release-area pr "
+            r"only after its clean second-reviewer pass, at max effort for `risk:high` and security-rules, §7\.2\.2\), with the pr number, the head sha, the round "
             r"history and the deferral records; check for a `veto #n` comment on #15 before you send the merge request, and tell the merge agent "
             r"to read #15 for one right before it runs `scripts/merge_ready\.py`",
             r"a pr with anything on the owner-retained list, or with an owner-only path outside the approver's scope \(§1\.1\), is not "
@@ -1099,7 +1101,6 @@ RULES = (
         ),
         "the orchestrator prompt carries the four delegated decisions, the exact owner-retained list and the approver and veto steps "
         "(owner decision, #15 comment 7075812943; ORCHESTRATION 1.1, 7.5)",
-        forbidden=(r"second-reviewer pass at max effort",),
     ),
     Rule(
         "approver-role", ("approver",),
@@ -1120,7 +1121,8 @@ RULES = (
             r"`scripts/verify\.sh` and ci, and no suppression, baseline, skipped test or lowered threshold without the owner's recorded decision",
             r"4\. clean final round: the last round was a fresh reviewer's whole-diff round \(or, for later commits, a delta review\) with no "
             r"finding above nit open; every deferral has its follow-up issue and `decision` comment under `docs/follow-ups\.md` §2; "
-            r"a `risk:high` or security-rules pr also has a clean independent second-reviewer pass \(§7\.2\.2\)",
+            r"a `risk:high` pr, a security-rules pr or another protected area \(release\) also has a clean independent second-reviewer pass "
+            r"\(§7\.2\.2\), at max effort for a `risk:high` or security-rules pr",
             r"5\. ci: every required check succeeded on the head sha",
             r"6\. no closing keyword: no commit message and no pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
             r"directly before an issue number",
@@ -1136,7 +1138,7 @@ RULES = (
         ),
         "the approver checks head, scope, REVIEW.md, the clean final round, CI, closing keywords and the veto, posts the anchored record or a "
         "refusal, and never merges, edits or pushes (owner decision, #15 comment 7075812943; ORCHESTRATION 7.5)",
-        forbidden=(r"second-reviewer pass at max effort", r"\byou (?:may|can|should|will|must) (?:merge|push|edit|mark|label)",),
+        forbidden=(r"\byou (?:may|can|should|will|must) (?:merge|push|edit|mark|label)",),
     ),
 )
 
@@ -1688,12 +1690,24 @@ DOC_RULES = (
             r"the orchestrator reads #15 for one before it sends the merge request and the merge agent right before it runs "
             r"`scripts/merge_ready\.py`, and neither merges or requests the merge of a vetoed pr",
             r"is refused by the approver and waits for the owner's own batch approval",
+            r"the second reviewer runs at max effort for `risk:high` and `area:security-rules` prs \(`agents/roles\.yaml`\)",
             r"for an owner-only pr in the approver's scope \(§1\.1\), an approver agent's anchored",
             r"or any owner-only path outside the approver's scope \(§1\.1\), is refused by the approver",
         ),
         "ORCHESTRATION 1.1, 7.2.1, 7.2.2, 7.5: the four delegated decisions, the exact owner-retained list, the approver and the owner's veto "
         "(owner decision, #15 comment 7075812943)",
-        forbidden=(r"for an owner-only pr, the owner's batch approval is always required", r"second-reviewer pass at max effort"),
+        forbidden=(r"for an owner-only pr, the owner's batch approval is always required",),
+    ),
+    DocRule(
+        "roles-second-reviewer", "agents/roles.yaml",
+        (
+            r"second-reviewer: model: opus effort: high session: fresh, same round as the reviewer, for risk:high prs and protected areas "
+            r"prompt: agents/prompts/second-reviewer\.md max_effort_when: - the pr is tagged risk:high in the milestone doc "
+            r"- the pr is labelled area:security-rules, even without the risk:high tag \(owner decision, #15 comment 7123360368",
+        ),
+        "roles.yaml: the second reviewer is max effort for risk:high and area:security-rules PRs, which the approver's condition needs "
+        "(owner decision, #15 comment 7123360368)",
+        forbidden=(r"second-reviewer:[^\n]{0,200}effort: max",),
     ),
     DocRule(
         "roles-approver", "agents/roles.yaml",

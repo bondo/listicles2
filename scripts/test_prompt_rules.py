@@ -2746,8 +2746,8 @@ class DelegatedDecisionsTests(unittest.TestCase):
         self.assertIn("roles-second-reviewer", self.doc_replace(
             "agents/roles.yaml", "- the PR is labelled area:security-rules, even without the risk:high tag (owner decision, #15 comment 7123360368",
             "- the PR is labelled area:sync-merge, even without the risk:high tag (owner decision, #15 comment 7123360368"))
-        self.assertIn("roles-second-reviewer", self.doc_replace("agents/roles.yaml", "session: fresh, same round as the reviewer, for risk:high PRs and protected areas\n    prompt: agents/prompts/second-reviewer.md\n    max_effort_when:",
-                                                               "session: fresh, same round as the reviewer, for risk:high PRs and protected areas\n    prompt: agents/prompts/second-reviewer.md\n    notes:"))
+        self.assertIn("roles-second-reviewer", self.doc_replace(
+            "agents/roles.yaml", "prompts/second-reviewer.md max_effort_when:", "prompts/second-reviewer.md notes:"))
 
     def test_the_orchestrator_sends_security_rules_and_privacy_prs_to_the_approver_only_inside_the_scope(self):
         for old, new in (
