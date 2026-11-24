@@ -37,9 +37,9 @@ class KoverExclusionsTest {
     }
 
     /**
-     * R1-01 and S1-01: each filter leaves out code of its hand-written class in Kover 0.9.11 (`*` and `?` in every
-     * name, annotations on functions and constructors too, supertypes; its KoverReportFilter KDoc), or is a set this
-     * test does not judge, so the hand-written case must count it.
+     * R1-01, S1-01, R2-01 and S2-01: each filter leaves out code of its hand-written class in Kover 0.9.11 (`*`, `#`
+     * and `?` in every name; annotations on functions and constructors too, and supertypes), or is a set this test
+     * does not judge, so the hand-written case must count it.
      */
     @Test
     fun aFilterThatReachesHandWrittenCodeCounts() {
@@ -118,11 +118,11 @@ class KoverExclusionsTest {
 }
 
 /**
- * Kover's report filters: the patterns of each set, such as "excludes.classes". Kover 0.9.11 (its KoverReportFilter
- * KDoc) matches every name with `*` and `?`, and leaves out a class by its name, by an annotation on it or by a
- * supertype (not the class itself), and a function or constructor by an annotation on it. A supertype counts here at
- * any depth, where Kover counts one from outside the app only if an app class extends it directly: the safe side for
- * hand-written code.
+ * Kover's report filters: the patterns of each set, such as "excludes.classes". Kover 0.9.11 matches every name with
+ * `*`, `#` and `?` ([globRegex]). Its KoverReportFilter KDoc: it leaves out a class by its name, by an annotation on it
+ * or by a supertype (not the class itself), and a function or constructor by an annotation on it. A supertype counts
+ * here at any depth, where Kover counts one from outside the app only if an app class extends it directly: the safe
+ * side for hand-written code.
  */
 private class KoverFilters(
     private val sets: Map<String, List<String>>,
@@ -214,9 +214,22 @@ private class KoverFilters(
         return onClass to onFunctions
     }
 
-    /** `*` is any run of characters, `?` one character. */
+    /**
+     * As kover-features-jvm's wildcardsToRegex, which Kover's reports and koverVerify use: `*` is any run of
+     * characters, `#` any run without a dot, `?` one character, and every other character stands for itself.
+     */
     private fun globRegex(glob: String) =
-        Regex(glob.split('*').joinToString(".*") { part -> part.split('?').joinToString(".") { Regex.escape(it) } })
+        Regex(
+            glob
+                .map { char ->
+                    when (char) {
+                        '*' -> ".*"
+                        '#' -> "[^.]*"
+                        '?' -> "."
+                        else -> Regex.escape(char.toString())
+                    }
+                }.joinToString(""),
+        )
 
     companion object {
         /** Every set of Kover's filters; app/build.gradle.kts passes each to the test. */
