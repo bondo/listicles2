@@ -1,53 +1,140 @@
 package dk.bjarkebjarke.tally.domain.session
 
+import dk.bjarkebjarke.tally.domain.Validation
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 
-/** Email and password sign-in (AUTH-05..08, AUTH-10). Naive first draft so the tests compile and fail. */
+/**
+ * Email and password sign-in (AUTH-05..08; docs/milestones/M1.md, M1-15) over [PasswordAuthentication]. No answer tells
+ * whether an email has an account or which method it uses (AUTH-10, email enumeration protection): sign-up for an
+ * email that has one ends like a new account, every refused sign-in is one answer, and so is every reset. Each action
+ * checks its input first, then the connection (SYNC-03), then asks Firebase. Every email goes out in the app's
+ * language, set right before it, because the user can change the language in between (OQ-29).
+ */
 class PasswordAccount(
     private val connectivity: Connectivity,
     private val authentication: PasswordAuthentication,
 ) {
+    /**
+     * "Create account" (AUTH-05), for the email and password fields; M1-17 saves the name. A new account is signed in,
+     * not verified, and gets the verification email. An email that already has an account, by either method, ends the
+     * same, with no account, no email and nobody signed in (AUTH-10, R3-01): only a new account leaves a session.
+     */
     suspend fun createAccount(
         email: String,
         password: String,
     ): CreateAccountResult =
-        if (authentication.createUser(email, password) == PasswordAnswer.Done) {
-            CreateAccountResult.CheckYourEmail
-        } else {
-            CreateAccountResult.Failed.also { connectivity.isOnline() }
+        when {
+            Validation.email(email) != null -> CreateAccountResult.InvalidEmail
+            Validation.password(password) != null -> CreateAccountResult.PasswordTooShort
+            !connectivity.isOnline() -> CreateAccountResult.NeedsConnection
+            else -> created(authentication.createUser(Validation.normalizedEmail(email), password))
         }
 
+    /**
+     * "Sign in" with an email and password (AUTH-07). Every refusal is [PasswordSignInResult.WrongEmailOrPassword]: a
+     * wrong password, an email with no account or only a Google account, a disabled account, an empty field, and any
+     * other failure (OQ-34(c)).
+     */
     suspend fun signIn(
         email: String,
         password: String,
-    ): PasswordSignInResult =
-        if (authentication.signIn(email, password) == PasswordAnswer.Done) {
-            PasswordSignInResult.SignedIn
-        } else {
-            PasswordSignInResult.WrongEmailOrPassword
+    ): PasswordSignInResult {
+        val address = Validation.normalizedEmail(email)
+        return when {
+            address.isEmpty() || password.isEmpty() -> PasswordSignInResult.WrongEmailOrPassword
+            !connectivity.isOnline() -> PasswordSignInResult.NeedsConnection
+            else -> signedIn(authentication.signIn(address, password))
         }
+    }
 
-    suspend fun resetPassword(email: String): PasswordResetResult =
-        if (authentication.sendPasswordReset(email) == PasswordAnswer.Done) {
-            PasswordResetResult.SentIfAccountExists
-        } else {
-            PasswordResetResult.Failed
+    /**
+     * "Reset password" (AUTH-08): one answer whether or not the email has an account, and whatever method it uses
+     * (AUTH-10). For an email with only a Google account the reset may add a password to that same account (OQ-34(b),
+     * decided; M1-95 records what Firebase does).
+     */
+    suspend fun resetPassword(email: String): PasswordResetResult {
+        val address = Validation.normalizedEmail(email)
+        return when {
+            address.isEmpty() -> PasswordResetResult.InvalidEmail
+            !connectivity.isOnline() -> PasswordResetResult.NeedsConnection
+            else -> resetSent(inAppLanguage { authentication.sendPasswordReset(address) })
         }
+    }
 
+    /**
+     * "Send again" on the "check your email" screen (AUTH-06). With nobody signed in, as after sign-up for an email
+     * that had an account, nothing is sent and the answer is the same (AUTH-10).
+     */
     suspend fun sendVerificationAgain(): VerificationResult =
-        if (authentication.sendEmailVerification() == PasswordAnswer.Done) {
-            VerificationResult.Sent
-        } else {
-            VerificationResult.Failed
+        when {
+            !connectivity.isOnline() -> VerificationResult.NeedsConnection
+            else -> verificationSent(inAppLanguage { authentication.sendEmailVerification() })
         }
 
+    /**
+     * "Continue" on the "check your email" screen (AUTH-06): [VerificationResult.Verified] once the link was opened;
+     * "not verified yet" before, and also with nobody signed in (AUTH-10).
+     */
     suspend fun checkVerified(): VerificationResult =
-        if (authentication.reloadEmailVerified() == PasswordAnswer.Done) {
-            VerificationResult.Verified
-        } else {
-            VerificationResult.NotVerifiedYet
+        when {
+            !connectivity.isOnline() -> VerificationResult.NeedsConnection
+            else -> verified(authentication.reloadEmailVerified())
         }
+
+    private suspend fun created(answer: PasswordAnswer): CreateAccountResult {
+        // Whatever this answers, the user checks their email: the verify screen has "Send again" (AUTH-06).
+        if (answer == PasswordAnswer.Done) inAppLanguage { authentication.sendEmailVerification() }
+        return when (answer) {
+            PasswordAnswer.Done, PasswordAnswer.EmailInUse -> CreateAccountResult.CheckYourEmail
+            PasswordAnswer.InvalidEmail -> CreateAccountResult.InvalidEmail
+            PasswordAnswer.WeakPassword -> CreateAccountResult.PasswordTooShort
+            PasswordAnswer.TooManyAttempts -> CreateAccountResult.TooManyAttempts
+            PasswordAnswer.NoConnection -> CreateAccountResult.NeedsConnection
+            else -> CreateAccountResult.Failed
+        }
+    }
+
+    private suspend fun inAppLanguage(send: suspend () -> PasswordAnswer): PasswordAnswer {
+        authentication.useAppLanguage()
+        return send()
+    }
 }
+
+// Firebase's answer as the screens show it; none tells whether the email has an account (AUTH-10).
+
+private fun signedIn(answer: PasswordAnswer): PasswordSignInResult =
+    when (answer) {
+        PasswordAnswer.Done -> PasswordSignInResult.SignedIn
+        PasswordAnswer.TooManyAttempts -> PasswordSignInResult.TooManyAttempts
+        PasswordAnswer.NoConnection -> PasswordSignInResult.NeedsConnection
+        else -> PasswordSignInResult.WrongEmailOrPassword
+    }
+
+private fun resetSent(answer: PasswordAnswer): PasswordResetResult =
+    when (answer) {
+        PasswordAnswer.Done, PasswordAnswer.Refused -> PasswordResetResult.SentIfAccountExists
+        PasswordAnswer.InvalidEmail -> PasswordResetResult.InvalidEmail
+        PasswordAnswer.TooManyAttempts -> PasswordResetResult.TooManyAttempts
+        PasswordAnswer.NoConnection -> PasswordResetResult.NeedsConnection
+        else -> PasswordResetResult.Failed
+    }
+
+private fun verificationSent(answer: PasswordAnswer): VerificationResult =
+    when (answer) {
+        PasswordAnswer.Done, PasswordAnswer.NotSignedIn -> VerificationResult.Sent
+        PasswordAnswer.TooManyAttempts -> VerificationResult.TryAgainLater
+        PasswordAnswer.NoConnection -> VerificationResult.NeedsConnection
+        else -> VerificationResult.Failed
+    }
+
+private fun verified(answer: PasswordAnswer): VerificationResult =
+    when (answer) {
+        PasswordAnswer.Done -> VerificationResult.Verified
+        PasswordAnswer.NotVerified, PasswordAnswer.NotSignedIn -> VerificationResult.NotVerifiedYet
+        PasswordAnswer.TooManyAttempts -> VerificationResult.TryAgainLater
+        PasswordAnswer.NoConnection -> VerificationResult.NeedsConnection
+        else -> VerificationResult.Failed
+    }
 
 /** How "Create account" ended (AUTH-05). */
 enum class CreateAccountResult {
