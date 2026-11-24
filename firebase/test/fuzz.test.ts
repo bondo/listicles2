@@ -58,7 +58,8 @@ test("the emulator and the model agree on every case", async () => {
 });
 
 // The negative case (P17): each mutant weakens one condition of firestore.rules, so the rules
-// allow a case the model denies, which the fuzz must find (on a fixed seed, so it is stable).
+// allow a case the model denies, which the fuzz must find. A fixed seed keeps it stable; the fuzz
+// stops at the first find (within 610 cases on seed 1), and 3 * RUNS leaves room for a new seed.
 const MUTANTS: [string, string, string][] = [
     ["Signed in without a verified email", "token.email_verified == true", "token != null"],
     ["Create household: any id (P3)", "hid.matches('^[A-Za-z0-9]{20}$')\n        && ", ""],
@@ -71,6 +72,6 @@ const MUTANTS: [string, string, string][] = [
 test.each(MUTANTS)("the fuzz finds the mutant: %s", async (_what, from, to) => {
     const rules = h.RULES.replace(from, to);
     expect(rules).not.toBe(h.RULES);
-    const run = fuzz(rules, { seed: 1, numRuns: RUNS, endOnFailure: true });
+    const run = fuzz(rules, { seed: 1, numRuns: 3 * RUNS, endOnFailure: true });
     await expect(run).rejects.toThrow("the emulator says allowed, the model denied");
 });

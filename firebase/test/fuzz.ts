@@ -211,12 +211,10 @@ export function build(c: Case): { world: m.World; caller: m.Caller; request: m.R
     return { world: d.world, caller: d.caller, request: d.read ?? { op: "commit", writes } };
 }
 
-// The SDK form of a document: the request time and the field delete as FieldValues.
+// The SDK form of a document: the request time as a FieldValue.
 function sdk(d: m.Doc): Record<string, unknown> {
-    const { FieldValue } = firebase.firestore;
-    const value = (v: m.Value): unknown =>
-        v === m.NOW ? FieldValue.serverTimestamp() : v === m.DELETE ? FieldValue.delete() : v;
-    return Object.fromEntries(Object.entries(d).map(([k, v]) => [k, value(v)]));
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    return Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v === m.NOW ? now : v]));
 }
 
 function send(db: h.Db, r: m.Request): Promise<unknown> {
