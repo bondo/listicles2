@@ -157,9 +157,9 @@ class SchemaTest(unittest.TestCase):
 
     def test_missing_required_fields_fail_at_every_level(self):
         self.assert_error(changed("next", DELETE), "missing field 'next'")
-        self.assert_error(changed("branches.0.reviewed_through", DELETE), "branches[0]: missing field 'reviewed_through'")
+        self.assert_error(changed("branches.0.disposition", DELETE), "branches[0]: missing field 'disposition'")
         self.assert_error(changed("orchestrator.depth", DELETE), "orchestrator: missing field 'depth'")
-        self.assert_error(changed("sessions.0.tags", DELETE), "sessions[0]: missing field 'tags'")
+        self.assert_error(changed("sessions.0.expects", DELETE), "sessions[0]: missing field 'expects'")
 
     def test_wrong_types(self):
         self.assert_error(changed("orchestrator.depth", "4"), "orchestrator.depth: expected a whole number")
@@ -245,8 +245,9 @@ class RenderTest(unittest.TestCase):
                      "open follow-ups: 41 (blocker 0, major 0, minor 29, nit 12)",
                      "1. #319 conflict fix, then a new owner approval", "2. #331 fix push, then R2"):
             self.assertIn(line, summary)
-        for part in (S2, "M1-14", "running", "M1-O5", "#291", "trig_01Bak4xL", "#319", "3bb6976", "7076085601"):
-            self.assertIn(part, summary)
+        for part in ("M1-O5", "#291", "#331", "3bb6976", "1 running"):
+            self.assertIn(part, summary)  # a running session is a count, not a row (M1-120)
+        self.assertNotIn(S2, summary)
         self.assertLessEqual(len(summary.splitlines()), 40)
 
     def test_render_round_trips_and_is_idempotent(self):
@@ -296,6 +297,130 @@ class RenderTest(unittest.TestCase):
     def test_one_marker_without_the_other_fails(self):
         once = state_body.render(body())
         self.assertIn("summary markers", errors(once.replace(state_body.END, "")))
+
+
+def full(data):
+    """The state with every optional row field spelled out (what a body had to carry before M1-120)."""
+    out = copy.deepcopy(data)
+    for row in out["sessions"]:
+        for k, v in (("tags", []), ("branch", None), ("pr", None), ("tasks", [])):
+            row.setdefault(k, v)
+    for row in out["branches"]:
+        for k, v in (("pr", None), ("in_review", []), ("reviewed_through", None), ("unreviewed_since", None)):
+            row.setdefault(k, v)
+    return out
+
+
+def session_row(i, role="implementer", branch=None, **extra):
+    return {"id": f"session_01{role[:3].title()}{i:02d}", "role": role, "spawned": "2026-11-24T15:47Z", "expects": "WR",
+            "checked": "2026-11-24T18:04Z", "status": "running", **({"branch": branch} if branch else {}), **extra}
+
+
+def lean_state(sessions=15, branches=11):
+    """About #399's shape: implementers on branches, a few reviewers, a merge agent; most optional fields empty."""
+    data = copy.deepcopy(STATE)
+    rows = [session_row(i, branch=f"m1/task-{i}", pr=300 + i, status="idle-with-result" if i % 4 == 0 else "running",
+                        **({"tasks": [f"M1-{40 + i}"]} if i % 3 == 0 else {})) for i in range(branches)]
+    rows += [session_row(i, "reviewer", f"m1/task-{i}", pr=300 + i) for i in range(sessions - branches - 1)]
+    rows.append(session_row(0, "merge-agent"))
+    data["sessions"] = rows
+    data["branches"] = [{"name": f"m1/task-{i}", "pr": 300 + i, "disposition": f"R{i}; owner",
+                         **({"in_review": [f"M1-{40 + i}"], "reviewed_through": "abc1234"} if i % 2 else {})} for i in range(branches)]
+    return data
+
+
+class LeanTest(unittest.TestCase):
+    """M1-120 (owner decision 7140391316 item 3): a leaner body at the same 15000-byte limit."""
+
+    def test_optional_row_fields_may_be_omitted_and_load_fills_them(self):
+        s, b = session_row(1), {"name": "m1/x", "disposition": "implementing"}
+        data = changed("branches", [b], changed("sessions", [s]))
+        self.assertEqual(errors(body(data)), "")
+        got = state_body.load(body(data))
+        self.assertEqual({k: got["sessions"][0][k] for k in ("tags", "branch", "pr", "tasks")}, {"tags": [], "branch": None, "pr": None, "tasks": []})
+        self.assertEqual({k: got["branches"][0][k] for k in ("pr", "in_review", "reviewed_through", "unreviewed_since")},
+                         {"pr": None, "in_review": [], "reviewed_through": None, "unreviewed_since": None})
+
+    def test_the_meaning_stays_required(self):
+        for key in ("id", "role", "spawned", "expects", "checked", "status"):
+            with self.subTest(key=key):
+                self.assertIn(f"sessions[0]: missing field '{key}'", errors(body(changed("sessions", [{k: v for k, v in session_row(1).items() if k != key}]))))
+        for key in ("name", "disposition"):
+            with self.subTest(key=key):
+                row = {k: v for k, v in {"name": "m1/x", "disposition": "d"}.items() if k != key}
+                self.assertIn(f"branches[0]: missing field '{key}'", errors(body(changed("branches", [row]))))
+
+    def test_an_omitted_field_with_a_bad_value_still_fails_when_present(self):
+        self.assertIn("sessions[0].tasks: expected a list", errors(body(changed("sessions", [session_row(1, tasks="M1-14")]))))
+        self.assertIn("branches[0].in_review[0]: expected a task id",
+                      errors(body(changed("branches", [{"name": "b", "disposition": "d", "in_review": ["x"]}]))))
+        self.assertIn("unknown field 'holders'", errors(body(changed("branches", [{"name": "b", "disposition": "d", "holders": 1}]))))
+
+    def test_an_omitted_holder_is_the_one_implementer_on_the_branch(self):
+        data = changed("branches", [{"name": "m1/x", "disposition": "d"}],
+                       changed("sessions", [session_row(1, branch="m1/x"), session_row(2, "reviewer", "m1/x")]))
+        self.assertEqual(state_body.load(body(data))["branches"][0]["holder"], session_row(1)["id"])
+
+    def test_an_omitted_holder_with_no_or_two_implementers(self):
+        none = changed("branches", [{"name": "m1/x", "disposition": "d"}], changed("sessions", [session_row(2, "reviewer", "m1/x")]))
+        self.assertIsNone(state_body.load(body(none))["branches"][0]["holder"])
+        two = changed("branches", [{"name": "m1/x", "disposition": "d"}],
+                      changed("sessions", [session_row(1, branch="m1/x"), session_row(2, branch="m1/x")]))
+        self.assertIn("branches[0].holder: 2 implementer sessions on m1/x; name the holder", errors(body(two)))
+
+    def test_an_explicit_holder_or_null_wins_over_the_derived_one(self):
+        sessions = [session_row(1, branch="m1/x"), session_row(2, branch="m1/x")]
+        named = changed("branches", [{"name": "m1/x", "holder": session_row(2)["id"], "disposition": "d"}], changed("sessions", sessions))
+        self.assertEqual(state_body.load(body(named))["branches"][0]["holder"], session_row(2)["id"])
+        null = changed("branches", [{"name": "m1/x", "holder": None, "disposition": "d"}], changed("sessions", sessions[:1]))
+        self.assertIsNone(state_body.load(body(null))["branches"][0]["holder"])
+
+    def test_render_writes_the_canonical_lean_block(self):
+        data = full(lean_state())
+        for b in data["branches"]:
+            b["holder"] = f"session_01Imp{int(b['name'].split('-')[1]):02d}"
+        out = state_body.render(body(data))
+        block = out[out.index("```json"):]
+        for gone in ('"tags": []', '"branch": null', '"pr": null', '"tasks": []', '"in_review": []', '"reviewed_through": null',
+                     '"unreviewed_since": null', '"holder"'):
+            self.assertNotIn(gone, block)
+        self.assertEqual(state_body.load(out), state_body.load(body(data)))
+        self.assertEqual(state_body.render(out), out)
+
+    def test_render_keeps_an_explicit_null_holder_when_one_would_be_derived(self):
+        data = changed("branches", [{"name": "m1/x", "holder": None, "disposition": "d"}], changed("sessions", [session_row(1, branch="m1/x")]))
+        out = state_body.render(body(data))
+        self.assertIn('"holder": null', out)
+        self.assertIsNone(state_body.load(out)["branches"][0]["holder"])
+
+    def test_the_summary_counts_running_sessions_and_lists_the_others(self):
+        summary = state_body.summary(state_body.load(body(lean_state())))
+        self.assertIn("**Sessions** (15): 12 running, 3 idle-with-result", summary)
+        for sid in ("session_01Imp00", "session_01Imp04", "session_01Imp08"):
+            self.assertIn(sid, summary)
+        for sid in ("session_01Imp01", "session_01Rev00", "session_01Mer00"):
+            self.assertNotIn(sid, summary)
+
+    def test_the_summary_has_one_line_per_branch_without_the_holder(self):
+        data = lean_state()
+        summary = state_body.summary(state_body.load(body(data)))
+        rows = [ln for ln in summary.splitlines() if ln.startswith("- `m1/task-")]
+        self.assertEqual(len(rows), 11)
+        self.assertIn("- `m1/task-1` PR #301, in review M1-41, reviewed through `abc1234`: R1; owner", rows[1])
+        self.assertNotIn("holder", "\n".join(rows))
+
+    def test_the_summary_keeps_the_owner_queue_and_counts_triggers_and_decisions(self):
+        summary = state_body.summary(STATE)
+        self.assertIn("M1-O5 #291: approve the privacy text; then unblock testers", summary)
+        self.assertIn("**Scheduled tasks:** 1, next 2026-11-23T06:55Z", summary)
+        self.assertIn("**Standing owner decisions:** 1 (comment ids in the block)", summary)
+
+    def test_a_body_with_a_live_load_stays_well_under_the_limit(self):
+        data = lean_state()
+        lean = len(state_body.render(body(data)).encode("utf-8"))
+        old = len(state_body.render(body(full(data))).encode("utf-8"))
+        self.assertEqual(lean, old, "render is canonical: a spelled-out body renders to the same bytes")
+        self.assertLess(lean, 7000)  # the same shape was about 13 KB before M1-120 (the PR body has the numbers)
 
 
 class CliTest(unittest.TestCase):
