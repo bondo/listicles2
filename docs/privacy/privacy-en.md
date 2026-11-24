@@ -20,7 +20,7 @@ what data the app collects and is responsible for it. Questions go to the contac
   it);
 - if you sign in with Google: your Google account's identifier and the profile data Google shares at sign-in: your
   name, your email address and a link to your profile photo. The app does not show or use the photo.
-  `[To confirm (M1-O15) with a real Google sign-in: on the Firebase Auth emulator (M1-67) the sign-in record keeps all
+  `[To confirm (M3-O3) with a real Google sign-in: on the Firebase Auth emulator (M1-67) the sign-in record keeps all
   of these and, for every sign-in method, also when the account was created, when you last signed in and when your
   sign-in was last renewed; M1-O5 decides whether this text names those times.]`
 - if you turn on two-step verification: what is needed to check your authenticator app's codes;
