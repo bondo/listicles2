@@ -37,12 +37,12 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    (also `getRootProject()`, passed, held in a variable or in string template code, `gradle.rootProject { }`) other than
    `isolated.rootProject`, which reads the root's directory; in a settings file `rootProject` is the project descriptor, so there only
    `rootProject.name`, `.buildFileName` and `.projectDir` pass. `parent` (also `getParent()`) with the implicit receiver or on `project`,
-   `target`, `this` or `getProject()` (also in parentheses). A `project(...)`/`findProject(...)` that is not a direct argument of a dependency declaration
-   (an allowlist: a call that is a whole statement in a `dependencies { }` block, `"conf"(...)`, Groovy `conf project(...)`, or
+   `target`, `this` or `getProject()` (also in parentheses). A `project(...)`/`findProject(...)` that is not a direct argument of a
+   dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block, `"conf"(...)`, Groovy `conf project(...)`, or
    `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in between), so one held in a variable or in
    `configure(listOf(project(...))) { }` fails; so do a callable reference (`::project`, Groovy `.&project`) and a quoted Groovy method
-   name (`'project'(...)`); a backticked name counts as the plain one (PR 384 R1-01, R1-02). A project dependency (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`)
-   is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the same name), and a Project reached
+   name (`'project'(...)`); a backticked name counts as the plain one (PR 384 R1-01, R1-02). A project dependency
+   (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the same name), and a Project reached
    through a helper function. Fails closed on: a Kotlin parameter, named argument or Groovy map key called `parent`, a settings plugin
    in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf project(':a'), project(':b')` list.
    Every module in settings.gradle.kts
