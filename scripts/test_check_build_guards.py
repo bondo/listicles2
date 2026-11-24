@@ -799,7 +799,8 @@ class CommandLine(unittest.TestCase):
         r = self.run_cli(root)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         lines = [ln for ln in r.stdout.splitlines() if ln.startswith("build-guards: ")]
-        self.assertEqual(len(lines), 5, r.stdout)  # a literal coordinate, two targetSdk, cleartext, allowBackup
+        # a literal coordinate, two targetSdk, cleartext, allowBackup, and lib/build.gradle:1 (`android` is not on the Groovy allowlist)
+        self.assertEqual(len(lines), 6, r.stdout)
         self.assertTrue(any(ln.startswith("build-guards: lib/build.gradle:3: ") and "catalog" in ln for ln in lines), r.stdout)
         self.assertEqual(sum("targetSdk" in ln for ln in lines), 2, r.stdout)
         self.assertTrue(any("usesCleartextTraffic" in ln for ln in lines))
