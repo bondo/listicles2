@@ -878,11 +878,87 @@ class Conventions(unittest.TestCase):
             "project(\":app\", Action { pluginManager.apply(\"x\") })",
             "project(\":app\", { pluginManager.apply(\"x\") })",
             "project(':app', { p -> p.pluginManager.apply('x') })",
+            # M1-84: isolated projects. The root project is read only through isolated.rootProject; no parent; no project(...)
+            # held in a variable or passed anywhere but a dependency declaration.
+            'apply(from = rootProject.file("config/licensee/policy.gradle"))',
+            'val tokens = rootProject.layout.projectDirectory.file("design/tokens.json")',
+            "val dir = rootProject.projectDir",
+            "val dir = project.rootProject.projectDir",
+            "val dir = rootProject?.projectDir",
+            "val root = rootProject",
+            "f(rootProject)",
+            "val dir = getRootProject().getProjectDir()",
+            "val dir = isolated.rootProject.projectDirectory.also { rootProject.file(\"x\") }",
+            "gradle.rootProject { }",
+            "gradle.rootProject(Action { })",
+            "val v = parent?.version",
+            "val v = project.parent!!.version",
+            "val v = getParent().version",
+            "val v = project.getParent().version",
+            "val p = parent",
+            'val app = project(":app")',
+            'var app: Project? = findProject(":app")',
+            'val app = rootProject.findProject(":app")',
+            'configure(listOf(project(":app"))) { }',
+            'configure(listOf(project(":app"), project(":core:domain"))) { }',
+            'with(project(":app")) { }',
+            'run(project(":app")) { }',
+            'f(project(":app"))',
+            'dependencies { implementation(listOf(project(":app"))) }',
+            'dependencies { val p = project(":app") }',
+            'dependencies { p = project(":app") }',
+            'dependencies { with(project(":app")) { } }',
+            "def app = project(':app')",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
                 self.assertEqual(len(found), 1, found)
                 self.assertRegex(found[0], r"^build\.gradle\.kts:\d+: reaches other projects")
+
+    def test_isolated_project_reads_are_flagged_in_module_build_files_and_build_logic(self):
+        # M1-84: the module build files read the root through isolated.rootProject; so do the convention plugins.
+        for name in ("app/build.gradle.kts", "core/domain/build.gradle", "config/licensee/policy.gradle", "build-logic/src/main/kotlin/P.kt"):
+            for code, shown in (
+                ('val f = rootProject.file("x")', "rootProject"),
+                ("val v = target.parent?.version", "parent"),
+                ('val p = target.project(":app")', "project(...)"),
+            ):
+                with self.subTest(name=name, code=code):
+                    base = {"app/build.gradle.kts": APP, "core/domain/build.gradle": DOMAIN}.get(name, "")
+                    lines = base.count("\n")
+                    found = self.problems({name: base + code + "\n"} | ({"core/domain/build.gradle.kts": None} if name.startswith("core") else {}))
+                    self.assertEqual(len(found), 1, found)
+                    self.assertTrue(found[0].startswith(f"{name}:{lines + 1}: reaches other projects ({shown}"), found)
+
+    def test_settings_files_may_name_the_root_project_but_not_configure_it(self):
+        # In a settings file rootProject is the ProjectDescriptor (rootProject.name), not a Project; gradle.rootProject { } is a hook.
+        for name in ("settings.gradle.kts", "build-logic/settings.gradle.kts", "x/settings.gradle", "build-logic/src/main/kotlin/a.settings.gradle.kts"):
+            with self.subTest(name=name):
+                ok = SETTINGS if name == "settings.gradle.kts" else ""
+                self.assertEqual(self.problems({name: ok + 'rootProject.name = "x"\nrootProject.buildFileName = "b.kts"\n'}), [])
+                found = self.problems({name: ok + "gradle.rootProject { }\n"})
+                self.assertEqual(len(found), 1, found)
+                self.assertRegex(found[0], rf"^{re.escape(name)}:\d+: reaches other projects \(rootProject")
+
+    def test_isolated_reads_and_project_dependencies_pass(self):
+        code = (
+            'apply(from = isolated.rootProject.projectDirectory.file("config/licensee/policy.gradle").asFile)\n'
+            'val t = project.isolated.rootProject.projectDirectory.file("design/tokens.json")\n'
+            'val d = getIsolated().getRootProject().getProjectDirectory()\n'
+            'val n = isolated.rootProject\n'
+            "val g = target.isolated.rootProject.projectDirectory\n"
+            "val f = layout.projectDirectory.asFile.parentFile\nval q = file(\"a\").parent\nval myparent = 1\nval parentDir = 2\n"
+            "val r = myrootProject\nval s = rootProjectDir\nval own = project\nval path = project.path\n"
+            "dependencies {\n    implementation(project(\":core:domain\"))\n    api(project(path = \":core:domain\"))\n"
+            "    add(\"implementation\", project(\":core:domain\"))\n    \"implementation\"(project(\":core:domain\"))\n"
+            "    testImplementation(testFixtures(project(\":core:domain\")))\n"
+            "    implementation(\n        project(\":core:domain\"),\n    )\n}\n"
+            "dependencies.implementation(project(\":core:domain\"))\n"
+            "val d2 = dependencies.project(mapOf(\"path\" to \":x\"))\n"
+        )
+        groovy = "dependencies {\n    implementation project(':core:domain')\n    api project(path: ':core:domain')\n}\n"
+        self.assertEqual(self.problems({"build.gradle.kts": code, "core/domain/build.gradle.kts": DOMAIN + code,
+                                        "config/licensee/policy.gradle": groovy}), [])
 
     def test_build_logic_kotlin_must_not_configure_other_projects_or_set_target_sdk(self):
         for src, want in (("fun f(p: Project) { p.allprojects { } }", "reaches other projects"),
@@ -962,6 +1038,12 @@ class Conventions(unittest.TestCase):
     def test_the_real_repository_has_four_modules_on_convention_plugins(self):
         self.assertEqual(cbg.convention_problems(ROOT), [])
         self.assertEqual(len(cbg.module_paths(ROOT)), 4)
+
+    def test_the_real_module_build_files_read_the_root_through_isolated_projects(self):
+        # M1-84: not vacuous: the module build files and the licensee policy do read root files, through isolated.rootProject.
+        for rel in ("app/build.gradle.kts", "core/data/build.gradle.kts", "core/domain/build.gradle.kts", "config/licensee/policy.gradle"):
+            with self.subTest(rel=rel):
+                self.assertIn("isolated.rootProject.projectDirectory", cbg.read(ROOT, rel))
 
 
 ROOT_BUILD = 'val listiclesModules = listOf(":app", ":core:domain")\ntasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }\n'
