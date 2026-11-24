@@ -121,11 +121,11 @@ step firebase-typecheck bash -c 'cd firebase && npm run typecheck --silent'
 step firebase-lint bash -c 'cd firebase && npm run lint --silent'
 step firebase-format bash -c 'cd firebase && npm run format:check --silent'
 step firebase-ts-tests python3 -I scripts/test_firebase_ts.py
-# M1-96: the live Nix check needs nix; CI job `nix` always runs it, so a workstation without nix says so instead of failing.
+# M1-96: the live Nix check needs nix; the CI firebase job always runs it, so a workstation without nix says so instead of failing.
 if command -v nix >/dev/null 2>&1; then
   step nix-shell-live python3 -I scripts/check_nix_shell.py --live
 else
-  echo "skip  nix-shell-live (nix is not installed; the CI job nix runs it)"; SKIPPED=1
+  echo "skip  nix-shell-live (nix is not installed; the CI firebase job runs it)"; SKIPPED=1
 fi
 if [ "${SKIP_FIREBASE:-0}" = 1 ]; then
   echo "skip  firebase-rules (SKIP_FIREBASE=1)"; SKIPPED=1

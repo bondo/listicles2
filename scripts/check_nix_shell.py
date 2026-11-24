@@ -9,8 +9,8 @@ experimental features; the owner's workstation has flakes disabled), and shell.n
 Static (default, no network): flake.nix has devShells.default for x86_64-linux, x86_64-darwin and aarch64-darwin, built from shell.nix,
 which installs from the lockfile and fetches the tarball flake.lock pins; flake.lock pins the nixpkgs URL in flake.nix by hash; verify.sh
 and ci.yml run this check and its tests.
---live: runs both entry points (`firebase --version`) and compares each with the lockfile (needs nix and the nixpkgs and npm hosts; CI job
-`nix` runs it, verify.sh runs it when nix is installed).
+--live: runs both entry points (`firebase --version`) and compares each with the lockfile (needs nix and the nixpkgs and npm hosts; the CI
+`firebase` job runs it, verify.sh runs it when nix is installed).
 """
 
 import json
