@@ -470,6 +470,10 @@ flowchart LR
 
 - **owner to-do** [#120](https://github.com/bondo/tally/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
 - **owner to-do** [#291](https://github.com/bondo/tally/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
+- **owner to-do** [#374](https://github.com/bondo/tally/issues/374): &#91;owner&#93; M1-O3&#58; Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and …
+- **owner to-do** [#375](https://github.com/bondo/tally/issues/375): &#91;owner&#93; M1-O4&#58; Enable the Play Integrity API for the Firebase project in the Google Cloud console
+- **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
+- **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
 - **PR to merge** [#359](https://github.com/bondo/tally/issues/359): M1-68 part B3&#58; checkJavaApiLevel per JVM module fed by the app, issue 48's warning flags, check…
 - **task** M1-11: waits on M1-54
 - **task** M1-82: waits on M1-88
