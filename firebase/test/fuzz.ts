@@ -6,15 +6,19 @@ import * as m from "./model";
 
 // The rules fuzz (M1-06, P17): random cases (a world seeded with rules off, a caller, a request)
 // sent to the emulator and to the reference model (model.ts), which must agree. A case is a
-// template's base case, which PLAN 3.1 allows in a minimal world (an extension point's once its task
-// adds the row), a few generic tweaks, each of one write, document or the caller, so most cases sit
-// next to a rule's boundary, and a random background. A new row needs only its template.
+// template's n-th variant (n = 0: its base case, which PLAN 3.1 allows in a minimal world; an
+// extension point's once its task adds the row), a few generic tweaks, each of one write, document
+// or the caller, so most cases sit next to a rule's boundary, and a random background. A new row
+// needs only its template.
 const [ALICE, BOB, CAROL, DAN] = ["alice", "bob", "carol", "dan"];
 const UIDS = [ALICE, BOB, CAROL, DAN];
 // Firestore auto-ids (P3), and ids that are not: 19 and 21 characters, a `_`, a `-`.
 const [H1, H2, H3] = ["Kq3ZtW9xLm2RbV7nPc4D", "Pz8YwV2nQs5TxK1mRc7B", "Mx4UvB6tRw9QaZ3nLk2C"];
 const HIDS = [H1, H2, H3, H1.slice(1), `${H1}x`, `${H1.slice(1)}_`, `${H1.slice(1)}-`];
 const CODE = `${H1}_${"s".repeat(22)}`;
+const CODE2 = CODE.replace(H1, H2); // an invite to dan's tombstone in the read world
+// The codes of the id and rename tweaks: P3's, and with a secret of 21 or 23 characters or a `.`.
+const CODES = [CODE, CODE2, CODE.slice(0, -1), `${CODE}s`, `${CODE.slice(0, -1)}.`];
 
 type Op = m.Write["op"];
 type Draft = { world: Map<string, m.Doc>; caller: m.Caller; writes: m.Write[]; read?: m.Request };
@@ -38,16 +42,20 @@ const LATER = new Date("2999-01-01T00:00:00Z"); // after any request time: an un
 const [SOON, LATE] = [new Date(Date.now() + 6 * 86_400_000), new Date(Date.now() + 8 * 86_400_000)];
 const INVITE = { householdId: H1, householdName: "Home", createdBy: CAROL, expiresAt: LATER };
 const ASKED: m.Doc = { ...INVITE, createdAt: m.NOW, expiresAt: SOON }; // carol's invite create
+const UNVERIFIED: m.Caller = { uid: BOB, auth: "unverified" }; // an invite reader
 const points = (householdId: string | null): m.Doc => ({ householdId });
-// For reads: bob's household with carol (alice, removed, still names it) and dan's tombstone.
+// For reads: bob's household with carol (alice, removed, still names it) and dan's tombstone (his
+// member doc not yet cleaned up, M1-11), with an invite to each.
 const TOMB = { ...LIVE, ownerUid: DAN, name: "", deleted: true };
 const SEEN = {
     ...CAROLS,
     [m.user(CAROL)]: points(H1),
     [m.household(H2)]: TOMB,
+    [m.member(H2, DAN)]: { ...MEMBER, role: "owner" },
     [m.user(DAN)]: points(H2),
     [m.user(ALICE)]: points(H1),
     [`invites/${CODE}`]: INVITE,
+    [`invites/${CODE2}`]: { ...INVITE, householdId: H2 },
 };
 
 // The n-th variant of a document: users doc holding null or an id, member doc of either role,
@@ -68,13 +76,15 @@ const READS: m.Request[] = [
     ...[...DOCS, "config/app"].map((path) => ({ op: "get" as const, path })),
     ...LISTS.map((path) => ({ op: "list" as const, path })),
 ];
-// Invite reads: carol's code, and lists without a filter, of H1, of carol's in H1, of H2 (#280).
+// Invite reads: both codes, and lists without a filter, of H1, of carol's and of alice's (removed)
+// in H1, of H2 (#280).
 const INVITE_READS: m.Request[] = [
-    { op: "get", path: `invites/${CODE}` },
+    ...[CODE, CODE2].map((code) => ({ op: "get" as const, path: `invites/${code}` })),
     ...Array.of<m.Doc>(
         {},
         { householdId: H1 },
         { householdId: H1, createdBy: CAROL },
+        { householdId: H1, createdBy: ALICE },
         { householdId: H2 },
     ).map((where) => ({ op: "list" as const, path: "invites", where })),
 ];
@@ -105,10 +115,32 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         draft(DAN, { ...HOME, [m.user(DAN)]: points(H1) }, up(m.user(DAN), points(null))),
     "users doc: create": () => draft(BOB, {}, set(m.user(BOB), { householdId: null, name: "B" })),
     "users doc: name": () => draft(CAROL, SEEN, up(m.user(CAROL), { name: "C" })),
-    "invite: read": (n) => ({ ...draft(UIDS[n % 4] ?? ALICE, SEEN), read: INVITE_READS[n % 5] }),
-    "invite: create": () => draft(CAROL, CAROLS, set(`invites/${CODE}`, ASKED)),
-    "invite: delete": () =>
-        draft(CAROL, { ...CAROLS, [`invites/${CODE}`]: INVITE }, del(`invites/${CODE}`)),
+    // By alice, bob, carol, dan or bob without a verified email (n % 5), each invite read.
+    "invite: read": (n) => {
+        const d = draft(UIDS[n % 5] ?? BOB, SEEN);
+        const read = INVITE_READS[Math.floor(n / 5) % INVITE_READS.length];
+        return { ...d, caller: n % 5 === 4 ? UNVERIFIED : d.caller, read };
+    },
+    // By n % 16: the base case (0, 6 to 15); an expiry after 7 days, now or past (1 to 3); the
+    // household a tombstone that keeps its name, so P2 holds (4); alice's own, not a member (5).
+    "invite: create": (n) => {
+        const v = n % 16;
+        const expiresAt = ([SOON, LATE, m.NOW, m.T0] as const)[v] ?? SOON;
+        const by = v === 5 ? ALICE : CAROL;
+        const world = { ...CAROLS, [m.household(H1)]: { ...LIVE, deleted: v === 4 } };
+        return draft(by, world, set(`invites/${CODE}`, { ...ASKED, createdBy: by, expiresAt }));
+    },
+    // By n % 16, carol's invite deleted by: her (0, 7 to 15); the owner (1); dan, a plain member,
+    // once it has expired or before (2, 3); alice, not a member, once expired (4); under a
+    // tombstone, carol once expired or the owner (5, 6).
+    "invite: delete": (n) => {
+        const v = n % 16;
+        const invite = { ...INVITE, expiresAt: [2, 4, 5].includes(v) ? m.T0 : LATER };
+        const home = { ...LIVE, deleted: v === 5 || v === 6 };
+        const world = { ...CAROLS, [m.member(H1, DAN)]: MEMBER, [m.household(H1)]: home };
+        const uid = [CAROL, BOB, DAN, DAN, ALICE, CAROL, BOB][v] ?? CAROL;
+        return draft(uid, { ...world, [`invites/${CODE}`]: invite }, del(`invites/${CODE}`));
+    },
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
     // Extension points that add a path to an allow statement the rules have (one with an allow
     // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
@@ -166,11 +198,13 @@ const tweak = fc.record({
 type Tweak = typeof tweak extends fc.Arbitrary<infer T> ? T : never;
 
 const pick = <T>(items: readonly T[], i: number): T | undefined => items[i % items.length];
-// Another id of the same kind (a uid or a household id); the ids of a path; one id swapped.
-const other = (id: string, i: number): string => pick(HIDS.includes(id) ? HIDS : UIDS, i) ?? ALICE;
+// Another id of the same kind (a uid, a household id or a code); the ids of a path; one id swapped,
+// and as a code's prefix too, so a renamed household keeps its codes (P3).
+const other = (id: string, i: number): string =>
+    pick([HIDS, CODES].find((kind) => kind.includes(id)) ?? UIDS, i) ?? ALICE;
 const ids = (path: string): string[] => path.split("/").filter((_, i) => i % 2 === 1);
 const swap = (path: string, from: string, to: string): string =>
-    `/${path}/`.replace(`/${from}/`, `/${to}/`).slice(1, -1);
+    `/${path}/`.replace(`/${from}/`, `/${to}/`).replace(`/${from}_`, `/${to}_`).slice(1, -1);
 const swapped = (d: m.Doc, from: string, to: string): m.Doc =>
     Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v === from ? to : v]));
 

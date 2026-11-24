@@ -171,10 +171,10 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
             return x.signedIn && home?.deleted === false && (name || transfer);
         },
     },
-    // Anyone, even signed out (START-01); no client writes.
-    // Invites (M1-12), each while the household is live: get, any user (they need the code, HH-03);
-    // list, a member whose query fixes householdId and, unless the owner, createdBy as the caller
-    // (#280); create (below); delete, its creator or the owner, any member once it has expired.
+    // Invites (M1-12), each while the household is live: get, any signed-in user (verified; they
+    // need the code, HH-03); list, a member whose query fixes householdId and, unless the owner,
+    // createdBy as the caller (#280); create (below); delete, its creator or the owner, any member
+    // once it has expired.
     "invites/{code}": {
         get: (x) => x.signedIn && live(x.before, String(x.old?.householdId)),
         list: (x) => {
@@ -203,6 +203,7 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
             return x.signedIn && live(x.before, hid) && who;
         },
     },
+    // Anyone, even signed out (START-01); no client writes.
     "config/app": { get: () => true },
 };
 
