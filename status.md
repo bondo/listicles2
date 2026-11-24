@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 66/100 (66%) | 34 |
+| M1 | Accounts and households | 67/100 (67%) | 33 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 66/100 done (66%), 34 open.
+**Progress:** 67/100 done (67%), 33 open.
 
 ### Tasks
 
@@ -163,7 +163,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-52 | Rules test harness&#58; default-deny paths from PLAN section 3, list and collection-group queries, unv… | done | M1-35 | implementer | [#301](https://github.com/bondo/tally/issues/301) |
 | M1-53 | Rules&#58; transfer ownership, allow and deny tests (partial transfers, plain member, non-member) | in progress | M1-10 | implementer | [#364](https://github.com/bondo/tally/issues/364) |
 | M1-54 | Rules&#58; the join batch with the one-household check, allow and deny tests | blocked | M1-12 | implementer |  |
-| M1-83 | Rules&#58; members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests | in progress | M1-10 | implementer | [#366](https://github.com/bondo/tally/issues/366) |
+| M1-83 | Rules&#58; members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests | done | M1-10 | implementer | [#366](https://github.com/bondo/tally/issues/366) |
 | M1-55 | Tooling&#58; move the androidTest ListiclesAppTest into the tally package as TallyAppTest and update t… | done | M1-29 | implementer |  |
 | M1-49 | detekt LongParameterList&#58; ignoreAnnotated &#91;Composable&#93; for that rule only (issue 217 item 5) | done | M1-01 | implementer | [#236](https://github.com/bondo/tally/issues/236) |
 | M1-56 | Java API level check&#58; also look up classes used only as class literals, annotations, checkcast, ins… | done | M1-37 | implementer | [#305](https://github.com/bondo/tally/issues/305) |
@@ -244,21 +244,20 @@ flowchart LR
     n16["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
     n17["M1-53 Rules: transfer ownership, allow and … (in progress)"]:::progress
     n18["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
-    n19["M1-83 Rules: members read the household doc… (in progress)"]:::progress
-    n20["M1-61 Java API level check: also look up clas… (ready)"]:::ready
-    n21["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n22["M1-68 Root check tasks without cross-project… (ready)"]:::ready
-    n23["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n24["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n25["M1-79 State issue part C: ORCHESTRATION.md 2… (in progress)"]:::progress
-    n26["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n27["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n28["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n29["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n30["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n31["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n32["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n33["M1-O15 Check once with a real Google sign-in … (owner to-do)"]:::owner
+    n19["M1-61 Java API level check: also look up clas… (ready)"]:::ready
+    n20["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
+    n21["M1-68 Root check tasks without cross-project… (ready)"]:::ready
+    n22["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n23["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n24["M1-79 State issue part C: ORCHESTRATION.md 2… (in progress)"]:::progress
+    n25["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n26["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
+    n27["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n28["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n29["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n30["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n31["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n32["M1-O15 Check once with a real Google sign-in … (owner to-do)"]:::owner
     n18 --> n1
     n17 --> n1
     n4 --> n3
@@ -268,7 +267,6 @@ flowchart LR
     n6 --> n7
     n18 --> n8
     n4 --> n8
-    n19 --> n8
     n1 --> n9
     n8 --> n9
     n8 --> n10
@@ -281,78 +279,77 @@ flowchart LR
     n13 --> n14
     n12 --> n14
     n14 --> n15
-    n29 --> n15
+    n28 --> n15
     n4 --> n16
     n2 --> n18
-    n8 --> n21
-    n7 --> n21
-    n16 --> n21
+    n8 --> n20
+    n7 --> n20
+    n16 --> n20
+    n6 --> n22
+    n7 --> n22
+    n10 --> n22
+    n11 --> n22
+    n12 --> n22
+    n13 --> n22
+    n15 --> n22
+    n16 --> n22
+    n14 --> n22
+    n20 --> n22
+    n0 --> n23
+    n1 --> n23
+    n2 --> n23
+    n5 --> n23
     n6 --> n23
     n7 --> n23
+    n8 --> n23
     n10 --> n23
     n11 --> n23
     n12 --> n23
     n13 --> n23
     n15 --> n23
     n16 --> n23
+    n9 --> n23
     n14 --> n23
+    n20 --> n23
+    n22 --> n23
+    n17 --> n23
+    n18 --> n23
     n21 --> n23
-    n0 --> n24
-    n1 --> n24
-    n2 --> n24
-    n5 --> n24
-    n6 --> n24
-    n7 --> n24
-    n8 --> n24
-    n10 --> n24
-    n11 --> n24
-    n12 --> n24
-    n13 --> n24
-    n15 --> n24
-    n16 --> n24
-    n9 --> n24
-    n14 --> n24
-    n21 --> n24
-    n23 --> n24
-    n17 --> n24
-    n18 --> n24
-    n22 --> n24
-    n3 --> n24
-    n0 --> n26
-    n1 --> n26
-    n2 --> n26
-    n5 --> n26
-    n6 --> n26
-    n7 --> n26
-    n8 --> n26
-    n10 --> n26
-    n11 --> n26
-    n12 --> n26
-    n13 --> n26
-    n15 --> n26
-    n16 --> n26
-    n9 --> n26
-    n14 --> n26
-    n21 --> n26
-    n23 --> n26
-    n24 --> n26
-    n17 --> n26
-    n18 --> n26
-    n20 --> n26
-    n4 --> n26
-    n22 --> n26
-    n25 --> n26
-    n3 --> n26
-    n19 --> n26
-    n27 --> n28
-    n27 --> n29
-    n27 --> n30
+    n3 --> n23
+    n0 --> n25
+    n1 --> n25
+    n2 --> n25
+    n5 --> n25
+    n6 --> n25
+    n7 --> n25
+    n8 --> n25
+    n10 --> n25
+    n11 --> n25
+    n12 --> n25
+    n13 --> n25
+    n15 --> n25
+    n16 --> n25
+    n9 --> n25
+    n14 --> n25
+    n20 --> n25
+    n22 --> n25
+    n23 --> n25
+    n17 --> n25
+    n18 --> n25
+    n19 --> n25
+    n4 --> n25
+    n21 --> n25
+    n24 --> n25
+    n3 --> n25
+    n26 --> n27
+    n26 --> n28
+    n26 --> n29
+    n26 --> n31
+    n1 --> n31
+    n26 --> n32
     n27 --> n32
-    n1 --> n32
-    n27 --> n33
-    n28 --> n33
-    n4 --> n33
-    n6 --> n33
+    n4 --> n32
+    n6 --> n32
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -452,13 +449,14 @@ flowchart LR
 - **owner to-do** [#120](https://github.com/bondo/tally/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
 - **owner to-do** [#291](https://github.com/bondo/tally/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#354](https://github.com/bondo/tally/issues/354): &#91;owner&#93; M1-O1&#58; Create the Firebase project (Spark, Firestore eur3, Google + email sign-in, googl…
+- **PR to merge** [#364](https://github.com/bondo/tally/issues/364): M1-53&#58; rules for Transfer ownership (one batch&#58; ownerUid and both roles), allow and deny tests
 - **PR to merge** [#367](https://github.com/bondo/tally/issues/367): Tasks&#58; Google sign-in off the v1 path (M1-O1 split, M1-O16, M1-86; OQ-23 amended)
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-82: waits on M1-66
 - **task** M1-15: waits on M1-66
 - **task** M1-16: waits on M1-66
 - **task** M1-17: waits on M1-15, M1-16
-- **task** M1-18: waits on M1-54, M1-66, M1-83
+- **task** M1-18: waits on M1-54, M1-66
 - **task** M1-31: waits on M1-11, M1-18
 - **task** M1-19: waits on M1-18
 - **task** M1-20: waits on M1-19, M1-17
@@ -471,7 +469,7 @@ flowchart LR
 - **task** M1-39: waits on M1-18, M1-17, M1-25
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +7
 - **task** M1-48: waits on M1-06, M1-11, M1-12 +18
-- **task** M1-FU: waits on M1-06, M1-11, M1-12 +23
+- **task** M1-FU: waits on M1-06, M1-11, M1-12 +22
 - **task** M1-O2: waits on M1-O1
 - **task** M1-O3: waits on M1-O1
 - **task** M1-O4: waits on M1-O1
