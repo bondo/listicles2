@@ -892,14 +892,25 @@ pr = 352
 notes = "Includes the one-household check on the owner's member create (PLAN 3.1). Deny test: re-creating a tombstoned household id (#199). Transfer (M1-53 since the refresh, docs/milestones/M1.md section 5.1): allow on a household seeded with createdBy null; deny by a plain member (single update and full batch), by a non-member who names an existing member, and partial transfers (no role updates, only one role update); O(uid), not M(uid)"
 
 [[task]]
+id = "M1-95"
+title = "Rules: household soft delete and cleanup (tombstone, P6, owner's cleanup of members, markers and invites), allow and deny tests"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-54", "M1-53"]
+pr = 390
+notes = "Split from M1-11 under its accepted conditional split (R2-08): M1-11's first commit of tests measured 545 lines with Leave and Remove member, over 450, so the soft delete and cleanup went first. PLAN 3.1 Delete household: the soft delete must clear the name (#205); no rule deletes households/{hid}, live or a tombstone (#199); under a tombstone only the owner's cleanup (get, list and delete of the members, the removed markers and the household's invites, one rule each) and P6 (a member's delete of her own member doc, alone or with her users-doc clear); every other write there denied; the tombstone seeded with createdBy null. Leave, Remove member and the marker writes stay M1-11's"
+
+[[task]]
 id = "M1-11"
-title = "Rules: leave, remove member (removed marker), household soft delete and cleanup, allow and deny tests"
+title = "Rules: leave and remove member (removed marker), allow and deny tests"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-53"]
-notes = "After M1-12: Leave, Remove and cleanup delete invites. Marker rules and tests here (create or overwrite, removedAt == request.time, remove-rejoin-remove allowed); the marker-driven list unsharing is M2. Soft delete must clear name (deny non-empty); no rule allows delete on households/{hid}: deny owner deleting the tombstone, a live household doc, or any other user; deny soft delete by a plain member or non-member; allow soft delete, tombstone read and cleanup with createdBy seeded null; deny every write under a tombstone except the cleanup deletes (#199, #205). Estimated ~450 with P6: accepted conditional split (R2-08), if the first commit's tests pass 450 lines, soft delete and cleanup go first as their own PR and the orchestrator adds that task"
+depends_on = ["M1-54", "M1-53", "M1-95"]
+notes = "Split (R2-08): the household soft delete, the tombstone cleanup and P6 went first as M1-95 (PR 390). Here, PLAN 3.1 Leave and Remove member, whose batches delete invites (Leave at most 8 of the leaver's, Remove at most 6 of the target's: ADR 0002). Leave: !O(uid), the own member doc, in one batch with the invite deletes and the users-doc clear (test: allow that clear). Remove member: O(uid), the target not the owner before or after the batch, the member delete needs getAfter(removed/target).removedAt == request.time; the marker is a create or an overwrite (remove-rejoin-remove allowed), holds only removedAt == request.time (P4), written only by O(uid) while M(target) before and !existsAfter(members/target); the owner gets, lists and deletes markers in a live household too (M1-95's managesMarkers has only the tombstone cleanup). Deny: leave by the owner; removal of the owner, also in one batch with a transfer; a marker by a non-owner, while the target stays a member, with another field or without removedAt; a non-owner member reading, listing or deleting a marker. The member delete keeps ADR 0002's order: Leave before P6, Remove last. The marker-driven list unsharing is M2. The tests drafted before the split are kept for this task in PR 390 comment 7135306110 (not run yet). Acceptance (PR 390 R2-01): Leave and the owner's marker get, list and delete in a live household are new paths of existing allow statements, which fuzz.test.ts's row check cannot see and no fuzz.ts template covers yet (model.ts's header): add a row template for each to fuzz.ts (base case allowed) with its model.ts row, and measure again the mutant finds that fuzz.test.ts notes"
 
 [[task]]
 id = "M1-12"
@@ -1678,7 +1689,7 @@ risk = "normal"
 depends_on = [
   "M1-88", "M1-89", "M1-90",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
-  "M1-91", "M1-92", "M1-93", "M1-94",
+  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",

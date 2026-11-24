@@ -39,10 +39,10 @@ spare (the join's member create: 7 of 10).
 | Transfer (M1-53) | household update 4, each role update 2 = 8 | yes |
 | Create invite (M1-12); query invites (M1-12) or lists (M2) | membership 1, household 1 (LIVE, P2's name or `O(uid)`) = 2 | yes |
 | Delete an invite (M1-12) | creator's, owner's or tombstone cleanup's 1, a member's expired cleanup 2, the joiner's 3 | yes |
-| P6 delete and users-doc clear (M1-11); display name (M1-10, M1-39) | 2; 1 | yes |
+| P6 delete and users-doc clear (M1-95); display name (M1-10, M1-39) | 2; 1 | yes |
 | Leave (M1-11, M1-31) | member delete 1, users-doc clear 1, each own invite 1, each + margin 1 = 4 + 2k | k ≤ 8 |
 | Remove member (M1-11, M1-31) | member delete 3, marker 3, each invite 1, each + margin 1 = 8 + 2k | k ≤ 6 |
-| A page of deletes: the invites Leave or Remove leaves out, the tombstone cleanup (M1-11, M1-31) | each 1 + margin 1 | 10 a page |
+| A page of deletes: the invites Leave or Remove leaves out, the tombstone cleanup (M1-95, M1-31) | each 1 + margin 1 | 10 a page |
 | Expired-invite cleanup (M1-18) | each delete 1 (creator's or owner's path: a plain member lists only their own, #280) + margin 1 | 10 a page |
 
 ## What does not work, or needs care
