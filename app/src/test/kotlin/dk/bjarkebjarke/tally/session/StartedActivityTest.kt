@@ -1,6 +1,5 @@
 package dk.bjarkebjarke.tally.session
 
-import android.app.Activity
 import android.app.Application
 import androidx.activity.ComponentActivity
 import io.kotest.matchers.shouldBe
@@ -35,26 +34,6 @@ class StartedActivityTest {
         started.current() shouldBeSameInstanceAs activity.get()
         activity.stop()
         started.current() shouldBe null
-    }
-
-    /**
-     * The picker's own translucent activity opens above MainActivity, which only pauses, and closes again. Application
-     * wide activity callbacks would see it: its stop would clear the activity while MainActivity stays started, and the
-     * next sign-in would find none.
-     */
-    @Test
-    fun thePickersActivityAboveItChangesNothing() {
-        val main = observed().setup()
-        val picker = Robolectric.buildActivity(Activity::class.java)
-
-        main.pause()
-        picker.setup()
-        started.current() shouldBeSameInstanceAs main.get()
-        picker.pause()
-        main.resume()
-        picker.stop().destroy()
-
-        started.current() shouldBeSameInstanceAs main.get()
     }
 
     /** A second MainActivity (a new task, say) starts before the first one stops: only its own stop clears it. */

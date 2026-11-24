@@ -1,5 +1,6 @@
 package dk.bjarkebjarke.tally.start
 
+import android.app.Activity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +22,7 @@ import io.kotest.matchers.types.shouldNotBeSameInstanceAs
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import javax.inject.Inject
@@ -77,6 +79,28 @@ class SignedOutStartTest {
         scenario.recreate()
         compose.activity shouldNotBeSameInstanceAs first
         startedActivity.current() shouldBeSameInstanceAs compose.activity
+    }
+
+    /**
+     * M1-88: the picker's own translucent activity opens above MainActivity, which only pauses, and closes again.
+     * Application-wide activity callbacks would see that activity too: its stop would clear MainActivity while it stays
+     * started, and the next sign-in would find no activity.
+     */
+    @Test
+    fun thePickersOwnActivityAboveMainActivityChangesNothing() {
+        hilt.inject()
+        val scenario = compose.activityRule.scenario
+        val main = compose.activity
+        val picker = Robolectric.buildActivity(Activity::class.java)
+
+        scenario.moveToState(Lifecycle.State.STARTED)
+        picker.setup()
+        startedActivity.current() shouldBeSameInstanceAs main
+        picker.pause()
+        scenario.moveToState(Lifecycle.State.RESUMED)
+        picker.stop().destroy()
+
+        startedActivity.current() shouldBeSameInstanceAs main
     }
 
     private companion object {

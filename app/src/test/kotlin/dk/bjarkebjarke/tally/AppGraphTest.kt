@@ -84,7 +84,7 @@ class AppGraphTest {
     lateinit var signOut: SignOut
 
     @Inject
-    @field:ApplicationScope
+    @ApplicationScope
     lateinit var scope: CoroutineScope
 
     /** TallyApplication initialises Firebase in the app; the Hilt test application does not. */
@@ -124,9 +124,12 @@ class AppGraphTest {
         userData shouldBeSameInstanceAs firestoreSession
     }
 
-    /** M1-88: Google sign-in asks Credential Manager. Injecting [googleSignIn] and [signOut] runs their providers. */
+    /**
+     * M1-88: Google's credentials come from Credential Manager, and the app's graph builds [googleSignIn] and [signOut]
+     * on these bindings. SignInAndSignOutWiringTest checks what the two are built from.
+     */
     @Test
-    fun googleSignInAndSignOutAskCredentialManager() {
+    fun theCredentialsComeFromCredentialManager() {
         hilt.inject()
         credentials.shouldBeInstanceOf<CredentialManagerGoogleCredentials>()
     }
