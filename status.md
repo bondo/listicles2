@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 77/111 (69%) | 34 |
+| M1 | Accounts and households | 78/111 (70%) | 33 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 77/111 done (69%), 34 open.
+**Progress:** 78/111 done (70%), 33 open.
 
 ### Tasks
 
@@ -138,18 +138,18 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-65 | guards check 2c&#58; npm &#96;--&#96; tail resolved through package.json scripts, fail closed by construction … | done | M1-42 | implementer | [#330](https://github.com/bondo/tally/issues/330) |
 | M1-71 | guards check 1&#58; test-runner options that skip or rewrite tests on command lines (jest, vitest, … | done | M1-65 | implementer | [#339](https://github.com/bondo/tally/issues/339) |
 | M1-81 | guards check 1&#58; playwright and cypress test-runner options on command lines | done | M1-71 | implementer | [#358](https://github.com/bondo/tally/issues/358) |
-| M1-82 | Firestore source for the minimum app version&#58; config/app.minVersionCode bound in GateModule | blocked | M1-27, M1-88 | implementer |  |
+| M1-82 | Firestore source for the minimum app version&#58; config/app.minVersionCode bound in GateModule | ready | M1-27, M1-88 | implementer |  |
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/tally/issues/303) |
 | M1-14 | Auth data 1&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step | done | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/tally/issues/319) |
 | M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | done | M1-14 | implementer | [#348](https://github.com/bondo/tally/issues/348) |
 | M1-66 | Auth wiring 1&#58; Credential Manager wrapper (Sign in with Google button flow) in &#58;core&#58;data, &#58;ap… | done | M1-67, M1-O14 | implementer | [#368](https://github.com/bondo/tally/issues/368) |
-| M1-88 | Auth wiring 2&#58; Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in Sessio… | in progress | M1-66 | implementer | [#381](https://github.com/bondo/tally/issues/381) |
-| M1-89 | Clear the local data on every change to signed out, also when Firebase signs the user out itself (… | blocked | M1-88 | implementer |  |
-| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-88, M1-62 | implementer |  |
-| M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | blocked | M1-88, M1-03, M1-49 | implementer |  |
+| M1-88 | Auth wiring 2&#58; Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in Sessio… | done | M1-66 | implementer | [#381](https://github.com/bondo/tally/issues/381) |
+| M1-89 | Clear the local data on every change to signed out, also when Firebase signs the user out itself (… | ready | M1-88 | implementer |  |
+| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | ready | M1-88, M1-62 | implementer |  |
+| M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | ready | M1-88, M1-03, M1-49 | implementer |  |
 | M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16, M1-62 | implementer |  |
 | M1-24 | LocaleConfig&#58; generateLocaleConfig and resources.properties (LANG-02) | done | M1-29 | implementer | [#287](https://github.com/bondo/tally/issues/287) |
-| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | blocked | M1-54, M1-88, M1-60, M1-62, M1-02, M1-83 | implementer |  |
+| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | ready | M1-54, M1-88, M1-60, M1-62, M1-02, M1-83 | implementer |  |
 | M1-31 | Household data 2&#58; leave, remove (marker, resumable), transfer, delete with cleanup resume (em… | blocked | M1-11, M1-18 | implementer |  |
 | M1-19 | Household UI&#58; create, members, invite share sheet, revoke (HH-01, HH-02, HH-04) | blocked | M1-18 | implementer |  |
 | M1-20 | Invite link and join screen (HH-03), incl. signed-out routing through sign-in | blocked | M1-19, M1-17 | implementer |  |
@@ -157,7 +157,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-22 | Account&#58; change password with recent sign-in (AUTH-11) | blocked | M1-17, M1-25 | implementer |  |
 | M1-32 | Account&#58; delete account (AUTH-04) with recent sign-in, resumable | blocked | M1-22, M1-21 | implementer |  |
 | M1-23 | Optional TOTP two-step verification (AUTH-09) | blocked | M1-32, M1-O3 | implementer |  |
-| M1-25 | Account screen (wireframe 18) and navigation&#58; sign-out UI (AUTH-03), Crashlytics opt-in switch, … | blocked | M1-60, M1-88 | implementer |  |
+| M1-25 | Account screen (wireframe 18) and navigation&#58; sign-out UI (AUTH-03), Crashlytics opt-in switch, … | ready | M1-60, M1-88 | implementer |  |
 | M1-26 | App Check&#58; Play Integrity in release, debug provider in debug builds (not enforced) | done | M1-30 | implementer |  |
 | M1-27 | Minimum app version&#58; config/app.minVersionCode, schemaVersion, update screen | done | M1-08, M1-60, M1-62 | implementer | [#343](https://github.com/bondo/tally/issues/343) |
 | M1-28 | Privacy text draft in English and Danish (OQ-30) | done | M1-01 | planner | [#286](https://github.com/bondo/tally/issues/286) |
@@ -223,8 +223,8 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-85 | Repo name and checkout path from one place, so the scripts work before and after the repo rename | done | none | implementer |  |
 | M1-86 | Google sign-in switch in &#58;app (off in v1)&#58; hide the Google button and the Google hint while off | blocked | M1-66, M1-16 | implementer |  |
 | M1-87 | Repo rename follow-up&#58; the old repo name and checkout path in process files, docs, README and a… | done | none | implementer |  |
-| M1-91 | Tooling&#58; hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICL… | ready | none | implementer |  |
-| M1-92 | Tooling&#58; process docs, prompts and status output say Tally; new sessions get tally&#58;* tags | ready | none | implementer |  |
+| M1-91 | Tooling&#58; hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICL… | in progress | none | implementer | [#389](https://github.com/bondo/tally/issues/389) |
+| M1-92 | Tooling&#58; process docs, prompts and status output say Tally; new sessions get tally&#58;* tags | in progress | none | implementer | [#388](https://github.com/bondo/tally/issues/388) |
 | M1-93 | Build names&#58; rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks … | ready | M1-68 | implementer |  |
 | M1-94 | Tooling&#58; drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling | blocked | M1-O17, M1-91, M1-92 | implementer |  |
 | M1-O17 | Owner&#58; add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now) | owner to-do | M1-91 | owner |  |
@@ -238,123 +238,115 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 flowchart LR
     n0["M1-06 Rules fuzzing: fast-check against a TS … (in progress)"]:::progress
     n1["M1-11 Rules: leave, remove member (remove… (ready)"]:::ready
-    n2["M1-82 Firestore source for the minimum app… (blocked)"]:::blocked
-    n3["M1-88 Auth wiring 2: Hilt bindings for sessi… (in progress)"]:::progress
-    n4["M1-89 Clear the local data on every change to… (blocked)"]:::blocked
-    n5["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
-    n6["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
-    n7["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
-    n8["M1-18 Household data 1: create, invite, revok… (blocked)"]:::blocked
-    n9["M1-31 Household data 2: leave, remove (mark… (blocked)"]:::blocked
-    n10["M1-19 Household UI: create, members, invite… (blocked)"]:::blocked
-    n11["M1-20 Invite link and join screen (HH-03), in… (blocked)"]:::blocked
-    n12["M1-21 Leave, remove, transfer and delete hou… (blocked)"]:::blocked
-    n13["M1-22 Account: change password with recent … (blocked)"]:::blocked
-    n14["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
-    n15["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
-    n16["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
-    n17["M1-61 Java API level check: also look up clas… (ready)"]:::ready
-    n18["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n19["M1-84 Isolated projects: module build files … (in progress)"]:::progress
-    n20["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
-    n21["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
-    n22["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n23["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n24["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n25["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n26["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n27["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::blocked
-    n28["M1-91 Tooling: hooks and status line read TAL… (ready)"]:::ready
-    n29["M1-92 Tooling: process docs, prompts and sta… (ready)"]:::ready
-    n30["M1-93 Build names: rootProject.name tally, … (ready)"]:::ready
-    n31["M1-94 Tooling: drop LISTICLES_TASK and the de… (blocked)"]:::blocked
-    n32["M1-O17 Owner: add TALLY_TASK=tooling to the T… (owner to-do)"]:::owner
-    n33["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
-    n3 --> n2
-    n3 --> n4
-    n3 --> n5
-    n3 --> n6
-    n5 --> n7
-    n6 --> n7
-    n3 --> n8
-    n1 --> n9
-    n8 --> n9
-    n8 --> n10
-    n10 --> n11
-    n7 --> n11
-    n10 --> n12
-    n9 --> n12
-    n7 --> n13
-    n16 --> n13
+    n2["M1-82 Firestore source for the minimum app… (ready)"]:::ready
+    n3["M1-89 Clear the local data on every change to… (ready)"]:::ready
+    n4["M1-15 Auth data: email and password sign-up… (ready)"]:::ready
+    n5["M1-16 Sign-in UI: sign-in screen and Google b… (ready)"]:::ready
+    n6["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
+    n7["M1-18 Household data 1: create, invite, revok… (ready)"]:::ready
+    n8["M1-31 Household data 2: leave, remove (mark… (blocked)"]:::blocked
+    n9["M1-19 Household UI: create, members, invite… (blocked)"]:::blocked
+    n10["M1-20 Invite link and join screen (HH-03), in… (blocked)"]:::blocked
+    n11["M1-21 Leave, remove, transfer and delete hou… (blocked)"]:::blocked
+    n12["M1-22 Account: change password with recent … (blocked)"]:::blocked
+    n13["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
+    n14["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
+    n15["M1-25 Account screen (wireframe 18) and nav… (ready)"]:::ready
+    n16["M1-61 Java API level check: also look up clas… (ready)"]:::ready
+    n17["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
+    n18["M1-84 Isolated projects: module build files … (in progress)"]:::progress
+    n19["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
+    n20["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
+    n21["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
+    n22["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n23["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n24["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n25["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n26["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::blocked
+    n27["M1-91 Tooling: hooks and status line read TAL… (in progress)"]:::progress
+    n28["M1-92 Tooling: process docs, prompts and sta… (in progress)"]:::progress
+    n29["M1-93 Build names: rootProject.name tally, … (ready)"]:::ready
+    n30["M1-94 Tooling: drop LISTICLES_TASK and the de… (blocked)"]:::blocked
+    n31["M1-O17 Owner: add TALLY_TASK=tooling to the T… (owner to-do)"]:::owner
+    n32["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
+    n4 --> n6
+    n5 --> n6
+    n1 --> n8
+    n7 --> n8
+    n7 --> n9
+    n9 --> n10
+    n6 --> n10
+    n9 --> n11
+    n8 --> n11
+    n6 --> n12
+    n15 --> n12
+    n12 --> n13
+    n11 --> n13
     n13 --> n14
-    n12 --> n14
-    n14 --> n15
-    n23 --> n15
-    n3 --> n16
-    n8 --> n18
-    n7 --> n18
-    n16 --> n18
+    n22 --> n14
+    n7 --> n17
+    n6 --> n17
+    n15 --> n17
+    n5 --> n19
+    n6 --> n19
+    n9 --> n19
+    n10 --> n19
+    n11 --> n19
+    n12 --> n19
+    n14 --> n19
+    n15 --> n19
+    n13 --> n19
+    n17 --> n19
+    n0 --> n20
+    n1 --> n20
+    n4 --> n20
+    n5 --> n20
     n6 --> n20
     n7 --> n20
+    n9 --> n20
     n10 --> n20
     n11 --> n20
     n12 --> n20
-    n13 --> n20
-    n15 --> n20
-    n16 --> n20
     n14 --> n20
-    n18 --> n20
+    n15 --> n20
+    n8 --> n20
+    n13 --> n20
+    n17 --> n20
+    n19 --> n20
+    n2 --> n20
+    n3 --> n21
     n0 --> n21
     n1 --> n21
+    n27 --> n21
+    n28 --> n21
+    n29 --> n21
+    n30 --> n21
+    n4 --> n21
     n5 --> n21
     n6 --> n21
     n7 --> n21
-    n8 --> n21
+    n9 --> n21
     n10 --> n21
     n11 --> n21
     n12 --> n21
-    n13 --> n21
-    n15 --> n21
-    n16 --> n21
-    n9 --> n21
     n14 --> n21
-    n18 --> n21
+    n15 --> n21
+    n8 --> n21
+    n13 --> n21
+    n17 --> n21
+    n19 --> n21
     n20 --> n21
+    n16 --> n21
     n2 --> n21
-    n3 --> n22
-    n4 --> n22
-    n0 --> n22
-    n1 --> n22
-    n28 --> n22
-    n29 --> n22
-    n30 --> n22
-    n31 --> n22
-    n5 --> n22
-    n6 --> n22
-    n7 --> n22
-    n8 --> n22
-    n10 --> n22
-    n11 --> n22
-    n12 --> n22
-    n13 --> n22
-    n15 --> n22
-    n16 --> n22
-    n9 --> n22
-    n14 --> n22
-    n18 --> n22
-    n20 --> n22
-    n21 --> n22
-    n17 --> n22
-    n2 --> n22
-    n19 --> n22
-    n27 --> n22
-    n1 --> n26
-    n6 --> n27
-    n32 --> n31
-    n28 --> n31
-    n29 --> n31
-    n28 --> n32
-    n31 --> n33
+    n18 --> n21
+    n26 --> n21
+    n1 --> n25
+    n5 --> n26
+    n31 --> n30
+    n27 --> n30
+    n28 --> n30
+    n27 --> n31
+    n30 --> n32
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -416,7 +408,7 @@ flowchart LR
     n0["M3-O1 Enable Google sign-in in Firebase (need… (owner to-do)"]:::owner
     n1["M3-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
     n2["M3-O3 Check once with a real Google sign-in … (owner to-do)"]:::owner
-    n3["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::ext
+    n3["M1-16 Sign-in UI: sign-in screen and Google b… (ready)"]:::ext
     n4["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::ext
     n0 --> n1
     n1 --> n2
@@ -486,12 +478,7 @@ flowchart LR
 - **owner to-do** [#375](https://github.com/bondo/tally/issues/375): &#91;owner&#93; M1-O4&#58; Enable the Play Integrity API for the Firebase project in the Google Cloud console
 - **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
-- **task** M1-82: waits on M1-88
-- **task** M1-89: waits on M1-88
-- **task** M1-15: waits on M1-88
-- **task** M1-16: waits on M1-88
 - **task** M1-17: waits on M1-15, M1-16
-- **task** M1-18: waits on M1-88
 - **task** M1-31: waits on M1-11, M1-18
 - **task** M1-19: waits on M1-18
 - **task** M1-20: waits on M1-19, M1-17
@@ -499,11 +486,10 @@ flowchart LR
 - **task** M1-22: waits on M1-17, M1-25
 - **task** M1-32: waits on M1-22, M1-21
 - **task** M1-23: waits on M1-32, M1-O3
-- **task** M1-25: waits on M1-88
 - **task** M1-39: waits on M1-18, M1-17, M1-25
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +7
 - **task** M1-48: waits on M1-06, M1-11, M1-15 +14
-- **task** M1-FU: waits on M1-88, M1-89, M1-06 +24
+- **task** M1-FU: waits on M1-89, M1-06, M1-11 +23
 - **task** M1-O6: waits on M1-11
 - **task** M1-86: waits on M1-16
 - **task** M1-94: waits on M1-O17, M1-91, M1-92
