@@ -1,4 +1,4 @@
-// M0.5-10 licensee policy (owner decision D3, issue #15). Applied by :app, :core:domain and the test fixture.
+// M0.5-10 licensee policy (owner decision D3, issue #15). Applied by :app, :core:data, :core:domain and the test fixture.
 // Groovy, not Kotlin: a Kotlin script plugin cannot see the licensee plugin's types.
 //
 // Allowed everywhere: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause. Any other licence, an unknown licence URL or a
