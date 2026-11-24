@@ -21,6 +21,7 @@ import dk.bjarkebjarke.tally.domain.start.EmailVerification
 import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
 import dk.bjarkebjarke.tally.domain.start.NameState
 import dk.bjarkebjarke.tally.domain.start.UpdateGate
+import dk.bjarkebjarke.tally.session.StartedActivity
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -84,6 +85,9 @@ class AppGraphTest {
     lateinit var signOut: SignOut
 
     @Inject
+    lateinit var startedActivity: StartedActivity
+
+    @Inject
     @ApplicationScope
     lateinit var scope: CoroutineScope
 
@@ -129,6 +133,25 @@ class AppGraphTest {
     fun theCredentialsComeFromCredentialManager() {
         hilt.inject()
         credentials.shouldBeInstanceOf<CredentialManagerGoogleCredentials>()
+    }
+
+    /**
+     * M1-88 (R1-02, S1-02): the picker opens in the activity MainActivity reports (SignedOutStartTest checks that part)
+     * and asks for the configured web client. Another activity source or an empty id would answer Failed to every
+     * Google sign-in.
+     */
+    @Test
+    fun theCredentialsAskInTheStartedActivityForTheConfiguredWebClient() {
+        hilt.inject()
+
+        fun field(name: String) =
+            CredentialManagerGoogleCredentials::class.java
+                .getDeclaredField(name)
+                .apply { isAccessible = true }
+                .get(credentials)
+        field("foreground") shouldBeSameInstanceAs startedActivity
+        field("webClientId") shouldBe
+            CredentialManagerGoogleCredentials.webClientId(RuntimeEnvironment.getApplication())
     }
 
     /**
