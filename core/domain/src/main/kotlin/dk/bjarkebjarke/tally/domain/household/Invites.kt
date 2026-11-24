@@ -14,7 +14,6 @@ object Invites {
 
     private const val SECRET_LENGTH = 22
     private const val SECRET_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-    private val codeForm = Regex("[A-Za-z0-9]{20}_[A-Za-z0-9_-]{22}")
 
     fun newCode(
         householdId: String,
@@ -23,12 +22,6 @@ object Invites {
         val secret = CharArray(SECRET_LENGTH) { SECRET_ALPHABET[random.nextInt(SECRET_ALPHABET.length)] }
         return "${householdId}_${String(secret)}"
     }
-
-    /** The rules' form; a code from a link that is not well formed names no invite and is never a document path. */
-    fun isWellFormed(code: String): Boolean = codeForm.matches(code)
-
-    /** The household of a well-formed code: the rules tie the prefix to the invite's `householdId`. */
-    fun householdId(code: String): String = code.substringBefore('_')
 
     fun expiresAt(nowMs: Long): Long = nowMs + LIFETIME_MS
 }
