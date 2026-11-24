@@ -963,6 +963,7 @@ class Conventions(unittest.TestCase):
             "val f = Project::getParent",
             "val f = Project::getRootProject",
             "val v = listOf(project).map { it.parent }",
+            'val q = file("a").parent',  # fails closed: File.parent has the name, use parentFile
             "val m = Project::class.members",
             'val m = project.javaClass.getMethod("getParent")',
             "import kotlin.reflect.full.memberProperties",
@@ -1043,7 +1044,7 @@ class Conventions(unittest.TestCase):
         self.assertTrue(found and found[0].startswith("config/licensee/policy.gradle:1: reaches other projects"), found)
 
     def test_a_groovy_name_off_the_allowlist_is_named(self):
-        found = self.problems({"config/licensee/policy.gradle": "def e = project.extensions\n"})
+        found = self.problems({"config/licensee/policy.gradle": "def ok = project.extensions\n"})
         self.assertEqual(found, ["config/licensee/policy.gradle:1: reaches other projects (`extensions` is not on the Groovy allowlist); "
                                  "a .gradle file uses only the names in GROOVY_IDENTIFIERS (Groovy resolves names at run time)"])
 
@@ -1096,7 +1097,7 @@ class Conventions(unittest.TestCase):
             'val d = getIsolated().getRootProject().getProjectDirectory()\n'
             'val n = isolated.rootProject\n'
             "val g = target.isolated.rootProject.projectDirectory\n"
-            "val f = layout.projectDirectory.asFile.parentFile\nval q = file(\"a\").parent\nval myparent = 1\nval parentDir = 2\n"
+            "val f = layout.projectDirectory.asFile.parentFile\nval myparent = 1\nval parentDir = 2\n"
             "val r = myrootProject\nval s = rootProjectDir\nval own = project\nval path = project.path\n"
             "dependencies {\n    implementation(project(\":core:domain\"))\n    api(project(path = \":core:domain\"))\n"
             "    add(\"implementation\", project(\":core:domain\"))\n    \"implementation\"(project(\":core:domain\"))\n"
