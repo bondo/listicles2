@@ -130,9 +130,18 @@ _DELEGATED = tuple(re.escape(t) for t in (
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
     "settings, network allowlists, licence and permission acceptances, guard thresholds (600/1500), design and product sign-off, merges of PRs "
-    "with security-rules or sync-merge content (firebase/ rules, sync and merge logic), and changes to the process files that define these "
-    "authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, agents/roles.yaml, agents/prompts/)."
+    "with sync-merge content (sync and merge logic), the owner task M1-O5 (approving the privacy text before anyone but the owner installs the "
+    "app), and changes to the process files that define these authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, "
+    "agents/roles.yaml, agents/prompts/)."
 )
+# Owner decision, #15 comment 7123360368 (2026-11-24): the approver's scope also takes security-rules PRs and privacy-doc changes. The one home
+# of the rule is ORCHESTRATION 1.1; the approver and orchestrator prompts point to it.
+_SCOPE = tuple(re.escape(t) for t in (
+    "Approver scope, widened (owner decision, #15 comment 7123360368, 2026-11-24): the approver also approves (a) PRs with security-rules "
+    "content (`firebase/` rules and their tests) and (b) changes to the privacy docs (`docs/privacy/**`), in both cases only after a clean "
+    "final review round, with green CI and no veto; for a security-rules or `risk:high` PR it also needs a clean independent second-reviewer "
+    "pass at max effort (§7.2.2). The record, the merge as `owner-batch` and the owner's veto are those of (1).",
+))
 # Wording the decision replaced: the owner is no longer asked for these.
 _STALE_ASKS = (r"the escalation reviewer's `owner` ruling", r"`risk:high` work(?: before starting it| \(before starting it\))",
                r"merges of owner-only prs(?:;| \(§7\.5\))")
@@ -844,9 +853,11 @@ RULES = (
             r"you are not given the first reviewer's findings", r"risk:high", r"security-rules, sync-merge and release",
             r"never edit or push the pr branch: report only", r"marked ready only after your pass",
             r"ids `s<round>-<nn>`", r"never `r<round>-<nn>`",  # own id prefix: no same-round collision (R2-01 of #128)
+            r"opus, high effort \(max for `risk:high` prs and for prs labelled `area:security-rules`, even without `risk:high`, per "
+            r"`agents/roles\.yaml`; you do not raise your own effort\)",  # roles.yaml max_effort_when backs it (#15 comment 7123360368)
         ),
         "the second reviewer works independently on risk:high and protected areas and never edits the PR branch",
-        forbidden=(r"effort \(max",),  # roles.yaml gives it no max_effort_when (R1-06 of #128)
+        forbidden=(r"effort \(max for `risk:high` prs and for prs labelled `area:sync-merge`",),  # the decision names security-rules and risk:high only
     ),
     Rule(
         "verifier-handoff", ("implementer", "reviewer", "second-reviewer"),
@@ -1081,10 +1092,12 @@ RULES = (
         "delegated-decisions", ("orchestrator",),
         _DELEGATED + (
             RETAINED,
-            r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round, with the pr number, the head sha, the round "
+            r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round \(a `risk:high`, security-rules or release-area pr "
+            r"only after its clean second-reviewer pass, at max effort for `risk:high` and security-rules, §7\.2\.2\), with the pr number, "
+            r"the head sha, the round "
             r"history and the deferral records; check for a `veto #n` comment on #15 before you send the merge request, and tell the merge agent "
             r"to read #15 for one right before it runs `scripts/merge_ready\.py`",
-            r"a pr with anything on the owner-retained list, or with an owner-only path outside tooling, build, ci and gate files, is not "
+            r"a pr with anything on the owner-retained list, or with an owner-only path outside the approver's scope \(§1\.1\), is not "
             r"approver work: ask the owner for the batch approval",
         ),
         "the orchestrator prompt carries the four delegated decisions, the exact owner-retained list and the approver and veto steps "
@@ -1094,20 +1107,23 @@ RULES = (
         "approver-role", ("approver",),
         (
             r"you are the approver for listicles\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
-            r"fresh session, one per pr, started by the orchestrator once an owner-only tooling, build, ci or gate pr is ready",
+            r"fresh session, one per pr, started by the orchestrator once an owner-only pr in your scope \(§1\.1: tooling, build, ci or gate, "
+            r"security rules, privacy docs\) is ready",
             r"you decide in the owner's place whether the pr may be merged as `owner-batch`\. you never merge it",
             r"inputs \(from the spawn message\): the pr number, the head sha, the round history and the deferral records",
             r"check every item and refuse if one fails; a pass on one item never offsets a failure of another",
             r"1\. head: the pr head is the head sha you were given\. a later commit needs a new approval",
             r"2\. scope: every owner-only changed path is tooling, build, ci or gate \(`scripts/`, build files, `ci\.yml` and other workflows, "
-            r"`verification-metadata`, architecture and gate tests, `merge_ready\.py` and similar\); a path that may merge as `general` "
+            r"`verification-metadata`, architecture and gate tests, `merge_ready\.py` and similar\), security-rules content \(`firebase/` rules and "
+            r"their tests\) or a privacy doc \(`docs/privacy/\*\*`\); a path that may merge as `general` "
             r"\(as `scripts/merge_ready\.py` `owner_only` decides, e\.g\. `docs/tasks\.toml`\) does not count; and none is on the owner-retained list below\. "
             r"an owner-only path outside those classes, such as a design or product doc, is not yours to approve",
             r"3\. review\.md: the pr meets it: about 400 changed lines or fewer, a failing test committed first with negative cases and wired into "
             r"`scripts/verify\.sh` and ci, and no suppression, baseline, skipped test or lowered threshold without the owner's recorded decision",
             r"4\. clean final round: the last round was a fresh reviewer's whole-diff round \(or, for later commits, a delta review\) with no "
             r"finding above nit open; every deferral has its follow-up issue and `decision` comment under `docs/follow-ups\.md` §2; "
-            r"a `risk:high` pr or a protected area also has a clean second-reviewer pass",
+            r"a `risk:high` pr, a security-rules pr or another protected area \(release\) also has a clean independent second-reviewer pass "
+            r"\(§7\.2\.2\), at max effort for a `risk:high` or security-rules pr",
             r"5\. ci: every required check succeeded on the head sha",
             r"6\. no closing keyword: no commit message and no pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
             r"directly before an issue number",
@@ -1656,7 +1672,7 @@ DOC_RULES = (
     ),
     DocRule(
         "orch-delegated-decisions", ORCH,
-        _DELEGATED + (
+        _DELEGATED + _SCOPE + (
             RETAINED,
             r"\| \*\*approver\*\* \| opus / high \| one pr; fresh session started by the orchestrator \(§7\.5\)",
             r"over-cap deferrals \(owner decision, #15 comment 7075812943\): over the cap the orchestrator may still defer a minor finding whose "
@@ -1675,10 +1691,24 @@ DOC_RULES = (
             r"the orchestrator reads #15 for one before it sends the merge request and the merge agent right before it runs "
             r"`scripts/merge_ready\.py`, and neither merges or requests the merge of a vetoed pr",
             r"is refused by the approver and waits for the owner's own batch approval",
+            r"the second reviewer runs at max effort for `risk:high` and `area:security-rules` prs \(`agents/roles\.yaml`\)",
+            r"for an owner-only pr in the approver's scope \(§1\.1\), an approver agent's anchored",
+            r"or any owner-only path outside the approver's scope \(§1\.1\), is refused by the approver",
         ),
         "ORCHESTRATION 1.1, 7.2.1, 7.2.2, 7.5: the four delegated decisions, the exact owner-retained list, the approver and the owner's veto "
         "(owner decision, #15 comment 7075812943)",
         forbidden=(r"for an owner-only pr, the owner's batch approval is always required",),
+    ),
+    DocRule(
+        "roles-second-reviewer", "agents/roles.yaml",
+        (
+            r"second-reviewer: model: opus effort: high session: fresh, same round as the reviewer, for risk:high prs and protected areas "
+            r"prompt: agents/prompts/second-reviewer\.md max_effort_when: - the pr is tagged risk:high in the milestone doc "
+            r"- the pr is labelled area:security-rules, even without the risk:high tag \(owner decision, #15 comment 7123360368",
+        ),
+        "roles.yaml: the second reviewer is max effort for risk:high and area:security-rules PRs, which the approver's condition needs "
+        "(owner decision, #15 comment 7123360368)",
+        forbidden=(r"second-reviewer:[^\n]{0,200}effort: max",),
     ),
     DocRule(
         "roles-approver", "agents/roles.yaml",
@@ -1701,8 +1731,8 @@ DOC_RULES = (
     ),
     DocRule(
         "review-approver-record", "REVIEW.md",
-        (r"an owner-only pr waits for the owner's approval or, for tooling, build, ci and gate prs, the approver's record",),
-        "REVIEW.md Loop and cap item 3: an owner-only PR waits for the owner or, for tooling, build, CI and gate PRs, the approver's record",
+        (r"an owner-only pr waits for the owner's approval or, for prs in the approver's scope \(`docs/orchestration\.md` §1\.1\), the approver's record",),
+        "REVIEW.md Loop and cap item 3: an owner-only PR waits for the owner or, for PRs in the approver's scope (ORCHESTRATION 1.1), the approver's record",
     ),
     DocRule(
         "plan-approver-record", "docs/PLAN.md",
