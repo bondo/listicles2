@@ -129,7 +129,7 @@ _DELEGATED = tuple(re.escape(t) for t in (
 ))
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
-    "settings, network allowlists, licence and permission acceptances, guard thresholds (600/1500), design and product sign-off, merges of PRs "
+    "settings, network allowlists, licence and permission acceptances, guard thresholds of 600 and 1500, design and product sign-off, merges of PRs "
     "with sync-merge content (sync and merge logic), the owner task M1-O5 (approving the privacy text before anyone but the owner installs the "
     "app), and changes to the process files that define these authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, "
     "agents/roles.yaml, agents/prompts/)."
@@ -140,7 +140,7 @@ _SCOPE = tuple(re.escape(t) for t in (
     "Approver scope, widened (owner decision, #15 comment 7123360368, 2026-11-24): the approver also approves (a) PRs with security-rules "
     "content (`firebase/` rules and their tests) and (b) changes to the privacy docs (`docs/privacy/**`), in both cases only after a clean "
     "final review round, with green CI and no veto; for a security-rules or `risk:high` PR it also needs a clean independent second-reviewer "
-    "pass at max effort. The record, the merge as `owner-batch` and the owner's veto are those of (1).",
+    "pass (§7.2.2), with effort per `agents/roles.yaml`. The record, the merge as `owner-batch` and the owner's veto are those of (1).",
 ))
 # Wording the decision replaced: the owner is no longer asked for these.
 _STALE_ASKS = (r"the escalation reviewer's `owner` ruling", r"`risk:high` work(?: before starting it| \(before starting it\))",
@@ -1091,7 +1091,7 @@ RULES = (
         _DELEGATED + (
             RETAINED,
             r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round \(a security-rules or `risk:high` pr only after its "
-            r"clean second-reviewer pass at max effort, §1\.1\), with the pr number, the head sha, the round "
+            r"clean second-reviewer pass, §7\.2\.2\), with the pr number, the head sha, the round "
             r"history and the deferral records; check for a `veto #n` comment on #15 before you send the merge request, and tell the merge agent "
             r"to read #15 for one right before it runs `scripts/merge_ready\.py`",
             r"a pr with anything on the owner-retained list, or with an owner-only path outside the approver's scope \(§1\.1\), is not "
@@ -1099,6 +1099,7 @@ RULES = (
         ),
         "the orchestrator prompt carries the four delegated decisions, the exact owner-retained list and the approver and veto steps "
         "(owner decision, #15 comment 7075812943; ORCHESTRATION 1.1, 7.5)",
+        forbidden=(r"second-reviewer pass at max effort",),
     ),
     Rule(
         "approver-role", ("approver",),
@@ -1119,7 +1120,7 @@ RULES = (
             r"`scripts/verify\.sh` and ci, and no suppression, baseline, skipped test or lowered threshold without the owner's recorded decision",
             r"4\. clean final round: the last round was a fresh reviewer's whole-diff round \(or, for later commits, a delta review\) with no "
             r"finding above nit open; every deferral has its follow-up issue and `decision` comment under `docs/follow-ups\.md` §2; "
-            r"a `risk:high` or security-rules pr also has a clean independent second-reviewer pass at max effort \(§1\.1\)",
+            r"a `risk:high` or security-rules pr also has a clean independent second-reviewer pass \(§7\.2\.2\)",
             r"5\. ci: every required check succeeded on the head sha",
             r"6\. no closing keyword: no commit message and no pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
             r"directly before an issue number",
@@ -1135,7 +1136,7 @@ RULES = (
         ),
         "the approver checks head, scope, REVIEW.md, the clean final round, CI, closing keywords and the veto, posts the anchored record or a "
         "refusal, and never merges, edits or pushes (owner decision, #15 comment 7075812943; ORCHESTRATION 7.5)",
-        forbidden=(r"\byou (?:may|can|should|will|must) (?:merge|push|edit|mark|label)",),
+        forbidden=(r"second-reviewer pass at max effort", r"\byou (?:may|can|should|will|must) (?:merge|push|edit|mark|label)",),
     ),
 )
 
@@ -1692,7 +1693,7 @@ DOC_RULES = (
         ),
         "ORCHESTRATION 1.1, 7.2.1, 7.2.2, 7.5: the four delegated decisions, the exact owner-retained list, the approver and the owner's veto "
         "(owner decision, #15 comment 7075812943)",
-        forbidden=(r"for an owner-only pr, the owner's batch approval is always required",),
+        forbidden=(r"for an owner-only pr, the owner's batch approval is always required", r"second-reviewer pass at max effort"),
     ),
     DocRule(
         "roles-approver", "agents/roles.yaml",
