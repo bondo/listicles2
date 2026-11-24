@@ -90,6 +90,7 @@ const MUTANTS: [string, string, string][] = [
         "true)",
     ],
     ["Join: through an expired invite", "invite.expiresAt > request.time", "true"],
+    ["Join: through another household's invite", "invite.householdId == hid && ", ""],
     ["Join: the invite not deleted (single use)", "&& !existsAfter(inviteDoc(code))", "&& true"],
     ["Join: through a former member's invite", "exists(memberDoc(hid, invite.createdBy))", "true"],
     [
