@@ -53,7 +53,9 @@ spare (the join's member create: 7 of 10).
   before and after (the role checks); in the list query `sharedWith != null`. They stay, as PLAN 3.1 has them, so each rule
   holds on its own; their deny tests in M1-53 and M1-54 pass through either check. M1-53 still isolates the transfer's
   `LIVE` and `O(uid)` on each document, in worlds the app never makes (a member's cached role already `owner` while
-  `ownerUid` is unchanged); `M(new)` cannot be isolated even so.
+  `ownerUid` is unchanged); `M(new)` cannot be isolated even so. M1-54 isolates the join's `invite.householdId == hid` the
+  same way: another household's invite, deleted in the batch through the owner's path by its owner, who has no member doc
+  there.
 * A field of a document that `getAfter` finds absent is an error, which denies: the joiner's delete relies on that.
 
 ## Decision

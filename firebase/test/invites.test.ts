@@ -10,7 +10,7 @@ import * as h from "./harness";
 // P4); read one invite, by any verified user with the code (HH-03); query invites, as the owner
 // decided on #280 (M1-O12): a plain member lists the invites they created, the owner all of the
 // household's; delete invite: its creator's or the owner's revoke, any member's cleanup of an
-// expired one; no updates. The joiner's delete is M1-54's (spike.rules (b)); the owner's cleanup
+// expired one; no updates. The joiner's delete is M1-54's (join.test.ts); the owner's cleanup
 // under a tombstone is M1-11's, so no test here reads or deletes as that owner. Each test seeds its
 // world with rules off; every allow test goes through h.verifiedOnly.
 // No test can isolate these (a scratch mutation pass dropped each condition in turn): on create,
