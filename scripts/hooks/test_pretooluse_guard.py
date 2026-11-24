@@ -182,7 +182,7 @@ class TaskNames(unittest.TestCase):
     def test_other_sessions(self):
         for env in ({}, {"TALLY_TASK": "normal", "LISTICLES_TASK": "tooling"}, {"TALLY_TASK": "normal"}, {"LISTICLES_TASK": "normal"},
                     {"TALLY_TASK": "Tooling"}, {"LISTICLES_TASK": "tooling "}, {"TALLY_TASK": "", "LISTICLES_TASK": ""},
-                    {"LISTICLES_TASK_X": "tooling"}, {"TALLY_TASKS": "tooling"}):
+                    {"TALLY_TASK": " ", "LISTICLES_TASK": "tooling"}, {"LISTICLES_TASK_X": "tooling"}, {"TALLY_TASKS": "tooling"}):
             with self.subTest(env=env):
                 self.assertEqual(self.edit(env).returncode, 2)
                 self.assertEqual(self.bash(env), 2)

@@ -116,7 +116,8 @@ class Headless(unittest.TestCase):
         self.assertEqual(self.hook(tp="/nonexistent/x.jsonl"), "")
         self.write([])
         self.assertEqual(self.hook(sid="e"), "")
-        r = subprocess.run([sys.executable, "-I", GUARD], input=json.dumps({"session_id": "h2"}), capture_output=True, text=True)
+        r = subprocess.run([sys.executable, "-I", GUARD], input=json.dumps({"session_id": "h2"}), capture_output=True, text=True,
+                           env=ctx_env(TMPDIR=self.tmp))
         self.assertEqual((r.returncode, r.stdout), (0, ""))
 
     # Default window is 1,000,000 (the models used here); a 200k default fired the reminder at ~100k tokens.
