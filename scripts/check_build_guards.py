@@ -609,13 +609,24 @@ PARENT = re.compile(
 # `"conf"(...)`, `add("conf", ...)`, Groovy `conf project(...)`, optionally with a configuration block) or `dependencies.<conf>(...)`,
 # with only testFixtures, platform or enforcedPlatform between it and project(...).
 PROJECT_CALL = re.compile(r"(?<![\w$])`?(?:project|findProject)`?\s*\(")  # also backticked (PR 384 R1-01)
-# A Groovy method name in a string, `owner.'project'(':x')`, `owner."""project"""(...)`, `.&'project'`, or one built by a GString
-# (`owner."${n}"(...)`): the name is a string, so it is read from the raw text (PR 384 R1-01, R2-02).
+# A name in a string literal (PR 384 R1-01, R2-02, R3-01, R3-02). Kotlin has none but `"conf"(...)`, so there only a quoted
+# project/findProject call fails. Groovy resolves names at run time, so in a .gradle file check 4 denies the whole class instead of
+# the names it knows: a string literal used as a name (after `.` or `.&`, called, in command syntax, as a subscript key), a dynamic
+# member `.(expr)`, a slashy string in a name or call position, `\uXXXX` in code, and the meta and reflection API.
 PROJECT_NAMES = {"project", "findProject"}
 MEMBER_BEFORE = re.compile(r"\.\s*&?\s*$")
-# A call after the name: `(` or, in Groovy command syntax, an argument (not `in`, `instanceof` or `as`; PR 384 R2-01).
-CALL_AFTER = re.compile(r"""\s*\(|[ \t]+(?!(?:in|instanceof|as)\b)['"\w$/\[]""")
-GROOVY_COMMAND = re.compile(r"""(?<![\w$])`?(?:project|findProject)`?[ \t]+(?!(?:in|instanceof|as)\b)(?=['"\w$/\[])""")
+CALL_AFTER = re.compile(r"\s*\(")
+# Groovy command syntax after a name (an argument, not `in`, `instanceof` or `as`; PR 384 R2-01), with no space before a quote (R3-01).
+COMMAND_AFTER = re.compile(r"""[ \t]+(?!(?:in|instanceof|as)\b)['"\w$]|['"]""")
+GROOVY_COMMAND = re.compile(r"""(?<![\w$])`?(?:project|findProject)`?(?:[ \t]+(?!(?:in|instanceof|as)\b)(?=['"\w$/\[])|(?=['"]))""")
+SUBSCRIPT_BEFORE = re.compile(r"[\w$)\]]\s*\[\s*$")
+GROOVY_DYNAMIC = re.compile(
+    r"[?*]?\.\s*&?\s*(?:\(|\$?/)"  # project.(expr), project.&(expr), owner./name/, owner.$/name/$
+    r"|\\u[0-9a-fA-F]{4}"
+    r"|(?<![\w$])(?:getMetaMethod|getMetaClass|metaClass|getProperty|setProperty|property|getMethod|getMethods|getDeclaredMethod"
+    r"|getDeclaredMethods|forName|evaluate|Eval|GroovyShell|respondsTo|methodMissing|propertyMissing)(?![\w$])"
+)
+SLASHY_CALL = re.compile(r"\$?/[^/\n]+/\$?\s*\(")
 
 
 def literals(raw, starts):
@@ -637,14 +648,26 @@ def literals(raw, starts):
         yield s - len(delim), min(len(raw), i + len(delim)), raw[s:i]
 
 
-def string_names(raw, text, starts):
-    """Offsets of string literals used as a project/findProject method name, or as a GString method name. raw gives the contents,
-    text (comments and string contents blanked, same offsets) what is around them."""
+def string_names(raw, text, starts, groovy):
+    """Offsets of string literals used as a name (see PROJECT_NAMES). raw gives the contents, text (comments and string contents
+    blanked, same offsets) what is around them."""
     found = []
     for q, e, contents in literals(raw, starts):
-        member = MEMBER_BEFORE.search(text[max(0, q - WINDOW) : q])
-        if (member and "$" in contents) or (contents in PROJECT_NAMES and (member or CALL_AFTER.match(text, e))):
+        before = text[max(0, q - WINDOW) : q]
+        if MEMBER_BEFORE.search(before) or (contents in PROJECT_NAMES and CALL_AFTER.match(text, e)):
             found.append(q)
+        elif groovy and (CALL_AFTER.match(text, e) or COMMAND_AFTER.match(text, e) or SUBSCRIPT_BEFORE.search(before)):
+            found.append(q)
+    return found
+
+
+def groovy_dynamic(text):
+    """Offsets in a .gradle file's code where Groovy resolves a name at run time (see PROJECT_NAMES)."""
+    found = [m.start() for m in GROOVY_DYNAMIC.finditer(text)]
+    for m in SLASHY_CALL.finditer(text):
+        operand = text[: m.start()].rstrip()[-1:]
+        if not (operand.isalnum() or operand in "_$)]"):  # where an operand goes, so not a division
+            found.append(m.start())
     return found
 DEPENDENCIES_BEFORE = re.compile(r"(?<![\w$])dependencies\s*\.\s*(?:constraints\s*\.\s*)?$")
 WRAPPERS = {"testFixtures", "platform", "enforcedPlatform"}
@@ -714,7 +737,8 @@ def dependency_argument(blank, pos, deps, wrapped=0):
 
 
 def cross_project(text, settings, quoted=(), groovy=False):
-    """(line, what, hint) for each line of text (comments and string contents blanked) that reaches other projects, first finding only."""
+    """(line, what, hint) for each line of text (comments and string contents blanked) that reaches other projects, first finding only.
+    quoted: offsets of string literals used as a name (string_names); groovy: text is a .gradle file."""
     found = []
     for m in CROSS_PROJECT.finditer(text):
         found.append((m.start(), m.group().strip(), "move it into a convention plugin in build-logic/"))
@@ -729,9 +753,10 @@ def cross_project(text, settings, quoted=(), groovy=False):
         if not DEPENDENCIES_BEFORE.search(text[max(0, m.start() - WINDOW) : m.start()]) and not dependency_argument(text, m.start(), deps):
             call = "findProject" if "findProject" in m.group() else "project"
             found.append((m.start(), f"{call}(...)", "use project(...) only as a dependency, e.g. implementation(project(...))"))
-    found += [(q, "project(...)", "call project(...) by its name, only as a dependency") for q in quoted]
+    found += [(q, "a name in a string", "call methods and read properties by their plain names") for q in quoted]
     if groovy:
         found += [(m.start(), "project(...)", "call project(...) with parentheses, only as a dependency") for m in GROOVY_COMMAND.finditer(text)]
+        found += [(o, "a name resolved at run time", "call methods and read properties by their plain names") for o in groovy_dynamic(text)]
     lines = {}
     for start, what, hint in sorted(found):
         lines.setdefault(line_of(text, start), (what, hint))
@@ -743,7 +768,7 @@ def convention_problems(root):
     for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
         raw, starts = read(root, p), []
         text = strip(raw, blank_strings=True, templates=True, strings=starts)
-        found = cross_project(text, is_settings(p), string_names(raw, text, starts), p.endswith(".gradle"))
+        found = cross_project(text, is_settings(p), string_names(raw, text, starts, p.endswith(".gradle")), p.endswith(".gradle"))
         problems += [f"{p}:{line}: reaches other projects ({what}); {hint}" for line, what, hint in found]
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
