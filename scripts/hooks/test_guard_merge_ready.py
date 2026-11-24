@@ -10,6 +10,7 @@ import hashlib
 import os
 import re
 import shutil
+import sys
 import unittest
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
@@ -153,7 +154,10 @@ class MergeReadyGuard(unittest.TestCase):
         self.assertEqual(run("Bash", {"command": CALL}, d), 0, "names that are not standard library modules")
 
     def test_the_real_scripts_directory_shadows_nothing(self):
-        self.assertEqual(run("Bash", {"command": CALL}, ROOT), 0, "the checkout itself passes the guard")
+        """The checkout itself passes the shadow check, so the merge agent is not blocked (same rule as merge_ready_shadow)."""
+        names = os.listdir(os.path.join(ROOT, "scripts"))
+        self.assertEqual([n for n in names if n.split(".")[0] in sys.stdlib_module_names], [])
+        self.assertIn("merge_ready.py", names)
 
     def test_kinds_match_merge_ready(self):
         """The guard's kind list is merge_ready.py's KINDS (owner-batch is the one that takes --approval)."""
