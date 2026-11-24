@@ -1,5 +1,6 @@
 package dk.bjarkebjarke.tally.signin
 
+import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
 import dk.bjarkebjarke.tally.domain.session.GoogleIdToken
 import dk.bjarkebjarke.tally.domain.session.GoogleSignIn
 import dk.bjarkebjarke.tally.domain.session.GoogleSignInResult
@@ -7,6 +8,7 @@ import dk.bjarkebjarke.tally.testing.FakeAuthentication
 import dk.bjarkebjarke.tally.testing.FakeConnectivity
 import dk.bjarkebjarke.tally.testing.FakeGoogleCredentials
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -100,5 +102,33 @@ class SignInViewModelTest {
         connectivity.online = true
         viewModel.continueWithGoogle()
         viewModel.uiState.value shouldBe SignInUiState()
+    }
+
+    /** R1-02: while the picker is open the screen is busy, a second tap opens no second picker, and busy ends after. */
+    @Test
+    fun aSecondTapWhileBusyOpensNoSecondPicker() {
+        val gate = CompletableDeferred<GoogleIdToken>()
+        val picker = GatedCredentials(gate)
+        val viewModel = SignInViewModel(GoogleSignIn(connectivity, picker, authentication))
+        viewModel.continueWithGoogle()
+        viewModel.uiState.value shouldBe SignInUiState(busy = true)
+        viewModel.continueWithGoogle()
+        picker.pickers shouldBe 1
+        gate.complete(GoogleIdToken.Picked("t"))
+        viewModel.uiState.value shouldBe SignInUiState()
+        authentication.googleIdTokens shouldBe listOf("t")
+    }
+
+    private class GatedCredentials(
+        private val gate: CompletableDeferred<GoogleIdToken>,
+    ) : GoogleCredentials {
+        var pickers = 0
+
+        override suspend fun idToken(): GoogleIdToken {
+            pickers++
+            return gate.await()
+        }
+
+        override suspend fun clearCredentialState() = Unit
     }
 }

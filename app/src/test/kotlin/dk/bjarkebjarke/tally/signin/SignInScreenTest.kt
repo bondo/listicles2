@@ -1,11 +1,21 @@
 package dk.bjarkebjarke.tally.signin
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import dk.bjarkebjarke.tally.TallyTheme
+import io.kotest.matchers.comparables.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import org.junit.Rule
 import org.junit.Test
@@ -112,6 +122,62 @@ class SignInScreenTest {
     fun failedMessageInDanish() {
         show(SignInUiState(message = SignInMessage.Failed))
         compose.onNodeWithText("Kunne ikke logge ind. Prøv igen.").assertExists()
+    }
+
+    /** R1-03: a label that wraps (Danish at 200 % font scale) stays centred in its button. */
+    @Test
+    fun theButtonLabelsAreCentred() {
+        show()
+        for (label in listOf("Continue with Google", "Use email and password")) {
+            textStyle(label).textAlign shouldBe TextAlign.Center
+        }
+    }
+
+    /** R1-04: wireframe 01's outlined button has a primary label; the filled one keeps its on-primary label. */
+    @Test
+    fun theOutlinedButtonLabelIsPrimary() {
+        lateinit var primary: Color
+        compose.setContent {
+            TallyTheme(false) {
+                primary = MaterialTheme.colorScheme.primary
+                SignInScreen(SignInUiState(), {}, {}, {})
+            }
+        }
+        textStyle("Use email and password").color shouldBe primary
+    }
+
+    /** R1-04: the app mark is shown; the two buttons are one group (touch targets meet), apart from the tagline. */
+    @Test
+    fun theMarkIsShownAndTheButtonsAreGrouped() {
+        show()
+        compose.onNodeWithTag(SIGN_IN_MARK_TAG).assertExists()
+        val google = compose.onNodeWithText("Continue with Google").getUnclippedBoundsInRoot()
+        val email = compose.onNodeWithText("Use email and password").getUnclippedBoundsInRoot()
+        (email.top - google.bottom).value shouldBe 0f
+        val tagline =
+            compose
+                .onNodeWithText(
+                    "Collections and lists, shared with your household",
+                ).getUnclippedBoundsInRoot()
+        (google.top - tagline.bottom) shouldBeGreaterThan 12.dp
+    }
+
+    @Test
+    fun bothButtonsShowTheirIcon() {
+        show()
+        compose.onNodeWithTag(SIGN_IN_GOOGLE_ICON_TAG, useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag(SIGN_IN_EMAIL_ICON_TAG, useUnmergedTree = true).assertExists()
+    }
+
+    private fun textStyle(label: String): TextStyle {
+        val results = mutableListOf<TextLayoutResult>()
+        compose
+            .onNodeWithText(label, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .config[SemanticsActions.GetTextLayoutResult]
+            .action
+            ?.invoke(results)
+        return results.single().layoutInput.style
     }
 
     @Test
