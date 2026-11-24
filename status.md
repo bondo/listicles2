@@ -194,7 +194,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-45 | merge_ready.py nits still open after PRs 248 and 245 (issue 148) | done | M1-01 | implementer | [#292](https://github.com/bondo/tally/issues/292) |
 | M1-46 | build-logic convention plugins; no allprojects or subprojects configuration (issue 217 items 1-3) | done | M1-02 | implementer |  |
 | M1-68 | Root check tasks without cross-project reads&#58; checkWarningsAsErrors, checkJdkRelease, checkJavaAp… | done | M1-46 | implementer | [#359](https://github.com/bondo/tally/issues/359) |
-| M1-84 | Isolated projects&#58; module build files read the root through isolated.rootProject, check 4 denies o… | ready | M1-68 | implementer |  |
+| M1-84 | Isolated projects&#58; module build files read the root through isolated.rootProject, check 4 denies o… | in progress | M1-68 | implementer | [#384](https://github.com/bondo/tally/issues/384) |
 | M1-69 | Nested builds&#58; dependency verification for the licensee fixture build (issue 217 item 4), check_gr… | done | M1-46 | implementer | [#328](https://github.com/bondo/tally/issues/328) |
 | M1-47 | R12 screens vs wireframes for M1 (issue 65 review catalogue) | blocked | M1-16, M1-17, M1-19, M1-20, M1-21, M1-22, M1-23, M1-25, M1-27, M1-32, M1-39, M1-03, M1-04 | process |  |
 | M1-48 | R8 milestone quality review for M1 (issue 65 review catalogue) | blocked | M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-60, M1-62, M1-31, M1-32, M1-33, M1-35, M1-36, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-68, M1-69, M1-82 | process |  |
@@ -256,7 +256,7 @@ flowchart LR
     n17["M1-54 Rules: the join batch with the one-hou… (in progress)"]:::progress
     n18["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n19["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
-    n20["M1-84 Isolated projects: module build files … (ready)"]:::ready
+    n20["M1-84 Isolated projects: module build files … (in progress)"]:::progress
     n21["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
     n22["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
     n23["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
