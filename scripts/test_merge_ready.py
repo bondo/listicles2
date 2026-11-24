@@ -870,10 +870,19 @@ class GeneralKindTests(unittest.TestCase):
                  "gradle/wrapper/gradle-wrapper.properties", "gradle/verification-metadata.xml", ".github/CODEOWNERS",  # the PROTECTED ones: see below
                  "gradlew", "gradlew.bat", "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py",  # R2-01: what CI runs through ci_scope.py
                  "config/licensee/google-sdk-terms.txt", "config/licensee/policy.gradle",  # R2-02: licence acceptances
-                 "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md")  # R2-07: canonical process and policy docs
+                 "docs/FOLLOW-UPS.md", "docs/SECURITY.md", "docs/orchestrator-state.md",  # R2-07: canonical process and policy docs
+                 "docs/privacy/privacy-en.md", "docs/privacy/privacy-da.md", "docs/privacy/new.md")  # R1-03 of #385: the privacy text has the approver's gate
         for name in names:
             with self.subTest(name=name):
                 self.refused(make_api(files=[file_entry("README.md"), file_entry(name)]), r"outside kind general.*" + re.escape(name))
+
+    def test_the_privacy_docs_are_owner_only_and_other_docs_stay_general(self):  # R1-03 of #385 (#15 comment 7123360368)
+        for name in ("docs/privacy/privacy-en.md", "docs/privacy/privacy-da.md", "docs/privacy/x/y.md", "DOCS/Privacy/privacy-en.md"):
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+        for name in ("docs/PLAN.md", "docs/adr/0002-x.md", "docs/privacy-notes.md", "docs/milestones/M1.md"):  # a sibling name is no privacy doc
+            with self.subTest(name=name):
+                self.assertFalse(merge_ready.owner_only(name))
 
     def test_a_recolour_of_the_signed_off_design_tokens_is_refused(self):  # R3-01: the owner signed design/tokens.json off (#15 7011560493, 7019570467)
         recolour = '@@ -9 +9 @@\n-    "primary": "#006878",\n+    "primary": "#7A1FA2",'
