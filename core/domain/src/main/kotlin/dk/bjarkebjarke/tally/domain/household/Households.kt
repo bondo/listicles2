@@ -2,10 +2,11 @@ package dk.bjarkebjarke.tally.domain.household
 
 /**
  * Create a household and invite to it (HH-01, HH-02): the writes of PLAN 3.1, which the Firestore rules check. Each
- * needs a connection (SYNC-03, OQ-22), so a screen runs it through `Connectivity.whenOnline`.
+ * needs a connection (SYNC-03, OQ-22), so a screen runs it through `Connectivity.whenOnline`; a write that loses it on
+ * the way stays queued, and the call waits until it is sent (a cancelled call's write still goes out).
  */
 interface Households {
-    /** HH-01: a household named [name] (validated with `Validation.name`, saved trimmed), its owner the caller. */
+    /** HH-01: a household named [name], trimmed (the screen checked it with `Validation.name`), owned by the caller. */
     suspend fun create(name: String): Membership
 
     /** HH-02: a new single-use invite to the caller's household [householdId]: its code, or null when it failed. */
