@@ -108,5 +108,5 @@ use `$GITHUB_REPOSITORY` (or `--repo OWNER/NAME`); without a valid value the num
 
 ## Live test (only possible after the merge)
 Actions > status > Run workflow (branch `main`). The run should end with `created` (first time) or `updated`/`unchanged`.
-Then open `https://raw.githubusercontent.com/bondo/listicles2/status/status.svg` and the repository front page.
+Then open `https://raw.githubusercontent.com/bondo/tally/status/status.svg` and the repository front page.
 The README image is served through GitHub's image proxy, so it can lag a few minutes behind the branch.

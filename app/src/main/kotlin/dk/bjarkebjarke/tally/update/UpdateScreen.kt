@@ -28,7 +28,7 @@ import dk.bjarkebjarke.tally.Spacing
 import dk.bjarkebjarke.tally.TallyTheme
 
 /** Where new versions are published: GitHub APKs cannot be force-updated (PLAN 3). */
-const val RELEASES_URL = "https://github.com/bondo/listicles2/releases"
+const val RELEASES_URL = "https://github.com/bondo/tally/releases"
 
 /**
  * START-01, wireframe 41: the full-screen "Update the app" shown before sign-in when this version is below the minimum.

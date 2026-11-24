@@ -32,7 +32,7 @@ Origin: owner decision on issue 187 (also logged on issue 15). Version-update PR
 
 ## 3. Alert list and reachability
 
-List the open alerts with `gh api "repos/bondo/listicles2/dependabot/alerts?state=open&per_page=100"`. For each alert
+List the open alerts with `gh api "repos/bondo/tally/dependabot/alerts?state=open&per_page=100"`. For each alert
 record: package, ecosystem, manifest, severity, advisory, fixed version, and whether the vulnerable code is reachable
 (shipped in the app, build-only, test-only, dev-only).
 
