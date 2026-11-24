@@ -42,7 +42,9 @@ const LATER = new Date("2999-01-01T00:00:00Z"); // after any request time: an un
 const [SOON, LATE] = [new Date(Date.now() + 6 * 86_400_000), new Date(Date.now() + 8 * 86_400_000)];
 const INVITE = { householdId: H1, householdName: "Home", createdBy: CAROL, expiresAt: LATER };
 const ASKED: m.Doc = { ...INVITE, createdAt: m.NOW, expiresAt: SOON }; // carol's invite create
-const UNVERIFIED: m.Caller = { uid: BOB, auth: "unverified" }; // an invite reader
+// The invite readers: each user with a verified email, and bob without one.
+const UNVERIFIED: m.Caller = { uid: BOB, auth: "unverified" };
+const READERS = [...UIDS.map((uid): m.Caller => ({ uid, auth: "verified" })), UNVERIFIED];
 const points = (householdId: string | null): m.Doc => ({ householdId });
 // For reads: bob's household with carol (alice, removed, still names it) and dan's tombstone (his
 // member doc not yet cleaned up, M1-11), with an invite to each.
@@ -115,12 +117,12 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         draft(DAN, { ...HOME, [m.user(DAN)]: points(H1) }, up(m.user(DAN), points(null))),
     "users doc: create": () => draft(BOB, {}, set(m.user(BOB), { householdId: null, name: "B" })),
     "users doc: name": () => draft(CAROL, SEEN, up(m.user(CAROL), { name: "C" })),
-    // By alice, bob, carol, dan or bob without a verified email (n % 5), each invite read.
-    "invite: read": (n) => {
-        const d = draft(UIDS[n % 5] ?? BOB, SEEN);
-        const read = INVITE_READS[Math.floor(n / 5) % INVITE_READS.length];
-        return { ...d, caller: n % 5 === 4 ? UNVERIFIED : d.caller, read };
-    },
+    // Each invite reader (n % 5) and each invite read.
+    "invite: read": (n) => ({
+        ...draft(ALICE, SEEN),
+        caller: READERS[n % READERS.length] ?? UNVERIFIED,
+        read: INVITE_READS[Math.floor(n / READERS.length) % INVITE_READS.length],
+    }),
     // By n % 16: the base case (0, 6 to 15); an expiry after 7 days, now or past (1 to 3); the
     // household a tombstone that keeps its name, so P2 holds (4); alice's own, not a member (5).
     "invite: create": (n) => {
@@ -199,7 +201,7 @@ type Tweak = typeof tweak extends fc.Arbitrary<infer T> ? T : never;
 
 const pick = <T>(items: readonly T[], i: number): T | undefined => items[i % items.length];
 // Another id of the same kind (a uid, a household id or a code); the ids of a path; one id swapped,
-// and as a code's prefix too, so a renamed household keeps its codes (P3).
+// in an invite's path also as its code's prefix, so a renamed household keeps its invites (P3).
 const other = (id: string, i: number): string =>
     pick([HIDS, CODES].find((kind) => kind.includes(id)) ?? UIDS, i) ?? ALICE;
 const ids = (path: string): string[] => path.split("/").filter((_, i) => i % 2 === 1);

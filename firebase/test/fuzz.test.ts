@@ -78,6 +78,12 @@ const MUTANTS: [string, string, string][] = [
     ["Invite create: another household's code (P3)", "[0] == invite.householdId", "[0] != ''"],
     ["Invite create: a secret of 21 or 23 characters (P3)", "_-]{22}", "_-]{21,23}"],
     ["Invite create: an expiry up to 9 days ahead (HH-02)", "value(7, 'd')", "value(9, 'd')"],
+    ["Invite cleanup under a tombstone (LIVE)", "time && household.deleted == false", "time"],
+    [
+        "Invite revoke by the owner under a tombstone (LIVE)",
+        "ownerUid == request.auth.uid && household.deleted == false",
+        "ownerUid == request.auth.uid",
+    ],
     [
         "Invite delete: the expired cleanup by a non-member",
         "exists(memberDoc(invite.householdId, request.auth.uid)))",
