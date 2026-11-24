@@ -996,8 +996,8 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-27", "M1-66"]
-notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee)"
+depends_on = ["M1-27", "M1-88"]
+notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee) and the app's one FirestoreSession in the Hilt graph (M1-88)"
 
 [[task]]
 id = "M1-13"
@@ -1034,13 +1034,34 @@ notes = "Split from M1-14 (PR 319). Implements the M1-14 domain interfaces: Sess
 
 [[task]]
 id = "M1-66"
-title = "Auth wiring: Credential Manager wrapper (Google ID option), :app on :core:data with licensee, Hilt bindings for session, sign-in and sign-out"
+title = "Auth wiring 1: Credential Manager wrapper (Sign in with Google button flow) in :core:data, :app on :core:data with licensee"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-67", "M1-O14"]
+pr = 368
+notes = "Split from M1-14 (PR 319). Split again 2026-11-24 (PR 368): the whole task measured about 620 changed lines without the #357 cleanup (guard 600), and :app on :core:data needs the Credential Manager artifacts with it (without them firebase-auth pulls older versions that no licence line lists). This part: GoogleCredentials over androidx.credentials 1.6.0 and googleid 1.2.1 with Google's button flow (GetSignInWithGoogleOption: every account on the phone; cancel; no account), not the two-step Google ID option the notes first named (its first sheet offers only accounts that signed in before, which a sign-out does not reset, so the next person on the phone is locked out; self-review), the activity it opens the picker in as a ForegroundActivity, the web client id (default_web_client_id: google-services.json's web client overrides the empty default of :core:data; the stand-in has one now), config/licensee/policy.gradle on :core:data. M1-88 has the Hilt bindings, M1-89 the #357 cleanup"
+
+[[task]]
+id = "M1-88"
+title = "Auth wiring 2: Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in SessionModule), MainActivity for the account picker"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-67", "M1-O14"]
-notes = "Split from M1-14 (PR 319). GoogleCredentials over androidx.credentials 1.6.0 and googleid: cancel and no account (NoCredentialException, then a retry without the authorized-accounts filter); the web client id (the google-services stand-in has no oauth_client yet); the foreground Activity for getCredential (the CredentialManager reference asks for an Activity context in a MutableContextWrapper); an application CoroutineScope for SignOut; replace the M1-60 stand-in SessionModule: FirebaseAuthentication binds SessionState and Authentication, and one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc). Applies config/licensee/policy.gradle to :core:data (its build file says so). Waits for the owner's licence decision M1-O14. Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-66 to-confirm marker in docs/privacy section 2 (en and da)"
+depends_on = ["M1-66"]
+notes = "Split from M1-66 (PR 368; a compiled, tested draft is its comment 7119090146). FirebaseAuthentication binds SessionState and Authentication; one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc); CredentialManagerGoogleCredentials with CredentialManager.create, its companion's web client id and a ForegroundActivity that MainActivity observes itself (application-wide activity callbacks would also see the picker's translucent activity, whose stop would clear it while MainActivity stays started); GoogleSignIn; SignOut with an application CoroutineScope (SupervisorJob). Tests: AppGraphTest, the started activity, SignedOutStartTest (it uninstalls SessionModule)"
+
+[[task]]
+id = "M1-89"
+title = "Clear the local data on every change to signed out, also when Firebase signs the user out itself (#357)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-88"]
+notes = "Split from M1-66 (PR 368). Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-89 to-confirm marker in docs/privacy section 2 (en and da)"
 
 [[task]]
 id = "M1-15"
@@ -1049,7 +1070,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-66", "M1-62"]
+depends_on = ["M1-88", "M1-62"]
 
 [[task]]
 id = "M1-16"
@@ -1058,7 +1079,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-66", "M1-03", "M1-49"]
+depends_on = ["M1-88", "M1-03", "M1-49"]
 
 [[task]]
 id = "M1-17"
@@ -1087,7 +1108,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-54", "M1-66", "M1-60", "M1-62", "M1-02", "M1-83"]
+depends_on = ["M1-54", "M1-88", "M1-60", "M1-62", "M1-02", "M1-83"]
 notes = "After M1-14: adds deleting the app's household-name copy to the M1-14 sign-out (step 3) and owns the store (PLAN 3.1, HH-06 household name). Under a tombstone the self-heal clears householdId only once the own member doc is gone (M1-08 rule): tests seed the state after the owner's cleanup; with the member doc still there it raises HH-06 and leaves householdId for the next start. The P6 delete before the clear is M1-31's (docs/milestones/M1.md section 5)"
 
 [[task]]
@@ -1164,7 +1185,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M1-60", "M1-66"]
+depends_on = ["M1-60", "M1-88"]
 notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, tested; the in-app privacy link is privacy Q10"
 
 [[task]]
@@ -1224,10 +1245,11 @@ notes = "Issues 202 and 210 item 7, area:security-rules; tooling env for the scr
 id = "M1-53"
 title = "Rules: transfer ownership, allow and deny tests (partial transfers, plain member, non-member)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-10"]
+pr = 364
 notes = "Split from M1-10 by the refresh (size); tests as in docs/milestones/M1.md section 5 (M1-10 paragraph, #234)"
 
 [[task]]
@@ -1244,10 +1266,11 @@ notes = "Split from M1-12 by the refresh (size); P1 deny tests; tests as in docs
 id = "M1-83"
 title = "Rules: members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-10"]
+pr = 366
 notes = "Found in M1-10 (PR 352): no task owned the Reads row for the household doc and its members (M(uid), LIVE); M1-08 added the own member path and the tombstone read, M1-12 owns the invite reads. ADR 0002 layout: the household get joins the tombstone read in one allow statement. Tests: allow a member's get of the live household doc and get and list of its members; deny a non-member, an unverified member and the members under a tombstone (the owner's cleanup reads are M1-11's). M1-18 reads both"
 
 [[task]]
@@ -1634,7 +1657,8 @@ notes = "Process PR (2b). Owner decision 7076313976 (amends item 3 of 7076085601
 id = "M1-79"
 title = "State issue part C: ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, rotation and the comment rule"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 365
 assignee = "process"
 risk = "normal"
 depends_on = ["M1-77", "M1-78", "M1-80"]
@@ -1648,33 +1672,36 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = [
+  "M1-88", "M1-89",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
   "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-55", "M1-56", "M1-58", "M1-59", "M1-60", "M1-61",
   "M1-62", "M1-63", "M1-64", "M1-65", "M1-66", "M1-67", "M1-68", "M1-69", "M1-70", "M1-71", "M1-73", "M1-74",
-  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-84", "M1-85", "M1-87",
+  "M1-75", "M1-76", "M1-77", "M1-78", "M1-79", "M1-80", "M1-81", "M1-82", "M1-83", "M1-84", "M1-85", "M1-86", "M1-87",
 ]
 
 [[task]]
 id = "M1-O1"
-title = "Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.json secret"
+title = "Create the Firebase project (Spark), Firestore in eur3, email sign-in, google-services.json secret"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["milestone:M0", "M0.5-O2", "M1-29", "M1-O10"]
-notes = "Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
+issue = 354
+notes = "Without Google sign-in (split off as M1-O16, now M3-O1, owner decision 7110501630). Done by the owner's report 7110544618: project tally-c1a15, eur3 production mode, Email/Password, enumeration protection, password policy Require/12, templates (sender and public-facing name Tally, EN/DA text), Android app registered, google-services.json secret. Steps: docs/milestones/M1.md R1 (database location eur3 cannot be changed; enumeration protection; password policy Require, 12; EN/DA email templates). After the rename M1-29, because the Android app is registered with its package name"
 
 [[task]]
 id = "M1-O2"
 title = "Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in)"
 milestone = "M1"
-status = "todo"
+status = "dropped"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1"]
+depends_on = ["M1-O1", "M1-O16"]
+notes = "Dropped 2026-11-23: moved off the v1 path to M3-O2 in M3 (owner decision 7110878938, #15 comment). Do not reuse this id"
 
 [[task]]
 id = "M1-O3"
@@ -1704,6 +1731,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-28"]
+issue = 291
 
 [[task]]
 id = "M1-O6"
@@ -1775,6 +1803,7 @@ status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = []
+issue = 285
 notes = "Owner decision 7064886556 on #15 (R1-A-04 of PR #265): #280 must be decided before M1-12. Options in #280: plain members list only their own invites (createdBy == uid), the owner lists all; or record the unassisted rejoin as an accepted residual. Any recorded answer completes this task; M1-12 implements it and #280 stays open until the change lands (M1-12 or M1-FU). Done: owner decision recorded on #15, comment 7081223083"
 
 [[task]]
@@ -1802,11 +1831,21 @@ notes = "Found by M1-14 (PR 319), measured with licensee 1.14.1: 13 artifacts un
 id = "M1-O15"
 title = "Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5)"
 milestone = "M1"
-status = "todo"
+status = "dropped"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1", "M1-O2", "M1-66", "M1-16"]
-notes = "Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M1-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M1-O15 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+depends_on = ["M1-O1", "M1-O2", "M1-O16", "M1-66", "M1-16", "M1-86"]
+notes = "Dropped 2026-11-23: moved off the v1 path to M3-O3 in M3 (owner decision 7110878938, #15 comment). Do not reuse this id"
+
+[[task]]
+id = "M1-O16"
+title = "Enable Google sign-in in Firebase (needs a public support email for Tally)"
+milestone = "M1"
+status = "dropped"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Dropped 2026-11-23: moved off the v1 path to M3-O1 in M3 (owner decision 7110878938, #15 comment). Do not reuse this id"
 
 # ---------------------------------------------------------------- M2 (planner task and burn-down only; the M2 plan adds the rest)
 
@@ -1830,6 +1869,38 @@ risk = "normal"
 depends_on = ["M2-01"]
 notes = "docs/FOLLOW-UPS.md section 8"
 
+# ---------------------------------------------------------------- M3 owner tasks (Google sign-in after v1; owner decisions 7110501630, 7110878938)
+
+[[task]]
+id = "M3-O1"
+title = "Enable Google sign-in in Firebase (needs a public support email for Tally)"
+milestone = "M3"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Re-homed from M1-O16 (owner decision 7110878938; ids are never reused). Split from M1-O1 (owner decision 7110501630): Google sign-in is postponed until Tally has a public support email. After v1 (owner decision 7110878938): then M3-O2 and M3-O3, then switch the Google button on (M1-86) in an app update. Its [owner] issue is opened after this PR merges"
+
+[[task]]
+id = "M3-O2"
+title = "Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in)"
+milestone = "M3"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M3-O1"]
+notes = "Re-homed from M1-O2 (owner decision 7110878938; ids are never reused). After v1 (owner decision 7110878938): Google sign-in does not block v1. Not on the v1 path"
+
+[[task]]
+id = "M3-O3"
+title = "Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5)"
+milestone = "M3"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M3-O2", "M3-O1", "M1-66", "M1-16", "M1-86"]
+notes = "Re-homed from M1-O15 (owner decision 7110878938; ids are never reused). After v1 (owner decision 7110878938; the switch M1-86 is on for this check). Found by M1-67 (PR 348, round 1: R1-03, S1-02); CI never talks to a real project. On the Auth emulator (firebase-tools 15.36.0) the record of a Google sign-in keeps the Google account id, name, email and photo link, and for every sign-in method also when the account was created, last signed in and last renewed (createdAt, lastLoginAt, lastRefreshAt). Once the debug app can sign in with Google (the project M1-O1, the debug key's fingerprints M3-O2, the wiring M1-66, the Google button M1-16), sign in once with a real Google account, then read the record in the Firebase console (Authentication, Users) or with `firebase auth:export`, and note on #15 which fields it keeps (no email address). The M3-O3 to-confirm marker in docs/privacy section 2 (en and da) is then replaced by the result. Whether the text names the times is M1-O5's call"
+
 # ---------------------------------------------------------------- M6 owner tasks (from the M1 plan)
 
 [[task]]
@@ -1839,8 +1910,8 @@ milestone = "M6"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O2"]
-notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 so M1 can close before the release key exists"
+depends_on = ["M1-O1"]
+notes = "Owner-held key, never committed (decision B, 2026-11-17). Split from M1-O2 (now M3-O2) so M1 can close before the release key exists. No longer waits for M3-O2 (it moved after v1, owner decision 7110878938); the Google fingerprints are then added with M3-O2"
 
 [[task]]
 id = "M6-O2"
@@ -1881,6 +1952,16 @@ assignee = "implementer"
 risk = "normal"
 depends_on = []
 notes = "owner request 2026-11-23 in the orchestrator #38 chat: prepare the repo rename; see #15"
+
+[[task]]
+id = "M1-86"
+title = "Google sign-in switch in :app (off in v1): hide the Google button and the Google hint while off"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-66", "M1-16"]
+notes = "Owner decision 7110878938 (amends OQ-23 for v1): a build-time switch in :app, off in v1; the Google code stays. While off, the sign-in screen shows only email and password (AUTH-01) and the failed-sign-in text drops \"If you signed up with Google, use Continue with Google.\" (OQ-34(c)). Test-first for both switch states (screenshot and UI tests, en and da). M1-66 stays in M1, built and tested with fakes. Turned on after v1 once M3-O1, M3-O2 and M3-O3 are done"
 
 [[task]]
 id = "M1-87"

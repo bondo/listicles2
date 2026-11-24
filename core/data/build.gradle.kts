@@ -1,9 +1,11 @@
 plugins {
     alias(libs.plugins.listicles.android.library)
+    alias(libs.plugins.licensee)
 }
 
-// M0.5-10: no licensee gate here yet. Nothing ships from this module until :app depends on it (M1-66); that PR applies
-// config/licensee/policy.gradle, and the owner approves the Google SDK terms lines for the Firebase artifacts there.
+// M0.5-10, M1-66: :app ships this module, so its dependencies must be on the owner's licence allowlist too
+// (the Google SDK terms lines in config/licensee/google-sdk-terms.txt, approved in M1-O14).
+apply(from = rootProject.file("config/licensee/policy.gradle"))
 
 val firestoreRulesAssetDir = layout.buildDirectory.dir("generated/firestoreRules")
 val syncFirestoreRulesAsset =
@@ -31,6 +33,11 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.kotlinx.coroutines.play.services)
+    // M1-66: GoogleCredentials over Credential Manager with Sign in with Google. :app passes a CredentialManager in, and
+    // on Android 13 and below that CredentialManager needs the Play services provider (lint CredentialDependency).
+    api(libs.androidx.credentials)
+    api(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
