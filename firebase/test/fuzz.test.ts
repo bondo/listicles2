@@ -19,11 +19,10 @@ test("the model has a row for each method an allow statement of firestore.rules 
     expect(ROWS).toEqual(h.allowedMethods(h.RULES));
 });
 
-test("the row check sees a rule the model lacks and a row the rules lack", () => {
-    const invites = h.underDocuments(h.RULES, "match /invites/{code} { allow read: if false; }");
-    expect(h.allowedMethods(invites)).toEqual(
-        [...ROWS, "invites/{code} get", "invites/{code} list"].sort(),
-    );
+test("the row check sees rules the model lacks (read, write) and a row the rules lack", () => {
+    const added = h.underDocuments(h.RULES, "match /x/{id} { allow read, write: if false; }");
+    const methods = ["get", "list", "create", "update", "delete"].map((k) => `x/{id} ${k}`);
+    expect(h.allowedMethods(added)).toEqual([...ROWS, ...methods].sort());
     const noList = h.RULES.replace("allow list: if signedIn() && readsMembers(hid);", "");
     expect(h.allowedMethods(noList)).toEqual(ROWS.filter((r) => !r.endsWith("{uid} list")));
 });
@@ -68,6 +67,9 @@ const MUTANTS: [string, string, string][] = [
     ["Display name update: the role too (P4)", "['displayName'])", "['displayName', 'role'])"],
     ["Member reads under a tombstone (LIVE)", "return household.deleted == false && ", "return "],
     ["Transfer: the old owner keeps the role (two owners)", "role == 'member'", "role != null"],
+    ["Owner member doc: another uid (P1)", "uid == request.auth.uid && doc.role", "doc.role"],
+    ["Household name: any length (P4)", "validName(data.name) &&", "data.name.trim() != '' &&"],
+    ["Tombstone read: of a live household too", "household.deleted == true && ", ""],
 ];
 
 test.each(MUTANTS)("the fuzz finds the mutant: %s", async (_what, from, to) => {
