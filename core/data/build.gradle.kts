@@ -33,9 +33,10 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.kotlinx.coroutines.play.services)
-    // M1-66: GoogleCredentials over Credential Manager with the Google ID option. :app passes a CredentialManager in.
+    // M1-66: GoogleCredentials over Credential Manager with Sign in with Google. :app passes a CredentialManager in, and
+    // on Android 13 and below that CredentialManager needs the Play services provider (lint CredentialDependency).
     api(libs.androidx.credentials)
-    implementation(libs.androidx.credentials.play.services.auth)
+    api(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
 
     androidTestImplementation(libs.androidx.test.junit)
