@@ -44,7 +44,7 @@ class SignInScreenInsetsTest {
                         WindowInsetsCompat.Type.systemBars(),
                         Insets.of(0, BAR_DP, 0, 0),
                     ).build()
-            ViewCompat.dispatchApplyWindowInsets(compose.activity.window.decorView, bars.toWindowInsets()!!)
+            ViewCompat.dispatchApplyWindowInsets(compose.activity.window.decorView, bars)
         }
         compose.waitForIdle()
         val after =

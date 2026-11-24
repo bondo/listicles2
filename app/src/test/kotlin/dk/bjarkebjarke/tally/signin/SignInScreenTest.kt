@@ -136,7 +136,7 @@ class SignInScreenTest {
     /** R1-04: wireframe 01's outlined button has a primary label; the filled one keeps its on-primary label. */
     @Test
     fun theOutlinedButtonLabelIsPrimary() {
-        lateinit var primary: Color
+        var primary = Color.Unspecified
         compose.setContent {
             TallyTheme(false) {
                 primary = MaterialTheme.colorScheme.primary

@@ -25,6 +25,9 @@ class MainActivity : ComponentActivity() {
         // M1-88: Credential Manager opens Google's account picker in this activity while it is started.
         lifecycle.addObserver(startedActivity)
         enableEdgeToEdge()
-        setContent { TallyApp(start, signIn = { SignInRoute(signInModel, onEmail = {}) }) }
+        setContent { TallyApp(start, signIn = { SignInRoute(signInModel, onEmail = ::openEmailScreens) }) }
     }
+
+    /** M1-17 opens the email screens; until then "Use email and password" does nothing. */
+    private fun openEmailScreens() = Unit
 }
