@@ -975,6 +975,28 @@ class Conventions(unittest.TestCase):
             "owner.\"${'project'}\"(':app')",
             "owner.\"${name}\"",
             "this.invokeMethod('project', ':app')",
+            # PR 384 R3-01, R3-02: Groovy resolves a name at run time in more ways than these lines show, so check 4 denies the class:
+            # a string literal used as a name (after a dot, called, in command syntax or as a subscript key), a dynamic member
+            # `.(expr)`, the meta and reflection API, and \\u escapes.
+            "def r = project':b'",
+            "def r = findProject':b'",
+            "def r = \"${'project'}\"(':b')",
+            "def r = /project/(':b')",
+            "def r = $/project/$(':b')",
+            "def r = project.'pro\\u006aect'(':b')",
+            "def r = pro\\u006aect(':b')",
+            "def r = project.('pro' + 'ject')(':b')",
+            "def r = project.&('project')",
+            "project.metaClass.getMetaMethod('project', String).invoke(project, ':b')",
+            "def p = project.'parent'",
+            "def p = project.getProperty('parent')",
+            "def p = project.property('parent')",
+            "def r = project['rootProject']",
+            "def r = owner[\"project\"](':b')",
+            "project.'allprojects' { println it.path }",
+            "def r = 'project' ':b'",
+            "def m = project.class.getMethod('project', String)",
+            "evaluate('project(\":b\")')",
         ):
             with self.subTest(code=code):
                 found = self.problems({"config/licensee/policy.gradle": code + "\n"})
@@ -985,7 +1007,10 @@ class Conventions(unittest.TestCase):
         code = (
             "def terms = project.ext.has('x') ? project.ext.get('x') : null\nif (project instanceof Project) { }\n"
             "def ok = project in [null]\ndef p = project as Object\ndef s = 'project'\ndef t = \"project\" + 'findProject'\n"
-            "def n = \"${project.name}: ${version}\"\ndef m = owner.'other'(1)\ndef r = /project/\n"
+            "def n = \"${project.name}: ${version}\"\ndef r = /project/\n"
+            "def v = 'parent'\ndef q = 4 / 2 / (1)\ndef map = [a: 'b', 'c': 'd']\ndef w = map.get('a') + 'x'.trim()\n"
+            "def parts = 'a:b'.split(':') as List\ndef first = parts[0]\nallowUrl('https://x/y') { because('z') }\n"
+            "def g = \"${map[first]} is ${'x'}\".toString()\n"
             "dependencies {\n    implementation project(':core:domain')\n}\n"
         )
         self.assertEqual(self.problems({"config/licensee/policy.gradle": code}), [])
@@ -1040,6 +1065,7 @@ class Conventions(unittest.TestCase):
             "dependencies {\n    implementation(project(\":core:domain\")) { exclude(group = \"x\") }\n"
             "    testImplementation(platform(project(\":core:domain\")));\n}\n"
             "val s = \"${layout.projectDirectory}/$version: parent rootProject\"\n"
+            "val m = mapOf(\"project\" to project.name, \"parent\" to 1)\n"
             "val d2 = dependencies.project(mapOf(\"path\" to \":x\"))\n"
         )
         groovy = "dependencies {\n    implementation project(':core:domain')\n    api project(path: ':core:domain')\n}\n"
