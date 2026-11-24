@@ -58,9 +58,10 @@ test("the emulator and the model agree on every case", async () => {
 
 // The negative case (P17): each mutant weakens one condition of firestore.rules, so the rules
 // allow a case the model denies, which the fuzz must find. Seed 1 finds each within 2701 cases
-// (#372's own, unchanged; the later ones, measured again with M1-11's templates, within 1726). On
-// #372's mutants seeds 2 and 3 find each within 3363, any of seeds 1 to 100 within 8672 (PR #372
-// has the reach per seed); all under the cap of 3 * RUNS.
+// (#372's own, unchanged; the later ones, measured again with M1-11's templates, within 1726).
+// Seeds 2 and 3 find #372's within 3363 (unchanged) and the later ones within 8275; any of seeds
+// 1 to 100 found #372's within 8672 (PR #372 has the reach per seed; not measured again). All
+// under the cap of 3 * RUNS.
 const MUTANTS: [string, string, string][] = [
     ["Signed in without a verified email", "token.email_verified == true", "token != null"],
     ["Create household: an id of 21 characters (P3)", "{20}$", "{20,21}$"],
