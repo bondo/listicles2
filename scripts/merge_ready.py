@@ -79,7 +79,7 @@ OWNER_ONLY_FILES = {f.casefold() for f in (
     "gradle/verification-metadata.xml", "gradlew", "gradlew.bat",
     "scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py")}  # the last two run through `ci_scope.py selftests` (a test keeps them in sync)
 OWNER_ONLY_PREFIXES = tuple(p.casefold() for p in (".claude/", ".github/", ".githooks/", ".tools/", "agents/", "scripts/hooks/", "docs/reviews/",
-                                                   "docs/product/", "design/", "gradle/wrapper/", "config/licensee/"))
+                                                   "docs/product/", "docs/privacy/", "design/", "gradle/wrapper/", "config/licensee/"))
 OWNER_ONLY_BASENAMES = {n.casefold() for n in ("CODEOWNERS", "package.json", "package-lock.json", "libs.versions.toml", "mark-ready.sh", "update-branch.sh",
                                                           "CLAUDE.md", "CLAUDE.local.md",  # Claude Code loads these as agent instructions in any directory
                                                           ".gitattributes", ".mcp.json", ".gitleaks.toml", ".gitleaksignore",  # R5
