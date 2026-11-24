@@ -924,6 +924,25 @@ class Conventions(unittest.TestCase):
             "val v = getProject().parent",
             "gradle.projectsLoaded { }",
             "gradle.projectsEvaluated { }",
+            # PR 384 R1-01: project/findProject without the literal `project(` token; R1-02: a parenthesized receiver of parent.
+            'val app = `project`(":app")',
+            '`project`(":app").pluginManager.apply("x")',
+            'val app = `findProject`(":app")',
+            'val v = project.`project`(":app")',
+            'dependencies { `project`(":app") }',
+            "val p = ::project",
+            "val p = ::`project`",
+            '(::project)(":app")',
+            "val f = Project::findProject",
+            "def app = this.&project",
+            "def app = this.& findProject",
+            "owner.'project'(':app')",
+            'owner."project"(":app")',
+            "'findProject' (':app')",
+            "val v = (project).parent",
+            "val v = (this).parent",
+            "val v = ( project )?.parent?.version",
+            "val v = (getProject()).parent",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
@@ -975,6 +994,8 @@ class Conventions(unittest.TestCase):
             "    testImplementation(testFixtures(project(\":core:domain\")))\n"
             "    implementation(\n        project(\":core:domain\"),\n    )\n}\n"
             "dependencies.implementation(project(\":core:domain\"))\n"
+            "dependencies { implementation(`project`(\":core:domain\")) }\n"
+            "val q2 = \"project\" + 'findProject'\nval q3 = listOf(\"project\")\n"
             "dependencies {\n    implementation(project(\":core:domain\")) { exclude(group = \"x\") }\n"
             "    testImplementation(platform(project(\":core:domain\")));\n}\n"
             "val s = \"${layout.projectDirectory}/$version: parent rootProject\"\n"
