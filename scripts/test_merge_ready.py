@@ -1206,6 +1206,21 @@ class StateIssueRotationTests(unittest.TestCase):
         self.assertTrue(prev is None or (type(prev) is int and 0 < prev != cur), prev)
         self.assertEqual(merge_ready.state_issues(), (cur,) if prev is None else (cur, prev))
 
+    def test_the_pointer_is_the_state_issue_after_the_rotation_from_15_to_373(self):  # rotation decision: #15 comment 7125300567
+        self.assertEqual((merge_ready.STATE_ISSUE, merge_ready.PREVIOUS_STATE_ISSUE), (373, 15))
+        self.assertEqual(merge_ready.state_issues(), (373, 15))
+
+    def test_with_the_real_pointer_373_and_15_count_and_any_third_issue_is_refused(self):
+        for issue in (373, 15):
+            with self.subTest(issue=issue):
+                code, text, merged = self.code(approval_comment(self.OK, issue=issue))
+                self.assertEqual((code, len(merged)), (0, 1), text)
+        for issue in (16, 372, 374, 37, 3730, 1, 400):
+            with self.subTest(refused=issue):
+                code, text, merged = self.code(approval_comment(self.OK, issue=issue))
+                self.assertEqual((code, merged), (1, []), text)
+                self.assertRegex(text, r"not on the state issue #373 or the previous state issue #15")
+
     def test_a_bad_pointer_refuses_every_approval(self):  # a typo in the rotation PR must fail closed, not open
         for cur, prev in ((15, 15), (0, None), (None, 15), ("15", None), (True, None), (400, "15"), (400, 0), (-1, 15)):
             with self.subTest(cur=cur, prev=prev), self.rotated(current=cur, previous=prev):
