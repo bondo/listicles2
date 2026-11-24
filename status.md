@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 81/112 (72%) | 31 |
+| M1 | Accounts and households | 82/113 (72%) | 31 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 81/112 done (72%), 31 open.
+**Progress:** 82/113 done (72%), 31 open.
 
 ### Tasks
 
@@ -129,7 +129,8 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-08 | Rules base&#58; signedIn() with email_verified, users/{uid} householdId set/clear and name, tombsto… | done | M1-52 | implementer | [#314](https://github.com/bondo/tally/issues/314) |
 | M1-09 | Rules spike&#58; PLAN 3.1 items a-e in the emulator, ADR 0002 with the results | done | M1-08 | implementer | [#333](https://github.com/bondo/tally/issues/333) |
 | M1-10 | Rules&#58; create household and member display name, allow and deny tests (transfer is M1-53) | done | M1-09 | implementer | [#352](https://github.com/bondo/tally/issues/352) |
-| M1-11 | Rules&#58; leave, remove member (removed marker), household soft delete and cleanup, allow and de… | ready | M1-54, M1-53 | implementer |  |
+| M1-95 | Rules&#58; household soft delete and cleanup (tombstone, P6, owner's cleanup of members, markers a… | done | M1-54, M1-53 | implementer | [#390](https://github.com/bondo/tally/issues/390) |
+| M1-11 | Rules&#58; leave and remove member (removed marker), allow and deny tests | ready | M1-54, M1-53, M1-95 | implementer |  |
 | M1-12 | Rules&#58; invites (create, get, list, revoke, cleanup), incl. unverified get denied (join is M1-54) | done | M1-10, M1-O12 | implementer | [#371](https://github.com/bondo/tally/issues/371) |
 | M1-30 | App skeleton&#58; Hilt with KSP, Google Services plugin + generated stand-in config, Connectivity help… | done | M1-29, M1-02, M1-36, M1-49 | implementer | [#304](https://github.com/bondo/tally/issues/304) |
 | M1-60 | Start-up root&#58; Navigation 3, M1 home (#194, Q1 A), signed-in/out routing (P10 steps 2 and 6), sig… | done | M1-30, M1-36, M1-49 | implementer | [#311](https://github.com/bondo/tally/issues/311) |
@@ -203,7 +204,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | done | M1-77 | implementer |  |
 | M1-78 | State issue part B&#58; rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… | done | M1-77 | implementer |  |
 | M1-79 | State issue part C&#58; ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… | done | M1-77, M1-78, M1-80 | process | [#365](https://github.com/bondo/tally/issues/365) |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-90, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-91, M1-92, M1-93, M1-94, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-84, M1-85, M1-86, M1-87 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-90, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-91, M1-92, M1-93, M1-94, M1-95, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-84, M1-85, M1-86, M1-87 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, email sign-in, google-services.json secret | done | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | dropped | M1-O1, M1-O16 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -237,7 +238,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M1-11 Rules: leave, remove member (remove… (ready)"]:::ready
+    n0["M1-11 Rules: leave and remove member (rem… (ready)"]:::ready
     n1["M1-82 Firestore source for the minimum app… (in progress)"]:::progress
     n2["M1-89 Clear the local data on every change to… (in progress)"]:::progress
     n3["M1-15 Auth data: email and password sign-up… (in progress)"]:::progress
@@ -472,6 +473,7 @@ flowchart LR
 - **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
 - **owner to-do** [#392](https://github.com/bondo/tally/issues/392): &#91;owner&#93; M1-O17&#58; add TALLY_TASK=tooling to the Tally tooling environment
+- **PR to merge** [#393](https://github.com/bondo/tally/issues/393): M1-97&#58; handover messages between orchestrators
 - **task** M1-17: waits on M1-15, M1-16
 - **task** M1-31: waits on M1-11, M1-18
 - **task** M1-19: waits on M1-18

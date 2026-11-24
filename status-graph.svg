@@ -49,11 +49,11 @@
 <path d="M424 295 H428 V358 H437" class="edge s3 crit" data-from="M1-32" data-to="M1-23" marker-end="url(#ac3)"/>
 <path d="M616 327 H624 V300 H633" class="edge s2 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac2)"/>
 <path d="M714 295 H718 V422 H739" class="edge s4 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac4)"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 81/112 done, 31 open</text>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 82/113 done, 31 open</text>
 <text x="34" y="664" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
 <text x="34" y="736" class="fg h">M3 Packing rules (domain): 0/3 done, 3 open</text>
 <text x="34" y="808" class="fg h">M6 Release: 0/4 done, 4 open</text>
-<g data-id="M1-11" data-state="ready"><title>M1-11: Rules: leave, remove member (removed marker), household soft delete and cleanup, allow and de… (ready)</title><rect x="34" y="190" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="202" r="4.5" class="ok mk-ready"/><text x="54" y="207" class="fg n">M1-11</text></g>
+<g data-id="M1-11" data-state="ready"><title>M1-11: Rules: leave and remove member (removed marker), allow and deny tests (ready)</title><rect x="34" y="190" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="202" r="4.5" class="ok mk-ready"/><text x="54" y="207" class="fg n">M1-11</text></g>
 <g data-id="M1-82" data-state="review"><title>M1-82: Firestore source for the minimum app version: config/app.minVersionCode bound in GateModule (in progress)</title><rect x="34" y="282" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,298 49,298 44,289" class="info mk-progress"/><text x="54" y="299" class="fg n">M1-82</text></g>
 <g data-id="M1-89" data-state="review"><title>M1-89: Clear the local data on every change to signed out, also when Firebase signs the user out itself (… (in progress)</title><rect x="34" y="314" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,330 49,330 44,321" class="info mk-progress"/><text x="54" y="331" class="fg n">M1-89</text></g>
 <g data-id="M1-15" data-state="review"><title>M1-15: Auth data: email and password sign-up, sign-in, verification, reset, error mapping, collision m… (in progress)</title><rect x="34" y="220" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,236 49,236 44,227" class="info mk-progress"/><text x="54" y="237" class="fg n">M1-15</text></g>
@@ -113,5 +113,5 @@
 <text x="24" y="970" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
 <text x="24" y="990" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
 <text x="24" y="1010" class="muted s">39 transitive arrows hidden.</text>
-<text x="24" y="1030" class="muted s">Also not drawn: 152 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
+<text x="24" y="1030" class="muted s">Also not drawn: 154 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
 </svg>
