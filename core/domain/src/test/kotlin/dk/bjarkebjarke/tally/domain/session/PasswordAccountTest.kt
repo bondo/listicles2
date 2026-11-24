@@ -12,6 +12,8 @@ import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.int
+import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
@@ -19,6 +21,8 @@ import io.kotest.property.checkAll
 private const val EMAIL = "anna@example.com"
 private const val PASSWORD = "correct horse battery"
 private val EMAILS = setOf("sendEmailVerification", "sendPasswordReset")
+private const val COOLDOWN = PasswordAccount.RESEND_COOLDOWN_MS
+private const val WINDOW = PasswordAccount.EMAIL_WINDOW_MS
 
 // BMP and non-BMP code points, never a lone surrogate; padding that Kotlin's trim() removes (M1-13).
 private val anyCodePoints = Arb.int(0x20..0x1F64F).filter { it !in 0xD800..0xDFFF }.map { Codepoint(it) }
@@ -30,12 +34,15 @@ private val passwords = Arb.bind(padding, Arb.string(12..40, anyCodePoints), pad
 private fun firebase(answer: PasswordAnswer = PasswordAnswer.Done) =
     FakePasswordAuthentication(answer, answer, answer, answer, answer)
 
-private fun FakePasswordAuthentication.account(online: Boolean = true) = PasswordAccount(FakeConnectivity(online), this)
+private fun FakePasswordAuthentication.account(
+    online: Boolean = true,
+    nowMs: () -> Long = { 0L },
+) = PasswordAccount(FakeConnectivity(online), this, nowMs)
 
 /** Every action the screens start (M1-17), with valid input. */
 private val actions: List<suspend PasswordAccount.() -> Enum<*>> =
     listOf(
-        { createAccount(EMAIL, PASSWORD) },
+        { createAccount(EMAIL, PASSWORD) {} },
         { signIn(EMAIL, PASSWORD) },
         { resetPassword(EMAIL) },
         { sendVerificationAgain() },
@@ -54,20 +61,23 @@ private suspend fun <R> answers(
 /** M1-15 (AUTH-05..08, AUTH-10) with a fake Firebase: no answer tells whether an email has an account. */
 class PasswordAccountTest :
     FunSpec({
-        test("AUTH-10, R3-01: sign-up for an email that has an account ends like a new one, with no email") {
+        test("AUTH-10, R3-01: only a new account saves the name (R1-02) and gets an email") {
             PasswordAnswer.entries.forEach { sent ->
                 val firebase = FakePasswordAuthentication(verificationAnswer = sent)
-                firebase.account().createAccount(EMAIL, PASSWORD) shouldBe SignUpResult.CheckYourEmail
-                firebase.steps shouldBe listOf("createUser", "useAppLanguage", "sendEmailVerification")
+                firebase.account().createAccount(EMAIL, PASSWORD) { firebase.steps += "saveName" } shouldBe
+                    SignUpResult.CheckYourEmail
+                firebase.steps shouldBe listOf("createUser", "saveName", "useAppLanguage", "sendEmailVerification")
             }
-            val taken = firebase(PasswordAnswer.EmailInUse)
-            taken.account().createAccount(EMAIL, PASSWORD) shouldBe SignUpResult.CheckYourEmail
-            taken.steps shouldBe listOf("createUser")
+            PasswordAnswer.entries.filter { it != PasswordAnswer.Done }.forEach { answer ->
+                val firebase = firebase(answer)
+                firebase.account().createAccount(EMAIL, PASSWORD) { firebase.steps += "saveName" }
+                withClue(answer) { firebase.steps shouldBe listOf("createUser") }
+            }
         }
 
         test("create account: Firebase's other answers") {
             answers(
-                { createAccount(EMAIL, PASSWORD) },
+                { createAccount(EMAIL, PASSWORD) {} },
                 SignUpResult.Failed,
                 PasswordAnswer.Done to SignUpResult.CheckYourEmail,
                 PasswordAnswer.EmailInUse to SignUpResult.CheckYourEmail,
@@ -124,8 +134,8 @@ class PasswordAccountTest :
             checkAll(padding, Arb.string(0..11, anyCodePoints)) { blank, short ->
                 val firebase = firebase()
                 val account = firebase.account()
-                account.createAccount(blank, PASSWORD) shouldBe SignUpResult.InvalidEmail
-                account.createAccount(EMAIL, short) shouldBe SignUpResult.PasswordTooShort
+                account.createAccount(blank, PASSWORD) {} shouldBe SignUpResult.InvalidEmail
+                account.createAccount(EMAIL, short) {} shouldBe SignUpResult.PasswordTooShort
                 account.signIn(blank, PASSWORD) shouldBe PasswordSignInResult.WrongEmailOrPassword
                 account.signIn(EMAIL, "") shouldBe PasswordSignInResult.WrongEmailOrPassword
                 account.resetPassword(blank) shouldBe PasswordResetResult.InvalidEmail
@@ -137,7 +147,7 @@ class PasswordAccountTest :
             checkAll(padding, addresses, padding, passwords) { before, address, after, password ->
                 val firebase = firebase()
                 val account = firebase.account()
-                account.createAccount(before + address + after, password) shouldBe SignUpResult.CheckYourEmail
+                account.createAccount(before + address + after, password) {} shouldBe SignUpResult.CheckYourEmail
                 account.signIn(before + address + after, password) shouldBe PasswordSignInResult.SignedIn
                 account.resetPassword(before + address + after) shouldBe PasswordResetResult.SentIfAccountExists
                 firebase.emails shouldBe listOf(address, address, address)
@@ -160,11 +170,68 @@ class PasswordAccountTest :
             }
         }
 
-        test("offline: every action needs a connection and asks Firebase nothing (SYNC-03)") {
+        test("offline: every action needs a connection, after any field error, and asks Firebase nothing (SYNC-03)") {
             actions.forEach { action ->
                 val firebase = firebase()
                 firebase.account(online = false).action().name shouldBe "NeedsConnection"
                 firebase.steps.shouldBeEmpty()
             }
+            val firebase = firebase()
+            val offline = firebase.account(online = false)
+            offline.createAccount(" ", PASSWORD) {} shouldBe SignUpResult.InvalidEmail
+            offline.createAccount(EMAIL, "short") {} shouldBe SignUpResult.PasswordTooShort
+            offline.signIn(" ", PASSWORD) shouldBe PasswordSignInResult.WrongEmailOrPassword
+            offline.resetPassword(" ") shouldBe PasswordResetResult.InvalidEmail
+            firebase.steps.shouldBeEmpty()
+        }
+
+        test("R1-01: Send again spaces the emails and answers the same whether or not the email had an account") {
+            checkAll(Arb.list(Arb.long(0L..2 * COOLDOWN), 1..20)) { gaps ->
+                // A new account (Firebase sends) and an email that had one (nobody signed in: Firebase sends nothing).
+                val runs =
+                    listOf(
+                        PasswordAnswer.Done to PasswordAnswer.Done,
+                        PasswordAnswer.EmailInUse to PasswordAnswer.NotSignedIn,
+                    ).map { (created, sent) ->
+                        var now = 0L
+                        val firebase = FakePasswordAuthentication(createUserAnswer = created, verificationAnswer = sent)
+                        val account = firebase.account { now }
+                        account.createAccount(EMAIL, PASSWORD) {}
+                        val asked = mutableListOf(0L) // the sign-up's email counts, sent or not
+                        val results =
+                            gaps.map { gap ->
+                                now += gap
+                                val before = firebase.steps.size
+                                account.sendVerificationAgain().also { if (firebase.steps.size > before) asked += now }
+                            }
+                        results to asked
+                    }
+                runs[0] shouldBe runs[1]
+                val asked = runs[0].second
+                withClue(asked) {
+                    asked.zipWithNext { a, b -> b - a >= COOLDOWN }.all { it } shouldBe true
+                    val mostInAnHour = asked.maxOf { t -> asked.count { it in t until t + WINDOW } }
+                    (mostInAnHour <= PasswordAccount.MAX_EMAILS_PER_WINDOW) shouldBe true
+                }
+            }
+        }
+
+        test("R1-01: Send again is Try again later a minute after an email and after five in an hour, then sent") {
+            var now = 0L
+            val firebase = firebase()
+            val account = firebase.account { now }
+            account.createAccount(EMAIL, PASSWORD) {}
+            now = COOLDOWN - 1
+            account.sendVerificationAgain() shouldBe VerificationResult.TryAgainLater
+            firebase.steps.count { it == "sendEmailVerification" } shouldBe 1
+            repeat(PasswordAccount.MAX_EMAILS_PER_WINDOW - 1) { n ->
+                now = COOLDOWN * (n + 1)
+                account.sendVerificationAgain() shouldBe VerificationResult.Sent
+            }
+            now = WINDOW - 1
+            account.sendVerificationAgain() shouldBe VerificationResult.TryAgainLater
+            now = WINDOW
+            account.sendVerificationAgain() shouldBe VerificationResult.Sent
+            firebase.steps.count { it == "sendEmailVerification" } shouldBe PasswordAccount.MAX_EMAILS_PER_WINDOW + 1
         }
     })

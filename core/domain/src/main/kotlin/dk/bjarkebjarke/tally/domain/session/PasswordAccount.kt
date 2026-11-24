@@ -11,6 +11,7 @@ import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 class PasswordAccount(
     private val connectivity: Connectivity,
     private val authentication: PasswordAuthentication,
+    private val nowMs: () -> Long,
 ) {
     /**
      * "Create account" (AUTH-05; M1-17 saves the name): a new account is signed in, not verified, and gets the
@@ -19,12 +20,13 @@ class PasswordAccount(
     suspend fun createAccount(
         email: String,
         password: String,
+        saveName: suspend () -> Unit,
     ): SignUpResult =
         when {
             Validation.email(email) != null -> SignUpResult.InvalidEmail
             Validation.password(password) != null -> SignUpResult.PasswordTooShort
             !connectivity.isOnline() -> SignUpResult.NeedsConnection
-            else -> created(authentication.createUser(Validation.normalizedEmail(email), password))
+            else -> created(authentication.createUser(Validation.normalizedEmail(email), password), saveName)
         }
 
     /** "Sign in" (AUTH-07): one answer for every failed sign-in, whatever went wrong (OQ-34(c)). */
@@ -54,7 +56,7 @@ class PasswordAccount(
     suspend fun sendVerificationAgain(): VerificationResult =
         when {
             !connectivity.isOnline() -> VerificationResult.NeedsConnection
-            else -> verificationSent(inAppLanguage { authentication.sendEmailVerification() })
+            else -> verificationSent(inAppLanguage { authentication.sendEmailVerification() }).also { nowMs() }
         }
 
     /** "Continue" (AUTH-06): verified once the link was opened; with nobody signed in, not yet (AUTH-10). */
@@ -64,7 +66,11 @@ class PasswordAccount(
             else -> verified(authentication.reloadEmailVerified())
         }
 
-    private suspend fun created(answer: PasswordAnswer): SignUpResult {
+    private suspend fun created(
+        answer: PasswordAnswer,
+        saveName: suspend () -> Unit,
+    ): SignUpResult {
+        saveName() // naive draft so the tests compile and fail; R1-02 follows
         // Whatever this answers, the user checks their email: the verify screen has "Send again" (AUTH-06).
         if (answer == PasswordAnswer.Done) inAppLanguage { authentication.sendEmailVerification() }
         return when (answer) {
@@ -80,6 +86,12 @@ class PasswordAccount(
     private suspend fun inAppLanguage(send: suspend () -> PasswordAnswer): PasswordAnswer {
         authentication.useAppLanguage()
         return send()
+    }
+
+    companion object {
+        const val RESEND_COOLDOWN_MS = 60_000L
+        const val MAX_EMAILS_PER_WINDOW = 5
+        const val EMAIL_WINDOW_MS = 3_600_000L
     }
 }
 
