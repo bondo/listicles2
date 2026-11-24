@@ -22,11 +22,13 @@ import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
 /**
- * The session (AUTH-02), Google sign-in (AUTH-01) and sign-out (AUTH-03) over Firebase Auth, Firestore and Credential
- * Manager from `:core:data` (M1-88), in place of the M1-60 stand-in. One [FirebaseAuthentication] is both the session
- * state the start routes on and the sign-in; one [FirestoreSession] is both the copy sign-out deletes and every
- * repository's Firestore, so its no-argument constructor holds the app's only `FirebaseFirestore.getInstance` (M1-67).
- * Firebase is first called when the first of them is injected, after TallyApplication installed App Check (M1-26).
+ * The session (AUTH-02) and what Google sign-in (AUTH-01) and sign-out (AUTH-03) are built from: Firebase Auth,
+ * Firestore and Credential Manager from `:core:data` (M1-88), in place of the M1-60 stand-in. One
+ * [FirebaseAuthentication] is both the session state the start routes on and the sign-in; one [FirestoreSession] is
+ * both the copy sign-out deletes and every repository's Firestore, so its no-argument constructor holds the app's only
+ * `FirebaseFirestore.getInstance` (M1-67). Firebase is first called when the first of them is injected, after
+ * TallyApplication installed App Check (M1-26). A test replaces this module with fakes and keeps
+ * [SignInAndSignOutModule].
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -60,7 +62,12 @@ object SessionModule {
             started,
             CredentialManagerGoogleCredentials.webClientId(context),
         )
+}
 
+/** Google sign-in and sign-out over the graph's session bindings: [SessionModule]'s, or a test's fakes. */
+@Module
+@InstallIn(SingletonComponent::class)
+object SignInAndSignOutModule {
     @Provides
     fun googleSignIn(
         connectivity: Connectivity,
