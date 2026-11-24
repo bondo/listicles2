@@ -1,8 +1,8 @@
 {
-  "blockers": 29,
+  "blockers": 28,
   "current_milestone": "M1",
   "followups": 46,
-  "generated_at": "2026-11-24T07:45:27Z",
+  "generated_at": "2026-11-24T08:24:51Z",
   "milestones": [
     {
       "done": 28,
@@ -17,10 +17,10 @@
       "total": 35
     },
     {
-      "done": 74,
+      "done": 75,
       "id": "M1",
       "title": "Accounts and households",
-      "total": 104
+      "total": 105
     },
     {
       "done": 0,
@@ -54,5 +54,5 @@
     }
   ],
   "outside_questions": 0,
-  "owner_queue": 4
+  "owner_queue": 3
 }

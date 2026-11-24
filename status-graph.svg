@@ -7,9 +7,9 @@
 <rect x="24" y="446" width="918" height="62" rx="6" class="card"/>
 <rect x="24" y="518" width="918" height="64" rx="6" class="card"/>
 <rect x="24" y="592" width="918" height="92" rx="6" class="card"/>
-<path d="M106 167 H110 V182 H748 V222 H765" class="edge s2" data-from="M1-06" data-to="M1-48" marker-end="url(#ah2)"/>
-<path d="M298 198 H319" class="edge s3" data-from="M1-11" data-to="M1-O6" marker-end="url(#ah3)"/>
-<path d="M208 308 H225" class="edge s4" data-from="M1-15" data-to="M1-17" marker-end="url(#ah4)"/>
+<path d="M106 167 H110 V182 H748 V222 H761" class="edge s1" data-from="M1-06" data-to="M1-48" marker-end="url(#ah1)"/>
+<path d="M298 198 H319" class="edge s2" data-from="M1-11" data-to="M1-O6" marker-end="url(#ah2)"/>
+<path d="M208 308 H225" class="edge s3" data-from="M1-15" data-to="M1-17" marker-end="url(#ah3)"/>
 <path d="M208 353 H212 V310 H225" class="edge s5" data-from="M1-16" data-to="M1-17" marker-end="url(#ah5)"/>
 <path d="M208 352 H225" class="edge s5" data-from="M1-16" data-to="M1-86" marker-end="url(#ah5)"/>
 <path d="M298 305 H306 V292 H396 V266 H409" class="edge s3" data-from="M1-17" data-to="M1-20" marker-end="url(#ah3)"/>
@@ -18,43 +18,43 @@
 <path d="M298 225 H306 V266 H319" class="edge s4" data-from="M1-18" data-to="M1-19" marker-end="url(#ah4)"/>
 <path d="M298 228 H319" class="edge s4" data-from="M1-18" data-to="M1-31" marker-end="url(#ah4)"/>
 <path d="M298 233 H302 V304 H319" class="edge s4" data-from="M1-18" data-to="M1-39" marker-end="url(#ah4)"/>
-<path d="M392 264 H409" class="edge s1" data-from="M1-19" data-to="M1-20" marker-end="url(#ah1)"/>
-<path d="M392 265 H396 V230 H409" class="edge s1" data-from="M1-19" data-to="M1-21" marker-end="url(#ah1)"/>
+<path d="M392 264 H409" class="edge s0" data-from="M1-19" data-to="M1-20" marker-end="url(#ah0)"/>
+<path d="M392 265 H396 V230 H409" class="edge s0" data-from="M1-19" data-to="M1-21" marker-end="url(#ah0)"/>
 <path d="M482 265 H486 V292 H662 V304 H671" class="edge s4" data-from="M1-20" data-to="M1-47" marker-end="url(#ah4)"/>
 <path d="M392 353 H400 V332 H490 V270 H499" class="edge s5" data-from="M1-22" data-to="M1-32" marker-end="url(#ah5)"/>
 <path d="M208 393 H212 V368 H310 V358 H319" class="edge s4" data-from="M1-25" data-to="M1-22" marker-end="url(#ah4)"/>
 <path d="M208 385 H216 V372 H306 V314 H319" class="edge s4" data-from="M1-25" data-to="M1-39" marker-end="url(#ah4)"/>
 <path d="M392 309 H396 V336 H662 V314 H671" class="edge s2" data-from="M1-39" data-to="M1-47" marker-end="url(#ah2)"/>
-<path d="M208 199 H212 V224 H225" class="edge s2" data-from="M1-54" data-to="M1-18" marker-end="url(#ah2)"/>
-<path d="M106 265 H110 V284 H842 V262 H859" class="edge s0" data-from="M1-61" data-to="M1-FU" marker-end="url(#ah0)"/>
-<path d="M106 309 H114 V280 H756 V236 H765" class="edge s1" data-from="M1-68" data-to="M1-48" marker-end="url(#ah1)"/>
-<path d="M208 229 H212 V248 H748 V226 H765" class="edge s0" data-from="M1-82" data-to="M1-48" marker-end="url(#ah0)"/>
+<path d="M208 199 H212 V224 H225" class="edge s0" data-from="M1-54" data-to="M1-18" marker-end="url(#ah0)"/>
+<path d="M106 265 H110 V280 H838 V260 H859" class="edge s0" data-from="M1-61" data-to="M1-FU" marker-end="url(#ah0)"/>
+<path d="M208 229 H212 V248 H748 V230 H761" class="edge s2" data-from="M1-82" data-to="M1-48" marker-end="url(#ah2)"/>
+<path d="M106 309 H110 V284 H846 V268 H859" class="edge s1" data-from="M1-84" data-to="M1-FU" marker-end="url(#ah1)"/>
 <path d="M298 349 H310 V328 H850 V272 H859" class="edge s0" data-from="M1-86" data-to="M1-FU" marker-end="url(#ah0)"/>
 <path d="M298 357 H302 V558 H319" class="edge s0" data-from="M1-86" data-to="M3-O3" marker-end="url(#ah0)"/>
-<path d="M106 229 H118 V310 H135" class="edge s2" data-from="M1-88" data-to="M1-15" marker-end="url(#ah2)"/>
-<path d="M106 231 H122 V354 H135" class="edge s2" data-from="M1-88" data-to="M1-16" marker-end="url(#ah2)"/>
-<path d="M106 221 H110 V244 H216 V234 H225" class="edge s2" data-from="M1-88" data-to="M1-18" marker-end="url(#ah2)"/>
-<path d="M106 235 H126 V390 H135" class="edge s2" data-from="M1-88" data-to="M1-25" marker-end="url(#ah2)"/>
-<path d="M106 228 H135" class="edge s2" data-from="M1-88" data-to="M1-82" marker-end="url(#ah2)"/>
-<path d="M106 225 H114 V266 H135" class="edge s2" data-from="M1-88" data-to="M1-89" marker-end="url(#ah2)"/>
-<path d="M208 265 H212 V288 H846 V268 H859" class="edge s2" data-from="M1-89" data-to="M1-FU" marker-end="url(#ah2)"/>
+<path d="M106 229 H118 V310 H135" class="edge s3" data-from="M1-88" data-to="M1-15" marker-end="url(#ah3)"/>
+<path d="M106 231 H122 V354 H135" class="edge s3" data-from="M1-88" data-to="M1-16" marker-end="url(#ah3)"/>
+<path d="M106 221 H110 V244 H216 V234 H225" class="edge s3" data-from="M1-88" data-to="M1-18" marker-end="url(#ah3)"/>
+<path d="M106 235 H126 V390 H135" class="edge s3" data-from="M1-88" data-to="M1-25" marker-end="url(#ah3)"/>
+<path d="M106 228 H135" class="edge s3" data-from="M1-88" data-to="M1-82" marker-end="url(#ah3)"/>
+<path d="M106 225 H114 V266 H135" class="edge s3" data-from="M1-88" data-to="M1-89" marker-end="url(#ah3)"/>
+<path d="M208 265 H212 V288 H842 V266 H859" class="edge s2" data-from="M1-89" data-to="M1-FU" marker-end="url(#ah2)"/>
 <path d="M106 353 H110 V324 H576 V314 H585" class="edge s1" data-from="M1-O3" data-to="M1-23" marker-end="url(#ah1)"/>
-<path d="M106 389 H110 V638 H135" class="edge s3" data-from="M1-O4" data-to="M6-O3" marker-end="url(#ah3)"/>
-<path d="M106 490 H135" class="edge s0" data-from="M2-01" data-to="M2-FU" marker-end="url(#ah0)"/>
-<path d="M106 562 H135" class="edge s4" data-from="M3-O1" data-to="M3-O2" marker-end="url(#ah4)"/>
+<path d="M106 389 H110 V638 H135" class="edge s1" data-from="M1-O4" data-to="M6-O3" marker-end="url(#ah1)"/>
+<path d="M106 490 H135" class="edge s2" data-from="M2-01" data-to="M2-FU" marker-end="url(#ah2)"/>
+<path d="M106 562 H135" class="edge s3" data-from="M3-O1" data-to="M3-O2" marker-end="url(#ah3)"/>
 <path d="M208 563 H212 V578 H302 V568 H319" class="edge s0" data-from="M3-O2" data-to="M3-O3" marker-end="url(#ah0)"/>
-<path d="M106 636 H135" class="edge s5" data-from="M6-O1" data-to="M6-O3" marker-end="url(#ah5)"/>
-<path d="M106 637 H114 V668 H135" class="edge s5" data-from="M6-O1" data-to="M6-O4" marker-end="url(#ah5)"/>
-<path d="M298 199 H302 V230 H319" class="edge s3 crit" data-from="M1-11" data-to="M1-31" marker-end="url(#ac3)"/>
-<path d="M106 198 H135" class="edge s3 crit" data-from="M1-12" data-to="M1-54" marker-end="url(#ac3)"/>
-<path d="M482 229 H486 V260 H499" class="edge s1 crit" data-from="M1-21" data-to="M1-32" marker-end="url(#ac1)"/>
-<path d="M658 308 H671" class="edge s0 crit" data-from="M1-23" data-to="M1-47" marker-end="url(#ac0)"/>
-<path d="M392 228 H409" class="edge s5 crit" data-from="M1-31" data-to="M1-21" marker-end="url(#ac5)"/>
+<path d="M106 636 H135" class="edge s4" data-from="M6-O1" data-to="M6-O3" marker-end="url(#ah4)"/>
+<path d="M106 637 H114 V668 H135" class="edge s4" data-from="M6-O1" data-to="M6-O4" marker-end="url(#ah4)"/>
+<path d="M298 199 H302 V230 H319" class="edge s2 crit" data-from="M1-11" data-to="M1-31" marker-end="url(#ac2)"/>
+<path d="M106 198 H135" class="edge s5 crit" data-from="M1-12" data-to="M1-54" marker-end="url(#ac5)"/>
+<path d="M482 229 H486 V260 H499" class="edge s0 crit" data-from="M1-21" data-to="M1-32" marker-end="url(#ac0)"/>
+<path d="M658 308 H671" class="edge s1 crit" data-from="M1-23" data-to="M1-47" marker-end="url(#ac1)"/>
+<path d="M392 228 H409" class="edge s4 crit" data-from="M1-31" data-to="M1-21" marker-end="url(#ac4)"/>
 <path d="M572 265 H576 V304 H585" class="edge s3 crit" data-from="M1-32" data-to="M1-23" marker-end="url(#ac3)"/>
-<path d="M744 309 H752 V232 H765" class="edge s5 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac5)"/>
-<path d="M838 229 H842 V258 H859" class="edge s1 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac1)"/>
-<path d="M208 198 H225" class="edge s2 crit" data-from="M1-54" data-to="M1-11" marker-end="url(#ac2)"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 74/104 done, 30 open</text>
+<path d="M744 309 H752 V234 H761" class="edge s5 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac5)"/>
+<path d="M834 229 H838 V256 H859" class="edge s5 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac5)"/>
+<path d="M208 198 H225" class="edge s0 crit" data-from="M1-54" data-to="M1-11" marker-end="url(#ac0)"/>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 75/105 done, 30 open</text>
 <text x="34" y="464" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
 <text x="34" y="536" class="fg h">M3 Packing rules (domain): 0/3 done, 3 open</text>
 <text x="34" y="610" class="fg h">M6 Release: 0/4 done, 4 open</text>
@@ -79,9 +79,9 @@
 <g data-id="M1-54" data-state="blocked"><title>M1-54: Rules: the join batch with the one-household check, allow and deny tests (blocked)</title><rect x="136" y="186" width="72" height="24" rx="4" class="nd-blocked"/><rect x="142" y="194" width="8" height="8" class="warn mk-blocked"/><text x="156" y="203" class="fg n">M1-54</text></g>
 <g data-id="M1-61" data-state="ready"><title>M1-61: Java API level check: also look up classes named only in descriptors, Signature attributes, throw… (ready)</title><rect x="34" y="252" width="72" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="264" r="4.5" class="ok mk-ready"/><text x="54" y="269" class="fg n">M1-61</text></g>
 <g data-id="M1-39" data-state="blocked"><title>M1-39: Your name (AUTH-12): users/{uid}.name, name step at first Google sign-in and at start, edit in A… (blocked)</title><rect x="320" y="296" width="72" height="24" rx="4" class="nd-blocked"/><rect x="326" y="304" width="8" height="8" class="warn mk-blocked"/><text x="340" y="313" class="fg n">M1-39</text></g>
-<g data-id="M1-68" data-state="ready"><title>M1-68: Root check tasks without cross-project reads: checkWarningsAsErrors, checkJdkRelease, checkJavaAp… (ready)</title><rect x="34" y="296" width="72" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="308" r="4.5" class="ok mk-ready"/><text x="54" y="313" class="fg n">M1-68</text></g>
+<g data-id="M1-84" data-state="ready"><title>M1-84: Isolated projects: module build files read the root through isolated.rootProject, check 4 denies o… (ready)</title><rect x="34" y="296" width="72" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="308" r="4.5" class="ok mk-ready"/><text x="54" y="313" class="fg n">M1-84</text></g>
 <g data-id="M1-47" data-state="blocked"><title>M1-47: R12 screens vs wireframes for M1 (issue 65 review catalogue) (blocked)</title><rect x="672" y="296" width="72" height="24" rx="4" class="nd-blocked"/><rect x="678" y="304" width="8" height="8" class="warn mk-blocked"/><text x="692" y="313" class="fg n">M1-47</text></g>
-<g data-id="M1-48" data-state="blocked"><title>M1-48: R8 milestone quality review for M1 (issue 65 review catalogue) (blocked)</title><rect x="766" y="216" width="72" height="24" rx="4" class="nd-blocked"/><rect x="772" y="224" width="8" height="8" class="warn mk-blocked"/><text x="786" y="233" class="fg n">M1-48</text></g>
+<g data-id="M1-48" data-state="blocked"><title>M1-48: R8 milestone quality review for M1 (issue 65 review catalogue) (blocked)</title><rect x="762" y="216" width="72" height="24" rx="4" class="nd-blocked"/><rect x="768" y="224" width="8" height="8" class="warn mk-blocked"/><text x="782" y="233" class="fg n">M1-48</text></g>
 <g data-id="M1-FU" data-state="blocked"><title>M1-FU: Follow-up burn-down for M1 (planner: add each new M1 task to depends_on) (blocked)</title><rect x="860" y="252" width="72" height="24" rx="4" class="nd-blocked"/><rect x="866" y="260" width="8" height="8" class="warn mk-blocked"/><text x="880" y="269" class="fg n">M1-FU</text></g>
 <g data-id="M1-O3" data-state="owner"><title>M1-O3: Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… (owner to-do)</title><rect x="34" y="340" width="72" height="24" rx="4" class="nd-owner"/><polygon points="39,352 44,347 49,352 44,357" class="bad mk-owner"/><text x="54" y="357" class="fg n">M1-O3</text></g>
 <g data-id="M1-O4" data-state="owner"><title>M1-O4: Enable the Play Integrity API for the Firebase project in the Google Cloud console (owner to-do)</title><rect x="34" y="376" width="72" height="24" rx="4" class="nd-owner"/><polygon points="39,388 44,383 49,388 44,393" class="bad mk-owner"/><text x="54" y="393" class="fg n">M1-O4</text></g>
@@ -116,6 +116,6 @@
 <text x="56" y="748" class="fg s">critical path: the longest chain of open tasks to M1-FU (10 tasks)</text>
 <text x="24" y="772" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
 <text x="24" y="792" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
-<text x="24" y="812" class="muted s">46 transitive arrows hidden.</text>
-<text x="24" y="832" class="muted s">Also not drawn: 134 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
+<text x="24" y="812" class="muted s">45 transitive arrows hidden.</text>
+<text x="24" y="832" class="muted s">Also not drawn: 136 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
 </svg>
