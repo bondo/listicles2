@@ -182,6 +182,7 @@ describe("Create household + owner (one batch)", () => {
         ["a display name of 51 characters", { ...OWNER, displayName: `${FIFTY}a` }],
         ["a display name of spaces only", { ...OWNER, displayName: "   " }],
         ["a display name of Unicode spaces only", { ...OWNER, displayName: "\u00a0\u3000" }],
+        ["a display name of control characters only", { ...OWNER, displayName: "\u0001\u0085" }],
         ["joinedAt not the request time", { ...OWNER, joinedAt: T0 }],
     ])("denied: the owner's member doc with %s", async (_what, data) => {
         await assertFails(create(alice.verified, { owner: data }));
@@ -265,6 +266,7 @@ describe("Update own member doc: displayName only", () => {
         ["a display name of 51 characters", { displayName: `${FIFTY}a` }],
         ["a display name of spaces only", { displayName: "   " }],
         ["a display name of Unicode spaces only", { displayName: "\u202f\u205f" }],
+        ["a display name of control characters only", { displayName: "\u0001\u0085" }],
         ["an added field", { displayName: "Caro", color: "red" }],
         ["the role: a plain member to owner", { role: "owner" }],
     ])("denied: an update of %s", async (_what, data) => {

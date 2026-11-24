@@ -193,7 +193,7 @@ class ValidationTest :
             Validation.name("   \u00A0 ") shouldBe NameError.Empty
         }
 
-        // M1-90: Kotlin's trim() kept U+0001 to U+0008 and U+0085, which the rules count as blank.
+        // M1-90: Kotlin's trim() kept U+0000 to U+0008, U+000E to U+001B and U+0085, which the rules count as blank.
         test("name: control characters and NEL count as blank, a zero-width space does not") {
             Validation.name("\u0001") shouldBe NameError.Empty
             Validation.name("\u0085") shouldBe NameError.Empty

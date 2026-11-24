@@ -207,7 +207,7 @@ or expired-invite deletes hold up to 10.
   blank name with one regex of exactly these code points (`trim()` alone keeps U+0085, U+00A0, U+3000 and the other
   Unicode spaces). The app removes blank code points from both ends of its input before it writes and refuses what is
   then empty (`Validation`, M1-13; Kotlin's `trim()` alone keeps U+0000 to U+0008, U+000E to U+001B and U+0085), so the
-  app writes exactly the names the rules accept. Tests per collection (M1-08 users, M1-10 households and members, M1-12 invites, M1-54 the join member doc,
+  app accepts an input exactly when the rules accept the value it saves. Tests per collection (M1-08 users, M1-10 households and members, M1-12 invites, M1-54 the join member doc,
   M1-11 markers, M1-53 the transfer updates): an unknown field on create and an update that adds one (deny); a create without one required key (deny; at least
   the owner's member doc without `joinedAt`, M1-10); a transfer that adds `role` to the household doc (deny, M1-53); for each
   name exactly the maximum (allow), the maximum + 1 and spaces only (deny), and 50 code points with non-BMP characters

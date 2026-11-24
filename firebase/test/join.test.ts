@@ -273,6 +273,7 @@ describe("Join (one batch)", () => {
         ["a display name of 51 characters", { doc: { displayName: `${FIFTY}a` } }],
         ["a display name of spaces only", { doc: { displayName: "   " } }],
         ["a display name of Unicode spaces only", { doc: { displayName: "\u1680\u3000" } }],
+        ["a display name of control characters only", { doc: { displayName: "\u0001\u0085" } }],
     ])("denied: the joiner's member doc with %s", async (_what, j) => {
         await assertFails(join(dan.verified, j));
     });

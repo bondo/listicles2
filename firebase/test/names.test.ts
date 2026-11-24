@@ -9,9 +9,13 @@ import * as m from "./model";
 let env: RulesTestEnvironment;
 let dbs: Record<h.Client, h.Db>;
 
+// One test below makes 69 emulator writes (about 2.5 s here), so the default 5 s per test is too
+// close on a slow runner.
+jest.setTimeout(30_000);
+
 const range = (from: number, to: number): number[] =>
     Array.from({ length: to - from + 1 }, (_, i) => from + i);
-// The PLAN's list.
+// The PLAN's list (PLAN 3.1 field validation, **Blank**; the first test reads it there).
 const BLANK = new Set([
     ...range(0x0, 0x20),
     0x85,
@@ -34,6 +38,16 @@ const mismatches = (blank: (c: number) => boolean): string[] =>
     range(0, 0x10ffff)
         .filter((c) => blank(c) !== BLANK.has(c))
         .map(U);
+
+// The code points PLAN 3.1 names in its definition of blank, one or "U+XXXX to U+YYYY", up to its first ";".
+test("BLANK is the list in the PLAN's definition of blank", () => {
+    const definition = /\*\*Blank\*\*[^:]*:([^;]*);/.exec(h.PLAN)?.[1] ?? "";
+    const points = /U\+([0-9A-F]{4})(?:\s+to\s+U\+([0-9A-F]{4}))?/g;
+    const listed = [...definition.matchAll(points)].flatMap(([, from = "", to = from]) =>
+        range(parseInt(from, 16), parseInt(to, 16)),
+    );
+    expect(new Set(listed)).toEqual(BLANK);
+});
 
 test("the PLAN's blank code points are U+0000 to U+0020 and Unicode White_Space", () => {
     expect(BLANK.size).toBe(52);
