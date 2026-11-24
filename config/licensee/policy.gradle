@@ -34,7 +34,7 @@ class GoogleTermsCheck implements Action<Task>, Serializable {
             def unknown = (artifact.unknownLicenses ?: []).collect { it.url }
             def ok = !(spdx.isEmpty() && unknown.isEmpty()) &&
                     spdx.every { spdxIds.contains(it) } &&
-                    unknown.every { termsUrls.contains(it) || artifactUrls[it] == "${artifact.groupId}:${artifact.artifactId}".toString() }
+                    unknown.every { termsUrls.contains(it) || artifactUrls.get(it) == "${artifact.groupId}:${artifact.artifactId}".toString() }
             if (!ok) {
                 problems << "${coordinates} is listed in ${listName} but its licence is not the Google/Android SDK terms: " +
                         (spdx + unknown).join(', ')

@@ -36,20 +36,23 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `gradle.allprojects`/`beforeProject`/`afterProject`/`projectsLoaded`/`projectsEvaluated`. M1-84 (isolated projects): any `rootProject`
    (also `getRootProject()`, passed, held in a variable or in string template code, `gradle.rootProject { }`) other than
    `isolated.rootProject`, which reads the root's directory; in a settings file `rootProject` is the project descriptor, so there only
-   `rootProject.name`, `.buildFileName` and `.projectDir` pass. `parent` (also `getParent()`) with the implicit receiver or on `project`,
-   `target`, `this` or `getProject()` (also backticked, in parentheses, after `!!` or a cast). A `project(...)`/`findProject(...)` that is
-   not a direct argument of a dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block,
+   `rootProject.name`, `.buildFileName` and `.projectDir` pass. `parent` and `getParent` on any receiver (also a reference such as
+   `Project::getParent`; File.parent and Path.parent share the name and fail closed, use `parentFile`). A `project(...)`/`findProject(...)`
+   that is not a direct argument of a dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block,
    `"conf"(...)`, Groovy `conf project(...)`, or `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in
    between), so one held in a variable or in `configure(listOf(project(...))) { }` fails; so does a callable reference (`::project`, Groovy
-   `.&project`) and a quoted `project`/`findProject` call. A backticked name counts as the plain one. Groovy resolves names at run time, so
-   in a .gradle file the class is denied, not the names: a string literal used as a name (after `.`, `.&` or `.@`, called, in command
-   syntax, as a subscript key), Groovy command syntax (`project ':app', { }`, `project':b'`), a dynamic member `.(expr)`, a slashy name or
-   call, `\\uXXXX` in code, `invokeMethod` and the meta and reflection API (`getMetaMethod`, `metaClass`, `getProperty`, `property`,
-   `getMethod`, `forName`, `evaluate` and the like; PR 384 R1 to R3). A project dependency (`implementation(project(":x"))`,
-   `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the same
-   name), and a Project reached through a helper function or a reflection API not in that list. Fails closed on: a Kotlin parameter, named
-   argument or Groovy map key called `parent`, a settings plugin in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy
-   `conf project(':a'), project(':b')` list.
+   `.&project`) and a quoted `project`/`findProject` call. A backticked name counts as the plain one. Kotlin reaches a name at run time
+   only through Gradle's property lookup, the Groovy builder and reflection, so those fail as a class: `withGroovyBuilder`, `properties`,
+   the KClass members API, `javaClass`, `getMethod` and the like (DYNAMIC_API), and `property`/`findProperty`/`hasProperty` with anything
+   but a plain string literal that is not a denied name. Groovy resolves every name at run time, so a .gradle file is read by allowlist: it
+   uses only the identifiers in GROOVY_IDENTIFIERS (what the licensee policy needs, keywords and the plugins and dependencies DSL), and
+   none of the forms that name something without an identifier: a string literal used as a name (after `.`, `.&` or `.@`, called, in
+   command syntax such as `project ':app', { }` or `project':b'`), a method pointer, field access or dynamic member (`.&`, `.@`,
+   `.(expr)`), a subscript whose key is not an integer, a slashy string, and a `\\uXXXX` escape anywhere (PR 384 R1 to R3). A project
+   dependency (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: a Kotlin
+   Project reached through a helper function, or through a reflection API not in DYNAMIC_API. Fails closed on: a Kotlin parameter or named
+   argument called `parent`, File.parent, a settings plugin in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf
+   project(':a'), project(':b')` list.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
@@ -594,28 +597,24 @@ def module_paths(root):
 # M1-84, isolated projects: the root project is read only through `isolated.rootProject` (an IsolatedProject: its directory, name and
 # path). In a settings file `rootProject` is the ProjectDescriptor: there only `rootProject.name`, `.buildFileName` and `.projectDir`
 # (also on `settings.`) pass.
-ROOT_PROJECT = re.compile(r"(?<![\w$])(?:rootProject|getRootProject\s*\(\s*\))(?![\w$])")
+ROOT_PROJECT = re.compile(r"(?<![\w$])(?:rootProject|getRootProject)(?![\w$])")  # also a reference, Project::getRootProject
 ISOLATED_BEFORE = re.compile(r"(?<![\w$])(?:isolated|getIsolated\s*\(\s*\))\s*(?:\?|!!)?\s*\.\s*$")
 DESCRIPTOR = re.compile(r"\s*\.\s*(?:name|buildFileName|projectDir)(?![\w$])")
 SETTINGS_RECEIVER = re.compile(r"(?:^|[^\w$.\s])\s*(?:settings\s*\.\s*)?$")
-# The parent project: with the implicit receiver (`parent`, `getParent()`) or on `project`, `target`, `this` or `getProject()`. A
-# `.parent` on any other receiver is not read: File.parent and Path.parent have the same name (a known gap).
-PARENT = re.compile(
-    r"(?<![\w$.])(?:parent|getParent\s*\(\s*\))(?![\w$])"
-    # PR 384 R1-02: also with the receiver in parentheses, `(project).parent`.
-    # PR 384 R2-03: backticked, in any parentheses, after `!!` or a cast: `((project)).parent`, `(project as Project).parent`.
-    r"|(?<![\w$])(?:\(\s*)*(?:`?(?:project|target|this)`?|`?getProject`?\s*\(\s*\))(?:\s*!!|\s+as\??\s+[\w.]+\??)*(?:\s*\))*"
-    r"\s*(?:\?|!!)?\s*\.\s*(?:parent|getParent\s*\(\s*\))(?![\w$])"
-)
+# The parent project, by its name on any receiver: File.parent and Path.parent share the name and fail closed (use parentFile).
+PARENT = re.compile(r"(?<![\w$])(?:parent|getParent)(?![\w$])")  # on any receiver (R3 self-review); File.parent fails closed
 # project(...)/findProject(...) on any receiver but `dependencies.` (DependencyHandler.project, a dependency). It passes only as a direct
 # argument of a dependency declaration (an allowlist): a call that is a whole statement in a `dependencies { }` block (`conf(...)`,
 # `"conf"(...)`, `add("conf", ...)`, Groovy `conf project(...)`, optionally with a configuration block) or `dependencies.<conf>(...)`,
 # with only testFixtures, platform or enforcedPlatform between it and project(...).
 PROJECT_CALL = re.compile(r"(?<![\w$])`?(?:project|findProject)`?\s*\(")  # also backticked (PR 384 R1-01)
 # A name in a string literal (PR 384 R1-01, R2-02, R3-01, R3-02). Kotlin has none but `"conf"(...)`, so there only a quoted
-# project/findProject call fails. Groovy resolves names at run time, so in a .gradle file check 4 denies the whole class instead of
-# the names it knows: a string literal used as a name (after `.` or `.&`, called, in command syntax, as a subscript key), a dynamic
-# member `.(expr)`, a slashy string in a name or call position, `\uXXXX` in code, and the meta and reflection API.
+# project/findProject call fails. Groovy resolves every name at run time, so a .gradle file is read by allowlist (R3 self-review):
+# it uses only the identifiers in GROOVY_IDENTIFIERS (what the licensee policy needs, keywords and the plugins/dependencies DSL), and
+# none of the forms that name something without an identifier: a string literal used as a name (after `.`, `.&` or `.@`, called, in
+# command syntax), a method pointer, field access or dynamic member (`.&`, `.@`, `.(expr)`), a subscript with a key that is not an
+# integer, a slashy string, and a `\uXXXX` escape anywhere. A map key or named argument (`[a: 1]`, `project(path: ':x')`) is a
+# string, not a name.
 PROJECT_NAMES = {"project", "findProject"}
 MEMBER_BEFORE = re.compile(r"\.\s*[&@]?\s*$")  # also Groovy method pointer .& and direct field access .@
 CALL_AFTER = re.compile(r"\s*\(")
@@ -623,13 +622,49 @@ CALL_AFTER = re.compile(r"\s*\(")
 COMMAND_AFTER = re.compile(r"""[ \t]+(?!(?:in|instanceof|as)\b)['"\w$]|['"]""")
 GROOVY_COMMAND = re.compile(r"""(?<![\w$])`?(?:project|findProject)`?(?:[ \t]+(?!(?:in|instanceof|as)\b)(?=['"\w$/\[])|(?=['"]))""")
 SUBSCRIPT_BEFORE = re.compile(r"[\w$)\]]\s*\[\s*$")
-GROOVY_DYNAMIC = re.compile(
-    r"[?*]?\.\s*[&@]?\s*(?:\(|\$?/)"  # project.(expr), project.&(expr), owner./name/, owner.$/name/$
-    r"|\\u[0-9a-fA-F]{4}"
-    r"|(?<![\w$])(?:getMetaMethod|getMetaClass|metaClass|getProperty|setProperty|property|getMethod|getMethods|getDeclaredMethod"
-    r"|getDeclaredMethods|forName|evaluate|Eval|GroovyShell|respondsTo|methodMissing|propertyMissing)(?![\w$])"
+GROOVY_IDENTIFIERS = frozenset(
+    [
+        # config/licensee/policy.gradle
+        "Action", "File", "GoogleTermsCheck", "GradleException", "JsonSlurper", "List", "Map", "Override", "Serializable", "String",
+        "Task", "allow", "allowDependency", "allowUrl", "allowedSpdxIds", "any", "approved", "approvedCoordinates", "artifact",
+        "artifactId", "artifactTermsUrls", "artifactUrls", "as", "asFile", "because", "class", "collect", "configureEach",
+        "contains", "coordinates", "def", "doLast", "each", "every", "execute", "exists", "ext", "file", "findAll", "get",
+        "googleTermsFile", "googleTermsUrls", "groovy", "groupId", "has", "identifier", "if", "implements", "import", "indexOf",
+        "isEmpty", "isolated", "it", "join", "json", "jsonOutput", "licensee", "licenseeTask", "line", "listName", "name", "new",
+        "ok", "parse", "parts", "problems", "project", "projectDirectory", "readLines", "reason", "return", "rootProject", "size",
+        "spdx", "spdxIds", "spdxLicenses", "split", "startsWith", "substring", "task", "tasks", "termsUrls", "throw", "toString",
+        "trim", "unknown", "unknownLicenses", "url", "version", "void",
+        # keywords and literals
+        "else", "null", "true", "false", "in", "instanceof", "for", "while", "try", "catch", "finally", "break", "continue",
+        "static", "final", "private", "public", "protected",
+        # the plugins and dependencies DSL, and a settings file's project descriptor
+        "plugins", "id", "alias", "libs", "dependencies", "implementation", "api", "settings", "buildFileName", "projectDir",
+    ]
 )
-SLASHY_CALL = re.compile(r"\$?/[^/\n]+/\$?\s*\(")
+IDENTIFIER = re.compile(r"(?<![\w$])[A-Za-z_][\w$]*")
+MAP_KEY = re.compile(r"\s*:(?!:)")  # after an identifier that follows `[`, `(` or `,`: a map key or named argument
+GROOVY_FORMS = re.compile(
+    r"(?<!\.)[?*]?\.\s*[&@(]"  # method pointer, direct field access, dynamic member; not a range `0..(n)`
+    r"|[\w$)\]]\s*\[(?!\s*\d+\s*\])"  # a subscript whose key is not an integer: project[name], map['key']
+    r"|\$/"  # a dollar-slashy string
+)
+DENIED_NAMES = {"parent", "getParent", "rootProject", "getRootProject", "allprojects", "getAllprojects", "subprojects", "getSubprojects",
+                "childProjects", "getChildProjects"}
+# Kotlin reaches a name at run time only through Gradle's property lookup, the Groovy builder and reflection (R3 self-review).
+DYNAMIC_API = re.compile(
+    r"(?<![\w$])(?:withGroovyBuilder|invokeMethod|metaClass|getMetaClass|getMetaMethod|javaClass|getMethod|getMethods|getDeclaredMethod"
+    r"|getDeclaredMethods|methods|declaredMethods|members|declaredMembers|memberFunctions|memberProperties|declaredMemberFunctions"
+    r"|declaredMemberProperties|memberExtensionFunctions|memberExtensionProperties|staticProperties|staticFunctions|functions"
+    r"|declaredFunctions|callBy|forName|getAt|evaluate|GroovyShell|Eval|properties|getProperties)(?![\w$])"
+)
+# A property lookup by name passes only with a plain string literal that is not a denied name: inputs.property("taskCount", x).
+PROPERTY_CALL = re.compile(r"(?<![\w$])(?:property|findProperty|hasProperty)\s*\(\s*")  # Kotlin's Project has no getProperty
+DEPENDENCIES_BEFORE = re.compile(r"(?<![\w$])dependencies\s*\.\s*(?:constraints\s*\.\s*)?$")
+WRAPPERS = {"testFixtures", "platform", "enforcedPlatform"}
+NOT_DEPENDENCY_CALLS = KEYWORDS | {"with", "run", "apply", "also", "let", "configure", "project", "findProject"}
+STATEMENT_START = re.compile(r"(?:^|[\n;{])[ \t]*$")
+STATEMENT_END = re.compile(r"[ \t]*(?:$|[\n;}]|\{)")
+WINDOW = 400  # how far back a receiver is looked for
 
 
 def literals(raw, starts):
@@ -648,7 +683,8 @@ def literals(raw, starts):
             elif len(delim) == 1 and raw[i] == "\n":
                 break
             i += 1
-        yield s - len(delim), min(len(raw), i + len(delim)), raw[s:i]
+        closed = raw.startswith(delim, i)
+        yield s - len(delim), min(len(raw), i + len(delim)) if closed else i, raw[s:i]
 
 
 def string_names(raw, text, starts, groovy):
@@ -663,20 +699,34 @@ def string_names(raw, text, starts, groovy):
     return found
 
 
-def groovy_dynamic(text):
-    """Offsets in a .gradle file's code where Groovy resolves a name at run time (see PROJECT_NAMES)."""
-    found = [m.start() for m in GROOVY_DYNAMIC.finditer(text)]
-    for m in SLASHY_CALL.finditer(text):
-        operand = text[: m.start()].rstrip()[-1:]
-        if not (operand.isalnum() or operand in "_$)]"):  # where an operand goes, so not a division
+def groovy_problems(raw, text):
+    """(strong, weak) offsets in a .gradle file: the forms that name something without an identifier, and identifiers that are not
+    on the allowlist (see GROOVY_IDENTIFIERS)."""
+    strong = [m.start() for m in GROOVY_FORMS.finditer(text)] + [m.start() for m in re.finditer(r"\\u[0-9a-fA-F]{4}", raw)]
+    for i, c in enumerate(text):
+        if c == "/":
+            operand = text[:i].rstrip()[-1:]
+            if not (operand.isalnum() or operand in "_$)]'\""):  # where an operand goes: a slashy string, not a division
+                strong.append(i)
+    weak = []
+    for m in IDENTIFIER.finditer(text):
+        if m.group() in GROOVY_IDENTIFIERS:
+            continue
+        if MAP_KEY.match(text, m.end()) and text[: m.start()].rstrip()[-1:] in ("[", "(", ","):
+            continue
+        weak.append((m.start(), m.group()))
+    return strong, weak
+
+
+def dynamic_lookups(text, lits):
+    """Offsets of a run-time name lookup (DYNAMIC_API, or PROPERTY_CALL without a plain, allowed literal); lits maps a literal's
+    quote offset to (end, contents)."""
+    found = [m.start() for m in DYNAMIC_API.finditer(text)]
+    for m in PROPERTY_CALL.finditer(text):
+        end, contents = lits.get(m.end(), (None, None))
+        if end is None or "$" in contents or contents in DENIED_NAMES or not re.match(r"\s*[,)]", text[end:]):
             found.append(m.start())
     return found
-DEPENDENCIES_BEFORE = re.compile(r"(?<![\w$])dependencies\s*\.\s*(?:constraints\s*\.\s*)?$")
-WRAPPERS = {"testFixtures", "platform", "enforcedPlatform"}
-NOT_DEPENDENCY_CALLS = KEYWORDS | {"with", "run", "apply", "also", "let", "configure", "project", "findProject"}
-STATEMENT_START = re.compile(r"(?:^|[\n;{])[ \t]*$")
-STATEMENT_END = re.compile(r"[ \t]*(?:$|[\n;}]|\{)")
-WINDOW = 400  # how far back a receiver is looked for
 
 
 def is_settings(p):
@@ -738,9 +788,9 @@ def dependency_argument(blank, pos, deps, wrapped=0):
     return declaration(blank, start, closer(blank, blank.index("(", pos)), deps, m.group(1))
 
 
-def cross_project(text, settings, quoted=(), groovy=False):
+def cross_project(text, settings, extra=(), weak=()):
     """(line, what, hint) for each line of text (comments and string contents blanked) that reaches other projects, first finding only.
-    quoted: offsets of string literals used as a name (string_names); groovy: text is a .gradle file."""
+    extra: more (offset, what, hint) findings; weak: findings reported only on a line with no other (the Groovy allowlist)."""
     found = []
     for m in CROSS_PROJECT.finditer(text):
         found.append((m.start(), m.group().strip(), "move it into a convention plugin in build-logic/"))
@@ -755,12 +805,9 @@ def cross_project(text, settings, quoted=(), groovy=False):
         if not DEPENDENCIES_BEFORE.search(text[max(0, m.start() - WINDOW) : m.start()]) and not dependency_argument(text, m.start(), deps):
             call = "findProject" if "findProject" in m.group() else "project"
             found.append((m.start(), f"{call}(...)", "use project(...) only as a dependency, e.g. implementation(project(...))"))
-    found += [(q, "a name in a string", "call methods and read properties by their plain names") for q in quoted]
-    if groovy:
-        found += [(m.start(), "project(...)", "call project(...) with parentheses, only as a dependency") for m in GROOVY_COMMAND.finditer(text)]
-        found += [(o, "a name resolved at run time", "call methods and read properties by their plain names") for o in groovy_dynamic(text)]
+    found += list(extra)
     lines = {}
-    for start, what, hint in sorted(found):
+    for start, what, hint in sorted(found) + sorted(weak):
         lines.setdefault(line_of(text, start), (what, hint))
     return [(line, what, hint) for line, (what, hint) in sorted(lines.items())]
 
@@ -770,7 +817,18 @@ def convention_problems(root):
     for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
         raw, starts = read(root, p), []
         text = strip(raw, blank_strings=True, templates=True, strings=starts)
-        found = cross_project(text, is_settings(p), string_names(raw, text, starts, p.endswith(".gradle")), p.endswith(".gradle"))
+        groovy, lits = p.endswith(".gradle"), {q: (e, c) for q, e, c in literals(raw, starts)}
+        runtime = "call methods and read properties by their plain names"
+        extra = [(q, "a name in a string", runtime) for q in string_names(raw, text, starts, groovy)]
+        extra += [(o, "a name looked up at run time", runtime) for o in dynamic_lookups(text, lits)]
+        weak = []
+        if groovy:
+            extra += [(m.start(), "project(...)", "call project(...) with parentheses, only as a dependency") for m in GROOVY_COMMAND.finditer(text)]
+            strong, names = groovy_problems(raw, text)
+            extra += [(o, "a name resolved at run time", runtime) for o in strong]
+            allowlist = "a .gradle file uses only the names in GROOVY_IDENTIFIERS (Groovy resolves names at run time)"
+            weak = [(o, f"`{n}` is not on the Groovy allowlist", allowlist) for o, n in names]
+        found = cross_project(text, is_settings(p), extra, weak)
         problems += [f"{p}:{line}: reaches other projects ({what}); {hint}" for line, what, hint in found]
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
