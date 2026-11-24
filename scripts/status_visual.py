@@ -285,7 +285,7 @@ def render_svg(model):
         y += 12
         out.insert(start, f'<rect x="24" y="{top}" width="{WIDTH - 48}" height="{y - top}" rx="6" class="card"/>')
 
-    text(24, 36, "Listicles status", "fg t")
+    text(24, 36, "Tally status", "fg t")
     text(WIDTH - 24, 36, escape(stamp_text(model["generated"])), "muted", "end", f' id="{STAMP_ID}"')
     text(24, 56, "Checked every 30 minutes; the picture is rewritten only when something changes. "
          f"Open follow-ups: {int(model['followups'])}. Outside questions: {int(model['outside'])}.", "muted s")
@@ -329,7 +329,7 @@ def render_svg(model):
     summary = (f"{len(model['milestones'])} milestones ({names}), {int(model['queue_total'])} PRs waiting, "
                f"{int(model['blockers_total'])} blockers")
     head = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{height}" viewBox="0 0 {WIDTH} {height}" '
-            f'role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">{escape(summary)}</desc>'
+            f'role="img" aria-labelledby="ti de"><title id="ti">Tally status</title><desc id="de">{escape(summary)}</desc>'
             f"<style>{CSS}</style>"
             f'<rect width="{WIDTH}" height="{height}" class="bg"/>')
     return head + "\n" + "\n".join(out) + "\n</svg>\n"

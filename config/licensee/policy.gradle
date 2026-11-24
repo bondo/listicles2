@@ -34,7 +34,7 @@ class GoogleTermsCheck implements Action<Task>, Serializable {
             def unknown = (artifact.unknownLicenses ?: []).collect { it.url }
             def ok = !(spdx.isEmpty() && unknown.isEmpty()) &&
                     spdx.every { spdxIds.contains(it) } &&
-                    unknown.every { termsUrls.contains(it) || artifactUrls[it] == "${artifact.groupId}:${artifact.artifactId}".toString() }
+                    unknown.every { termsUrls.contains(it) || artifactUrls.get(it) == "${artifact.groupId}:${artifact.artifactId}".toString() }
             if (!ok) {
                 problems << "${coordinates} is listed in ${listName} but its licence is not the Google/Android SDK terms: " +
                         (spdx + unknown).join(', ')
@@ -48,7 +48,7 @@ class GoogleTermsCheck implements Action<Task>, Serializable {
 
 def googleTermsFile = project.ext.has('licenseeGoogleTermsFile') ?
         project.ext.get('licenseeGoogleTermsFile') as File :
-        rootProject.file('config/licensee/google-sdk-terms.txt')
+        isolated.rootProject.projectDirectory.file('config/licensee/google-sdk-terms.txt').asFile
 
 def allowedSpdxIds = ['Apache-2.0', 'MIT', 'BSD-2-Clause', 'BSD-3-Clause']
 // M1-26, M1-O14 (owner decisions, issue 15 comments 7083187223, 7085175461 and 7095943127, group B): these two terms are each allowed for

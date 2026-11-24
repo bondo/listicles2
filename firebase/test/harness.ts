@@ -163,7 +163,7 @@ export async function verifiedOnly(
 // a quote, a brace, a match path of other than plain segments or an allow statement not ended by its
 // own ; before any brace is left unread, and then it throws (R2-01 to R3-04).
 function parseRules(rules: string): {
-    allows: { path: string; condition: string }[];
+    allows: { path: string; methods: string[]; condition: string }[];
     signedIn: string[];
 } {
     const code = rules.replace(
@@ -171,11 +171,11 @@ function parseRules(rules: string): {
         (m) => (m.startsWith("/") ? " " : "''"),
     );
     const stack: string[] = [];
-    const allows: { path: string; condition: string }[] = [];
+    const allows: { path: string; methods: string[]; condition: string }[] = [];
     const signedIn: string[] = [];
     let matches = 0;
     for (const m of code.matchAll(
-        /\bmatch\s*((?:\/(?:\{\w+(?:=\*\*)?\}|[^\s/{}]+))+)\s*\{|\ballow\b[^:;{}]*(?::\s*if\b([^;{}]*))?;|\bfunction\s+signedIn\b|[{}]/g,
+        /\bmatch\s*((?:\/(?:\{\w+(?:=\*\*)?\}|[^\s/{}]+))+)\s*\{|\ballow\b([^:;{}]*)(?::\s*if\b([^;{}]*))?;|\bfunction\s+signedIn\b|[{}]/g,
     )) {
         if (m[1] !== undefined) {
             stack.push(m[1]);
@@ -183,7 +183,8 @@ function parseRules(rules: string): {
         } else if (m[0].startsWith("allow")) {
             allows.push({
                 path: stack.join(""),
-                condition: (m[2] ?? "").replace(/\s+/g, " ").trim(),
+                methods: (m[2] ?? "").split(",").map((s) => s.trim()),
+                condition: (m[3] ?? "").replace(/\s+/g, " ").trim(),
             });
         } else if (m[0].startsWith("function")) signedIn.push(stack.join(""));
         else if (m[0] === "{") stack.push("");
@@ -228,6 +229,21 @@ export function withoutSignedIn(rules: string): string[] {
     if (signedIn.length === 1 && signedIn[0] === DOCUMENTS) return missing;
     const found = signedIn.map((path) => path || "the service block").join(", ") || "none";
     return [...missing, `signedIn() must be declared once, at ${DOCUMENTS}; found: ${found}`];
+}
+
+// M1-06: each method an allow statement grants (read and write spelled out), as `<path under the
+// documents match> <method>`, sorted; fuzz.test.ts compares them with the rows of model.ts.
+const SPELLED: Record<string, string[]> = {
+    read: ["get", "list"],
+    write: ["create", "update", "delete"],
+};
+export function allowedMethods(rules: string): string[] {
+    const granted = parseRules(rules).allows.flatMap(({ path, methods }) =>
+        methods
+            .flatMap((m) => SPELLED[m] ?? [m])
+            .map((m) => `${path.replace(`${DOCUMENTS}/`, "")} ${m}`),
+    );
+    return granted.sort();
 }
 
 // "denied" only for a permission-denied error; any other error is thrown, so a broken probe never
