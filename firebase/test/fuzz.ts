@@ -11,9 +11,9 @@ import * as m from "./model";
 // next to a rule's boundary, and a random background. A new row needs only its template.
 const [ALICE, BOB, CAROL, DAN] = ["alice", "bob", "carol", "dan"];
 const UIDS = [ALICE, BOB, CAROL, DAN];
-// Firestore auto-ids (P3), and two ids that are not: 19 characters, a `_`.
+// Firestore auto-ids (P3), and ids that are not: 19 and 21 characters, a `_`, a `-`.
 const [H1, H2, H3] = ["Kq3ZtW9xLm2RbV7nPc4D", "Pz8YwV2nQs5TxK1mRc7B", "Mx4UvB6tRw9QaZ3nLk2C"];
-const HIDS = [H1, H2, H3, H1.slice(1), `${H1.slice(1)}_`];
+const HIDS = [H1, H2, H3, H1.slice(1), `${H1}x`, `${H1.slice(1)}_`, `${H1.slice(1)}-`];
 const CODE = `${H1}_${"s".repeat(22)}`;
 
 type Op = m.Write["op"];
@@ -34,7 +34,8 @@ const HOME = { [m.household(H1)]: LIVE, [m.member(H1, BOB)]: { ...MEMBER, role: 
 const CAROLS = { ...HOME, [m.member(H1, CAROL)]: MEMBER };
 const NEW: m.Doc = { ...LIVE, createdBy: ALICE, createdAt: m.NOW, ownerUid: ALICE };
 const OWNER: m.Doc = { role: "owner", displayName: "Ann", joinedAt: m.NOW };
-const INVITE = { householdId: H1, householdName: "Home", createdBy: CAROL };
+const LATER = new Date("2999-01-01T00:00:00Z"); // after any request time: an unexpired invite
+const INVITE = { householdId: H1, householdName: "Home", createdBy: CAROL, expiresAt: LATER };
 const points = (householdId: string | null): m.Doc => ({ householdId });
 // For reads: carol's live household of bob's, and dan's tombstone, which his householdId names.
 const TOMB = { ...LIVE, ownerUid: DAN, name: "", deleted: true };
@@ -122,6 +123,13 @@ const STORED: Record<string, m.Value[]> = {
     role: ["owner", "member"],
     displayName: ["Name", " "],
     name: ["Home", ""],
+    expiresAt: [m.T0, LATER],
+};
+// The key an `extra` tweak adds: one of the collection's in PLAN section 3 (P4) or an unknown one.
+const KEYS: Record<string, string[]> = {
+    users: ["householdId", "name", "color"],
+    households: [...Object.keys(LIVE), "color"],
+    members: [...Object.keys(MEMBER), "viaInvite", "color"],
 };
 
 const KINDS = "value value value field field field rename rename clone drop extra op id omit";
@@ -153,10 +161,11 @@ function change(d: Draft, t: Tweak, paths: string[]): void {
     const reid = (p: string, id = pick(ids(p), t.key) ?? ""): string =>
         swap(p, id, other(id, t.at));
     const value = doc && pick(STORED[key(doc)] ?? [], t.at);
+    const extra = pick(KEYS[w?.path.split("/").at(-2) ?? ""] ?? [], t.key) ?? "color";
     if (t.kind === "value" && w) w.data = { ...w.data, [key(w.data)]: t.value };
     if (t.kind === "drop" && w)
         w.data = Object.fromEntries(Object.entries(w.data).filter(([k]) => k !== key(w.data)));
-    if (t.kind === "extra" && w) w.data = { ...w.data, color: t.value };
+    if (t.kind === "extra" && w) w.data = { ...w.data, [extra]: t.value };
     if (t.kind === "op" && w) w.op = pick<Op>(["set", "update", "delete"], t.key) ?? "set";
     if (t.kind === "id" && w) w.path = reid(w.path);
     if (t.kind === "clone" && w) d.writes.push({ ...w, path: reid(w.path) });

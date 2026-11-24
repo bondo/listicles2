@@ -20,7 +20,7 @@ export type Request = { op: "get" | "list"; path: string } | { op: "commit"; wri
 type Method = "get" | "list" | "create" | "update" | "delete";
 
 // What a row sees: the caller, the world before the request (get, exists) and after it (getAfter,
-// existsAfter), the document before (resource) and after (request.resource; {} for reads, deletes).
+// existsAfter), the document before (resource) and after (request.resource; {} after a delete).
 type Ctx = { uid: string; authed: boolean; signedIn: boolean; before: World; after: World };
 type Row = (x: Ctx & { old: Doc | undefined; doc: Doc }, ...ids: string[]) => boolean;
 
