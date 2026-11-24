@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="2006" viewBox="0 0 880 2006" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 78/111; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/3; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 5 PRs waiting, 23 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="2006" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="2042" viewBox="0 0 880 2042" role="img" aria-labelledby="ti de"><title id="ti">Listicles status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 79/112; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/3; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 6 PRs waiting, 23 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="2042" class="bg"/>
 <text x="24" y="36" class="fg t">Listicles status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-24 14:51 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-24 15:52 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 44. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -20,202 +20,206 @@
 <rect x="40" y="276" width="640" height="8" rx="3" class="full"/>
 <polyline points="40,304 43,307 48,300" class="tick mk-done"/>
 <text x="60" y="308" class="ok">35 done</text>
-<rect x="24" y="332" width="832" height="428" rx="6" class="card"/>
+<rect x="24" y="332" width="832" height="442" rx="6" class="card"/>
 <text x="40" y="356" class="fg h">M1 Accounts and households</text>
-<text x="840" y="356" class="fg" text-anchor="end">70%  78/111</text>
+<text x="840" y="356" class="fg" text-anchor="end">70%  79/112</text>
 <text x="840" y="374" class="info s" text-anchor="end">current</text>
 <text x="40" y="374" class="muted s">Google and email sign-in, households, invite links, members and ownership, with rules tests.</text>
 <rect x="40" y="386" width="640" height="8" rx="3" class="track"/>
-<rect x="40" y="386" width="449" height="8" rx="3" class="bar"/>
+<rect x="40" y="386" width="451" height="8" rx="3" class="bar"/>
 <polyline points="40,414 43,417 48,410" class="tick mk-done"/>
-<text x="60" y="418" class="ok">78 done</text>
-<polygon points="39,438 49,438 44,429" class="info mk-progress"/>
-<text x="60" y="438" class="info">in progress #372</text>
-<text x="180" y="438" class="fg h">M1-06</text>
-<text x="262" y="438" class="fg">Rules fuzzing: fast-check against a TS reference model of PLAN 3.1 (P17)</text>
+<text x="60" y="418" class="ok">79 done</text>
+<circle cx="44" cy="434" r="4.5" class="ok mk-ready"/>
+<text x="60" y="438" class="ok">ready</text>
+<text x="180" y="438" class="fg h">M1-11</text>
+<text x="262" y="438" class="fg">Rules: leave, remove member (removed marker), household soft delete and cl…</text>
 <circle cx="44" cy="454" r="4.5" class="ok mk-ready"/>
 <text x="60" y="458" class="ok">ready</text>
-<text x="180" y="458" class="fg h">M1-11</text>
-<text x="262" y="458" class="fg">Rules: leave, remove member (removed marker), household soft delete and cl…</text>
+<text x="180" y="458" class="fg h">M1-82</text>
+<text x="262" y="458" class="fg">Firestore source for the minimum app version: config/app.minVersionCode bou…</text>
 <circle cx="44" cy="474" r="4.5" class="ok mk-ready"/>
 <text x="60" y="478" class="ok">ready</text>
-<text x="180" y="478" class="fg h">M1-82</text>
-<text x="262" y="478" class="fg">Firestore source for the minimum app version: config/app.minVersionCode bou…</text>
+<text x="180" y="478" class="fg h">M1-89</text>
+<text x="262" y="478" class="fg">Clear the local data on every change to signed out, also when Firebase signs t…</text>
 <circle cx="44" cy="494" r="4.5" class="ok mk-ready"/>
 <text x="60" y="498" class="ok">ready</text>
-<text x="180" y="498" class="fg h">M1-89</text>
-<text x="262" y="498" class="fg">Clear the local data on every change to signed out, also when Firebase signs t…</text>
+<text x="180" y="498" class="fg h">M1-15</text>
+<text x="262" y="498" class="fg">Auth data: email and password sign-up, sign-in, verification, reset, error m…</text>
 <circle cx="44" cy="514" r="4.5" class="ok mk-ready"/>
 <text x="60" y="518" class="ok">ready</text>
-<text x="180" y="518" class="fg h">M1-15</text>
-<text x="262" y="518" class="fg">Auth data: email and password sign-up, sign-in, verification, reset, error m…</text>
-<circle cx="44" cy="534" r="4.5" class="ok mk-ready"/>
-<text x="60" y="538" class="ok">ready</text>
-<text x="180" y="538" class="fg h">M1-16</text>
-<text x="262" y="538" class="fg">Sign-in UI: sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is …</text>
-<rect x="40" y="550" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="558" class="warn">blocked</text>
-<text x="180" y="558" class="fg h">M1-17</text>
-<text x="262" y="558" class="fg">Email UI: create account, check your email, sign in, reset (AUTH-05..08, AUTH…</text>
-<text x="262" y="572" class="muted s">waits on M1-15, M1-16</text>
-<circle cx="44" cy="588" r="4.5" class="ok mk-ready"/>
-<text x="60" y="592" class="ok">ready</text>
-<text x="180" y="592" class="fg h">M1-18</text>
-<text x="262" y="592" class="fg">Household data 1: create, invite, revoke, join, start-up self-heal (emulator)</text>
-<rect x="40" y="604" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="612" class="warn">blocked</text>
-<text x="180" y="612" class="fg h">M1-31</text>
-<text x="262" y="612" class="fg">Household data 2: leave, remove (marker, resumable), transfer, delete with …</text>
-<text x="262" y="626" class="muted s">waits on M1-11, M1-18</text>
-<rect x="40" y="638" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="646" class="warn">blocked</text>
-<text x="180" y="646" class="fg h">M1-19</text>
-<text x="262" y="646" class="fg">Household UI: create, members, invite share sheet, revoke (HH-01, HH-02, HH-0…</text>
-<text x="262" y="660" class="muted s">waits on M1-18</text>
-<rect x="40" y="672" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="680" class="warn">blocked</text>
-<text x="180" y="680" class="fg h">M1-20</text>
-<text x="262" y="680" class="fg">Invite link and join screen (HH-03), incl. signed-out routing through sign-in</text>
-<text x="262" y="694" class="muted s">waits on M1-19, M1-17</text>
-<rect x="40" y="706" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="714" class="warn">blocked</text>
-<text x="180" y="714" class="fg h">M1-21</text>
-<text x="262" y="714" class="fg">Leave, remove, transfer and delete household UI, household-deleted dialog (HH-…</text>
-<text x="262" y="728" class="muted s">waits on M1-19, M1-31</text>
-<text x="60" y="748" class="muted">+21 more open tasks</text>
-<rect x="24" y="772" width="832" height="146" rx="6" class="card"/>
-<text x="40" y="796" class="fg h">M2 Inventory lists</text>
-<text x="840" y="796" class="fg" text-anchor="end">0%  0/2</text>
-<text x="40" y="814" class="muted s">Private and shared lists, plain and collection items, real-time sync and offline use, in English and Danish.</text>
-<rect x="40" y="826" width="640" height="8" rx="3" class="track"/>
-<rect x="40" y="850" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="858" class="warn">blocked</text>
-<text x="180" y="858" class="fg h">M2-01</text>
-<text x="262" y="858" class="fg">Plan M2: docs/milestones/M2.md and PR-sized tasks in this file</text>
-<text x="262" y="872" class="muted s">waits on all of M1</text>
-<rect x="40" y="884" width="8" height="8" class="warn mk-blocked"/>
-<text x="60" y="892" class="warn">blocked</text>
-<text x="180" y="892" class="fg h">M2-FU</text>
-<text x="262" y="892" class="fg">Follow-up burn-down for M2 (planner: add each new M2 task to depends_on)</text>
-<text x="262" y="906" class="muted s">waits on M2-01</text>
-<rect x="24" y="930" width="832" height="166" rx="6" class="card"/>
-<text x="40" y="954" class="fg h">M3 Packing rules (domain)</text>
-<text x="840" y="954" class="fg" text-anchor="end">0%  0/3</text>
-<text x="40" y="972" class="muted s">(After v1.) Scaling, per-person templates and merging as property-tested pure Kotlin.</text>
-<rect x="40" y="984" width="640" height="8" rx="3" class="track"/>
-<polygon points="39,1012 44,1007 49,1012 44,1017" class="bad mk-owner"/>
-<text x="60" y="1016" class="bad">owner to-do</text>
-<text x="180" y="1016" class="fg h">M3-O1</text>
-<text x="262" y="1016" class="fg">Enable Google sign-in in Firebase (needs a public support email for Tally)</text>
-<polygon points="39,1032 44,1027 49,1032 44,1037" class="bad mk-owner"/>
-<text x="60" y="1036" class="bad">owner to-do</text>
-<text x="180" y="1036" class="fg h">M3-O2</text>
-<text x="262" y="1036" class="fg">Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Googl…</text>
-<text x="262" y="1050" class="bad s">waits on M3-O1 (owner)</text>
-<polygon points="39,1066 44,1061 49,1066 44,1071" class="bad mk-owner"/>
-<text x="60" y="1070" class="bad">owner to-do</text>
-<text x="180" y="1070" class="fg h">M3-O3</text>
-<text x="262" y="1070" class="fg">Check once with a real Google sign-in which fields the Firebase Auth record k…</text>
-<text x="262" y="1084" class="bad s">waits on M3-O2 (owner), M3-O1 (owner), M1-16 +1</text>
-<rect x="24" y="1108" width="832" height="66" rx="6" class="card"/>
-<text x="40" y="1132" class="fg h">M4 Packing templates and trips</text>
-<text x="840" y="1132" class="muted" text-anchor="end">not planned yet</text>
-<text x="40" y="1150" class="muted s">(After v1.) Template and rule editor, create a trip, trip checklist and one-off items.</text>
-<rect x="24" y="1186" width="832" height="66" rx="6" class="card"/>
-<text x="40" y="1210" class="fg h">M5 Barcode scanning</text>
-<text x="840" y="1210" class="muted" text-anchor="end">not planned yet</text>
-<text x="40" y="1228" class="muted s">(After v1.) Camera scanning, product lookup with a fallback to manual entry, duplicate warning.</text>
-<rect x="24" y="1264" width="832" height="186" rx="6" class="card"/>
-<text x="40" y="1288" class="fg h">M6 Release</text>
-<text x="840" y="1288" class="fg" text-anchor="end">0%  0/4</text>
-<text x="40" y="1306" class="muted s">Signed APK on tag as a GitHub Release, and a disabled Play internal-track workflow.</text>
-<rect x="40" y="1318" width="640" height="8" rx="3" class="track"/>
-<polygon points="39,1346 44,1341 49,1346 44,1351" class="bad mk-owner"/>
-<text x="60" y="1350" class="bad">owner to-do</text>
-<text x="180" y="1350" class="fg h">M6-O1</text>
-<text x="262" y="1350" class="fg">Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Chec…</text>
-<polygon points="39,1366 44,1361 49,1366 44,1371" class="bad mk-owner"/>
-<text x="60" y="1370" class="bad">owner to-do</text>
-<text x="180" y="1370" class="fg h">M6-O2</text>
-<text x="262" y="1370" class="fg">Register a free limited-distribution Android developer account when available…</text>
-<polygon points="39,1386 44,1381 49,1386 44,1391" class="bad mk-owner"/>
-<text x="60" y="1390" class="bad">owner to-do</text>
-<text x="180" y="1390" class="fg h">M6-O3</text>
-<text x="262" y="1390" class="fg">Register App Check (Play Integrity, device integrity only) with the release ke…</text>
-<text x="262" y="1404" class="bad s">waits on M6-O1 (owner), M1-O4 (owner)</text>
-<polygon points="39,1420 44,1415 49,1420 44,1425" class="bad mk-owner"/>
-<text x="60" y="1424" class="bad">owner to-do</text>
-<text x="180" y="1424" class="fg h">M6-O4</text>
-<text x="262" y="1424" class="fg">Adopt Git LFS for screenshot goldens (deferred: only when the revisit trigger …</text>
-<text x="262" y="1438" class="bad s">waits on M6-O1 (owner)</text>
-<text x="24" y="1484" class="fg h">Owner queue</text>
-<text x="856" y="1484" class="muted s" text-anchor="end">open PRs that are not drafts</text>
-<line x1="24" y1="1492" x2="856" y2="1492" class="rule"/>
-<text x="24" y="1516" class="fg h">#351</text>
-<text x="80" y="1516" class="fg">Build(deps): bump the gradle-minor-patch group across 1 d…</text>
-<text x="856" y="1516" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1538" class="fg h">#369</text>
-<text x="80" y="1538" class="fg">Build(deps): bump actions/upload-artifact from 7.0.1 to 7…</text>
-<text x="856" y="1538" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1560" class="fg h">#370</text>
-<text x="80" y="1560" class="fg">Build(deps-dev): bump typescript-eslint from 8.72.2 to 8.…</text>
-<text x="856" y="1560" class="bad" text-anchor="end">CI failing  behind main</text>
-<text x="24" y="1582" class="fg h">#372</text>
-<text x="80" y="1582" class="fg">M1-06: rules fuzzing with fast-check against a TS referen…</text>
-<text x="856" y="1582" class="warn" text-anchor="end">CI passing  behind main</text>
-<text x="24" y="1604" class="fg h">#384</text>
-<text x="80" y="1604" class="fg">M1-84: isolated projects, module build files read the roo…</text>
-<text x="856" y="1604" class="warn" text-anchor="end">CI pending  behind main</text>
-<text x="24" y="1638" class="fg h">BLOCKERS</text>
-<text x="856" y="1638" class="muted s" text-anchor="end">23 open</text>
-<line x1="24" y1="1646" x2="856" y2="1646" class="rule"/>
-<text x="24" y="1670" class="bad">owner to-do</text>
-<text x="120" y="1670" class="fg h">#120</text>
-<text x="190" y="1670" class="fg">[owner] Register a free limited-distribution Android deve…</text>
-<text x="856" y="1670" class="muted" text-anchor="end">7d</text>
-<text x="24" y="1692" class="bad">owner to-do</text>
-<text x="120" y="1692" class="fg h">#291</text>
-<text x="190" y="1692" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
-<text x="856" y="1692" class="muted" text-anchor="end">2d</text>
-<text x="24" y="1714" class="bad">owner to-do</text>
-<text x="120" y="1714" class="fg h">#374</text>
-<text x="190" y="1714" class="fg">[owner] M1-O3: Check the Identity Platform upgrade needs…</text>
-<text x="856" y="1714" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1736" class="bad">owner to-do</text>
-<text x="120" y="1736" class="fg h">#375</text>
-<text x="190" y="1736" class="fg">[owner] M1-O4: Enable the Play Integrity API for the Fire…</text>
-<text x="856" y="1736" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1758" class="bad">owner to-do</text>
-<text x="120" y="1758" class="fg h">#376</text>
-<text x="190" y="1758" class="fg">[owner] M3-O1: Enable Google sign-in in Firebase (needs a…</text>
-<text x="856" y="1758" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1780" class="bad">owner to-do</text>
-<text x="120" y="1780" class="fg h">#377</text>
-<text x="190" y="1780" class="fg">[owner] M6-O1: Create the GitHub release key; register it…</text>
-<text x="856" y="1780" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1802" class="warn">task</text>
-<text x="120" y="1802" class="fg h">M1-17</text>
-<text x="190" y="1802" class="fg">waits on M1-15, M1-16</text>
-<text x="24" y="1824" class="warn">task</text>
-<text x="120" y="1824" class="fg h">M1-31</text>
-<text x="190" y="1824" class="fg">waits on M1-11, M1-18</text>
-<text x="24" y="1846" class="warn">task</text>
-<text x="120" y="1846" class="fg h">M1-19</text>
-<text x="190" y="1846" class="fg">waits on M1-18</text>
-<text x="24" y="1868" class="warn">task</text>
-<text x="120" y="1868" class="fg h">M1-20</text>
-<text x="190" y="1868" class="fg">waits on M1-19, M1-17</text>
-<text x="24" y="1890" class="warn">task</text>
-<text x="120" y="1890" class="fg h">M1-21</text>
-<text x="190" y="1890" class="fg">waits on M1-19, M1-31</text>
-<text x="24" y="1912" class="warn">task</text>
-<text x="120" y="1912" class="fg h">M1-22</text>
-<text x="190" y="1912" class="fg">waits on M1-17, M1-25</text>
-<text x="24" y="1934" class="warn">task</text>
-<text x="120" y="1934" class="fg h">M1-32</text>
-<text x="190" y="1934" class="fg">waits on M1-22, M1-21</text>
-<text x="24" y="1956" class="warn">task</text>
-<text x="120" y="1956" class="fg h">M1-23</text>
-<text x="190" y="1956" class="fg">waits on M1-32, M1-O3</text>
-<text x="24" y="1978" class="muted">+9 more</text>
+<text x="180" y="518" class="fg h">M1-16</text>
+<text x="262" y="518" class="fg">Sign-in UI: sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is …</text>
+<rect x="40" y="530" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="538" class="warn">blocked</text>
+<text x="180" y="538" class="fg h">M1-17</text>
+<text x="262" y="538" class="fg">Email UI: create account, check your email, sign in, reset (AUTH-05..08, AUTH…</text>
+<text x="262" y="552" class="muted s">waits on M1-15, M1-16</text>
+<circle cx="44" cy="568" r="4.5" class="ok mk-ready"/>
+<text x="60" y="572" class="ok">ready</text>
+<text x="180" y="572" class="fg h">M1-18</text>
+<text x="262" y="572" class="fg">Household data 1: create, invite, revoke, join, start-up self-heal (emulator)</text>
+<rect x="40" y="584" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="592" class="warn">blocked</text>
+<text x="180" y="592" class="fg h">M1-31</text>
+<text x="262" y="592" class="fg">Household data 2: leave, remove (marker, resumable), transfer, delete with …</text>
+<text x="262" y="606" class="muted s">waits on M1-11, M1-18</text>
+<rect x="40" y="618" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="626" class="warn">blocked</text>
+<text x="180" y="626" class="fg h">M1-19</text>
+<text x="262" y="626" class="fg">Household UI: create, members, invite share sheet, revoke (HH-01, HH-02, HH-0…</text>
+<text x="262" y="640" class="muted s">waits on M1-18</text>
+<rect x="40" y="652" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="660" class="warn">blocked</text>
+<text x="180" y="660" class="fg h">M1-20</text>
+<text x="262" y="660" class="fg">Invite link and join screen (HH-03), incl. signed-out routing through sign-in</text>
+<text x="262" y="674" class="muted s">waits on M1-19, M1-17</text>
+<rect x="40" y="686" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="694" class="warn">blocked</text>
+<text x="180" y="694" class="fg h">M1-21</text>
+<text x="262" y="694" class="fg">Leave, remove, transfer and delete household UI, household-deleted dialog (HH-…</text>
+<text x="262" y="708" class="muted s">waits on M1-19, M1-31</text>
+<rect x="40" y="720" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="728" class="warn">blocked</text>
+<text x="180" y="728" class="fg h">M1-22</text>
+<text x="262" y="728" class="fg">Account: change password with recent sign-in (AUTH-11)</text>
+<text x="262" y="742" class="muted s">waits on M1-17, M1-25</text>
+<text x="60" y="762" class="muted">+21 more open tasks</text>
+<rect x="24" y="786" width="832" height="146" rx="6" class="card"/>
+<text x="40" y="810" class="fg h">M2 Inventory lists</text>
+<text x="840" y="810" class="fg" text-anchor="end">0%  0/2</text>
+<text x="40" y="828" class="muted s">Private and shared lists, plain and collection items, real-time sync and offline use, in English and Danish.</text>
+<rect x="40" y="840" width="640" height="8" rx="3" class="track"/>
+<rect x="40" y="864" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="872" class="warn">blocked</text>
+<text x="180" y="872" class="fg h">M2-01</text>
+<text x="262" y="872" class="fg">Plan M2: docs/milestones/M2.md and PR-sized tasks in this file</text>
+<text x="262" y="886" class="muted s">waits on all of M1</text>
+<rect x="40" y="898" width="8" height="8" class="warn mk-blocked"/>
+<text x="60" y="906" class="warn">blocked</text>
+<text x="180" y="906" class="fg h">M2-FU</text>
+<text x="262" y="906" class="fg">Follow-up burn-down for M2 (planner: add each new M2 task to depends_on)</text>
+<text x="262" y="920" class="muted s">waits on M2-01</text>
+<rect x="24" y="944" width="832" height="166" rx="6" class="card"/>
+<text x="40" y="968" class="fg h">M3 Packing rules (domain)</text>
+<text x="840" y="968" class="fg" text-anchor="end">0%  0/3</text>
+<text x="40" y="986" class="muted s">(After v1.) Scaling, per-person templates and merging as property-tested pure Kotlin.</text>
+<rect x="40" y="998" width="640" height="8" rx="3" class="track"/>
+<polygon points="39,1026 44,1021 49,1026 44,1031" class="bad mk-owner"/>
+<text x="60" y="1030" class="bad">owner to-do</text>
+<text x="180" y="1030" class="fg h">M3-O1</text>
+<text x="262" y="1030" class="fg">Enable Google sign-in in Firebase (needs a public support email for Tally)</text>
+<polygon points="39,1046 44,1041 49,1046 44,1051" class="bad mk-owner"/>
+<text x="60" y="1050" class="bad">owner to-do</text>
+<text x="180" y="1050" class="fg h">M3-O2</text>
+<text x="262" y="1050" class="fg">Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Googl…</text>
+<text x="262" y="1064" class="bad s">waits on M3-O1 (owner)</text>
+<polygon points="39,1080 44,1075 49,1080 44,1085" class="bad mk-owner"/>
+<text x="60" y="1084" class="bad">owner to-do</text>
+<text x="180" y="1084" class="fg h">M3-O3</text>
+<text x="262" y="1084" class="fg">Check once with a real Google sign-in which fields the Firebase Auth record k…</text>
+<text x="262" y="1098" class="bad s">waits on M3-O2 (owner), M3-O1 (owner), M1-16 +1</text>
+<rect x="24" y="1122" width="832" height="66" rx="6" class="card"/>
+<text x="40" y="1146" class="fg h">M4 Packing templates and trips</text>
+<text x="840" y="1146" class="muted" text-anchor="end">not planned yet</text>
+<text x="40" y="1164" class="muted s">(After v1.) Template and rule editor, create a trip, trip checklist and one-off items.</text>
+<rect x="24" y="1200" width="832" height="66" rx="6" class="card"/>
+<text x="40" y="1224" class="fg h">M5 Barcode scanning</text>
+<text x="840" y="1224" class="muted" text-anchor="end">not planned yet</text>
+<text x="40" y="1242" class="muted s">(After v1.) Camera scanning, product lookup with a fallback to manual entry, duplicate warning.</text>
+<rect x="24" y="1278" width="832" height="186" rx="6" class="card"/>
+<text x="40" y="1302" class="fg h">M6 Release</text>
+<text x="840" y="1302" class="fg" text-anchor="end">0%  0/4</text>
+<text x="40" y="1320" class="muted s">Signed APK on tag as a GitHub Release, and a disabled Play internal-track workflow.</text>
+<rect x="40" y="1332" width="640" height="8" rx="3" class="track"/>
+<polygon points="39,1360 44,1355 49,1360 44,1365" class="bad mk-owner"/>
+<text x="60" y="1364" class="bad">owner to-do</text>
+<text x="180" y="1364" class="fg h">M6-O1</text>
+<text x="262" y="1364" class="fg">Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Chec…</text>
+<polygon points="39,1380 44,1375 49,1380 44,1385" class="bad mk-owner"/>
+<text x="60" y="1384" class="bad">owner to-do</text>
+<text x="180" y="1384" class="fg h">M6-O2</text>
+<text x="262" y="1384" class="fg">Register a free limited-distribution Android developer account when available…</text>
+<polygon points="39,1400 44,1395 49,1400 44,1405" class="bad mk-owner"/>
+<text x="60" y="1404" class="bad">owner to-do</text>
+<text x="180" y="1404" class="fg h">M6-O3</text>
+<text x="262" y="1404" class="fg">Register App Check (Play Integrity, device integrity only) with the release ke…</text>
+<text x="262" y="1418" class="bad s">waits on M6-O1 (owner), M1-O4 (owner)</text>
+<polygon points="39,1434 44,1429 49,1434 44,1439" class="bad mk-owner"/>
+<text x="60" y="1438" class="bad">owner to-do</text>
+<text x="180" y="1438" class="fg h">M6-O4</text>
+<text x="262" y="1438" class="fg">Adopt Git LFS for screenshot goldens (deferred: only when the revisit trigger …</text>
+<text x="262" y="1452" class="bad s">waits on M6-O1 (owner)</text>
+<text x="24" y="1498" class="fg h">Owner queue</text>
+<text x="856" y="1498" class="muted s" text-anchor="end">open PRs that are not drafts</text>
+<line x1="24" y1="1506" x2="856" y2="1506" class="rule"/>
+<text x="24" y="1530" class="fg h">#351</text>
+<text x="80" y="1530" class="fg">Build(deps): bump the gradle-minor-patch group across 1 d…</text>
+<text x="856" y="1530" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="24" y="1552" class="fg h">#369</text>
+<text x="80" y="1552" class="fg">Build(deps): bump actions/upload-artifact from 7.0.1 to 7…</text>
+<text x="856" y="1552" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="24" y="1574" class="fg h">#370</text>
+<text x="80" y="1574" class="fg">Build(deps-dev): bump typescript-eslint from 8.72.2 to 8.…</text>
+<text x="856" y="1574" class="bad" text-anchor="end">CI failing  behind main</text>
+<text x="24" y="1596" class="fg h">#384</text>
+<text x="80" y="1596" class="fg">M1-84: isolated projects, module build files read the roo…</text>
+<text x="856" y="1596" class="warn" text-anchor="end">CI pending  behind main</text>
+<text x="24" y="1618" class="fg h">#388</text>
+<text x="80" y="1618" class="fg">M1-92: Tooling: process docs, prompts and status output s…</text>
+<text x="856" y="1618" class="warn" text-anchor="end">CI passing  behind main</text>
+<text x="24" y="1640" class="fg h">#389</text>
+<text x="80" y="1640" class="fg">M1-91: hooks and status line read TALLY_* env names; TALL…</text>
+<text x="856" y="1640" class="warn" text-anchor="end">CI passing  behind main</text>
+<text x="24" y="1674" class="fg h">BLOCKERS</text>
+<text x="856" y="1674" class="muted s" text-anchor="end">23 open</text>
+<line x1="24" y1="1682" x2="856" y2="1682" class="rule"/>
+<text x="24" y="1706" class="bad">owner to-do</text>
+<text x="120" y="1706" class="fg h">#120</text>
+<text x="190" y="1706" class="fg">[owner] Register a free limited-distribution Android deve…</text>
+<text x="856" y="1706" class="muted" text-anchor="end">7d</text>
+<text x="24" y="1728" class="bad">owner to-do</text>
+<text x="120" y="1728" class="fg h">#291</text>
+<text x="190" y="1728" class="fg">[owner] M1-O5: Approve the privacy text (OQ-30) before an…</text>
+<text x="856" y="1728" class="muted" text-anchor="end">2d</text>
+<text x="24" y="1750" class="bad">owner to-do</text>
+<text x="120" y="1750" class="fg h">#374</text>
+<text x="190" y="1750" class="fg">[owner] M1-O3: Check the Identity Platform upgrade needs…</text>
+<text x="856" y="1750" class="muted" text-anchor="end">0d</text>
+<text x="24" y="1772" class="bad">owner to-do</text>
+<text x="120" y="1772" class="fg h">#375</text>
+<text x="190" y="1772" class="fg">[owner] M1-O4: Enable the Play Integrity API for the Fire…</text>
+<text x="856" y="1772" class="muted" text-anchor="end">0d</text>
+<text x="24" y="1794" class="bad">owner to-do</text>
+<text x="120" y="1794" class="fg h">#376</text>
+<text x="190" y="1794" class="fg">[owner] M3-O1: Enable Google sign-in in Firebase (needs a…</text>
+<text x="856" y="1794" class="muted" text-anchor="end">0d</text>
+<text x="24" y="1816" class="bad">owner to-do</text>
+<text x="120" y="1816" class="fg h">#377</text>
+<text x="190" y="1816" class="fg">[owner] M6-O1: Create the GitHub release key; register it…</text>
+<text x="856" y="1816" class="muted" text-anchor="end">0d</text>
+<text x="24" y="1838" class="warn">task</text>
+<text x="120" y="1838" class="fg h">M1-17</text>
+<text x="190" y="1838" class="fg">waits on M1-15, M1-16</text>
+<text x="24" y="1860" class="warn">task</text>
+<text x="120" y="1860" class="fg h">M1-31</text>
+<text x="190" y="1860" class="fg">waits on M1-11, M1-18</text>
+<text x="24" y="1882" class="warn">task</text>
+<text x="120" y="1882" class="fg h">M1-19</text>
+<text x="190" y="1882" class="fg">waits on M1-18</text>
+<text x="24" y="1904" class="warn">task</text>
+<text x="120" y="1904" class="fg h">M1-20</text>
+<text x="190" y="1904" class="fg">waits on M1-19, M1-17</text>
+<text x="24" y="1926" class="warn">task</text>
+<text x="120" y="1926" class="fg h">M1-21</text>
+<text x="190" y="1926" class="fg">waits on M1-19, M1-31</text>
+<text x="24" y="1948" class="warn">task</text>
+<text x="120" y="1948" class="fg h">M1-22</text>
+<text x="190" y="1948" class="fg">waits on M1-17, M1-25</text>
+<text x="24" y="1970" class="warn">task</text>
+<text x="120" y="1970" class="fg h">M1-32</text>
+<text x="190" y="1970" class="fg">waits on M1-22, M1-21</text>
+<text x="24" y="1992" class="warn">task</text>
+<text x="120" y="1992" class="fg h">M1-23</text>
+<text x="190" y="1992" class="fg">waits on M1-32, M1-O3</text>
+<text x="24" y="2014" class="muted">+9 more</text>
 </svg>
