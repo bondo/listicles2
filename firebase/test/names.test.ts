@@ -97,11 +97,15 @@ describe("on the emulator, through the users doc", () => {
 
     // The first row is what the two trims let through before M1-90: trim() keeps U+0085 and U+3000.
     test.each<[h.Outcome, string, string]>([
-        ["denied", "blank code points of every kind", "\u0001\u0085　 \t"],
-        ["denied", "50 blank code points", "　".repeat(50)],
-        ["allowed", "blank code points around and inside visible ones", "　\u0001Ann\u0085Lee  "],
-        ["allowed", "49 blank code points and a visible one", `${" ".repeat(49)}a`],
-        ["allowed", "a zero-width space, which is not White_Space", "​"],
+        ["denied", "blank code points of every kind", "\u0001\u0085\u3000 \t"],
+        ["denied", "50 blank code points", "\u3000".repeat(50)],
+        [
+            "allowed",
+            "blank code points around and inside visible ones",
+            "\u3000\u0001Ann\u0085Lee \u00a0",
+        ],
+        ["allowed", "49 blank code points and a visible one", `${"\u2003".repeat(49)}a`],
+        ["allowed", "a zero-width space, which is not White_Space", "\u200b"],
     ])("%s: a name of %s", async (want, _what, n) => {
         await expect(name(n)).resolves.toBe(want);
     });
