@@ -11,9 +11,8 @@ import unittest
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 import pretooluse_guard
-from test_pretooluse_guard import repo, run
+from test_pretooluse_guard import TOOLING, repo, run
 
-TOOLING = {"LISTICLES_TASK": "tooling"}
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 REAL = os.path.join(ROOT, "scripts", "update-branch.sh")
 SHA = "0123456789abcdef0123456789abcdef01234567"
