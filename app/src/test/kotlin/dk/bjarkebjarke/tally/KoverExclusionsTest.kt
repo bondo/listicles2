@@ -50,6 +50,10 @@ class KoverExclusionsTest {
         filter("excludes.annotatedBy", "dagger.Provides").whollyLeftOut(GATE_MODULE) shouldBe false
         // A listed class that is gone fails, whatever the patterns.
         shouldThrow<IllegalStateException> { filter("excludes.classes", "*").whollyLeftOut(GONE) }
+        // R2-01 and S2-01: `#` is any run of characters without a dot.
+        filter("excludes.classes", "dk.bjarkebjarke.tally.session.#").whollyLeftOut(HOLDER) shouldBe true
+        filter("excludes.classes", "dk.bjarkebjarke.tally.#").whollyLeftOut(HOLDER) shouldBe false
+        filter("excludes.annotatedBy", "dagger.#").partlyLeftOut(START_VIEW_MODEL) shouldBe false
     }
 
     private fun configured(key: String) = checkNotNull(System.getProperty(key)) { "$key is not set" }
@@ -67,13 +71,14 @@ class KoverExclusionsTest {
         const val READY = "dk.bjarkebjarke.tally.start.StartUiState\$Ready"
         const val START_FUNCTIONS = "dk.bjarkebjarke.tally.start.StartViewModelKt"
         const val GONE = "dk.bjarkebjarke.tally.start.GoneFactory\$InstanceHolder"
+        const val HOLDER = "dk.bjarkebjarke.tally.session.SessionModule_FirebaseAuthenticationFactory\$InstanceHolder"
 
         val DAGGER_GENERATED =
             listOf(
                 "dk.bjarkebjarke.tally.MainActivity_MembersInjector",
                 "dk.bjarkebjarke.tally.ApplicationScopeModule_ApplicationScopeFactory",
                 "dk.bjarkebjarke.tally.session.SessionModule_GoogleCredentialsFactory",
-                "dk.bjarkebjarke.tally.session.SessionModule_FirebaseAuthenticationFactory\$InstanceHolder",
+                HOLDER,
                 "dk.bjarkebjarke.tally.session.SignInAndSignOutModule_SignOutFactory",
                 "dk.bjarkebjarke.tally.start.GateModule_UpdateGateFactory",
             )
@@ -96,6 +101,9 @@ class KoverExclusionsTest {
                 Triple("excludes.annotatedBy", "javax.inject.Inj?ct", STARTED_ACTIVITY),
                 Triple("excludes.inheritedFrom", "androidx.lifecycle.ViewModel", START_VIEW_MODEL),
                 Triple("excludes.classes", "dk.bjarkebjarke.tally.*\$*", READY),
+                Triple("excludes.annotatedBy", "dagger.hilt.#", SESSION_MODULE),
+                Triple("excludes.classes", "dk.bjarkebjarke.tally.session.#", STARTED_ACTIVITY),
+                Triple("excludes.inheritedFrom", "androidx.lifecycle.#", START_VIEW_MODEL),
                 // Lambdas Kotlin compiles to classes of their own: StartViewModel$uiState$1, StartViewModelKt$orElse$1.
                 Triple("excludes.inheritedFrom", "kotlin.coroutines.jvm.internal.SuspendLambda", START_VIEW_MODEL),
                 Triple("excludes.annotatedBy", "kotlin.coroutines.jvm.internal.DebugMetadata", START_VIEW_MODEL),
