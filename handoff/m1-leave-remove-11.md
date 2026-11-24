@@ -9,10 +9,13 @@ model rows, fuzz templates and mutants (docs/tasks.toml M1-11 notes).
 
 ## Done
 - Red tests first: `65059c5` (leave.test.ts, tombstone.test.ts row, model.ts rows, fuzz.ts templates, fuzz.test.ts mutants).
-- Rules, PLAN 3.1 Leave tests line, tasks.toml: see `git log`.
+- Rules and PLAN 3.1's Leave tests line: `8ab16f3`. Draft PR #401. Then fuzz template variants with the
+  re-measured mutant finds, and tasks.toml (M1-11 done, pr 401): see `git log`.
+- Scratch mutation pass: 20 mutants, 12 killed, the 8 survivors are the header's "no test can isolate" list.
 
 ## Next (in order)
-1. Review rounds: fix findings, rerun `scripts/verify.sh`, push, WORKER-RESULT on the PR, send_message to the orchestrator.
+1. Review rounds: fix findings, rerun `scripts/verify.sh`, push, WORKER-RESULT on the PR, send_message to the
+   orchestrator (session_013srDQiFtrPbVLdnHo4u9fz).
 2. Final commit: delete this file.
 
 ## Decisions made
@@ -20,6 +23,9 @@ model rows, fuzz templates and mutants (docs/tasks.toml M1-11 notes).
   denied, it self-heals instead; keeps a no-op delete from telling that a household exists.
 - Marker create checks keys (hasAll, hasOnly); the overwrite checks affectedKeys (PLAN 3.1 field validation).
 - New fuzz templates sit in the ninth-weight group with the former extension points, so #372's draws stay.
+  The join's former-member variant takes a second slot (12): with the group shared by five templates, seed 1
+  found it only at 8298 of the 9000-case cap. Remove member got a marker-with-another-field variant (7): the
+  extra tweak alone did not find that mutant within the cap.
 
 ## Open findings
 - none yet

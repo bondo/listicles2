@@ -148,12 +148,13 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
     },
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
     // dan joins bob's household through carol's invite (M1-54): his member doc, the invite's delete
-    // and his users doc in one batch. By n % 16: the base case (0, 11 to 15); the invite expired (1);
-    // its creator, carol, no longer a member (2); the invite kept (3); dan's doc with role owner, an
-    // earlier joinedAt or an unknown key (4 to 6); an invite to H2, which dan owns, so he may delete
-    // it (7); the household a tombstone that keeps its name (8); dan already a member, his doc set
-    // again unchanged, so only the delete's !M(uid) denies (9); another of carol's invites deleted
-    // too, which his doc does not name (10).
+    // and his users doc in one batch. By n % 16: the base case (0, 11, 13 to 15); the invite
+    // expired (1); its creator, carol, no longer a member (2, and 12 since M1-11's templates share
+    // the ninth weight); the invite kept (3); dan's doc with role owner, an earlier joinedAt or an
+    // unknown key (4 to 6); an invite to H2, which dan owns, so he may delete it (7); the household
+    // a tombstone that keeps its name (8); dan already a member, his doc set again unchanged, so
+    // only the delete's !M(uid) denies (9); another of carol's invites deleted too, which his doc
+    // does not name (10).
     join: (n) => {
         const v = n % 16;
         const code = v === 7 ? CODE2 : CODE;
@@ -161,7 +162,7 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         const doc: m.Doc = { ...MEMBER, joinedAt, viaInvite: code, ...JOINED[v] };
         const expiresAt = v === 1 ? m.T0 : LATER;
         const world: Record<string, m.Doc> = {
-            ...(v === 2 ? HOME : CAROLS),
+            ...(v === 2 || v === 12 ? HOME : CAROLS),
             [m.household(H1)]: { ...LIVE, deleted: v === 8 },
             [`invites/${code}`]: { ...INVITE, householdId: v === 7 ? H2 : H1, expiresAt },
         };
@@ -203,7 +204,7 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
     },
     // M1-11, Leave: carol, a plain member of bob's H1, deletes her member doc and her invite and
     // clears her users doc (the base case). By n % 8: bob, the owner, leaves (1); carol's member
-    // doc already gone (2); she deletes dan's alone (3); she writes her own marker in the batch (4).
+    // doc already gone (2); she deletes dan's alone (3); she writes her own marker in it (4).
     leave: (n) => {
         const v = n % 8;
         const by = v === 1 ? BOB : CAROL;
@@ -219,7 +220,8 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
     // M1-11, Remove member: bob deletes carol's member doc and her invite and writes her marker
     // (the base case). By n % 8: an overwrite of her leftover marker (1); the member delete with
     // the leftover marker and no marker write (2), or with neither (3); bob removes himself (4);
-    // the marker alone, carol staying a member (5); carol's member doc already gone (6).
+    // the marker alone, carol staying a member (5); carol's member doc already gone (6); the
+    // marker with another field (7).
     "remove member": (n) => {
         const v = n % 8;
         const target = v === 4 ? BOB : CAROL;
@@ -227,7 +229,8 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         const carols = v === 6 ? {} : { [m.member(H1, CAROL)]: MEMBER };
         const world = { ...HOME, ...carols, ...leftover, [`invites/${CODE}`]: INVITE };
         const member = v === 5 ? [] : [del(m.member(H1, target))];
-        const mark = v === 2 || v === 3 ? [] : [set(m.marker(H1, target), { removedAt: m.NOW })];
+        const marker: m.Doc = { removedAt: m.NOW, ...(v === 7 ? { by: BOB } : {}) };
+        const mark = v === 2 || v === 3 ? [] : [set(m.marker(H1, target), marker)];
         return draft(BOB, world, ...member, ...mark, del(`invites/${CODE}`));
     },
     // M1-11: in his live household bob gets, lists or deletes (n % 3) alice's marker (the base
