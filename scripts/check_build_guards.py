@@ -37,8 +37,8 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    (also `getRootProject()`, passed, held in a variable or in string template code, `gradle.rootProject { }`) other than
    `isolated.rootProject`, which reads the root's directory; in a settings file `rootProject` is the project descriptor, so there only
    `rootProject.name`, `.buildFileName` and `.projectDir` pass. `parent` (also `getParent()`) with the implicit receiver or on `project`,
-   `target`, `this` or `getProject()` (also backticked, in parentheses, after `!!` or a cast). A `project(...)`/`findProject(...)` that is not a direct argument of a
-   dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block, `"conf"(...)`, Groovy
+   `target`, `this` or `getProject()` (also backticked, in parentheses, after `!!` or a cast). A `project(...)`/`findProject(...)`
+   that is not a direct argument of a dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block, `"conf"(...)`, Groovy
    `conf project(...)`, or `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in between), so one held
    in a variable or in `configure(listOf(project(...))) { }` fails; so do a callable reference (`::project`, Groovy `.&project`), a
    Groovy method name in any string (`'project'(...)`, triple-quoted, slashy, `.&"project"`) or built by a GString (`owner."${n}"`),
