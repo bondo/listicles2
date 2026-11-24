@@ -1,20 +1,12 @@
 """Checks the Nix dev shell for the rules deploy (M1-96, owner decision 7136806608 on #373). Run: python3 -I scripts/check_nix_shell.py [--live]
 
-`nix develop -c firebase ...` on a workstation with only Nix must run the firebase-tools version pinned in firebase/package-lock.json
-(owner step R7 in docs/milestones/M1.md). The shell holds Node.js from a pinned nixpkgs and installs firebase-tools from that lockfile
-(`npm ci --ignore-scripts`), so there is no second pin. If a second firebase-tools version is ever written into flake.nix or shell.nix it
-must equal the lockfile's. Two entry points share the definition in shell.nix: `nix develop` (flake.nix imports it) and `nix-shell` (no
-experimental features; the owner's workstation has flakes disabled), and shell.nix reads the nixpkgs pin from flake.lock.
-
-Static (default, no network): flake.nix has devShells.default for x86_64-linux, aarch64-linux, x86_64-darwin and aarch64-darwin, built from shell.nix,
-which installs from the lockfile and fetches the tarball flake.lock pins; flake.lock pins the nixpkgs URL in flake.nix by hash; verify.sh
-and ci.yml run this check and its tests, and the ci.yml step that downloads and runs the Nix installer keeps its https-only curl flags and a
-sha256 check before the install (the way the gitleaks download is guarded in scripts/check_ci_hardening.py). The deploy docs in
-docs/milestones/M1.md must not claim there is no firebase/.firebaserc while one exists (it names only the demo project).
---live: runs both entry points (`firebase --version`) and compares each with the lockfile (needs nix and the nixpkgs and npm hosts; the CI
-`firebase` job runs it, verify.sh runs it when nix is installed).
+`nix develop` (flake.nix) and `nix-shell` (no experimental features; flakes are disabled on the owner's workstation) share shell.nix: Node.js
+from the nixpkgs flake.lock pins, firebase-tools by `npm ci --ignore-scripts` from firebase/package-lock.json, so there is no second pin (one
+written into flake.nix or shell.nix must equal the lockfile's). Static (default, no network): the files above, flake.lock, verify.sh and ci.yml
+are wired, the ci.yml Nix installer step keeps its https-only curl flags and a sha256 check before the install (as the gitleaks download does
+in scripts/check_ci_hardening.py), and M1.md R7 does not claim there is no firebase/.firebaserc (it names only the demo project).
+--live: runs both entry points and compares `firebase --version` with the lockfile (the CI `firebase` job runs it, verify.sh when nix exists).
 """
-
 import json
 import os
 import re
@@ -32,9 +24,9 @@ TARBALL = re.compile(r"^https://releases\.nixos\.org/nixos/[\w.-]+/nixos-[\w.-]+
 PIN = re.compile(r"firebase-tools(?:@|-|\s*=\s*\"?)v?(\d+\.\d+\.\d+)")
 VERSION = re.compile(r"^\d+\.\d+\.\d+$")
 VERIFY_STEPS = (
-    r"step\s+nix-shell-tests\s+python3 -I scripts/test_check_nix_shell\.py",
-    r"step\s+nix-shell\s+python3 -I scripts/check_nix_shell\.py",
-    r"step\s+nix-shell-live\s+python3 -I scripts/check_nix_shell\.py --live",
+    "step nix-shell-tests python3 -I scripts/test_check_nix_shell.py",
+    "step nix-shell python3 -I scripts/check_nix_shell.py",
+    "step nix-shell-live python3 -I scripts/check_nix_shell.py --live",
 )
 CI_RUNS = ("scripts/test_check_nix_shell.py", "scripts/check_nix_shell.py", "scripts/check_nix_shell.py --live")
 
@@ -77,27 +69,22 @@ def lock_problems(flake, lock):
     return out
 
 
+def pin_problems(name, text, pinned):
+    return [f"{name} pins firebase-tools {v} but firebase/package-lock.json pins {pinned}: drop the second pin" for v in PIN.findall(text) if v != pinned]
+
+
 def shell_problems(shell, pinned):
     sh = active(shell)
-    out = []
+    out = pin_problems("shell.nix", sh, pinned)
     if not re.search(r"pkgs\.nodejs_\d+\b", sh):
         out.append("shell.nix: the shell must hold Node.js from the pinned nixpkgs (pkgs.nodejs_N)")
     if "package-lock.json" not in sh or not re.search(r"\bnpm ci\b", sh):
         out.append("shell.nix: the shell hook must install firebase-tools from firebase/package-lock.json with `npm ci`")
     elif "--ignore-scripts" not in sh:
         out.append("shell.nix: `npm ci` must run with --ignore-scripts (as CI and verify.sh do)")
-    for needle, what in (
-        ("builtins.fromJSON", "parse flake.lock"),
-        ("builtins.readFile ./flake.lock", "read ./flake.lock"),
-        ("builtins.fetchTarball", "fetch the locked tarball"),
-        ("url = locked.url;", "take the url from flake.lock (no second nixpkgs pin)"),
-        ("sha256 = locked.narHash;", "take the hash from flake.lock (no second nixpkgs pin)"),
-    ):
+    for needle in ("builtins.fromJSON", "builtins.readFile ./flake.lock", "builtins.fetchTarball", "url = locked.url;", "sha256 = locked.narHash;"):
         if needle not in sh:
-            out.append(f"shell.nix must {what} (`{needle}`): without flakes it would use another nixpkgs than flake.lock")
-    for found in PIN.findall(sh):
-        if found != pinned:
-            out.append(f"shell.nix pins firebase-tools {found} but firebase/package-lock.json pins {pinned}: drop the second pin")
+            out.append(f"shell.nix must contain `{needle}`: without flakes it would use another nixpkgs than flake.lock")
     return out
 
 
@@ -160,15 +147,11 @@ def problems(flake, shell, lock, package_lock, verify, ci):
             out.append(f"flake.nix does not list the system {system}")
     if not re.search(r"\bdefault\s*=\s*import \./shell\.nix\b", f):
         out.append("flake.nix: devShells.default must be `import ./shell.nix { inherit pkgs; }` (one definition for both entry points)")
-    for found in PIN.findall(f):
-        if found != pinned:
-            out.append(f"flake.nix pins firebase-tools {found} but firebase/package-lock.json pins {pinned}: drop the second pin")
-    out += shell_problems(shell, pinned)
-    out += lock_problems(flake, lock)
+    out += pin_problems("flake.nix", f, pinned) + shell_problems(shell, pinned) + lock_problems(flake, lock)
     v, w = active(verify), active(ci)
     for step in VERIFY_STEPS:
-        if not re.search(rf"(?m)^\s*{step}\s*$", v):
-            out.append(f"verify.sh does not run `{step.replace(chr(92), '').replace(r's+', ' ')}`")
+        if not re.search(rf"(?m)^\s*{re.escape(step)}\s*$", v):
+            out.append(f"verify.sh does not run `{step}`")
     for script in CI_RUNS:
         if not re.search(rf"(?m)^\s*(?:-\s+)?run:\s+python3 -I {re.escape(script)}\s*$", w):
             out.append(f"ci.yml does not run `python3 -I {script}`")
