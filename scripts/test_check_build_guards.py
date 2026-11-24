@@ -952,6 +952,20 @@ class Conventions(unittest.TestCase):
             "val v = (project!!).parent",
             "val v = (project as Project).parent",
             "val v = (project as Project?)?.parent?.version",
+            # Self-review of R3 (each ran in Gradle 8.14.3): Kotlin reaches a name at run time only through Gradle's property
+            # lookup, the Groovy builder and reflection, so those fail as a class; parent fails on any receiver.
+            'val p = project.property("parent")',
+            'val p = project.findProperty("rootProject")',
+            'val n = "parent"; val p = project.property(n)',
+            'val p = project.property("$n")',
+            'val p = project.properties["parent"]',
+            'project.withGroovyBuilder { "getParent"() }',
+            "val f = Project::getParent",
+            "val f = Project::getRootProject",
+            "val v = listOf(project).map { it.parent }",
+            "val m = Project::class.members",
+            'val m = project.javaClass.getMethod("getParent")',
+            "import kotlin.reflect.full.memberProperties",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
@@ -999,20 +1013,47 @@ class Conventions(unittest.TestCase):
             "evaluate('project(\":b\")')",
             "def p = project.@parent",
             "def p = project?.@'parent'",
+            # Self-review of R3 (each ran in Gradle 8.14.3): a .gradle file uses only GROOVY_IDENTIFIERS, so a lookup API not on the
+            # list fails whatever its name; a non-integer subscript, any slashy string and any \\u escape fail too.
+            "def p = project.findProperty('parent')",
+            "def p = findProperty('rootProject')",
+            "def p = project.properties.parent",
+            "def p = project.properties.get('parent')",
+            "def p = project.getAt('parent')",
+            "def name = 'parent'; def p = project[name]",
+            "def f = project.&getParent",
+            "def f = project.&getRootProject",
+            "def m = project.class.methods.find { it.name == 'getParent' }.invoke(project)",
+            "def x = /it's/; def p = project.parent",
+            "def x = $/\"/$; def p = project.parent",
+            "def p = [project]*.parent",
+            "def p = project.with { it.parent }",
+            "def e = project.extensions",
+            "def r = 'a.b'.split(/\\./)",
+            "// \\u0027",
         ):
             with self.subTest(code=code):
                 found = self.problems({"config/licensee/policy.gradle": code + "\n"})
                 self.assertEqual(len(found), 1, found)
                 self.assertRegex(found[0], r"^config/licensee/policy\.gradle:1: reaches other projects")
 
+    def test_a_slashy_string_cannot_hide_code_from_the_guard(self):
+        # A quote inside a slashy string would start a string the guard blanks; the slashy string itself fails.
+        found = self.problems({"config/licensee/policy.gradle": "def x = /\'\'\'/\ndef p = project.parent\ndef y = /\'\'\'/\n"})
+        self.assertTrue(found and found[0].startswith("config/licensee/policy.gradle:1: reaches other projects"), found)
+
+    def test_a_groovy_name_off_the_allowlist_is_named(self):
+        found = self.problems({"config/licensee/policy.gradle": "def e = project.extensions\n"})
+        self.assertEqual(found, ["config/licensee/policy.gradle:1: reaches other projects (`extensions` is not on the Groovy allowlist); "
+                                 "a .gradle file uses only the names in GROOVY_IDENTIFIERS (Groovy resolves names at run time)"])
+
     def test_groovy_reads_of_the_own_project_and_plain_strings_pass(self):
+        # Self-review of R3: a .gradle file uses only GROOVY_IDENTIFIERS; these forms of the licensee policy stay fine.
         code = (
-            "def terms = project.ext.has('x') ? project.ext.get('x') : null\nif (project instanceof Project) { }\n"
-            "def ok = project in [null]\ndef p = project as Object\ndef s = 'project'\ndef t = \"project\" + 'findProject'\n"
-            "def n = \"${project.name}: ${version}\"\ndef r = /project/\n"
-            "def v = 'parent'\ndef q = 4 / 2 / (1)\ndef map = [a: 'b', 'c': 'd']\ndef w = map.get('a') + 'x'.trim()\n"
-            "def parts = 'a:b'.split(':') as List\ndef first = parts[0]\nallowUrl('https://x/y') { because('z') }\n"
-            "def g = \"${map[first]} is ${'x'}\".toString()\n"
+            "def ok = project.ext.has('x') ? project.ext.get('x') : null\ndef line = 'project' + \"findProject\" + 'parent'\n"
+            "def reason = \"${project.name}: ${version}\".toString()\ndef spdx = 4 / 2 / (1)\n"
+            "def parts = 'a:b'.split(':') as List\ndef coordinates = parts[0]\nallowUrl('https://x/y') { because('z') }\n"
+            "def unknown = [a: 'b', 'c': 'd']\nif (unknown.isEmpty() && parts.get(1) != null) { return }\n"
             "dependencies {\n    implementation project(':core:domain')\n}\n"
         )
         self.assertEqual(self.problems({"config/licensee/policy.gradle": code}), [])
@@ -1068,6 +1109,8 @@ class Conventions(unittest.TestCase):
             "    testImplementation(platform(project(\":core:domain\")));\n}\n"
             "val s = \"${layout.projectDirectory}/$version: parent rootProject\"\n"
             "val m = mapOf(\"project\" to project.name, \"parent\" to 1)\n"
+            "val ins = tasks.register(\"x\") { inputs.property(\"taskCount\", 1) }\nval f2 = file(\"a\").parentFile\n"
+            "dependencies { testImplementation(libs.kotest.property) }\n"
             "val d2 = dependencies.project(mapOf(\"path\" to \":x\"))\n"
         )
         groovy = "dependencies {\n    implementation project(':core:domain')\n    api project(path: ':core:domain')\n}\n"
