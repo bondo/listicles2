@@ -144,10 +144,9 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         return draft(uid, { ...world, [`invites/${CODE}`]: invite }, del(`invites/${CODE}`));
     },
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
-    // Extension points that add a path to an allow statement the rules have (one with an allow
-    // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
-    "M1-11 soft delete": () => draft(BOB, HOME, up(m.household(H1), { deleted: true, name: "" })),
-    "M1-54 join": () =>
+    // dan joins bob's household through carol's invite (M1-54): his member doc, the invite's delete
+    // and his users doc, in one batch.
+    join: () =>
         draft(
             DAN,
             { ...CAROLS, [`invites/${CODE}`]: INVITE, [m.user(DAN)]: points(null) },
@@ -155,6 +154,9 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
             del(`invites/${CODE}`),
             up(m.user(DAN), points(H1)),
         ),
+    // Extension points that add a path to an allow statement the rules have (one with an allow
+    // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
+    "M1-11 soft delete": () => draft(BOB, HOME, up(m.household(H1), { deleted: true, name: "" })),
 };
 export const EXTENSIONS = Object.keys(TEMPLATES).filter((t) => t.startsWith("M1-"));
 
@@ -255,13 +257,16 @@ function change(d: Draft, t: Tweak, paths: string[]): void {
     if (d.caller.uid === from) d.caller = { ...d.caller, uid: to };
 }
 
-// Row templates; Create household (most conditions: P1, P3, P4) is drawn 3x as often, read 2x.
-const ROWS = Object.keys(TEMPLATES).filter((t) => !EXTENSIONS.includes(t));
+// Row templates; Create household (most conditions: P1, P3, P4) is drawn 3x as often, read 2x. A
+// former extension point (the join) keeps its share of the ninth weight, so the other templates'
+// draws, and with them the mutants' first finds, stay as measured.
+const FORMER = ["join"];
+const ROWS = Object.keys(TEMPLATES).filter((t) => !EXTENSIONS.includes(t) && !FORMER.includes(t));
 const DRAWN = [...ROWS, "create household", "create household", "read"];
 export const cases = fc.record({
     template: fc.oneof(
         { weight: 8, arbitrary: fc.constantFrom(...DRAWN) },
-        { weight: 1, arbitrary: fc.constantFrom(...EXTENSIONS) },
+        { weight: 1, arbitrary: fc.constantFrom(...EXTENSIONS, ...FORMER) },
     ),
     n: fc.nat(),
     tweaks: fc.oneof({ weight: 2, arbitrary: fc.tuple(tweak) }, fc.array(tweak, { maxLength: 3 })),

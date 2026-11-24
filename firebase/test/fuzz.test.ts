@@ -67,7 +67,7 @@ const MUTANTS: [string, string, string][] = [
     ["Display name update: the role too (P4)", "['displayName'])", "['displayName', 'role'])"],
     ["Member reads under a tombstone (LIVE)", "return household.deleted == false && ", "return "],
     ["Transfer: the old owner keeps the role", "data.role == 'member'", "data.role != null"],
-    ["Owner member doc: another uid (P1)", "uid == request.auth.uid && doc.role", "doc.role"],
+    ["Member doc: another uid (P1)", "uid == request.auth.uid && validName", "validName"],
     ["Household name: any length (P4)", "validName(data.name) &&", "data.name.trim() != '' &&"],
     ["Tombstone read: of a live household too", "household.deleted == true && ", ""],
     [

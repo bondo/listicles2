@@ -2,9 +2,9 @@
 // the PLAN rows, not from firestore.rules, so that fuzz.test.ts can compare the two on random
 // cases. ROWS has a row for each allow statement of the rules (fuzz.test.ts checks it). The PLAN
 // rows the rules lack are extension points, denied here until their task adds the rule and its row:
-// the join batch with its invite delete (M1-54), leave, remove member, the removed markers, the
-// soft delete, its cleanup and P6 (M1-11). A new allow statement fails that check until its row is in;
-// a new path of an existing one (the join, the soft delete) fails the fuzz on its base case (fuzz.ts).
+// leave, remove member, the removed markers, the soft delete, its cleanup and P6 (M1-11). A new
+// allow statement fails that check until its row is in; a new path of an existing one (the soft
+// delete) fails the fuzz on its base case (fuzz.ts).
 
 export const NOW = Symbol("request.time"); // FieldValue.serverTimestamp() in a write
 export const T0 = new Date(0); // every stored timestamp, never request.time
@@ -70,16 +70,43 @@ const userDoc = (d: Doc): boolean =>
     keysAre(d, "name" in d ? ["householdId", "name"] : ["householdId"]) &&
     (!("name" in d) || validName(d.name));
 
+// The one-household check of a member create: the caller's users doc holds null before the request
+// and `hid` after it.
+function oneHousehold(x: Ctx, hid: string): boolean {
+    const users = [x.before, x.after].map((w) => w.get(user(x.uid))?.householdId);
+    return users[0] === null && users[1] === hid;
+}
+
 // The owner's member doc of Create household: the caller's own (P1), role owner, the keys (P4),
 // joined now, in a household that does not exist before the request and names the caller as owner
-// after it, with the one-household check: the users doc holds null before, `hid` after.
+// after it, with the one-household check.
 function createsOwner(x: Ctx, d: Doc, hid: string, uid: string): boolean {
     const shape = keysAre(d, ["role", "displayName", "joinedAt"]) && validName(d.displayName);
     const owner = uid === x.uid && d.role === "owner" && d.joinedAt === NOW;
     const created =
         !x.before.has(household(hid)) && x.after.get(household(hid))?.ownerUid === x.uid;
-    const users = [x.before, x.after].map((w) => w.get(user(x.uid))?.householdId);
-    return x.signedIn && shape && owner && created && users[0] === null && users[1] === hid;
+    return x.signedIn && shape && owner && created && oneHousehold(x, hid);
+}
+
+// The joiner's member doc of Join: the caller's own (P1) and no member doc before the request,
+// role member, joined now, the keys with viaInvite (P4), the code of an invite before the request
+// that points at this live household, has not expired, whose creator is still a member and which
+// the request deletes (single use), with the one-household check.
+function joins(x: Ctx, d: Doc, hid: string, uid: string): boolean {
+    const keys = ["role", "displayName", "joinedAt", "viaInvite"];
+    const shape = keysAre(d, keys) && validName(d.displayName);
+    const own = uid === x.uid && !isMember(x.before, hid, uid);
+    const values = own && d.role === "member" && d.joinedAt === NOW;
+    const code = `invites/${String(d.viaInvite)}`;
+    const invite = typeof d.viaInvite === "string" ? x.before.get(code) : undefined;
+    const exp = invite?.expiresAt;
+    const valid =
+        invite?.householdId === hid &&
+        exp instanceof Date &&
+        exp.getTime() > Date.now() &&
+        isMember(x.before, hid, String(invite.createdBy)) &&
+        !x.after.has(code);
+    return x.signedIn && shape && values && valid && live(x.before, hid) && oneHousehold(x, hid);
 }
 
 // Transfer ownership, the household update: the owner (O(uid), never M(uid)) of the live household
@@ -156,7 +183,7 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
         // The caller's own member path in any household (it may not exist), or a member's read.
         get: (x, hid, uid) => (x.signedIn && uid === x.uid) || reader(x, hid),
         list: (x, hid) => reader(x, hid),
-        create: (x, hid, uid) => createsOwner(x, x.doc, hid, uid),
+        create: (x, hid, uid) => createsOwner(x, x.doc, hid, uid) || joins(x, x.doc, hid, uid),
         // While the household is live: the caller's own displayName (P4), or, by the owner before
         // the request, the role ownerUid gives the doc after it (Transfer ownership).
         update: (x, hid, uid) => {
@@ -174,7 +201,7 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
     // Invites (M1-12), each while the household is live: get, any signed-in user (verified; they
     // need the code, HH-03); list, a member whose query fixes householdId and, unless the owner,
     // createdBy as the caller (#280); create (below); delete, its creator or the owner, any member
-    // once it has expired.
+    // once it has expired, or the joiner in the join batch.
     "invites/{code}": {
         get: (x) => x.signedIn && live(x.before, String(x.old?.householdId)),
         list: (x) => {
@@ -191,15 +218,20 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
             );
         },
         create: (x, code) => createsInvite(x, x.doc, code),
-        delete: (x) => {
+        delete: (x, code) => {
             const hid = String(x.old?.householdId);
             const exp = x.old?.expiresAt;
             const expired =
                 exp instanceof Date && exp.getTime() < Date.now() && isMember(x.before, hid, x.uid);
+            // The joiner's: no member doc before the request, one after it that names this code.
+            const joiner =
+                !isMember(x.before, hid, x.uid) &&
+                x.after.get(member(hid, x.uid))?.viaInvite === code;
             const who =
                 x.old?.createdBy === x.uid ||
                 x.before.get(household(hid))?.ownerUid === x.uid ||
-                expired;
+                expired ||
+                joiner;
             return x.signedIn && live(x.before, hid) && who;
         },
     },
