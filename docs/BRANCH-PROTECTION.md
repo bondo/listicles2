@@ -100,7 +100,7 @@ Try these in order; stop at the first that works.
    on the PR, or click **Update branch** (the triggers include `labeled`, `unlabeled` and `synchronize`, and
    `cancel-in-progress` replaces the old run; no commit needed).
 3. Still stuck: force-cancel the run, then re-run it:
-   `gh api -X POST repos/bondo/listicles2/actions/runs/<run-id>/force-cancel`
+   `gh api -X POST repos/bondo/tally/actions/runs/<run-id>/force-cancel`
 4. Still stuck and you have verified the change locally (`scripts/verify.sh`): **temporary owner bypass**.
    Settings > Rules > Rulesets > `main` > Bypass list > add yourself (or the Repository admin role),
    then in the PR's merge box use **Merge without waiting for requirements to be met (bypass rules)** and
