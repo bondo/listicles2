@@ -4,6 +4,8 @@ Needs a JDK, the Gradle wrapper and the Android SDK platform of the app's compil
 and runs with the other Gradle gate self-tests (scripts/ci_scope.py). It uses the real api-versions.xml. The checker's own cases are in
 scripts/test_check_java_api_level.py. Each source is injected into :core:domain with a Gradle init script (-I), so no tracked file changes.
 Every negative case must fail with the checker's own message, so a compile error in an injection is not mistaken for the gate working.
+M1-68 part B3 (issue 48): each JVM library module runs its own checkJavaApiLevel (build-logic ModuleChecks.kt); the app hands it its minSdk
+and the api-versions.xml of its compileSdk platform through a consumable configuration, so no project reads another's configuration.
 """
 
 import os
@@ -34,7 +36,7 @@ JAVA_API_26 = (
     "}\n"
 )
 
-# Groovy init script. %s is the directory holding the injected sources; %s the statement run on the root project after it is evaluated.
+# Groovy init script. %s is the directory holding the injected sources; %s the statement run on :app after it is evaluated (p: the project).
 INIT = """
 allprojects {
     afterEvaluate { p ->
@@ -42,15 +44,13 @@ allprojects {
             p.kotlin.sourceSets.main.kotlin.srcDir('%s')
             p.sourceSets.main.java.srcDir('%s')
         }
+        if (p.path == ':app') { %s }
     }
-}
-rootProject { r0 ->
-    if (r0.gradle.parent == null) r0.afterEvaluate { r -> %s }  // the main build, not the included build-logic
 }
 """
 
 
-def gradle(*args, kotlin=None, java=None, root_statement=""):
+def gradle(*args, kotlin=None, java=None, app_statement=""):
     """Runs Gradle with the given sources added to :core:domain; returns (exit code, output)."""
     with tempfile.TemporaryDirectory() as tmp:
         for sub, files, ext in (("kotlin", kotlin or {}, ".kt"), ("java", java or {}, ".java")):
@@ -60,7 +60,7 @@ def gradle(*args, kotlin=None, java=None, root_statement=""):
                     f.write(text)
         init = os.path.join(tmp, "inject.init.gradle")
         with open(init, "w", encoding="utf-8") as f:
-            f.write(INIT % (os.path.join(tmp, "kotlin"), os.path.join(tmp, "java"), root_statement))
+            f.write(INIT % (os.path.join(tmp, "kotlin"), os.path.join(tmp, "java"), app_statement))
         cmd = [os.path.join(ROOT, "gradlew"), "-q", "--console=plain", "--no-daemon", "-I", init, *args]
         # Retry only Maven/Gradle 429 (rate limit) so a throttled download is not read as a test failure.
         for attempt in range(5):
@@ -95,19 +95,40 @@ class JavaApiLevelGateTest(unittest.TestCase):
         self.assertIn("java/util/Objects.requireNonNullElse", out)
         self.assertIn("requires API 30", out)
 
-    def test_missing_api_versions_file_fails_closed(self):
-        # Replaces the arguments of the real task, just before it runs, with a path that does not exist: the build must fail, not pass.
-        statement = (
-            "r.tasks.named('checkJavaApiLevel') { t -> t.doFirst { t.argumentProviders.clear();"
-            " t.setArgs(['-I', r.projectDir.path + '/scripts/check_java_api_level.py', '--api-versions', '/nonexistent/data/api-versions.xml',"
-            " '--min-sdk', '26', r.projectDir.path + '/core/domain/build/classes/kotlin/main']) } }"
+    def test_min_sdk_comes_from_the_app(self):
+        # Stream.toList is API 34: with the app's minSdk raised to 34 (an init script only; the guards forbid it in a build file)
+        # the same source passes, so the check reads the app's minSdk and not a copy of its own.
+        rc, out = gradle(
+            "checkJavaApiLevel", kotlin={"StreamToList": KOTLIN["StreamToList"]}, app_statement="p.android.defaultConfig.minSdk = 34"
         )
-        # The injected closure holds the project, which the configuration cache cannot store.
-        rc, out = gradle("--no-configuration-cache", "checkJavaApiLevel", root_statement=statement)
+        self.assertEqual(rc, 0, out)
+        self.assertIn(CHECKER_MESSAGE, out)
+
+    def test_each_jvm_library_module_runs_its_own_check(self):
+        # M1-68 part B3: the module's own task, run by its listiclesChecks (the root's detekt runs every module's). The root, the
+        # Android modules (lint NewApi covers them) and the test-support module (host JDK API on purpose) have none.
+        rc, out = gradle("detekt", "--dry-run")
+        self.assertEqual(rc, 0, out)
+        lines = out.splitlines()
+        self.assertIn(":core:domain:checkJavaApiLevel SKIPPED", lines)
+        for path in (":checkJavaApiLevel", ":app:checkJavaApiLevel", ":core:data:checkJavaApiLevel", ":core:testing:checkJavaApiLevel"):
+            self.assertNotIn(f"{path} SKIPPED", lines)
+        rc, out = gradle(":core:domain:listiclesChecks", "--dry-run")
+        self.assertEqual(rc, 0, out)
+        self.assertIn(":core:domain:checkJavaApiLevel SKIPPED", out.splitlines())
+        self.assertIn(":app:listiclesJavaApiLevelInputs SKIPPED", out.splitlines())
+
+    def test_missing_api_versions_file_fails_closed(self):
+        # The app's hand-over names, just after it is written, a path that does not exist: the build must fail, not pass.
+        statement = (
+            "p.tasks.named('listiclesJavaApiLevelInputs') { t -> t.doLast {"
+            " t.outputs.files.singleFile.text = '26\\n/nonexistent/data/api-versions.xml\\n' } }"
+        )
+        # The injected closure holds the task, which the configuration cache cannot store.
+        rc, out = gradle("--no-configuration-cache", "checkJavaApiLevel", app_statement=statement)
         self.assertNotEqual(rc, 0, out)
         self.assertIn("cannot check", out)
-        self.assertIn("api-versions.xml", out)
-
+        self.assertIn("/nonexistent/data/api-versions.xml", out)
 
 if __name__ == "__main__":
     unittest.main()
