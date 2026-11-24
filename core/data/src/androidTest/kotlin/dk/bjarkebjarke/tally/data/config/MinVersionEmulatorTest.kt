@@ -23,6 +23,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MinVersionEmulatorTest {
     private lateinit var app: FirebaseApp
+    private lateinit var session: FirestoreSession
     private lateinit var remote: FirestoreMinVersionRemote
 
     @Before
@@ -30,7 +31,8 @@ class MinVersionEmulatorTest {
         FirebaseEmulator.requireRunning()
         app = FirebaseEmulator.app(InstrumentationRegistry.getInstrumentation().targetContext)
         FirebaseAuth.getInstance(app).signOut()
-        remote = FirestoreMinVersionRemote(FirestoreSession { FirebaseEmulator.firestore(app) })
+        session = FirestoreSession { FirebaseEmulator.firestore(app) }
+        remote = FirestoreMinVersionRemote(session)
         FirebaseEmulator.restoreProjectRules()
         setConfig(null)
     }
@@ -86,8 +88,9 @@ class MinVersionEmulatorTest {
 
     @Test
     fun aTerminatedInstanceIsAFailureNotAThrow() {
-        runBlocking { FirebaseEmulator.firestore(app).terminate().await() }
+        // The instance the session holds, as while a sign-out's clear() runs and firestore() still answers it.
+        runBlocking { session.firestore().terminate().await() }
 
-        assertTrue(fetch().isFailure)
+        assertTrue(fetch().exceptionOrNull() is IllegalStateException)
     }
 }
