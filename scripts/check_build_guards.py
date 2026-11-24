@@ -42,8 +42,8 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in between), so one held in a variable or in
    `configure(listOf(project(...))) { }` fails; so do a callable reference (`::project`, Groovy `.&project`) and a quoted Groovy method
    name (`'project'(...)`); a backticked name counts as the plain one (PR 384 R1-01, R1-02). A project dependency
-   (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: `.parent` on another receiver (File.parent has the same name), and a Project reached
-   through a helper function. Fails closed on: a Kotlin parameter, named argument or Groovy map key called `parent`, a settings plugin
+   (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps:
+   `.parent` on another receiver (File.parent has the same name), and a Project reached through a helper function. Fails closed on: a Kotlin parameter, named argument or Groovy map key called `parent`, a settings plugin
    in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf project(':a'), project(':b')` list.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
