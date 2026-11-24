@@ -91,6 +91,7 @@ step dependency-floors-tests python3 -I scripts/test_dependency_floors.py
 step dependency-floors python3 -I scripts/dependency_floors.py
 step ci-hardening-tests python3 -I scripts/test_check_ci_hardening.py
 step ci-hardening python3 -I scripts/check_ci_hardening.py
+step nix-shell-tests python3 -I scripts/test_check_nix_shell.py
 step build-guards-tests python3 -I scripts/test_check_build_guards.py
 step build-guards python3 -I scripts/check_build_guards.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
