@@ -2,7 +2,8 @@ rules_version = '2';
 
 // The Firestore rules of docs/PLAN.md section 3.1. Anything no rule below allows is denied.
 // M1-08, the base: signedIn(), the users doc, config/app, the caller's own member path and the
-// tombstone read. M1-10: Create household + owner and the own display name. Every later allow
+// tombstone read. M1-10: Create household + owner and the own display name. M1-53: Transfer
+// ownership (the household update and the role update of a member doc). Every later allow
 // statement starts `if signedIn() && ...` (rules.test.ts checks it), and its allow tests go through
 // verifiedOnly (firebase/test/harness.ts), which fails unless an unverified token is denied.
 // Layout (docs/adr/0002-rules-spike.md): one allow statement per method of a match; in its function
@@ -57,6 +58,24 @@ service cloud.firestore {
           && !existsAfter(memberDoc(before, request.auth.uid)));
     }
 
+    // Get the household doc (PLAN 3.1 Reads): a member of the live household, M(uid) and LIVE
+    // (M1-83); or the tombstone read (M1-08), the household deleted and the caller's householdId
+    // pointing at it (the HH-06 dialog, the self-heal, the owner's cleanup resume). Each path tests
+    // deleted, which makes no call, first, so a get makes one call (ADR 0002).
+    function readsHousehold(hid) {
+      let household = resource.data;
+      return (household.deleted == false && exists(memberDoc(hid, request.auth.uid)))
+        || (household.deleted == true && get(userDoc(request.auth.uid)).data.householdId == hid);
+    }
+
+    // Get any member doc or list the members (PLAN 3.1 Reads, M1-83): a member of the live
+    // household, M(uid) and LIVE; two calls. The owner's cleanup reads under a tombstone are M1-11's
+    // path here.
+    function readsMembers(hid) {
+      let household = get(householdDoc(hid)).data;
+      return household.deleted == false && exists(memberDoc(hid, request.auth.uid));
+    }
+
     // Create household + owner, one batch (PLAN 3.1): the caller creates and owns a household whose
     // id is a Firestore auto-id (P3), with the caller's member doc after the batch. Household docs are
     // never deleted (#199), so an id that has existed stays taken. On create !exists always holds; it
@@ -95,14 +114,34 @@ service cloud.firestore {
         && getAfter(user).data.householdId == hid;
     }
 
-    // Update own member doc (PLAN 3.1): only displayName, a name (P4), while the household is live;
-    // an update implies the doc, M(uid). The transfer's role update is M1-53's path here.
+    // Transfer ownership, the household update (PLAN 3.1): the owner of the live household changes
+    // only ownerUid, to a member before and after the batch, after which the old owner's role is
+    // member and the new owner's owner, so the batch holds both role updates (no partial transfer).
+    // O(uid) is ownerUid before the batch, never M(uid). The new ownerUid is a string (P4): a path
+    // takes a number as a document id. The soft delete is M1-11's path here.
+    function updatesHousehold(hid) {
+      let before = resource.data;
+      let after = request.resource.data;
+      return before.deleted == false && before.ownerUid == request.auth.uid
+        && after.ownerUid is string && after.diff(before).affectedKeys().hasOnly(['ownerUid'])
+        && exists(memberDoc(hid, after.ownerUid)) && existsAfter(memberDoc(hid, after.ownerUid))
+        && getAfter(memberDoc(hid, before.ownerUid)).data.role == 'member'
+        && getAfter(memberDoc(hid, after.ownerUid)).data.role == 'owner';
+    }
+
+    // A member doc update (PLAN 3.1) while the household is live; an update implies the doc. Two
+    // paths: the caller's own displayName, a name (P4); and the transfer's role update, by the owner
+    // before the batch (O(uid)), to the role ownerUid gives this doc after it: owner for the new
+    // owner, member for anyone else. ownerUid is the source of truth, role a cached copy.
     function updatesMember(hid, uid) {
       let household = get(householdDoc(hid)).data;
       let doc = request.resource.data;
-      return uid == request.auth.uid && household.deleted == false
-        && doc.diff(resource.data).affectedKeys().hasOnly(['displayName'])
-        && validName(doc.displayName);
+      let changed = doc.diff(resource.data).affectedKeys();
+      return household.deleted == false
+        && ((uid == request.auth.uid && changed.hasOnly(['displayName'])
+            && validName(doc.displayName))
+          || (household.ownerUid == request.auth.uid && changed.hasOnly(['role'])
+            && doc.role == (getAfter(householdDoc(hid)).data.ownerUid == uid ? 'owner' : 'member')));
     }
 
     match /users/{uid} {
@@ -118,17 +157,18 @@ service cloud.firestore {
     }
 
     match /households/{hid} {
-      // The tombstone read: the household is deleted and the caller's householdId points at it
-      // (the HH-06 dialog, the self-heal, the owner's cleanup resume). Members' reads come later.
-      allow get: if signedIn() && resource.data.deleted == true
-        && get(userDoc(request.auth.uid)).data.householdId == hid;
+      // A member's read of the live household, or the tombstone read (readsHousehold).
+      allow get: if signedIn() && readsHousehold(hid);
       allow create: if signedIn() && createsHousehold(hid);
+      allow update: if signedIn() && updatesHousehold(hid);
 
       // get: the caller's own member path in any household, live, a tombstone or none; it may not
       // exist. create and update: only as createsMember and updatesMember allow (the owner's doc
-      // before the household exists, the own displayName while it is live).
+      // before the household exists; while it is live, the own displayName and the transfer's role).
       match /members/{uid} {
-        allow get: if signedIn() && request.auth.uid == uid;
+        // get, besides the own path, and list: a member of the live household (readsMembers).
+        allow get: if signedIn() && (request.auth.uid == uid || readsMembers(hid));
+        allow list: if signedIn() && readsMembers(hid);
         allow create: if signedIn() && createsMember(hid, uid);
         allow update: if signedIn() && updatesMember(hid, uid);
       }
