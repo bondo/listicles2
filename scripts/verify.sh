@@ -8,7 +8,7 @@ FAST=0
 SKIPPED=0
 [ "${1:-}" = "--fast" ] && FAST=1
 fail=0
-LOG_DIR="${TMPDIR:-/tmp}/listicles-verify"
+LOG_DIR="${TMPDIR:-/tmp}/tally-verify"
 mkdir -p "$LOG_DIR"
 
 step() {
