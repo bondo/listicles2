@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 65/99 (65%) | 34 |
+| M1 | Accounts and households | 66/100 (66%) | 34 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | not planned yet | 0 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 65/99 done (65%), 34 open.
+**Progress:** 66/100 done (66%), 34 open.
 
 ### Tasks
 
@@ -142,7 +142,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-13 | Domain&#58; email, password and name validation (12+ code points, name 1-50), property tests | done | M1-37 | implementer | [#303](https://github.com/bondo/tally/issues/303) |
 | M1-14 | Auth data 1&#58; Google sign-in and sign-out steps (OQ-13) in core/domain, with fakes for every step | done | M1-60, M1-13, M1-02, M1-50 | implementer | [#319](https://github.com/bondo/tally/issues/319) |
 | M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | done | M1-14 | implementer | [#348](https://github.com/bondo/tally/issues/348) |
-| M1-66 | Auth wiring&#58; Credential Manager wrapper (Google ID option), &#58;app on &#58;core&#58;data with licensee, H… | ready | M1-67, M1-O14 | implementer |  |
+| M1-66 | Auth wiring&#58; Credential Manager wrapper (Google ID option), &#58;app on &#58;core&#58;data with licensee, H… | in progress | M1-67, M1-O14 | implementer | [#368](https://github.com/bondo/tally/issues/368) |
 | M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | blocked | M1-66, M1-62 | implementer |  |
 | M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | blocked | M1-66, M1-03, M1-49 | implementer |  |
 | M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16, M1-62 | implementer |  |
@@ -163,7 +163,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-52 | Rules test harness&#58; default-deny paths from PLAN section 3, list and collection-group queries, unv… | done | M1-35 | implementer | [#301](https://github.com/bondo/tally/issues/301) |
 | M1-53 | Rules&#58; transfer ownership, allow and deny tests (partial transfers, plain member, non-member) | in progress | M1-10 | implementer | [#364](https://github.com/bondo/tally/issues/364) |
 | M1-54 | Rules&#58; the join batch with the one-household check, allow and deny tests | blocked | M1-12 | implementer |  |
-| M1-83 | Rules&#58; members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests | ready | M1-10 | implementer |  |
+| M1-83 | Rules&#58; members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests | in progress | M1-10 | implementer | [#366](https://github.com/bondo/tally/issues/366) |
 | M1-55 | Tooling&#58; move the androidTest ListiclesAppTest into the tally package as TallyAppTest and update t… | done | M1-29 | implementer |  |
 | M1-49 | detekt LongParameterList&#58; ignoreAnnotated &#91;Composable&#93; for that rule only (issue 217 item 5) | done | M1-01 | implementer | [#236](https://github.com/bondo/tally/issues/236) |
 | M1-56 | Java API level check&#58; also look up classes used only as class literals, annotations, checkcast, ins… | done | M1-37 | implementer | [#305](https://github.com/bondo/tally/issues/305) |
@@ -200,7 +200,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | done | M1-77 | implementer |  |
 | M1-78 | State issue part B&#58; rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… | done | M1-77 | implementer |  |
 | M1-79 | State issue part C&#58; ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… | in progress | M1-77, M1-78, M1-80 | process | [#365](https://github.com/bondo/tally/issues/365) |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-85 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-85, M1-87 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -217,6 +217,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-O14 | Decide the licences of the 17 artifacts &#58;app needs for Firebase Auth and Credential Manager (list … | done | none | owner |  |
 | M1-O15 | Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5) | owner to-do | M1-O1, M1-O2, M1-66, M1-16 | owner |  |
 | M1-85 | Repo name and checkout path from one place, so the scripts work before and after the repo rename | done | none | implementer |  |
+| M1-87 | Repo rename follow-up&#58; the old repo name and checkout path in process files, docs, README and a… | done | none | implementer |  |
 
 ### Open tasks and what blocks them
 
@@ -228,7 +229,7 @@ flowchart LR
     n1["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n2["M1-12 Rules: invites (create, get, list, revo… (ready)"]:::ready
     n3["M1-82 Firestore source for the minimum app… (blocked)"]:::blocked
-    n4["M1-66 Auth wiring: Credential Manager wrap… (ready)"]:::ready
+    n4["M1-66 Auth wiring: Credential Manager wrap… (in progress)"]:::progress
     n5["M1-15 Auth data: email and password sign-up… (blocked)"]:::blocked
     n6["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::blocked
     n7["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
@@ -243,7 +244,7 @@ flowchart LR
     n16["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
     n17["M1-53 Rules: transfer ownership, allow and … (in progress)"]:::progress
     n18["M1-54 Rules: the join batch with the one-hou… (blocked)"]:::blocked
-    n19["M1-83 Rules: members read the household doc… (ready)"]:::ready
+    n19["M1-83 Rules: members read the household doc… (in progress)"]:::progress
     n20["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n21["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
     n22["M1-68 Root check tasks without cross-project… (ready)"]:::ready
@@ -451,7 +452,7 @@ flowchart LR
 - **owner to-do** [#120](https://github.com/bondo/tally/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
 - **owner to-do** [#291](https://github.com/bondo/tally/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
 - **owner to-do** [#354](https://github.com/bondo/tally/issues/354): &#91;owner&#93; M1-O1&#58; Create the Firebase project (Spark, Firestore eur3, Google + email sign-in, googl…
-- **PR to merge** [#363](https://github.com/bondo/tally/issues/363): M1-87&#58; repo rename follow-up&#58; bondo/listicles2 -&gt; bondo/tally in the orchestrator prompt, READ…
+- **PR to merge** [#367](https://github.com/bondo/tally/issues/367): Tasks&#58; Google sign-in off the v1 path (M1-O1 split, M1-O16, M1-86; OQ-23 amended)
 - **task** M1-11: waits on M1-54, M1-53
 - **task** M1-82: waits on M1-66
 - **task** M1-15: waits on M1-66
