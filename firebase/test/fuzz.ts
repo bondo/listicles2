@@ -149,8 +149,9 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
     // dan joins bob's household through carol's invite (M1-54): his member doc, the invite's delete
     // and his users doc in one batch. By n % 16: the base case (0, 11, 13 to 15); the invite
-    // expired (1); its creator, carol, no longer a member (2, and 12 since M1-11's templates share
-    // the ninth weight); the invite kept (3); dan's doc with role owner, an earlier joinedAt or an
+    // expired (1); its creator, carol, no longer a member (2 and 12: with M1-11's templates in the
+    // ninth weight, seed 1 found the former-member mutant only at case 8298 of the 9000 cap with
+    // slot 2 alone); the invite kept (3); dan's doc with role owner, an earlier joinedAt or an
     // unknown key (4 to 6); an invite to H2, which dan owns, so he may delete it (7); the household
     // a tombstone that keeps its name (8); dan already a member, his doc set again unchanged, so
     // only the delete's !M(uid) denies (9); another of carol's invites deleted too, which his doc
