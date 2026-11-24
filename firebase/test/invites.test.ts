@@ -15,8 +15,9 @@ import * as h from "./harness";
 // world with rules off; every allow test goes through h.verifiedOnly.
 // No test can isolate these (a scratch mutation pass dropped each condition in turn): on create,
 // hasAll (each key's value has its own check) and `expiresAt is timestamp` (any other type fails the
-// comparison with request.time); LIVE on the owner's delete path (M1-11's cleanup path will allow
-// the owner's delete under a tombstone).
+// comparison with request.time). Not pinned: LIVE on the owner's delete path, which a test could
+// isolate today (the owner deleting a member's open invite under a tombstone), but M1-11's cleanup
+// path allows exactly that delete.
 type Fields = Record<string, unknown>;
 type Clients = Record<h.Client, h.Db>;
 type Query = firebase.firestore.Query;
@@ -56,6 +57,9 @@ const household = (ownerUid: string, name = "Home", deleted = false): Fields => 
     ownerUid,
     deleted,
 });
+// HOME as a transfer (M1-53) leaves it: alice created it, bob owns it, so a rule that took createdBy
+// for O(uid) fails the tests.
+const home = (name = "Home"): Fields => ({ ...household(BOB, name), createdBy: ALICE });
 const membership = (role: string): Fields => ({ role, displayName: "Name", joinedAt: T0 });
 // A stored invite, open for a day or (a negative expiresIn) expired.
 const stored = (hid: string, name: string, createdBy: string, expiresIn = DAY): Fields => ({
@@ -66,12 +70,13 @@ const stored = (hid: string, name: string, createdBy: string, expiresIn = DAY): 
     expiresAt: new Date(Date.now() + expiresIn),
 });
 // What the app writes (PLAN 3 invites): alice's invite of HOME, expiring a minute inside 7 days.
+const inSevenDays = (): Date => new Date(Date.now() + 7 * DAY - 60_000);
 const fresh = (fields: Fields = {}): Fields => ({
     householdId: HOME,
     householdName: "Home",
     createdBy: ALICE,
     createdAt: NOW,
-    expiresAt: new Date(Date.now() + 7 * DAY - 60_000),
+    expiresAt: inSevenDays(),
     ...fields,
 });
 const without = (fields: Fields, key: string): Fields =>
@@ -110,14 +115,15 @@ afterAll(async () => {
     await env.cleanup();
 });
 
-// HOME: bob owns it, alice and carol are plain members; gus was removed and his invite is left over
-// (his householdId not self-healed yet). Open invites (a day left) by alice, bob, carol and gus,
+// HOME: alice created it and transferred it to bob (home()); alice and carol are plain members; gus
+// was removed and his invite is left over (his householdId not self-healed yet). Open invites (a day
+// left) by alice, bob, carol and gus,
 // expired ones by alice and bob. AWAY: eve's. TOMB: dan's tombstone, its cleanup not done, so dan's
 // and erin's member docs and their invites are still there. Frank is in no household.
 beforeEach(async () => {
     await env.clearFirestore();
     await seed({
-        [`households/${HOME}`]: household(BOB),
+        [`households/${HOME}`]: home(),
         [`households/${AWAY}`]: household(EVE, "Away"),
         [`households/${TOMB}`]: household(DAN, "", true),
         [member(HOME, BOB)]: membership("owner"),
@@ -161,7 +167,7 @@ describe("Create invite", () => {
         ["exactly 50 characters", FIFTY],
         ["50 non-BMP code points", NON_BMP],
     ])("verified only: a household name of %s, copied", async (_what, name) => {
-        await seed({ [`households/${HOME}`]: household(BOB, name) });
+        await seed({ [`households/${HOME}`]: home(name) });
         await h.verifiedOnly(alice, (db) =>
             create(db, code(HOME, "n"), fresh({ householdName: name })),
         );
@@ -173,7 +179,7 @@ describe("Create invite", () => {
         ["spaces only", "Home", "   "],
         ["another household's", "Home", "Away"],
     ])("denied: a householdName of %s", async (_what, name, householdName) => {
-        await seed({ [`households/${HOME}`]: household(BOB, name) });
+        await seed({ [`households/${HOME}`]: home(name) });
         await assertFails(create(alice.verified, code(HOME, "n"), fresh({ householdName })));
     });
 
@@ -247,12 +253,15 @@ describe("Create invite", () => {
         await assertFails(create(erin.verified, code(TOMB, "n"), data));
     });
 
-    test.each<[string, () => h.Db]>([
-        ["its creator", () => alice.verified],
-        ["the owner", () => bob.verified],
-    ])("denied: an update by %s (invites have none)", async (_who, db) => {
+    // No updates. Each update meets every condition of the create rule, so only the missing update
+    // rule denies it: through createsInvite, a link could outlive HH-02's 7 days or change hands.
+    test.each<[string, () => h.Db, Fields]>([
+        ["its creator, renewing it", () => alice.verified, {}],
+        ["a plain member, taking it over", () => carol.verified, { createdBy: CAROL }],
+        ["the owner, taking it over", () => bob.verified, { createdBy: BOB }],
+    ])("denied: an update of an open invite by %s", async (_who, db, data) => {
         const invite = db().doc(inviteDoc(code(HOME, "a")));
-        await assertFails(invite.update({ expiresAt: new Date(Date.now() + 2 * DAY) }));
+        await assertFails(invite.update({ createdAt: NOW, expiresAt: inSevenDays(), ...data }));
     });
 });
 
@@ -382,5 +391,15 @@ describe("Delete invite: revoke, and the cleanup of expired invites", () => {
         ["signed out, an expired invite", () => alice.anonymous, code(HOME, "x")],
     ])("denied: %s", async (_what, db, c) => {
         await assertFails(remove(c)(db()));
+    });
+
+    // PLAN 3.1 Expired invites: the delete of an invite already gone (revoked, used, or deleted by
+    // the other cleanup) has no data to check, so it is denied, and the whole batch with it.
+    test("denied: the owner's cleanup batch holding an invite already gone; nothing is deleted", async () => {
+        const db = bob.verified;
+        const batch = db.batch();
+        for (const c of [code(HOME, "x"), code(HOME, "r")]) batch.delete(db.doc(inviteDoc(c)));
+        await assertFails(batch.commit());
+        expect((await db.doc(inviteDoc(code(HOME, "x"))).get()).exists).toBe(true);
     });
 });
