@@ -12,12 +12,14 @@ class HouseholdsTest :
     FunSpec({
         test("a set householdId stops the batch whatever the name: one household per user") {
             checkAll(Arb.string(), Arb.string().orNull()) { householdId, name ->
-                membershipBlocker(householdId, name) shouldBe Membership.AlreadyInHousehold
+                membership(householdId, name) { error("no batch") } shouldBe Membership.AlreadyInHousehold
             }
         }
 
-        test("in no household, a missing name stops it (the member doc copies it) and any saved name lets it go") {
-            membershipBlocker(null, null) shouldBe Membership.Failed
-            checkAll(Arb.string()) { name -> membershipBlocker(null, name) shouldBe null }
+        test("in no household, a missing name stops it and a saved one is the new member doc's displayName") {
+            membership(null, null) { error("no batch") } shouldBe Membership.Failed
+            checkAll(Arb.string()) { name ->
+                membership(null, name) { Membership.Member(householdId = it) } shouldBe Membership.Member(name)
+            }
         }
     })

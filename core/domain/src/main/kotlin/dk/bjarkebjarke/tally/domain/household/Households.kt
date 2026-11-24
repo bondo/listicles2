@@ -34,16 +34,9 @@ sealed interface Membership {
     data object Failed : Membership
 }
 
-/**
- * What the caller's `users/{uid}` decides before a create or join batch: a set [householdId] stops it (one household
- * per user), and so does a missing [name], which the new member doc's `displayName` copies (P9). Null: it may go.
- */
-fun membershipBlocker(
+/** Test-first draft (M1-18): HouseholdsTest fails against it until the next commit. */
+suspend fun membership(
     householdId: String?,
     name: String?,
-): Membership? =
-    when {
-        householdId != null -> Membership.AlreadyInHousehold
-        name == null -> Membership.Failed
-        else -> null
-    }
+    batch: suspend (displayName: String) -> Membership,
+): Membership = if (householdId == null) batch(name.orEmpty()) else Membership.Failed
