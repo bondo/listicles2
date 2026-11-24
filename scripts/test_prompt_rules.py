@@ -1177,7 +1177,7 @@ class Pr3RuleTests(unittest.TestCase):
         for needle in ("model and effort come from `agents/roles.yaml`", "opus, high effort for", "sonnet, medium effort otherwise, high for tooling",
                        "design or architecture", "guard/hook/command-parsing tooling", "a new implementer for a pr with 3+ review rounds"):  # R1-07
             self.assertIn(needle, norm)
-        old = ("You are an IMPLEMENTER for Listicles. Opus, high effort (max for risk:high PRs per `agents/roles.yaml`; "
+        old = ("You are an IMPLEMENTER for Tally. Opus, high effort (max for risk:high PRs per `agents/roles.yaml`; "
                "you do not raise your own effort), fresh session, one PR, kept across its review rounds.")
         text = prompt_rules.normalize(real("implementer"))
         first, _, rest = text.partition(" Read:")
@@ -1673,7 +1673,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
         self.assertNotRegex(text, r"depth (?:is )?(?:≥|>=) ?7")
 
     def test_effort_is_medium_everywhere_the_orchestrator_is_described(self):
-        self.assertRegex(self.norm(self.ORCH_MD), r"^you are the orchestrator for listicles \(repo bondo/tally\)\. opus, medium effort")
+        self.assertRegex(self.norm(self.ORCH_MD), r"^you are the orchestrator for tally \(repo bondo/tally\)\. opus, medium effort")
         self.assertRegex(self.norm(self.ORCH_DOC), r"\| \*\*orchestrator\*\* \| opus / medium \|")
 
     RECIPE_HEADING = "repo access and worker-prompt recipes"
@@ -3164,6 +3164,83 @@ class GoldenUpdateDelegationTests(unittest.TestCase):
         self.assertIn("never-labels", ids(prompt_rules.check_text("orchestrator", text.replace("golden-update, big-pr,", "big-pr,", 1))))
         self.assertIn("tier-bullets-labels", ids(prompt_rules.check_text(
             "orchestrator", text.replace("Tier 0, no ask: reply;", "Tier 0, no ask: reply; apply golden-update;", 1))))
+
+
+class TallyNamesTests(unittest.TestCase):
+    """M1-92: process docs, prompts and status output say Tally; session tags are tally:* and the live-worker reads match both
+    tally:* and listicles:* until no running session carries the old prefix. LISTICLES_TASK and dev/listicles stay (M1-94)."""
+
+    KEPT = re.compile(r"LISTICLES_TASK|dev/listicles|`listicles:\*`|listicles:<|listicles2", re.I)
+
+    @staticmethod
+    def text(rel):
+        return (ROOT / rel).read_text(encoding="utf-8")
+
+    def leftovers(self, rel):
+        return [ln.strip()[:80] for ln in self.text(rel).splitlines()
+                if "listicles" in self.KEPT.sub("", ln).lower()]
+
+    def test_line_1_of_every_prompt_names_tally_and_not_listicles(self):
+        for role in ROLES:
+            with self.subTest(role=role):
+                first = real(role).splitlines()[0]
+                self.assertIn("Tally", first)
+                self.assertNotIn("listicles", first.lower())
+
+    def test_no_prompt_or_process_doc_has_a_stray_old_name(self):
+        for rel in [f"agents/prompts/{r}.md" for r in ROLES] + ["CLAUDE.md", "README.md", "docs/COLLABORATING.md", "docs/ORCHESTRATION.md",
+                                                                "docs/orchestrator-state.md", "scripts/tasks.py", "scripts/status_page.py",
+                                                                "scripts/status_visual.py"]:
+            with self.subTest(path=rel):
+                self.assertEqual(self.leftovers(rel), [])
+
+    def test_the_first_lines_of_the_docs_and_the_task_graph_say_tally(self):
+        for rel, start in (("CLAUDE.md", "# CLAUDE.md: rules for agents working on Tally"), ("README.md", "# Tally"),
+                           ("docs/COLLABORATING.md", "# Working together on Tally"), ("docs/tasks.toml", "# Tally task graph"),
+                           ("docs/orchestrator-state.md", None)):
+            with self.subTest(path=rel):
+                text = self.text(rel)
+                if start:
+                    self.assertTrue(text.startswith(start), rel)
+                else:
+                    self.assertIn("Living state for the Tally orchestrator.", text)
+        self.assertIn("Task graph for Tally:", self.text("scripts/tasks.py"))
+
+    def test_the_orchestration_templates_say_tally(self):
+        text = self.text("docs/ORCHESTRATION.md")
+        self.assertIn("How Tally work is coordinated", text)
+        self.assertIn("You are the Tally orchestrator for bondo/tally", text)
+        self.assertIn("You are a fresh-context {role} for Tally (bondo/tally)", text)
+
+    def test_new_sessions_get_tally_tags_and_the_note_names_the_old_prefix(self):
+        text = self.text("docs/ORCHESTRATION.md")
+        block = text.split("### 2.1 Session tags", 1)[1].split("## 3.", 1)[0]
+        self.assertIn("tally:<milestone or task>   e.g. tally:M0, tally:process", block)
+        self.assertNotIn("listicles:<", block)
+        self.assertRegex(" ".join(block.split()), r"sessions spawned before M1-92 carry `listicles:\*`; metrics over history match both")
+
+    def test_every_live_worker_read_matches_both_prefixes_and_no_tag_filter_is_left_with_only_the_old_one(self):
+        for rel in ("docs/ORCHESTRATION.md", "agents/prompts/orchestrator.md"):
+            lines = [ln for ln in self.text(rel).splitlines() if "listicles:*" in ln]
+            self.assertTrue(lines, rel)
+            for ln in lines:
+                with self.subTest(path=rel, line=ln[:60]):
+                    self.assertIn("`tally:*`", ln)
+        reads = [ln for ln in self.text("docs/ORCHESTRATION.md").splitlines() if "tagged `" in ln]
+        self.assertGreaterEqual(len(reads), 2)
+        for ln in reads:
+            self.assertIn("`tally:*`", ln)
+            self.assertIn("`listicles:*`", ln)
+        self.assertIn("every running `tally:*` or `listicles:*` session", self.text("agents/prompts/orchestrator.md"))
+
+    def test_naming_status_says_the_working_name_is_history(self):
+        text = self.text("docs/product/naming.md")
+        self.assertNotIn("Working name: **Listicles**", text)
+        self.assertIn("Working name until 2026-11-15 was Listicles; the name is Tally.", text)
+
+    def test_other_names_the_check_must_not_miss(self):  # negative case: the filter finds an old name that is not kept
+        self.assertEqual(self.KEPT.sub("", "You are an IMPLEMENTER for Listicles. Set LISTICLES_TASK=tooling").lower().count("listicles"), 1)
+        self.assertEqual(self.KEPT.sub("", "Set LISTICLES_TASK=tooling; match `listicles:*`").lower().count("listicles"), 0)
 
 
 if __name__ == "__main__":
