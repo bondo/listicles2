@@ -5,11 +5,11 @@ rules_version = '2';
 // tombstone read. M1-10: Create household + owner and the own display name. M1-53: Transfer
 // ownership (the household update and the role update of a member doc). M1-12: the invite rows
 // (create, get, list as the owner decided on #280, revoke and expired cleanup). M1-54: Join (the
-// joiner's member doc and invite delete, in one batch with the users-doc set). M1-11, first part:
-// the soft delete, the owner's tombstone cleanup and P6 (a member's delete of her own member doc
-// under a tombstone). Every later allow statement starts `if signedIn() && ...` (rules.test.ts
-// checks it), and its allow tests go through verifiedOnly (firebase/test/harness.ts), which fails
-// unless an unverified token is denied.
+// joiner's member doc and invite delete, in one batch with the users-doc set). M1-95, split from
+// M1-11: the soft delete, the owner's tombstone cleanup and P6 (a member's delete of her own
+// member doc under a tombstone). Every later allow statement starts `if signedIn() && ...`
+// (rules.test.ts checks it), and its allow tests go through verifiedOnly
+// (firebase/test/harness.ts), which fails unless an unverified token is denied.
 // Layout (docs/adr/0002-rules-spike.md): one allow statement per method of a match; in its function
 // the conditions that make no get()/exists() call come first, so the ADR's call counts hold.
 service cloud.firestore {
@@ -94,7 +94,7 @@ service cloud.firestore {
 
     // Delete a member doc (PLAN 3.1) under a tombstone, one call; paths in ADR 0002's order. P6:
     // the caller's own, which the self-heal deletes before it clears householdId. The owner's
-    // cleanup: any. Leave and Remove member, while the household is live, come next as paths here
+    // cleanup: any. M1-11 adds Leave and Remove member, while the household is live, as paths here
     // (Leave before P6, Remove last).
     function deletesMember(hid, uid) {
       let household = get(householdDoc(hid)).data;
@@ -102,7 +102,7 @@ service cloud.firestore {
     }
 
     // Get, list and delete the removed markers (PLAN 3.1): only the owner, here in the tombstone
-    // cleanup, one call. Remove member adds the owner's of the live household and the writes.
+    // cleanup, one call. M1-11's Remove member adds the owner's of a live household and the writes.
     function managesMarkers(hid) {
       let household = get(householdDoc(hid)).data;
       return cleansUp(household);
