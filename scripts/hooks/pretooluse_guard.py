@@ -7,7 +7,8 @@ Denies:
   * destructive worktree commands (reset --hard, checkout -f/--/<tree> <path>, restore, clean -f, stash, ...)
     while the working tree has uncommitted changes; reset --hard is always denied on main/master
   * writes to process files (CLAUDE.md, REVIEW.md, agents/, .claude/, scripts/guards.sh, ...) unless the session
-    was started with LISTICLES_TASK=tooling; writes to .git/config and .git/hooks/ are never allowed
+    was started with TALLY_TASK=tooling (or LISTICLES_TASK=tooling while TALLY_TASK is unset or empty, M1-91);
+    writes to .git/config and .git/hooks/ are never allowed
 
 How it works: the command is tokenised like a shell (quotes, heredocs, newlines, $(...), redirects, wrappers such as
 timeout/sudo/env/xargs/bash -c) and each simple command is checked. Quoted text and heredoc bodies are data, not commands.
@@ -145,7 +146,8 @@ CODE_WRITES = re.compile(
     r"|(?<!stdout)(?<!stderr)\.write\s*\(|\bFileUtils\.")
 PROCESS_CALLS = re.compile(r"subprocess|os\.system|os\.popen|popen|execSync|execFileSync|child_process|spawn|\bsystem\s*\(|\bexec\s*\(|%x")
 SENSITIVE_SUBS = {"reset", "push", "checkout", "restore", "clean", "stash", "commit", "config", "switch", "rm"}
-TOOLING = os.environ.get("LISTICLES_TASK") == "tooling"
+# M1-91: TALLY_TASK wins when set and non-empty; LISTICLES_TASK is the old name, still set by the environments until M1-94.
+TOOLING = (os.environ.get("TALLY_TASK") or os.environ.get("LISTICLES_TASK")) == "tooling"
 
 
 def deny(msg):
@@ -249,7 +251,7 @@ def guard_path(path, cwd, what="write to"):
         deny(f"{what} {path}: git config and hooks must not be edited (hooks are installed by scripts/install-hooks.sh)")
     if k == "process" and not TOOLING:
         deny(f"{what} {path}: it is a process file (CLAUDE.md, REVIEW.md, agents/, .claude/, .github/, hooks). "
-             "Only sessions started with LISTICLES_TASK=tooling may edit it; ask the owner.")
+             "Only sessions started with TALLY_TASK=tooling may edit it; ask the owner.")
 
 
 # ---------------------------------------------------------------- shell tokeniser

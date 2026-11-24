@@ -1998,10 +1998,11 @@ notes = "Found by M1-06 with an emulator probe: Firestore's trim() strips only c
 id = "M1-91"
 title = "Tooling: hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICLES_TASK"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 389
 notes = "Tooling env (scripts/hooks/). Implementer profile Opus (guard/hook change). Start after the tooling/permission-rules and tooling/guard-threshold-prose PRs merge (they touch the PreToolUse guard and the hook tests). Step 1 of the LISTICLES_TASK transition. Files: scripts/hooks/pretooluse_guard.py (tooling = TALLY_TASK when set, else LISTICLES_TASK; refusal text names TALLY_TASK), scripts/hooks/session_end_metrics.py (TALLY_ROLE, TALLY_PR, TALLY_METRICS_DIR; task from TALLY_TASK, else LISTICLES_TASK), scripts/hooks/context_guard.py and scripts/statusline.sh (TALLY_CONTEXT_WINDOW, TALLY_CONTEXT_THRESHOLD; the shared temp dir listicles-ctx becomes tally-ctx in both files in this one PR), scripts/verify.sh (log dir tally-verify), and their tests: test_pretooluse_guard.py, the eleven test_guard_*.py files that set LISTICLES_TASK, test_context_guard.py, test_session_end_metrics.py. Only LISTICLES_TASK gets the both-names read: no environment and no spawn template sets the other LISTICLES_* variables, so they are renamed outright. Test-first with negative cases: each name alone, both, neither, TALLY_TASK=normal with LISTICLES_TASK=tooling (not tooling), and every hook test clears both names from the inherited env (tooling sessions run the suite with LISTICLES_TASK=tooling set). Docs keep LISTICLES_TASK until M1-94 (the environment still sets it). About 200 changed lines"
 
 [[task]]

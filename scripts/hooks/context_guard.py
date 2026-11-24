@@ -8,11 +8,11 @@ agents/roles.yaml (a test ties the two).
 Usage source (works headless/in the cloud, where the statusline never runs): the last main-thread assistant record in
 transcript_path, context = input + cache_creation + cache_read + output tokens of that call. If scripts/statusline.sh did
 record a value for the session (interactive CLI), the larger of the two is used.
-Window: the one the status line recorded for the session, else LISTICLES_CONTEXT_WINDOW (tokens), else 1,000,000 (the models used
-here have a 1M window). A window of up to 200,000 tokens uses the small-window stages. Set LISTICLES_CONTEXT_WINDOW at spawn for a
+Window: the one the status line recorded for the session, else TALLY_CONTEXT_WINDOW (tokens), else 1,000,000 (the models used
+here have a 1M window). A window of up to 200,000 tokens uses the small-window stages. Set TALLY_CONTEXT_WINDOW at spawn for a
 smaller window. Garbage values fall back.
 Calls made inside subagents (hook input has agent_id) are ignored.
-Env: LISTICLES_CONTEXT_THRESHOLD (percent) replaces the hard stage and switches the step-boundary stage off; garbage falls back to
+Env: TALLY_CONTEXT_THRESHOLD (percent) replaces the hard stage and switches the step-boundary stage off; garbage falls back to
 the window defaults. Output: hookSpecificOutput.additionalContext. Never fails."""
 
 import contextlib
@@ -63,18 +63,18 @@ def positive_int(value):
 
 
 def window_of(base="", sid=""):
-    """The window the status line recorded for this session (<base>/<sid>.window), else LISTICLES_CONTEXT_WINDOW, else 1,000,000.
+    """The window the status line recorded for this session (<base>/<sid>.window), else TALLY_CONTEXT_WINDOW, else 1,000,000.
     (PostToolUse input has no window field; only the statusline JSON does, so the statusline records it. Garbage is ignored.)"""
     recorded = None
     with contextlib.suppress(OSError, ValueError), open(os.path.join(base, sid + ".window")) as f:
         recorded = positive_int(f.read())
-    return recorded or positive_int(os.environ.get("LISTICLES_CONTEXT_WINDOW")) or DEFAULT_WINDOW
+    return recorded or positive_int(os.environ.get("TALLY_CONTEXT_WINDOW")) or DEFAULT_WINDOW
 
 
 def stages(window):
-    """(step-boundary %, hard %) for this window; LISTICLES_CONTEXT_THRESHOLD replaces the hard stage and drops the soft one."""
+    """(step-boundary %, hard %) for this window; TALLY_CONTEXT_THRESHOLD replaces the hard stage and drops the soft one."""
     soft, hard = THRESHOLDS_SMALL if window <= SMALL_WINDOW_MAX else THRESHOLDS_LARGE
-    override = positive_int(os.environ.get("LISTICLES_CONTEXT_THRESHOLD"))
+    override = positive_int(os.environ.get("TALLY_CONTEXT_THRESHOLD"))
     return (None, override) if override else (soft, hard)
 
 
@@ -85,7 +85,7 @@ def main():
     sid = str(data.get("session_id", ""))
     if not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
         return
-    base = os.path.join(os.environ.get("TMPDIR", "/tmp"), "listicles-ctx")
+    base = os.path.join(os.environ.get("TMPDIR", "/tmp"), "tally-ctx")
     pcts = []
     with contextlib.suppress(OSError, ValueError), open(os.path.join(base, sid)) as f:
         pcts.append(int(f.read().strip()))
