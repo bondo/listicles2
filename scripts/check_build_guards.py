@@ -37,11 +37,13 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    (also `getRootProject()`, passed, held in a variable or in string template code, `gradle.rootProject { }`) other than
    `isolated.rootProject`, which reads the root's directory; in a settings file `rootProject` is the project descriptor, so there only
    `rootProject.name`, `.buildFileName` and `.projectDir` pass. `parent` (also `getParent()`) with the implicit receiver or on `project`,
-   `target`, `this` or `getProject()` (also in parentheses). A `project(...)`/`findProject(...)` that is not a direct argument of a
+   `target`, `this` or `getProject()` (also backticked, in parentheses, after `!!` or a cast). A `project(...)`/`findProject(...)` that is not a direct argument of a
    dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block, `"conf"(...)`, Groovy
    `conf project(...)`, or `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in between), so one held
-   in a variable or in `configure(listOf(project(...))) { }` fails; so do a callable reference (`::project`, Groovy `.&project`) and a
-   quoted Groovy method name (`'project'(...)`); a backticked name counts as the plain one (PR 384 R1-01, R1-02). A project dependency
+   in a variable or in `configure(listOf(project(...))) { }` fails; so do a callable reference (`::project`, Groovy `.&project`), a
+   Groovy method name in any string (`'project'(...)`, triple-quoted, slashy, `.&"project"`) or built by a GString (`owner."${n}"`),
+   Groovy command syntax (`project ':app', { }`) and `invokeMethod`; a backticked name counts as the plain one (PR 384 R1, R2).
+   A project dependency
    (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding per line. Known gaps: `.parent` on
    another receiver (File.parent has the same name), and a Project reached through a helper function. Fails closed on: a Kotlin
    parameter, named argument or Groovy map key called `parent`, a settings plugin in build-logic/ Kotlin that reads
@@ -560,6 +562,9 @@ CROSS_PROJECT = re.compile(
     r"|(?<![\w$])`?project`?\s*\([^(){}]*,\s*(?:Action\b|\{)"
     # PR 384 R1-01: a callable reference (Kotlin `::project`, Groovy `.&project`).
     r"|(?:::|\.\s*&)\s*`?(?:project|findProject)`?(?![\w$])"
+    # PR 384 R2-02: a Groovy slashy method name (`owner./project/(...)`, `$/project/$`) and a dynamic call by name.
+    r"|\.\s*&?\s*\$?/(?:project|findProject)/"
+    r"|(?<![\w$])invokeMethod\b"
     r"|(?<![\w$])evaluationDependsOn(?:Children)?\b"
     r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject|projectsLoaded|projectsEvaluated)\b"
 )
@@ -596,15 +601,52 @@ SETTINGS_RECEIVER = re.compile(r"(?:^|[^\w$.\s])\s*(?:settings\s*\.\s*)?$")
 PARENT = re.compile(
     r"(?<![\w$.])(?:parent|getParent\s*\(\s*\))(?![\w$])"
     # PR 384 R1-02: also with the receiver in parentheses, `(project).parent`.
-    r"|(?<![\w$])(?:\(\s*)?(?:project|target|this|getProject\s*\(\s*\))\s*\)?\s*(?:\?|!!)?\s*\.\s*(?:parent|getParent\s*\(\s*\))(?![\w$])"
+    # PR 384 R2-03: backticked, in any parentheses, after `!!` or a cast: `((project)).parent`, `(project as Project).parent`.
+    r"|(?<![\w$])(?:\(\s*)*(?:`?(?:project|target|this)`?|`?getProject`?\s*\(\s*\))(?:\s*!!|\s+as\??\s+[\w.]+\??)*(?:\s*\))*"
+    r"\s*(?:\?|!!)?\s*\.\s*(?:parent|getParent\s*\(\s*\))(?![\w$])"
 )
 # project(...)/findProject(...) on any receiver but `dependencies.` (DependencyHandler.project, a dependency). It passes only as a direct
 # argument of a dependency declaration (an allowlist): a call that is a whole statement in a `dependencies { }` block (`conf(...)`,
 # `"conf"(...)`, `add("conf", ...)`, Groovy `conf project(...)`, optionally with a configuration block) or `dependencies.<conf>(...)`,
 # with only testFixtures, platform or enforcedPlatform between it and project(...).
 PROJECT_CALL = re.compile(r"(?<![\w$])`?(?:project|findProject)`?\s*\(")  # also backticked (PR 384 R1-01)
-# A Groovy method name in quotes, `owner.'project'(':x')`: the name is a string, so it is found in the raw text (PR 384 R1-01).
-QUOTED_PROJECT_CALL = re.compile(r"""(['"])(?:project|findProject)\1\s*\(""")
+# A Groovy method name in a string, `owner.'project'(':x')`, `owner."""project"""(...)`, `.&'project'`, or one built by a GString
+# (`owner."${n}"(...)`): the name is a string, so it is read from the raw text (PR 384 R1-01, R2-02).
+PROJECT_NAMES = {"project", "findProject"}
+MEMBER_BEFORE = re.compile(r"\.\s*&?\s*$")
+# A call after the name: `(` or, in Groovy command syntax, an argument (not `in`, `instanceof` or `as`; PR 384 R2-01).
+CALL_AFTER = re.compile(r"""\s*\(|[ \t]+(?!(?:in|instanceof|as)\b)['"\w$/\[]""")
+GROOVY_COMMAND = re.compile(r"""(?<![\w$])`?(?:project|findProject)`?[ \t]+(?!(?:in|instanceof|as)\b)(?=['"\w$/\[])""")
+
+
+def literals(raw, starts):
+    """(quote offset, end offset, contents) of each string literal whose contents start at an offset in starts (see strip)."""
+    for s in starts:
+        delim = raw[s - 3 : s] if raw[s - 3 : s] in ('"""', "'''") else raw[s - 1 : s]
+        i, depth = s, 0
+        while i < len(raw) and not (depth == 0 and raw.startswith(delim, i)):
+            if len(delim) == 1 and raw[i] == "\\":
+                i += 1
+            elif delim[0] == '"' and raw.startswith("${", i):
+                depth += 1
+                i += 1
+            elif depth and raw[i] == "}":
+                depth -= 1
+            elif len(delim) == 1 and raw[i] == "\n":
+                break
+            i += 1
+        yield s - len(delim), min(len(raw), i + len(delim)), raw[s:i]
+
+
+def string_names(raw, text, starts):
+    """Offsets of string literals used as a project/findProject method name, or as a GString method name. raw gives the contents,
+    text (comments and string contents blanked, same offsets) what is around them."""
+    found = []
+    for q, e, contents in literals(raw, starts):
+        member = MEMBER_BEFORE.search(text[max(0, q - WINDOW) : q])
+        if (member and "$" in contents) or (contents in PROJECT_NAMES and (member or CALL_AFTER.match(text, e))):
+            found.append(q)
+    return found
 DEPENDENCIES_BEFORE = re.compile(r"(?<![\w$])dependencies\s*\.\s*(?:constraints\s*\.\s*)?$")
 WRAPPERS = {"testFixtures", "platform", "enforcedPlatform"}
 NOT_DEPENDENCY_CALLS = KEYWORDS | {"with", "run", "apply", "also", "let", "configure", "project", "findProject"}
@@ -672,7 +714,7 @@ def dependency_argument(blank, pos, deps, wrapped=0):
     return declaration(blank, start, closer(blank, blank.index("(", pos)), deps, m.group(1))
 
 
-def cross_project(text, settings, quoted=()):
+def cross_project(text, settings, quoted=(), groovy=False):
     """(line, what, hint) for each line of text (comments and string contents blanked) that reaches other projects, first finding only."""
     found = []
     for m in CROSS_PROJECT.finditer(text):
@@ -689,6 +731,8 @@ def cross_project(text, settings, quoted=()):
             call = "findProject" if "findProject" in m.group() else "project"
             found.append((m.start(), f"{call}(...)", "use project(...) only as a dependency, e.g. implementation(project(...))"))
     found += [(q, "project(...)", "call project(...) by its name, only as a dependency") for q in quoted]
+    if groovy:
+        found += [(m.start(), "project(...)", "call project(...) with parentheses, only as a dependency") for m in GROOVY_COMMAND.finditer(text)]
     lines = {}
     for start, what, hint in sorted(found):
         lines.setdefault(line_of(text, start), (what, hint))
@@ -700,8 +744,8 @@ def convention_problems(root):
     for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
         raw, starts = read(root, p), []
         text = strip(raw, blank_strings=True, templates=True, strings=starts)
-        quoted = [s - 1 for s in starts if QUOTED_PROJECT_CALL.match(raw, s - 1)]
-        problems += [f"{p}:{line}: reaches other projects ({what}); {hint}" for line, what, hint in cross_project(text, is_settings(p), quoted)]
+        found = cross_project(text, is_settings(p), string_names(raw, text, starts), p.endswith(".gradle"))
+        problems += [f"{p}:{line}: reaches other projects ({what}); {hint}" for line, what, hint in found]
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
                 problems.append(f"{p}:{line_of(text, m.start())}: {m.group()} in build-logic; set it in the module build file, where the floor guard reads it")
