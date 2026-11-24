@@ -8,9 +8,9 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 70/102 (68%) | 32 |
+| M1 | Accounts and households | 74/104 (71%) | 30 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
-| M3 | Packing rules (domain) | not planned yet | 0 |
+| M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
 | M5 | Barcode scanning | not planned yet | 0 |
 | M6 | Release | 0/4 (0%) | 4 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 70/102 done (68%), 32 open.
+**Progress:** 74/104 done (71%), 30 open.
 
 ### Tasks
 
@@ -123,7 +123,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-03 | Roborazzi screenshots (light/dark x en/da), scripts/screenshots.sh, CI diff artifact, ATF and enabl… | done | M1-01 | implementer |  |
 | M1-04 | Design tokens&#58; Theme.kt parity test against design/tokens.json and WCAG AA contrast test (P22) | done | M0.5-03, M1-03 | implementer | [#295](https://github.com/bondo/tally/issues/295) |
 | M1-05 | PIT plus kotest-pitest on core/domain, mutationThreshold 80 (P16) | done | M1-01 | implementer |  |
-| M1-06 | Rules fuzzing&#58; fast-check against a TS reference model of PLAN 3.1 (P17) | ready | M1-01, M0.5-08, M1-10 | implementer |  |
+| M1-06 | Rules fuzzing&#58; fast-check against a TS reference model of PLAN 3.1 (P17) | in progress | M1-01, M0.5-08, M1-10 | implementer | [#372](https://github.com/bondo/tally/issues/372) |
 | M1-07 | Test-impact summary&#58; uncovered changed lines to the step summary and verify.sh (P19) | done | M1-01 | implementer | [#298](https://github.com/bondo/tally/issues/298) |
 | M1-29 | Rename to Tally&#58; applicationId and namespace dk.bjarkebjarke.tally, packages, app label en/da | done | M1-01 | implementer | [#268](https://github.com/bondo/tally/issues/268) |
 | M1-08 | Rules base&#58; signedIn() with email_verified, users/{uid} householdId set/clear and name, tombsto… | done | M1-52 | implementer | [#314](https://github.com/bondo/tally/issues/314) |
@@ -202,9 +202,9 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | done | M1-77 | implementer |  |
 | M1-78 | State issue part B&#58; rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… | done | M1-77 | implementer |  |
 | M1-79 | State issue part C&#58; ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… | done | M1-77, M1-78, M1-80 | process | [#365](https://github.com/bondo/tally/issues/365) |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-85, M1-87 | implementer |  |
-| M1-O1 | Create the Firebase project (Spark), Firestore in eur3, Google and email sign-in, google-services.… | owner to-do | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
-| M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1 | owner |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-85, M1-86, M1-87 | implementer |  |
+| M1-O1 | Create the Firebase project (Spark), Firestore in eur3, email sign-in, google-services.json secret | done | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
+| M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | dropped | M1-O1, M1-O16 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
 | M1-O4 | Enable the Play Integrity API for the Firebase project in the Google Cloud console | owner to-do | M1-O1, M1-26 | owner |  |
 | M1-O5 | Approve the privacy text (OQ-30) before anyone but the owner installs the app | owner to-do | M1-28 | owner |  |
@@ -217,8 +217,10 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-O12 | Decide #280 (who may list invites) before M1-12 starts | done | none | owner |  |
 | M1-O13 | Add the release-smoke check to the main ruleset required list (M1-33 added the job; docs list it… | done | M1-33 | owner |  |
 | M1-O14 | Decide the licences of the 17 artifacts &#58;app needs for Firebase Auth and Credential Manager (list … | done | none | owner |  |
-| M1-O15 | Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5) | owner to-do | M1-O1, M1-O2, M1-66, M1-16 | owner |  |
+| M1-O15 | Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5) | dropped | M1-O1, M1-O2, M1-O16, M1-66, M1-16, M1-86 | owner |  |
+| M1-O16 | Enable Google sign-in in Firebase (needs a public support email for Tally) | dropped | M1-O1 | owner |  |
 | M1-85 | Repo name and checkout path from one place, so the scripts work before and after the repo rename | done | none | implementer |  |
+| M1-86 | Google sign-in switch in &#58;app (off in v1)&#58; hide the Google button and the Google hint while off | blocked | M1-66, M1-16 | implementer |  |
 | M1-87 | Repo rename follow-up&#58; the old repo name and checkout path in process files, docs, README and a… | done | none | implementer |  |
 
 ### Open tasks and what blocks them
@@ -227,7 +229,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M1-06 Rules fuzzing: fast-check against a TS … (ready)"]:::ready
+    n0["M1-06 Rules fuzzing: fast-check against a TS … (in progress)"]:::progress
     n1["M1-11 Rules: leave, remove member (remove… (blocked)"]:::blocked
     n2["M1-12 Rules: invites (create, get, list, revo… (in progress)"]:::progress
     n3["M1-82 Firestore source for the minimum app… (blocked)"]:::blocked
@@ -252,13 +254,11 @@ flowchart LR
     n22["M1-47 R12 screens vs wireframes for M1 (is… (blocked)"]:::blocked
     n23["M1-48 R8 milestone quality review for M1 (… (blocked)"]:::blocked
     n24["M1-FU Follow-up burn-down for M1 (planner:… (blocked)"]:::blocked
-    n25["M1-O1 Create the Firebase project (Spark), Fi… (owner to-do)"]:::owner
-    n26["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
-    n27["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
-    n28["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
-    n29["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
-    n30["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
-    n31["M1-O15 Check once with a real Google sign-in … (owner to-do)"]:::owner
+    n25["M1-O3 Check the Identity Platform upgrade ne… (owner to-do)"]:::owner
+    n26["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::owner
+    n27["M1-O5 Approve the privacy text (OQ-30) before… (owner to-do)"]:::owner
+    n28["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
+    n29["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::blocked
     n18 --> n1
     n4 --> n3
     n4 --> n5
@@ -280,7 +280,7 @@ flowchart LR
     n14 --> n15
     n13 --> n15
     n15 --> n16
-    n27 --> n16
+    n25 --> n16
     n4 --> n17
     n2 --> n18
     n9 --> n20
@@ -340,14 +340,9 @@ flowchart LR
     n19 --> n24
     n21 --> n24
     n3 --> n24
-    n25 --> n26
-    n25 --> n27
-    n25 --> n28
-    n25 --> n30
-    n1 --> n30
-    n25 --> n31
-    n26 --> n31
-    n7 --> n31
+    n29 --> n24
+    n1 --> n28
+    n7 --> n29
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -390,7 +385,38 @@ flowchart LR
 
 (After v1.) Scaling, per-person templates and merging as property-tested pure Kotlin.
 
-Not planned yet.
+**Progress:** 0/3 done (0%), 3 open.
+
+### Tasks
+
+| Task | Title | Status | Depends on | Who | PR |
+|---|---|---|---|---|---|
+| M3-O1 | Enable Google sign-in in Firebase (needs a public support email for Tally) | owner to-do | M1-O1 | owner |  |
+| M3-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | owner to-do | M1-O1, M3-O1 | owner |  |
+| M3-O3 | Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5) | owner to-do | M1-O1, M3-O2, M3-O1, M1-66, M1-16, M1-86 | owner |  |
+
+### Open tasks and what blocks them
+
+An arrow points from what a task waits on to the task. Dashed grey boxes are outside this milestone.
+
+```mermaid
+flowchart LR
+    n0["M3-O1 Enable Google sign-in in Firebase (need… (owner to-do)"]:::owner
+    n1["M3-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
+    n2["M3-O3 Check once with a real Google sign-in … (owner to-do)"]:::owner
+    n3["M1-16 Sign-in UI: sign-in screen and Google b… (blocked)"]:::ext
+    n4["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::ext
+    n0 --> n1
+    n1 --> n2
+    n0 --> n2
+    n3 --> n2
+    n4 --> n2
+    classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
+    classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
+    classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
+    classDef owner fill:#ffebe9,stroke:#cf222e,color:#1f2328,stroke-dasharray:4 3
+    classDef ext fill:#eaeef2,stroke:#59636e,color:#1f2328,stroke-dasharray:2 2
+```
 
 ## M4 Packing templates and trips
 
@@ -414,7 +440,7 @@ Signed APK on tag as a GitHub Release, and a disabled Play internal-track workfl
 
 | Task | Title | Status | Depends on | Who | PR |
 |---|---|---|---|---|---|
-| M6-O1 | Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json | owner to-do | M1-O2 | owner |  |
+| M6-O1 | Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json | owner to-do | M1-O1 | owner |  |
 | M6-O2 | Register a free limited-distribution Android developer account when available in Denmark | owner to-do | none | owner |  |
 | M6-O3 | Register App Check (Play Integrity, device integrity only) with the release key; watch metrics t… | owner to-do | M6-O1, M1-O4 | owner |  |
 | M6-O4 | Adopt Git LFS for screenshot goldens (deferred&#58; only when the revisit trigger fires) | owner to-do | M6-O1 | owner |  |
@@ -429,11 +455,9 @@ flowchart LR
     n1["M6-O2 Register a free limited-distribution A… (owner to-do)"]:::owner
     n2["M6-O3 Register App Check (Play Integrity, dev… (owner to-do)"]:::owner
     n3["M6-O4 Adopt Git LFS for screenshot goldens (d… (owner to-do)"]:::owner
-    n4["M1-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::ext
-    n5["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::ext
-    n4 --> n0
+    n4["M1-O4 Enable the Play Integrity API for the F… (owner to-do)"]:::ext
     n0 --> n2
-    n5 --> n2
+    n4 --> n2
     n0 --> n3
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
@@ -446,7 +470,6 @@ flowchart LR
 
 - **owner to-do** [#120](https://github.com/bondo/tally/issues/120): &#91;owner&#93; Register a free limited-distribution Android developer account when available in Denmark
 - **owner to-do** [#291](https://github.com/bondo/tally/issues/291): &#91;owner&#93; M1-O5&#58; Approve the privacy text (OQ-30) before anyone but the owner installs the app
-- **owner to-do** [#354](https://github.com/bondo/tally/issues/354): &#91;owner&#93; M1-O1&#58; Create the Firebase project (Spark, Firestore eur3, Google + email sign-in, googl…
 - **task** M1-11: waits on M1-54
 - **task** M1-82: waits on M1-88
 - **task** M1-89: waits on M1-88
@@ -466,9 +489,6 @@ flowchart LR
 - **task** M1-39: waits on M1-18, M1-17, M1-25
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +7
 - **task** M1-48: waits on M1-06, M1-11, M1-12 +17
-- **task** M1-FU: waits on M1-88, M1-89, M1-06 +21
-- **task** M1-O2: waits on M1-O1
-- **task** M1-O3: waits on M1-O1
-- **task** M1-O4: waits on M1-O1
-- **task** M1-O6: waits on M1-O1, M1-11
-- **task** M1-O15: waits on M1-O1, M1-O2, M1-16
+- **task** M1-FU: waits on M1-88, M1-89, M1-06 +22
+- **task** M1-O6: waits on M1-11
+- **task** M1-86: waits on M1-16
