@@ -139,6 +139,11 @@ class TestsAreWired(unittest.TestCase):
     def test_verify_runs_the_hook_tests(self):
         self.assertIn("scripts/hooks/run_hook_tests.py", read("scripts", "verify.sh"))
 
+    def test_verify_logs_go_to_tally_verify(self):
+        """M1-91: the step logs (the `full log:` path a failing step prints) live in $TMPDIR/tally-verify."""
+        dirs = re.findall(r'^LOG_DIR="\$\{TMPDIR:-/tmp\}/([^"]+)"$', read("scripts", "verify.sh"), re.M)
+        self.assertEqual(dirs, ["tally-verify"])
+
     def test_pre_push_uses_the_scope_script_and_runs_hook_tests(self):
         hook = read(".githooks", "pre-push")
         self.assertIn("prepush_scope.py", hook)

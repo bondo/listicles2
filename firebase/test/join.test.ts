@@ -254,7 +254,7 @@ describe("Join (one batch)", () => {
     });
 
     // LIVE (PLAN 3.1): erin's member doc and her invite are still there, but under a tombstone only
-    // the owner's cleanup and the P6 delete write (M1-11).
+    // the owner's cleanup and the P6 delete write (M1-95).
     test("denied: a join under a tombstone, with an open invite", async () => {
         await assertFails(join(dan.verified, { hid: TOMB, via: code(TOMB, "t") }));
     });
