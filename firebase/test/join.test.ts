@@ -126,10 +126,10 @@ afterAll(async () => {
 
 // HOME: bob owns it, alice and carol are plain members; carol joined with JOIN's code, which a
 // member then created again (P3's accepted residual). Gus was removed and has self-healed; his
-// invite is left over. Open invites: JOIN by bob, alice's, gus's and one by lee, who left; an
-// expired one by bob. AWAY: eve's, with her open invite. TOMB: erin's tombstone, its cleanup not
-// done, so her member doc and her open invite are still there. Dan and frank, who join, are in no
-// household; their users docs hold a name (P9).
+// invite is left over. Open invites: JOIN by bob, alice's, gus's and one by lee, who left; one by
+// bob that expired a minute ago, so a grace period on the expiry fails. AWAY: eve's, with her open
+// invite. TOMB: erin's tombstone, its cleanup not done, so her member doc and her open invite are
+// still there. Dan and frank, who join, are in no household; their users docs hold a name (P9).
 beforeEach(async () => {
     await env.clearFirestore();
     await seed({
@@ -148,7 +148,7 @@ beforeEach(async () => {
         [inviteDoc(code(HOME, "a"))]: stored(HOME, ALICE),
         [inviteDoc(code(HOME, "g"))]: stored(HOME, GUS),
         [inviteDoc(code(HOME, "l"))]: stored(HOME, "lee"),
-        [inviteDoc(code(HOME, "x"))]: stored(HOME, BOB, -DAY),
+        [inviteDoc(code(HOME, "x"))]: stored(HOME, BOB, -60_000),
         [inviteDoc(code(AWAY, "e"))]: stored(AWAY, EVE),
         [inviteDoc(code(TOMB, "t"))]: stored(TOMB, ERIN),
     });
@@ -201,7 +201,7 @@ describe("Join (one batch)", () => {
     test.each<[string, Join]>([
         ["without the invite delete", { invite: false }],
         ["with a revoked code", { via: code(HOME, "r"), invite: false }],
-        ["with an expired invite", { via: code(HOME, "x") }],
+        ["with an invite that expired a minute ago", { via: code(HOME, "x") }],
         ["with an invite whose creator left", { via: code(HOME, "l") }],
         ["with another household's invite", { via: code(AWAY, "e") }],
         ["deleting another invite of the household too", { burn: code(HOME, "a") }],
