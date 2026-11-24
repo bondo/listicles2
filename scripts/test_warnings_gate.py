@@ -43,6 +43,15 @@ BAD = {
     "warning-level-bare-last": "compilerOptions.freeCompilerArgs.add('-Xwarning-level')",
     "warning-level-uppercase-error": "compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:ERROR')",
     "xsuppress-warning": "compilerOptions.freeCompilerArgs.add('-Xsuppress-warning=DEPRECATION')",
+    # Issue 48 (PR 47 R2-03, R4-01, R4-02; M1-68 part B3): every -Xsuppress-* and -Xdont-warn* flag, and any @argfile, whose
+    # contents the gate cannot see (args.txt could hold -Xwarning-level=DEPRECATION:disabled).
+    "xsuppress-version-warnings": "compilerOptions.freeCompilerArgs.add('-Xsuppress-version-warnings')",
+    "xsuppress-other-flag": "compilerOptions.freeCompilerArgs.add('-Xsuppress-deprecated-jvm-target-warning')",
+    "xdont-warn-on-error-suppression": "compilerOptions.freeCompilerArgs.add('-Xdont-warn-on-error-suppression')",
+    "xdont-warn-other-flag": "compilerOptions.freeCompilerArgs.add('-Xdont-warn-anything')",
+    "argfile": "compilerOptions.freeCompilerArgs.add('@args.txt')",
+    # PR 359 R1-02: the value of a bare flag that is not otherwise checked, so only the @ rule can reject it.
+    "argfile-as-value": "compilerOptions.freeCompilerArgs.addAll(['-opt-in', '@x.txt'])",
 }
 
 
@@ -76,6 +85,14 @@ class WarningsGateTest(unittest.TestCase):
         rc, out = gradle(
             "checkWarningsAsErrors",
             init="compilerOptions.freeCompilerArgs.add('-Xwarning-level=DEPRECATION:error, UNUSED_VARIABLE:error')",
+        )
+        self.assertEqual(rc, 0, out)
+
+    def test_flags_that_only_mention_warnings_are_accepted(self):
+        # Issue 48's rules match prefixes (-Xsuppress-, -Xdont-warn, @), not any flag naming warnings or suppression.
+        rc, out = gradle(
+            "checkWarningsAsErrors",
+            init="compilerOptions.freeCompilerArgs.addAll(['-Xreport-all-warnings', '-Xno-suppress-x', '-Xwarn@x'])",
         )
         self.assertEqual(rc, 0, out)
 
