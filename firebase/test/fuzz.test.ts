@@ -62,9 +62,10 @@ test("the emulator and the model agree on every case", async () => {
 // stops at the first find (within 610 cases on seed 1), and 3 * RUNS leaves room for a new seed.
 const MUTANTS: [string, string, string][] = [
     ["Signed in without a verified email", "token.email_verified == true", "token != null"],
-    ["Create household: any id (P3)", "hid.matches('^[A-Za-z0-9]{20}$')\n        && ", ""],
+    ["Create household: an id of 21 characters (P3)", "{20}$", "{20,21}$"],
     ["users doc: from one household to another (P5)", "(before == null && after", "(after"],
     ["Display name: any value (P4)", "&& validName(doc.displayName))", ")"],
+    ["Display name update: the role too (P4)", "['displayName'])", "['displayName', 'role'])"],
     ["Member reads under a tombstone (LIVE)", "return household.deleted == false && ", "return "],
     ["Transfer: the old owner keeps the role (two owners)", "role == 'member'", "role != null"],
 ];
