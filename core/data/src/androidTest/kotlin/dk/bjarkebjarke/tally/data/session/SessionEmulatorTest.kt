@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
@@ -11,8 +12,10 @@ import dk.bjarkebjarke.tally.data.FirebaseEmulator
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
 import dk.bjarkebjarke.tally.domain.session.GoogleIdToken
 import dk.bjarkebjarke.tally.domain.session.GoogleSignInResult
+import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.session.SignOutResult
+import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.SupervisorJob
@@ -41,8 +44,9 @@ import java.util.UUID
 
 /**
  * M1-67 against the Auth and Firestore emulators (`ui` job): Google sign-in with a Google-style credential, the session
- * state, and the M1-14 sign-out (OQ-13) over the real Firestore cache and write queue. `runBlocking`, not `runTest`:
- * the emulators answer in real time, and virtual time would end the sign-out wait before they do.
+ * state, and the M1-14 sign-out (OQ-13) over the real Firestore cache and write queue; M1-89: the copy goes when
+ * Firebase ends a session by itself. `runBlocking`, not `runTest`: the emulators answer in real time, and virtual time
+ * would end the sign-out wait before they do.
  */
 @RunWith(AndroidJUnit4::class)
 class SessionEmulatorTest {
@@ -257,6 +261,43 @@ class SessionEmulatorTest {
             assertNotSame(before, userData.firestore())
         }
 
+    /**
+     * M1-89 (#357): Firebase signs out by itself when a token refresh is refused, here because the account was
+     * disabled, and the signed-out cleanup then deletes the copy on the phone. Disabled, not deleted: firebase-auth
+     * 25.0.0 signs out on USER_DISABLED, USER_NOT_FOUND (Firebase's answer for a deleted account) and TOKEN_EXPIRED (a
+     * changed password), but the emulator answers a deleted account's refresh with INVALID_REFRESH_TOKEN.
+     */
+    @Test
+    fun aSessionFirebaseEndsByItselfLeavesNoCopyOnThePhone() =
+        emulatorTest {
+            signIn(googleIdToken("disabled-${UUID.randomUUID()}@example.com"))
+            val user = checkNotNull(auth.currentUser)
+            val path = "sign-out/${UUID.randomUUID()}"
+            userData
+                .firestore()
+                .document(path)
+                .set(mapOf("sent" to true))
+                .await()
+            assertTrue(cacheHas(path))
+            val watched = ReportedClears(userData)
+            SignedOutCleanup(authentication, watched, externalScope).start()
+
+            FirebaseEmulator.disableUser(user.uid)
+            val refused =
+                try {
+                    user.getIdToken(true).await()
+                    null
+                } catch (expected: FirebaseAuthInvalidUserException) {
+                    expected
+                }
+
+            assertEquals("ERROR_USER_DISABLED", refused?.errorCode)
+            // Nothing here signed out: Firebase did, and the watcher cleared at that change.
+            assertTrue(watched.answers.receive())
+            assertNull(auth.currentUser)
+            assertFalse(cacheHas(path))
+        }
+
     @Test
     fun theAuthRecordKeepsTheGoogleNameEmailAndPhotoLink() =
         emulatorTest {
@@ -331,6 +372,15 @@ class SessionEmulatorTest {
     /** A hung emulator call fails its test instead of the whole `ui` job. */
     private fun emulatorTest(block: suspend CoroutineScope.() -> Unit) {
         runBlocking { withTimeout(TEST_TIMEOUT_MS, block) }
+    }
+
+    /** The copy on the phone, reporting each clear's answer, so a test can wait for the signed-out cleanup. */
+    private class ReportedClears(
+        private val userData: LocalUserData,
+    ) : LocalUserData by userData {
+        val answers = Channel<Boolean>(Channel.UNLIMITED)
+
+        override suspend fun clear(): Boolean = userData.clear().also { answers.send(it) }
     }
 
     /** Credential Manager is M1-66's: here only that sign-out clears its state. */

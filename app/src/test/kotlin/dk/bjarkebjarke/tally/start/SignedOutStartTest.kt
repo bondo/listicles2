@@ -10,26 +10,32 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import dagger.hilt.android.testing.UninstallModules
+import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.MainActivity
 import dk.bjarkebjarke.tally.R
+import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.session.SessionModule
 import dk.bjarkebjarke.tally.session.StartedActivity
+import dk.bjarkebjarke.tally.testing.FakeLocalUserData
 import dk.bjarkebjarke.tally.testing.FakeSessionState
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.kotest.matchers.types.shouldNotBeSameInstanceAs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.job
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Collections
 import javax.inject.Inject
 
 /**
  * M1-60: the real activity, its Hilt ViewModel and the root, with a signed-out session, open on sign-in. The fake
- * session replaces the whole Firebase session module (M1-88), so the test needs no Firebase app.
+ * session and local copy replace the whole Firebase session module (M1-88, M1-89), so the test needs no Firebase app.
  */
 @HiltAndroidTest
 @UninstallModules(SessionModule::class)
@@ -46,8 +52,19 @@ class SignedOutStartTest {
     @JvmField
     val session: SessionState = FakeSessionState(signedIn = false)
 
+    /** What the signed-out cleanup (M1-89) deletes; it runs on a thread of the application scope. */
+    private val steps: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    @BindValue
+    @JvmField
+    val userData: LocalUserData = FakeLocalUserData(steps = steps)
+
     @Inject
     lateinit var startedActivity: StartedActivity
+
+    @Inject
+    @ApplicationScope
+    lateinit var applicationScope: CoroutineScope
 
     @Test
     fun signedOutStartShowsSignIn() {
@@ -101,6 +118,23 @@ class SignedOutStartTest {
         picker.stop().destroy()
 
         startedActivity.current() shouldBeSameInstanceAs main
+    }
+
+    /**
+     * M1-89: MainActivity starts the process's one signed-out cleanup, so a signed-out start deletes a copy that a
+     * session left on the phone. A recreated MainActivity starts no second watcher.
+     */
+    @Test
+    fun theStartedActivityStartsTheOneSignedOutCleanup() {
+        hilt.inject()
+        compose.waitUntil(START_TIMEOUT_MS) { "cleared" in steps }
+        steps shouldBe listOf("clear", "cleared")
+
+        compose.activityRule.scenario.recreate()
+
+        applicationScope.coroutineContext.job.children
+            .count() shouldBe 1
+        steps shouldBe listOf("clear", "cleared")
     }
 
     private companion object {
