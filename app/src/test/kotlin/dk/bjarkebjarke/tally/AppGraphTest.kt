@@ -124,10 +124,7 @@ class AppGraphTest {
         userData shouldBeSameInstanceAs firestoreSession
     }
 
-    /**
-     * M1-88: Google's credentials come from Credential Manager, and the app's graph builds [googleSignIn] and [signOut]
-     * on these bindings. SignInAndSignOutWiringTest checks what the two are built from.
-     */
+    /** M1-88: the graph builds [googleSignIn] and [signOut] too; SignInAndSignOutWiringTest checks what they use. */
     @Test
     fun theCredentialsComeFromCredentialManager() {
         hilt.inject()

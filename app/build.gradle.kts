@@ -290,7 +290,7 @@ tasks.withType<Test>().configureEach {
 
 dependencies {
     implementation(project(":core:domain"))
-    // M1-66: :core:data ships in the app, Firebase and Credential Manager with it (M1-88: session/SessionModule).
+    // M1-66: :core:data ships in the app, Firebase and Credential Manager with it (the Hilt bindings are M1-88).
     implementation(project(":core:data"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

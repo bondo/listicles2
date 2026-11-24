@@ -8,10 +8,9 @@ import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.Opcodes
 
 /**
- * Owner decision 7127528405 (PR 381): coverage leaves out what Dagger generates (its factories and members
- * injectors, whose `get` and `create` Hilt's fast init never calls) and counts every hand-written class, so an
- * uncovered hand-written line still counts against the 80% gate. Judged on the app's compiled classes against the
- * exclusions Kover is configured with in app/build.gradle.kts (build.gradle.kts repeats them for the aggregate report).
+ * Owner decision 7127528405 (PR 381): coverage leaves out what Dagger marks generated (its factories and members
+ * injectors) and counts every hand-written class, so an uncovered hand-written line still counts against the 80% gate.
+ * Judged on the app's compiled classes against the Kover exclusions of app/build.gradle.kts (repeated at the root).
  */
 class KoverExclusionsTest {
     private val patterns = configured("tally.koverExcludedClasses").map(::globRegex)

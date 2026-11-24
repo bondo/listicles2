@@ -122,8 +122,6 @@ class SignInAndSignOutWiringTest {
 
         steps shouldBe listOf("clear", "cleared", "signOut", "clearCredentialState")
     }
-
-    private companion object {
-        const val TOKEN = "picked-account-id-token"
-    }
 }
+
+private const val TOKEN = "picked-account-id-token"
