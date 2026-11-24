@@ -1,13 +1,22 @@
 package dk.bjarkebjarke.tally
 
+import com.google.firebase.FirebaseApp
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import dagger.hilt.internal.GeneratedComponentManager
 import dagger.hilt.internal.GeneratedComponentManagerHolder
 import dk.bjarkebjarke.tally.connectivity.AndroidConnectivity
+import dk.bjarkebjarke.tally.data.session.CredentialManagerGoogleCredentials
+import dk.bjarkebjarke.tally.data.session.FirebaseAuthentication
+import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
+import dk.bjarkebjarke.tally.domain.session.Authentication
+import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
+import dk.bjarkebjarke.tally.domain.session.GoogleSignIn
+import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
+import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.start.EmailVerification
 import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
 import dk.bjarkebjarke.tally.domain.start.NameState
@@ -15,8 +24,13 @@ import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.kotest.matchers.types.shouldBeSameInstanceAs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,6 +65,34 @@ class AppGraphTest {
     @Inject
     lateinit var notices: HouseholdNotices
 
+    @Inject
+    lateinit var authentication: Authentication
+
+    @Inject
+    lateinit var userData: LocalUserData
+
+    @Inject
+    lateinit var firestoreSession: FirestoreSession
+
+    @Inject
+    lateinit var credentials: GoogleCredentials
+
+    @Inject
+    lateinit var googleSignIn: GoogleSignIn
+
+    @Inject
+    lateinit var signOut: SignOut
+
+    @Inject
+    @field:ApplicationScope
+    lateinit var scope: CoroutineScope
+
+    /** TallyApplication initialises Firebase in the app; the Hilt test application does not. */
+    @Before
+    fun firebase() {
+        FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
+    }
+
     /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-15, M1-39, M1-18). */
     @Test
     fun gateStandInsAllPass() {
@@ -69,11 +111,36 @@ class AppGraphTest {
         connectivity.shouldBeInstanceOf<AndroidConnectivity>()
     }
 
-    /** M1-60: until M1-88 binds the Firebase Auth session, nobody is signed in, so the app opens on sign-in. */
+    /**
+     * M1-88: one Firebase Auth session is both the session state the start routes on and the sign-in, and one Firestore
+     * holder is both the copy sign-out deletes and every repository's Firestore (M1-67). Separate instances would
+     * route on a session the sign-in never changes, or delete a copy no repository writes to.
+     */
     @Test
-    fun sessionIsSignedOutUntilAuthExists() {
+    fun oneFirebaseSessionIsTheStateTheSignInAndTheLocalCopy() {
         hilt.inject()
-        runBlocking { session.signedIn().first() } shouldBe false
+        session.shouldBeInstanceOf<FirebaseAuthentication>()
+        authentication shouldBeSameInstanceAs session
+        userData shouldBeSameInstanceAs firestoreSession
+    }
+
+    /** M1-88: Google sign-in asks Credential Manager. Injecting [googleSignIn] and [signOut] runs their providers. */
+    @Test
+    fun googleSignInAndSignOutAskCredentialManager() {
+        hilt.inject()
+        credentials.shouldBeInstanceOf<CredentialManagerGoogleCredentials>()
+    }
+
+    /**
+     * Sign-out's steps 2 to 5 run in the application scope, with a SupervisorJob (checklist section 5): one failed
+     * sign-out ends nothing, so the next one still runs.
+     */
+    @Test
+    fun theApplicationScopeOutlivesAFailedChild() {
+        hilt.inject()
+        val failed = scope.async { error("a failed sign-out step") }
+        runBlocking { failed.join() }
+        scope.isActive shouldBe true
     }
 }
 
