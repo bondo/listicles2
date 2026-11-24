@@ -277,6 +277,11 @@ test.each<[string, () => h.Db, Request]>([
                 .doc(invite(code(TOMB, "n")))
                 .set({ ...stored(DAN), householdName: "", createdAt: NOW }),
     ],
+    [
+        "the owner overwrites a removed marker",
+        () => dan.verified,
+        (db) => db.doc(marker(TOMB, GUS)).set({ removedAt: NOW }),
+    ],
 ])("denied under the tombstone: %s", async (_what, db, request) => {
     await assertFails(request(db()));
 });
