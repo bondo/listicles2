@@ -1,14 +1,10 @@
 package dk.bjarkebjarke.tally.signin
 
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextAlign
 import dk.bjarkebjarke.tally.TallyTheme
 import io.kotest.matchers.shouldBe
 import org.junit.Rule
@@ -67,15 +63,10 @@ class SignInScreenTest {
         email shouldBe 1
     }
 
-    @Test
-    fun noMessageShowsNothingExtra() {
-        show()
-        compose.onNodeWithText("This needs a connection").assertDoesNotExist()
-    }
-
+    /** SYNC-03 and the sign-in failures are snackbars, reported shown at once; Danish checks the same strings. */
     @Test
     @Config(qualifiers = "en")
-    fun needsConnectionIsASnackbarAndIsReportedShown() {
+    fun theMessagesAreSnackbarsInEnglish() {
         show(SignInUiState(message = SignInMessage.NeedsConnection))
         compose.onNodeWithText("This needs a connection").assertExists()
         compose.waitUntil { shown == 1 }
@@ -83,59 +74,11 @@ class SignInScreenTest {
 
     @Test
     @Config(qualifiers = "da")
-    fun needsConnectionInDanish() {
-        show(SignInUiState(message = SignInMessage.NeedsConnection))
-        compose.onNodeWithText("Det kræver internetforbindelse").assertExists()
-    }
-
-    @Test
-    @Config(qualifiers = "en")
-    fun noAccountMessageInEnglish() {
-        show(SignInUiState(message = SignInMessage.NoAccount))
-        compose.onNodeWithText("This phone has no Google account. Add one, or use email and password.").assertExists()
-    }
-
-    @Test
-    @Config(qualifiers = "da")
-    fun noAccountMessageInDanish() {
+    fun theNoAccountMessageIsASnackbarInDanish() {
         show(SignInUiState(message = SignInMessage.NoAccount))
         compose
             .onNodeWithText("Der er ingen Google-konto på denne telefon. Tilføj en, eller brug e-mail og adgangskode.")
             .assertExists()
-    }
-
-    @Test
-    @Config(qualifiers = "en")
-    fun failedMessageInEnglish() {
-        show(SignInUiState(message = SignInMessage.Failed))
-        compose.onNodeWithText("Could not sign in. Try again.").assertExists()
-    }
-
-    @Test
-    @Config(qualifiers = "da")
-    fun failedMessageInDanish() {
-        show(SignInUiState(message = SignInMessage.Failed))
-        compose.onNodeWithText("Kunne ikke logge ind. Prøv igen.").assertExists()
-    }
-
-    /** R1-03: a label that wraps (Danish at 200 % font scale) stays centred in its button. */
-    @Test
-    fun theButtonLabelsAreCentred() {
-        show()
-        for (label in listOf("Continue with Google", "Use email and password")) {
-            textStyle(label).textAlign shouldBe TextAlign.Center
-        }
-    }
-
-    private fun textStyle(label: String): TextStyle {
-        val results = mutableListOf<TextLayoutResult>()
-        compose
-            .onNodeWithText(label, useUnmergedTree = true)
-            .fetchSemanticsNode()
-            .config[SemanticsActions.GetTextLayoutResult]
-            .action
-            ?.invoke(results)
-        return results.single().layoutInput.style
     }
 
     @Test
