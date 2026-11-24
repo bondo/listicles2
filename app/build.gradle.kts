@@ -80,7 +80,9 @@ abstract class GoogleServicesStandIn : DefaultTask() {
         val client =
             """{"client_info": {"mobilesdk_app_id": "1:000000000000:android:0000000000000000", """ +
                 """"android_client_info": {"package_name": "${packageName.get()}"}}, """ +
-                """"oauth_client": [], "api_key": [{"current_key": "stand-in-not-a-key"}], "services": {}}"""
+                // M1-66: a web client (type 3), so the plugin generates default_web_client_id as a real config would.
+                """"oauth_client": [{"client_id": "000000000000-stand-in.apps.googleusercontent.com", """ +
+                """"client_type": 3}], "api_key": [{"current_key": "stand-in-not-a-key"}], "services": {}}"""
         jsonFile.get().asFile.writeText(
             """{"project_info": {"project_number": "000000000000", "project_id": "demo-tally"}, """ +
                 """"client": [$client], "configuration_version": "1"}""",
@@ -259,6 +261,8 @@ tasks.withType<Test>().configureEach {
 
 dependencies {
     implementation(project(":core:domain"))
+    // M1-66: :core:data ships in the app, Firebase and Credential Manager with it (the Hilt bindings are M1-88).
+    implementation(project(":core:data"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime)
@@ -284,6 +288,8 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.kotest.assertions)
     testImplementation(libs.hilt.android.testing)
+    // M1-66: CredentialManagerGoogleCredentialsTest builds Google ID token credentials and reads the requests.
+    testImplementation(libs.googleid)
     kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
