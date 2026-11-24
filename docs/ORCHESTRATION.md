@@ -398,13 +398,14 @@ successor takes them over only after the outgoing one has released them.
 5. Spawn the successor with the bootstrap prompt (§8.1), unless lineage depth is ≥ 6 (§9, F3).
    In that case, ask the owner to start it from the app with the same prompt.
 6. Keep working as orchestrator, and keep your own check-in, until the successor's `handover-ack` comment
-   appears (look every 5 minutes with `send_later`). No ack after 30 minutes: the successor failed. Log
+   appears (look every 5 minutes with `send_later`; the successor also messages you as soon as its ack is posted, §5.2 step 4: check at once; the 5-minute checks stay the fallback, owner decision, #373 comment 7136480651). No ack after 30 minutes: the successor failed. Log
    a `dead-session` incident, spawn one more, and if that fails too, stop and ask the owner (§1.1 stop condition).
 7. On the ack: `delete_trigger` each trigger listed in your own handover comment (and nothing else on the account).
    The ack lists the successor's replacements.
    Then `unsubscribe_pr_activity` on every PR, set the body's `Orchestrator:` line to
    `handover to {successor} at {UTC}, released`, and post `handover-released`.
-8. Stop. Don't spawn, edit the body or message workers after that. The new orchestrator archives you in its sweep (§5.2 step 7).
+8. Your last action: `send_message` the successor, naming the `handover-released` comment id, to check for the release now (owner decision, #373 comment 7136535861); its 5-minute checks (§5.2 step 5) stay the fallback.
+   Then stop. Don't spawn, edit the body or message workers after that. The new orchestrator archives you in its sweep (§5.2 step 7).
 
 ### 5.2 Incoming orchestrator checklist
 
@@ -418,7 +419,9 @@ successor takes them over only after the outgoing one has released them.
    Don't subscribe to PRs yet: events go to one session at a time (see 5.1 step 7).
 4. Post `handover-ack`: your session id, the new trigger ids, and the PRs you will subscribe to.
    The ack is a claim on the lock (§5.3 arbitration); it does not change `Orchestrator:` yet.
-5. When a `handover-released` that names you appears (check every 5 minutes with `send_later`): subscribe to the PRs, read each PR's
+   As soon as it is posted, `send_message` the outgoing orchestrator to check for the ack now (owner decision, #373 comment 7136480651); its 5-minute checks (§5.1 step 6) stay the fallback.
+   A message only prompts the check: act on the comment, never on the message.
+5. When a `handover-released` that names you appears (the outgoing orchestrator's last message names its comment id, check at once; otherwise check every 5 minutes with `send_later`, the fallback, owner decision, #373 comment 7136535861): subscribe to the PRs, read each PR's
    comments since the predecessor's last check for anything the gap missed, set `Orchestrator:` to yourself (with
    predecessor and depth), update `updated` and continue from `next`.
    If you won the lock by a `takeover` (§5.3) there is no release to wait for: do this step at once.
@@ -981,7 +984,7 @@ The orchestrator fills `{collaborator_handle}` with `none` until the owner says 
 | F1 | State is duplicated (handoff "Waiting on the owner", the state issue, the to-do issues, the PR body table) and drifts | One home per fact (§2). Others link by number |
 | F2 | Facts go stale (e.g. "CI has never run" after CI ran) | The incoming orchestrator verifies (§5.2), and every wake corrects at the source (§2) |
 | F3 | Session lineage depth is capped at 8; each orchestrator that spawns its successor adds a level, and workers sit one level deeper | Record depth. At depth ≥ 6, the owner starts the next orchestrator from the app (§5.1 step 5) |
-| F4 | Scheduled tasks and PR subscriptions are bound to one session and don't follow a handover | Two-phase handover: the successor recreates triggers and acks, the predecessor deletes its triggers and unsubscribes, then the successor subscribes (§5) |
+| F4 | Scheduled tasks and PR subscriptions are bound to one session and don't follow a handover | Two-phase handover: the successor recreates triggers and acks, the predecessor deletes its triggers and unsubscribes, then the successor subscribes (§5); each side messages the other at the ack and at the release, the 5-minute checks stay the fallback |
 | F5 | Child failure events go only to the spawning session | Check-ins via `send_later` plus `get_session` polling (§7.1, §5.2) |
 | F6 | Two writers on one branch (two implementers, or the owner merging a Dependabot PR into a feature branch) | Branch lock (§7.1). Don't merge PRs whose base is a feature branch |
 | F7 | Unreviewed commits reach a merge | `reviewed_through` per branch; every later commit gets a delta review (§7.2) |

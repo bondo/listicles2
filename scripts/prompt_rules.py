@@ -597,6 +597,19 @@ RULES = (
         forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window"),
     ),
     Rule(
+        "handover-messages", ("orchestrator",),
+        (
+            r"as the incoming orchestrator, `send_message` the outgoing one as soon as your `handover-ack` is posted, telling it to check for the ack now",
+            r"#373 comments 7136480651 and 7136535861",
+            r"the scheduled 5-minute checks stay the fallback in both directions",
+            r"a message only prompts the check: read the comment itself",
+            r"post `handover-released`, then as your last action `send_message` the successor naming the `handover-released` comment id, "
+            r"so it checks for the release now, and stop",
+        ),
+        "handover messages (owner decisions #373 comments 7136480651, 7136535861): the incoming orchestrator messages the outgoing one after its ack, "
+        "the outgoing one messages the incoming one last, naming the release comment id; the 5-minute checks stay the fallback",
+    ),
+    Rule(
         "lock-takeover", ("orchestrator",),
         (
             r"lock check, first thing on every wake \(§5\.3\)", r"post `lock-lost`", r"the lowest id after the latest `handover`",
@@ -1393,6 +1406,23 @@ DOC_RULES = (
         "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
         "the successor archives the predecessor",
         forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"the owner archives you"),
+    ),
+    DocRule(
+        "orch-handover-messages", ORCH,
+        (
+            r"the successor also messages you as soon as its ack is posted, §5\.2 step 4: check at once; the 5-minute checks stay the fallback, "
+            r"owner decision, #373 comment 7136480651",
+            r"as soon as it is posted, `send_message` the outgoing orchestrator to check for the ack now \(owner decision, #373 comment 7136480651\); "
+            r"its 5-minute checks \(§5\.1 step 6\) stay the fallback",
+            r"a message only prompts the check: act on the comment, never on the message",
+            r"8\. your last action: `send_message` the successor, naming the `handover-released` comment id, to check for the release now "
+            r"\(owner decision, #373 comment 7136535861\); its 5-minute checks \(§5\.2 step 5\) stay the fallback",
+            r"the outgoing orchestrator's last message names its comment id, check at once; otherwise check every 5 minutes with `send_later`, "
+            r"the fallback, owner decision, #373 comment 7136535861",
+            r"each side messages the other at the ack and at the release, the 5-minute checks stay the fallback",
+        ),
+        "ORCHESTRATION 5 and 9 F4: the incoming orchestrator messages the outgoing one after its ack, the outgoing one messages the incoming one "
+        "last, naming the release comment id; the 5-minute checks stay the fallback (owner decisions #373 comments 7136480651, 7136535861)",
     ),
     DocRule(
         "orch-parallel", ORCH,

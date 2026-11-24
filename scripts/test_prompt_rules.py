@@ -3255,9 +3255,6 @@ class HandoverMessageTests(unittest.TestCase):
     def doc(self):
         return (ROOT / self.DOC).read_text(encoding="utf-8")
 
-    def rule_patterns(self, rule):
-        return [p for p in rule.patterns]
-
     def test_both_rules_exist_with_patterns_for_both_decisions(self):
         prompt = next((r for r in prompt_rules.RULES if r.id == self.PROMPT_RULE), None)
         doc = next((r for r in prompt_rules.DOC_RULES if r.id == self.DOC_RULE), None)
@@ -3267,8 +3264,9 @@ class HandoverMessageTests(unittest.TestCase):
         self.assertEqual(doc.path, self.DOC)
         for rule in (prompt, doc):
             joined = " ".join(rule.patterns)
-            for needle in ("7136480651", "7136535861", "send_message", "handover-ack", "handover-released", "fallback"):
+            for needle in ("7136480651", "7136535861", "send_message", "handover-released", "fallback", "5-minute"):
                 self.assertIn(needle, joined, f"{rule.id} does not pin {needle}")
+        self.assertIn("handover-ack", " ".join(prompt.patterns))  # the prompt names the comment; the doc says "the ack" (its step 4 names the comment)
 
     def test_the_real_files_pass_both_rules(self):
         self.assertNotIn(self.PROMPT_RULE, ids(prompt_rules.check_text("orchestrator", real("orchestrator"))))
