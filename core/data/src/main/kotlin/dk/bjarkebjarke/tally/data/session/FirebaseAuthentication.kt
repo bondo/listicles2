@@ -39,8 +39,8 @@ class FirebaseAuthentication(
             auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
             GoogleSignInResult.SignedIn
         } catch (expected: FirebaseException) {
-            // A refused token, no network, too many attempts or a disabled account. M1-15 tells the email collision
-            // (AUTH-10) apart.
+            // A refused token, no network, too many attempts or a disabled account. M1-95 tells the email collision
+            // (AUTH-10) apart: GoogleSignInResult.EmailHasPasswordAccount.
             GoogleSignInResult.Failed
         }
     }

@@ -26,9 +26,11 @@ class GoogleSignInTest :
             }
         }
 
-        test("Firebase refusing the token fails the sign-in") {
-            val authentication = FakeAuthentication(googleResult = GoogleSignInResult.Failed)
-            googleSignIn(GoogleIdToken.Picked("token"), authentication)() shouldBe GoogleSignInResult.Failed
+        test("Firebase's refusal reaches the screen as it is, the non-Gmail collision included (M1-15, AUTH-10)") {
+            listOf(GoogleSignInResult.Failed, GoogleSignInResult.EmailHasPasswordAccount).forEach { refusal ->
+                val authentication = FakeAuthentication(googleResult = refusal)
+                googleSignIn(GoogleIdToken.Picked("token"), authentication)() shouldBe refusal
+            }
         }
 
         test("cancel, no account or a failed picker: Firebase is never asked") {
