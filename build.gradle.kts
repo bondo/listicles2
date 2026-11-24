@@ -1,4 +1,3 @@
-import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import io.gitlab.arturbosch.detekt.Detekt
 
 // Dependabot alerts (issue 187, docs/SECURITY.md): transitive build and lint tool dependencies that have an advisory are
@@ -109,69 +108,10 @@ kover {
 // M0.5-09, issue 211 and M1-68 part B2 (issue 48): checkWarningsAsErrors and checkJdkRelease are each module's own
 // tasks (build-logic ModuleChecks.kt), so the root reads no other project. listiclesChecks groups a module's checks,
 // and detekt (verify.sh and CI) runs it for every module by task path. check_build_guards.py keeps this list equal to
-// the modules in settings.gradle.kts. Run: ./gradlew checkWarningsAsErrors checkJdkRelease (every module).
+// the modules in settings.gradle.kts. Part B3: checkJavaApiLevel too, in each JVM library module. Run: ./gradlew
+// checkWarningsAsErrors checkJdkRelease checkJavaApiLevel (every module that has them).
 val listiclesModules = listOf(":app", ":core:data", ":core:domain", ":core:testing")
 tasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }
-
-// The test-support modules (host JDK 21 API on purpose): the one list in build-logic (TestSupportModules), which every
-// module's checkJdkRelease and the listicles.jvm.testsupport plugin also follow; checkJavaApiLevel below skips them.
-val jdkTestSupportModules = TestSupportModules.paths
-
-// M1-37 (issue 228): checkJdkRelease closes the JDK 18 to 21 gap only. A Java 9 to 17 member that is newer than minSdk (Stream.toList is
-// API 34, Objects.requireNonNullElse is API 30) still compiles in a JVM module, and Android lint's NewApi skips pure JVM modules.
-// checkJavaApiLevel runs scripts/check_java_api_level.py over the main classes of every JVM module (the test-support modules excepted,
-// as in checkJdkRelease) against api-versions.xml of the compileSdk platform that :app uses, with the minSdk of :app. Both come from
-// :app's own configuration, so they cannot drift from the app. A missing or unreadable api-versions.xml fails the build.
-// Tested by scripts/test_check_java_api_level.py (checker) and scripts/test_java_api_level_gate.py (this task). Run: ./gradlew checkJavaApiLevel
-val javaApiVersions = objects.fileProperty()
-val javaApiMinSdk = objects.property<Int>()
-project(":app").pluginManager.withPlugin("com.android.application") {
-    val components = project(":app").extensions.getByType<ApplicationAndroidComponentsExtension>()
-    val androidJar =
-        components.sdkComponents.bootClasspath.map { jars ->
-            jars.first { it.asFile.name == "android.jar" }
-        }
-    javaApiVersions.set(layout.file(androidJar.map { it.asFile.resolveSibling("data/api-versions.xml") }))
-    components.onVariants(components.selector().withName("debug")) { variant ->
-        javaApiMinSdk.set(variant.minSdk.apiLevel)
-    }
-}
-
-val checkJavaApiLevel =
-    tasks.register<Exec>("checkJavaApiLevel") {
-        group = "verification"
-        description = "Fails if a JVM module's main classes use a java/ or android/ member above the app's minSdk."
-        val checker = layout.projectDirectory.file("scripts/check_java_api_level.py")
-        val classDirs =
-            files(
-                provider {
-                    allprojects
-                        .filter { p ->
-                            p.plugins.hasPlugin("org.jetbrains.kotlin.jvm") && p.path !in jdkTestSupportModules
-                        }.map {
-                            it.extensions
-                                .getByType<SourceSetContainer>()
-                                .getByName("main")
-                                .output.classesDirs
-                        }
-                },
-            )
-        val apiVersions = javaApiVersions
-        val minSdk = javaApiMinSdk
-        inputs.file(checker)
-        inputs.files(classDirs).withPropertyName("classDirs")
-        // A missing file is not an input error: the checker reports it and fails closed.
-        inputs.files(apiVersions).withPropertyName("apiVersions").optional()
-        executable = "python3"
-        argumentProviders.add(
-            CommandLineArgumentProvider {
-                val options =
-                    listOf("-I", checker.asFile.path, "--api-versions", apiVersions.get().asFile.path) +
-                        listOf("--min-sdk", minSdk.get().toString())
-                options + classDirs.files.filter { it.exists() }.map { it.path }
-            },
-        )
-    }
 
 // M0.5-10: the licensee policy (config/licensee/policy.gradle) is tested against a fixture build whose
 // artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's
