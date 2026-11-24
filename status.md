@@ -164,7 +164,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-33 | Release smoke build with R8 in CI (best-practices checklist follow-up 7) | done | M1-30 | implementer |  |
 | M1-52 | Rules test harness&#58; default-deny paths from PLAN section 3, list and collection-group queries, unv… | done | M1-35 | implementer | [#301](https://github.com/bondo/tally/issues/301) |
 | M1-53 | Rules&#58; transfer ownership, allow and deny tests (partial transfers, plain member, non-member) | done | M1-10 | implementer | [#364](https://github.com/bondo/tally/issues/364) |
-| M1-54 | Rules&#58; the join batch with the one-household check, allow and deny tests | ready | M1-12 | implementer |  |
+| M1-54 | Rules&#58; the join batch with the one-household check, allow and deny tests | in progress | M1-12 | implementer | [#382](https://github.com/bondo/tally/issues/382) |
 | M1-83 | Rules&#58; members read the household doc and its members (PLAN 3.1 Reads), allow and deny tests | done | M1-10 | implementer | [#366](https://github.com/bondo/tally/issues/366) |
 | M1-55 | Tooling&#58; move the androidTest ListiclesAppTest into the tally package as TallyAppTest and update t… | done | M1-29 | implementer |  |
 | M1-49 | detekt LongParameterList&#58; ignoreAnnotated &#91;Composable&#93; for that rule only (issue 217 item 5) | done | M1-01 | implementer | [#236](https://github.com/bondo/tally/issues/236) |
@@ -253,7 +253,7 @@ flowchart LR
     n14["M1-32 Account: delete account (AUTH-04) with… (blocked)"]:::blocked
     n15["M1-23 Optional TOTP two-step verification (A… (blocked)"]:::blocked
     n16["M1-25 Account screen (wireframe 18) and nav… (blocked)"]:::blocked
-    n17["M1-54 Rules: the join batch with the one-hou… (ready)"]:::ready
+    n17["M1-54 Rules: the join batch with the one-hou… (in progress)"]:::progress
     n18["M1-61 Java API level check: also look up clas… (ready)"]:::ready
     n19["M1-39 Your name (AUTH-12): users/{uid}.name… (blocked)"]:::blocked
     n20["M1-84 Isolated projects: module build files … (ready)"]:::ready
