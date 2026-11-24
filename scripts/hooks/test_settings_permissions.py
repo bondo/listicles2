@@ -1,5 +1,6 @@
-"""Pins .claude/settings.json permissions: exactly five rules (owner approval of three checksum-pinned linters, issue #15, plus the
-scripts/mark-ready.sh and scripts/update-branch.sh wrappers), and a documented-semantics model of rule matching (`*` spans
+"""Pins .claude/settings.json permissions: exactly seven rules (owner approval of three checksum-pinned linters, issue #15, the
+scripts/mark-ready.sh and scripts/update-branch.sh wrappers, the merge agent's `python3 -I scripts/merge_ready.py` and the orchestrator's
+mcp__claude-code-remote__add_repo; owner request, 2026-11-24), and a documented-semantics model of rule matching (`*` spans
 spaces and slashes; compound commands need every part allowed). The wrappers (test_mark_ready.py,
 test_update_branch.py) validate their arguments; no rule may allow `gh api` directly. How the real matcher
 or the classifier behaves is NOT tested (see the residual risks in docs/ORCHESTRATION.md section 7.5).
@@ -13,12 +14,19 @@ import unittest
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 WRAPPER_RULE = "Bash(scripts/mark-ready.sh *)"
 UPDATE_RULE = "Bash(scripts/update-branch.sh *)"  # owner decision, #15 comment 7008033864: the merge agent may update PR branches
+# Owner request in the orchestrator chat, 2026-11-24: the merge agent's one merge call (narrowed by the PreToolUse guard, test_guard_merge_ready.py)
+# and the orchestrator's attach of this repository. An MCP rule names one tool and takes no argument pattern.
+MERGE_RULE = "Bash(python3 -I scripts/merge_ready.py *)"
+ADD_REPO_RULE = "mcp__claude-code-remote__add_repo"
+SHA = "0123456789abcdef0123456789abcdef01234567"
 PINNED_ALLOW = frozenset({
     "Bash(.tools/bin/shellcheck *)",
     "Bash(.tools/bin/actionlint *)",
     "Bash(.tools/bin/zizmor --offline *)",
     WRAPPER_RULE,
     UPDATE_RULE,
+    MERGE_RULE,
+    ADD_REPO_RULE,
 })
 SEPARATORS = re.compile(r"&&|\|\||\|&|[;&|\n]")
 
@@ -55,7 +63,7 @@ def command_allowed(rules, command):
 
 
 def check_allow(rules):
-    """Problems with an allow list; empty when it is exactly the five pinned rules."""
+    """Problems with an allow list; empty when it is exactly the seven pinned rules."""
     dup = ["duplicate rule"] * (len(rules) != len(set(rules)))
     return dup + [f"unexpected rule: {r}" for r in sorted(set(rules) - PINNED_ALLOW)] + [f"missing rule: {r}" for r in sorted(PINNED_ALLOW - set(rules))]
 
@@ -101,6 +109,11 @@ class AllowList(unittest.TestCase):
             "Bash(scripts/*)", "Bash(scripts/mark-ready.sh)", "Bash(bash scripts/mark-ready.sh *)", "Bash(scripts/update-branch.sh)",
             "Bash(bash scripts/update-branch.sh *)", "Bash(./scripts/update-branch.sh *)", "Bash(gh api -X PUT repos/bondo/tally/pulls/*/update-branch *)",
             "mcp__github__merge_pull_request", "Bash(gh api -X PUT repos/bondo/tally/pulls/*/merge *)",
+            "Bash(python3 scripts/merge_ready.py *)", "Bash(python3 -I scripts/merge_ready.py*)", "Bash(python3 -I scripts/*)", "Bash(python3 *)",
+            "Bash(python3 -I *)", "Bash(python3 -I scripts/merge_ready.py)", "Bash(scripts/merge_ready.py *)", "Bash(python3 -I ./scripts/merge_ready.py *)",
+            "Bash(python3 -I scripts/merge_ready.py * general)", "Bash(python *)", "Bash(/usr/bin/python3 -I scripts/merge_ready.py *)",
+            "mcp__claude-code-remote", "mcp__claude-code-remote__*", "mcp__claude-code-remote__create_session", "mcp__claude-code-remote__send_message",
+            "mcp__claude-code-remote__update_environment", "mcp__claude-code-remote__add_repo(*)", "mcp__claude-code-remote__add_repo *", "mcp__*",
         ]
         for extra in bad_extras:
             self.assertTrue(check_allow(base + [extra]), extra)
@@ -109,6 +122,8 @@ class AllowList(unittest.TestCase):
         self.assertTrue(check_allow(base + [base[0]]), "duplicate")
         self.assertTrue(check_allow(base + [WRAPPER_RULE]), "duplicate wrapper rule")
         self.assertTrue(check_allow(base + [UPDATE_RULE]), "duplicate update-branch rule")
+        self.assertTrue(check_allow(base + [MERGE_RULE]), "duplicate merge_ready rule")
+        self.assertTrue(check_allow(base + [ADD_REPO_RULE]), "duplicate add_repo rule")
         self.assertTrue(check_allow([]))
         self.assertEqual(check_allow(base), [])
 
@@ -145,9 +160,31 @@ class WrapperRule(unittest.TestCase):
             self.assertFalse(rx.fullmatch(cmd), cmd)
 
     def test_no_gh_api_or_merge_pattern_anywhere_in_permissions(self):
-        text = json.dumps(self.settings.get("permissions", {}))
+        """The one rule allowed to name a merge is the pinned merge_ready.py call; every other substring stays out of every rule."""
+        perms = self.settings.get("permissions", {})
+        text = json.dumps({k: [r for r in v if r != MERGE_RULE] if k == "allow" else v for k, v in perms.items()})
         for bad in ("gh", "api", "merge", "PUT", "DELETE", "bypassPermissions", "dangerously", "ccr/"):
             self.assertNotIn(bad, text)
+            if bad != "merge":
+                self.assertNotIn(bad, MERGE_RULE)
+        self.assertEqual(json.dumps(perms).count("merge"), 1, "merge appears only in the merge_ready.py rule")
+
+    def test_merge_ready_rule_is_present_once_and_matches_only_that_script_under_python3_dash_i(self):
+        self.assertEqual(self.settings["permissions"]["allow"].count(MERGE_RULE), 1)
+        rx = rule_regex(MERGE_RULE)
+        for cmd in [f"python3 -I scripts/merge_ready.py 12 {SHA} general", f"python3 -I scripts/merge_ready.py --wait --approval 7 12 {SHA} owner-batch"]:
+            self.assertTrue(rx.fullmatch(cmd), cmd)
+        for cmd in [f"python3 scripts/merge_ready.py 12 {SHA} general", f"python3 -I scripts/test_merge_ready.py 12", "python3 -I scripts/merge_ready.py",
+                    f"python3 -I scripts/merge_ready.pyx 12 {SHA} general", f"scripts/merge_ready.py 12 {SHA} general", "python3 -c 'import os'",
+                    f"python3 -I ./scripts/merge_ready.py 12 {SHA} general", f"python3.13 -I scripts/merge_ready.py 12 {SHA} general",
+                    f"PYTHONPATH=x python3 -I scripts/merge_ready.py 12 {SHA} general", "gh api -X PUT repos/bondo/tally/pulls/12/merge", "gh pr merge 12"]:
+            self.assertFalse(rx.fullmatch(cmd), cmd)
+
+    def test_add_repo_rule_is_the_one_exact_mcp_tool_name(self):
+        allow = self.settings["permissions"]["allow"]
+        self.assertEqual(allow.count(ADD_REPO_RULE), 1)
+        self.assertEqual([r for r in allow if not r.startswith("Bash(")], [ADD_REPO_RULE], "no other non-Bash rule, no server-wide MCP rule")
+        self.assertRegex(ADD_REPO_RULE, r"^mcp__[a-z-]+__[a-z_]+$", "one tool, no wildcard, no argument pattern")
 
     def test_codeowners_cover_claude_dir_and_scripts(self):
         text = read(".github", "CODEOWNERS")
@@ -187,6 +224,17 @@ class WrapperResidualRisksAreDocumented(unittest.TestCase):
         self.assertIn("GH_HOST/GH_REPO cannot redirect the call", updating)
         self.assertNotIn("no environment redirect", updating)
 
+    def test_merge_agent_bullet_names_the_merge_ready_rule_and_its_limits(self):
+        bullet = self.bullet(r"Merge agent \(issue 136\):")
+        for needle in (MERGE_RULE, "whole command", "project root", "SHA-256", "`scripts/repo_slug.py`", "standard library", "`PATH`",
+                       "`-I`", "classifier", "not a guarantee", "pin"):
+            self.assertIn(needle, bullet, needle)
+
+    def test_add_repo_bullet_names_the_rule_and_its_limits(self):
+        bullet = self.bullet(r"Attaching the repository")
+        for needle in (ADD_REPO_RULE, "orchestrator", "bondo/tally", "push", "every session", "classifier", "not a guarantee", "argument"):
+            self.assertIn(needle, bullet, needle)
+
 
 class RuleMatching(unittest.TestCase):
     @classmethod
@@ -224,7 +272,7 @@ class RuleMatching(unittest.TestCase):
                 self.assertFalse(command_allowed(self.rules, c), c)
                 c = f"{evil} {sep} .tools/bin/shellcheck a.sh"
                 self.assertFalse(command_allowed(self.rules, c), c)
-                for script in ("scripts/mark-ready.sh 12", "scripts/update-branch.sh 12 " + "a" * 40):
+                for script in ("scripts/mark-ready.sh 12", "scripts/update-branch.sh 12 " + "a" * 40, f"python3 -I scripts/merge_ready.py 12 {SHA} general"):
                     c = f"{script} {sep} {evil}"
                     self.assertFalse(command_allowed(self.rules, c), c)
         self.assertTrue(command_allowed(self.rules, ".tools/bin/shellcheck a.sh && .tools/bin/actionlint b.yml"))
