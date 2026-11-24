@@ -8,9 +8,9 @@ import * as h from "./harness";
 // M1-83, PLAN 3.1 Reads: a member of the live household (M(uid), LIVE) gets the household doc and
 // gets and lists its members. The household get shares its allow statement with M1-08's tombstone
 // read, the member get with M1-08's own member path (ADR 0002 layout); base.test.ts keeps their
-// tests. Under a tombstone the owner's cleanup reads are M1-11's, so no test here reads as the owner
-// there. Each test seeds its world with rules off; every allow test goes through h.verifiedOnly,
-// which first shows the request denied to the member's unverified token.
+// tests. Under a tombstone the owner's cleanup reads are M1-95's (tombstone.test.ts), so no test
+// here reads as the owner there. Each test seeds its world with rules off; every allow test goes
+// through h.verifiedOnly, which first shows the request denied to the member's unverified token.
 type Clients = Record<h.Client, h.Db>;
 type Read = (db: h.Db) => Promise<unknown>;
 let env: RulesTestEnvironment;

@@ -49,7 +49,7 @@ const JOINED: m.Doc[] = [{}, {}, {}, {}, { role: "owner" }, { joinedAt: m.T0 }, 
 const READERS = [...UIDS.map((uid): m.Caller => ({ uid, auth: "verified" })), UNVERIFIED];
 const points = (householdId: string | null): m.Doc => ({ householdId });
 // For reads: bob's household with carol (alice, removed, still names it) and dan's tombstone (his
-// member doc not yet cleaned up, M1-11), with an invite to each.
+// member doc not yet cleaned up, M1-95), with an invite to each.
 const TOMB = { ...LIVE, ownerUid: DAN, name: "", deleted: true };
 const SEEN = {
     ...CAROLS,
@@ -177,9 +177,30 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
             up(m.user(DAN), points(H1)),
         );
     },
-    // Extension points that add a path to an allow statement the rules have (one with an allow
-    // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
-    "M1-11 soft delete": () => draft(BOB, HOME, up(m.household(H1), { deleted: true, name: "" })),
+    // M1-95, once the soft delete's extension point: bob's soft delete of H1 (the base case); by
+    // n % 8 under dan's tombstone H2: dan's cleanup of carol's member doc, alice's marker or the
+    // invite (1 to 3), his get and list of the markers (4, 5); carol's own member doc deleted with
+    // her users-doc clear (P6), there (6) or already gone (7).
+    tombstone: (n) => {
+        const v = n % 8;
+        const marker = `${m.household(H2)}/removed/${ALICE}`;
+        const carols = v === 7 ? {} : { [m.member(H2, CAROL)]: MEMBER };
+        const world = {
+            ...SEEN,
+            ...carols,
+            [marker]: { removedAt: m.T0 },
+            [m.user(CAROL)]: points(H2),
+        };
+        const reads: m.Request[] = [
+            { op: "get", path: marker },
+            { op: "list", path: `${m.household(H2)}/removed` },
+        ];
+        const gone = [m.member(H2, CAROL), marker, `invites/${CODE2}`][v - 1];
+        if (v === 0) return draft(BOB, HOME, up(m.household(H1), { deleted: true, name: "" }));
+        if (v === 4 || v === 5) return { ...draft(DAN, world), read: reads[v - 4] };
+        if (gone !== undefined) return draft(DAN, world, del(gone));
+        return draft(CAROL, world, del(m.member(H2, CAROL)), up(m.user(CAROL), points(null)));
+    },
 };
 export const EXTENSIONS = Object.keys(TEMPLATES).filter((t) => t.startsWith("M1-"));
 
@@ -280,10 +301,10 @@ function change(d: Draft, t: Tweak, paths: string[]): void {
     if (d.caller.uid === from) d.caller = { ...d.caller, uid: to };
 }
 
-// Row templates; Create household (most conditions: P1, P3, P4) is drawn 3x as often, read 2x. A
-// former extension point (the join) keeps its share of the ninth weight, so the other templates'
-// draws, and with them the mutants' first finds, stay as measured.
-const FORMER = ["join"];
+// Row templates; Create household (most conditions: P1, P3, P4) is drawn 3x as often, read 2x.
+// Former extension points (the tombstone's soft delete, the join) keep their share of the ninth
+// weight, in their places, so the other templates' draws stay as #372 measured them.
+const FORMER = ["tombstone", "join"];
 const ROWS = Object.keys(TEMPLATES).filter((t) => !EXTENSIONS.includes(t) && !FORMER.includes(t));
 const DRAWN = [...ROWS, "create household", "create household", "read"];
 export const cases = fc.record({
