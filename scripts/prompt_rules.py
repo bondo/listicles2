@@ -901,7 +901,7 @@ RULES = (
             r"60% of a 1m window, 40% of a 200k one", r"80% / 60%",
         ),
         "the implementer prompt names the roles.yaml model and the hook's handoff thresholds (rev 46 rows 1, 12)",
-        forbidden=(r"at about 50% context", r"implementer for listicles\. opus, high effort"),
+        forbidden=(r"at about 50% context", r"implementer for (?:listicles|tally)\. opus, high effort"),
     ),
     Rule(
         "impl-minors-and-triage", ("implementer",),
@@ -1106,7 +1106,7 @@ RULES = (
     Rule(
         "approver-role", ("approver",),
         (
-            r"you are the approver for listicles\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
+            r"you are the approver for tally\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
             r"fresh session, one per pr, started by the orchestrator once an owner-only pr in your scope \(§1\.1: tooling, build, ci or gate, "
             r"security rules, privacy docs\) is ready",
             r"you decide in the owner's place whether the pr may be merged as `owner-batch`\. you never merge it",

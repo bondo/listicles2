@@ -1,4 +1,4 @@
-# Listicles task graph: the single source of truth for tasks and their dependencies.
+# Tally task graph: the single source of truth for tasks and their dependencies.
 # Process and field meanings: docs/ORCHESTRATION.md section 4. Check: scripts/tasks.py validate
 #
 # status:     todo | done | dropped   ("in progress" is not stored: it is a claim in the state issue)
@@ -828,10 +828,11 @@ notes = "Normal env plus a CI step (tooling) if it is not inside the unit job's 
 id = "M1-06"
 title = "Rules fuzzing: fast-check against a TS reference model of PLAN 3.1 (P17)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-01", "M0.5-08", "M1-10"]
+pr = 372
 notes = "Normal env. Effort M. Depends on the first real rules task from the M1 plan (M1-10, docs/milestones/M1.md)."
 
 [[task]]
@@ -1048,10 +1049,11 @@ notes = "Split from M1-14 (PR 319). Split again 2026-11-24 (PR 368): the whole t
 id = "M1-88"
 title = "Auth wiring 2: Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in SessionModule), MainActivity for the account picker"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-66"]
+pr = 381
 notes = "Split from M1-66 (PR 368; a compiled, tested draft is its comment 7119090146). FirebaseAuthentication binds SessionState and Authentication; one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc); CredentialManagerGoogleCredentials with CredentialManager.create, its companion's web client id and a ForegroundActivity that MainActivity observes itself (application-wide activity callbacks would also see the picker's translucent activity, whose stop would clear it while MainActivity stays started); GoogleSignIn; SignOut with an application CoroutineScope (SupervisorJob). Tests: AppGraphTest, the started activity, SignedOutStartTest (it uninstalls SessionModule)"
 
 [[task]]
@@ -1674,7 +1676,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = [
-  "M1-88", "M1-89",
+  "M1-88", "M1-89", "M1-90",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-91", "M1-92", "M1-93", "M1-94",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
@@ -1976,6 +1978,16 @@ risk = "normal"
 depends_on = []
 notes = "rename checklist item 5 (#15 comment 7107080653) and the after-rename checklist item 2 (#15 comment 7111328399); owner-approved merge (process files). The name-agnostic scripts are M1-85"
 
+[[task]]
+id = "M1-90"
+title = "Blank names: one definition for the rules (trim strips code points up to U+0020) and the app (Kotlin trim)"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-06"]
+notes = "Found by M1-06 with an emulator probe: Firestore's trim() strips only code points up to U+0020, while Validation.name (M1-13) uses Kotlin's trim(), which also strips Unicode spaces (U+00A0, U+3000) but not U+0001 to U+0008. So the rules accept a name of only U+3000 that the app rejects, and deny a name of U+0001 that the app accepts (PLAN 3.1 P4: non-empty after trim). Owner decision 7125484823 (#373 item 3): change both sides. The Firestore rules refuse a name whose trim() is empty (a PLAN 3.1 P4 amendment, then a rules PR with allow and deny tests), and the app trims input before writing. Keep validName in firebase/test/model.ts in step. area:security-rules for the rules part"
+
 # ---- Tally rename sweep (owner decision 7124795794 on #15: "change to tally everywhere"; reopens the rename deferred in
 # 7095943127). Plan: PR for this block. Order: M1-93 (build names, after #359) and M1-91 (TALLY_* env names accepted) and
 # M1-92 (process docs, prompts, session tags) in parallel; then the owner adds TALLY_TASK (M1-O17); then M1-94 drops the old
@@ -1997,10 +2009,11 @@ notes = "Tooling env (scripts/hooks/). Implementer profile Opus (guard/hook chan
 id = "M1-92"
 title = "Tooling: process docs, prompts and status output say Tally; new sessions get tally:* tags"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 388
 notes = "Tooling env (agents/, CLAUDE.md). Start after the tooling/approver-scope PR merges (approver.md, ORCHESTRATION.md and prompt_rules.py overlap). Wording: CLAUDE.md line 1, README.md, docs/COLLABORATING.md, docs/ORCHESTRATION.md (intro, 8.1 and 8.4 templates), docs/orchestrator-state.md template line, line 1 of all nine agents/prompts/*.md, scripts/prompt_rules.py pins (implementer and approver first lines) with scripts/test_prompt_rules.py, scripts/status_page.py and status_visual.py titles with their tests, scripts/tasks.py docstring, docs/tasks.toml header comment, scripts/test_state_body.py PROSE (mirrors the state template line), scripts/test_gitignore_secrets.py fixture name, docs/product/naming.md status and decision lines (sections 1 to 6 stay as history). Session tags: ORCHESTRATION 2.1 says tally:<milestone or task>; the live-worker reads (5.3 table, 7.x interrupt step) and orchestrator.md (2) match tally:* and listicles:* until no running session carries listicles:*, and 2.1 notes that sessions spawned before this merge carry listicles:* (metrics over history match both). No script filters by the prefix (state_body.py checks only the tag shape). The orchestrator may add tally:* to running sessions with set_session_tags and refreshes the state body's environment names and title line at its next rewrite. Leaves LISTICLES_TASK text alone (M1-94). About 80 changed lines"
 
 [[task]]

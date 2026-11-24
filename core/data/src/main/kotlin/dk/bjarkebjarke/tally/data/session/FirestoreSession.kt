@@ -19,6 +19,9 @@ import kotlinx.coroutines.withContext
 class FirestoreSession(
     private val newInstance: () -> FirebaseFirestore,
 ) : LocalUserData {
+    /** The app's holder (M1-88): the default Firebase app's Firestore. */
+    constructor() : this({ FirebaseFirestore.getInstance() })
+
     private val lock = Any()
     private var current: FirebaseFirestore? = null
 

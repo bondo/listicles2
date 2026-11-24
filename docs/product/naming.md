@@ -12,7 +12,7 @@
 Status: decided (Tally, 2026-11-15); sections 1 to 6 are the original proposal, kept as history; section 7 is current. No agent renames anything. Research date: **2026-11-13**.
 
 The app: shared household lists for Android (inventories, packing templates that merge into trip checklists), real-time sync,
-English and Danish UI. Working name: **Listicles**.
+English and Danish UI. Working name until 2026-11-15 was Listicles; the name is Tally.
 
 ## 1. What was and was not verified
 
@@ -117,5 +117,5 @@ Checked **2026-11-15**, public sources only, no personal details in any request.
 | App label en and da (`app_name` in `values/` and `values-da/`) | `Tally`, possibly with a descriptor; both languages |
 | Firebase project and Android app registration | Project id cannot change later; create it with the decided `applicationId` in mind; `google-services.json` package must match (never committed) |
 | Repo `bondo/listicles2` | Rename optional; GitHub redirects, but CI, README badges, CODEOWNERS and docs links need updating |
-| Docs, README, `docs/PLAN.md`, `CLAUDE.md` | Replace "Listicles"; `CLAUDE.md` is a process file (tooling session only) |
+| Docs, README, `docs/PLAN.md`, `CLAUDE.md` | Say Tally (process docs, prompts and status output: M1-92); `CLAUDE.md` is a process file (tooling session only) |
 | Signing key alias, Play listing, domain, invite-link host | Name after the final decisions |

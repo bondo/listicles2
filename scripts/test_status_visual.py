@@ -359,7 +359,7 @@ class RenderSvg(unittest.TestCase):
         root = ET.fromstring(self.svg(prs=[pr(20)]))
         ns = "{http://www.w3.org/2000/svg}"
         self.assertEqual(root.get("role"), "img")
-        self.assertEqual(root.find(ns + "title").text, "Listicles status")
+        self.assertEqual(root.find(ns + "title").text, "Tally status")
         desc = root.find(ns + "desc").text
         self.assertIn("3 milestones", desc)
         self.assertIn("Alpha name", desc)
