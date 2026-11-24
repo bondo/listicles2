@@ -12,6 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -111,7 +112,7 @@ class SignedOutCleanupTest :
             }
         }
 
-        test("a session that fails counts as signed out, as at the start-up root") {
+        test("a session that fails counts as signed out, as at the start-up root, and ends the watch") {
             runTest {
                 val steps = mutableListOf<String>()
                 val failing =
@@ -124,6 +125,8 @@ class SignedOutCleanupTest :
                 SignedOutCleanup(failing, FakeLocalUserData(steps = steps), backgroundScope).start()
                 runCurrent()
                 steps shouldBe CLEARED
+                backgroundScope.coroutineContext.job.children
+                    .none() shouldBe true
             }
         }
     })
