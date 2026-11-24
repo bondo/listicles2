@@ -6,6 +6,7 @@ import unittest
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 from test_guard_round1 import PUSH, Base
+from test_pretooluse_guard import TOOLING
 
 P = "'core.hooksPath'='/x'"
 
@@ -33,7 +34,7 @@ class Round3(Base):
     def test_r3_01_a_cd_with_a_mixed_word_is_applied_once(self):
         self.deny(['A=; cd "docs"$A; rm ../CLAUDE.md', 'A=; cd "scripts"$A; rm guards.sh'], both=False)
         for c in ('A=; cd ".git"$A; echo x >> config', 'A=; cd ".git"$A; touch hooks/pre-commit'):  # CLAUDE_PROJECT_DIR is set in a real session
-            for env in ({"CLAUDE_PROJECT_DIR": self.d}, {"CLAUDE_PROJECT_DIR": self.d, "LISTICLES_TASK": "tooling"}):
+            for env in ({"CLAUDE_PROJECT_DIR": self.d}, {"CLAUDE_PROJECT_DIR": self.d, **TOOLING}):
                 self.assertEqual(self.bash(c, env), 2, (c, env))
         self.allow(['A=; cd "docs"$A; rm notes.md'])
 

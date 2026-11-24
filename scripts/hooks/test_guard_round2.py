@@ -8,11 +8,9 @@ import sys
 import tempfile
 import unittest
 
-from test_pretooluse_guard import GUARD, repo, run
+from test_pretooluse_guard import GUARD, TOOLING, clean_env, repo, run
 
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
-
-TOOLING = {"LISTICLES_TASK": "tooling"}
 
 
 class Base(unittest.TestCase):
@@ -80,7 +78,7 @@ class UntestedBranches(Base):
         code = (f"import sys; sys.path.insert(0, {os.path.dirname(GUARD)!r}); import pretooluse_guard as g\n"
                 "g.check_bash = lambda *a: 1 / 0\ng.run_guarded()")
         r = subprocess.run([sys.executable, "-I", "-c", code], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "ls"}, "cwd": self.d}),
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, env=clean_env())
         self.assertEqual(r.returncode, 2, r.stderr)
         self.assertIn("internal error", r.stderr)
 
