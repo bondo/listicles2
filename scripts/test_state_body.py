@@ -37,7 +37,7 @@ STATE = {
     "next": ["#319 conflict fix, then a new owner approval", "#331 fix push, then R2"],
     "decisions": [{"comment": 7076085601, "what": "structured state body"}],
 }
-PROSE = "Living state for the Listicles orchestrator. Process: docs/ORCHESTRATION.md.\n\n## Standing rules\n- keep me\n"
+PROSE = "Living state for the Tally orchestrator. Process: docs/ORCHESTRATION.md.\n\n## Standing rules\n- keep me\n"
 
 
 def body(data=STATE, prose=PROSE, after=""):
@@ -85,6 +85,10 @@ def run_cli(*args, stdin=None):
 
 
 class ValidTest(unittest.TestCase):
+    def test_prose_mirrors_the_template_first_line(self):  # M1-92: the fixture and docs/orchestrator-state.md say the same name
+        template = (Path(__file__).resolve().parent.parent / "docs" / "orchestrator-state.md").read_text(encoding="utf-8")
+        self.assertIn(PROSE.splitlines()[0], template)
+
     def test_sample_state_is_valid(self):
         self.assertEqual(errors(body()), "")
         self.assertEqual(state_body.load(body()), STATE)

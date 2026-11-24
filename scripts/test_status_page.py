@@ -36,7 +36,7 @@ def with_title(task_id, title):
 class Structure(unittest.TestCase):
     def test_has_a_title_an_overview_and_one_section_per_milestone_in_order(self):
         text = page()
-        self.assertTrue(text.startswith("# Listicles status detail\n"))
+        self.assertTrue(text.startswith("# Tally status detail\n"))
         headings = re.findall(r"(?m)^## (.*)$", text)
         self.assertEqual(headings, ["Overview", "A Alpha name", "B Beta name", "C Gamma name", "Blockers"])
         self.assertIn("| Milestone | Name | Done | Open |", text)

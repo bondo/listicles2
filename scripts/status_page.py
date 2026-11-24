@@ -111,7 +111,7 @@ def render_page(model, repo=None):
         raise PageError("repo must look like OWNER/NAME")
     by_id = {t["id"]: t for m in model["milestones"] for t in m["tasks"]}
     home = {t["id"]: m["id"] for m in model["milestones"] for t in m["tasks"]}
-    out = ["# Listicles status detail", "",
+    out = ["# Tally status detail", "",
            "Milestones, their tasks, what each open task waits on, and every blocker, generated from `docs/tasks.toml` and the open "
            "PRs and issues. The picture on the front page (`status.svg`) shows the same state. Status words: **done**, **ready** (all "
            "dependencies met), **in progress** (an open PR names the task), **blocked** (unmet dependencies or a `blocked` label), "

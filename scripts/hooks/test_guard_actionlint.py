@@ -5,7 +5,7 @@
 import os
 import unittest
 
-from test_pretooluse_guard import repo, run
+from test_pretooluse_guard import TOOLING, repo, run
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))  # an absolute checkout path, wherever it is
 
@@ -52,7 +52,7 @@ class ActionlintFlags(unittest.TestCase):
 
     def test_hostile_forms_denied_in_every_session_kind(self):
         for c in HOSTILE:
-            for env in (None, {"LISTICLES_TASK": "tooling"}):
+            for env in (None, TOOLING):
                 self.assertEqual(run("Bash", {"command": c}, self.d, env), 2, (c, env))
 
     def test_normal_use_allowed(self):
