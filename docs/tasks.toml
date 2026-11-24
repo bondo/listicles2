@@ -1224,10 +1224,11 @@ notes = "Issues 202 and 210 item 7, area:security-rules; tooling env for the scr
 id = "M1-53"
 title = "Rules: transfer ownership, allow and deny tests (partial transfers, plain member, non-member)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-10"]
+pr = 364
 notes = "Split from M1-10 by the refresh (size); tests as in docs/milestones/M1.md section 5 (M1-10 paragraph, #234)"
 
 [[task]]
