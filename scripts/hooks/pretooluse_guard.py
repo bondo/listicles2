@@ -69,9 +69,9 @@ WRAPPER_WORD = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)) 
 WRAPPER_PREFIX = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)) + r")")
 # Owner request, 2026-11-24: the allow rule `Bash(python3 -I scripts/merge_ready.py *)` approves any command that starts with that text. So a
 # command that runs a merge_ready.py is allowed only as the whole command, exactly MERGE_READY_WHOLE, from the project root, while
-# scripts/merge_ready.py and scripts/repo_slug.py (which it imports) are regular files with these SHA-256 pins and no name in scripts/ is a standard
-# library module (merge_ready.py puts scripts/ first on sys.path, so scripts/pathlib.py would run). A legitimate edit of either file updates its pin
-# in the same reviewed tooling PR (test_guard_merge_ready.py fails until it does).
+# scripts/merge_ready.py and scripts/repo_slug.py (which it imports) are regular files with these SHA-256 pins and nothing in scripts/ can be imported
+# in place of a standard library module or repo_slug.py (merge_ready.py puts scripts/ first on sys.path; see merge_ready_shadow). A legitimate edit
+# of either file updates its pin in the same reviewed tooling PR (test_guard_merge_ready.py fails until it does).
 MERGE_READY_SHA256 = "1ee48a5493400b30be65bc00491434072d8a84809fa9cce5c4b5acf9285b5e60"
 REPO_SLUG_SHA256 = "65666ea6c13c20c0f2530c60357913e0cd2c4a71e877d0b9890566774d3f9ead"
 MERGE_READY_PINS = {"merge_ready.py": MERGE_READY_SHA256, "repo_slug.py": REPO_SLUG_SHA256}
@@ -79,6 +79,9 @@ MERGE_KINDS = ("working-draft-docs", "tasks-sync", "dependabot", "general")  # m
 MERGE_READY_WHOLE = re.compile(r"python3 -I scripts/merge_ready\.py(?: --wait)?(?: --approval [1-9][0-9]{0,19} " + PR_NUMBER.pattern + " "
                                + HEX40.pattern + r" owner-batch| " + PR_NUMBER.pattern + " " + HEX40.pattern + " (?:" + "|".join(MERGE_KINDS) + "))")
 MERGE_READY_NAME = re.compile(r"(^|/)merge_ready\.py")  # the start of the name, as WRAPPER_PREFIX: `merge_ready.py""<backslash-newline>12` runs too
+# R1-01 of #387: what Python could import as repo_slug from scripts/ (a package, an extension, a cache file) is a process file to write; the run
+# check (merge_ready_shadow) is the real control, because writes cannot all be caught by name.
+REPO_SLUG_SHADOW = re.compile(r"(^|/)scripts/(__pycache__/)?repo_slug(\.|/|$)")
 ALWAYS = (".git/config", ".git/hooks/")  # no session may write these
 SHARED = {"main", "master"}
 SCRIPT_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -206,7 +209,7 @@ def protection(path, cwd):
     """'always' (git internals), 'process' (process files) or None."""
     if not path:
         return None
-    if WRAPPER_WORD.search(path):
+    if WRAPPER_WORD.search(path) or REPO_SLUG_SHADOW.search(path):
         return "process"
     proj = os.environ.get("CLAUDE_PROJECT_DIR")
     if proj:
@@ -1116,13 +1119,47 @@ def runs_merge_ready(words):
     return False
 
 
-def merge_ready_shadow(root):
-    """The first name in scripts/ that is a standard library module (pathlib.py, json/, _strptime.pyc, x.cpython-313-....so), or None."""
+SAME_CODE = ("import importlib.util, marshal, sys\n"  # run in a child process, so a malformed cache file that crashes marshal cannot crash the guard
+             "src, data = open(sys.argv[1], 'rb').read(), open(sys.argv[2], 'rb').read()\n"
+             "same = data[:4] == importlib.util.MAGIC_NUMBER and marshal.loads(data[16:]) == compile(src, sys.argv[1], 'exec', dont_inherit=True)\n"
+             "print('same' if same else 'different')\n")
+
+
+def cached_is_pinned_source(source, cached):
+    """True when the cache file `cached` holds exactly the code compiled from `source` (code objects compare their bytecode, constants and names,
+    not the header, so the invalidation mode does not matter)."""
     try:
-        names = sorted(os.listdir(os.path.join(root, "scripts")))
+        if not stat.S_ISREG(os.lstat(cached).st_mode):
+            return False
+        r = subprocess.run([sys.executable, "-I", "-c", SAME_CODE, source, cached], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0 and r.stdout.strip() == "same"
+
+
+def merge_ready_shadow(root):
+    """The first entry Python could load in place of what merge_ready.py imports (it puts scripts/ first on sys.path), or None: a standard library
+    module name in scripts/ (pathlib.py, json/, _strptime.pyc, x.cpython-313-....so); anything named repo_slug.* or repo_slug/ but the regular file
+    repo_slug.py (a package or an extension module wins over it, R1-01 of #387); and in scripts/__pycache__ any repo_slug.* other than this
+    interpreter's cache file holding the code of repo_slug.py (a forged cache file runs instead of the source). merge_ready.py itself runs as a
+    script, so Python never reads a cache file for it. Run after the pin check, so repo_slug.py is the pinned source."""
+    scripts = os.path.join(root, "scripts")
+    try:
+        names = sorted(os.listdir(scripts))
     except OSError:
         return None  # the pin check denies a missing directory
-    return next((n for n in names if n.split(".")[0] in sys.stdlib_module_names), None)
+    for n in names:
+        if n.split(".")[0] in sys.stdlib_module_names or (n.split(".")[0] == "repo_slug" and n != "repo_slug.py"):
+            return n
+    try:
+        cached = sorted(n for n in os.listdir(os.path.join(scripts, "__pycache__")) if n.split(".")[0] == "repo_slug")
+    except (FileNotFoundError, NotADirectoryError):
+        return None  # no cache directory: nothing is read from it
+    except OSError:
+        return "__pycache__"
+    own = f"repo_slug.{sys.implementation.cache_tag}.pyc"
+    source = os.path.join(scripts, "repo_slug.py")
+    return next(("__pycache__/" + n for n in cached if n != own or not cached_is_pinned_source(source, os.path.join(scripts, "__pycache__", n))), None)
 
 
 def merge_ready_is_pinned(root):
@@ -1159,12 +1196,13 @@ def check_merge_ready(cmd, assigns, words, wrappers, state):
     if not exact:
         deny(f"run merge_ready.py only as exactly {shape} from the project root: no other path or interpreter, no cd or env prefix, "
              "no wrapper, redirect or substitution (the project allow rule approves that text, so the guard narrows it)")
-    shadow = merge_ready_shadow(here)
-    if shadow:
-        deny(f"scripts/{shadow} has the name of a standard library module, and merge_ready.py puts scripts/ first on sys.path; remove it")
     if not merge_ready_is_pinned(here):
         deny("scripts/merge_ready.py or scripts/repo_slug.py is missing, a symlink, or not the pinned version (SHA-256 in pretooluse_guard.py); "
              "only a tooling session may change them, together with the pins")
+    shadow = merge_ready_shadow(here)
+    if shadow:
+        deny(f"scripts/{shadow} could be imported in place of a standard library module or the pinned repo_slug.py (merge_ready.py puts scripts/ "
+             "first on sys.path); remove it (a stale cache file: remove scripts/__pycache__)")
 
 
 def split_value(v, ifs):
