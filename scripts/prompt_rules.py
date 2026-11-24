@@ -603,7 +603,7 @@ RULES = (
             r"#373 comments 7136480651 and 7136535861",
             r"the scheduled 5-minute checks stay the fallback in both directions",
             r"a message only prompts the check: read the comment itself",
-            r"post `handover-released`, then as your last action `send_message` the successor naming the `handover-released` comment id, "
+            r"post `handover-released`, then as your last action `send_message` the successor naming that comment's id, "
             r"so it checks for the release now, and stop",
         ),
         "handover messages (owner decisions #373 comments 7136480651, 7136535861): the incoming orchestrator messages the outgoing one after its ack, "
