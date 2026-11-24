@@ -75,6 +75,11 @@ const MUTANTS: [string, string, string][] = [
     ["Transfer: the old owner keeps the role", "data.role == 'member'", "data.role != null"],
     ["Member doc: another uid (P1)", "uid == request.auth.uid && validName", "validName"],
     ["Household name: any length (P4)", "validName(data.name) &&", "data.name.trim() != '' &&"],
+    [
+        "Names: Unicode White_Space not blank, as trim() has it (P4, M1-90)",
+        String.raw`\\x{85}\\x{A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}`,
+        "",
+    ],
     ["Tombstone read: of a live household too", "household.deleted == true && get(", "get("],
     [
         "Invite list: all, by any member (#280)",

@@ -38,11 +38,13 @@ export const user = (uid: string): string => `users/${uid}`;
 export const household = (hid: string): string => `households/${hid}`;
 export const member = (hid: string, uid: string): string => `households/${hid}/members/${uid}`;
 
-// P4: 1-50 code points and not blank. Blank is as Firestore's trim() has it: only code points up
-// to U+0020 (the app's Kotlin trim also strips Unicode spaces: M1-90).
+// P4: 1-50 code points and not blank (M1-90): a code point is blank when it is U+0000 to U+0020,
+// what Firestore's trim() strips, or Unicode White_Space; a name is blank when all of them are.
+const blank = (c: string): boolean =>
+    (c.codePointAt(0) ?? 0) <= 0x20 || /^\p{White_Space}$/u.test(c);
 export function validName(v: Value | undefined): boolean {
     const points = typeof v === "string" ? Array.from(v) : [];
-    return points.length <= 50 && points.some((c) => (c.codePointAt(0) ?? 0) > 0x20);
+    return points.length <= 50 && points.some((c) => !blank(c));
 }
 
 const keysAre = (d: Doc, keys: string[]): boolean =>

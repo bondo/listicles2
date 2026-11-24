@@ -96,6 +96,7 @@ describe("users/{uid}", () => {
         ["a name of 51 non-BMP code points", { householdId: null, name: `${nonBmp}\u{1F3E0}` }],
         ["an empty name", { householdId: null, name: "" }],
         ["a name of spaces only", { householdId: null, name: "   " }],
+        ["a name of Unicode spaces only", { householdId: null, name: "\u3000\u00a0" }],
         ["a name that is no string", { householdId: null, name: 42 }],
     ])("denied: create with %s", async (_what, data) => {
         await seed({ [member(LIVE)]: MEMBER });
@@ -109,6 +110,7 @@ describe("users/{uid}", () => {
         ["denied", "verified", "an unknown field", { role: "owner" }],
         ["denied", "verified", "a name of 51 characters", { name: `${fifty}a` }],
         ["denied", "verified", "a name of spaces only", { name: "   " }],
+        ["denied", "verified", "a name of Unicode spaces only", { name: "\u2003\u2028" }],
         ["denied", "verified", "a name that is no string", { name: 42 }],
     ])("%s: update by the %s client of %s", async (want, client, _what, data) => {
         await mine(LIVE, LIVE);
