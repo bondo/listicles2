@@ -58,8 +58,18 @@ GOOD_VERIFY = (
     "step nix-shell python3 -I scripts/check_nix_shell.py\n"
     "if command -v nix >/dev/null 2>&1; then\n  step nix-shell-live python3 -I scripts/check_nix_shell.py --live\nfi\n"
 )
+SHA = "a" * 64
+INSTALL_STEP = (
+    "      - name: Nix\n        run: |\n"
+    "          f=nix-2.34.6-x86_64-linux\n"
+    "          curl -sSfL --proto '=https' --proto-redir '=https' --retry 3 \"https://releases.nixos.org/nix/nix-2.34.6/$f.tar.xz\" -o \"$f.tar.xz\"\n"
+    f'          echo "{SHA}  $f.tar.xz" | sha256sum --check --status -\n'
+    '          tar -xJf "$f.tar.xz"\n'
+    '          sh "$f/install" --no-daemon --yes --no-channel-add\n'
+)
 GOOD_CI = (
     "  nix:\n    steps:\n"
+    + INSTALL_STEP +
     "      - name: nix shell tests\n        run: python3 -I scripts/test_check_nix_shell.py\n"
     "      - name: nix shell static\n        run: python3 -I scripts/check_nix_shell.py\n"
     "      - name: nix shell live\n        run: python3 -I scripts/check_nix_shell.py --live\n"
@@ -101,7 +111,7 @@ class Static(unittest.TestCase):
         self.assertTrue(self.check(flake=GOOD_FLAKE.replace("default = ", "other = ")))
 
     def test_every_required_system_is_needed(self):
-        for system in ("x86_64-linux", "x86_64-darwin", "aarch64-darwin"):
+        for system in ("x86_64-linux", "aarch64-linux", "x86_64-darwin", "aarch64-darwin"):
             with self.subTest(system=system):
                 self.assertTrue(self.check(flake=GOOD_FLAKE.replace(f'"{system}"', "")))
 
@@ -183,6 +193,74 @@ class Static(unittest.TestCase):
             with self.subTest(script=script):
                 self.assertTrue(self.check(ci=GOOD_CI.replace(script, "other.py")))
         self.assertTrue(self.check(ci=GOOD_CI.replace("run: ", "run: # ")))
+
+
+class Installer(unittest.TestCase):
+    """R1-01: the CI step downloads and runs the Nix installer; its pin and protocol flags are what make that safe."""
+
+    def check(self, step):
+        return c.problems(GOOD_FLAKE, GOOD_SHELL, GOOD_LOCK, GOOD_PKG, GOOD_VERIFY, GOOD_CI.replace(INSTALL_STEP, step))
+
+    def edit(self, old, new):
+        self.assertIn(old, INSTALL_STEP)
+        return self.check(INSTALL_STEP.replace(old, new))
+
+    def test_good_step_passes(self):
+        self.assertEqual(self.check(INSTALL_STEP), [])
+
+    def test_the_step_is_required(self):
+        self.assertTrue(self.check(""))
+        self.assertTrue(self.check(INSTALL_STEP.replace("releases.nixos.org/nix/", "example.org/nix/")))
+
+    def test_each_download_flag_is_required(self):
+        for flag in ("--proto '=https' ", "--proto-redir '=https' ", "--retry 3 "):
+            with self.subTest(flag=flag):
+                self.assertTrue(self.edit(flag, ""))
+
+    def test_download_must_be_https(self):
+        self.assertTrue(self.edit("https://releases", "http://releases"))
+
+    def test_checksum_line_is_required_and_a_full_sha256(self):
+        self.assertTrue(self.edit(f'          echo "{SHA}  $f.tar.xz" | sha256sum --check --status -\n', ""))
+        self.assertTrue(self.edit(SHA, SHA[:63]))
+        self.assertTrue(self.edit(SHA, "g" * 64))
+        self.assertTrue(self.edit("sha256sum --check --status -", "cat"))
+        self.assertTrue(self.edit(f'          echo "{SHA}', f'          # echo "{SHA}'))
+
+    def test_short_check_flag_is_accepted(self):
+        self.assertEqual(self.edit("sha256sum --check --status -", "sha256sum -c -"), [])
+
+    def test_checksum_must_run_before_the_installer(self):
+        sha = f'          echo "{SHA}  $f.tar.xz" | sha256sum --check --status -\n'
+        install = '          sh "$f/install" --no-daemon --yes --no-channel-add\n'
+        self.assertTrue(self.check(INSTALL_STEP.replace(sha, "").replace(install, install + sha)))
+
+    def test_a_failing_checksum_must_not_be_ignored(self):
+        self.assertTrue(self.edit("sha256sum --check --status -", "sha256sum --check --status - || true"))
+
+    def test_url_version_and_file_name_must_agree(self):
+        self.assertTrue(self.edit("nix-2.34.6/", "nix-2.34.5/"))
+        self.assertTrue(self.edit("f=nix-2.34.6-", "f=nix-2.34.5-"))
+
+
+class DeployDocs(unittest.TestCase):
+    """R1-02: firebase/.firebaserc exists (default project demo-tally), so the deploy docs must not say there is none."""
+
+    def test_real_docs_are_consistent_with_the_repository(self):
+        found = c.deploy_docs_problems(read("docs", "milestones", "M1.md"), os.path.exists(os.path.join(ROOT, "firebase", ".firebaserc")))
+        self.assertEqual(found, [])
+
+    def test_claiming_no_firebaserc_while_one_exists_fails(self):
+        self.assertTrue(c.deploy_docs_problems("There is no `.firebaserc`, so every command names the project.\n--project tally-c1a15\n", True))
+        self.assertTrue(c.deploy_docs_problems("There is **no** `.firebaserc` here\n--project tally-c1a15\n", True))
+
+    def test_the_claim_is_fine_when_there_really_is_none(self):
+        self.assertEqual(c.deploy_docs_problems("There is no `.firebaserc`, so name the project: --project tally-c1a15\n", False), [])
+
+    def test_the_docs_must_name_the_project_and_warn_about_the_demo_default(self):
+        self.assertTrue(c.deploy_docs_problems("Run the deploy.\n", True))
+        self.assertTrue(c.deploy_docs_problems("--project tally-c1a15 only\n", True))
+        self.assertEqual(c.deploy_docs_problems("`firebase/.firebaserc` default is demo-tally, so use --project tally-c1a15\n", True), [])
 
 
 class Live(unittest.TestCase):
