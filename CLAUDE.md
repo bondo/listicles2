@@ -1,4 +1,4 @@
-# CLAUDE.md: rules for agents working on Listicles
+# CLAUDE.md: rules for agents working on Tally
 
 Read `docs/PLAN.md` (section for your task) and your handoff file in `handoff/` if one exists. Shared household
 lists app: Kotlin, Compose, Firebase (Firestore + Auth), no Cloud Functions, English + Danish.

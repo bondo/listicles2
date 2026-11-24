@@ -1,4 +1,4 @@
-# Working together on Listicles
+# Working together on Tally
 
 Welcome! This page is the whole agreement, on one page. You do not need to know how to code. Your ideas, questions
 and opinions are what we need. Danish or English is fine everywhere.
