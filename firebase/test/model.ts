@@ -2,8 +2,10 @@
 // the PLAN rows, not from firestore.rules, so that fuzz.test.ts can compare the two on random
 // cases. ROWS has a row for each allow statement of the rules (fuzz.test.ts checks it). The PLAN
 // rows the rules lack are extension points, denied here until their task adds the rule and its row:
-// leave, remove member and the marker writes (M1-11). A new allow statement fails that check until
-// its row is in; a new path of an existing one fails the fuzz on its base case (fuzz.ts).
+// leave, remove member and the markers in a live household (M1-11). A new allow statement (the
+// marker writes, in remove member's batch) fails that check until its row is in. Leave and the
+// owner's marker get, list and delete are new paths of existing ones: no template covers them yet
+// and the random cases may miss them, so M1-11 adds a template for each (docs/tasks.toml).
 
 export const NOW = Symbol("request.time"); // FieldValue.serverTimestamp() in a write
 export const T0 = new Date(0); // every stored timestamp, never request.time
