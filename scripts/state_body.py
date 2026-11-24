@@ -106,7 +106,7 @@ def is_time(v: Any) -> bool:
 
 TIME = kind(is_time, "a UTC time like 2026-11-23T05:33Z")
 SESSION = pattern(r"session_[A-Za-z0-9]+", "a session id")
-TASK = pattern(r"M\d+(\.\d+)?-(\d\d|O\d+|FU)", "a task id")
+TASK = pattern(r"M\d+(\.\d+)?-(\d{2,3}|O\d+|FU)", "a task id")
 SHA = pattern(r"[0-9a-f]{7,40}", "a commit SHA")
 ROLE = pattern(r"[a-z][a-z-]*", "a role (lower case, e.g. implementer)")
 USAGE_RX = r"ok|near limit \((5-hour(, forecast|, rateLimitType unknown)?|7-day|overage)\)|paused until (?P<hhmm>\d\d:\d\d) UTC"
