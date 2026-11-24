@@ -144,12 +144,12 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-67 | Auth data 2&#58; Firebase session state, Google ID-token sign-in, per-session Firestore holder in &#58;core… | done | M1-14 | implementer | [#348](https://github.com/bondo/tally/issues/348) |
 | M1-66 | Auth wiring 1&#58; Credential Manager wrapper (Sign in with Google button flow) in &#58;core&#58;data, &#58;ap… | done | M1-67, M1-O14 | implementer | [#368](https://github.com/bondo/tally/issues/368) |
 | M1-88 | Auth wiring 2&#58; Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in Sessio… | done | M1-66 | implementer | [#381](https://github.com/bondo/tally/issues/381) |
-| M1-89 | Clear the local data on every change to signed out, also when Firebase signs the user out itself (… | ready | M1-88 | implementer |  |
-| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | ready | M1-88, M1-62 | implementer |  |
-| M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | ready | M1-88, M1-03, M1-49 | implementer |  |
+| M1-89 | Clear the local data on every change to signed out, also when Firebase signs the user out itself (… | in progress | M1-88 | implementer | [#398](https://github.com/bondo/tally/issues/398) |
+| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | in progress | M1-88, M1-62 | implementer | [#396](https://github.com/bondo/tally/issues/396) |
+| M1-16 | Sign-in UI&#58; sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) | in progress | M1-88, M1-03, M1-49 | implementer | [#397](https://github.com/bondo/tally/issues/397) |
 | M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16, M1-62 | implementer |  |
 | M1-24 | LocaleConfig&#58; generateLocaleConfig and resources.properties (LANG-02) | done | M1-29 | implementer | [#287](https://github.com/bondo/tally/issues/287) |
-| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | ready | M1-54, M1-88, M1-60, M1-62, M1-02, M1-83 | implementer |  |
+| M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | in progress | M1-54, M1-88, M1-60, M1-62, M1-02, M1-83 | implementer | [#395](https://github.com/bondo/tally/issues/395) |
 | M1-31 | Household data 2&#58; leave, remove (marker, resumable), transfer, delete with cleanup resume (em… | blocked | M1-11, M1-18 | implementer |  |
 | M1-19 | Household UI&#58; create, members, invite share sheet, revoke (HH-01, HH-02, HH-04) | blocked | M1-18 | implementer |  |
 | M1-20 | Invite link and join screen (HH-03), incl. signed-out routing through sign-in | blocked | M1-19, M1-17 | implementer |  |
@@ -239,11 +239,11 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 flowchart LR
     n0["M1-11 Rules: leave, remove member (remove… (ready)"]:::ready
     n1["M1-82 Firestore source for the minimum app… (in progress)"]:::progress
-    n2["M1-89 Clear the local data on every change to… (ready)"]:::ready
-    n3["M1-15 Auth data: email and password sign-up… (ready)"]:::ready
-    n4["M1-16 Sign-in UI: sign-in screen and Google b… (ready)"]:::ready
+    n2["M1-89 Clear the local data on every change to… (in progress)"]:::progress
+    n3["M1-15 Auth data: email and password sign-up… (in progress)"]:::progress
+    n4["M1-16 Sign-in UI: sign-in screen and Google b… (in progress)"]:::progress
     n5["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
-    n6["M1-18 Household data 1: create, invite, revok… (ready)"]:::ready
+    n6["M1-18 Household data 1: create, invite, revok… (in progress)"]:::progress
     n7["M1-31 Household data 2: leave, remove (mark… (blocked)"]:::blocked
     n8["M1-19 Household UI: create, members, invite… (blocked)"]:::blocked
     n9["M1-20 Invite link and join screen (HH-03), in… (blocked)"]:::blocked
@@ -401,7 +401,7 @@ flowchart LR
     n0["M3-O1 Enable Google sign-in in Firebase (need… (owner to-do)"]:::owner
     n1["M3-O2 Register the SHA-1 and SHA-256 fingerpr… (owner to-do)"]:::owner
     n2["M3-O3 Check once with a real Google sign-in … (owner to-do)"]:::owner
-    n3["M1-16 Sign-in UI: sign-in screen and Google b… (ready)"]:::ext
+    n3["M1-16 Sign-in UI: sign-in screen and Google b… (in progress)"]:::ext
     n4["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::ext
     n0 --> n1
     n1 --> n2
