@@ -1,16 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1094" viewBox="0 0 960 1094" role="img" aria-labelledby="ti de"><title id="ti">Open tasks and their dependencies</title><desc id="de">42 open tasks, 44 dependencies</desc><style>.bg{fill:#ffffff}.card{fill:#f6f8fa}.fg{fill:#1f2328}.muted{fill:#59636e}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.edge{fill:none;stroke-width:1.8}.crit{stroke-width:3.6}.key{stroke:#8c959f}.s0{stroke:#e69f00}.f0{fill:#e69f00}.s1{stroke:#56b4e9}.f1{fill:#56b4e9}.s2{stroke:#009e73}.f2{fill:#009e73}.s3{stroke:#0072b2}.f3{fill:#0072b2}.s4{stroke:#d55e00}.f4{fill:#d55e00}.s5{stroke:#cc79a7}.f5{fill:#cc79a7}.nd-ready{fill:#dafbe1;stroke:#1a7f37}.nd-review{fill:#ddf4ff;stroke:#0969da}.nd-blocked{fill:#fff8c5;stroke:#9a6700}.nd-owner{fill:#ffebe9;stroke:#cf222e}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px}.t{font-size:22px;font-weight:600}.h{font-size:14px;font-weight:600;paint-order:stroke;stroke:#f6f8fa;stroke-width:4px}.s{font-size:14px}.n{font-size:14px;font-weight:600}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}.fg{fill:#e6edf3}.muted{fill:#9198a1}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.key{stroke:#6e7681}.h{stroke:#161b22}.nd-ready{fill:#12261e;stroke:#3fb950}.nd-review{fill:#10294d;stroke:#4493f8}.nd-blocked{fill:#2f2408;stroke:#d29922}.nd-owner{fill:#3b1219;stroke:#f85149}}</style><defs><marker id="ah0" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f0"/></marker><marker id="ah1" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f1"/></marker><marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f2"/></marker><marker id="ah3" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f3"/></marker><marker id="ah4" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f4"/></marker><marker id="ah5" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f5"/></marker><marker id="ac0" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f0"/></marker><marker id="ac1" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f1"/></marker><marker id="ac2" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f2"/></marker><marker id="ac3" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f3"/></marker><marker id="ac4" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f4"/></marker><marker id="ac5" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f5"/></marker></defs><rect width="960" height="1094" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1062" viewBox="0 0 960 1062" role="img" aria-labelledby="ti de"><title id="ti">Open tasks and their dependencies</title><desc id="de">41 open tasks, 43 dependencies</desc><style>.bg{fill:#ffffff}.card{fill:#f6f8fa}.fg{fill:#1f2328}.muted{fill:#59636e}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.edge{fill:none;stroke-width:1.8}.crit{stroke-width:3.6}.key{stroke:#8c959f}.s0{stroke:#e69f00}.f0{fill:#e69f00}.s1{stroke:#56b4e9}.f1{fill:#56b4e9}.s2{stroke:#009e73}.f2{fill:#009e73}.s3{stroke:#0072b2}.f3{fill:#0072b2}.s4{stroke:#d55e00}.f4{fill:#d55e00}.s5{stroke:#cc79a7}.f5{fill:#cc79a7}.nd-ready{fill:#dafbe1;stroke:#1a7f37}.nd-review{fill:#ddf4ff;stroke:#0969da}.nd-blocked{fill:#fff8c5;stroke:#9a6700}.nd-owner{fill:#ffebe9;stroke:#cf222e}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px}.t{font-size:22px;font-weight:600}.h{font-size:14px;font-weight:600;paint-order:stroke;stroke:#f6f8fa;stroke-width:4px}.s{font-size:14px}.n{font-size:14px;font-weight:600}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}.fg{fill:#e6edf3}.muted{fill:#9198a1}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.key{stroke:#6e7681}.h{stroke:#161b22}.nd-ready{fill:#12261e;stroke:#3fb950}.nd-review{fill:#10294d;stroke:#4493f8}.nd-blocked{fill:#2f2408;stroke:#d29922}.nd-owner{fill:#3b1219;stroke:#f85149}}</style><defs><marker id="ah0" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f0"/></marker><marker id="ah1" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f1"/></marker><marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f2"/></marker><marker id="ah3" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f3"/></marker><marker id="ah4" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f4"/></marker><marker id="ah5" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8z" class="f5"/></marker><marker id="ac0" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f0"/></marker><marker id="ac1" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f1"/></marker><marker id="ac2" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f2"/></marker><marker id="ac3" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f3"/></marker><marker id="ac4" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f4"/></marker><marker id="ac5" viewBox="0 0 8 8" refX="7" refY="4" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L8 4L0 8z" class="f5"/></marker></defs><rect width="960" height="1062" class="bg"/>
 <text x="24" y="36" class="fg t">Open tasks and their dependencies</text>
-<text x="24" y="56" class="muted s">42 open tasks in 4 milestones. Task ids only; titles are on the status detail page.</text>
+<text x="24" y="56" class="muted s">41 open tasks in 4 milestones. Task ids only; titles are on the status detail page.</text>
 <text x="24" y="76" class="muted s">All done: M0 28/28; M0.5 35/35</text>
 <text x="24" y="96" class="muted s">Not planned yet: M4, M5</text>
-<rect x="24" y="122" width="912" height="546" rx="6" class="card"/>
-<rect x="24" y="678" width="912" height="62" rx="6" class="card"/>
-<rect x="24" y="750" width="912" height="62" rx="6" class="card"/>
-<rect x="24" y="822" width="912" height="92" rx="6" class="card"/>
-<path d="M114 166 H135" class="edge s1" data-from="M1-11" data-to="M1-O6" marker-end="url(#ah1)"/>
+<rect x="24" y="122" width="912" height="514" rx="6" class="card"/>
+<rect x="24" y="646" width="912" height="62" rx="6" class="card"/>
+<rect x="24" y="718" width="912" height="62" rx="6" class="card"/>
+<rect x="24" y="790" width="912" height="92" rx="6" class="card"/>
+<path d="M114 166 H135" class="edge s4" data-from="M1-11" data-to="M1-O6" marker-end="url(#ah4)"/>
 <path d="M114 233 H118 V358 H135" class="edge s3" data-from="M1-15" data-to="M1-17" marker-end="url(#ah3)"/>
-<path d="M114 527 H122 V368 H135" class="edge s5" data-from="M1-16" data-to="M1-17" marker-end="url(#ah5)"/>
-<path d="M114 526 H135" class="edge s5" data-from="M1-16" data-to="M1-86" marker-end="url(#ah5)"/>
+<path d="M114 527 H122 V368 H135" class="edge s4" data-from="M1-16" data-to="M1-17" marker-end="url(#ah4)"/>
+<path d="M114 526 H135" class="edge s4" data-from="M1-16" data-to="M1-86" marker-end="url(#ah4)"/>
 <path d="M216 362 H249" class="edge s4" data-from="M1-17" data-to="M1-20" marker-end="url(#ah4)"/>
 <path d="M216 367 H220 V332 H249" class="edge s4" data-from="M1-17" data-to="M1-22" marker-end="url(#ah4)"/>
 <path d="M216 359 H240 V268 H249" class="edge s4" data-from="M1-17" data-to="M1-39" marker-end="url(#ah4)"/>
@@ -23,40 +23,39 @@
 <path d="M330 327 H334 V296 H343" class="edge s2" data-from="M1-22" data-to="M1-32" marker-end="url(#ah2)"/>
 <path d="M114 201 H122 V212 H224 V322 H249" class="edge s0" data-from="M1-25" data-to="M1-22" marker-end="url(#ah0)"/>
 <path d="M114 193 H118 V216 H228 V256 H249" class="edge s0" data-from="M1-25" data-to="M1-39" marker-end="url(#ah0)"/>
-<path d="M330 263 H334 V278 H522 V320 H535" class="edge s2" data-from="M1-39" data-to="M1-47" marker-end="url(#ah2)"/>
+<path d="M330 263 H334 V278 H522 V320 H535" class="edge s0" data-from="M1-39" data-to="M1-47" marker-end="url(#ah0)"/>
 <path d="M114 363 H118 V378 H726 V426 H739" class="edge s2" data-from="M1-61" data-to="M1-FU" marker-end="url(#ah2)"/>
 <path d="M114 295 H122 V310 H620 V290 H633" class="edge s1" data-from="M1-82" data-to="M1-48" marker-end="url(#ah1)"/>
 <path d="M114 395 H118 V414 H730 V428 H739" class="edge s3" data-from="M1-84" data-to="M1-FU" marker-end="url(#ah3)"/>
-<path d="M216 523 H220 V510 H726 V436 H739" class="edge s1" data-from="M1-86" data-to="M1-FU" marker-end="url(#ah1)"/>
-<path d="M216 531 H220 V796 H249" class="edge s1" data-from="M1-86" data-to="M3-O3" marker-end="url(#ah1)"/>
+<path d="M216 523 H220 V510 H726 V436 H739" class="edge s3" data-from="M1-86" data-to="M1-FU" marker-end="url(#ah3)"/>
+<path d="M216 531 H220 V764 H249" class="edge s3" data-from="M1-86" data-to="M3-O3" marker-end="url(#ah3)"/>
 <path d="M114 327 H122 V342 H722 V424 H739" class="edge s0" data-from="M1-89" data-to="M1-FU" marker-end="url(#ah0)"/>
-<path d="M114 463 H118 V446 H718 V432 H739" class="edge s4" data-from="M1-90" data-to="M1-FU" marker-end="url(#ah4)"/>
-<path d="M114 588 H135" class="edge s1" data-from="M1-91" data-to="M1-O17" marker-end="url(#ah1)"/>
-<path d="M114 621 H118 V604 H224 V590 H249" class="edge s4" data-from="M1-92" data-to="M1-94" marker-end="url(#ah4)"/>
-<path d="M114 495 H118 V478 H722 V434 H739" class="edge s0" data-from="M1-93" data-to="M1-FU" marker-end="url(#ah0)"/>
-<path d="M330 589 H334 V572 H730 V438 H739" class="edge s5" data-from="M1-94" data-to="M1-FU" marker-end="url(#ah5)"/>
-<path d="M330 588 H343" class="edge s5" data-from="M1-94" data-to="M1-O18" marker-end="url(#ah5)"/>
-<path d="M216 588 H249" class="edge s5" data-from="M1-O17" data-to="M1-94" marker-end="url(#ah5)"/>
+<path d="M114 463 H118 V446 H718 V432 H739" class="edge s1" data-from="M1-90" data-to="M1-FU" marker-end="url(#ah1)"/>
+<path d="M114 558 H135" class="edge s1" data-from="M1-91" data-to="M1-O17" marker-end="url(#ah1)"/>
+<path d="M114 495 H118 V478 H722 V434 H739" class="edge s5" data-from="M1-93" data-to="M1-FU" marker-end="url(#ah5)"/>
+<path d="M330 559 H334 V542 H730 V438 H739" class="edge s0" data-from="M1-94" data-to="M1-FU" marker-end="url(#ah0)"/>
+<path d="M330 558 H343" class="edge s0" data-from="M1-94" data-to="M1-O18" marker-end="url(#ah0)"/>
+<path d="M216 558 H249" class="edge s1" data-from="M1-O17" data-to="M1-94" marker-end="url(#ah1)"/>
 <path d="M114 431 H126 V410 H428 V368 H437" class="edge s0" data-from="M1-O3" data-to="M1-23" marker-end="url(#ah0)"/>
-<path d="M114 651 H118 V868 H135" class="edge s1" data-from="M1-O4" data-to="M6-O3" marker-end="url(#ah1)"/>
-<path d="M114 722 H135" class="edge s4" data-from="M2-01" data-to="M2-FU" marker-end="url(#ah4)"/>
-<path d="M114 794 H135" class="edge s5" data-from="M3-O1" data-to="M3-O2" marker-end="url(#ah5)"/>
-<path d="M216 794 H249" class="edge s0" data-from="M3-O2" data-to="M3-O3" marker-end="url(#ah0)"/>
-<path d="M114 866 H135" class="edge s2" data-from="M6-O1" data-to="M6-O3" marker-end="url(#ah2)"/>
-<path d="M114 867 H122 V898 H135" class="edge s2" data-from="M6-O1" data-to="M6-O4" marker-end="url(#ah2)"/>
-<path d="M114 167 H118 V192 H135" class="edge s1 crit" data-from="M1-11" data-to="M1-31" marker-end="url(#ac1)"/>
-<path d="M330 294 H343" class="edge s0 crit" data-from="M1-21" data-to="M1-32" marker-end="url(#ac0)"/>
+<path d="M114 619 H118 V836 H135" class="edge s1" data-from="M1-O4" data-to="M6-O3" marker-end="url(#ah1)"/>
+<path d="M114 690 H135" class="edge s3" data-from="M2-01" data-to="M2-FU" marker-end="url(#ah3)"/>
+<path d="M114 762 H135" class="edge s4" data-from="M3-O1" data-to="M3-O2" marker-end="url(#ah4)"/>
+<path d="M216 762 H249" class="edge s5" data-from="M3-O2" data-to="M3-O3" marker-end="url(#ah5)"/>
+<path d="M114 834 H135" class="edge s0" data-from="M6-O1" data-to="M6-O3" marker-end="url(#ah0)"/>
+<path d="M114 835 H122 V866 H135" class="edge s0" data-from="M6-O1" data-to="M6-O4" marker-end="url(#ah0)"/>
+<path d="M114 167 H118 V192 H135" class="edge s4 crit" data-from="M1-11" data-to="M1-31" marker-end="url(#ac4)"/>
+<path d="M330 294 H343" class="edge s5 crit" data-from="M1-21" data-to="M1-32" marker-end="url(#ac5)"/>
 <path d="M518 363 H526 V332 H535" class="edge s3 crit" data-from="M1-23" data-to="M1-47" marker-end="url(#ac3)"/>
 <path d="M216 197 H220 V290 H249" class="edge s1 crit" data-from="M1-31" data-to="M1-21" marker-end="url(#ac1)"/>
-<path d="M424 295 H428 V358 H437" class="edge s3 crit" data-from="M1-32" data-to="M1-23" marker-end="url(#ac3)"/>
-<path d="M616 327 H624 V300 H633" class="edge s3 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac3)"/>
-<path d="M714 295 H718 V422 H739" class="edge s4 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac4)"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 79/112 done, 33 open</text>
-<text x="34" y="696" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
-<text x="34" y="768" class="fg h">M3 Packing rules (domain): 0/3 done, 3 open</text>
-<text x="34" y="840" class="fg h">M6 Release: 0/4 done, 4 open</text>
+<path d="M424 295 H428 V358 H437" class="edge s4 crit" data-from="M1-32" data-to="M1-23" marker-end="url(#ac4)"/>
+<path d="M616 327 H624 V300 H633" class="edge s2 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac2)"/>
+<path d="M714 295 H718 V422 H739" class="edge s5 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac5)"/>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 80/112 done, 32 open</text>
+<text x="34" y="664" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
+<text x="34" y="736" class="fg h">M3 Packing rules (domain): 0/3 done, 3 open</text>
+<text x="34" y="808" class="fg h">M6 Release: 0/4 done, 4 open</text>
 <g data-id="M1-11" data-state="ready"><title>M1-11: Rules: leave, remove member (removed marker), household soft delete and cleanup, allow and de… (ready)</title><rect x="34" y="154" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="166" r="4.5" class="ok mk-ready"/><text x="54" y="171" class="fg n">M1-11</text></g>
-<g data-id="M1-82" data-state="ready"><title>M1-82: Firestore source for the minimum app version: config/app.minVersionCode bound in GateModule (ready)</title><rect x="34" y="282" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="294" r="4.5" class="ok mk-ready"/><text x="54" y="299" class="fg n">M1-82</text></g>
+<g data-id="M1-82" data-state="review"><title>M1-82: Firestore source for the minimum app version: config/app.minVersionCode bound in GateModule (in progress)</title><rect x="34" y="282" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,298 49,298 44,289" class="info mk-progress"/><text x="54" y="299" class="fg n">M1-82</text></g>
 <g data-id="M1-89" data-state="ready"><title>M1-89: Clear the local data on every change to signed out, also when Firebase signs the user out itself (… (ready)</title><rect x="34" y="314" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="326" r="4.5" class="ok mk-ready"/><text x="54" y="331" class="fg n">M1-89</text></g>
 <g data-id="M1-15" data-state="ready"><title>M1-15: Auth data: email and password sign-up, sign-in, verification, reset, error mapping, collision m… (ready)</title><rect x="34" y="220" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="232" r="4.5" class="ok mk-ready"/><text x="54" y="237" class="fg n">M1-15</text></g>
 <g data-id="M1-16" data-state="ready"><title>M1-16: Sign-in UI: sign-in screen and Google button (AUTH-01, AUTH-02; sign-out UI is M1-25) (ready)</title><rect x="34" y="514" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="526" r="4.5" class="ok mk-ready"/><text x="54" y="531" class="fg n">M1-16</text></g>
@@ -77,45 +76,44 @@
 <g data-id="M1-48" data-state="blocked"><title>M1-48: R8 milestone quality review for M1 (issue 65 review catalogue) (blocked)</title><rect x="634" y="282" width="80" height="24" rx="4" class="nd-blocked"/><rect x="640" y="290" width="8" height="8" class="warn mk-blocked"/><text x="654" y="299" class="fg n">M1-48</text></g>
 <g data-id="M1-FU" data-state="blocked"><title>M1-FU: Follow-up burn-down for M1 (planner: add each new M1 task to depends_on) (blocked)</title><rect x="740" y="418" width="80" height="24" rx="4" class="nd-blocked"/><rect x="746" y="426" width="8" height="8" class="warn mk-blocked"/><text x="760" y="435" class="fg n">M1-FU</text></g>
 <g data-id="M1-O3" data-state="owner"><title>M1-O3: Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… (owner to-do)</title><rect x="34" y="418" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,430 44,425 49,430 44,435" class="bad mk-owner"/><text x="54" y="435" class="fg n">M1-O3</text></g>
-<g data-id="M1-O4" data-state="owner"><title>M1-O4: Enable the Play Integrity API for the Firebase project in the Google Cloud console (owner to-do)</title><rect x="34" y="638" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,650 44,645 49,650 44,655" class="bad mk-owner"/><text x="54" y="655" class="fg n">M1-O4</text></g>
-<g data-id="M1-O5" data-state="owner"><title>M1-O5: Approve the privacy text (OQ-30) before anyone but the owner installs the app (owner to-do)</title><rect x="34" y="544" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,556 44,551 49,556 44,561" class="bad mk-owner"/><text x="54" y="561" class="fg n">M1-O5</text></g>
+<g data-id="M1-O4" data-state="owner"><title>M1-O4: Enable the Play Integrity API for the Firebase project in the Google Cloud console (owner to-do)</title><rect x="34" y="606" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,618 44,613 49,618 44,623" class="bad mk-owner"/><text x="54" y="623" class="fg n">M1-O4</text></g>
+<g data-id="M1-O5" data-state="owner"><title>M1-O5: Approve the privacy text (OQ-30) before anyone but the owner installs the app (owner to-do)</title><rect x="34" y="576" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,588 44,583 49,588 44,593" class="bad mk-owner"/><text x="54" y="593" class="fg n">M1-O5</text></g>
 <g data-id="M1-O6" data-state="owner"><title>M1-O6: Deploy firestore.rules to the real project after each merged rules PR and before each tester build (owner to-do)</title><rect x="136" y="154" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,166 146,161 151,166 146,171" class="bad mk-owner"/><text x="156" y="171" class="fg n">M1-O6</text></g>
 <g data-id="M1-86" data-state="blocked"><title>M1-86: Google sign-in switch in :app (off in v1): hide the Google button and the Google hint while off (blocked)</title><rect x="136" y="514" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="522" width="8" height="8" class="warn mk-blocked"/><text x="156" y="531" class="fg n">M1-86</text></g>
 <g data-id="M1-90" data-state="ready"><title>M1-90: Blank names: one definition for the rules (trim strips code points up to U+0020) and the app (Kot… (ready)</title><rect x="34" y="450" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="462" r="4.5" class="ok mk-ready"/><text x="54" y="467" class="fg n">M1-90</text></g>
-<g data-id="M1-91" data-state="review"><title>M1-91: Tooling: hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICL… (in progress)</title><rect x="34" y="576" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,592 49,592 44,583" class="info mk-progress"/><text x="54" y="593" class="fg n">M1-91</text></g>
-<g data-id="M1-92" data-state="review"><title>M1-92: Tooling: process docs, prompts and status output say Tally; new sessions get tally:* tags (in progress)</title><rect x="34" y="608" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,624 49,624 44,615" class="info mk-progress"/><text x="54" y="625" class="fg n">M1-92</text></g>
+<g data-id="M1-91" data-state="review"><title>M1-91: Tooling: hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICL… (in progress)</title><rect x="34" y="546" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,562 49,562 44,553" class="info mk-progress"/><text x="54" y="563" class="fg n">M1-91</text></g>
 <g data-id="M1-93" data-state="ready"><title>M1-93: Build names: rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks … (ready)</title><rect x="34" y="482" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="494" r="4.5" class="ok mk-ready"/><text x="54" y="499" class="fg n">M1-93</text></g>
-<g data-id="M1-94" data-state="blocked"><title>M1-94: Tooling: drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling (blocked)</title><rect x="250" y="576" width="80" height="24" rx="4" class="nd-blocked"/><rect x="256" y="584" width="8" height="8" class="warn mk-blocked"/><text x="270" y="593" class="fg n">M1-94</text></g>
-<g data-id="M1-O17" data-state="owner"><title>M1-O17: Owner: add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now) (owner to-do)</title><rect x="136" y="576" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,588 146,583 151,588 146,593" class="bad mk-owner"/><text x="156" y="593" class="fg n">M1-O17</text></g>
-<g data-id="M1-O18" data-state="owner"><title>M1-O18: Owner: remove LISTICLES_TASK from the Tally tooling environment; drop the listicles2 path in th… (owner to-do)</title><rect x="344" y="576" width="80" height="24" rx="4" class="nd-owner"/><polygon points="349,588 354,583 359,588 354,593" class="bad mk-owner"/><text x="364" y="593" class="fg n">M1-O18</text></g>
-<g data-id="M2-01" data-state="blocked"><title>M2-01: Plan M2: docs/milestones/M2.md and PR-sized tasks in this file (blocked)</title><rect x="34" y="710" width="80" height="24" rx="4" class="nd-blocked"/><rect x="40" y="718" width="8" height="8" class="warn mk-blocked"/><text x="54" y="727" class="fg n">M2-01</text></g>
-<g data-id="M2-FU" data-state="blocked"><title>M2-FU: Follow-up burn-down for M2 (planner: add each new M2 task to depends_on) (blocked)</title><rect x="136" y="710" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="718" width="8" height="8" class="warn mk-blocked"/><text x="156" y="727" class="fg n">M2-FU</text></g>
-<g data-id="M3-O1" data-state="owner"><title>M3-O1: Enable Google sign-in in Firebase (needs a public support email for Tally) (owner to-do)</title><rect x="34" y="782" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,794 44,789 49,794 44,799" class="bad mk-owner"/><text x="54" y="799" class="fg n">M3-O1</text></g>
-<g data-id="M3-O2" data-state="owner"><title>M3-O2: Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) (owner to-do)</title><rect x="136" y="782" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,794 146,789 151,794 146,799" class="bad mk-owner"/><text x="156" y="799" class="fg n">M3-O2</text></g>
-<g data-id="M3-O3" data-state="owner"><title>M3-O3: Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5) (owner to-do)</title><rect x="250" y="782" width="80" height="24" rx="4" class="nd-owner"/><polygon points="255,794 260,789 265,794 260,799" class="bad mk-owner"/><text x="270" y="799" class="fg n">M3-O3</text></g>
-<g data-id="M6-O1" data-state="owner"><title>M6-O1: Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json (owner to-do)</title><rect x="34" y="854" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,866 44,861 49,866 44,871" class="bad mk-owner"/><text x="54" y="871" class="fg n">M6-O1</text></g>
-<g data-id="M6-O2" data-state="owner"><title>M6-O2: Register a free limited-distribution Android developer account when available in Denmark (owner to-do)</title><rect x="34" y="884" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,896 44,891 49,896 44,901" class="bad mk-owner"/><text x="54" y="901" class="fg n">M6-O2</text></g>
-<g data-id="M6-O3" data-state="owner"><title>M6-O3: Register App Check (Play Integrity, device integrity only) with the release key; watch metrics t… (owner to-do)</title><rect x="136" y="854" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,866 146,861 151,866 146,871" class="bad mk-owner"/><text x="156" y="871" class="fg n">M6-O3</text></g>
-<g data-id="M6-O4" data-state="owner"><title>M6-O4: Adopt Git LFS for screenshot goldens (deferred: only when the revisit trigger fires) (owner to-do)</title><rect x="136" y="884" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,896 146,891 151,896 146,901" class="bad mk-owner"/><text x="156" y="901" class="fg n">M6-O4</text></g>
-<circle cx="30" cy="928" r="4.5" class="ok mk-ready"/>
-<text x="40" y="932" class="fg s">ready</text>
-<polygon points="107,932 117,932 112,923" class="info mk-progress"/>
-<text x="122" y="932" class="fg s">in progress</text>
-<rect x="238" y="924" width="8" height="8" class="warn mk-blocked"/>
-<text x="252" y="932" class="fg s">blocked</text>
-<polygon points="335,928 340,923 345,928 340,933" class="bad mk-owner"/>
-<text x="350" y="932" class="fg s">owner to-do</text>
-<text x="24" y="956" class="fg s">Arrow colour (one per source task):</text>
-<path d="M312 952 H336" class="edge s0"/>
-<path d="M342 952 H366" class="edge s1"/>
-<path d="M372 952 H396" class="edge s2"/>
-<path d="M402 952 H426" class="edge s3"/>
-<path d="M432 952 H456" class="edge s4"/>
-<path d="M462 952 H486" class="edge s5"/>
-<path d="M24 974 H48" class="edge crit key"/>
-<text x="56" y="978" class="fg s">critical path: the longest chain of open tasks to M1-FU (8 tasks)</text>
-<text x="24" y="1002" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
-<text x="24" y="1022" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
-<text x="24" y="1042" class="muted s">42 transitive arrows hidden.</text>
-<text x="24" y="1062" class="muted s">Also not drawn: 147 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
+<g data-id="M1-94" data-state="blocked"><title>M1-94: Tooling: drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling (blocked)</title><rect x="250" y="546" width="80" height="24" rx="4" class="nd-blocked"/><rect x="256" y="554" width="8" height="8" class="warn mk-blocked"/><text x="270" y="563" class="fg n">M1-94</text></g>
+<g data-id="M1-O17" data-state="owner"><title>M1-O17: Owner: add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now) (owner to-do)</title><rect x="136" y="546" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,558 146,553 151,558 146,563" class="bad mk-owner"/><text x="156" y="563" class="fg n">M1-O17</text></g>
+<g data-id="M1-O18" data-state="owner"><title>M1-O18: Owner: remove LISTICLES_TASK from the Tally tooling environment; drop the listicles2 path in th… (owner to-do)</title><rect x="344" y="546" width="80" height="24" rx="4" class="nd-owner"/><polygon points="349,558 354,553 359,558 354,563" class="bad mk-owner"/><text x="364" y="563" class="fg n">M1-O18</text></g>
+<g data-id="M2-01" data-state="blocked"><title>M2-01: Plan M2: docs/milestones/M2.md and PR-sized tasks in this file (blocked)</title><rect x="34" y="678" width="80" height="24" rx="4" class="nd-blocked"/><rect x="40" y="686" width="8" height="8" class="warn mk-blocked"/><text x="54" y="695" class="fg n">M2-01</text></g>
+<g data-id="M2-FU" data-state="blocked"><title>M2-FU: Follow-up burn-down for M2 (planner: add each new M2 task to depends_on) (blocked)</title><rect x="136" y="678" width="80" height="24" rx="4" class="nd-blocked"/><rect x="142" y="686" width="8" height="8" class="warn mk-blocked"/><text x="156" y="695" class="fg n">M2-FU</text></g>
+<g data-id="M3-O1" data-state="owner"><title>M3-O1: Enable Google sign-in in Firebase (needs a public support email for Tally) (owner to-do)</title><rect x="34" y="750" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,762 44,757 49,762 44,767" class="bad mk-owner"/><text x="54" y="767" class="fg n">M3-O1</text></g>
+<g data-id="M3-O2" data-state="owner"><title>M3-O2: Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) (owner to-do)</title><rect x="136" y="750" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,762 146,757 151,762 146,767" class="bad mk-owner"/><text x="156" y="767" class="fg n">M3-O2</text></g>
+<g data-id="M3-O3" data-state="owner"><title>M3-O3: Check once with a real Google sign-in which fields the Firebase Auth record keeps (privacy Q5) (owner to-do)</title><rect x="250" y="750" width="80" height="24" rx="4" class="nd-owner"/><polygon points="255,762 260,757 265,762 260,767" class="bad mk-owner"/><text x="270" y="767" class="fg n">M3-O3</text></g>
+<g data-id="M6-O1" data-state="owner"><title>M6-O1: Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check and assetlinks.json (owner to-do)</title><rect x="34" y="822" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,834 44,829 49,834 44,839" class="bad mk-owner"/><text x="54" y="839" class="fg n">M6-O1</text></g>
+<g data-id="M6-O2" data-state="owner"><title>M6-O2: Register a free limited-distribution Android developer account when available in Denmark (owner to-do)</title><rect x="34" y="852" width="80" height="24" rx="4" class="nd-owner"/><polygon points="39,864 44,859 49,864 44,869" class="bad mk-owner"/><text x="54" y="869" class="fg n">M6-O2</text></g>
+<g data-id="M6-O3" data-state="owner"><title>M6-O3: Register App Check (Play Integrity, device integrity only) with the release key; watch metrics t… (owner to-do)</title><rect x="136" y="822" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,834 146,829 151,834 146,839" class="bad mk-owner"/><text x="156" y="839" class="fg n">M6-O3</text></g>
+<g data-id="M6-O4" data-state="owner"><title>M6-O4: Adopt Git LFS for screenshot goldens (deferred: only when the revisit trigger fires) (owner to-do)</title><rect x="136" y="852" width="80" height="24" rx="4" class="nd-owner"/><polygon points="141,864 146,859 151,864 146,869" class="bad mk-owner"/><text x="156" y="869" class="fg n">M6-O4</text></g>
+<circle cx="30" cy="896" r="4.5" class="ok mk-ready"/>
+<text x="40" y="900" class="fg s">ready</text>
+<polygon points="107,900 117,900 112,891" class="info mk-progress"/>
+<text x="122" y="900" class="fg s">in progress</text>
+<rect x="238" y="892" width="8" height="8" class="warn mk-blocked"/>
+<text x="252" y="900" class="fg s">blocked</text>
+<polygon points="335,896 340,891 345,896 340,901" class="bad mk-owner"/>
+<text x="350" y="900" class="fg s">owner to-do</text>
+<text x="24" y="924" class="fg s">Arrow colour (one per source task):</text>
+<path d="M312 920 H336" class="edge s0"/>
+<path d="M342 920 H366" class="edge s1"/>
+<path d="M372 920 H396" class="edge s2"/>
+<path d="M402 920 H426" class="edge s3"/>
+<path d="M432 920 H456" class="edge s4"/>
+<path d="M462 920 H486" class="edge s5"/>
+<path d="M24 942 H48" class="edge crit key"/>
+<text x="56" y="946" class="fg s">critical path: the longest chain of open tasks to M1-FU (8 tasks)</text>
+<text x="24" y="970" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
+<text x="24" y="990" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
+<text x="24" y="1010" class="muted s">41 transitive arrows hidden.</text>
+<text x="24" y="1030" class="muted s">Also not drawn: 149 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
 </svg>
