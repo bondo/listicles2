@@ -2,8 +2,10 @@
 
 The Nix dev shell exists so the owner can run the rules deploy (M1.md R7) on a workstation with only Nix: `nix develop -c firebase ...`
 must run the firebase-tools version pinned in firebase/package-lock.json. The shell reuses that lockfile (`npm ci`) instead of holding a
-second pin; if a second pin of firebase-tools is ever written into flake.nix, it must equal the lockfile's. The static check needs no
-network; the live check runs `nix develop` and compares `firebase --version` with the lockfile.
+second pin; if a second pin of firebase-tools is ever written into flake.nix, it must equal the lockfile's. Two entry
+points share one definition (shell.nix): `nix develop` (flake) and `nix-shell` (no experimental features; the owner's workstation has
+flakes disabled), both on the nixpkgs locked in flake.lock. The static check needs no network; the live check runs both and compares
+`firebase --version` with the lockfile.
 """
 
 import json
@@ -27,12 +29,15 @@ GOOD_FLAKE = (
     '{\n  inputs.nixpkgs.url = "' + URL + '";\n'
     '  outputs = { self, nixpkgs }:\n    let\n'
     '      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];\n    in {\n'
-    "      devShells = forEachSystem (pkgs: {\n        default = pkgs.mkShell {\n"
-    "          packages = [ pkgs.nodejs_22 ];\n"
-    "          shellHook = ''\n"
-    '            (cd "$tally_fb" && npm ci --ignore-scripts --silent)\n'
-    '            cmp -s "$tally_fb/package-lock.json" "$tally_fb/node_modules/.tally-package-lock.json"\n'
-    "          '';\n        };\n      });\n    };\n}\n"
+    "      devShells = forEachSystem (pkgs: {\n        default = import ./shell.nix { inherit pkgs; };\n      });\n    };\n}\n"
+)
+GOOD_SHELL = (
+    "{ pkgs ? import (builtins.fetchTarball { url = locked.url; sha256 = locked.narHash; }) { } }:\n"
+    'let locked = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs.locked; in\n'
+    "pkgs.mkShell {\n  packages = [ pkgs.nodejs_22 ];\n  shellHook = ''\n"
+    '    (cd "$tally_fb" && npm ci --ignore-scripts --silent)\n'
+    '    cmp -s "$tally_fb/package-lock.json" "$tally_fb/node_modules/.tally-package-lock.json"\n'
+    "  '';\n}\n"
 )
 GOOD_LOCK = json.dumps(
     {
@@ -65,6 +70,7 @@ class RealFiles(unittest.TestCase):
     def test_repository_is_wired(self):
         found = c.problems(
             read("flake.nix"),
+            read("shell.nix"),
             read("flake.lock"),
             read("firebase", "package-lock.json"),
             read("scripts", "verify.sh"),
@@ -77,9 +83,10 @@ class RealFiles(unittest.TestCase):
 
 
 class Static(unittest.TestCase):
-    def check(self, flake=None, lock=None, pkg=None, verify=None, ci=None):
+    def check(self, flake=None, lock=None, pkg=None, verify=None, ci=None, shell=None):
         return c.problems(
             GOOD_FLAKE if flake is None else flake,
+            GOOD_SHELL if shell is None else shell,
             GOOD_LOCK if lock is None else lock,
             GOOD_PKG if pkg is None else pkg,
             GOOD_VERIFY if verify is None else verify,
@@ -102,27 +109,28 @@ class Static(unittest.TestCase):
         self.assertTrue(self.check(flake=GOOD_FLAKE.replace('"x86_64-linux"', "# \"x86_64-linux\"")))
 
     def test_node_must_come_from_nixpkgs(self):
-        self.assertTrue(self.check(flake=GOOD_FLAKE.replace("pkgs.nodejs_22", "pkgs.hello")))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("pkgs.nodejs_22", "pkgs.hello")))
 
     def test_shell_must_install_from_the_lockfile_with_ignore_scripts(self):
-        self.assertTrue(self.check(flake=GOOD_FLAKE.replace("npm ci", "npm install")))
-        self.assertTrue(self.check(flake=GOOD_FLAKE.replace(" --ignore-scripts", "")))
-        self.assertTrue(self.check(flake=GOOD_FLAKE.replace("package-lock.json", "other.json")))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("npm ci", "npm install")))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace(" --ignore-scripts", "")))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("package-lock.json", "other.json")))
 
     def test_a_second_pin_that_drifted_fails(self):
         for pin in ("firebase-tools@15.35.0", "firebase-tools-15.35.0", 'firebase-tools = "14.0.0"'):
             with self.subTest(pin=pin):
-                drifted = GOOD_FLAKE.replace("packages = [ pkgs.nodejs_22 ];", f'packages = [ pkgs.nodejs_22 ]; extra = "{pin}";')
-                self.assertTrue(self.check(flake=drifted))
+                drifted = GOOD_SHELL.replace("packages = [ pkgs.nodejs_22 ];", f'packages = [ pkgs.nodejs_22 ]; extra = "{pin}";')
+                self.assertTrue(self.check(shell=drifted))
+                self.assertTrue(self.check(flake=GOOD_FLAKE.replace("default =", f'# pinned: {pin}\n        default =') + f' extra = "{pin}";'))
 
     def test_a_second_pin_equal_to_the_lockfile_is_allowed(self):
-        same = GOOD_FLAKE.replace("packages = [ pkgs.nodejs_22 ];", 'packages = [ pkgs.nodejs_22 ]; extra = "firebase-tools@15.36.0";')
-        self.assertEqual(self.check(flake=same), [])
+        same = GOOD_SHELL.replace("packages = [ pkgs.nodejs_22 ];", 'packages = [ pkgs.nodejs_22 ]; extra = "firebase-tools@15.36.0";')
+        self.assertEqual(self.check(shell=same), [])
 
     def test_lockfile_version_change_is_followed(self):
-        pinned = GOOD_FLAKE.replace("packages = [ pkgs.nodejs_22 ];", 'packages = [ pkgs.nodejs_22 ]; extra = "firebase-tools@15.36.0";')
+        pinned = GOOD_SHELL.replace("packages = [ pkgs.nodejs_22 ];", 'packages = [ pkgs.nodejs_22 ]; extra = "firebase-tools@15.36.0";')
         bumped = json.dumps({"packages": {"node_modules/firebase-tools": {"version": "15.37.0"}}})
-        self.assertTrue(self.check(flake=pinned, pkg=bumped))
+        self.assertTrue(self.check(shell=pinned, pkg=bumped))
 
     def test_package_lock_without_firebase_tools_fails_closed(self):
         self.assertTrue(self.check(pkg=json.dumps({"packages": {"": {}}})))
@@ -147,6 +155,21 @@ class Static(unittest.TestCase):
         channel = "https://channels.nixos.org/nixos-26.05/nixexprs.tar.xz"
         self.assertTrue(self.check(flake=GOOD_FLAKE.replace(URL, channel), lock=GOOD_LOCK.replace(URL, channel)))
 
+    def test_flake_must_use_the_shared_shell(self):
+        self.assertTrue(self.check(flake=GOOD_FLAKE.replace("import ./shell.nix", "import ./other.nix")))
+        self.assertTrue(self.check(flake=GOOD_FLAKE.replace("default = import ./shell.nix { inherit pkgs; };", "default = pkgs.mkShell { };")))
+
+    def test_shell_nix_is_required_and_must_read_the_flake_lock(self):
+        # Without flakes, shell.nix must still use the nixpkgs flake.lock pins: a second pin could drift.
+        self.assertTrue(self.check(shell=""))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("./flake.lock", "./other.lock")))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("builtins.fetchTarball", "builtins.fetchGit")))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("sha256 = locked.narHash;", "")))
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("builtins.fromJSON", "builtins.fromTOML")))
+
+    def test_shell_nix_must_not_hard_code_a_nixpkgs_hash_or_url(self):
+        self.assertTrue(self.check(shell=GOOD_SHELL.replace("url = locked.url;", f'url = "{URL}";')))
+
     def test_verify_wiring_is_required(self):
         self.assertTrue(self.check(verify=""))
         self.assertTrue(self.check(verify=GOOD_VERIFY.replace("step nix-shell-tests", "# step nix-shell-tests")))
@@ -163,27 +186,36 @@ class Static(unittest.TestCase):
 
 
 class Live(unittest.TestCase):
-    def runner(self, rc=0, out="15.36.0\n", err=""):
+    FLAKE_CMD = ["nix", "--extra-experimental-features", "nix-command flakes", "develop", "-c", "firebase", "--version"]
+    SHELL_CMD = ["nix-shell", "--run", "firebase --version"]
+
+    def runner(self, out="15.36.0\n", rc=0, err="", drifted=None):
+        """A fake runner; `drifted` names the command (FLAKE_CMD or SHELL_CMD) that prints 15.35.0 instead."""
         calls = []
 
         def run(cmd):
             calls.append(cmd)
+            if cmd == drifted:
+                return 0, "15.35.0\n", ""
             return rc, out, err
 
         run.calls = calls
         return run
 
-    def test_matching_version_passes_and_uses_the_default_shell(self):
+    def test_matching_version_passes_and_runs_both_entry_points(self):
         run = self.runner()
         self.assertEqual(c.live_problems("15.36.0", run), [])
-        self.assertEqual(run.calls, [["nix", "develop", "-c", "firebase", "--version"]])
+        self.assertEqual(run.calls, [self.FLAKE_CMD, self.SHELL_CMD])
 
     def test_install_noise_before_the_version_is_ignored(self):
         self.assertEqual(c.live_problems("15.36.0", self.runner(out="nix shell: npm ci in firebase/\n15.36.0\n")), [])
 
-    def test_drifted_version_fails(self):
+    def test_drifted_version_fails_in_either_entry_point(self):
         self.assertTrue(c.live_problems("15.36.0", self.runner(out="15.35.0\n")))
         self.assertTrue(c.live_problems("15.36.0", self.runner(out="115.36.0\n")))
+        for cmd in (self.FLAKE_CMD, self.SHELL_CMD):
+            with self.subTest(cmd=cmd[0]):
+                self.assertEqual(len(c.live_problems("15.36.0", self.runner(drifted=cmd))), 1)
 
     def test_failure_or_empty_output_fails(self):
         self.assertTrue(c.live_problems("15.36.0", self.runner(rc=1, out="", err="boom")))
