@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 80/112 (71%) | 32 |
+| M1 | Accounts and households | 81/112 (72%) | 31 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 80/112 done (71%), 32 open.
+**Progress:** 81/112 done (72%), 31 open.
 
 ### Tasks
 
@@ -224,7 +224,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-86 | Google sign-in switch in &#58;app (off in v1)&#58; hide the Google button and the Google hint while off | blocked | M1-66, M1-16 | implementer |  |
 | M1-87 | Repo rename follow-up&#58; the old repo name and checkout path in process files, docs, README and a… | done | none | implementer |  |
 | M1-90 | Blank names&#58; one definition for the rules (trim strips code points up to U+0020) and the app (Kot… | ready | M1-06 | implementer |  |
-| M1-91 | Tooling&#58; hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICL… | in progress | none | implementer | [#389](https://github.com/bondo/tally/issues/389) |
+| M1-91 | Tooling&#58; hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICL… | done | none | implementer | [#389](https://github.com/bondo/tally/issues/389) |
 | M1-92 | Tooling&#58; process docs, prompts and status output say Tally; new sessions get tally&#58;* tags | done | none | implementer | [#388](https://github.com/bondo/tally/issues/388) |
 | M1-93 | Build names&#58; rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks … | ready | M1-68 | implementer |  |
 | M1-94 | Tooling&#58; drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling | blocked | M1-O17, M1-91, M1-92 | implementer |  |
@@ -264,11 +264,10 @@ flowchart LR
     n24["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
     n25["M1-86 Google sign-in switch in :app (off in … (blocked)"]:::blocked
     n26["M1-90 Blank names: one definition for the ru… (ready)"]:::ready
-    n27["M1-91 Tooling: hooks and status line read TAL… (in progress)"]:::progress
-    n28["M1-93 Build names: rootProject.name tally, … (ready)"]:::ready
-    n29["M1-94 Tooling: drop LISTICLES_TASK and the de… (blocked)"]:::blocked
-    n30["M1-O17 Owner: add TALLY_TASK=tooling to the T… (owner to-do)"]:::owner
-    n31["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
+    n27["M1-93 Build names: rootProject.name tally, … (ready)"]:::ready
+    n28["M1-94 Tooling: drop LISTICLES_TASK and the de… (blocked)"]:::blocked
+    n29["M1-O17 Owner: add TALLY_TASK=tooling to the T… (owner to-do)"]:::owner
+    n30["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
     n3 --> n5
     n4 --> n5
     n0 --> n7
@@ -318,7 +317,6 @@ flowchart LR
     n0 --> n20
     n27 --> n20
     n28 --> n20
-    n29 --> n20
     n3 --> n20
     n4 --> n20
     n5 --> n20
@@ -340,10 +338,8 @@ flowchart LR
     n25 --> n20
     n0 --> n24
     n4 --> n25
-    n30 --> n29
-    n27 --> n29
-    n27 --> n30
-    n29 --> n31
+    n29 --> n28
+    n28 --> n30
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -475,7 +471,6 @@ flowchart LR
 - **owner to-do** [#375](https://github.com/bondo/tally/issues/375): &#91;owner&#93; M1-O4&#58; Enable the Play Integrity API for the Firebase project in the Google Cloud console
 - **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
-- **PR to merge** [#389](https://github.com/bondo/tally/issues/389): M1-91&#58; hooks and status line read TALLY_* env names; TALLY_TASK=tooling accepted next to LISTICLE…
 - **task** M1-17: waits on M1-15, M1-16
 - **task** M1-31: waits on M1-11, M1-18
 - **task** M1-19: waits on M1-18
@@ -487,9 +482,8 @@ flowchart LR
 - **task** M1-39: waits on M1-18, M1-17, M1-25
 - **task** M1-47: waits on M1-16, M1-17, M1-19 +7
 - **task** M1-48: waits on M1-11, M1-15, M1-16 +13
-- **task** M1-FU: waits on M1-89, M1-90, M1-11 +22
+- **task** M1-FU: waits on M1-89, M1-90, M1-11 +21
 - **task** M1-O6: waits on M1-11
 - **task** M1-86: waits on M1-16
-- **task** M1-94: waits on M1-O17, M1-91
-- **task** M1-O17: waits on M1-91
+- **task** M1-94: waits on M1-O17
 - **task** M1-O18: waits on M1-94
