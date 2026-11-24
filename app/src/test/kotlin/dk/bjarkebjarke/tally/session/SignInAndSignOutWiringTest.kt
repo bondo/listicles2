@@ -7,6 +7,7 @@ import dagger.hilt.android.testing.HiltTestApplication
 import dagger.hilt.android.testing.UninstallModules
 import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.connectivity.ConnectivityModule
+import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
@@ -76,6 +77,11 @@ class SignInAndSignOutWiringTest {
     @BindValue
     @JvmField
     val session: SessionState = FakeSessionState(signedIn = false)
+
+    /** The update gate's remote reads through it; no Firebase app here, so it fails and the gate fails open. */
+    @BindValue
+    @JvmField
+    val firestoreSession: FirestoreSession = FirestoreSession()
 
     @Inject
     lateinit var googleSignIn: GoogleSignIn
