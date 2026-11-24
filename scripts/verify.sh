@@ -92,6 +92,7 @@ step dependency-floors python3 -I scripts/dependency_floors.py
 step ci-hardening-tests python3 -I scripts/test_check_ci_hardening.py
 step ci-hardening python3 -I scripts/check_ci_hardening.py
 step nix-shell-tests python3 -I scripts/test_check_nix_shell.py
+step nix-shell python3 -I scripts/check_nix_shell.py
 step build-guards-tests python3 -I scripts/test_check_build_guards.py
 step build-guards python3 -I scripts/check_build_guards.py
 step python-lint-tests python3 -I scripts/test_lint_python.py
@@ -120,6 +121,12 @@ step firebase-typecheck bash -c 'cd firebase && npm run typecheck --silent'
 step firebase-lint bash -c 'cd firebase && npm run lint --silent'
 step firebase-format bash -c 'cd firebase && npm run format:check --silent'
 step firebase-ts-tests python3 -I scripts/test_firebase_ts.py
+# M1-96: the live Nix check needs nix; CI job `nix` always runs it, so a workstation without nix says so instead of failing.
+if command -v nix >/dev/null 2>&1; then
+  step nix-shell-live python3 -I scripts/check_nix_shell.py --live
+else
+  echo "skip  nix-shell-live (nix is not installed; the CI job nix runs it)"; SKIPPED=1
+fi
 if [ "${SKIP_FIREBASE:-0}" = 1 ]; then
   echo "skip  firebase-rules (SKIP_FIREBASE=1)"; SKIPPED=1
 else

@@ -106,7 +106,7 @@ class Static(unittest.TestCase):
                 self.assertTrue(self.check(flake=GOOD_FLAKE.replace(f'"{system}"', "")))
 
     def test_system_only_in_a_comment_does_not_count(self):
-        self.assertTrue(self.check(flake=GOOD_FLAKE.replace('"x86_64-linux"', "# \"x86_64-linux\"")))
+        self.assertTrue(self.check(flake=GOOD_FLAKE.replace('"x86_64-linux" ', '\n      # "x86_64-linux"\n      ')))
 
     def test_node_must_come_from_nixpkgs(self):
         self.assertTrue(self.check(shell=GOOD_SHELL.replace("pkgs.nodejs_22", "pkgs.hello")))
