@@ -195,6 +195,13 @@ describe("Create invite", () => {
         await assertFails(create(alice.verified, code(HOME, "n"), data));
     });
 
+    // HH-02: a link stops working after 7 days, so the bound is pinned a minute past them, computed
+    // when the test runs (the rows above are built when the file loads).
+    test("denied: an invite with expiresAt 7 days and a minute ahead", async () => {
+        const data = fresh({ expiresAt: new Date(Date.now() + 7 * DAY + 60_000) });
+        await assertFails(create(alice.verified, code(HOME, "n"), data));
+    });
+
     // P3 (#243): the code binds the invite to its household, so a used or revoked code of HOME
     // cannot come back for another household; the first row is the #243 probe.
     const s = (n: number): string => "s".repeat(n);
