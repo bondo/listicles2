@@ -35,7 +35,9 @@ const CAROLS = { ...HOME, [m.member(H1, CAROL)]: MEMBER };
 const NEW: m.Doc = { ...LIVE, createdBy: ALICE, createdAt: m.NOW, ownerUid: ALICE };
 const OWNER: m.Doc = { role: "owner", displayName: "Ann", joinedAt: m.NOW };
 const LATER = new Date("2999-01-01T00:00:00Z"); // after any request time: an unexpired invite
+const [SOON, LATE] = [new Date(Date.now() + 6 * 86_400_000), new Date(Date.now() + 8 * 86_400_000)];
 const INVITE = { householdId: H1, householdName: "Home", createdBy: CAROL, expiresAt: LATER };
+const ASKED: m.Doc = { ...INVITE, createdAt: m.NOW, expiresAt: SOON }; // carol's invite create
 const points = (householdId: string | null): m.Doc => ({ householdId });
 // For reads: bob's household with carol (alice, removed, still names it) and dan's tombstone.
 const TOMB = { ...LIVE, ownerUid: DAN, name: "", deleted: true };
@@ -45,6 +47,7 @@ const SEEN = {
     [m.household(H2)]: TOMB,
     [m.user(DAN)]: points(H2),
     [m.user(ALICE)]: points(H1),
+    [`invites/${CODE}`]: INVITE,
 };
 
 // The n-th variant of a document: users doc holding null or an id, member doc of either role,
@@ -64,6 +67,16 @@ const LISTS = [...[H1, H2, H3].map((hid) => `${m.household(hid)}/members`), "use
 const READS: m.Request[] = [
     ...[...DOCS, "config/app"].map((path) => ({ op: "get" as const, path })),
     ...LISTS.map((path) => ({ op: "list" as const, path })),
+];
+// Invite reads: carol's code, and lists without a filter, of H1, of carol's in H1, of H2 (#280).
+const INVITE_READS: m.Request[] = [
+    { op: "get", path: `invites/${CODE}` },
+    ...Array.of<m.Doc>(
+        {},
+        { householdId: H1 },
+        { householdId: H1, createdBy: CAROL },
+        { householdId: H2 },
+    ).map((where) => ({ op: "list" as const, path: "invites", where })),
 ];
 
 export const TEMPLATES: Record<string, (n: number) => Draft> = {
@@ -92,6 +105,10 @@ export const TEMPLATES: Record<string, (n: number) => Draft> = {
         draft(DAN, { ...HOME, [m.user(DAN)]: points(H1) }, up(m.user(DAN), points(null))),
     "users doc: create": () => draft(BOB, {}, set(m.user(BOB), { householdId: null, name: "B" })),
     "users doc: name": () => draft(CAROL, SEEN, up(m.user(CAROL), { name: "C" })),
+    "invite: read": (n) => ({ ...draft(UIDS[n % 4] ?? ALICE, SEEN), read: INVITE_READS[n % 5] }),
+    "invite: create": () => draft(CAROL, CAROLS, set(`invites/${CODE}`, ASKED)),
+    "invite: delete": () =>
+        draft(CAROL, { ...CAROLS, [`invites/${CODE}`]: INVITE }, del(`invites/${CODE}`)),
     "users doc: delete": () => draft(ALICE, { [m.user(ALICE)]: points(null) }, del(m.user(ALICE))),
     // Extension points that add a path to an allow statement the rules have (one with an allow
     // statement of its own fails fuzz.test.ts's row check instead): denied until their task adds it.
@@ -116,7 +133,8 @@ const NAME = fc.oneof(
     fc.string({ unit: fc.constantFrom(...CHARS.slice(1, 5)), minLength: 1, maxLength: 3 }),
     fc.string({ unit: fc.constantFrom(...CHARS), minLength: 49, maxLength: 51 }),
 );
-const VALUES: m.Value[] = [...UIDS, ...HIDS, "owner", "member", m.T0, m.NOW, true, false, null, 42];
+const TIMES: m.Value[] = [m.T0, m.NOW, SOON, LATE];
+const VALUES: m.Value[] = [...UIDS, ...HIDS, "owner", "member", ...TIMES, true, false, null, 42];
 // A stored value keeps its PLAN section 3 type: another id, the other role, a tombstone, null.
 const STORED: Record<string, m.Value[]> = {
     householdId: [null, H1, H2, H3],
@@ -133,6 +151,7 @@ const KEYS: Record<string, string[]> = {
     users: ["householdId", "name"],
     households: Object.keys(LIVE),
     members: [...Object.keys(MEMBER), "viaInvite"],
+    invites: Object.keys(ASKED),
 };
 
 const KINDS = "value value value field field field rename rename clone clone drop extra op id omit";
@@ -237,9 +256,14 @@ function sdk(d: m.Doc): Record<string, unknown> {
     return Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v === m.NOW ? now : v]));
 }
 
+type Query = ReturnType<ReturnType<h.Db["collection"]>["where"]>;
 function send(db: h.Db, r: m.Request): Promise<unknown> {
-    if (r.op !== "commit")
-        return r.op === "get" ? db.doc(r.path).get() : db.collection(r.path).get();
+    if (r.op !== "commit") {
+        if (r.op === "get") return db.doc(r.path).get();
+        let query: Query = db.collection(r.path);
+        for (const [k, v] of Object.entries(r.where ?? {})) query = query.where(k, "==", v);
+        return query.get();
+    }
     const batch = db.batch();
     for (const { op, path, data } of r.writes)
         if (op === "delete") batch.delete(db.doc(path));

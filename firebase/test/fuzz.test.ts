@@ -69,6 +69,12 @@ const MUTANTS: [string, string, string][] = [
     ["Owner member doc: another uid (P1)", "uid == request.auth.uid && doc.role", "doc.role"],
     ["Household name: any length (P4)", "validName(data.name) &&", "data.name.trim() != '' &&"],
     ["Tombstone read: of a live household too", "household.deleted == true && ", ""],
+    [
+        "Invite list: all, by any member (#280)",
+        "invite.createdBy == request.auth.uid ||",
+        "true ||",
+    ],
+    ["Invite create: another household's code (P3)", "[0] == invite.householdId", "[0] != ''"],
 ];
 
 test.each(MUTANTS)("the fuzz finds the mutant: %s", async (_what, from, to) => {

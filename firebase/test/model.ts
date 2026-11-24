@@ -2,8 +2,8 @@
 // the PLAN rows, not from firestore.rules, so that fuzz.test.ts can compare the two on random
 // cases. ROWS has a row for each allow statement of the rules (fuzz.test.ts checks it). The PLAN
 // rows the rules lack are extension points, denied here until their task adds the rule and its row:
-// invites (M1-12), the join batch (M1-54), leave, remove member, the removed markers, the soft
-// delete, its cleanup and P6 (M1-11). A new allow statement fails that check until its row is in;
+// the join batch with its invite delete (M1-54), leave, remove member, the removed markers, the
+// soft delete, its cleanup and P6 (M1-11). A new allow statement fails that check until its row is in;
 // a new path of an existing one (the join, the soft delete) fails the fuzz on its base case (fuzz.ts).
 
 export const NOW = Symbol("request.time"); // FieldValue.serverTimestamp() in a write
@@ -16,12 +16,21 @@ export type Caller = {
     readonly auth: "anonymous" | "unverified" | "verified";
 };
 export type Write = { op: "set" | "update" | "delete"; path: string; data: Doc };
-export type Request = { op: "get" | "list"; path: string } | { op: "commit"; writes: Write[] };
+// A list query's equality filters are `where` (an invite list must fix householdId, #280).
+export type Request =
+    { op: "get" | "list"; path: string; where?: Doc } | { op: "commit"; writes: Write[] };
 type Method = "get" | "list" | "create" | "update" | "delete";
 
 // What a row sees: the caller, the world before the request (get, exists) and after it (getAfter,
 // existsAfter), the document before (resource) and after (request.resource; {} after a delete).
-type Ctx = { uid: string; authed: boolean; signedIn: boolean; before: World; after: World };
+type Ctx = {
+    uid: string;
+    authed: boolean;
+    signedIn: boolean;
+    before: World;
+    after: World;
+    where: Doc;
+};
 type Row = (x: Ctx & { old: Doc | undefined; doc: Doc }, ...ids: string[]) => boolean;
 
 export const user = (uid: string): string => `users/${uid}`;
@@ -85,6 +94,29 @@ function transfers(x: Ctx, old: Doc | undefined, d: Doc, hid: string): boolean {
     return owner && isMember(x.before, hid, to) && isMember(x.after, hid, to) && roles;
 }
 
+// Create invite: a member of the live household as createdBy, now, the household's name (P2), an
+// expiry within 7 days, a code of that household and a 22-character secret (P3, #243), the keys (P4).
+function createsInvite(x: Ctx, d: Doc, code: string): boolean {
+    const hid = String(d.householdId);
+    const keys = keysAre(d, [
+        "householdId",
+        "householdName",
+        "createdBy",
+        "createdAt",
+        "expiresAt",
+    ]);
+    const id =
+        /^[A-Za-z0-9]{20}_[A-Za-z0-9_-]{22}$/.test(code) && code.split("_")[0] === d.householdId;
+    const exp = d.expiresAt;
+    const week =
+        exp === NOW || (exp instanceof Date && exp.getTime() <= Date.now() + 7 * 86_400_000);
+    const values = d.createdBy === x.uid && d.createdAt === NOW && week;
+    const home = x.before.get(household(hid));
+    const own =
+        live(x.before, hid) && d.householdName === home?.name && isMember(x.before, hid, x.uid);
+    return x.signedIn && keys && id && values && own;
+}
+
 export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
     // Only that user, verified or not (AUTH-06, HH-03); created holding no household; deleted only
     // holding none, or when there is no doc (M1-08's rule, not in PLAN 3.1 yet: a repeated delete).
@@ -140,6 +172,37 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
         },
     },
     // Anyone, even signed out (START-01); no client writes.
+    // Invites (M1-12), each while the household is live: get, any user (they need the code, HH-03);
+    // list, a member whose query fixes householdId and, unless the owner, createdBy as the caller
+    // (#280); create (below); delete, its creator or the owner, any member once it has expired.
+    "invites/{code}": {
+        get: (x) => x.signedIn && live(x.before, String(x.old?.householdId)),
+        list: (x) => {
+            const hid = x.where.householdId;
+            const own =
+                x.where.createdBy === x.uid ||
+                x.before.get(household(String(hid)))?.ownerUid === x.uid;
+            return (
+                x.signedIn &&
+                typeof hid === "string" &&
+                live(x.before, hid) &&
+                isMember(x.before, hid, x.uid) &&
+                own
+            );
+        },
+        create: (x, code) => createsInvite(x, x.doc, code),
+        delete: (x) => {
+            const hid = String(x.old?.householdId);
+            const exp = x.old?.expiresAt;
+            const expired =
+                exp instanceof Date && exp.getTime() < Date.now() && isMember(x.before, hid, x.uid);
+            const who =
+                x.old?.createdBy === x.uid ||
+                x.before.get(household(hid))?.ownerUid === x.uid ||
+                expired;
+            return x.signedIn && live(x.before, hid) && who;
+        },
+    },
     "config/app": { get: () => true },
 };
 
@@ -160,7 +223,8 @@ function apply(world: World, writes: Write[]): World {
 export function explain(world: World, c: Caller, r: Request): { row: string; allowed: boolean }[] {
     const after = r.op === "commit" ? apply(world, r.writes) : world;
     const signedIn = c.auth === "verified";
-    const x = { uid: c.uid, authed: c.auth !== "anonymous", signedIn, before: world, after };
+    const where = r.op === "list" ? (r.where ?? {}) : {};
+    const x = { uid: c.uid, authed: c.auth !== "anonymous", signedIn, before: world, after, where };
     const asks =
         r.op === "commit" ? r.writes : [{ ...r, path: r.op === "list" ? `${r.path}/-` : r.path }];
     return asks.map((w) => {
