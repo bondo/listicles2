@@ -5,7 +5,9 @@
       "Bash(.tools/bin/actionlint *)",
       "Bash(.tools/bin/zizmor --offline *)",
       "Bash(scripts/mark-ready.sh *)",
-      "Bash(scripts/update-branch.sh *)"
+      "Bash(scripts/update-branch.sh *)",
+      "Bash(python3 -I scripts/merge_ready.py *)",
+      "mcp__claude-code-remote__add_repo"
     ]
   },
   "statusLine": {

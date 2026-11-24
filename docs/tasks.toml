@@ -1049,10 +1049,11 @@ notes = "Split from M1-14 (PR 319). Split again 2026-11-24 (PR 368): the whole t
 id = "M1-88"
 title = "Auth wiring 2: Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in SessionModule), MainActivity for the account picker"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-66"]
+pr = 381
 notes = "Split from M1-66 (PR 368; a compiled, tested draft is its comment 7119090146). FirebaseAuthentication binds SessionState and Authentication; one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc); CredentialManagerGoogleCredentials with CredentialManager.create, its companion's web client id and a ForegroundActivity that MainActivity observes itself (application-wide activity callbacks would also see the picker's translucent activity, whose stop would clear it while MainActivity stays started); GoogleSignIn; SignOut with an application CoroutineScope (SupervisorJob). Tests: AppGraphTest, the started activity, SignedOutStartTest (it uninstalls SessionModule)"
 
 [[task]]
