@@ -1060,10 +1060,11 @@ notes = "Split from M1-66 (PR 368; a compiled, tested draft is its comment 71190
 id = "M1-89"
 title = "Clear the local data on every change to signed out, also when Firebase signs the user out itself (#357)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-88"]
+pr = 398
 notes = "Split from M1-66 (PR 368). Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-89 to-confirm marker in docs/privacy section 2 (en and da)"
 
 [[task]]
