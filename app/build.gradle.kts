@@ -222,17 +222,24 @@ class ReleaseManifestArgs(
     override fun asArguments() = listOf("-Dtally.releaseManifest=${manifest.get().asFile.absolutePath}")
 }
 
-// PR 381 (owner decision 7127528405): KoverExclusionsTest judges the Kover exclusions below on the app's classes.
+// PR 381 (owner decision 7127528405): KoverExclusionsTest judges the Kover filters below on the app's classes, as the
+// total report applies them (koverVerify's: the common filters and any total block's). It gets every set (R1-01).
 class KoverExclusionArgs(
-    @get:Input val classes: Provider<Set<String>>,
-    @get:Input val annotations: Provider<Set<String>>,
+    @get:Input val sets: Provider<Map<String, Set<String>>>,
 ) : CommandLineArgumentProvider {
-    override fun asArguments() =
-        listOf(
-            "-Dtally.koverExcludedClasses=${classes.get().joinToString(",")}",
-            "-Dtally.koverExcludedAnnotations=${annotations.get().joinToString(",")}",
-        )
+    override fun asArguments() = sets.get().map { (set, values) -> "-Dtally.kover.$set=${values.joinToString(",")}" }
 }
+
+val koverFilterSets =
+    objects.mapProperty<String, Set<String>>().apply {
+        val filters = kover.reports.total.filters
+        mapOf("excludes" to filters.excludes, "includes" to filters.includes).forEach { (kind, filter) ->
+            put("$kind.classes", filter.classes)
+            put("$kind.annotatedBy", filter.annotatedBy)
+            put("$kind.inheritedFrom", filter.inheritedFrom)
+            put("$kind.projects", filter.projects)
+        }
+    }
 
 androidComponents.onVariants(androidComponents.selector().withBuildType("release")) { variant ->
     val manifest = variant.artifacts.get(SingleArtifact.MERGED_MANIFEST)
@@ -255,9 +262,7 @@ tasks.withType<Test>().configureEach {
     jvmArgumentProviders.add(
         RobolectricOfflineArgs(robolectricAndroidAllDir, checkNotNull(android.defaultConfig.targetSdk)),
     )
-    jvmArgumentProviders.add(
-        KoverExclusionArgs(kover.reports.filters.excludes.classes, kover.reports.filters.excludes.annotatedBy),
-    )
+    jvmArgumentProviders.add(KoverExclusionArgs(koverFilterSets))
 }
 
 // A JUnit 4 test with no result XML was silently skipped: fail the build (issue #212).

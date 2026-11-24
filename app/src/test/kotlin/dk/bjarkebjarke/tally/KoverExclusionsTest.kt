@@ -6,21 +6,17 @@ import org.junit.jupiter.api.Test
 import org.objectweb.asm.AnnotationVisitor
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
 /**
  * Owner decisions 7127528405 and 7129260438 (PR 381): coverage leaves out what Dagger generates (factories, their
  * nested instance holders, members injectors) and counts the hand-written classes below, so their uncovered lines
- * still count against the 80% gate. Judged on the app's compiled classes against app/build.gradle.kts's exclusions.
+ * still count against the 80% gate. Judged on the app's compiled classes against every filter of app/build.gradle.kts's
+ * total report, the one koverVerify checks (the root copy is not read; follow-up #386).
  */
 class KoverExclusionsTest {
-    private val configured =
-        KoverFilters(
-            mapOf(
-                "excludes.classes" to configured("tally.koverExcludedClasses"),
-                "excludes.annotatedBy" to configured("tally.koverExcludedAnnotations"),
-            ),
-        )
+    private val configured = KoverFilters(KoverFilters.SETS.associateWith { configured("tally.kover.$it") })
 
     @Test
     fun whatDaggerGeneratesIsLeftOut() {
@@ -88,39 +84,86 @@ class KoverExclusionsTest {
     }
 }
 
-/** Kover's report filters, as comma-separated patterns per set, such as "excludes.classes". */
+/**
+ * Kover's report filters, as comma-separated `*` and `?` patterns per set, such as "excludes.classes". Kover 0.9.11
+ * leaves out a class by its name, by an annotation on it or by a supertype at any depth (not the class itself), and a
+ * function or constructor by an annotation on it (KoverReportFilter's KDoc).
+ */
 private class KoverFilters(
     private val sets: Map<String, String>,
 ) {
-    private fun values(set: String) = sets[set].orEmpty().split(',').filter(String::isNotEmpty)
+    private fun matches(
+        set: String,
+        names: List<String>,
+    ) = sets[set]
+        .orEmpty()
+        .split(',')
+        .filter(String::isNotEmpty)
+        .any { glob -> names.any(globRegex(glob)::matches) }
 
-    /** By its name, or by an annotation on the class itself (one on a function leaves out only that function). */
-    fun whollyLeftOut(name: String): Boolean {
-        val annotations = values("excludes.annotatedBy").map { "L${it.replace('.', '/')};" }
-        return values("excludes.classes").map(::globRegex).any { it.matches(name) } ||
-            classAnnotations(name).any { it in annotations }
-    }
+    /** All of it: by its name, or by an annotation on the class itself. */
+    fun whollyLeftOut(name: String) =
+        matches("excludes.classes", listOf(name)) || matches("excludes.annotatedBy", annotations(name).first)
 
-    fun partlyLeftOut(name: String) = whollyLeftOut(name)
+    /**
+     * Any of its code, by an annotation on one of its functions or by a supertype too. Fails closed: a set this does
+     * not judge (includes, which leave out what they do not name, and projects) counts as leaving out every class.
+     */
+    fun partlyLeftOut(name: String) =
+        UNJUDGED.any { sets[it].orEmpty().isNotEmpty() } ||
+            whollyLeftOut(name) ||
+            matches("excludes.annotatedBy", annotations(name).second) ||
+            matches("excludes.inheritedFrom", supertypes(Class.forName(name, false, javaClass.classLoader)))
 
-    private fun classAnnotations(name: String): List<String> {
-        val file = checkNotNull(javaClass.getResource("/" + name.replace('.', '/') + ".class")) { "no $name" }
+    private fun supertypes(type: Class<*>): List<String> =
+        (listOfNotNull(type.superclass) + type.interfaces).flatMap { listOf(it.name) + supertypes(it) }
+
+    /** The annotations on the class and on its functions and constructors, named as Kover names them. */
+    private fun annotations(className: String): Pair<List<String>, List<String>> {
+        val file = checkNotNull(javaClass.getResource("/" + className.replace('.', '/') + ".class")) { "no $className" }
         val onClass = mutableListOf<String>()
+        val onFunctions = mutableListOf<String>()
+
+        fun MutableList<String>.record(descriptor: String): AnnotationVisitor? {
+            add(descriptor.substring(1, descriptor.length - 1).replace('/', '.'))
+            return null
+        }
+        val functions =
+            object : MethodVisitor(Opcodes.ASM9) {
+                override fun visitAnnotation(
+                    descriptor: String,
+                    visible: Boolean,
+                ) = onFunctions.record(descriptor)
+            }
         val reader =
             object : ClassVisitor(Opcodes.ASM9) {
                 override fun visitAnnotation(
                     descriptor: String,
                     visible: Boolean,
-                ): AnnotationVisitor? {
-                    onClass += descriptor
-                    return null
-                }
+                ) = onClass.record(descriptor)
+
+                override fun visitMethod(
+                    access: Int,
+                    name: String?,
+                    descriptor: String?,
+                    signature: String?,
+                    exceptions: Array<out String>?,
+                ) = functions
             }
         ClassReader(file.readBytes()).accept(reader, ClassReader.SKIP_CODE)
-        return onClass
+        return onClass to onFunctions
     }
 
-    /** Kover's class patterns: `*` is any run of characters, `?` one character. */
+    /** `*` is any run of characters, `?` one character. */
     private fun globRegex(glob: String) =
         Regex(glob.split('*').joinToString(".*") { part -> part.split('?').joinToString(".") { Regex.escape(it) } })
+
+    companion object {
+        /** Every set of Kover's filters; app/build.gradle.kts passes each to the test. */
+        val SETS =
+            listOf("excludes", "includes").flatMap { kind ->
+                listOf("classes", "annotatedBy", "inheritedFrom", "projects").map { "$kind.$it" }
+            }
+        val UNJUDGED = SETS.filter { it.startsWith("includes.") } + "excludes.projects"
+    }
 }
