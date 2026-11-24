@@ -2753,8 +2753,8 @@ class DelegatedDecisionsTests(unittest.TestCase):
         for old, new in (
             ("or with an owner-only path outside the approver's scope (§1.1), is not approver work",
              "or with an owner-only path outside tooling, build, CI and gate files, is not approver work"),
-            ("a `risk:high`, security-rules or release-area PR only after its clean second-reviewer pass, at max effort for `risk:high` and security-rules, §7.2.2",
-             "a security-rules PR at any time"),
+            ("a `risk:high`, security-rules or release-area PR only after its clean second-reviewer pass, at max effort for `risk:high` "
+             "and security-rules, §7.2.2", "a security-rules PR at any time"),
         ):
             with self.subTest(old=old[:40]):
                 self.assertIn("delegated-decisions", self.role_replace("orchestrator", old, new))

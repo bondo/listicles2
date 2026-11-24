@@ -233,20 +233,21 @@ class RolesYaml(unittest.TestCase):
         return found
 
     def test_a_security_rules_pr_without_risk_high_gets_a_max_effort_reviewer(self):  # owner decision, #134 comment 6989468926
-        self.assertEqual(self.max_effort_roles(["area:security-rules"]), {"reviewer"})
-        self.assertEqual(self.max_effort_roles(["area:sync-merge"]), {"reviewer"})
+        self.assertEqual(self.max_effort_roles(["area:security-rules"]), {"reviewer", "second-reviewer"})  # the second one: #15 comment 7123360368
+        self.assertEqual(self.max_effort_roles(["area:sync-merge"]), {"reviewer"})  # no approver delegation there: not raised for the second reviewer
 
     def test_risk_high_still_raises_the_reviewer_and_the_implementer_to_max(self):
-        self.assertEqual(self.max_effort_roles(["risk:high"]), {"implementer", "reviewer"})
-        self.assertEqual(self.max_effort_roles(["area:security-rules", "risk:high"]), {"implementer", "reviewer"})
+        self.assertEqual(self.max_effort_roles(["risk:high"]), {"implementer", "reviewer", "second-reviewer"})
+        self.assertEqual(self.max_effort_roles(["area:security-rules", "risk:high"]), {"implementer", "reviewer", "second-reviewer"})
 
     def test_a_plain_pr_gets_no_max_effort_role(self):
         for labels in ([], ["area:ui"], ["area:release"], ["area:process"], ["area:security-rules-docs"], ["area:sync-merge-ui"]):
             self.assertEqual(self.max_effort_roles(labels), set(), labels)
 
-    def test_the_security_rules_label_does_not_raise_anyone_but_the_reviewer(self):
-        for role in ("implementer", "second-reviewer", "planner", "design-reviewer"):
+    def test_the_security_rules_label_raises_only_the_reviewer_and_the_second_reviewer(self):
+        for role in ("implementer", "planner", "design-reviewer"):
             self.assertNotIn(role, self.max_effort_roles(["area:security-rules", "area:sync-merge"]), role)
+        self.assertNotIn("second-reviewer", self.max_effort_roles(["area:sync-merge", "area:release"]))
 
     def test_the_process_docs_state_the_same_reviewer_rule(self):
         for path in (("docs", "ORCHESTRATION.md"), ("docs", "PLAN.md")):

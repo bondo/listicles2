@@ -1093,7 +1093,8 @@ RULES = (
         _DELEGATED + (
             RETAINED,
             r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round \(a `risk:high`, security-rules or release-area pr "
-            r"only after its clean second-reviewer pass, at max effort for `risk:high` and security-rules, §7\.2\.2\), with the pr number, the head sha, the round "
+            r"only after its clean second-reviewer pass, at max effort for `risk:high` and security-rules, §7\.2\.2\), with the pr number, "
+            r"the head sha, the round "
             r"history and the deferral records; check for a `veto #n` comment on #15 before you send the merge request, and tell the merge agent "
             r"to read #15 for one right before it runs `scripts/merge_ready\.py`",
             r"a pr with anything on the owner-retained list, or with an owner-only path outside the approver's scope \(§1\.1\), is not "
