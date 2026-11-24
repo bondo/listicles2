@@ -90,8 +90,8 @@ object SignInAndSignOutModule {
     ): SignOut = SignOut(connectivity, userData, authentication, credentials, scope)
 
     /**
-     * One a process, in the application scope: MainActivity starts it at every creation, and only the first start
-     * watches (M1-89).
+     * One per process, in the application scope: MainActivity starts it at every creation, and only the first start
+     * watches (M1-89). Whatever comes to use Firestore without MainActivity (a worker, say) starts it too.
      */
     @Provides
     @Singleton

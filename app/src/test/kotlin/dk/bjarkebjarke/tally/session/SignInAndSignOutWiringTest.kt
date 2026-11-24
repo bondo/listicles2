@@ -142,11 +142,12 @@ class SignInAndSignOutWiringTest {
         val cleanup = cleanups.get()
         cleanup shouldBeSameInstanceAs cleanups.get()
 
+        val scope = applicationScope.coroutineContext.job
+        val before = scope.children.count()
         cleanup.start()
+        scope.children.count() shouldBe before + 1
         cleanups.get().start()
-
-        applicationScope.coroutineContext.job.children
-            .count() shouldBe 1
+        scope.children.count() shouldBe before + 1
         runBlocking { withTimeout(WAIT_MS) { while ("cleared" !in steps) delay(POLL_MS) } }
         steps shouldBe listOf("clear", "cleared")
     }

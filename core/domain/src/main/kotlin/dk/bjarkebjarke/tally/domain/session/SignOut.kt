@@ -69,8 +69,8 @@ interface LocalUserData {
 
     /**
      * Deletes the cache and the write queue (Firestore terminate, then clearPersistence); false when it could not.
-     * [SignOut] calls it, and [SignedOutCleanup] whenever nobody is signed in: also with nothing left to delete, and
-     * while another clear runs.
+     * Nothing is written to the copy while it runs. [SignOut] calls it, and [SignedOutCleanup] whenever nobody is
+     * signed in: also with nothing left to delete, and while another clear runs.
      */
     suspend fun clear(): Boolean
 }

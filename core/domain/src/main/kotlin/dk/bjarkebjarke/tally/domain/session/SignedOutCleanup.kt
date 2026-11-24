@@ -1,9 +1,8 @@
 package dk.bjarkebjarke.tally.domain.session
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -14,10 +13,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  * or its password changed on another phone), and without this the copy would stay, shared with the next account that
  * signs in on the phone.
  *
- * A signed-out start clears too: a copy that a stopped process or a failed clear left behind goes before anyone signs
- * in. One clear at a time, in order; the states that come while one runs wait, none dropped, so a sign-in and a
- * sign-out during a clear clear again. A failing session counts as signed out, as at the start-up root, and ends the
- * watch.
+ * A signed-out start clears too: a copy that a stopped process left behind goes before anyone signs in. A clear that
+ * fails is tried again only at the next signed-out state, so an account that signs in before then still finds the copy.
+ * One clear at a time; when it ends, only the latest of the states that came meanwhile counts (conflated). Nothing is
+ * written to the copy while a clear runs, so a session that came and went needs one more clear at most, and a sign-out
+ * that a sign-in followed never reaches the live session's copy. A failing session counts as signed out, as at the
+ * start-up root, and ends the watch.
  */
 class SignedOutCleanup(
     private val session: SessionState,
@@ -38,6 +39,6 @@ class SignedOutCleanup(
         session
             .signedIn()
             .catch { emit(false) }
-            .buffer(Channel.UNLIMITED)
+            .conflate()
             .collect { signedIn -> if (!signedIn) userData.clear() }
 }

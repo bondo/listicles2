@@ -129,11 +129,12 @@ class SignedOutStartTest {
         hilt.inject()
         compose.waitUntil(START_TIMEOUT_MS) { "cleared" in steps }
         steps shouldBe listOf("clear", "cleared")
+        val scope = applicationScope.coroutineContext.job
+        val watchers = scope.children.count()
 
         compose.activityRule.scenario.recreate()
 
-        applicationScope.coroutineContext.job.children
-            .count() shouldBe 1
+        scope.children.count() shouldBe watchers
         steps shouldBe listOf("clear", "cleared")
     }
 
