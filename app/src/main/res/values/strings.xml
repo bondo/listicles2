@@ -18,4 +18,10 @@
     <string name="gate_name_title">What should we call you?</string>
     <string name="gate_notice_removed">You were removed from the household</string>
     <string name="gate_notice_deleted">This household was deleted</string>
+    <!-- AUTH-01, wireframe 01: the sign-in screen. -->
+    <string name="signin_google">Continue with Google</string>
+    <string name="signin_email">Use email and password</string>
+    <string name="signin_note">Your lists are kept with your account, so they follow you to a new phone.</string>
+    <string name="signin_no_account">This phone has no Google account. Add one, or use email and password.</string>
+    <string name="signin_failed">Could not sign in. Try again.</string>
 </resources>
