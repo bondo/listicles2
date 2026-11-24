@@ -1589,11 +1589,12 @@ notes = "Split from M1-46. Each convention plugin registers the module's own che
 id = "M1-84"
 title = "Isolated projects: module build files read the root through isolated.rootProject, check 4 denies other rootProject/parent reads"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-68"]
-notes = "Found in the M1-68 part B3 self-review. Isolated projects rejects rootProject.<member> reads: rootProject.file in app/build.gradle.kts (policy.gradle, check_test_results.py), core/data (firestore.rules) and core/domain (policy.gradle), rootProject.layout in app. Move them to isolated.rootProject.projectDirectory, then add check 4 deny cases for rootProject.<member> (not isolated.rootProject), parent, gradle.rootProject { }, a project(...) held in a variable and configure(listOf(project(...))) { } (scripts/check_build_guards.py known gaps). Tooling env, test-first with negative cases"
+pr = 384
+notes = "Found in the M1-68 part B3 self-review. Isolated projects rejects rootProject.<member> reads: rootProject.file in app/build.gradle.kts (policy.gradle, check_test_results.py), core/data (firestore.rules) and core/domain (policy.gradle), rootProject.layout in app. Move them to isolated.rootProject.projectDirectory, then add check 4 deny cases for rootProject.<member> (not isolated.rootProject), parent, gradle.rootProject { }, a project(...) held in a variable and configure(listOf(project(...))) { } (scripts/check_build_guards.py known gaps). Tooling env, test-first with negative cases. Done (PR 384): the modules and policy.gradle read through isolated.rootProject.projectDirectory; check 4 denies any other rootProject (settings: only the descriptor name/buildFileName/projectDir), gradle.projectsLoaded/projectsEvaluated, parent, and a project(...) that is not a direct argument of a statement-level dependency declaration (an allowlist)"
 
 [[task]]
 id = "M1-69"
@@ -1689,7 +1690,7 @@ risk = "normal"
 depends_on = [
   "M1-88", "M1-89", "M1-90",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
-  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95",
+  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-98",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
@@ -2046,6 +2047,16 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-O17", "M1-91", "M1-92"]
 notes = "Tooling env (CLAUDE.md, scripts/hooks/). Implementer profile Opus (guard/hook change). Step 3 of the LISTICLES_TASK transition; after M1-O17 (the tooling environment sets TALLY_TASK), else main's guard would refuse tooling sessions. Start once no tooling session spawned before M1-O17 is still running (the orchestrator checks the state body's spawn times), or restart such sessions. After M1-92 (same CLAUDE.md, ORCHESTRATION.md, orchestrator.md and prompt_rules.py). Files: scripts/hooks/pretooluse_guard.py and session_end_metrics.py read TALLY_TASK only (tests: LISTICLES_TASK=tooling alone is now not tooling); CLAUDE.md line 16, ORCHESTRATION 7.1, agents/prompts/orchestrator.md and the scripts/prompt_rules.py pin with its test name TALLY_TASK=tooling; scripts/merge_ready.py ROOT and docs/ORCHESTRATION.md 7.5 drop dev/listicles (no file is left under it since M1-55; this narrows general merges, test: a Kotlin file under dev/listicles is owner-only) with scripts/test_merge_ready.py (its REPO fixture becomes bondo/tally, the dev/listicles general-path fixtures move to dk/bjarkebjarke/tally, and the R7_RISK pin follows the 7.5 text); scripts/hooks/test_guards_sh.py fixture paths (listicles.tests.gradle.kts, dev/listicles/app). Keeps the old-slug fixtures in test_repo_slug.py, test_owner_drift_check.py and test_mark_ready.py (they test the renamed repo's old remotes). About 150 changed lines"
+
+[[task]]
+id = "M1-98"
+title = "Isolated projects in the build: try org.gradle.unsafe.isolated-projects=true and enable it once the plugins allow it"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-84"]
+notes = "Found in PR 384 (M1-84) review rounds 1 to 3: check 4 of scripts/check_build_guards.py reads text, so a Kotlin API it does not list that returns a Project passes it; Gradle's isolated projects mode rejects any cross-project access at configuration time. Spike first: run the build with -Dorg.gradle.unsafe.isolated-projects=true and list what fails (AGP, Kover's root aggregation, licensee, detekt, roborazzi, google-services, our build-logic); enable it in gradle.properties only when the whole of verify.sh passes, else record the blockers and their upstream issues here. Tooling env, test-first (a check that gradle.properties keeps it on)"
 
 [[task]]
 id = "M1-O17"
