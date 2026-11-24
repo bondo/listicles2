@@ -12,6 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -29,6 +30,23 @@ private class WatchedPhone(
     val session = FakeSessionState()
     val userData = FakeLocalUserData(steps = steps)
     val cleanup = SignedOutCleanup(session, userData, scope)
+}
+
+/** Signs out, holds that clear while the [later] states come, then lets it end: the steps while held and at the end. */
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun TestScope.heldClear(later: List<Boolean>): Pair<List<String>, List<String>> {
+    val phone = WatchedPhone(backgroundScope)
+    val clearing = CompletableDeferred<Unit>()
+    phone.userData.clearGate = clearing
+    phone.cleanup.start()
+    (listOf(false) + later).forEach {
+        phone.session.signedIn = it
+        runCurrent()
+    }
+    val held = phone.steps.toList()
+    clearing.complete(Unit)
+    runCurrent()
+    return held to phone.steps
 }
 
 /**
@@ -52,24 +70,20 @@ class SignedOutCleanupTest :
             }
         }
 
-        test("the states that come while a clear runs are all handled after it, one clear at a time") {
-            // A sign-in and a sign-out during a clear (a slow one) clear again: the watcher drops no state meanwhile.
+        test("one clear at a time; when it ends only the latest state counts, and only after a change") {
+            // Nothing is written to the copy while a clear runs, so a session that came and went meanwhile needs one
+            // more clear at most, and one that is signed in again needs none: its copy is live.
             checkAll(Arb.list(Arb.boolean(), 0..20)) { later ->
                 runTest {
-                    val phone = WatchedPhone(backgroundScope)
-                    val clearing = CompletableDeferred<Unit>()
-                    phone.userData.clearGate = clearing
-                    phone.cleanup.start()
-                    (listOf(false) + later).forEach {
-                        phone.session.signedIn = it
-                        runCurrent()
-                    }
-                    phone.steps shouldBe listOf("clear")
-                    clearing.complete(Unit)
-                    runCurrent()
-                    phone.steps shouldBe clearsFor(listOf(false) + later)
+                    val (held, steps) = heldClear(later)
+                    held shouldBe listOf("clear")
+                    steps shouldBe if (true in later && !later.last()) CLEARED + CLEARED else CLEARED
                 }
             }
+        }
+
+        test("a sign-out, then a sign-in again, both while a clear runs: the live session keeps its copy") {
+            runTest { heldClear(listOf(true, false, true)).second shouldBe CLEARED }
         }
 
         test("only start watches, and only its first call: a recreated activity starts no second watcher") {
