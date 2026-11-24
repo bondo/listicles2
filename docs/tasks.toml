@@ -1040,7 +1040,8 @@ status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-67", "M1-O14"]
-notes = "Split from M1-14 (PR 319). Split again 2026-11-24: the whole task measured about 620 changed lines without the #357 cleanup (guard 600), and :app on :core:data needs the Credential Manager artifacts with it (without them firebase-auth pulls older versions that no licence line lists). This part: GoogleCredentials over androidx.credentials 1.6.0 and googleid 1.2.1 with Google's button flow (GetSignInWithGoogleOption: every account on the phone; cancel; no account), not the two-step Google ID option the notes first named (its first sheet offers only accounts that signed in before, which a sign-out does not reset, so the next person on the phone is locked out; self-review), the activity it opens the picker in as a ForegroundActivity, the web client id (default_web_client_id: google-services.json's web client overrides the empty default of :core:data; the stand-in has one now), config/licensee/policy.gradle on :core:data. M1-88 has the Hilt bindings, M1-89 the #357 cleanup"
+pr = 368
+notes = "Split from M1-14 (PR 319). Split again 2026-11-24 (PR 368): the whole task measured about 620 changed lines without the #357 cleanup (guard 600), and :app on :core:data needs the Credential Manager artifacts with it (without them firebase-auth pulls older versions that no licence line lists). This part: GoogleCredentials over androidx.credentials 1.6.0 and googleid 1.2.1 with Google's button flow (GetSignInWithGoogleOption: every account on the phone; cancel; no account), not the two-step Google ID option the notes first named (its first sheet offers only accounts that signed in before, which a sign-out does not reset, so the next person on the phone is locked out; self-review), the activity it opens the picker in as a ForegroundActivity, the web client id (default_web_client_id: google-services.json's web client overrides the empty default of :core:data; the stand-in has one now), config/licensee/policy.gradle on :core:data. M1-88 has the Hilt bindings, M1-89 the #357 cleanup"
 
 [[task]]
 id = "M1-88"
@@ -1050,7 +1051,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-66"]
-notes = "Split from M1-66 (its PR has a compiled, tested draft). FirebaseAuthentication binds SessionState and Authentication; one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc); CredentialManagerGoogleCredentials with CredentialManager.create, its companion's web client id and a ForegroundActivity that MainActivity observes itself (application-wide activity callbacks would also see the picker's translucent activity, whose stop would clear it while MainActivity stays started); GoogleSignIn; SignOut with an application CoroutineScope (SupervisorJob). Tests: AppGraphTest, the started activity, SignedOutStartTest (it uninstalls SessionModule)"
+notes = "Split from M1-66 (PR 368; a compiled, tested draft is its comment 7119090146). FirebaseAuthentication binds SessionState and Authentication; one FirestoreSession binds LocalUserData, its newInstance the app's only FirebaseFirestore.getInstance (M1-67, its KDoc); CredentialManagerGoogleCredentials with CredentialManager.create, its companion's web client id and a ForegroundActivity that MainActivity observes itself (application-wide activity callbacks would also see the picker's translucent activity, whose stop would clear it while MainActivity stays started); GoogleSignIn; SignOut with an application CoroutineScope (SupervisorJob). Tests: AppGraphTest, the started activity, SignedOutStartTest (it uninstalls SessionModule)"
 
 [[task]]
 id = "M1-89"
@@ -1060,7 +1061,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-88"]
-notes = "Split from M1-66. Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-89 to-confirm marker in docs/privacy section 2 (en and da)"
+notes = "Split from M1-66 (PR 368). Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-89 to-confirm marker in docs/privacy section 2 (en and da)"
 
 [[task]]
 id = "M1-15"
