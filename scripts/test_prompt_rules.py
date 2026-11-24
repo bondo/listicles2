@@ -3215,9 +3215,9 @@ class TallyNamesTests(unittest.TestCase):
     def test_new_sessions_get_tally_tags_and_the_note_names_the_old_prefix(self):
         text = self.text("docs/ORCHESTRATION.md")
         block = text.split("### 2.1 Session tags", 1)[1].split("## 3.", 1)[0]
-        self.assertIn("tally:<milestone or task>   e.g. tally:M0, tally:process", block)
+        self.assertRegex(block, r"tally:<milestone or task> +e\.g\. tally:M0, tally:process")
         self.assertNotIn("listicles:<", block)
-        self.assertRegex(" ".join(block.split()), r"sessions spawned before M1-92 carry `listicles:\*`; metrics over history match both")
+        self.assertRegex(" ".join(block.split()), r"(?i)sessions spawned before M1-92 carry `listicles:\*`, not `tally:\*`\. metrics over history match both")
 
     def test_every_live_worker_read_matches_both_prefixes_and_no_tag_filter_is_left_with_only_the_old_one(self):
         for rel in ("docs/ORCHESTRATION.md", "agents/prompts/orchestrator.md"):

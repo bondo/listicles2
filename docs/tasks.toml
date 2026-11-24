@@ -1,4 +1,4 @@
-# Listicles task graph: the single source of truth for tasks and their dependencies.
+# Tally task graph: the single source of truth for tasks and their dependencies.
 # Process and field meanings: docs/ORCHESTRATION.md section 4. Check: scripts/tasks.py validate
 #
 # status:     todo | done | dropped   ("in progress" is not stored: it is a claim in the state issue)
