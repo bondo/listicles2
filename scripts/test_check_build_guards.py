@@ -968,6 +968,20 @@ class Conventions(unittest.TestCase):
             "val m = Project::class.members",
             'val m = project.javaClass.getMethod("getParent")',
             "import kotlin.reflect.full.memberProperties",
+            # Second self-review of R3 (each ran in Gradle 8.14.3): the lexer follows Kotlin's nested comments and backticked
+            # names; a Project from a task, a dependency or the task graph; GroovyObject and InvokerHelper lookups by name.
+            '/* /* */ " */ val p = project.parent',
+            'val `x\'` = 1; val p = project.parent',
+            'val p = tasks.findByPath(":b:help")!!.project',
+            'val p = tasks.getByPath(":b:help")',
+            'val p = gradle.taskGraph.allTasks.map { it.project }',
+            'val p = tasks.named("x").get().getProject()',
+            'val p = (dependencies.project(mapOf("path" to ":b")) as ProjectDependency).dependencyProject',
+            'val p = (project as groovy.lang.GroovyObject).getProperty("parent")',
+            'val p = org.codehaus.groovy.runtime.InvokerHelper.getProperty(project, "parent")',
+            'val p = (project as org.gradle.internal.extensibility.DynamicObjectAware).asDynamicObject',
+            'val h = java.lang.invoke.MethodHandles.lookup()',
+            'val p = properties["parent"]',
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
@@ -1033,6 +1047,9 @@ class Conventions(unittest.TestCase):
             "def e = project.extensions",
             "def r = 'a.b'.split(/\\./)",
             "// \\u0027",
+            # Groovy calls a local closure in a dependency statement, so project(...) fails in a .gradle file outright.
+            "def ok = { it.version = 'x' }; dependencies { ok project(':b') }",
+            "dependencies { implementation project(':core:domain') }",
         ):
             with self.subTest(code=code):
                 found = self.problems({"config/licensee/policy.gradle": code + "\n"})
@@ -1056,7 +1073,6 @@ class Conventions(unittest.TestCase):
             "def reason = \"${project.name}: ${version}\".toString()\ndef spdx = 4 / 2 / (1)\n"
             "def parts = 'a:b'.split(':') as List\ndef coordinates = parts[0]\nallowUrl('https://x/y') { because('z') }\n"
             "def unknown = [a: 'b', 'c': 'd']\nif (unknown.isEmpty() && parts.get(1) != null) { return }\n"
-            "dependencies {\n    implementation project(':core:domain')\n}\n"
         )
         self.assertEqual(self.problems({"config/licensee/policy.gradle": code}), [])
 
@@ -1113,9 +1129,11 @@ class Conventions(unittest.TestCase):
             "val m = mapOf(\"project\" to project.name, \"parent\" to 1)\n"
             "val ins = tasks.register(\"x\") { inputs.property(\"taskCount\", 1) }\nval f2 = file(\"a\").parentFile\n"
             "dependencies { testImplementation(libs.kotest.property) }\n"
+            "val op = objects.property(String::class.java)\nval props = java.util.Properties()\nval home = System.getProperty(\"user.home\")\n"
+            "/* a /* nested */ comment */ val own = project.name\nval `my name` = 1\n"
             "val d2 = dependencies.project(mapOf(\"path\" to \":x\"))\n"
         )
-        groovy = "dependencies {\n    implementation project(':core:domain')\n    api project(path: ':core:domain')\n}\n"
+        groovy = "plugins {\n    id 'com.example'\n}\n"  # a project dependency fails in Groovy (see the Groovy deny cases)
         self.assertEqual(self.problems({"build.gradle.kts": code, "core/domain/build.gradle.kts": DOMAIN + code,
                                         "config/licensee/policy.gradle": groovy}), [])
 
