@@ -1575,11 +1575,12 @@ notes = "Split from M1-46. Each convention plugin registers the module's own che
 id = "M1-84"
 title = "Isolated projects: module build files read the root through isolated.rootProject, check 4 denies other rootProject/parent reads"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-68"]
-notes = "Found in the M1-68 part B3 self-review. Isolated projects rejects rootProject.<member> reads: rootProject.file in app/build.gradle.kts (policy.gradle, check_test_results.py), core/data (firestore.rules) and core/domain (policy.gradle), rootProject.layout in app. Move them to isolated.rootProject.projectDirectory, then add check 4 deny cases for rootProject.<member> (not isolated.rootProject), parent, gradle.rootProject { }, a project(...) held in a variable and configure(listOf(project(...))) { } (scripts/check_build_guards.py known gaps). Tooling env, test-first with negative cases"
+pr = 384
+notes = "Found in the M1-68 part B3 self-review. Isolated projects rejects rootProject.<member> reads: rootProject.file in app/build.gradle.kts (policy.gradle, check_test_results.py), core/data (firestore.rules) and core/domain (policy.gradle), rootProject.layout in app. Move them to isolated.rootProject.projectDirectory, then add check 4 deny cases for rootProject.<member> (not isolated.rootProject), parent, gradle.rootProject { }, a project(...) held in a variable and configure(listOf(project(...))) { } (scripts/check_build_guards.py known gaps). Tooling env, test-first with negative cases. Done (PR 384): the modules and policy.gradle read through isolated.rootProject.projectDirectory; check 4 denies any other rootProject (settings: only the descriptor name/buildFileName/projectDir), gradle.projectsLoaded/projectsEvaluated, parent, and a project(...) that is not a direct argument of a statement-level dependency declaration (an allowlist)"
 
 [[task]]
 id = "M1-69"
