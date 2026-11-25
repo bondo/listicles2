@@ -1,6 +1,6 @@
-"""Pins .claude/settings.json permissions: exactly seven rules (owner approval of three checksum-pinned linters, issue #15, the
+"""Pins .claude/settings.json permissions: exactly thirteen rules (owner approval of three checksum-pinned linters, issue #15, the
 scripts/mark-ready.sh and scripts/update-branch.sh wrappers, the merge agent's `python3 -I scripts/merge_ready.py` and the orchestrator's
-mcp__claude-code-remote__add_repo; owner request, 2026-11-24), and a documented-semantics model of rule matching (`*` spans
+mcp__claude-code-remote__add_repo; owner request, 2026-11-24; plus the six scheduled-task tools, owner request on issue #399, 2026-11-25), and a documented-semantics model of rule matching (`*` spans
 spaces and slashes; compound commands need every part allowed). The wrappers (test_mark_ready.py,
 test_update_branch.py) validate their arguments; no rule may allow `gh api` directly. How the real matcher
 or the classifier behaves is NOT tested (see the residual risks in docs/ORCHESTRATION.md section 7.5).
@@ -18,7 +18,17 @@ UPDATE_RULE = "Bash(scripts/update-branch.sh *)"  # owner decision, #15 comment 
 # and the orchestrator's attach of this repository. An MCP rule names one tool and takes no argument pattern.
 MERGE_RULE = "Bash(python3 -I scripts/merge_ready.py *)"
 ADD_REPO_RULE = "mcp__claude-code-remote__add_repo"
-SHA = "0123456789abcdef0123456789abcdef01234567"
+# Owner request in orchestrator #47's session, 2026-11-25 (state issue #399): the orchestrator creates, edits, lists and deletes its own scheduled
+# tasks and schedules its own wake-ups. One rule per tool; no server-wide rule.
+TRIGGER_RULES = (
+    "mcp__claude-code-remote__create_trigger",
+    "mcp__claude-code-remote__delete_trigger",
+    "mcp__claude-code-remote__update_trigger",
+    "mcp__claude-code-remote__list_triggers",
+    "mcp__claude-code-remote__get_trigger",
+    "mcp__claude-code-remote__send_later",
+)
+SHA ="0123456789abcdef0123456789abcdef01234567"
 PINNED_ALLOW = frozenset({
     "Bash(.tools/bin/shellcheck *)",
     "Bash(.tools/bin/actionlint *)",
@@ -27,6 +37,7 @@ PINNED_ALLOW = frozenset({
     UPDATE_RULE,
     MERGE_RULE,
     ADD_REPO_RULE,
+    *TRIGGER_RULES,
 })
 SEPARATORS = re.compile(r"&&|\|\||\|&|[;&|\n]")
 
@@ -63,7 +74,7 @@ def command_allowed(rules, command):
 
 
 def check_allow(rules):
-    """Problems with an allow list; empty when it is exactly the seven pinned rules."""
+    """Problems with an allow list; empty when it is exactly the thirteen pinned rules."""
     dup = ["duplicate rule"] * (len(rules) != len(set(rules)))
     return dup + [f"unexpected rule: {r}" for r in sorted(set(rules) - PINNED_ALLOW)] + [f"missing rule: {r}" for r in sorted(PINNED_ALLOW - set(rules))]
 
@@ -114,6 +125,9 @@ class AllowList(unittest.TestCase):
             "Bash(python3 -I scripts/merge_ready.py * general)", "Bash(python *)", "Bash(/usr/bin/python3 -I scripts/merge_ready.py *)",
             "mcp__claude-code-remote", "mcp__claude-code-remote__*", "mcp__claude-code-remote__create_session", "mcp__claude-code-remote__send_message",
             "mcp__claude-code-remote__update_environment", "mcp__claude-code-remote__add_repo(*)", "mcp__claude-code-remote__add_repo *", "mcp__*",
+            "mcp__claude-code-remote__fire_trigger", "mcp__claude-code-remote__create_trigger(*)", "mcp__claude-code-remote__send_later *",
+            "mcp__claude-code-remote__*_trigger", "mcp__claude-code-remote__trigger", "mcp__claude-code-remote__archive_session",
+            "mcp__claude-code-remote__create_environment", "mcp__claude-code-remote__watch_url",
         ]
         for extra in bad_extras:
             self.assertTrue(check_allow(base + [extra]), extra)
@@ -124,6 +138,8 @@ class AllowList(unittest.TestCase):
         self.assertTrue(check_allow(base + [UPDATE_RULE]), "duplicate update-branch rule")
         self.assertTrue(check_allow(base + [MERGE_RULE]), "duplicate merge_ready rule")
         self.assertTrue(check_allow(base + [ADD_REPO_RULE]), "duplicate add_repo rule")
+        for rule in TRIGGER_RULES:
+            self.assertTrue(check_allow(base + [rule]), f"duplicate {rule}")
         self.assertTrue(check_allow([]))
         self.assertEqual(check_allow(base), [])
 
@@ -183,8 +199,16 @@ class WrapperRule(unittest.TestCase):
     def test_add_repo_rule_is_the_one_exact_mcp_tool_name(self):
         allow = self.settings["permissions"]["allow"]
         self.assertEqual(allow.count(ADD_REPO_RULE), 1)
-        self.assertEqual([r for r in allow if not r.startswith("Bash(")], [ADD_REPO_RULE], "no other non-Bash rule, no server-wide MCP rule")
+        self.assertEqual(sorted(r for r in allow if not r.startswith("Bash(")), sorted([ADD_REPO_RULE, *TRIGGER_RULES]),
+                         "no other non-Bash rule, no server-wide MCP rule")
         self.assertRegex(ADD_REPO_RULE, r"^mcp__[a-z-]+__[a-z_]+$", "one tool, no wildcard, no argument pattern")
+
+    def test_trigger_rules_are_present_once_each_and_exact_tool_names(self):
+        allow = self.settings["permissions"]["allow"]
+        self.assertEqual(len(TRIGGER_RULES), 6)
+        for rule in TRIGGER_RULES:
+            self.assertEqual(allow.count(rule), 1, rule)
+            self.assertRegex(rule, r"^mcp__claude-code-remote__(?:(?:create|delete|update|list|get)_triggers?|send_later)$", rule)
 
     def test_codeowners_cover_claude_dir_and_scripts(self):
         text = read(".github", "CODEOWNERS")
