@@ -583,8 +583,8 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 35% of a 1m window \(30% of a 200k window: this pr's scaling, pending owner confirmation "
-            r"\(not part of 7153510972\), `agents/roles\.yaml` context\)",
+            r"handover \(§5, two-phase\), at about 35% of a 1m window \(30% of a 200k window: pr #408's scaling \(scaled to 26, set to 30\), "
+            r"pending owner confirmation \(not part of 7153510972\), `agents/roles\.yaml` context\)",
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
             r"a successor does §5\.2",
@@ -1169,12 +1169,15 @@ RULES = (
     ),
     Rule(
         "token-savings-orchestrator", ("orchestrator",),
-        (r"at about 35% of a 1m window \(30% of a 200k window: this pr's scaling, pending owner confirmation \(not part of 7153510972\)",
+        (r"at about 35% of a 1m window \(30% of a 200k window: pr #408's scaling \(scaled to 26, set to 30\), "
+         r"pending owner confirmation \(not part of 7153510972\)",
          r"a fresh merge agent once a day, at the first merge request after 00:00 utc",
+         r"sets the old merge-agent row to archived \(once it has no merge in flight\) and adds the new agent's row",
          r"up to about 150 changed lines when they touch only tests or docs",
          r"a fresh implementer from `handoff/<branch>\.md` when the running one is above 30% context"),
         "the orchestrator hands over at about 35% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
-        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 50% of a 1m window", r"daily pacing recompute"),
+        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 50% of a 1m window", r"daily pacing recompute",
+                   r"this pr's scaling", r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
 )
 
@@ -1420,7 +1423,8 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 35% of a 1m window \(30% of a 200k window: this pr's scaling, pending owner confirmation \(not part of 7153510972\); "
+            r"trigger: about 35% of a 1m window \(30% of a 200k window: pr #408's scaling \(scaled to 26, set to 30\), "
+            r"pending owner confirmation \(not part of 7153510972\); "
             r"`agents/roles\.yaml` context, #15 comment 7001335975; 35% by owner decision "
             r"7153510972 item 6",
             r"until the hard stage, the orchestrator follows this section, not the soft reminder",
@@ -1813,7 +1817,7 @@ DOC_RULES = (
             "up to about 150 changed lines when they touch only tests or docs",
             "a fresh merge agent once a day, at the first merge request after 00:00 utc",
             "the first reviewer (the primary reviewer, not the second reviewer) in every round",
-            "30% of a 200k window: this pr's scaling, pending owner confirmation (not part of 7153510972)",
+            "30% of a 200k window: pr #408's scaling (scaled to 26, set to 30), pending owner confirmation (not part of 7153510972)",
             "implementer_handoff_at_percent: 30",
             "orchestrator_handover_at_percent_1m: 35",
         )),
@@ -1834,19 +1838,26 @@ DOC_RULES = (
             "an implementer hands off at about 30% context",
             "a fix round goes to a fresh implementer",
             "a pr above 500 counted lines is split before its first review round",
-            "a fresh merge agent once a day, at the first merge request after 00:00 utc, i.e. the orchestrator's first check-in of the utc day",
+            "a fresh merge agent once a day, at the first merge request after 00:00 utc (checked at each check-in)",
+            "spawn it in three steps: (1) `create_session` with the template below and `merge requests: wait for the first merge request`",
+            "(3) send the first merge request with `send_message`, only after that update",
+            "a `merge-agent` row that is not archived or failed",
+            "if the body does not name you as active, do not merge; send_message the orchestrator and wait",
             "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row",
             "the merge-agent row's `spawned-at` records the rotation time",
             "check that the state issue body names you as active before your first merge",
-            "trigger: about 35% of a 1m window (30% of a 200k window: this pr's scaling, pending owner confirmation (not part of 7153510972)",
-            "hand over at about 35% of a 1m window (30% of a 200k window: this pr's scaling, pending owner confirmation (not part of 7153510972)",
+            "trigger: about 35% of a 1m window (30% of a 200k window: pr #408's scaling (scaled to 26, set to 30), "
+            "pending owner confirmation (not part of 7153510972)",
+            "hand over at about 35% of a 1m window (30% of a 200k window: pr #408's scaling (scaled to 26, set to 30), "
+            "pending owner confirmation (not part of 7153510972)",
             "### 8.6 merge agent",
             "tags `role:merge-agent`, `tally:process`",
         )),
         "ORCHESTRATION carries the token-savings rules: effort, implementer context and fix rounds, PR size, the 150-line re-check, the daily "
         "merge agent and its spawn message, the 35% orchestrator handover (7153510972)",
         forbidden=(r"opus / high \(max for `risk:high`\)", r"second reviewer every round", r"max effort for `risk:high`",
-                   r"about 50% of a 1m window", r"daily pacing recompute"),
+                   r"about 50% of a 1m window", r"daily pacing recompute", r"this pr's scaling",
+                   r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
     DocRule(
         "token-savings-m1", "docs/milestones/M1.md",

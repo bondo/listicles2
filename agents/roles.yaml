@@ -105,7 +105,7 @@ roles:
     session: fresh, one per retro run
 context:
   # Orchestrator handover (ORCHESTRATION 5; owner decisions #15 comment 7001335975 and 7153510972 item 6): earlier than the hook stages below.
-  # The 200k value scales 80 -> 60 the same way (35 -> 26, rounded to 30): 30% of a 200k window: this PR's scaling, pending owner confirmation (not part of 7153510972).
+  # The 200k value scales 80 -> 60 the same way (35 -> 26, set to 30): 30% of a 200k window: PR #408's scaling (scaled to 26, set to 30), pending owner confirmation (not part of 7153510972).
   orchestrator_handover_at_percent_1m: 35
   orchestrator_handover_at_percent_200k: 30
   # Implementer handoff (owner decision 7153510972 item 2): earlier than the hook stages below, which stay the backstop.
