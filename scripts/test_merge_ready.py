@@ -747,6 +747,17 @@ class GeneralKindTests(unittest.TestCase):
                 self.assertTrue(merge_ready.owner_only(name))
                 self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
 
+    def test_core_testing_is_refused_by_the_allowlist_itself(self):  # R1-01: not only by the gate regex, so the (?!testing/) lookahead is pinned
+        for root in ("dev/listicles", "dk/bjarkebjarke/tally"):
+            for source_set in ("main", "test", "androidTest"):
+                name = f"core/testing/src/{source_set}/kotlin/{root}/other/X.kt"  # a package that is not `testing`, so GENERAL_GATE_RE stays out
+                with self.subTest(name=name):
+                    self.assertIsNone(merge_ready.GENERAL_GATE_RE.search(name.casefold()))
+                    self.assertTrue(merge_ready.owner_only(name))
+                    self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+                    self.assertFalse(any(p.fullmatch(name) for p in merge_ready.GENERAL_ALLOW))
+                    self.assertTrue(any(p.fullmatch(name.replace("core/testing/", "core/data/")) for p in merge_ready.GENERAL_ALLOW))
+
     def test_every_path_outside_the_allowlist_is_refused(self):  # fail closed: R6-01, R6-05, R6-03, R6-04 and everything unknown
         names = ("firebase/.npmrc", "firebase/jest.config.cjs", "firebase/eslint.config.mjs", "firebase/nested/eslint.config.mjs",  # R6-01, R6-05, R6-03
                  "scripts/shellcheckrc", "scripts/.shellcheckrc", "scripts/verify.sh", "scripts/new_tool.py",  # R6-04, scripts
