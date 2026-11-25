@@ -921,7 +921,8 @@ RULES = (
             r"opus, high effort \(max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`, "
             r"per `agents/roles\.yaml`",
         ),
-        "the reviewer prompt names max effort for the first reviewer of area:security-rules and area:sync-merge PRs only, as roles.yaml does (#134, 7153510972)",
+        "the reviewer prompt names max effort for the first reviewer of area:security-rules and area:sync-merge PRs only, "
+        "as roles.yaml does (#134, 7153510972)",
         forbidden=(r"max for `?risk:high`? prs\)",),
     ),
     Rule(
@@ -999,7 +1000,8 @@ RULES = (
             r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"the stages are cumulative",
             r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice", r"\(3\) pause new work and finish the open prs",
             r"a stage lifts, and the limit returns to the §7\.1 default, at the first check-in where its trigger no longer applies",
-            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on security-rules, sync-merge and release prs, delta reviews and the r2 usage read",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on security-rules, "
+            r"sync-merge and release prs, delta reviews and the r2 usage read",
         ),
         "concurrency is for pipeline flow (default 10, reviews without a slot); throttle only near a rate limit or in overage (2026-11-18)",
         forbidden=(r"cap of [35] workers|at most 5 worker sessions|worker cap 3, then 2|recurring reviews r2|one stage per check-in|§7\.7\.5 forecast says",),
@@ -1379,7 +1381,8 @@ DOC_RULES = (
         "orch-autonomy", ORCH,
         (
             r"run review rounds \(max 4 per batch, §6\.2\) and the one escalation reviewer after round 4",
-            r"mark a pr ready and send it to the merge agent \(a pr in the security-rules, sync-merge or release area only after the independent second-reviewer pass\)",
+            r"mark a pr ready and send it to the merge agent \(a pr in the security-rules, sync-merge or release area only after "
+            r"the independent second-reviewer pass\)",
             r"\* merges of prs that stay with the owner \(below, §7\.5\)",
             r"\* anything above nit still open after round 5 \(§6\.2, §7\.2\.2\)",
             r"two consecutive worker sessions fail or stall \(§7\.4\)\. the orchestrator reads both with targeted `list_events`, logs an incident "
@@ -1559,7 +1562,8 @@ DOC_RULES = (
             r"the stages are cumulative", r"\(3\) pause new work and finish the open prs",
             r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice",
             r"a stage lifts, and the limit returns to the §7\.1 default, at the first check-in where its trigger no longer applies",
-            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on security-rules, sync-merge and release prs, delta reviews, and the r2 usage read",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on security-rules, "
+            r"sync-merge and release prs, delta reviews, and the r2 usage read",
         ),
         "ORCHESTRATION 7.7.6: throttle only near a rate limit or in overage: extras, halve the concurrency, pause new work; reviews are never throttled",
         forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2", r"one stage per check-in",
@@ -1608,7 +1612,8 @@ DOC_RULES = (
             r"\*\*nits are accepted without a round\.\*\* a review with verdict `ready_nits_only` goes to the merge request \(§7\.5\)\. "
             r"its nits are recorded as accepted in the pr review table and the round row: no fix round, no re-review, no follow-up issue",
             r"\*\*a small fix is re-checked cheaply\.\*\* a re-check of a small fix-only or docs-only commit \(the fixes of the previous round's "
-            r"findings, about 30 changed lines or fewer in total, or up to about 150 when they touch only tests or docs; owner decision 7153510972, item 4\) is the delta review of §7\.2, with its inputs, done by a fresh sonnet medium "
+            r"findings, about 30 changed lines or fewer in total, or up to about 150 when they touch only tests or docs; "
+            r"owner decision 7153510972, item 4\) is the delta review of §7\.2, with its inputs, done by a fresh sonnet medium "
             r"reviewer \(`recheck-reviewer` in `agents/roles\.yaml`\), focused on those findings\. full rounds stay opus at the effort "
             r"`agents/roles\.yaml` gives the reviewer",
             r"\*\*guard and prompt_rules hardening prs stop early\.\*\* on a pr that hardens `scripts/guards\.sh`, "

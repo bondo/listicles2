@@ -1000,7 +1000,7 @@ class Pr2CheckTests(unittest.TestCase):
             with self.subTest(role=role, clause=clause):
                 self.assertIn(rid, self.mutate(role, clause))
 
-    def test_the_second_reviewer_is_high_effort_and_only_in_three_areas_per_roles_yaml(self):  # owner decision 7153510972 item 1 (replaces #15 comment 7123360368)
+    def test_the_second_reviewer_is_high_effort_and_only_in_three_areas_per_roles_yaml(self):  # owner decision 7153510972 item 1
         block = (ROOT / "agents" / "roles.yaml").read_text().split("  escalation-reviewer:")[0].split("  second-reviewer:")[1]
         self.assertNotIn("max_effort_when", block)
         self.assertIn("effort: high", block)
@@ -1008,7 +1008,8 @@ class Pr2CheckTests(unittest.TestCase):
         pin = "Opus, high effort, per `agents/roles.yaml` (you do not raise your own effort)"
         self.assertIn(pin.lower(), prompt_rules.normalize(real("second-reviewer")).lower())
         self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, "Opus, high effort (`agents/roles.yaml`; you do not raise your own effort)"))
-        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, "Opus, high effort (max for `risk:high` PRs, per `agents/roles.yaml`; you do not raise your own effort)"))
+        old = "Opus, high effort (max for `risk:high` PRs, per `agents/roles.yaml`; you do not raise your own effort)"
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, old))
 
     def test_second_reviewer_ids_never_collide_with_the_reviewers(self):  # R2-01 of #128 (was R1-03)
         norm = prompt_rules.normalize(real("second-reviewer"))
