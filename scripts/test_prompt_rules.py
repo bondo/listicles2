@@ -1644,7 +1644,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_orchestrator_prompt_and_orchestration_section_5_carry_the_roles_yaml_threshold(self):
         phrase = (f"at about {self.context_value('orchestrator_handover_at_percent_1m')}% of a 1m window "
-                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k window: this pr's scaling")
+                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k window: pr #408's scaling")
         for path in (self.ORCH_MD, self.ORCH_DOC):
             with self.subTest(path=path.name):
                 text = self.norm(path)
@@ -1654,7 +1654,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
     def test_the_bootstrap_prompt_states_threshold_and_depth_rule(self):
         boot = self.norm(self.ORCH_DOC).split("### 8.1 orchestrator bootstrap", 1)[1].split("### 8.2", 1)[0]
         big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
-        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k window: this pr's scaling", boot)
+        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k window: pr #408's scaling", boot)
         self.assertRegex(boot, r"lineage depth (?:is )?6 or more.{0,80}the owner starts the next orchestrator")
 
     def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):
@@ -3245,7 +3245,7 @@ class TokenSavingsTests(unittest.TestCase):
     """
 
     ORCH, ROLES_YAML, M1 = "docs/ORCHESTRATION.md", "agents/roles.yaml", "docs/milestones/M1.md"
-    P200 = "30% of a 200k window: this pr's scaling, pending owner confirmation (not part of 7153510972)"  # round 1 R1-05 of #408
+    P200 = "30% of a 200k window: pr #408's scaling (scaled to 26, set to 30), pending owner confirmation (not part of 7153510972)"  # R1-05, R2-03 of #408
     PINNED = (
         (ROLES_YAML, "the first reviewer of a pr labelled area:security-rules or area:sync-merge"),
         (ROLES_YAML, "a risk:high implementer runs at high effort, not max"),
@@ -3265,7 +3265,11 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "an implementer hands off at about 30% context"),
         (ORCH, "a fix round goes to a fresh implementer"),
         (ORCH, "a pr above 500 counted lines is split before its first review round"),
-        (ORCH, "a fresh merge agent once a day, at the first merge request after 00:00 utc, i.e. the orchestrator's first check-in of the utc day"),
+        (ORCH, "a fresh merge agent once a day, at the first merge request after 00:00 utc (checked at each check-in)"),
+        (ORCH, "spawn it in three steps: (1) `create_session` with the template below and `merge requests: wait for the first merge request`"),
+        (ORCH, "(3) send the first merge request with `send_message`, only after that update"),
+        (ORCH, "a `merge-agent` row that is not archived or failed"),
+        (ORCH, "if the body does not name you as active, do not merge; send_message the orchestrator and wait"),
         (ORCH, "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
         (ORCH, "the merge-agent row's `spawned-at` records the rotation time"),
         (ORCH, "check that the state issue body names you as active before your first merge"),
@@ -3280,6 +3284,7 @@ class TokenSavingsTests(unittest.TestCase):
         ("planner", "plan prs at about 400 counted lines; a pr above 500 is split before its first review round"),
         ("orchestrator", "at about 35% of a 1m window (" + P200),
         ("orchestrator", "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
+        ("orchestrator", "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
         ("orchestrator", "up to about 150 changed lines when they touch only tests or docs"),
         ("orchestrator", "a fresh implementer from `handoff/<branch>.md` when the running one is above 30% context"),
     )
@@ -3291,6 +3296,9 @@ class TokenSavingsTests(unittest.TestCase):
         (ROLES_YAML, "second-reviewer: model: opus effort: max"),
         (ROLES_YAML, "every other reviewer and every later round runs at high"),
         (ORCH, "after the daily pacing recompute"),
+        (ORCH, "at the first merge request after 00:00 UTC, i.e. the orchestrator's first check-in of the UTC day"),
+        (ORCH, "this PR's scaling, pending owner confirmation"),
+        ("orchestrator", "this PR's scaling, pending owner confirmation"),
         (M1, "implementer and reviewer at high effort, both at max for `risk:high`"),
         ("reviewer", "every other reviewer and every later round runs at high"),
         ("orchestrator", "after the daily pacing recompute"),
