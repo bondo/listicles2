@@ -14,7 +14,11 @@ import kotlinx.coroutines.withContext
  * because a terminated one allows nothing but `clearPersistence`. [newInstance] is the app's only way to an instance:
  * while [clear] runs, [firestore] still answers the terminated one, so nothing opens the files again before they are
  * deleted. `SignOut` calls [awaitPendingWrites] and [clear] in turn; a second sign-out can start while the first one's
- * [clear] still runs, and [awaitPendingWrites] meanwhile answers a failed wait.
+ * [clear] still runs, and [awaitPendingWrites] meanwhile answers a failed wait. `SignedOutCleanup` also calls [clear]
+ * whenever nobody is signed in (M1-89), also when no screen asked (Firebase signed out by itself), so a repository can
+ * get the terminated instance at any time: its Firestore calls then throw `IllegalStateException`, and a `get()` in
+ * flight when it is terminated never answers, so a read has a time limit (the update gate's, M1-82). After `SignOut`'s
+ * clear that one works on a new, empty instance; while another runs, on the same one (terminating it again is a no-op).
  */
 class FirestoreSession(
     private val newInstance: () -> FirebaseFirestore,

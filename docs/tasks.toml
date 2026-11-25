@@ -1010,7 +1010,7 @@ status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-27", "M1-88"]
-notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee) and the app's one FirestoreSession in the Hilt graph (M1-88)"
+notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee) and the app's one FirestoreSession in the Hilt graph (M1-88). The read is signed out, before sign-in, through that FirestoreSession, whose instance a clear terminates: M1-89 starts its signed-out cleanup only once the start-up root is ready, so a start's clear never cuts that read (PR 398, R1-01). Only that first read is ordered: a later read (back in the app after 5 s or more) can meet the clear of Firebase's own sign-out, and the root then keeps its screen for up to the gate's 5 s limit (PR 398, S2-01; a follow-up decides the fix)"
 pr = 391
 
 [[task]]
@@ -1072,10 +1072,11 @@ notes = "Split from M1-66 (PR 368; a compiled, tested draft is its comment 71190
 id = "M1-89"
 title = "Clear the local data on every change to signed out, also when Firebase signs the user out itself (#357)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-88"]
+pr = 398
 notes = "Split from M1-66 (PR 368). Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-89 to-confirm marker in docs/privacy section 2 (en and da)"
 
 [[task]]
@@ -1201,7 +1202,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60", "M1-88"]
-notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, tested; the in-app privacy link is privacy Q10"
+notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, deleted in LocalUserData.clear() so that a sign-out Firebase starts by itself clears them too (M1-89, SignedOutCleanup), tested; the in-app privacy link is privacy Q10"
 
 [[task]]
 id = "M1-26"
