@@ -40,8 +40,8 @@ bestemmer, hvilke data appen indsamler, og som har ansvaret for dem. Spørgsmål
 slettes, når du logger ud eller sletter din konto. Telefonen husker også, hvornår du sidst åbnede hver liste på den,
 så listerne kan sorteres; det forlader aldrig telefonen og slettes også, når du logger ud (når du logger ud, ryddes
 alle Tallys data på telefonen for din konto). Det sker også, når Firebase selv logger dig ud, og det gør Firebase,
-næste gang Tally er på nettet på denne telefon, efter at kontoen er blevet slettet eller adgangskoden ændret på en
-anden telefon.
+næste gang det fornyer dit login på denne telefon (inden for cirka en time, mens Tally er åben og på nettet), efter at
+kontoen er blevet slettet eller adgangskoden ændret et andet sted.
 
 Tally har ingen reklamer og **ingen analyseværktøjer**: appen måler ikke, hvordan du bruger den.
 

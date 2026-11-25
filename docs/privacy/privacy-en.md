@@ -38,7 +38,8 @@ what data the app collects and is responsible for it. Questions go to the contac
 removed when you sign out or delete your account. The phone also keeps when you last opened each list on it, to
 sort your lists; this never leaves the phone and is removed too when you sign out (signing out clears all of
 Tally's data on the phone for your account). This also happens when Firebase signs you out by itself, which it does
-the next time Tally is online on this phone after the account was deleted or its password changed on another phone.
+when it next renews your sign-in on this phone (within about an hour while Tally is open and online) after the account
+was deleted or its password changed elsewhere.
 
 Tally has no ads and **no analytics**: the app does not measure how you use it.
 

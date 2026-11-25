@@ -28,7 +28,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // M1-89: once the start-up root is ready, the copy on the phone goes whenever nobody is signed in. Not before:
-        // the update gate reads config/app (M1-82) through the Firestore instance that a clear terminates.
+        // the update gate reads config/app (M1-82) through the Firestore instance that a clear terminates. Only that
+        // first read is ordered: a later one (back in the app after 5 s or more) can meet the clear of Firebase's own
+        // sign-out, and the root keeps its screen for up to the gate's 5 s limit.
         lifecycleScope.launch {
             start.uiState.first { it is StartUiState.Ready }
             signedOutCleanup.start()
