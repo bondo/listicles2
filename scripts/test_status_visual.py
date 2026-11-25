@@ -150,6 +150,17 @@ class Clip(unittest.TestCase):
         self.assertEqual(status_visual.clip("a\ud800b", 20), "ab")
 
 
+class TaskIdPatterns(unittest.TestCase):
+    def test_pr_and_flag_titles_take_two_or_three_digit_task_ids(self):
+        for title, want in (("M1-99: x", "M1-99"), ("M1-100: x", "M1-100"), ("[owner] M1-999: x", "M1-999"), ("M1-O2: x", "M1-O2"), ("M1-FU: x", "M1-FU")):
+            m = status_visual.FLAG_TASK.match(title)
+            self.assertIsNotNone(m, title)
+            self.assertEqual(m.group(1), want)
+        for title in ("M1-1: x", "M1-1000: x", "M1-ABC: x", "M1-100 x"):
+            self.assertIsNone(status_visual.PR_TASK.match(title), title)
+        self.assertEqual(status_visual.PR_TASK.match("M1-100: x").group(1), "M1-100")
+
+
 class BuildModel(unittest.TestCase):
     def test_milestone_progress_counts_dropped_as_done(self):
         ms = {m["id"]: m for m in model()["milestones"]}
