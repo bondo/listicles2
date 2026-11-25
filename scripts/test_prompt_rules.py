@@ -1644,7 +1644,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_orchestrator_prompt_and_orchestration_section_5_carry_the_roles_yaml_threshold(self):
         phrase = (f"at about {self.context_value('orchestrator_handover_at_percent_1m')}% of a 1m window "
-                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k window: pr #408's scaling")
+                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k window (owner decision 7158603054")
         for path in (self.ORCH_MD, self.ORCH_DOC):
             with self.subTest(path=path.name):
                 text = self.norm(path)
@@ -1654,7 +1654,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
     def test_the_bootstrap_prompt_states_threshold_and_depth_rule(self):
         boot = self.norm(self.ORCH_DOC).split("### 8.1 orchestrator bootstrap", 1)[1].split("### 8.2", 1)[0]
         big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
-        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k window: pr #408's scaling", boot)
+        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k window (owner decision 7158603054", boot)
         self.assertRegex(boot, r"lineage depth (?:is )?6 or more.{0,80}the owner starts the next orchestrator")
 
     def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):
@@ -3245,7 +3245,7 @@ class TokenSavingsTests(unittest.TestCase):
     """
 
     ORCH, ROLES_YAML, M1 = "docs/ORCHESTRATION.md", "agents/roles.yaml", "docs/milestones/M1.md"
-    P200 = "30% of a 200k window: pr #408's scaling (scaled to 26, set to 30), pending owner confirmation (not part of 7153510972)"  # R1-05, R2-03 of #408
+    P200 = "25% of a 200k window (owner decision 7158603054 item 2)"  # answers the open 200k question of #408 (R1-05, R2-03)
     PINNED = (
         (ROLES_YAML, "the first reviewer of a pr labelled area:security-rules or area:sync-merge"),
         (ROLES_YAML, "a risk:high implementer runs at high effort, not max"),
@@ -3253,7 +3253,9 @@ class TokenSavingsTests(unittest.TestCase):
         (ROLES_YAML, "up to about 150 changed lines when they touch only tests or docs"),
         (ROLES_YAML, "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
         (ROLES_YAML, P200),
-        (ROLES_YAML, "the first reviewer (the primary reviewer, not the second reviewer) in every round"),
+        (ROLES_YAML, "the first reviewer (the primary reviewer, not the second reviewer) in every round (owner decision 7158603054 item 1)"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_200k: 25"),
+        (ORCH, "the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)"),
         (M1, "max only for the first reviewer of an `area:security-rules` or `area:sync-merge` pr"),
         (ROLES_YAML, "implementer_handoff_at_percent: 30"),
         (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
@@ -3299,6 +3301,10 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "at the first merge request after 00:00 UTC, i.e. the orchestrator's first check-in of the UTC day"),
         (ORCH, "this PR's scaling, pending owner confirmation"),
         ("orchestrator", "this PR's scaling, pending owner confirmation"),
+        (ORCH, "30% of a 200k window: PR #408's scaling (scaled to 26, set to 30), pending owner confirmation"),
+        ("orchestrator", "30% of a 200k window: PR #408's scaling (scaled to 26, set to 30), pending owner confirmation"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_200k: 30"),
+        (ORCH, "(30% of a 200k one"),
         (M1, "implementer and reviewer at high effort, both at max for `risk:high`"),
         ("reviewer", "every other reviewer and every later round runs at high"),
         ("orchestrator", "after the daily pacing recompute"),
