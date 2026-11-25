@@ -3243,5 +3243,87 @@ class TallyNamesTests(unittest.TestCase):
         self.assertEqual(self.KEPT.sub("", "Set LISTICLES_TASK=tooling; match `listicles:*`").lower().count("listicles"), 0)
 
 
+class TokenSavingsTests(unittest.TestCase):
+    """Owner decision 7153510972 (state issue #399), items 1-5 and the doc of item 6: effort, implementer context, PR size, re-check, merge agent.
+
+    Each phrase must be in the real file and pinned by a `token-savings-*` rule (deleting it fails the checker); the replaced wording must be rejected.
+    """
+
+    ORCH, ROLES_YAML = "docs/ORCHESTRATION.md", "agents/roles.yaml"
+    PINNED = (
+        (ROLES_YAML, "the first reviewer of a pr labelled area:security-rules or area:sync-merge"),
+        (ROLES_YAML, "a risk:high implementer runs at high effort, not max"),
+        (ROLES_YAML, "for security-rules, sync-merge and release prs"),
+        (ROLES_YAML, "up to about 150 changed lines when they touch only tests or docs"),
+        (ROLES_YAML, "a fresh merge agent once a day"),
+        (ROLES_YAML, "implementer_handoff_at_percent: 30"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
+        (ORCH, "opus / high (max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`)"),
+        (ORCH, "the implementer runs at high effort, not max"),
+        (ORCH, "a pr in the security-rules, sync-merge or release area also needs a clean independent second-reviewer pass"),
+        (ORCH, "the second reviewer runs at high effort"),
+        (ORCH, "about 30 changed lines or fewer in total, or up to about 150 when they touch only tests or docs"),
+        (ORCH, "an implementer hands off at about 30% context"),
+        (ORCH, "a fix round goes to a fresh implementer"),
+        (ORCH, "a pr above 500 counted lines is split before its first review round"),
+        (ORCH, "a fresh merge agent once a day, at the first merge request after the daily pacing recompute"),
+        (ORCH, "trigger: about 35% of a 1m window"),
+        (ORCH, "hand over at about 35% of a 1m window (30% of a 200k one)"),
+        (ORCH, "### 8.6 merge agent"),
+        (ORCH, "tags `role:merge-agent`, `tally:process`"),
+        ("implementer", "hand off at about 30% context"),
+        ("implementer", "a pr above 500 counted lines is split before its first review round"),
+        ("reviewer", "max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`"),
+        ("second-reviewer", "opus, high effort, per `agents/roles.yaml`"),
+        ("planner", "plan prs at about 400 counted lines; a pr above 500 is split before its first review round"),
+        ("orchestrator", "at about 35% of a 1m window (30% of a 200k one"),
+        ("orchestrator", "a fresh merge agent once a day"),
+    )
+    STALE = (
+        (ORCH, "Opus / high (max for `risk:high`) or Sonnet"),
+        (ORCH, "they still get max effort, a second reviewer every round"),
+        (ORCH, "a second reviewer runs at max effort for `risk:high` and `area:security-rules` PRs"),
+        (ORCH, "Trigger: about 50% of a 1M window (40% of a 200k one)"),
+        (ROLES_YAML, "second-reviewer: model: opus effort: max"),
+        ("reviewer", "Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`"),
+        ("second-reviewer", "Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`"),
+        ("implementer", "max for risk:high PRs"),
+        ("orchestrator", "a second reviewer every round"),
+        ("orchestrator", "at max effort for `risk:high` and security-rules"),
+        ("orchestrator", "at about 50% of a 1M window (40% of a 200k one"),
+    )
+
+    def text(self, key):
+        path = ROOT / key if "/" in key else PROMPTS / f"{key}.md"
+        return path.read_text(encoding="utf-8")
+
+    def problems(self, key, text):
+        found = prompt_rules.check_doc_text(key, text) if "/" in key else prompt_rules.check_text(key, text)
+        return [p for p in found if p.startswith("token-savings")]
+
+    def test_the_real_files_carry_every_phrase(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase):
+                self.assertIn(phrase, prompt_rules.normalize(self.text(key)).lower())
+
+    def test_the_real_files_pass_the_token_savings_rules(self):
+        for key in sorted({k for k, _ in self.PINNED}):
+            with self.subTest(key=key):
+                self.assertEqual(self.problems(key, self.text(key)), [])
+
+    def test_deleting_any_phrase_fails_a_token_savings_rule(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase):
+                norm = prompt_rules.normalize(self.text(key))
+                cut = re.sub(re.escape(phrase), " ", norm, flags=re.I)
+                self.assertNotEqual(cut, norm)
+                self.assertTrue(self.problems(key, cut))
+
+    def test_the_replaced_wording_is_rejected(self):
+        for key, old in self.STALE:
+            with self.subTest(key=key, old=old):
+                self.assertTrue(self.problems(key, self.text(key) + "\n\n" + old + "\n"))
+
+
 if __name__ == "__main__":
     unittest.main()
