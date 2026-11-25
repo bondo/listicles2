@@ -7,6 +7,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dk.bjarkebjarke.tally.data.config.FirestoreMinVersionRemote
+import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.config.MinVersionGate
 import dk.bjarkebjarke.tally.domain.config.MinVersionRemote
 import dk.bjarkebjarke.tally.domain.config.MinVersionStore
@@ -21,18 +23,14 @@ import kotlinx.coroutines.flow.flowOf
 /**
  * Stand-in bindings for the start-up gates (P10) until their tasks implement them: no update is required, the email is
  * verified, the name is saved and there is no notice, so every gate passes. Each task replaces its own provider:
- * update M1-27 (gate done, Firestore source pending), email verified M1-15, name M1-39, notices M1-18.
+ * update M1-27 and M1-82 (done), email verified M1-15, name M1-39, notices M1-18.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object GateModule {
-    /**
-     * M1-27: the gate reads `config/app` through [MinVersionRemote]. Until the app depends on `:core:data` (M1-82, its
-     * Firestore source needs the licensee terms the owner approves) the remote has no answer, so with no remembered
-     * minimum the gate fails open and nothing blocks the start.
-     */
+    /** M1-82: the gate reads `config/app.minVersionCode` through the app's one [FirestoreSession], signed out. */
     @Provides
-    fun minVersionRemote(): MinVersionRemote = MinVersionRemote { Result.success(null) }
+    fun minVersionRemote(session: FirestoreSession): MinVersionRemote = FirestoreMinVersionRemote(session)
 
     @Provides
     fun minVersionStore(

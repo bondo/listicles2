@@ -155,7 +155,7 @@ describe("Transfer ownership (one batch)", () => {
         await assertFails(transfer(bob.verified, b));
     });
 
-    // LIVE (PLAN 3.1): under a tombstone only the owner's cleanup and the P6 delete write (M1-11).
+    // LIVE (PLAN 3.1): under a tombstone only the owner's cleanup and the P6 delete write (M1-95).
     test("denied: the owner's batch under a tombstone", async () => {
         await assertFails(transfer(bob.verified, { hid: TOMB }));
     });

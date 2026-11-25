@@ -139,6 +139,11 @@ class TestsAreWired(unittest.TestCase):
     def test_verify_runs_the_hook_tests(self):
         self.assertIn("scripts/hooks/run_hook_tests.py", read("scripts", "verify.sh"))
 
+    def test_verify_logs_go_to_tally_verify(self):
+        """M1-91: the step logs (the `full log:` path a failing step prints) live in $TMPDIR/tally-verify."""
+        dirs = re.findall(r'^LOG_DIR="\$\{TMPDIR:-/tmp\}/([^"]+)"$', read("scripts", "verify.sh"), re.M)
+        self.assertEqual(dirs, ["tally-verify"])
+
     def test_pre_push_uses_the_scope_script_and_runs_hook_tests(self):
         hook = read(".githooks", "pre-push")
         self.assertIn("prepush_scope.py", hook)
@@ -217,9 +222,9 @@ class RolesYaml(unittest.TestCase):
         for name, role in roles_file()["roles"].items():
             self.assertNotIn("token_budget", role, name)
 
-    def test_risk_high_raises_implementer_effort_to_max(self):
+    def test_a_risk_high_implementer_runs_at_high_not_max(self):  # owner decision 7153510972 item 1, replaces max for risk:high
         impl = roles_file()["roles"]["implementer"]
-        self.assertEqual(impl["max_effort_when"], ["the PR is tagged risk:high in the milestone doc"])
+        self.assertNotIn("max_effort_when", impl)
         self.assertNotIn("high_effort_when", impl)  # high is the default now; an agent may ask for more in its WORKER-RESULT
 
     @staticmethod
@@ -233,18 +238,18 @@ class RolesYaml(unittest.TestCase):
         return found
 
     def test_a_security_rules_pr_without_risk_high_gets_a_max_effort_reviewer(self):  # owner decision, #134 comment 6989468926
-        self.assertEqual(self.max_effort_roles(["area:security-rules"]), {"reviewer", "second-reviewer"})  # the second one: #15 comment 7123360368
-        self.assertEqual(self.max_effort_roles(["area:sync-merge"]), {"reviewer"})  # no approver delegation there: not raised for the second reviewer
+        self.assertEqual(self.max_effort_roles(["area:security-rules"]), {"reviewer"})  # the first reviewer only; the second runs at high (7153510972)
+        self.assertEqual(self.max_effort_roles(["area:sync-merge"]), {"reviewer"})
 
-    def test_risk_high_still_raises_the_reviewer_and_the_implementer_to_max(self):
-        self.assertEqual(self.max_effort_roles(["risk:high"]), {"implementer", "reviewer", "second-reviewer"})
-        self.assertEqual(self.max_effort_roles(["area:security-rules", "risk:high"]), {"implementer", "reviewer", "second-reviewer"})
+    def test_risk_high_alone_raises_no_role_to_max(self):  # owner decision 7153510972 item 1
+        self.assertEqual(self.max_effort_roles(["risk:high"]), set())
+        self.assertEqual(self.max_effort_roles(["area:security-rules", "risk:high"]), {"reviewer"})
 
     def test_a_plain_pr_gets_no_max_effort_role(self):
         for labels in ([], ["area:ui"], ["area:release"], ["area:process"], ["area:security-rules-docs"], ["area:sync-merge-ui"]):
             self.assertEqual(self.max_effort_roles(labels), set(), labels)
 
-    def test_the_security_rules_label_raises_only_the_reviewer_and_the_second_reviewer(self):
+    def test_the_security_rules_label_raises_only_the_reviewer(self):
         for role in ("implementer", "planner", "design-reviewer"):
             self.assertNotIn(role, self.max_effort_roles(["area:security-rules", "area:sync-merge"]), role)
         self.assertNotIn("second-reviewer", self.max_effort_roles(["area:sync-merge", "area:release"]))
@@ -252,22 +257,22 @@ class RolesYaml(unittest.TestCase):
     def test_the_process_docs_state_the_same_reviewer_rule(self):
         for path in (("docs", "ORCHESTRATION.md"), ("docs", "PLAN.md")):
             row = next(line for line in read(*path).splitlines() if line.startswith("| **Reviewer**"))
-            for needle in ("risk:high", "area:security-rules", "area:sync-merge"):
+            for needle in ("first reviewer", "area:security-rules", "area:sync-merge"):
                 self.assertIn(needle, row, f"{'/'.join(path)}: {needle}")
+            self.assertNotIn("max for `risk:high`", row, f"{'/'.join(path)}: the old max-for-risk:high rule")
 
     @staticmethod
-    def second_reviewer_row_names_the_max_cases(row):
-        """The PLAN role-table row of the second reviewer carries the roles.yaml max cases (risk:high, area:security-rules), and not sync-merge's."""
-        cases = row.split("max for", 1)[1] if "max for" in row else ""
-        return "risk:high" in cases and "area:security-rules" in cases and "sync-merge" not in row
+    def second_reviewer_row_is_high_in_three_areas(row):
+        """The PLAN role-table row of the second reviewer: high effort (no max) and only the security-rules, sync-merge and release areas."""
+        return "max" not in row.split("|")[2] and all(area in row for area in ("security-rules", "sync-merge", "release")) and "risk:high" not in row
 
-    def test_the_plan_role_table_gives_the_second_reviewer_the_roles_yaml_max_cases(self):  # R2-01 of #385, owner decision #15 comment 7123360368
+    def test_the_plan_role_table_gives_the_second_reviewer_high_effort_in_three_areas(self):  # owner decision 7153510972 item 1
         row = next(line for line in read("docs", "PLAN.md").splitlines() if line.startswith("| **Second reviewer**"))
-        self.assertTrue(self.second_reviewer_row_names_the_max_cases(row), row)
-        for stale in ("| **Second reviewer** | Opus / high | Fresh session in the same round |",  # the row before the decision
-                      "| **Second reviewer** | Opus / high (max for `risk:high` and `area:sync-merge`) | x |",  # the wrong case
-                      "| **Second reviewer** | Opus / high (max for `risk:high`) | x |"):  # security-rules missing
-            self.assertFalse(self.second_reviewer_row_names_the_max_cases(stale), stale)
+        self.assertTrue(self.second_reviewer_row_is_high_in_three_areas(row), row)
+        for stale in ("| **Second reviewer** | Opus / high (max for `risk:high` and `area:security-rules`) | x security-rules sync-merge release |",
+                      "| **Second reviewer** | Opus / high | for `risk:high` and the protected areas |",
+                      "| **Second reviewer** | Opus / high | security-rules and sync-merge only |"):
+            self.assertFalse(self.second_reviewer_row_is_high_in_three_areas(stale), stale)
 
     def test_fallback_set_keeps_the_pre_pilot_values(self):
         fallback = roles_file()["fallback"]
