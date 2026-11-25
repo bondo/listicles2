@@ -2064,10 +2064,11 @@ notes = "Found in PR 384 (M1-84) review rounds 1 to 3: check 4 of scripts/check_
 id = "M1-O17"
 title = "Owner: add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-91"]
+issue = 392
 notes = "Step 2 of the LISTICLES_TASK transition, after M1-91 merges. Environment settings for Tally tooling (env_0129uioPQNmr2zrhgxpqMdhG): add TALLY_TASK=tooling, keep LISTICLES_TASK=tooling (tooling branches older than M1-91 read only the old name). Then the orchestrator runs the 7.1 smoke task on Tally tooling (fresh session: TALLY_TASK is set; the PreToolUse guard reports a Write to CLAUDE.md as allowed, without writing it; verify.sh --fast passes). Running sessions keep their old variables until restart; both names work meanwhile"
 
 [[task]]
