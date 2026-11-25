@@ -377,7 +377,7 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
 
 ## 5. Orchestrator handover
 
-Trigger: about 35% of a 1M window (30% of a 200k window: PR #408's scaling (scaled to 26, set to 30), pending owner confirmation (not part of 7153510972); `agents/roles.yaml` context, #15 comment 7001335975; 35% by owner decision 7153510972 item 6, written here as the orchestrator's own practice). This is earlier than the hook stages every session gets (60% / 80%); until the hard stage, the orchestrator follows this section, not the soft reminder. (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
+Trigger: about 35% of a 1M window (25% of a 200k window (owner decision 7158603054 item 2); `agents/roles.yaml` context, #15 comment 7001335975; 35% by owner decision 7153510972 item 6, written here as the orchestrator's own practice). This is earlier than the hook stages every session gets (60% / 80%); until the hard stage, the orchestrator follows this section, not the soft reminder. (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
 or the status line), at the first **batch boundary** (if none comes before the hard stage, at the next step boundary) rather than mid-batch.
 `used_tokens` can read 0 while a turn is running, so read it at the start of a wake and treat 0 as
 **unknown**, not as "plenty left". When it is unknown, hand over at the first batch boundary after about
@@ -642,7 +642,7 @@ The one home of these rules; `REVIEW.md`, `agents/roles.yaml` and the orchestrat
 1. **Nits are accepted without a round.** A review with verdict `ready_nits_only` goes to the merge request (§7.5). Its nits are recorded as accepted in the PR review table and the round row: no fix round, no re-review, no follow-up issue.
 2. **A small fix is re-checked cheaply.** A re-check of a small fix-only or docs-only commit (the fixes of the previous round's findings, about 30 changed lines or fewer in total, or up to about 150 when they touch only tests or docs; owner decision 7153510972, item 4) is the delta review of §7.2, with its inputs, done by a fresh Sonnet medium reviewer (`recheck-reviewer` in `agents/roles.yaml`), focused on those findings. Full rounds stay Opus at the effort `agents/roles.yaml` gives the reviewer.
 3. **Guard and prompt_rules hardening PRs stop early.** On a PR that hardens `scripts/guards.sh`, `scripts/hooks/pretooluse_guard.py` or `scripts/prompt_rules.py`, the second round that finds new bypass forms ends the PR. The forms are recorded as accepted residuals in the PR body (the hook is a tripwire, F18) and the PR goes to the merge request.
-4. **Reviewer effort** is strictly per `agents/roles.yaml`, which owns the rule: max effort only for the first reviewer of a PR labelled `area:security-rules` or `area:sync-merge`, high for every other reviewer, and the second reviewer (only on security-rules, sync-merge and release PRs) at high (owner decision 7153510972, item 1). The metrics row per archived session is §6.1.
+4. **Reviewer effort** is strictly per `agents/roles.yaml`, which owns the rule: max effort only for the first reviewer of a PR labelled `area:security-rules` or `area:sync-merge` (the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)), high for every other reviewer, and the second reviewer (only on security-rules, sync-merge and release PRs) at high (owner decision 7153510972, item 1). The metrics row per archived session is §6.1.
 
 ### 7.3 Results
 
@@ -914,7 +914,7 @@ commit or push. Read docs/ORCHESTRATION.md, then state issue #{state_issue} (bod
 since the last "handover"). Do §5.2 (incoming checklist) first, including the ready query (§4.3),
 then continue from the block's `next`. If the lock was not released to you or there is no handover comment, follow §5.3.
 Follow §1.1 (autonomy: what you may do unasked, what you must ask the owner). Predecessor: {session_id}.
-Hand over at about 35% of a 1M window (30% of a 200k window: PR #408's scaling (scaled to 26, set to 30), pending owner confirmation (not part of 7153510972)), §5. At lineage depth 6 or more the owner starts the next orchestrator (§5.1 step 5, §9 F3).
+Hand over at about 35% of a 1M window (25% of a 200k window (owner decision 7158603054 item 2)), §5. At lineage depth 6 or more the owner starts the next orchestrator (§5.1 step 5, §9 F3).
 Repo access and worker-prompt recipes: §7.8.
 ```
 
