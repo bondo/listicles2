@@ -1644,7 +1644,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_orchestrator_prompt_and_orchestration_section_5_carry_the_roles_yaml_threshold(self):
         phrase = (f"at about {self.context_value('orchestrator_handover_at_percent_1m')}% of a 1m window "
-                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k one")
+                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k window: this pr's scaling")
         for path in (self.ORCH_MD, self.ORCH_DOC):
             with self.subTest(path=path.name):
                 text = self.norm(path)
@@ -1654,7 +1654,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
     def test_the_bootstrap_prompt_states_threshold_and_depth_rule(self):
         boot = self.norm(self.ORCH_DOC).split("### 8.1 orchestrator bootstrap", 1)[1].split("### 8.2", 1)[0]
         big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
-        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k one)", boot)
+        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k window: this pr's scaling", boot)
         self.assertRegex(boot, r"lineage depth (?:is )?6 or more.{0,80}the owner starts the next orchestrator")
 
     def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):

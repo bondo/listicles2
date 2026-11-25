@@ -3,7 +3,7 @@ Agent Usage Redesign PR 2: plan review, self-review, finding verification, secon
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
 docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md,
-docs/reviews/collaborator-workflow.md, agents/roles.yaml and handoff/TEMPLATE.md).
+docs/reviews/collaborator-workflow.md, docs/milestones/M1.md, agents/roles.yaml and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
