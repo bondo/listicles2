@@ -3244,13 +3244,17 @@ class TokenSavingsTests(unittest.TestCase):
     Each phrase must be in the real file and pinned by a `token-savings-*` rule (deleting it fails the checker); the replaced wording must be rejected.
     """
 
-    ORCH, ROLES_YAML = "docs/ORCHESTRATION.md", "agents/roles.yaml"
+    ORCH, ROLES_YAML, M1 = "docs/ORCHESTRATION.md", "agents/roles.yaml", "docs/milestones/M1.md"
+    P200 = "30% of a 200k window: this pr's scaling, pending owner confirmation (not part of 7153510972)"  # round 1 R1-05 of #408
     PINNED = (
         (ROLES_YAML, "the first reviewer of a pr labelled area:security-rules or area:sync-merge"),
         (ROLES_YAML, "a risk:high implementer runs at high effort, not max"),
         (ROLES_YAML, "for security-rules, sync-merge and release prs"),
         (ROLES_YAML, "up to about 150 changed lines when they touch only tests or docs"),
-        (ROLES_YAML, "a fresh merge agent once a day"),
+        (ROLES_YAML, "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
+        (ROLES_YAML, P200),
+        (ROLES_YAML, "the first reviewer (the primary reviewer, not the second reviewer) in every round"),
+        (M1, "max only for the first reviewer of an `area:security-rules` or `area:sync-merge` pr"),
         (ROLES_YAML, "implementer_handoff_at_percent: 30"),
         (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
         (ORCH, "opus / high (max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`)"),
@@ -3261,18 +3265,23 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "an implementer hands off at about 30% context"),
         (ORCH, "a fix round goes to a fresh implementer"),
         (ORCH, "a pr above 500 counted lines is split before its first review round"),
-        (ORCH, "a fresh merge agent once a day, at the first merge request after the daily pacing recompute"),
-        (ORCH, "trigger: about 35% of a 1m window"),
-        (ORCH, "hand over at about 35% of a 1m window (30% of a 200k one)"),
+        (ORCH, "a fresh merge agent once a day, at the first merge request after 00:00 utc, i.e. the orchestrator's first check-in of the utc day"),
+        (ORCH, "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
+        (ORCH, "the merge-agent row's `spawned-at` records the rotation time"),
+        (ORCH, "check that the state issue body names you as active before your first merge"),
+        (ORCH, "trigger: about 35% of a 1m window (" + P200),
+        (ORCH, "hand over at about 35% of a 1m window (" + P200),
         (ORCH, "### 8.6 merge agent"),
         (ORCH, "tags `role:merge-agent`, `tally:process`"),
         ("implementer", "hand off at about 30% context"),
         ("implementer", "a pr above 500 counted lines is split before its first review round"),
-        ("reviewer", "max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`"),
+        ("reviewer", "max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`, in every round"),
         ("second-reviewer", "opus, high effort, per `agents/roles.yaml`"),
         ("planner", "plan prs at about 400 counted lines; a pr above 500 is split before its first review round"),
-        ("orchestrator", "at about 35% of a 1m window (30% of a 200k one"),
-        ("orchestrator", "a fresh merge agent once a day"),
+        ("orchestrator", "at about 35% of a 1m window (" + P200),
+        ("orchestrator", "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
+        ("orchestrator", "up to about 150 changed lines when they touch only tests or docs"),
+        ("orchestrator", "a fresh implementer from `handoff/<branch>.md` when the running one is above 30% context"),
     )
     STALE = (
         (ORCH, "Opus / high (max for `risk:high`) or Sonnet"),
@@ -3280,6 +3289,11 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "a second reviewer runs at max effort for `risk:high` and `area:security-rules` PRs"),
         (ORCH, "Trigger: about 50% of a 1M window (40% of a 200k one)"),
         (ROLES_YAML, "second-reviewer: model: opus effort: max"),
+        (ROLES_YAML, "every other reviewer and every later round runs at high"),
+        (ORCH, "after the daily pacing recompute"),
+        (M1, "implementer and reviewer at high effort, both at max for `risk:high`"),
+        ("reviewer", "every other reviewer and every later round runs at high"),
+        ("orchestrator", "after the daily pacing recompute"),
         ("reviewer", "Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`"),
         ("second-reviewer", "Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`"),
         ("implementer", "max for risk:high PRs"),
