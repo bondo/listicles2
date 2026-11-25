@@ -3238,6 +3238,72 @@ class TallyNamesTests(unittest.TestCase):
         self.assertEqual(self.KEPT.sub("", "Set LISTICLES_TASK=tooling; match `listicles:*`").lower().count("listicles"), 0)
 
 
+class HandoverMessageTests(unittest.TestCase):
+    """M1-97, owner decisions on #373: 7136480651 (the incoming orchestrator messages the outgoing one once its `handover-ack` is posted)
+    and 7136535861 (the outgoing one's last action, after `handover-released`, is a message naming that comment id to the incoming one).
+    The scheduled 5-minute checks stay the fallback in both directions."""
+
+    DOC_RULE = "orch-handover-messages"
+    PROMPT_RULE = "handover-messages"
+    DOC = "docs/ORCHESTRATION.md"
+
+    def doc(self):
+        return (ROOT / self.DOC).read_text(encoding="utf-8")
+
+    def test_both_rules_exist_with_patterns_for_both_decisions(self):
+        prompt = next((r for r in prompt_rules.RULES if r.id == self.PROMPT_RULE), None)
+        doc = next((r for r in prompt_rules.DOC_RULES if r.id == self.DOC_RULE), None)
+        self.assertIsNotNone(prompt, self.PROMPT_RULE)
+        self.assertIsNotNone(doc, self.DOC_RULE)
+        self.assertEqual(prompt.roles, ("orchestrator",))
+        self.assertEqual(doc.path, self.DOC)
+        for rule in (prompt, doc):
+            joined = " ".join(rule.patterns)
+            for needle in ("7136480651", "7136535861", "send_message", "handover-released", "fallback", "5-minute"):
+                self.assertIn(needle, joined, f"{rule.id} does not pin {needle}")
+        self.assertIn("handover-ack", " ".join(prompt.patterns))  # the prompt names the comment; the doc says "the ack" (its step 4 names the comment)
+
+    def test_the_real_files_pass_both_rules(self):
+        self.assertNotIn(self.PROMPT_RULE, ids(prompt_rules.check_text("orchestrator", real("orchestrator"))))
+        self.assertNotIn(self.DOC_RULE, ids(prompt_rules.check_doc_text(self.DOC, self.doc())))
+
+    def test_deleting_any_pinned_clause_fails_its_rule(self):  # negative cases: every pattern matters
+        prompt_rule = next(r for r in prompt_rules.RULES if r.id == self.PROMPT_RULE)
+        doc_rule = next(r for r in prompt_rules.DOC_RULES if r.id == self.DOC_RULE)
+        prompt_norm = prompt_rules.normalize(real("orchestrator"))
+        doc_norm = prompt_rules.normalize(self.doc())
+        for i, pattern in enumerate(prompt_rule.patterns):
+            with self.subTest(rule=prompt_rule.id, pattern=i):
+                cut, n = re.subn(pattern, "", prompt_norm, flags=re.I)
+                self.assertTrue(n)
+                self.assertIn(self.PROMPT_RULE, ids(prompt_rules.check_text("orchestrator", cut)))
+        for i, pattern in enumerate(doc_rule.patterns):
+            with self.subTest(rule=doc_rule.id, pattern=i):
+                cut, n = re.subn(pattern, "", doc_norm, flags=re.I)
+                self.assertTrue(n)
+                self.assertIn(self.DOC_RULE, ids(prompt_rules.check_doc_text(self.DOC, cut)))
+
+    def test_the_scheduled_checks_stay_the_fallback_in_both_directions(self):
+        text = prompt_rules.normalize(self.doc()).lower()
+        s51 = text.split("### 5.1", 1)[1].split("### 5.2", 1)[0]
+        s52 = text.split("### 5.2", 1)[1].split("### 5.3", 1)[0]
+        self.assertRegex(s51, r"send_later.{0,300}fallback|fallback.{0,300}send_later|5-minute checks stay the fallback")
+        self.assertRegex(s52, r"5-minute .{0,40}stay the fallback")
+
+    def test_step_orders_in_5_1_and_5_2(self):
+        text = prompt_rules.normalize(self.doc()).lower()
+        s51 = text.split("### 5.1", 1)[1].split("### 5.2", 1)[0]
+        s52 = text.split("### 5.2", 1)[1].split("### 5.3", 1)[0]
+        # the outgoing orchestrator's last action is the message, after the release comment; it never messages workers
+        self.assertRegex(s51, r"post `handover-released`.{0,400}last action.{0,200}`send_message`.{0,200}`handover-released` comment id")
+        # the incoming one messages the outgoing one right after posting its ack
+        self.assertRegex(s52, r"post `handover-ack`.{0,600}`send_message` the outgoing orchestrator.{0,200}check.{0,60}now")
+
+    def test_a_message_never_replaces_the_comment(self):  # the message only prompts a look; the lock rules read the comments
+        text = prompt_rules.normalize(self.doc()).lower()
+        self.assertRegex(text, r"a message only prompts the check: .{0,120}comment")
+
+
 class TokenSavingsTests(unittest.TestCase):
     """Owner decision 7153510972 (state issue #399), items 1-5 and the doc of item 6: effort, implementer context, PR size, re-check, merge agent.
 
