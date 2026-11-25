@@ -12,6 +12,7 @@ import dagger.hilt.android.testing.HiltTestApplication
 import dagger.hilt.android.testing.UninstallModules
 import dk.bjarkebjarke.tally.MainActivity
 import dk.bjarkebjarke.tally.R
+import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.session.SessionModule
 import dk.bjarkebjarke.tally.session.StartedActivity
@@ -45,6 +46,11 @@ class SignedOutStartTest {
     @BindValue
     @JvmField
     val session: SessionState = FakeSessionState(signedIn = false)
+
+    /** The update gate's remote reads through it; no Firebase app here, so it fails and the gate fails open. */
+    @BindValue
+    @JvmField
+    val firestoreSession: FirestoreSession = FirestoreSession()
 
     @Inject
     lateinit var startedActivity: StartedActivity
