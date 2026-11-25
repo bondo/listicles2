@@ -101,30 +101,52 @@ object FirebaseEmulator {
         putRules(assets.open(RULES_FILE).bufferedReader().use { it.readText() })
     }
 
-    private fun putRules(rules: String) {
-        val body =
-            org.json.JSONObject().put(
-                "rules",
-                org.json.JSONObject().put("files", org.json.JSONArray().put(file(rules))),
-            )
-        val url = URL("http://$HOST:$FIRESTORE_PORT/emulator/v1/projects/$PROJECT_ID:securityRules")
+    /**
+     * Disables [uid]'s account, as an administrator would (the Auth emulator takes the token `owner` as admin access).
+     * The session on the phone lasts until Firebase next refreshes its token, which the emulator then refuses
+     * (`USER_DISABLED`).
+     */
+    fun disableUser(uid: String) =
+        send(
+            "POST",
+            URL("http://$HOST:$AUTH_PORT/identitytoolkit.googleapis.com/v1/projects/$PROJECT_ID/accounts:update"),
+            JSONObject().put("localId", uid).put("disableUser", true),
+            "Disabling the user",
+            authorization = "Bearer owner",
+        )
+
+    private fun putRules(rules: String) =
+        send(
+            "PUT",
+            URL("http://$HOST:$FIRESTORE_PORT/emulator/v1/projects/$PROJECT_ID:securityRules"),
+            JSONObject().put("rules", JSONObject().put("files", JSONArray().put(file(rules)))),
+            "Loading rules",
+        )
+
+    private fun send(
+        method: String,
+        url: URL,
+        body: JSONObject,
+        what: String,
+        authorization: String? = null,
+    ) {
         val connection = url.openConnection() as HttpURLConnection
         try {
-            connection.requestMethod = "PUT"
+            connection.requestMethod = method
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
+            authorization?.let { connection.setRequestProperty("Authorization", it) }
             connection.outputStream.use { it.write(body.toString().toByteArray()) }
-            check(
-                connection.responseCode == HttpURLConnection.HTTP_OK,
-            ) { "Loading rules failed: HTTP ${connection.responseCode}" }
+            check(connection.responseCode == HttpURLConnection.HTTP_OK) {
+                "$what failed: HTTP ${connection.responseCode}"
+            }
         } finally {
             connection.disconnect()
         }
     }
 
     private fun file(rules: String) =
-        org.json
-            .JSONObject()
+        JSONObject()
             .put("name", RULES_FILE)
             .put("content", rules)
 }

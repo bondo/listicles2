@@ -1006,11 +1006,12 @@ notes = "Found in M1-71: runopt reads jest, vitest and mocha only. A direct play
 id = "M1-82"
 title = "Firestore source for the minimum app version: config/app.minVersionCode bound in GateModule"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-27", "M1-88"]
-notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee) and the app's one FirestoreSession in the Hilt graph (M1-88)"
+notes = "Split from M1-27. A MinVersionRemote in :core:data reading config/app.minVersionCode with get() (a missing document or field is Result.success(null); any failure is Result.failure, never a throw), emulator test against the project rules (signed out read allowed), and the GateModule binding in :app replacing the stand-in Result.success(null). Needs :app on :core:data (M1-66, licensee) and the app's one FirestoreSession in the Hilt graph (M1-88). The read is signed out, before sign-in, through that FirestoreSession, whose instance a clear terminates: M1-89 starts its signed-out cleanup only once the start-up root is ready, so a start's clear never cuts that read (PR 398, R1-01). Only that first read is ordered: a later read (back in the app after 5 s or more) can meet the clear of Firebase's own sign-out, and the root then keeps its screen for up to the gate's 5 s limit (PR 398, S2-01; a follow-up decides the fix)"
+pr = 391
 
 [[task]]
 id = "M1-13"
@@ -1071,10 +1072,11 @@ notes = "Split from M1-66 (PR 368; a compiled, tested draft is its comment 71190
 id = "M1-89"
 title = "Clear the local data on every change to signed out, also when Firebase signs the user out itself (#357)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-88"]
+pr = 398
 notes = "Split from M1-66 (PR 368). Burns down #357 (PR 348 S1-01, owner-ok): clear the local data on every change to signed out, also one Firebase starts by itself after a refused token refresh (until then the copy stays, and the next account that signs in on that phone shares Firestore's cache), with an Auth emulator test (disable or delete the user, then the cache is gone); then drop the M1-89 to-confirm marker in docs/privacy section 2 (en and da)"
 
 [[task]]
@@ -1200,7 +1202,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60", "M1-88"]
-notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, tested; the in-app privacy link is privacy Q10"
+notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, deleted in LocalUserData.clear() so that a sign-out Firebase starts by itself clears them too (M1-89, SignedOutCleanup), tested; the in-app privacy link is privacy Q10"
 
 [[task]]
 id = "M1-26"
@@ -1589,11 +1591,12 @@ notes = "Split from M1-46. Each convention plugin registers the module's own che
 id = "M1-84"
 title = "Isolated projects: module build files read the root through isolated.rootProject, check 4 denies other rootProject/parent reads"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-68"]
-notes = "Found in the M1-68 part B3 self-review. Isolated projects rejects rootProject.<member> reads: rootProject.file in app/build.gradle.kts (policy.gradle, check_test_results.py), core/data (firestore.rules) and core/domain (policy.gradle), rootProject.layout in app. Move them to isolated.rootProject.projectDirectory, then add check 4 deny cases for rootProject.<member> (not isolated.rootProject), parent, gradle.rootProject { }, a project(...) held in a variable and configure(listOf(project(...))) { } (scripts/check_build_guards.py known gaps). Tooling env, test-first with negative cases"
+pr = 384
+notes = "Found in the M1-68 part B3 self-review. Isolated projects rejects rootProject.<member> reads: rootProject.file in app/build.gradle.kts (policy.gradle, check_test_results.py), core/data (firestore.rules) and core/domain (policy.gradle), rootProject.layout in app. Move them to isolated.rootProject.projectDirectory, then add check 4 deny cases for rootProject.<member> (not isolated.rootProject), parent, gradle.rootProject { }, a project(...) held in a variable and configure(listOf(project(...))) { } (scripts/check_build_guards.py known gaps). Tooling env, test-first with negative cases. Done (PR 384): the modules and policy.gradle read through isolated.rootProject.projectDirectory; check 4 denies any other rootProject (settings: only the descriptor name/buildFileName/projectDir), gradle.projectsLoaded/projectsEvaluated, parent, and a project(...) that is not a direct argument of a statement-level dependency declaration (an allowlist)"
 
 [[task]]
 id = "M1-69"
@@ -1689,7 +1692,7 @@ risk = "normal"
 depends_on = [
   "M1-88", "M1-89", "M1-90",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
-  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-97",
+  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
@@ -2059,6 +2062,16 @@ depends_on = ["M1-O17", "M1-91", "M1-92"]
 notes = "Tooling env (CLAUDE.md, scripts/hooks/). Implementer profile Opus (guard/hook change). Step 3 of the LISTICLES_TASK transition; after M1-O17 (the tooling environment sets TALLY_TASK), else main's guard would refuse tooling sessions. Start once no tooling session spawned before M1-O17 is still running (the orchestrator checks the state body's spawn times), or restart such sessions. After M1-92 (same CLAUDE.md, ORCHESTRATION.md, orchestrator.md and prompt_rules.py). Files: scripts/hooks/pretooluse_guard.py and session_end_metrics.py read TALLY_TASK only (tests: LISTICLES_TASK=tooling alone is now not tooling); CLAUDE.md line 16, ORCHESTRATION 7.1, agents/prompts/orchestrator.md and the scripts/prompt_rules.py pin with its test name TALLY_TASK=tooling; scripts/merge_ready.py ROOT and docs/ORCHESTRATION.md 7.5 drop dev/listicles (no file is left under it since M1-55; this narrows general merges, test: a Kotlin file under dev/listicles is owner-only) with scripts/test_merge_ready.py (its REPO fixture becomes bondo/tally, the dev/listicles general-path fixtures move to dk/bjarkebjarke/tally, and the R7_RISK pin follows the 7.5 text); scripts/hooks/test_guards_sh.py fixture paths (listicles.tests.gradle.kts, dev/listicles/app). Keeps the old-slug fixtures in test_repo_slug.py, test_owner_drift_check.py and test_mark_ready.py (they test the renamed repo's old remotes). About 150 changed lines"
 
 [[task]]
+id = "M1-98"
+title = "Isolated projects in the build: try org.gradle.unsafe.isolated-projects=true and enable it once the plugins allow it"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-84"]
+notes = "Found in PR 384 (M1-84) review rounds 1 to 3: check 4 of scripts/check_build_guards.py reads text, so a Kotlin API it does not list that returns a Project passes it; Gradle's isolated projects mode rejects any cross-project access at configuration time. Spike first: run the build with -Dorg.gradle.unsafe.isolated-projects=true and list what fails (AGP, Kover's root aggregation, licensee, detekt, roborazzi, google-services, our build-logic); enable it in gradle.properties only when the whole of verify.sh passes, else record the blockers and their upstream issues here. Tooling env, test-first (a check that gradle.properties keeps it on)"
+
+[[task]]
 id = "M1-O17"
 title = "Owner: add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now)"
 milestone = "M1"
@@ -2077,3 +2090,14 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M1-94"]
 notes = "Step 4 of the LISTICLES_TASK transition, after M1-94 merges and once every open tooling branch has main with M1-91 merged in (the orchestrator checks; a fresh session on an older branch would lose tooling rights). Environment settings: remove LISTICLES_TASK from Tally tooling; optionally drop the listicles2/scripts/requirements-lint.txt fallback line from the setup scripts of Tally and Tally tooling (the checkout is tally since 2026-11-23). Then the 7.1 smoke task on Tally tooling"
+
+[[task]]
+id = "M1-96"
+title = "Tooling: Nix dev shell with the pinned firebase-tools for the rules deploy (M1-O6)"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+pr = 394
+notes = "Owner decision 7136806608 on #373, extended by the owner via the orchestrator (flakes disabled on the owner's workstation): flake.nix and shell.nix (one shell definition, `nix develop` and `nix-shell`), flake.lock pins nixpkgs (shell.nix reads it), Node from that nixpkgs, firebase-tools from firebase/package-lock.json (npm ci, no second pin). scripts/check_nix_shell.py: static check (no network) plus --live (both entry points print the lockfile's firebase-tools version), wired into verify.sh and CI. M1.md R7 gets the commands. Build files: owner-only merge, approver-eligible. Scope is firebase-tools only (no JDK or Android)"
