@@ -29,7 +29,7 @@ class SignedOutCleanup(
 
     /**
      * Watches in [externalScope], an application-wide scope, for the rest of the process. Only the first call starts
-     * it: MainActivity calls it at every creation (M1-89).
+     * it: MainActivity calls it at every creation, once its start-up root is ready (M1-89).
      */
     fun start() {
         if (started.compareAndSet(false, true)) externalScope.launch { watch() }

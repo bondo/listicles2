@@ -5,10 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
 import dk.bjarkebjarke.tally.session.StartedActivity
+import dk.bjarkebjarke.tally.start.StartUiState
 import dk.bjarkebjarke.tally.start.StartViewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -23,8 +27,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // M1-89: from the first start on, the copy on the phone goes whenever nobody is signed in.
-        signedOutCleanup.start()
+        // M1-89: once the start-up root is ready, the copy on the phone goes whenever nobody is signed in. Not before:
+        // the update gate reads config/app (M1-82) through the Firestore instance that a clear terminates.
+        lifecycleScope.launch {
+            start.uiState.first { it is StartUiState.Ready }
+            signedOutCleanup.start()
+        }
         // M1-88: Credential Manager opens Google's account picker in this activity while it is started.
         lifecycle.addObserver(startedActivity)
         enableEdgeToEdge()
