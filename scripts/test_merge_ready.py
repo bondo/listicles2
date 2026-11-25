@@ -1032,7 +1032,8 @@ def fake_merge_tree(result=TREE, calls=None, fail=None):
     return merge_tree
 
 
-def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=False, line="batch approval: "):
+def approval_comment(listed, login="bondo", assoc="OWNER", issue=None, edited=False, line="batch approval: "):
+    issue = merge_ready.STATE_ISSUE if issue is None else issue  # the current state issue, whatever the pointer says at call time
     return {"user": {"login": login}, "author_association": assoc, "issue_url": f"https://api.github.com/repos/{REPO}/issues/{issue}",
             "body": f"{line}{listed}\nThanks.", "created_at": "2026-11-19T12:00:00Z",
             "updated_at": "2026-11-19T12:05:00Z" if edited else "2026-11-19T12:00:00Z"}
@@ -1131,7 +1132,7 @@ class OwnerBatchTests(unittest.TestCase):
                  "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True), "#150": approval_comment(f"#{N}@{C1[:7]}", issue=150)}
         for name, comment in cases.items():
             with self.subTest(name):
-                self.refused(batch_api(comment=comment), r"approval comment.*(owner|#15|edited)")
+                self.refused(batch_api(comment=comment), r"approval comment.*(owner|not on the state issue #399|edited)")
 
     def test_anything_but_update_branch_merges_of_main_after_the_approved_sha_is_refused(self):
         merge = commit(M2, [M1, MAIN2], "Merge branch 'main' into x")
@@ -1255,20 +1256,20 @@ class StateIssueRotationTests(unittest.TestCase):
         self.assertTrue(prev is None or (type(prev) is int and 0 < prev != cur), prev)
         self.assertEqual(merge_ready.state_issues(), (cur,) if prev is None else (cur, prev))
 
-    def test_the_pointer_is_the_state_issue_after_the_rotation_from_15_to_373(self):  # rotation decision: #15 comment 7125300567
-        self.assertEqual((merge_ready.STATE_ISSUE, merge_ready.PREVIOUS_STATE_ISSUE), (373, 15))
-        self.assertEqual(merge_ready.state_issues(), (373, 15))
+    def test_the_pointer_is_the_state_issue_after_the_rotation_from_373_to_399(self):  # rotation decision: #373 comment 7140025416
+        self.assertEqual((merge_ready.STATE_ISSUE, merge_ready.PREVIOUS_STATE_ISSUE), (399, 373))
+        self.assertEqual(merge_ready.state_issues(), (399, 373))
 
-    def test_with_the_real_pointer_373_and_15_count_and_any_third_issue_is_refused(self):
-        for issue in (373, 15):
+    def test_with_the_real_pointer_399_and_373_count_and_any_third_issue_is_refused(self):
+        for issue in (399, 373):
             with self.subTest(issue=issue):
                 code, text, merged = self.code(approval_comment(self.OK, issue=issue))
                 self.assertEqual((code, len(merged)), (0, 1), text)
-        for issue in (16, 372, 374, 37, 3730, 1, 400):
+        for issue in (15, 16, 372, 374, 398, 400, 39, 3990, 37, 1):
             with self.subTest(refused=issue):
                 code, text, merged = self.code(approval_comment(self.OK, issue=issue))
                 self.assertEqual((code, merged), (1, []), text)
-                self.assertRegex(text, r"not on the state issue #373 or the previous state issue #15")
+                self.assertRegex(text, r"not on the state issue #399 or the previous state issue #373")
 
     def test_a_bad_pointer_refuses_every_approval(self):  # a typo in the rotation PR must fail closed, not open
         for cur, prev in ((15, 15), (0, None), (None, 15), ("15", None), (True, None), (400, "15"), (400, 0), (-1, 15)):
