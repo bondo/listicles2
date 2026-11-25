@@ -61,7 +61,7 @@ roles:
     session: fresh, one per review round
     prompt: agents/prompts/reviewer.md
     max_effort_when:
-      - the first reviewer of a PR labelled area:security-rules or area:sync-merge, even without the risk:high tag (owner decisions #134 and 7153510972; R7 in docs/reviews/README.md); every later round and every other reviewer runs at high
+      - the first reviewer of a PR labelled area:security-rules or area:sync-merge (owner decisions #134 and 7153510972; R7 in docs/reviews/README.md); every later round and every other reviewer runs at high
   # The delta review of a small fix-only or docs-only commit (ORCHESTRATION 7.2.3): the reviewer prompt, focused on the findings it is given.
   # It covers fix-only commits up to about 150 changed lines when they touch only tests or docs (owner decision 7153510972 item 4); other fix commits stay at about 30 lines.
   recheck-reviewer:
