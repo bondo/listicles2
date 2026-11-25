@@ -138,6 +138,16 @@ jobs:
       - name: rules tests (emulator, no secrets)
         working-directory: firebase
         run: npm test --silent
+      - name: Nix (release tarball, version and checksum pinned; update both by hand; M1-96)
+        run: |
+          f=nix-2.34.6-x86_64-linux
+          curl -sSfL --proto '=https' --proto-redir '=https' --retry 3 "https://releases.nixos.org/nix/nix-2.34.6/$f.tar.xz" -o "$f.tar.xz"
+          echo "311b9f406f0239ef640a1e3fbea1df1bac9d3a7c316c4def30df3206dd964960  $f.tar.xz" | sha256sum --check --status -
+          tar -xJf "$f.tar.xz"
+          sh "$f/install" --no-daemon --yes --no-channel-add
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+      - name: the Nix shell runs the firebase-tools pinned in firebase/package-lock.json, with and without flakes (M1-96)
+        run: python3 -I scripts/check_nix_shell.py --live
 
   ui:
     name: ui
@@ -342,6 +352,10 @@ jobs:
         run: python3 -I scripts/test_check_ci_hardening.py
       - name: CI hardening (job timeouts, pinned python and node, npm ci --ignore-scripts, gitleaks download, hashed pip lock; M1-44)
         run: python3 -I scripts/check_ci_hardening.py
+      - name: Nix dev shell check tests (M1-96)
+        run: python3 -I scripts/test_check_nix_shell.py
+      - name: Nix dev shell files (flake.nix, shell.nix, flake.lock) match package-lock.json and verify.sh and CI are wired (M1-96; static, no network)
+        run: python3 -I scripts/check_nix_shell.py
       - name: agent_metrics.py tests
         run: python3 -I scripts/test_agent_metrics.py
       - name: docs/agent-metrics.csv is up to date

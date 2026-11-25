@@ -5,9 +5,11 @@ rules_version = '2';
 // tombstone read. M1-10: Create household + owner and the own display name. M1-53: Transfer
 // ownership (the household update and the role update of a member doc). M1-12: the invite rows
 // (create, get, list as the owner decided on #280, revoke and expired cleanup). M1-54: Join (the
-// joiner's member doc and invite delete, in one batch with the users-doc set). Every later allow
-// statement starts `if signedIn() && ...` (rules.test.ts checks it), and its allow tests go through
-// verifiedOnly (firebase/test/harness.ts), which fails unless an unverified token is denied.
+// joiner's member doc and invite delete, in one batch with the users-doc set). M1-95, split from
+// M1-11: the soft delete, the owner's tombstone cleanup and P6 (a member's delete of their own
+// member doc under a tombstone). Every later allow statement starts `if signedIn() && ...`
+// (rules.test.ts checks it), and its allow tests go through verifiedOnly
+// (firebase/test/harness.ts), which fails unless an unverified token is denied.
 // Layout (docs/adr/0002-rules-spike.md): one allow statement per method of a match; in its function
 // the conditions that make no get()/exists() call come first, so the ADR's call counts hold.
 service cloud.firestore {
@@ -74,12 +76,38 @@ service cloud.firestore {
         || (household.deleted == true && get(userDoc(request.auth.uid)).data.householdId == hid);
     }
 
+    // The owner's tombstone cleanup (PLAN 3.1 Delete household), on the household doc a rule has
+    // read: while it is deleted, its owner (O(uid)) gets, lists and deletes what is under it, one
+    // rule per subcollection (members, removed) and the household's invites; never the household
+    // doc itself (#199). Makes no call.
+    function cleansUp(household) {
+      return household.deleted == true && household.ownerUid == request.auth.uid;
+    }
+
     // Get any member doc or list the members (PLAN 3.1 Reads, M1-83): a member of the live
-    // household, M(uid) and LIVE; two calls. The owner's cleanup reads under a tombstone are M1-11's
-    // path here.
+    // household, M(uid) and LIVE, two calls; or the owner's cleanup under a tombstone, one.
     function readsMembers(hid) {
       let household = get(householdDoc(hid)).data;
-      return household.deleted == false && exists(memberDoc(hid, request.auth.uid));
+      return (household.deleted == false && exists(memberDoc(hid, request.auth.uid)))
+        || cleansUp(household);
+    }
+
+    // Delete a member doc (PLAN 3.1) under a tombstone, one call; paths in ADR 0002's order. P6:
+    // the caller's own, which the self-heal deletes before it clears householdId. A delete of no
+    // doc is allowed, so a self-heal after the cleanup, or a resumed one, sends the same batch;
+    // so whoever knows a household id can tell whether it is a tombstone. The owner's cleanup:
+    // any. M1-11 adds Leave and Remove member, while the household is live, as paths here (Leave
+    // before P6, Remove last).
+    function deletesMember(hid, uid) {
+      let household = get(householdDoc(hid)).data;
+      return (uid == request.auth.uid && household.deleted == true) || cleansUp(household);
+    }
+
+    // Get, list and delete the removed markers (PLAN 3.1): only the owner, here in the tombstone
+    // cleanup, one call. M1-11's Remove member adds the owner's of a live household and the writes.
+    function managesMarkers(hid) {
+      let household = get(householdDoc(hid)).data;
+      return cleansUp(household);
     }
 
     // Create household + owner, one batch (PLAN 3.1): the caller creates and owns a household whose
@@ -145,19 +173,24 @@ service cloud.firestore {
         && getAfter(user).data.householdId == hid;
     }
 
-    // Transfer ownership, the household update (PLAN 3.1): the owner of the live household changes
-    // only ownerUid, to a member before and after the batch, after which the old owner's role is
-    // member and the new owner's owner, so the batch holds both role updates (no partial transfer).
-    // O(uid) is ownerUid before the batch, never M(uid). The new ownerUid is a string (P4): a path
-    // takes a number as a document id. The soft delete is M1-11's path here.
+    // The household update (PLAN 3.1), by the owner of the live household (O(uid): ownerUid before
+    // the write, never M(uid)), two paths. The soft delete (Delete household), no call: deleted
+    // false -> true and the name cleared (#205), nothing else, so no household name, a street
+    // address say, outlives the household; from then on the household is a tombstone for good.
+    // Transfer ownership: only ownerUid changes, to a member before and after the batch, after
+    // which the old owner's role is member and the new owner's owner, so the batch holds both role
+    // updates (no partial transfer). The new ownerUid is a string (P4): a path takes a number as a
+    // document id.
     function updatesHousehold(hid) {
       let before = resource.data;
       let after = request.resource.data;
       return before.deleted == false && before.ownerUid == request.auth.uid
-        && after.ownerUid is string && after.diff(before).affectedKeys().hasOnly(['ownerUid'])
-        && exists(memberDoc(hid, after.ownerUid)) && existsAfter(memberDoc(hid, after.ownerUid))
-        && getAfter(memberDoc(hid, before.ownerUid)).data.role == 'member'
-        && getAfter(memberDoc(hid, after.ownerUid)).data.role == 'owner';
+        && ((after.deleted == true && after.name == ''
+            && after.diff(before).affectedKeys().hasOnly(['deleted', 'name']))
+          || (after.ownerUid is string && after.diff(before).affectedKeys().hasOnly(['ownerUid'])
+            && exists(memberDoc(hid, after.ownerUid)) && existsAfter(memberDoc(hid, after.ownerUid))
+            && getAfter(memberDoc(hid, before.ownerUid)).data.role == 'member'
+            && getAfter(memberDoc(hid, after.ownerUid)).data.role == 'owner'));
     }
 
     // A member doc update (PLAN 3.1) while the household is live; an update implies the doc. Two
@@ -195,35 +228,36 @@ service cloud.firestore {
 
     // Read one invite (PLAN 3.1): any verified user (they need the code, HH-03) while the household
     // is live; the join screen shows its householdName (P2). A code that does not exist has no
-    // household to check, so its get is denied as well. The owner's cleanup read under a tombstone
-    // is M1-11's path here.
+    // household to check, so its get is denied as well. Under a tombstone only the owner's cleanup.
     function readsInvite() {
       let household = get(householdDoc(resource.data.householdId)).data;
-      return household.deleted == false;
+      return household.deleted == false || cleansUp(household);
     }
 
     // Query invites (PLAN 3.1, as the owner decided on #280, M1-O12): a member of the live household
     // lists the invites they created, the owner all of the household's. Rules are not filters: the
-    // query must fix householdId, and createdBy for a plain member. The owner's cleanup list under a
-    // tombstone is M1-11's path here.
+    // query must fix householdId, and createdBy for a plain member. Under a tombstone only the
+    // owner's cleanup, on householdId alone.
     function listsInvites() {
       let invite = resource.data;
       let household = get(householdDoc(invite.householdId)).data;
-      return household.deleted == false
-        && (invite.createdBy == request.auth.uid || household.ownerUid == request.auth.uid)
-        && exists(memberDoc(invite.householdId, request.auth.uid));
+      return (household.deleted == false
+          && (invite.createdBy == request.auth.uid || household.ownerUid == request.auth.uid)
+          && exists(memberDoc(invite.householdId, request.auth.uid)))
+        || cleansUp(household);
     }
 
     // Delete invite (PLAN 3.1) while the household is live: the revoke by its creator or the owner
     // (HH-02), any member's cleanup once it has expired, or the joiner's in the join batch: no
     // member before the batch, and the member doc after it names this code, so a member cannot burn
-    // another's invite. Paths in ADR 0002's order: creator, owner, then M1-11's cleanup under a
-    // tombstone, the expired cleanup (expiresAt first), the joiner.
+    // another's invite. Under a tombstone: the owner's cleanup. Paths in ADR 0002's order: creator,
+    // owner, the tombstone cleanup, the expired cleanup (expiresAt first), the joiner.
     function deletesInvite(code) {
       let invite = resource.data;
       let household = get(householdDoc(invite.householdId)).data;
       return (invite.createdBy == request.auth.uid && household.deleted == false)
         || (household.ownerUid == request.auth.uid && household.deleted == false)
+        || cleansUp(household)
         || (invite.expiresAt < request.time && household.deleted == false
           && exists(memberDoc(invite.householdId, request.auth.uid)))
         || (household.deleted == false
@@ -248,17 +282,27 @@ service cloud.firestore {
       allow get: if signedIn() && readsHousehold(hid);
       allow create: if signedIn() && createsHousehold(hid);
       allow update: if signedIn() && updatesHousehold(hid);
+      // No delete, for anyone, live or a tombstone (#199): the id stays taken for good. The cleanup
+      // matches below name their subcollections; a recursive match here would match this doc too.
 
       // get: the caller's own member path in any household, live, a tombstone or none; it may not
       // exist. create and update: only as createsMember and updatesMember allow (the owner's doc
       // before the household exists, the joiner's while it is live; while it is live, the own
-      // displayName and the transfer's role).
+      // displayName and the transfer's role). delete: only under a tombstone (deletesMember).
       match /members/{uid} {
-        // get, besides the own path, and list: a member of the live household (readsMembers).
+        // get, besides the own path, and list: a member of the live household, or the owner's
+        // cleanup under a tombstone (readsMembers).
         allow get: if signedIn() && (request.auth.uid == uid || readsMembers(hid));
         allow list: if signedIn() && readsMembers(hid);
         allow create: if signedIn() && createsMember(hid, uid);
         allow update: if signedIn() && updatesMember(hid, uid);
+        allow delete: if signedIn() && deletesMember(hid, uid);
+      }
+
+      // The removed markers (PLAN 3.1 Remove member): owner only, no member read rule over the
+      // household. Here only the tombstone cleanup's get, list and delete (managesMarkers).
+      match /removed/{uid} {
+        allow get, list, delete: if signedIn() && managesMarkers(hid);
       }
     }
 

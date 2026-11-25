@@ -13,6 +13,7 @@ import dagger.hilt.android.testing.UninstallModules
 import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.MainActivity
 import dk.bjarkebjarke.tally.R
+import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.session.SessionModule
@@ -51,6 +52,11 @@ class SignedOutStartTest {
     @BindValue
     @JvmField
     val session: SessionState = FakeSessionState(signedIn = false)
+
+    /** The update gate's remote reads through it; no Firebase app here, so it fails and the gate fails open. */
+    @BindValue
+    @JvmField
+    val firestoreSession: FirestoreSession = FirestoreSession()
 
     /** What the signed-out cleanup (M1-89) deletes; it runs on a thread of the application scope. */
     private val steps: MutableList<String> = Collections.synchronizedList(mutableListOf())

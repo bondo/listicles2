@@ -222,7 +222,7 @@ title = "Product design and guardrails"   # <= 40 characters
 purpose = "User stories, app flow, design tokens, guardrails."   # <= 110
 
 [[task]]
-id = "M1-03"              # <milestone>-NN (agent) or <milestone>-O<n> (owner); stable, never reused
+id = "M1-03"              # <milestone>-NN or -NNN (agent: two or three digits) or <milestone>-O<n> (owner); stable, never reused
 title = "Invite links: create, redeem, revoke + rules tests"
 milestone = "M1"
 status = "todo"           # todo | done | dropped   (no "in progress": that is a claim, §2)
