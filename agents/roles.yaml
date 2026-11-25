@@ -10,7 +10,7 @@ roles:
   orchestrator:
     model: opus
     effort: medium
-    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 35% context (1M window; 30% of a 200k one), see `context`
+    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 35% context (1M window; 30% of a 200k one, see the note at `context`), see `context`
     prompt: agents/prompts/orchestrator.md
   planner:
     model: opus
@@ -46,7 +46,7 @@ roles:
   merge-agent:
     model: sonnet
     effort: medium
-    session: long-lived, started by the orchestrator, replaced by a fresh merge agent once a day at the first merge request after the daily pacing recompute (the old one is archived after its metrics row, ORCHESTRATION 7.5; owner decision 7153510972 item 5); merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge
+    session: long-lived, started by the orchestrator, replaced by a fresh merge agent once a day, at the first merge request after 00:00 UTC (the old one is archived after its metrics row, ORCHESTRATION 7.5; owner decision 7153510972 item 5); merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge
     definition: docs/ORCHESTRATION.md section 7.5
   # Owner decision, #15 comment 7075812943: approves owner-only PRs in its scope (tooling, build, CI, gate, security rules, privacy docs; #15 comment 7123360368) in the owner's place (ORCHESTRATION 1.1, 7.5); never merges, edits or pushes.
   approver:
@@ -61,7 +61,7 @@ roles:
     session: fresh, one per review round
     prompt: agents/prompts/reviewer.md
     max_effort_when:
-      - the first reviewer of a PR labelled area:security-rules or area:sync-merge (owner decisions #134 and 7153510972; R7 in docs/reviews/README.md); every later round and every other reviewer runs at high
+      - the first reviewer of a PR labelled area:security-rules or area:sync-merge (owner decisions #134 and 7153510972; R7 in docs/reviews/README.md): the first reviewer (the primary reviewer, not the second reviewer) in every round; every other reviewer runs at high
   # The delta review of a small fix-only or docs-only commit (ORCHESTRATION 7.2.3): the reviewer prompt, focused on the findings it is given.
   # It covers fix-only commits up to about 150 changed lines when they touch only tests or docs (owner decision 7153510972 item 4); other fix commits stay at about 30 lines.
   recheck-reviewer:
@@ -105,7 +105,7 @@ roles:
     session: fresh, one per retro run
 context:
   # Orchestrator handover (ORCHESTRATION 5; owner decisions #15 comment 7001335975 and 7153510972 item 6): earlier than the hook stages below.
-  # The 200k value scales 80 -> 60 the same way (35 -> 26, rounded to 30).
+  # The 200k value scales 80 -> 60 the same way (35 -> 26, rounded to 30): 30% of a 200k window: this PR's scaling, pending owner confirmation (not part of 7153510972).
   orchestrator_handover_at_percent_1m: 35
   orchestrator_handover_at_percent_200k: 30
   # Implementer handoff (owner decision 7153510972 item 2): earlier than the hook stages below, which stay the backstop.
