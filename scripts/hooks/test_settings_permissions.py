@@ -1,6 +1,7 @@
 """Pins .claude/settings.json permissions: exactly thirteen rules (owner approval of three checksum-pinned linters, issue #15, the
 scripts/mark-ready.sh and scripts/update-branch.sh wrappers, the merge agent's `python3 -I scripts/merge_ready.py` and the orchestrator's
-mcp__claude-code-remote__add_repo; owner request, 2026-11-24; plus the six scheduled-task tools, owner request on issue #399, 2026-11-25), and a documented-semantics model of rule matching (`*` spans
+mcp__claude-code-remote__add_repo; owner request, 2026-11-24; plus the six scheduled-task tools,
+owner request on issue #399, 2026-11-25), and a documented-semantics model of rule matching (`*` spans
 spaces and slashes; compound commands need every part allowed). The wrappers (test_mark_ready.py,
 test_update_branch.py) validate their arguments; no rule may allow `gh api` directly. How the real matcher
 or the classifier behaves is NOT tested (see the residual risks in docs/ORCHESTRATION.md section 7.5).
