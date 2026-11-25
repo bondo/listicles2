@@ -593,7 +593,8 @@ RULES = (
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 35% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7153510972 and 7158603054), first batch boundary: "
+        "two-phase handover at about 35% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7153510972, 7158603054), "
+        "first batch boundary: "
         "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
         forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 50% of a 1m window"),
     ),
@@ -1176,7 +1177,8 @@ RULES = (
          r"a fresh implementer from `handoff/<branch>\.md` when the running one is above 30% context"),
         "the orchestrator hands over at about 35% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
         forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 50% of a 1m window", r"daily pacing recompute",
-                   r"this pr's scaling", r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k", r"i\.e\. the orchestrator's first check-in of the utc day"),
+                   r"this pr's scaling", r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k",
+                   r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
 )
 
