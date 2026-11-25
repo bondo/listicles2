@@ -473,6 +473,7 @@ flowchart LR
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
 - **owner to-do** [#392](https://github.com/bondo/tally/issues/392): &#91;owner&#93; M1-O17&#58; add TALLY_TASK=tooling to the Tally tooling environment
 - **PR to merge** [#393](https://github.com/bondo/tally/issues/393): M1-97&#58; handover messages between orchestrators
+- **PR to merge** [#398](https://github.com/bondo/tally/issues/398): M1-89&#58; clear the copy on the phone whenever nobody is signed in, also after Firebase signs out by…
 - **task** M1-17: waits on M1-15, M1-16
 - **task** M1-31: waits on M1-11, M1-18
 - **task** M1-19: waits on M1-18
