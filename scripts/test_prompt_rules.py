@@ -1000,18 +1000,16 @@ class Pr2CheckTests(unittest.TestCase):
             with self.subTest(role=role, clause=clause):
                 self.assertIn(rid, self.mutate(role, clause))
 
-    def test_the_second_reviewer_is_max_effort_only_where_roles_yaml_and_the_owner_decision_say(self):  # #15 comment 7123360368 (replaces R1-06 of #128)
+    def test_the_second_reviewer_is_high_effort_and_only_in_three_areas_per_roles_yaml(self):  # owner decision 7153510972 item 1
         block = (ROOT / "agents" / "roles.yaml").read_text().split("  escalation-reviewer:")[0].split("  second-reviewer:")[1]
-        self.assertIn("max_effort_when:", block)
-        self.assertIn("- the PR is tagged risk:high in the milestone doc", block)
-        self.assertIn("- the PR is labelled area:security-rules, even without the risk:high tag", block)
-        self.assertNotIn("sync-merge", block)  # the decision names security-rules and risk:high only
-        pin = ("Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`, even without `risk:high`, "
-               "per `agents/roles.yaml`; you do not raise your own effort)")
+        self.assertNotIn("max_effort_when", block)
+        self.assertIn("effort: high", block)
+        self.assertIn("only for security-rules, sync-merge and release PRs", block)
+        pin = "Opus, high effort, per `agents/roles.yaml` (you do not raise your own effort)"
         self.assertIn(pin.lower(), prompt_rules.normalize(real("second-reviewer")).lower())
         self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, "Opus, high effort (`agents/roles.yaml`; you do not raise your own effort)"))
-        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, pin.replace("`risk:high` PRs and for PRs labelled `area:security-rules`",
-                                                                                              "`risk:high` PRs and for PRs labelled `area:sync-merge`")))
+        old = "Opus, high effort (max for `risk:high` PRs, per `agents/roles.yaml`; you do not raise your own effort)"
+        self.assertIn("second-reviewer-role", self.mutate("second-reviewer", pin, old))
 
     def test_second_reviewer_ids_never_collide_with_the_reviewers(self):  # R2-01 of #128 (was R1-03)
         norm = prompt_rules.normalize(real("second-reviewer"))
@@ -1632,7 +1630,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_roles_yaml_has_the_orchestrator_handover_values_and_keeps_the_hook_values(self):
         big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
-        self.assertEqual(big, 50)
+        self.assertEqual(big, 35)  # owner decision 7153510972 item 6
         self.assertLess(small, big)  # a 200k window hands over earlier, as the hook stages do
         # the context-guard hook stages are for every session and are not part of this decision
         self.assertEqual((self.context_value("step_boundary_after_percent_1m"), self.context_value("handoff_at_percent_1m")), (60, 80))
@@ -1646,7 +1644,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_orchestrator_prompt_and_orchestration_section_5_carry_the_roles_yaml_threshold(self):
         phrase = (f"at about {self.context_value('orchestrator_handover_at_percent_1m')}% of a 1m window "
-                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k one")
+                  f"({self.context_value('orchestrator_handover_at_percent_200k')}% of a 200k window (owner decision 7158603054")
         for path in (self.ORCH_MD, self.ORCH_DOC):
             with self.subTest(path=path.name):
                 text = self.norm(path)
@@ -1656,7 +1654,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
     def test_the_bootstrap_prompt_states_threshold_and_depth_rule(self):
         boot = self.norm(self.ORCH_DOC).split("### 8.1 orchestrator bootstrap", 1)[1].split("### 8.2", 1)[0]
         big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
-        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k one)", boot)
+        self.assertIn(f"hand over at about {big}% of a 1m window ({small}% of a 200k window (owner decision 7158603054", boot)
         self.assertRegex(boot, r"lineage depth (?:is )?6 or more.{0,80}the owner starts the next orchestrator")
 
     def test_orchestrator_prompt_states_the_depth_6_owner_start_rule_and_no_depth_7(self):
@@ -2363,7 +2361,7 @@ class Issue134ReviewerEffortTests(unittest.TestCase):
 
     def test_dropping_either_label_or_the_even_without_clause_is_rejected(self):
         text = prompt_rules.normalize(real("reviewer"))
-        for clause in ("`area:security-rules`", "`area:sync-merge`", "even without `risk:high`"):
+        for clause in ("`area:security-rules`", "`area:sync-merge`", "the first reviewer"):
             with self.subTest(clause=clause):
                 self.assertIn(clause, text)
                 self.assertIn(self.RULE, ids(prompt_rules.check_text("reviewer", text.replace(clause, "", 1))))
@@ -2580,8 +2578,9 @@ class DelegatedDecisionsTests(unittest.TestCase):
         ("the orchestrator may defer a minor finding past the 8-per-milestone follow-up cap when its fix is out of the PR's scope or the PR is "
          "at the line guard, with the usual follow-up issue and `decision` comment; majors still need the owner",
          "the orchestrator may defer any finding past the cap"),
-        ("the orchestrator starts `risk:high` tasks without asking; they still get max effort, a second reviewer every round and a clean "
-         "second-reviewer pass before READY", "the orchestrator asks before it starts `risk:high` tasks"),
+        ("the orchestrator starts `risk:high` tasks without asking; the implementer runs at high effort, not max, and a PR in the security-rules, "
+         "sync-merge or release area gets a second reviewer and a clean second-reviewer pass before READY",
+         "the orchestrator asks before it starts `risk:high` tasks"),
     )
 
     def doc(self, path):
@@ -2699,7 +2698,7 @@ class DelegatedDecisionsTests(unittest.TestCase):
         ("the approver also approves (a) PRs with security-rules content (`firebase/` rules and their tests)", "the approver also approves (a) PRs"),
         ("(b) changes to the privacy docs (`docs/privacy/**`)", "(b) changes to docs"),
         ("only after a clean final review round, with green CI and no veto", "after the owner looks"),
-        ("a clean independent second-reviewer pass at max effort (§7.2.2)", "a second look"),
+        ("a PR in the security-rules, sync-merge or release area also needs a clean independent second-reviewer pass (§7.2.2)", "a second look"),
     )
 
     def test_the_widened_scope_is_pinned_in_orchestration(self):
@@ -2732,29 +2731,26 @@ class DelegatedDecisionsTests(unittest.TestCase):
         # The decision (#15 comment 7123360368) says "at max effort"; the effort itself is set by roles.yaml max_effort_when. The release area
         # stays gated on the pass as before the decision (second-reviewer.md, REVIEW.md).
         for old, new in (
-            (", at max effort for a `risk:high` or security-rules PR", ""),
-            ("or another protected area (release) ", ""),
-            ("a `risk:high` PR, a security-rules PR", "a `risk:high` PR"),
+            ("a PR in the security-rules, sync-merge or release area also has a clean independent second-reviewer pass (§7.2.2)", ""),
+            ("a PR in the security-rules, sync-merge or release area also has", "a PR in the security-rules area also has"),
         ):
             with self.subTest(text="approver", old=old):
                 self.assertIn("approver-role", self.role_replace("approver", old, new))
-        for old, new in (("at max effort for `risk:high` and security-rules, ", ""), ("security-rules or release-area PR", "security-rules PR")):
+        for old, new in (("security-rules, sync-merge or release-area PR", "security-rules PR"),):
             with self.subTest(text="orchestrator", old=old):
                 self.assertIn("delegated-decisions", self.role_replace("orchestrator", old, new))
         self.assertIn("orch-delegated-decisions", self.doc_replace(
-            "docs/ORCHESTRATION.md", "The second reviewer runs at max effort for `risk:high` and `area:security-rules` PRs (`agents/roles.yaml`).", ""))
+            "docs/ORCHESTRATION.md", "The second reviewer runs at high effort (`agents/roles.yaml`; owner decision 7153510972, item 1).", ""))
         self.assertIn("roles-second-reviewer", self.doc_replace(
-            "agents/roles.yaml", "- the PR is labelled area:security-rules, even without the risk:high tag (owner decision, #15 comment 7123360368",
-            "- the PR is labelled area:sync-merge, even without the risk:high tag (owner decision, #15 comment 7123360368"))
+            "agents/roles.yaml", "only for security-rules, sync-merge and release PRs", "for risk:high PRs and protected areas"))
         self.assertIn("roles-second-reviewer", self.doc_replace(
-            "agents/roles.yaml", "prompts/second-reviewer.md max_effort_when:", "prompts/second-reviewer.md notes:"))
+            "agents/roles.yaml", "prompts/second-reviewer.md escalation-reviewer:", "prompts/second-reviewer.md max_effort_when: escalation-reviewer:"))
 
     def test_the_orchestrator_sends_security_rules_and_privacy_prs_to_the_approver_only_inside_the_scope(self):
         for old, new in (
             ("or with an owner-only path outside the approver's scope (§1.1), is not approver work",
              "or with an owner-only path outside tooling, build, CI and gate files, is not approver work"),
-            ("a `risk:high`, security-rules or release-area PR only after its clean second-reviewer pass, at max effort for `risk:high` "
-             "and security-rules, §7.2.2", "a security-rules PR at any time"),
+            ("a security-rules, sync-merge or release-area PR only after its clean second-reviewer pass, §7.2.2", "a security-rules PR at any time"),
         ):
             with self.subTest(old=old[:40]):
                 self.assertIn("delegated-decisions", self.role_replace("orchestrator", old, new))
@@ -2784,8 +2780,7 @@ class DelegatedDecisionsTests(unittest.TestCase):
             "refuse if one fails",
             "a design or product doc, is not yours to approve",
             "security-rules content (`firebase/` rules and their tests)", "or a privacy doc (`docs/privacy/**`)",
-            "a `risk:high` PR, a security-rules PR or another protected area (release) also has a clean independent second-reviewer pass (§7.2.2)",
-            ", at max effort for a `risk:high` or security-rules PR",
+            "a PR in the security-rules, sync-merge or release area also has a clean independent second-reviewer pass (§7.2.2)",
             "whose first line is `batch approval: #N@<full head sha> (approver session <your session id>)`",
             "post one PR comment `approval refused` with the failed items and their evidence",
             "Then post the WORKER-RESULT block",
@@ -3241,6 +3236,116 @@ class TallyNamesTests(unittest.TestCase):
     def test_other_names_the_check_must_not_miss(self):  # negative case: the filter finds an old name that is not kept
         self.assertEqual(self.KEPT.sub("", "You are an IMPLEMENTER for Listicles. Set LISTICLES_TASK=tooling").lower().count("listicles"), 1)
         self.assertEqual(self.KEPT.sub("", "Set LISTICLES_TASK=tooling; match `listicles:*`").lower().count("listicles"), 0)
+
+
+class TokenSavingsTests(unittest.TestCase):
+    """Owner decision 7153510972 (state issue #399), items 1-5 and the doc of item 6: effort, implementer context, PR size, re-check, merge agent.
+
+    Each phrase must be in the real file and pinned by a `token-savings-*` rule (deleting it fails the checker); the replaced wording must be rejected.
+    """
+
+    ORCH, ROLES_YAML, M1 = "docs/ORCHESTRATION.md", "agents/roles.yaml", "docs/milestones/M1.md"
+    P200 = "25% of a 200k window (owner decision 7158603054 item 2)"  # answers the open 200k question of #408 (R1-05, R2-03)
+    PINNED = (
+        (ROLES_YAML, "the first reviewer of a pr labelled area:security-rules or area:sync-merge"),
+        (ROLES_YAML, "a risk:high implementer runs at high effort, not max"),
+        (ROLES_YAML, "for security-rules, sync-merge and release prs"),
+        (ROLES_YAML, "up to about 150 changed lines when they touch only tests or docs"),
+        (ROLES_YAML, "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
+        (ROLES_YAML, P200),
+        (ROLES_YAML, "the first reviewer (the primary reviewer, not the second reviewer) in every round (owner decision 7158603054 item 1)"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_200k: 25"),
+        (ORCH, "the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)"),
+        (M1, "max only for the first reviewer of an `area:security-rules` or `area:sync-merge` pr"),
+        (ROLES_YAML, "implementer_handoff_at_percent: 30"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
+        (ORCH, "opus / high (max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`)"),
+        (ORCH, "the implementer runs at high effort, not max"),
+        (ORCH, "a pr in the security-rules, sync-merge or release area also needs a clean independent second-reviewer pass"),
+        (ORCH, "the second reviewer runs at high effort"),
+        (ORCH, "about 30 changed lines or fewer in total, or up to about 150 when they touch only tests or docs"),
+        (ORCH, "an implementer hands off at about 30% context"),
+        (ORCH, "a fix round goes to a fresh implementer"),
+        (ORCH, "a pr above 500 counted lines is split before its first review round"),
+        (ORCH, "a fresh merge agent once a day, at the first merge request after 00:00 utc (checked at each check-in)"),
+        (ORCH, "spawn it in three steps: (1) `create_session` with the template below and `merge requests: wait for the first merge request`"),
+        (ORCH, "(3) send the first merge request with `send_message`, only after that update"),
+        (ORCH, "a `merge-agent` row that is not archived or failed"),
+        (ORCH, "if the body does not name you as active, do not merge; send_message the orchestrator and wait"),
+        (ORCH, "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
+        (ORCH, "the merge-agent row's `spawned-at` records the rotation time"),
+        (ORCH, "check that the state issue body names you as active before your first merge"),
+        (ORCH, "trigger: about 35% of a 1m window (" + P200),
+        (ORCH, "hand over at about 35% of a 1m window (" + P200),
+        (ORCH, "### 8.6 merge agent"),
+        (ORCH, "tags `role:merge-agent`, `tally:process`"),
+        ("implementer", "hand off at about 30% context"),
+        ("implementer", "a pr above 500 counted lines is split before its first review round"),
+        ("reviewer", "max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`, in every round"),
+        ("second-reviewer", "opus, high effort, per `agents/roles.yaml`"),
+        ("planner", "plan prs at about 400 counted lines; a pr above 500 is split before its first review round"),
+        ("orchestrator", "at about 35% of a 1m window (" + P200),
+        ("orchestrator", "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
+        ("orchestrator", "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
+        ("orchestrator", "up to about 150 changed lines when they touch only tests or docs"),
+        ("orchestrator", "a fresh implementer from `handoff/<branch>.md` when the running one is above 30% context"),
+    )
+    STALE = (
+        (ORCH, "Opus / high (max for `risk:high`) or Sonnet"),
+        (ORCH, "they still get max effort, a second reviewer every round"),
+        (ORCH, "a second reviewer runs at max effort for `risk:high` and `area:security-rules` PRs"),
+        (ORCH, "Trigger: about 50% of a 1M window (40% of a 200k one)"),
+        (ROLES_YAML, "second-reviewer: model: opus effort: max"),
+        (ROLES_YAML, "every other reviewer and every later round runs at high"),
+        (ORCH, "after the daily pacing recompute"),
+        (ORCH, "at the first merge request after 00:00 UTC, i.e. the orchestrator's first check-in of the UTC day"),
+        (ORCH, "this PR's scaling, pending owner confirmation"),
+        ("orchestrator", "this PR's scaling, pending owner confirmation"),
+        (ORCH, "30% of a 200k window: PR #408's scaling (scaled to 26, set to 30), pending owner confirmation"),
+        ("orchestrator", "30% of a 200k window: PR #408's scaling (scaled to 26, set to 30), pending owner confirmation"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_200k: 30"),
+        (ORCH, "(30% of a 200k one"),
+        (M1, "implementer and reviewer at high effort, both at max for `risk:high`"),
+        ("reviewer", "every other reviewer and every later round runs at high"),
+        ("orchestrator", "after the daily pacing recompute"),
+        ("reviewer", "Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`"),
+        ("second-reviewer", "Opus, high effort (max for `risk:high` PRs and for PRs labelled `area:security-rules`"),
+        ("implementer", "max for risk:high PRs"),
+        ("orchestrator", "a second reviewer every round"),
+        ("orchestrator", "at max effort for `risk:high` and security-rules"),
+        ("orchestrator", "at about 50% of a 1M window (40% of a 200k one"),
+    )
+
+    def text(self, key):
+        path = ROOT / key if "/" in key else PROMPTS / f"{key}.md"
+        return path.read_text(encoding="utf-8")
+
+    def problems(self, key, text):
+        found = prompt_rules.check_doc_text(key, text) if "/" in key else prompt_rules.check_text(key, text)
+        return [p for p in found if p.startswith("token-savings")]
+
+    def test_the_real_files_carry_every_phrase(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase):
+                self.assertIn(phrase, prompt_rules.normalize(self.text(key)).lower())
+
+    def test_the_real_files_pass_the_token_savings_rules(self):
+        for key in sorted({k for k, _ in self.PINNED}):
+            with self.subTest(key=key):
+                self.assertEqual(self.problems(key, self.text(key)), [])
+
+    def test_deleting_any_phrase_fails_a_token_savings_rule(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase):
+                norm = prompt_rules.normalize(self.text(key))
+                cut = re.sub(re.escape(phrase), " ", norm, flags=re.I)
+                self.assertNotEqual(cut, norm)
+                self.assertTrue(self.problems(key, cut))
+
+    def test_the_replaced_wording_is_rejected(self):
+        for key, old in self.STALE:
+            with self.subTest(key=key, old=old):
+                self.assertTrue(self.problems(key, self.text(key) + "\n\n" + old + "\n"))
 
 
 if __name__ == "__main__":
