@@ -718,6 +718,46 @@ class GeneralKindTests(unittest.TestCase):
         self.assertEqual(go(api, kind="general")[0], 0)
         self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
 
+    CORE_ANDROID_TEST = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/config/MinVersionEmulatorTest.kt"
+
+    def test_a_core_module_android_test_source_is_merged(self):  # unblocks #391: instrumented tests of core modules are general
+        for name in (self.CORE_ANDROID_TEST, "core/domain/src/androidTest/kotlin/dev/listicles/domain/ListsTest.kt"):
+            with self.subTest(name=name):
+                self.assertFalse(merge_ready.owner_only(name))
+                api = make_api(files=[file_entry(name)])
+                self.assertEqual(go(api, kind="general")[0], 0)
+                self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_core_android_test_paths_that_stay_owner_only_are_refused(self):  # negative cases of the androidTest widening
+        names = ("core/testing/src/androidTest/kotlin/dk/bjarkebjarke/tally/testing/X.kt",  # core/testing stays a gate
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/architecture/NewRule.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/NoNetworkTest.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/RobolectricWiringTest.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/testing/BlockingSelectorProvider.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/ProjectConfig.kt",
+                 "core/data/src/androidTest/AndroidManifest.xml", "core/data/src/androidTest/res/values/strings.xml",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/Notes.md",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/../X.kt", "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/.hidden.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/.d/X.kt", "core/data/src/androidTest/java/dk/bjarkebjarke/tally/X.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/other/X.kt", "core/data/src/androidTest/kotlin/X.kt",
+                 "core/data/src/androidTest/X.kt", "core/data/src/androidTestDebug/kotlin/dk/bjarkebjarke/tally/X.kt",
+                 "core/src/androidTest/kotlin/dk/bjarkebjarke/tally/X.kt", "core/Data/src/androidTest/kotlin/dk/bjarkebjarke/tally/X.kt")
+        for name in names:
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+
+    def test_core_testing_is_refused_by_the_allowlist_itself(self):  # R1-01: not only by the gate regex, so the (?!testing/) lookahead is pinned
+        for root in ("dev/listicles", "dk/bjarkebjarke/tally"):
+            for source_set in ("main", "test", "androidTest"):
+                name = f"core/testing/src/{source_set}/kotlin/{root}/other/X.kt"  # a package that is not `testing`, so GENERAL_GATE_RE stays out
+                with self.subTest(name=name):
+                    self.assertIsNone(merge_ready.GENERAL_GATE_RE.search(name.casefold()))
+                    self.assertTrue(merge_ready.owner_only(name))
+                    self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+                    self.assertFalse(any(p.fullmatch(name) for p in merge_ready.GENERAL_ALLOW))
+                    self.assertTrue(any(p.fullmatch(name.replace("core/testing/", "core/data/")) for p in merge_ready.GENERAL_ALLOW))
+
     def test_every_path_outside_the_allowlist_is_refused(self):  # fail closed: R6-01, R6-05, R6-03, R6-04 and everything unknown
         names = ("firebase/.npmrc", "firebase/jest.config.cjs", "firebase/eslint.config.mjs", "firebase/nested/eslint.config.mjs",  # R6-01, R6-05, R6-03
                  "scripts/shellcheckrc", "scripts/.shellcheckrc", "scripts/verify.sh", "scripts/new_tool.py",  # R6-04, scripts
