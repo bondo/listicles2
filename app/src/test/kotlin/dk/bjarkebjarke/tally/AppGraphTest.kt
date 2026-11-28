@@ -97,7 +97,7 @@ class AppGraphTest {
         FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
     }
 
-    /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-15, M1-39, M1-18). */
+    /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-15, M1-39, M1-102). */
     @Test
     fun gateStandInsAllPass() {
         hilt.inject()
