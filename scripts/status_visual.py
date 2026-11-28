@@ -146,7 +146,7 @@ def build_model(tasks_text, data, now):
 
     milestones, current = [], None
     for m in graph.milestones:
-        mine = [{"id": t.id, "title": t.title, "state": visual(t), "assignee": t.assignee, "deps": list(t.depends_on),
+        mine = [{"id": t.id, "title": t.title, "state": visual(t), "assignee": t.assignee, "deps": tasks.dependencies(graph, t),
                  "unmet": [unmet_ref(d) for d in derived[t.id]["unmet"]], "pr": review_pr.get(t.id), "flag": flagged.get(t.id), "toml_pr": t.pr}
                 for t in graph.tasks if t.milestone == m]
         done = sum(t["state"] in FINISHED for t in mine)

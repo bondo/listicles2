@@ -71,7 +71,7 @@ milestone = "M0"
 status = "todo"
 assignee = "implementer"
 risk = "normal"
-depends_on = ["M0-01"]
+depends_on = []
 """
 
 
