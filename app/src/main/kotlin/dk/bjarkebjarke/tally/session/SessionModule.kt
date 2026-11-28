@@ -10,6 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.data.session.CredentialManagerGoogleCredentials
 import dk.bjarkebjarke.tally.data.session.FirebaseAuthentication
+import dk.bjarkebjarke.tally.data.session.FirebasePasswordAuthentication
 import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
@@ -17,6 +18,8 @@ import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
 import dk.bjarkebjarke.tally.domain.session.GoogleSignIn
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
+import dk.bjarkebjarke.tally.domain.session.PasswordAccount
+import dk.bjarkebjarke.tally.domain.session.PasswordAuthentication
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
@@ -48,6 +51,15 @@ object SessionModule {
 
     @Provides
     fun authentication(authentication: FirebaseAuthentication): Authentication = authentication
+
+    @Provides
+    fun passwordAuthentication(): PasswordAuthentication = FirebasePasswordAuthentication()
+
+    @Provides
+    fun passwordAccount(
+        connectivity: Connectivity,
+        authentication: PasswordAuthentication,
+    ): PasswordAccount = PasswordAccount(connectivity, authentication, System::currentTimeMillis)
 
     @Provides
     @Singleton

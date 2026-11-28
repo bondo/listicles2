@@ -110,6 +110,7 @@ private fun SignInMessage.text(): Int =
     when (this) {
         SignInMessage.NeedsConnection -> R.string.needs_connection
         SignInMessage.NoAccount -> R.string.signin_no_account
+        SignInMessage.EmailHasPasswordAccount -> R.string.signin_email_has_password
         SignInMessage.Failed -> R.string.signin_failed
     }
 

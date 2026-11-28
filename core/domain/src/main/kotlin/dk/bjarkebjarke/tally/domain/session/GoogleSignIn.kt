@@ -40,6 +40,12 @@ sealed interface GoogleSignInResult {
     /** Offline: the first sign-in needs a connection (AUTH-01, SYNC-03); the picker is not shown. */
     data object NeedsConnection : GoogleSignInResult
 
+    /**
+     * The picked Google account's email has a password account, and Firebase trusts Google for it only for `@gmail.com`
+     * (M1.md docs check 3, wireframe 44): nobody is signed in, and the screen says to use email and password.
+     */
+    data object EmailHasPasswordAccount : GoogleSignInResult
+
     /** The picker or Firebase failed. */
     data object Failed : GoogleSignInResult
 }
