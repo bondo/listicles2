@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 92/118 (77%) | 26 |
+| M1 | Accounts and households | 93/118 (78%) | 25 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 92/118 done (77%), 26 open.
+**Progress:** 93/118 done (78%), 25 open.
 
 ### Tasks
 
@@ -230,7 +230,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-92 | Tooling&#58; process docs, prompts and status output say Tally; new sessions get tally&#58;* tags | done | none | implementer | [#388](https://github.com/bondo/tally/issues/388) |
 | M1-97 | Tooling&#58; handover messages between orchestrators (ack and release) | done | none | implementer | [#393](https://github.com/bondo/tally/issues/393) |
 | M1-120 | Tooling&#58; leaner orchestrator state body at the same 15000-byte rotation limit | done | none | implementer | [#412](https://github.com/bondo/tally/issues/412) |
-| M1-93 | Build names&#58; rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks … | in progress | M1-68 | implementer | [#414](https://github.com/bondo/tally/issues/414) |
+| M1-93 | Build names&#58; rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks … | done | M1-68 | implementer | [#414](https://github.com/bondo/tally/issues/414) |
 | M1-94 | Tooling&#58; drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling | done | M1-O17, M1-91, M1-92 | implementer | [#413](https://github.com/bondo/tally/issues/413) |
 | M1-98 | Isolated projects in the build&#58; try org.gradle.unsafe.isolated-projects=true and enable it once the… | ready | M1-84 | implementer |  |
 | M1-O17 | Owner&#58; add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now) | done | M1-91 | owner |  |
@@ -266,9 +266,8 @@ flowchart LR
     n20["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
     n21["M1-86 Google sign-in switch in :app (off in … (ready)"]:::ready
     n22["M1-90 Blank names: one definition for the ru… (in progress)"]:::progress
-    n23["M1-93 Build names: rootProject.name tally, … (in progress)"]:::progress
-    n24["M1-98 Isolated projects in the build: try org… (ready)"]:::ready
-    n25["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
+    n23["M1-98 Isolated projects in the build: try org… (ready)"]:::ready
+    n24["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
     n0 --> n2
     n3 --> n4
     n3 --> n5
@@ -309,7 +308,6 @@ flowchart LR
     n14 --> n15
     n22 --> n16
     n23 --> n16
-    n24 --> n16
     n1 --> n16
     n0 --> n16
     n2 --> n16
@@ -469,4 +467,4 @@ flowchart LR
 - **task** M1-39: waits on M1-18, M1-17, M1-25
 - **task** M1-47: waits on M1-17, M1-19, M1-20 +6
 - **task** M1-48: waits on M1-15, M1-17, M1-18 +10
-- **task** M1-FU: waits on M1-90, M1-93, M1-98 +17
+- **task** M1-FU: waits on M1-90, M1-98, M1-99 +16
