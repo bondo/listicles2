@@ -2008,10 +2008,11 @@ notes = "rename checklist item 5 (#15 comment 7107080653) and the after-rename c
 id = "M1-90"
 title = "Blank names: one definition for the rules (trim strips code points up to U+0020) and the app (Kotlin trim)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-06"]
+pr = 402
 notes = "Found by M1-06 with an emulator probe: Firestore's trim() strips only code points up to U+0020, while Validation.name (M1-13) uses Kotlin's trim(), which also strips Unicode spaces (U+00A0, U+3000) but not U+0001 to U+0008. So the rules accept a name of only U+3000 that the app rejects, and deny a name of U+0001 that the app accepts (PLAN 3.1 P4: non-empty after trim). Owner decision 7125484823 (#373 item 3): change both sides. The Firestore rules refuse a name whose trim() is empty (a PLAN 3.1 P4 amendment, then a rules PR with allow and deny tests), and the app trims input before writing. Keep validName in firebase/test/model.ts in step. area:security-rules for the rules part"
 
 # ---- Tally rename sweep (owner decision 7124795794 on #15: "change to tally everywhere"; reopens the rename deferred in
