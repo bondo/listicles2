@@ -142,8 +142,11 @@ Never edit the summary by hand. History goes to comments or onto the PR concerne
 
 ### 3.1 Required fields
 
-All of these are fields of the JSON block (schema in `scripts/state_body.py`); every one is mandatory. Elsewhere in this file and in the prompts,
+All of these are fields of the JSON block (schema in `scripts/state_body.py`); every top-level field is mandatory, and so are the row fields that carry the meaning
+(session: id, role, spawned, expects, checked, status; branch: name, disposition). The other row fields may be left out when empty, to keep the body lean
+(M1-120, owner decision 7140391316 item 3; the field notes in [`orchestrator-state.md`](orchestrator-state.md) list them and the holder rule). Elsewhere in this file and in the prompts,
 `Orchestrator:`, `Updated:`, `Usage:`, `Tasks ref:`, `Inbox since:`, `Next:` and `Follow-ups:` name the matching fields as the generated summary prints them.
+The summary is lean: session counts and a row only for a session that is not `running`, one line per branch, counts for scheduled tasks and decisions; the block holds every row.
 
 * `orchestrator`: session id, `since`, `predecessor` session id (or null), **lineage depth** (from `get_session` → `lineage.depth`).
 * `updated`: UTC time of the last edit and what triggered it (`after`). This is where a quiet wake is recorded (§3.3).

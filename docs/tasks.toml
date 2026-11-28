@@ -906,10 +906,11 @@ notes = "Split from M1-11 under its accepted conditional split (R2-08): M1-11's 
 id = "M1-11"
 title = "Rules: leave and remove member (removed marker), allow and deny tests"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-54", "M1-53", "M1-95"]
+pr = 401
 notes = "Split (R2-08): the household soft delete, the tombstone cleanup and P6 went first as M1-95 (PR 390). Here, PLAN 3.1 Leave and Remove member, whose batches delete invites (Leave at most 8 of the leaver's, Remove at most 6 of the target's: ADR 0002). Leave: !O(uid), the own member doc, in one batch with the invite deletes and the users-doc clear (test: allow that clear). Remove member: O(uid), the target not the owner before or after the batch, the member delete needs getAfter(removed/target).removedAt == request.time; the marker is a create or an overwrite (remove-rejoin-remove allowed), holds only removedAt == request.time (P4), written only by O(uid) while M(target) before and !existsAfter(members/target); the owner gets, lists and deletes markers in a live household too (M1-95's managesMarkers has only the tombstone cleanup). Deny: leave by the owner; removal of the owner, also in one batch with a transfer; a marker by a non-owner, while the target stays a member, with another field or without removedAt; a non-owner member reading, listing or deleting a marker. The member delete keeps ADR 0002's order: Leave before P6, Remove last. The marker-driven list unsharing is M2. The tests drafted before the split are kept for this task in PR 390 comment 7135306110 (not run yet). Acceptance (PR 390 R2-01): Leave and the owner's marker get, list and delete in a live household are new paths of existing allow statements, which fuzz.test.ts's row check cannot see and no fuzz.ts template covers yet (model.ts's header): add a row template for each to fuzz.ts (base case allowed) with its model.ts row, and measure again the mutant finds that fuzz.test.ts notes"
 
 [[task]]
@@ -1701,7 +1702,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = [
-  "M1-88", "M1-89", "M1-90",
+  "M1-88", "M1-89", "M1-90", "M1-120",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
@@ -2051,6 +2052,17 @@ risk = "normal"
 depends_on = []
 pr = 393
 notes = "Tooling env (agents/prompts, docs/ORCHESTRATION.md). Owner decisions on state issue #373: 7136480651 (the incoming orchestrator send_messages the outgoing one as soon as its handover-ack is posted, to check now) and 7136535861 (the outgoing orchestrator's last action, after handover-released, is a send_message to the incoming one naming the release comment id). The scheduled 5-minute checks stay the fallback in both directions. Files: docs/ORCHESTRATION.md 5.1 steps 6 and 8, 5.2 steps 4 and 5, 9 F4; agents/prompts/orchestrator.md (Handover paragraph); scripts/prompt_rules.py pins handover-messages and orch-handover-messages with tests in scripts/test_prompt_rules.py (red commit first). Owner merge (owner-retained process files). About 90 changed lines"
+
+[[task]]
+id = "M1-120"
+title = "Tooling: leaner orchestrator state body at the same 15000-byte rotation limit"
+milestone = "M1"
+status = "done"
+assignee = "implementer"
+risk = "normal"
+depends_on = []
+pr = 412
+notes = "Owner decision 7140391316 item 3 on #399 (\"keep the 15000-byte limit; a small process PR makes the state body leaner\"; continued by 7161270696 item 2). scripts/state_body.py, scripts/tasks.py (--state reads rows without tasks or in_review), their tests, docs/orchestrator-state.md, docs/ORCHESTRATION.md section 3. Optional empty row fields, an omitted holder derived from the one implementer on the branch, a lean summary (counts, rows only for sessions that are not running, one line per branch). The 15000 and 250 limits do not change"
 
 [[task]]
 id = "M1-93"
