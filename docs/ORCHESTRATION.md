@@ -243,8 +243,9 @@ notes = "…"               # optional free text (decisions, follow-ups for a na
 * owner ids on non-owner tasks, and the reverse
 * unknown dependencies, and dependencies on the task's own milestone
 * cycles, including cycles through `milestone:` dependencies
-* a milestone with agent work and no burn-down task `<M>-FU`, or a burn-down that is not assigned to `implementer`
-  or does not depend on every other non-owner task of its milestone (FOLLOW-UPS.md §8; ids end in `-FU`)
+* a milestone with agent work and no burn-down task `<M>-FU`, a burn-down that is not assigned to `implementer`, or a
+  burn-down whose `depends_on` names a non-owner task of its own milestone (redundant: it depends on all of them
+  implicitly, FOLLOW-UPS.md §8, owner decision 7242447401 item 2; ids end in `-FU`)
 * duplicate entries in one `depends_on`, a non-string `notes`
 * a milestone without its `[[milestone]]` table, a table for an unknown or repeated milestone, a missing, empty or
   too long `title` or `purpose`

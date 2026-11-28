@@ -99,7 +99,8 @@ class Graph:
 def parse(text: str, burn_down: bool = True) -> Graph:
     """Parse and validate. Raises TaskFileError listing every problem found.
 
-    burn_down: also require each milestone with agent work to have its Mx-FU task (see check_burn_downs).
+    burn_down: also require each milestone with agent work to have its Mx-FU task and reject its redundant
+    depends_on entries (see check_burn_downs).
     """
     try:
         data = tomllib.loads(text)
@@ -189,7 +190,7 @@ def parse(text: str, burn_down: bool = True) -> Graph:
     for t in tasks:
         if t.status != "done" or t.assignee == "owner":
             continue
-        for d in t.depends_on:
+        for d in [*t.depends_on, *implied_deps(tasks, t)]:
             if d.startswith(MILESTONE_DEP):
                 for x in tasks:
                     if x.milestone == d[len(MILESTONE_DEP):] and x.assignee != "owner" and x.status == "todo":
@@ -197,7 +198,7 @@ def parse(text: str, burn_down: bool = True) -> Graph:
                         break
                 continue
             dep = by_id.get(d)
-            if dep is not None and dep.assignee != "owner" and dep.status == "todo":
+            if dep is not None and dep.assignee != "owner" and dep.status == "todo" and d != t.id:
                 errors.append(f"{t.id}: status done but depends on {d}, which is still todo")
     if errors:
         raise TaskFileError(errors)
@@ -243,11 +244,33 @@ def parse_milestone_info(raw: object, milestones: list[str], errors: list[str]) 
     return {m: found[m] for m in milestones if m in found}
 
 
-def check_burn_downs(milestones: list[str], tasks: list[Task]) -> list[str]:
-    """Each milestone with non-owner work has one Mx-FU task: implementer, depending on all that work.
+def is_burn_down(t: Task) -> bool:
+    return t.id == f"{t.milestone}-{BURN_DOWN}"
 
-    That makes the follow-up burn-down the last agent task of its milestone, so `milestone:Mx`
-    dependencies (and the merge task) cannot be satisfied while follow-ups are un-triaged.
+
+def implied_deps(tasks: list[Task], t: Task) -> list[str]:
+    """Dependencies a task has without listing them: a burn-down Mx-FU depends on every other non-owner task of Mx.
+
+    Owner decision 7242447401 item 2 on #399: the explicit list made every PR that adds a task edit the same
+    line. Owner tasks, other milestones and any other dependency stay explicit. File order.
+    """
+    if not is_burn_down(t):
+        return []
+    return [x.id for x in tasks if x.milestone == t.milestone and x.assignee != "owner" and x is not t]
+
+
+def dependencies(graph: Graph, t: Task) -> list[str]:
+    """Explicit depends_on plus the implied ones (no duplicates; milestone: entries are not expanded)."""
+    implied = implied_deps(graph.tasks, t)
+    return [*implied, *(d for d in t.depends_on if d not in implied)]
+
+
+def check_burn_downs(milestones: list[str], tasks: list[Task]) -> list[str]:
+    """Each milestone with non-owner work has one Mx-FU task, an implementer task that depends on all that work.
+
+    The dependency is implicit (implied_deps), so the follow-up burn-down is the last agent task of its
+    milestone and `milestone:Mx` dependencies (and the merge task) cannot be satisfied while follow-ups are
+    un-triaged. A depends_on entry naming such a task is redundant and rejected, so the list cannot grow back.
     """
     errors: list[str] = []
     for m in milestones:
@@ -260,14 +283,15 @@ def check_burn_downs(milestones: list[str], tasks: list[Task]) -> list[str]:
             continue
         if fu.assignee != "implementer":
             errors.append(f"{fu.id} must be assigned to implementer")
-        errors += [f"{fu.id} must depend on {t.id}" for t in work if t.id not in fu.depends_on]
+        errors += [f"{fu.id} lists {t.id} in depends_on, but it depends on every other non-owner task of {m} already"
+                   " (remove the entry; docs/FOLLOW-UPS.md section 8)" for t in work if t.id in fu.depends_on]
     return errors
 
 
 def edges(graph: Graph, t: Task) -> list[str]:
-    """Task-level dependencies, with milestone dependencies expanded to their tasks."""
+    """Task-level dependencies, implied ones included, with milestone dependencies expanded to their tasks."""
     out: list[str] = []
-    for d in t.depends_on:
+    for d in dependencies(graph, t):
         if d.startswith(MILESTONE_DEP):
             m = d[len(MILESTONE_DEP):]
             out.extend(x.id for x in graph.tasks if x.milestone == m)
@@ -363,7 +387,7 @@ def derive(graph: Graph, issues=None, prs=None, claimed=(), in_review=()) -> dic
             return graph.by_id[tid].status == "dropped" or finished(graph.by_id[tid])
 
         unmet = []
-        for d in t.depends_on:
+        for d in dependencies(graph, t):
             if d.startswith(MILESTONE_DEP):
                 m = d[len(MILESTONE_DEP):]
                 members = [x for x in graph.tasks if x.milestone == m]

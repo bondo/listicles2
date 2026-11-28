@@ -4,7 +4,6 @@ import io
 import itertools
 import json
 import os
-import re
 import subprocess
 import sys
 import tempfile
@@ -257,7 +256,7 @@ class ImplicitBurnDownDeriveTest(unittest.TestCase):
 
     def test_owner_tasks_are_not_implied(self):
         g = graph(task("M0-01", status="done"), task("M0-O1", assignee="owner"), task("M0-FU"))
-        self.assertEqual(ready_ids(g), ["M0-FU"])
+        self.assertEqual(ready_ids(g), ["M0-O1", "M0-FU"])  # the open owner task does not hold the burn-down back
 
     def test_an_explicit_owner_dependency_is_still_waited_on(self):
         g = graph(task("M0-01", status="done"), task("M0-O1", assignee="owner"), task("M0-FU", deps=["M0-O1"]))
