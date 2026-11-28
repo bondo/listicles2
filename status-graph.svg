@@ -42,7 +42,7 @@
 <path d="M502 292 H515" class="edge s4 crit" data-from="M1-32" data-to="M1-23" marker-end="url(#ac4)"/>
 <path d="M694 360 H707" class="edge s2 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac2)"/>
 <path d="M788 361 H796 V332 H809" class="edge s2 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac2)"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 98/125 done, 27 open</text>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 99/126 done, 27 open</text>
 <text x="34" y="568" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
 <text x="34" y="640" class="fg h">M3 Packing rules (domain): 0/3 done, 3 open</text>
 <text x="34" y="712" class="fg h">M6 Release: 0/4 done, 4 open</text>
@@ -102,5 +102,5 @@
 <text x="24" y="874" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
 <text x="24" y="894" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
 <text x="24" y="914" class="muted s">38 transitive arrows hidden.</text>
-<text x="24" y="934" class="muted s">Also not drawn: 169 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
+<text x="24" y="934" class="muted s">Also not drawn: 170 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
 </svg>
