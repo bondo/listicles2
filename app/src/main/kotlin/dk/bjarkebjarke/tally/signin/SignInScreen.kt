@@ -42,9 +42,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewFontScale
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dk.bjarkebjarke.tally.R
+import dk.bjarkebjarke.tally.SignInButtonIconSize
+import dk.bjarkebjarke.tally.SignInMarkCorner
+import dk.bjarkebjarke.tally.SignInMarkSize
 import dk.bjarkebjarke.tally.Sizes
 import dk.bjarkebjarke.tally.Spacing
 import dk.bjarkebjarke.tally.TallyTheme
@@ -104,8 +106,8 @@ private fun SignInContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            Modifier.size(MarkSize).testTag(SIGN_IN_MARK_TAG),
-            shape = RoundedCornerShape(MarkCorner),
+            Modifier.size(SignInMarkSize).testTag(SIGN_IN_MARK_TAG),
+            shape = RoundedCornerShape(SignInMarkCorner),
             color = MaterialTheme.colorScheme.primary,
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -158,7 +160,7 @@ private fun RowScope.ButtonLabel(
     Icon(
         painterResource(icon),
         null,
-        Modifier.size(ButtonIconSize).testTag(iconTag),
+        Modifier.size(SignInButtonIconSize).testTag(iconTag),
         color.takeOrElse { LocalContentColor.current },
     )
     Spacer(Modifier.width(Spacing.s))
@@ -168,11 +170,6 @@ private fun RowScope.ButtonLabel(
 const val SIGN_IN_MARK_TAG = "signin_mark"
 const val SIGN_IN_GOOGLE_ICON_TAG = "signin_google_icon"
 const val SIGN_IN_EMAIL_ICON_TAG = "signin_email_icon"
-
-/** Wireframe 01's `.logo` (72 dp, 20 dp corners) and `.btn .ms` (18 dp); not design tokens. */
-private val MarkSize = 72.dp
-private val MarkCorner = 20.dp
-private val ButtonIconSize = 18.dp
 
 @StringRes
 private fun SignInMessage.text(): Int =
