@@ -73,7 +73,7 @@ WRAPPER_PREFIX = re.compile(r"(^|/)(" + "|".join(map(re.escape, PINNED_WRAPPERS)
 # scripts/merge_ready.py and scripts/repo_slug.py (which it imports) are regular files with these SHA-256 pins and nothing in scripts/ can be imported
 # in place of a standard library module or repo_slug.py (merge_ready.py puts scripts/ first on sys.path; see merge_ready_shadow). A legitimate edit
 # of either file updates its pin in the same reviewed tooling PR (test_guard_merge_ready.py fails until it does).
-MERGE_READY_SHA256 = "5e77d82e16347107709de74655c1afe198059246721cc7544daa825132e92213"
+MERGE_READY_SHA256 = "5ca6e611b0c33553db008632a210df2f4d7fbe2a57fa85c7d92c274d2d055f1e"
 REPO_SLUG_SHA256 = "65666ea6c13c20c0f2530c60357913e0cd2c4a71e877d0b9890566774d3f9ead"
 MERGE_READY_PINS = {"merge_ready.py": MERGE_READY_SHA256, "repo_slug.py": REPO_SLUG_SHA256}
 MERGE_KINDS = ("working-draft-docs", "tasks-sync", "dependabot", "general")  # merge_ready.KINDS without owner-batch, which takes --approval

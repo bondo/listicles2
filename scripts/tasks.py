@@ -137,7 +137,7 @@ def parse(text: str, burn_down: bool = True) -> Graph:
             assignee=raw["assignee"], risk=raw["risk"], depends_on=raw["depends_on"], index=i,
             issue=raw.get("issue"), pr=raw.get("pr"), notes=raw.get("notes", ""),
         )
-        if not isinstance(t.id, str) or not re.fullmatch(r"[A-Za-z0-9.]+-(\d{2}|O\d+|FU)", t.id):
+        if not isinstance(t.id, str) or not re.fullmatch(r"[A-Za-z0-9.]+-(\d{2,3}|O\d+|FU)", t.id):
             errors.append(f"{where}: id must look like M1-03 (agent), M1-O2 (owner) or M1-FU (burn-down)")
         elif t.id in seen:
             errors.append(f"{where}: duplicate id")

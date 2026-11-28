@@ -194,6 +194,12 @@ class SchemaTest(unittest.TestCase):
         self.assert_error(changed("owner_queue.0.kind", "chore"), "owner_queue[0].kind: expected one of")
         self.assert_error(changed("sessions.0.role", "Implementer!"), "sessions[0].role: expected a role")
 
+    def test_task_ids_take_two_or_three_digits(self):
+        for ok in ("M1-99", "M1-100", "M1-999", "M1-O2", "M1-FU", "M0.5-100"):
+            self.assertEqual(errors(body(changed("sessions.0.tasks", [ok]))), "", ok)
+        for bad in ("M1-1", "M1-1000", "M1-0100", "M1-ABC", "M1-10x", "M1-\u0661\u0660\u0660", "M1-100\n"):
+            self.assert_error(changed("sessions.0.tasks", [bad]), "sessions[0].tasks[0]: expected a task id")
+
     def test_next_holds_one_to_three_actions(self):
         self.assertEqual(errors(body(changed("next", ["a", "b", "c"]))), "")
         self.assert_error(changed("next", []), "next: expected 1 to 3 items")

@@ -22,7 +22,7 @@ class DependencyFloorsPlugin : Plugin<Project> {
         val floors = Properties().apply { load(StringReader(text)) }
         target.configurations.configureEach {
             resolutionStrategy.eachDependency {
-                val fixed = floors.getProperty("${requested.group}:${requested.name}")
+                val fixed = floors["${requested.group}:${requested.name}"] as String?
                 val wanted = requested.version
                 if (fixed != null && wanted != null && isOlder(wanted, fixed)) {
                     useVersion(fixed)
