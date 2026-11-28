@@ -119,6 +119,31 @@ class PasswordEmulatorTest {
             assertEquals(withPassword, auth.currentUser?.email)
         }
 
+    /** AUTH-05: what the emulator refuses before any account check; [PasswordAccount] checks both first. */
+    @Test
+    fun aMalformedEmailAndAShortPasswordAreFieldErrors() =
+        emulatorTest {
+            assertEquals(PasswordAnswer.InvalidEmail, password.createUser("not-an-email", PASSWORD))
+            assertEquals(PasswordAnswer.WeakPassword, password.createUser(email("weak"), "abc"))
+            assertNull(auth.currentUser)
+        }
+
+    /** Without enumeration protection Firebase names what is wrong; the answers stay the same (AUTH-10). */
+    @Test
+    fun withoutEnumerationProtectionTheRefusalsAndTheResetAnswerTheSame() =
+        emulatorTest {
+            FirebaseEmulator.emailPrivacy(on = false)
+            val email = email("plain")
+            auth.createUserWithEmailAndPassword(email, PASSWORD).await()
+            auth.signOut()
+            val unknown = email("unknown")
+
+            assertEquals(PasswordAnswer.Refused, password.signIn(email, OTHER_PASSWORD))
+            assertEquals(PasswordAnswer.Refused, password.signIn(unknown, PASSWORD))
+            assertEquals(PasswordAnswer.Refused, password.sendPasswordReset(unknown))
+            assertEquals(PasswordResetResult.SentIfAccountExists, account.resetPassword(unknown))
+        }
+
     /** AUTH-08, AUTH-10: the same answer for every email; only an email with an account gets one. */
     @Test
     fun aResetAnswersTheSameAndSendsOnlyToAnAccount() =

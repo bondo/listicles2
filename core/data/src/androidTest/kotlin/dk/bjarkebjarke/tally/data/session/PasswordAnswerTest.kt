@@ -15,7 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * M1-121: Firebase's exceptions as answers, for the ones the Auth emulator does not raise (no connection, too many
+ * M1-121: Firebase's exceptions as answers, with those the Auth emulator does not raise (no connection, too many
  * attempts, the project's password policy). On the phone, not the JVM: the exceptions need Android to be made.
  */
 @RunWith(AndroidJUnit4::class)
