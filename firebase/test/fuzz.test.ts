@@ -58,10 +58,10 @@ test("the emulator and the model agree on every case", async () => {
 
 // The negative case (P17): each mutant weakens one condition of firestore.rules, so the rules
 // allow a case the model denies, which the fuzz must find. Seed 1 finds each within 4551 cases
-// (M1-95's soft-delete mutant; #372's own within 2701; M1-90's at 1228, and at 491 and 119 on
-// seeds 2 and 3). On #372's mutants seeds 2 and 3 find each within 3363 (re-measured with M1-90's
-// blank names), any of seeds 1 to 100 within 8672 on #372's rules (PR #372 has the reach per
-// seed); all under the cap of 3 * RUNS.
+// (M1-95's soft-delete mutant; #372's own within 2701; M1-90's at 1228; M1-11's within 1726, each
+// measured before M1-90 and M1-11 met). Seeds 2 and 3 find #372's within 3363 and the later ones
+// within 8275; any of seeds 1 to 100 found #372's within 8672 (PR #372 has the reach per seed).
+// All under the cap of 3 * RUNS.
 const MUTANTS: [string, string, string][] = [
     ["Signed in without a verified email", "token.email_verified == true", "token != null"],
     ["Create household: an id of 21 characters (P3)", "{20}$", "{20,21}$"],
@@ -125,6 +125,42 @@ const MUTANTS: [string, string, string][] = [
         "Invite list: by a non-member who created them or owns the household",
         "uid)\n          && exists(memberDoc(invite.householdId, request.auth.uid)))",
         "uid))",
+    ],
+    ["Leave: by the owner (!O(uid))", "household.ownerUid != request.auth.uid", "true"],
+    ["Leave: another member's doc", "(uid == request.auth.uid && resource", "(resource"],
+    ["Leave: no member doc of the caller (M(uid))", "resource != null &&", ""],
+    [
+        "Remove member: the member delete without the marker",
+        "getAfter(markerDoc(hid, uid)).data.removedAt == request.time",
+        "true",
+    ],
+    [
+        "Remove member: with a leftover marker",
+        "getAfter(markerDoc(hid, uid)).data.removedAt == request.time",
+        "getAfter(markerDoc(hid, uid)).data.removedAt != null",
+    ],
+    [
+        "Remove member: the owner removes himself",
+        "\n          && uid != household.ownerUid\n          && uid != getAfter(householdDoc(hid)).data.ownerUid",
+        "",
+    ],
+    [
+        "Marker: by a plain member (O(uid))",
+        "household.ownerUid == request.auth.uid\n        && keys.hasOnly",
+        "true\n        && keys.hasOnly",
+    ],
+    [
+        "Marker: under a tombstone (LIVE)",
+        "return household.deleted == false && household.ownerUid == request.auth.uid\n        && keys",
+        "return household.ownerUid == request.auth.uid\n        && keys",
+    ],
+    ["Marker: another field (P4)", "keys.hasOnly(['removedAt'])", "true"],
+    ["Marker: of a non-member (M(target))", "&& exists(memberDoc(hid, uid)) &&", "&&"],
+    ["Marker: the target still a member", "&& !existsAfter(memberDoc(hid, uid))", ""],
+    [
+        "Markers: any member of the live household reads them (O(uid))",
+        "(household.deleted == false && household.ownerUid == request.auth.uid)\n        || cleansUp",
+        "(household.deleted == false)\n        || cleansUp",
     ],
 ];
 
