@@ -13,10 +13,12 @@ model rows, fuzz templates and mutants (docs/tasks.toml M1-11 notes).
   re-measured mutant finds, and tasks.toml (M1-11 done, pr 401): see `git log`.
 - Scratch mutation pass: 20 mutants, 12 killed, the 8 survivors are the header's "no test can isolate" list.
 - Verifier self-review on 78113f9: no blocker, major or minor; two nits (fuzz note, join comment) fixed after it.
+- Round 1 fix (db0b903): S1-01's four deny rows for the marker overwrite alone; red under the reviewer's
+  update mutant (4 failed, 30 passed), green on the rules (34/34). R1-01: coverage report in the PR body.
 
 ## Next (in order)
 1. Review rounds: fix findings, rerun `scripts/verify.sh`, push, WORKER-RESULT on the PR, send_message to the
-   orchestrator (session_013srDQiFtrPbVLdnHo4u9fz).
+   orchestrator (session_013srDQjLpHeCsTPG1DS6RCD).
 2. Final commit: delete this file.
 
 ## Decisions made
@@ -29,7 +31,8 @@ model rows, fuzz templates and mutants (docs/tasks.toml M1-11 notes).
   extra tweak alone did not find that mutant within the cap.
 
 ## Open findings
-- none yet
+- Round 1: S1-01 (major) fixed in db0b903; R1-01 (nit) fixed in the PR body. Not done: S1-01's optional fuzz
+  variant and update-statement mutant (seed 1 does not reach it within the cap, per the reviewer).
 
 ## Commands to resume
 ```
