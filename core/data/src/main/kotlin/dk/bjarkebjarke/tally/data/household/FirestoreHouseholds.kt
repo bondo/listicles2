@@ -10,6 +10,7 @@ import com.google.firebase.firestore.Source
 import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.Validation
 import dk.bjarkebjarke.tally.domain.household.Households
+import dk.bjarkebjarke.tally.domain.household.InviteLookup
 import dk.bjarkebjarke.tally.domain.household.Invites
 import dk.bjarkebjarke.tally.domain.household.Membership
 import dk.bjarkebjarke.tally.domain.household.membership
@@ -73,6 +74,13 @@ class FirestoreHouseholds(
             null
         }
     }
+
+    // Test first: stubs until M1-100's next commits.
+    override suspend fun invite(code: String): InviteLookup =
+        if (Invites.isWellFormed(code)) InviteLookup.Failed else InviteLookup.Unusable
+
+    override suspend fun join(code: String): Membership =
+        if (Invites.isWellFormed(code)) Membership.Failed else Membership.InviteUnusable
 
     /**
      * The task [call] starts. While a sign-out's `clear()` runs, [session] still answers its terminated instance, whose

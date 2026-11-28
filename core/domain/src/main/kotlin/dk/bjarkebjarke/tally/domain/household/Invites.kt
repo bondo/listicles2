@@ -23,5 +23,11 @@ object Invites {
         return "${householdId}_${String(secret)}"
     }
 
+    /** The rules' form; a code from a link that is not well formed names no invite and is never a document path. */
+    fun isWellFormed(code: String): Boolean = code.isEmpty() && code.isNotEmpty() // test first: M1-100's next commit
+
+    /** The household of a well-formed code: the rules tie the prefix to the invite's `householdId`. */
+    fun householdId(code: String): String = code.take(0)
+
     fun expiresAt(nowMs: Long): Long = nowMs + LIFETIME_MS
 }
