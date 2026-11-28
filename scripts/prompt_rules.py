@@ -129,10 +129,10 @@ _DELEGATED = tuple(re.escape(t) for t in (
 ))
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
-    "settings, network allowlists, licence and permission acceptances, guard thresholds (600/1500), design and product sign-off, merges of PRs "
+    "settings, network allowlists, licence and permission acceptances (except 7239863908, above), guard thresholds (600/1500), design and product sign-off, merges of PRs "
     "with sync-merge content (sync and merge logic), the owner task M1-O5 (approving the privacy text before anyone but the owner installs the "
     "app), and changes to the process files that define these authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, "
-    "agents/roles.yaml, agents/prompts/)."
+    "agents/roles.yaml, agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)."
 )
 # Owner decision, #15 comment 7123360368 (2026-11-24): the approver's scope also takes security-rules PRs and privacy-doc changes. The one home
 # of the rule is ORCHESTRATION 1.1; the approver and orchestrator prompts point to it.
@@ -142,6 +142,46 @@ _SCOPE = tuple(re.escape(t) for t in (
     "final review round, with green CI and no veto; a PR in the security-rules, sync-merge or release area also needs a clean independent "
     "second-reviewer pass (§7.2.2). The record, the merge as `owner-batch` and the owner's veto are those of (1).",
 ))
+# Owner decisions 7239676323 items 1 and 4 and 7239863908 (#399, 2026-11-28): the approver's scope takes task-file and decision-recording
+# process PRs; the Google Android SDK terms have a standing acceptance. Pinned in ORCHESTRATION 1.1 and 7.5, the approver prompt, the retained
+# sentence (RETAINED) and the licensee header; test_prompt_rules.AutonomyDecisionsTests lists the phrases.
+_TASKS_PR = "a PR whose `docs/tasks.toml` change adds or splits tasks (new rows, `depends_on`, `notes`, `risk`)"
+_PROCESS_PR = (
+    "a process-file PR (ORCHESTRATION.md, agents/prompts/, agents/roles.yaml, REVIEW.md, CLAUDE.md) whose diff only writes down owner decisions "
+    "already posted on the state issue (#399 or #373), each cited by comment id,"
+)
+_EXACT = (
+    "a change to who may approve or merge what, to guard thresholds, permissions or settings stays with the owner, unless a cited owner "
+    "decision states that exact change"
+)
+_DECISIONS_ORCH = tuple(re.escape(t) for t in (
+    "Approver scope, widened again (owner decision, #399 comment 7239676323, 2026-11-28, items 1 and 4)",
+    _TASKS_PR + ", as `owner-batch`",
+    "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the PR-size rule) with no finding above nit "
+    "open against them, `scripts/tasks.py validate` passes, CI is green and there is no veto",
+    "other owner-retained paths in the same PR still need the owner",
+    _PROCESS_PR + " after a clean review round that checked every changed line against a cited decision",
+    _EXACT,
+    "Standing acceptance of the Google Android SDK terms (owner decision, #399 comment 7239863908, 2026-11-28)",
+    "the PR that needs such an artifact adds its exact `group:artifact:version` line to `config/licensee/google-sdk-terms.txt`, citing this "
+    "comment, and lists the added lines in its PR body; the reviewer checks each added line is in scope",
+    "licence and permission acceptances (except 7239863908, above)",
+    "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
+    "Still with the owner: any artifact outside those two groups, any other licence, and any other permission acceptance",
+    "except the standing acceptance of the Google Android SDK terms (#399 comment 7239863908, below)",
+    "The approver's scope also takes task-file PRs and decision-recording process PRs (owner decision, #399 comment 7239676323 items 1 and 4; §1.1)",
+))
+_DECISIONS_APPROVER = tuple(re.escape(t) for t in (
+    "Also yours (§1.1, #399 comment 7239676323 items 1 and 4): " + _TASKS_PR,
+    "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the PR-size rule) with no finding above nit "
+    "open against them and `scripts/tasks.py validate` passes",
+    _PROCESS_PR + " when a clean review round that checked every changed line against a cited decision",
+    "licence and permission acceptances (except 7239863908, above)",
+    "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
+    "a PR that changes who may approve or merge what, guard thresholds, permissions or settings is not yours, unless a cited owner decision "
+    "states that exact change",
+))
+
 # Wording the decision replaced: the owner is no longer asked for these.
 _STALE_ASKS = (r"the escalation reviewer's `owner` ruling", r"`risk:high` work(?: before starting it| \(before starting it\))",
                r"merges of owner-only prs(?:;| \(§7\.5\))")
@@ -1120,6 +1160,17 @@ RULES = (
         "(owner decision, #15 comment 7075812943; ORCHESTRATION 1.1, 7.5)",
     ),
     Rule(
+        "decisions-7239-approver", ("approver",), _DECISIONS_APPROVER,
+        "the approver prompt carries the task-file and decision-recording scope and the exact-change limit (#399 comment 7239676323 items 1, 4)",
+    ),
+    Rule(
+        "decisions-7239-orchestrator", ("orchestrator",), tuple(re.escape(t) for t in (
+            "licence and permission acceptances (except 7239863908, above)",
+            "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
+        )),
+        "the orchestrator prompt carries the exceptions to the owner-retained list (#399 comments 7239676323 item 4, 7239863908)",
+    ),
+    Rule(
         "approver-role", ("approver",),
         (
             r"you are the approver for tally\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
@@ -1198,6 +1249,11 @@ RULES = (
 
 ORCH = "docs/ORCHESTRATION.md"
 DOC_RULES = (
+    DocRule("decisions-7239-orch", ORCH, _DECISIONS_ORCH,
+            "ORCHESTRATION 1.1 and 7.5 carry the approver scope of #399 comment 7239676323 items 1, 4 and the standing acceptance 7239863908"),
+    DocRule("decisions-7239-licensee", "config/licensee/google-sdk-terms.txt",
+            (re.escape("Except lines under the standing acceptance of the Google Android SDK terms (#399 comment 7239863908)"),),
+            "the licensee header names the standing acceptance of 7239863908"),
     DocRule(
         "orch-no-resolve-thread", ORCH,
         (
@@ -1850,7 +1906,7 @@ DOC_RULES = (
             "25% of a 200k window (owner decision 7158603054 item 2)",
             "orchestrator_handover_at_percent_200k: 25",
             "implementer_handoff_at_percent: 30",
-            "orchestrator_handover_at_percent_1m: 35",
+            "orchestrator_handover_at_percent_1m: 50",
         )),
         "roles.yaml carries the token-savings rules: reviewer max effort only for the first reviewer of security-rules and sync-merge PRs, the "
         "second reviewer high, the implementer at high and handing off at 30%, the 150-line re-check, the daily merge agent (7153510972)",
