@@ -7,7 +7,7 @@ fun interface UpdateGate {
     fun updateRequired(): Flow<Boolean>
 }
 
-/** AUTH-06: whether the signed-in account's email is verified. M1-15 implements it. Asked while signed in. */
+/** AUTH-06: whether the signed-in account's email is verified. M1-121 implements it. Asked while signed in. */
 fun interface EmailVerification {
     fun verified(): Flow<Boolean>
 }
@@ -17,7 +17,7 @@ fun interface NameState {
     fun saved(): Flow<Boolean>
 }
 
-/** HH-06: a self-heal notice not yet seen, `null` while there is none. M1-18 implements it. Asked while signed in. */
+/** HH-06: a self-heal notice not yet seen, `null` while there is none. M1-102 implements it. Asked while signed in. */
 fun interface HouseholdNotices {
     fun pending(): Flow<HouseholdNotice?>
 }

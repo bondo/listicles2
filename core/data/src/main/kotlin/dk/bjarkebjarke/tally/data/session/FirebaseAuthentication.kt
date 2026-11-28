@@ -3,6 +3,8 @@ package dk.bjarkebjarke.tally.data.session
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import dk.bjarkebjarke.tally.domain.account.AccountProfile
+import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleSignInResult
 import dk.bjarkebjarke.tally.domain.session.SessionState
@@ -20,7 +22,8 @@ import kotlinx.coroutines.tasks.await
 class FirebaseAuthentication(
     private val auth: FirebaseAuth,
 ) : SessionState,
-    Authentication {
+    Authentication,
+    AccountProfiles {
     /** The app's session (M1-88): the default Firebase app's Auth. */
     constructor() : this(FirebaseAuth.getInstance())
 
@@ -39,11 +42,14 @@ class FirebaseAuthentication(
             auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
             GoogleSignInResult.SignedIn
         } catch (expected: FirebaseException) {
-            // A refused token, no network, too many attempts or a disabled account. M1-15 tells the email collision
+            // A refused token, no network, too many attempts or a disabled account. M1-121 tells the email collision
             // (AUTH-10) apart.
             GoogleSignInResult.Failed
         }
     }
 
     override fun signOut() = auth.signOut()
+
+    override fun current(): AccountProfile =
+        auth.currentUser.let { AccountProfile(name = it?.displayName?.ifBlank { null }, email = it?.email) }
 }
