@@ -58,7 +58,7 @@ class SignOut(
 
 /**
  * The signed-in user's data on this phone: Firestore's offline cache and its write queue (PLAN 3.2), and every other
- * store the app keeps there for the account (M1-18's household-name copy, M1-25's last-opened times). [clear] deletes
+ * store the app keeps there for the account (M1-101's household-name copy, M1-25's last-opened times). [clear] deletes
  * them all: it is all that runs when Firebase signs out by itself ([SignedOutCleanup]). An implementation throws
  * nothing but `CancellationException`.
  */
