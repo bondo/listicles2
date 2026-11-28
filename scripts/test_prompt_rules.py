@@ -3435,6 +3435,8 @@ class AutonomyDecisionsTests(unittest.TestCase):
     pinned by a `decisions-7239` rule (deleting it fails the checker)."""
 
     ORCH, APPROVER, LICENSEE = "docs/ORCHESTRATION.md", "approver", "config/licensee/google-sdk-terms.txt"
+    LICENCE = ("licence and permission acceptances (except the standing acceptance of the google android sdk terms for com.google.firebase and "
+               "com.google.android.gms, #399 comment 7239863908, §1.1)")
     SCOPE = ("approver scope, widened again (owner decision, #399 comment 7239676323, 2026-11-28, items 1 and 4)")
     TASKS = ("a pr whose `docs/tasks.toml` change adds or splits tasks (new rows, `depends_on`, `notes`, `risk`), as `owner-batch`")
     CHECKED = ("a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the pr-size rule) with no finding "
@@ -3452,20 +3454,20 @@ class AutonomyDecisionsTests(unittest.TestCase):
                "citing this comment, and lists the added lines in its pr body; the reviewer checks each added line is in scope"),
         (ORCH, "still with the owner: any artifact outside those two groups, any other licence, and any other permission acceptance"),
         (ORCH, "except the standing acceptance of the google android sdk terms (#399 comment 7239863908, below)"),
-        (ORCH, "licence and permission acceptances (except 7239863908, above)"),
+        (ORCH, LICENCE),
         (ORCH, "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
         (ORCH, "the approver's scope also takes task-file prs and decision-recording process prs (owner decision, #399 comment 7239676323 "
                "items 1 and 4; §1.1)"),
         (APPROVER, "also yours (§1.1, #399 comment 7239676323 items 1 and 4): " + TASKS.replace(", as `owner-batch`", "")),
         (APPROVER, "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the pr-size rule) with no "
                    "finding above nit open against them and `scripts/tasks.py validate` passes"),
-        (APPROVER, PROCESS.replace("after a clean", "when a clean")),
+        (APPROVER, PROCESS),
         (APPROVER, EXACT.replace("a change to who may approve or merge what, to guard thresholds, permissions or settings stays with the "
                                  "owner", "a pr that changes who may approve or merge what, guard thresholds, permissions or settings is not "
                                  "yours")),
-        (APPROVER, "licence and permission acceptances (except 7239863908, above)"),
+        (APPROVER, LICENCE),
         (APPROVER, "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
-        ("orchestrator", "licence and permission acceptances (except 7239863908, above)"),
+        ("orchestrator", LICENCE),
         ("orchestrator", "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
         (LICENSEE, "except lines under the standing acceptance of the google android sdk terms (#399 comment 7239863908)"),
     )
