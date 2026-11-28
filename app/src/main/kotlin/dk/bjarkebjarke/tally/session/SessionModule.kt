@@ -1,6 +1,7 @@
 package dk.bjarkebjarke.tally.session
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.credentials.CredentialManager
 import dagger.Module
 import dagger.Provides
@@ -10,6 +11,7 @@ import dagger.hilt.components.SingletonComponent
 import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.data.session.CredentialManagerGoogleCredentials
 import dk.bjarkebjarke.tally.data.session.FirebaseAuthentication
+import dk.bjarkebjarke.tally.data.session.FirebasePasswordAuthentication
 import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
@@ -17,6 +19,8 @@ import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
 import dk.bjarkebjarke.tally.domain.session.GoogleSignIn
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
+import dk.bjarkebjarke.tally.domain.session.PasswordAccount
+import dk.bjarkebjarke.tally.domain.session.PasswordAuthentication
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
@@ -49,6 +53,11 @@ object SessionModule {
     @Provides
     fun authentication(authentication: FirebaseAuthentication): Authentication = authentication
 
+    /** Email and password (M1-121), on the same default Firebase app's Auth. */
+    @Provides
+    @Singleton
+    fun passwordAuthentication(): PasswordAuthentication = FirebasePasswordAuthentication()
+
     @Provides
     @Singleton
     fun firestoreSession(): FirestoreSession = FirestoreSession()
@@ -71,12 +80,23 @@ object SessionModule {
 }
 
 /**
- * Google sign-in, sign-out and the signed-out cleanup over the graph's session bindings: [SessionModule]'s, or a test's
- * fakes.
+ * Google sign-in, sign-out, the signed-out cleanup and the password account over the graph's session bindings:
+ * [SessionModule]'s, or a test's fakes.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object SignInAndSignOutModule {
+    /**
+     * One for the app, on the phone's monotonic clock (not the wall clock, which the user can set): its Send again
+     * limits span the sign-up and the "check your email" screens (M1-15).
+     */
+    @Provides
+    @Singleton
+    fun passwordAccount(
+        connectivity: Connectivity,
+        authentication: PasswordAuthentication,
+    ): PasswordAccount = PasswordAccount(connectivity, authentication, SystemClock::elapsedRealtime)
+
     @Provides
     fun googleSignIn(
         connectivity: Connectivity,

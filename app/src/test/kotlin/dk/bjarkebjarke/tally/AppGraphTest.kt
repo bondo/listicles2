@@ -1,5 +1,6 @@
 package dk.bjarkebjarke.tally
 
+import android.os.SystemClock
 import com.google.firebase.FirebaseApp
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -9,12 +10,15 @@ import dagger.hilt.internal.GeneratedComponentManagerHolder
 import dk.bjarkebjarke.tally.connectivity.AndroidConnectivity
 import dk.bjarkebjarke.tally.data.session.CredentialManagerGoogleCredentials
 import dk.bjarkebjarke.tally.data.session.FirebaseAuthentication
+import dk.bjarkebjarke.tally.data.session.FirebasePasswordAuthentication
 import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
 import dk.bjarkebjarke.tally.domain.session.GoogleSignIn
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
+import dk.bjarkebjarke.tally.domain.session.PasswordAccount
+import dk.bjarkebjarke.tally.domain.session.PasswordAuthentication
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.start.EmailVerification
@@ -38,7 +42,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 import javax.inject.Inject
+import javax.inject.Provider
 
 /** M1-30: the app is a Hilt app, its activity is an entry point, and the graph binds the app's own implementations. */
 @HiltAndroidTest
@@ -70,6 +77,12 @@ class AppGraphTest {
     lateinit var authentication: Authentication
 
     @Inject
+    lateinit var passwordAuthentication: PasswordAuthentication
+
+    @Inject
+    lateinit var passwordAccounts: Provider<PasswordAccount>
+
+    @Inject
     lateinit var userData: LocalUserData
 
     @Inject
@@ -97,7 +110,7 @@ class AppGraphTest {
         FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
     }
 
-    /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-121, M1-39, M1-102). */
+    /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-129, M1-39, M1-102). */
     @Test
     fun gateStandInsAllPass() {
         hilt.inject()
@@ -107,6 +120,25 @@ class AppGraphTest {
             name.saved().first() shouldBe true
             notices.pending().first() shouldBe null
         }
+    }
+
+    /**
+     * M1-121: the password calls are Firebase's, and the app has one [PasswordAccount] with the phone's monotonic
+     * clock, so the Send again limits span the sign-up and the "check your email" screens.
+     */
+    @Test
+    fun thePasswordCallsAreFirebasesWithOnePasswordAccount() {
+        hilt.inject()
+        passwordAuthentication.shouldBeInstanceOf<FirebasePasswordAuthentication>()
+        val passwordAccount = passwordAccounts.get()
+        passwordAccount shouldBeSameInstanceAs passwordAccounts.get()
+        val clock =
+            PasswordAccount::class.java
+                .getDeclaredField("nowMs")
+                .apply { isAccessible = true }
+                .get(passwordAccount) as Function0<*>
+        ShadowSystemClock.advanceBy(Duration.ofMinutes(1))
+        clock() shouldBe SystemClock.elapsedRealtime()
     }
 
     @Test
