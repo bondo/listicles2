@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.flowOf
 /**
  * Stand-in bindings for the start-up gates (P10) until their tasks implement them: no update is required, the email is
  * verified, the name is saved and there is no notice, so every gate passes. Each task replaces its own provider:
- * update M1-27 and M1-82 (done), email verified M1-121, name M1-39, notices M1-102.
+ * update M1-27 and M1-82 (done), email verified M1-127, name M1-39, notices M1-102.
  */
 @Module
 @InstallIn(SingletonComponent::class)

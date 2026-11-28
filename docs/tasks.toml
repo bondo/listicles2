@@ -1093,7 +1093,7 @@ notes = "Split (PR 396): with the Firebase data layer, its Auth emulator tests a
 
 [[task]]
 id = "M1-121"
-title = "Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), the collision message, the email-verified gate, Hilt bindings"
+title = "Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), Hilt bindings (gate: M1-127, collision: M1-128)"
 milestone = "M1"
 status = "done"
 assignee = "implementer"
@@ -1975,7 +1975,7 @@ status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-121"]
-notes = "Split from M1-121 (about 680 counted lines in full). Not stacked: a PR from main after M1-121 merges, rebuilt from commit 728fafa of branch m1/auth-data-121 (tests first in 0db143e): GoogleSignInResult.EmailHasPasswordAccount, FirebaseAuthentication's mapping of ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL to it, SignInMessage.EmailHasPasswordAccount with the decided text en/da (stories.md OQ-34(a), string signin_email_has_password) and its view model and screen tests; emulator tests: the collision (a Google token with email_verified false stands in for a non-Gmail account, as the emulator trusts no provider by domain), and the OQ-34(b) reverse case with FirebaseEmulator.resetPassword (recorded on firebase-tools 15.36.0: same uid, password set, Google removed, the next Google sign-in adds it back), then the M1.md section 6 OQ-34(b) note. Adds the M3 owner task (after M3-O1, M3-O2, M1-86) to check in the real project once Google is on: the collision with a real non-Gmail account, the reverse case, and the Google-only sign-up and sign-in answers M1-121 recorded. Google sign-in is off in v1 (M1-86), so this only matters once it is on. About 120 changed lines"
+notes = "Split from M1-121 (about 680 counted lines in full). Not stacked: a PR from main after M1-121 merges, rebuilt from commit 728fafa of branch m1/auth-data-121 (tests first in 0db143e): GoogleSignInResult.EmailHasPasswordAccount, FirebaseAuthentication's mapping of ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL to it, SignInMessage.EmailHasPasswordAccount with the decided text en/da (stories.md OQ-34(a), string signin_email_has_password) and its view model and screen tests; emulator tests: the collision (a Google token with email_verified false stands in for a non-Gmail account, as the emulator trusts no provider by domain), and the OQ-34(b) reverse case with FirebaseEmulator.resetPassword (recorded on firebase-tools 15.36.0: same uid, password set, Google removed, the next Google sign-in adds it back), then the M1-121 pointers of M1.md (docs check 3, section 6 OQ-34(b)) and stories.md OQ-34(b) name M1-128. Adds the M3 owner task (after M3-O1, M3-O2, M1-86) to check in the real project once Google is on: the collision with a real non-Gmail account, the reverse case, and the Google-only sign-up and sign-in answers M1-121 recorded. Google sign-in is off in v1 (M1-86), so this only matters once it is on. About 120 changed lines"
 
 [[task]]
 id = "M1-O20"

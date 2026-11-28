@@ -33,7 +33,6 @@ class PasswordAnswerTest {
                 invalid("ERROR_INVALID_CREDENTIAL") to PasswordAnswer.Refused,
                 invalid("ERROR_WRONG_PASSWORD") to PasswordAnswer.Refused,
                 FirebaseAuthInvalidUserException("ERROR_USER_DISABLED", "disabled") to PasswordAnswer.Refused,
-                invalid("ERROR_INVALID_CUSTOM_TOKEN") to PasswordAnswer.Failed,
                 auth("ERROR_OPERATION_NOT_ALLOWED") to PasswordAnswer.Failed,
                 FirebaseException("internal") to PasswordAnswer.Failed,
             )

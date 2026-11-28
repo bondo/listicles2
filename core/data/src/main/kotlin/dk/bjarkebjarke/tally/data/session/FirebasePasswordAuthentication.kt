@@ -15,7 +15,6 @@ import kotlinx.coroutines.tasks.await
 class FirebasePasswordAuthentication(
     private val auth: FirebaseAuth,
 ) : PasswordAuthentication {
-    /** The app's session: the default Firebase app's Auth. */
     constructor() : this(FirebaseAuth.getInstance())
 
     override suspend fun createUser(
@@ -60,9 +59,9 @@ class FirebasePasswordAuthentication(
 }
 
 /**
- * Firebase's exception as a [PasswordAnswer]. Under enumeration protection a wrong password, an unknown email and an
- * email with only Google are one `ERROR_INVALID_CREDENTIAL` (`INVALID_LOGIN_CREDENTIALS`); without it, and for a
- * disabled account, Firebase names the user ([FirebaseAuthInvalidUserException]). Both are [PasswordAnswer.Refused].
+ * Firebase's exception as a [PasswordAnswer]. Enumeration protection makes every refused sign-in one
+ * `ERROR_INVALID_CREDENTIAL`; a disabled account (or, without it, an unknown email) names the user. Both are
+ * [PasswordAnswer.Refused].
  */
 internal fun passwordAnswer(failure: FirebaseException): PasswordAnswer =
     when (failure) {

@@ -137,20 +137,19 @@ class PasswordEmulatorTest {
             }
 
             assertEquals(2, FirebaseEmulator.oobCodes(withPassword, RESET).size)
-            // OQ-34(b): a Google-only account gets one too; what its link does is M1-128's recording.
-            assertEquals(2, FirebaseEmulator.oobCodes(onlyGoogle, RESET).size)
+            assertEquals(2, FirebaseEmulator.oobCodes(onlyGoogle, RESET).size) // OQ-34(b): its link is M1-128's
             assertEquals(emptyList<String>(), FirebaseEmulator.oobCodes(unknown, RESET))
         }
 
     /**
      * AUTH-06: Continue answers not verified until the link is opened, then verified with a new ID token whose
-     * `email_verified` the rules see at once. The gate on that claim is M1-127.
+     * `email_verified` claim is true at once: the token Firestore sends to the rules (M1-127 gates on it).
      */
     @Test
     fun continueIsVerifiedOnceTheLinkIsOpenedWithTheClaimRenewed() =
         emulatorTest {
             val email = email("verify")
-            account.createAccount(email, PASSWORD) {}
+            assertEquals(SignUpResult.CheckYourEmail, account.createAccount(email, PASSWORD) {})
 
             assertEquals(VerificationResult.NotVerifiedYet, account.checkVerified())
             FirebaseEmulator.openVerificationLink(FirebaseEmulator.oobCodes(email, VERIFY).single())
@@ -158,11 +157,7 @@ class PasswordEmulatorTest {
 
             assertEquals(VerificationResult.Verified, account.checkVerified())
             assertEquals(true, emailVerifiedClaim())
-        }
-
-    @Test
-    fun withNobodySignedInNothingIsSentOrChecked() =
-        emulatorTest {
+            auth.signOut() // with nobody signed in, nothing is sent or checked
             assertEquals(PasswordAnswer.NotSignedIn, password.reloadEmailVerified())
             assertEquals(PasswordAnswer.NotSignedIn, password.sendEmailVerification())
         }

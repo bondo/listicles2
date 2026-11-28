@@ -45,6 +45,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSystemClock
 import java.time.Duration
 import javax.inject.Inject
+import javax.inject.Provider
 
 /** M1-30: the app is a Hilt app, its activity is an entry point, and the graph binds the app's own implementations. */
 @HiltAndroidTest
@@ -79,10 +80,7 @@ class AppGraphTest {
     lateinit var passwordAuthentication: PasswordAuthentication
 
     @Inject
-    lateinit var passwordAccount: PasswordAccount
-
-    @Inject
-    lateinit var otherPasswordAccount: PasswordAccount
+    lateinit var passwordAccounts: Provider<PasswordAccount>
 
     @Inject
     lateinit var userData: LocalUserData
@@ -132,7 +130,8 @@ class AppGraphTest {
     fun thePasswordCallsAreFirebasesWithOnePasswordAccount() {
         hilt.inject()
         passwordAuthentication.shouldBeInstanceOf<FirebasePasswordAuthentication>()
-        passwordAccount shouldBeSameInstanceAs otherPasswordAccount
+        val passwordAccount = passwordAccounts.get()
+        passwordAccount shouldBeSameInstanceAs passwordAccounts.get()
         val clock =
             PasswordAccount::class.java
                 .getDeclaredField("nowMs")
