@@ -1,6 +1,7 @@
 package dk.bjarkebjarke.tally.session
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.credentials.CredentialManager
 import dagger.Module
 import dagger.Provides
@@ -23,6 +24,7 @@ import dk.bjarkebjarke.tally.domain.session.PasswordAuthentication
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
+import dk.bjarkebjarke.tally.domain.start.EmailVerification
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
@@ -52,14 +54,16 @@ object SessionModule {
     @Provides
     fun authentication(authentication: FirebaseAuthentication): Authentication = authentication
 
+    /** Email and password (M1-121) and the email-verified start gate (M1-62) on the same Auth session. */
     @Provides
-    fun passwordAuthentication(): PasswordAuthentication = FirebasePasswordAuthentication()
+    @Singleton
+    fun firebasePasswordAuthentication(): FirebasePasswordAuthentication = FirebasePasswordAuthentication()
 
     @Provides
-    fun passwordAccount(
-        connectivity: Connectivity,
-        authentication: PasswordAuthentication,
-    ): PasswordAccount = PasswordAccount(connectivity, authentication, System::currentTimeMillis)
+    fun passwordAuthentication(authentication: FirebasePasswordAuthentication): PasswordAuthentication = authentication
+
+    @Provides
+    fun emailVerification(authentication: FirebasePasswordAuthentication): EmailVerification = authentication
 
     @Provides
     @Singleton
@@ -83,12 +87,23 @@ object SessionModule {
 }
 
 /**
- * Google sign-in, sign-out and the signed-out cleanup over the graph's session bindings: [SessionModule]'s, or a test's
- * fakes.
+ * Google sign-in, sign-out, the signed-out cleanup and the password account over the graph's session bindings:
+ * [SessionModule]'s, or a test's fakes.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object SignInAndSignOutModule {
+    /**
+     * One for the app, on the phone's monotonic clock (not the wall clock, which the user can set): its Send again
+     * limits span the sign-up and the "check your email" screens (M1-15).
+     */
+    @Provides
+    @Singleton
+    fun passwordAccount(
+        connectivity: Connectivity,
+        authentication: PasswordAuthentication,
+    ): PasswordAccount = PasswordAccount(connectivity, authentication, SystemClock::elapsedRealtime)
+
     @Provides
     fun googleSignIn(
         connectivity: Connectivity,

@@ -19,9 +19,11 @@ import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
+import dk.bjarkebjarke.tally.domain.start.EmailVerification
 import dk.bjarkebjarke.tally.testing.FakeAccountProfiles
 import dk.bjarkebjarke.tally.testing.FakeAuthentication
 import dk.bjarkebjarke.tally.testing.FakeConnectivity
+import dk.bjarkebjarke.tally.testing.FakeEmailVerification
 import dk.bjarkebjarke.tally.testing.FakeGoogleCredentials
 import dk.bjarkebjarke.tally.testing.FakeLocalUserData
 import dk.bjarkebjarke.tally.testing.FakeSessionState
@@ -89,6 +91,11 @@ class SignInAndSignOutWiringTest {
     @BindValue
     @JvmField
     val session: SessionState = FakeSessionState(signedIn = false)
+
+    /** StartViewModel's email gate is SessionModule's (M1-121). */
+    @BindValue
+    @JvmField
+    val emailVerification: EmailVerification = FakeEmailVerification()
 
     /** The update gate's remote reads through it; no Firebase app here, so it fails and the gate fails open. */
     @BindValue

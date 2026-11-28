@@ -12,7 +12,6 @@ import dk.bjarkebjarke.tally.data.session.FirestoreSession
 import dk.bjarkebjarke.tally.domain.config.MinVersionGate
 import dk.bjarkebjarke.tally.domain.config.MinVersionRemote
 import dk.bjarkebjarke.tally.domain.config.MinVersionStore
-import dk.bjarkebjarke.tally.domain.start.EmailVerification
 import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
 import dk.bjarkebjarke.tally.domain.start.NameState
 import dk.bjarkebjarke.tally.domain.start.UpdateGate
@@ -21,9 +20,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 
 /**
- * Stand-in bindings for the start-up gates (P10) until their tasks implement them: no update is required, the email is
- * verified, the name is saved and there is no notice, so every gate passes. Each task replaces its own provider:
- * update M1-27 and M1-82 (done), email verified M1-121, name M1-39, notices M1-102.
+ * Stand-in bindings for the start-up gates (P10) until their tasks implement them: no update is required, the name is
+ * saved and there is no notice, so every gate passes. Each task replaces its own provider: update M1-27 and M1-82
+ * (done), name M1-39, notices M1-102. The email-verified gate is Firebase's (M1-121, SessionModule).
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -49,9 +48,6 @@ object GateModule {
             )
         return MinVersionGate(remote, store, installed)
     }
-
-    @Provides
-    fun emailVerification(): EmailVerification = EmailVerification { flowOf(true) }
 
     @Provides
     fun nameState(): NameState = NameState { flowOf(true) }

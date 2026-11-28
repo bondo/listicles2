@@ -1095,7 +1095,7 @@ notes = "Split (PR 396): with the Firebase data layer, its Auth emulator tests a
 id = "M1-121"
 title = "Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), the collision message, the email-verified gate, Hilt bindings"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-15"]
@@ -1956,6 +1956,26 @@ assignee = "owner"
 risk = "normal"
 depends_on = ["M1-O1"]
 notes = "Re-homed from M1-O16 (owner decision 7110878938; ids are never reused). Split from M1-O1 (owner decision 7110501630): Google sign-in is postponed until Tally has a public support email. After v1 (owner decision 7110878938): then M3-O2 and M3-O3, then switch the Google button on (M1-86) in an app update. Its [owner] issue is opened after this PR merges"
+
+[[task]]
+id = "M1-O19"
+title = "Check once in the real project what the email and password emulator tests recorded (M1-121)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1", "M1-121", "M1-17"]
+notes = "Found by M1-121 (PasswordEmulatorTest, Auth emulator of firebase-tools 15.36.0 with enumeration protection on); CI never talks to a real project. With the debug app on the real project (M1.md R1), once: sign up with an email that already has an account (expect the same 'check your email' screen, nobody signed in, no email arrives); sign in with a wrong password and with an unknown email (one 'Wrong email or password'); reset for an unknown email (the same answer, no email); open a verification link, then Continue (the lists open at once, Firestore writes are allowed). Note the result on #15 (no email address). A difference is a bug for M1-121's code, filed as an issue"
+
+[[task]]
+id = "M3-O4"
+title = "Check once in the real project the Google cases M1-121 recorded on the Auth emulator (collision, reset for a Google-only email)"
+milestone = "M3"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M3-O1", "M3-O2", "M1-86", "M1-121"]
+notes = "Found by M1-121; after v1, as Google sign-in is off until M3-O1 (owner decision 7110878938). The emulator trusts no provider by domain, so its collision test sends a Google token with email_verified false: check with a real non-Gmail Google account whose email has a password account that sign-in fails with the collision message (M1.md docs check 3) and nobody is signed in. OQ-34(b) reverse case, recorded on the emulator: a reset for a Google-only email sends the email, and its link gives the same account (same uid) a password and removes Google from it; the next Google sign-in adds Google back. Check what the real project does and note it on #15 (no email address); if Google is not added back or the uid changes, ask the owner whether OQ-34(b) still holds"
 
 [[task]]
 id = "M3-O2"

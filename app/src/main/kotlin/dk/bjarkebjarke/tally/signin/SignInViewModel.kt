@@ -33,7 +33,8 @@ class SignInViewModel
                     when (googleSignIn()) {
                         GoogleSignInResult.NeedsConnection -> SignInMessage.NeedsConnection
                         GoogleSignInResult.NoAccount -> SignInMessage.NoAccount
-                        GoogleSignInResult.Failed, GoogleSignInResult.EmailHasPasswordAccount -> SignInMessage.Failed
+                        GoogleSignInResult.EmailHasPasswordAccount -> SignInMessage.EmailHasPasswordAccount
+                        GoogleSignInResult.Failed -> SignInMessage.Failed
                         GoogleSignInResult.SignedIn, GoogleSignInResult.Cancelled -> null
                     }
                 state.value = SignInUiState(message = message)
