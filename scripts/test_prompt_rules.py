@@ -3334,7 +3334,7 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)"),
         (M1, "max only for the first reviewer of an `area:security-rules` or `area:sync-merge` pr"),
         (ROLES_YAML, "implementer_handoff_at_percent: 30"),
-        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 50"),
         (ORCH, "opus / high (max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`)"),
         (ORCH, "the implementer runs at high effort, not max"),
         (ORCH, "a pr in the security-rules, sync-merge or release area also needs a clean independent second-reviewer pass"),
@@ -3351,8 +3351,8 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
         (ORCH, "the merge-agent row's `spawned-at` records the rotation time"),
         (ORCH, "check that the state issue body names you as active before your first merge"),
-        (ORCH, "trigger: about 35% of a 1m window (" + P200),
-        (ORCH, "hand over at about 35% of a 1m window (" + P200),
+        (ORCH, "trigger: about 50% of a 1m window (" + P200),
+        (ORCH, "hand over at about 50% of a 1m window (" + P200),
         (ORCH, "### 8.6 merge agent"),
         (ORCH, "tags `role:merge-agent`, `tally:process`"),
         ("implementer", "hand off at about 30% context"),
@@ -3360,7 +3360,7 @@ class TokenSavingsTests(unittest.TestCase):
         ("reviewer", "max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`, in every round"),
         ("second-reviewer", "opus, high effort, per `agents/roles.yaml`"),
         ("planner", "plan prs at about 400 counted lines; a pr above 500 is split before its first review round"),
-        ("orchestrator", "at about 35% of a 1m window (" + P200),
+        ("orchestrator", "at about 50% of a 1m window (" + P200),
         ("orchestrator", "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
         ("orchestrator", "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
         ("orchestrator", "up to about 150 changed lines when they touch only tests or docs"),
@@ -3390,6 +3390,11 @@ class TokenSavingsTests(unittest.TestCase):
         ("orchestrator", "a second reviewer every round"),
         ("orchestrator", "at max effort for `risk:high` and security-rules"),
         ("orchestrator", "at about 50% of a 1M window (40% of a 200k one"),
+        # Owner decision 7239676323 item 5 (2026-11-28): 50% of a 1M window replaces 35%.
+        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
+        (ORCH, "trigger: about 35% of a 1M window (" + P200),
+        (ORCH, "Hand over at about 35% of a 1M window (" + P200),
+        ("orchestrator", "at about 35% of a 1M window (" + P200),
     )
 
     def text(self, key):
