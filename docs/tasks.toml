@@ -2168,10 +2168,11 @@ notes = "Step 2 of the LISTICLES_TASK transition, after M1-91 merges. Environmen
 id = "M1-O18"
 title = "Owner: remove LISTICLES_TASK from the Tally tooling environment; drop the listicles2 path in the setup scripts"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-94"]
+issue = 415
 notes = "Step 4 of the LISTICLES_TASK transition, after M1-94 merges and once every open tooling branch has main with M1-91 merged in (the orchestrator checks; a fresh session on an older branch would lose tooling rights). Environment settings: remove LISTICLES_TASK from Tally tooling; optionally drop the listicles2/scripts/requirements-lint.txt fallback line from the setup scripts of Tally and Tally tooling (the checkout is tally since 2026-11-23). Then the 7.1 smoke task on Tally tooling"
 
 [[task]]
