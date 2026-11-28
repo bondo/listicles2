@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 94/118 (79%) | 24 |
+| M1 | Accounts and households | 95/119 (79%) | 24 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 94/118 done (79%), 24 open.
+**Progress:** 95/119 done (79%), 24 open.
 
 ### Tasks
 
@@ -146,10 +146,11 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-66 | Auth wiring 1&#58; Credential Manager wrapper (Sign in with Google button flow) in &#58;core&#58;data, &#58;ap… | done | M1-67, M1-O14 | implementer | [#368](https://github.com/bondo/tally/issues/368) |
 | M1-88 | Auth wiring 2&#58; Hilt bindings for session, sign-in and sign-out (replace the M1-60 stand-in Sessio… | done | M1-66 | implementer | [#381](https://github.com/bondo/tally/issues/381) |
 | M1-89 | Clear the local data on every change to signed out, also when Firebase signs the user out itself (… | done | M1-88 | implementer | [#398](https://github.com/bondo/tally/issues/398) |
-| M1-15 | Auth data&#58; email and password sign-up, sign-in, verification, reset, error mapping, collision m… | in progress | M1-88, M1-62 | implementer | [#396](https://github.com/bondo/tally/issues/396) |
+| M1-15 | Auth data&#58; email and password steps in core/domain (sign-up, sign-in, verification, reset, error… | done | M1-88, M1-62 | implementer | [#396](https://github.com/bondo/tally/issues/396) |
+| M1-121 | Auth data&#58; email and password over Firebase in &#58;core&#58;data (Auth emulator tests for each case), t… | ready | M1-15 | implementer |  |
 | M1-16 | Sign-in UI part 1&#58; SignInViewModel, its wiring and a plain sign-in screen with the Google butto… | done | M1-88, M1-03, M1-49 | implementer | [#397](https://github.com/bondo/tally/issues/397) |
 | M1-99 | Sign-in UI part 2 (split from M1-16)&#58; wireframe 01 look (mark, icons, grouped buttons), inset … | ready | M1-16 | implementer |  |
-| M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-16, M1-62 | implementer |  |
+| M1-17 | Email UI&#58; create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) | blocked | M1-15, M1-121, M1-16, M1-62 | implementer |  |
 | M1-24 | LocaleConfig&#58; generateLocaleConfig and resources.properties (LANG-02) | done | M1-29 | implementer | [#287](https://github.com/bondo/tally/issues/287) |
 | M1-18 | Household data 1&#58; create, invite, revoke, join, start-up self-heal (emulator) | in progress | M1-54, M1-88, M1-60, M1-62, M1-02, M1-83 | implementer | [#395](https://github.com/bondo/tally/issues/395) |
 | M1-31 | Household data 2&#58; leave, remove (marker, resumable), transfer, delete with cleanup resume (em… | blocked | M1-11, M1-18 | implementer |  |
@@ -205,7 +206,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-80 | State issue part A2&#58; state_body.py render (short summary above the block), tasks.py --state reads… | done | M1-77 | implementer |  |
 | M1-78 | State issue part B&#58; rotation (milestone end, ~250 comments or ~15 KB body), merge_ready.py --ap… | done | M1-77 | implementer |  |
 | M1-79 | State issue part C&#58; ORCHESTRATION.md 2, 3, 4.3, 5 and orchestrator-state.md for the JSON block, r… | done | M1-77, M1-78, M1-80 | process | [#365](https://github.com/bondo/tally/issues/365) |
-| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-90, M1-120, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-91, M1-92, M1-93, M1-94, M1-95, M1-96, M1-97, M1-98, M1-99, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-84, M1-85, M1-86, M1-87 | implementer |  |
+| M1-FU | Follow-up burn-down for M1 (planner&#58; add each new M1 task to depends_on) | blocked | M1-88, M1-89, M1-90, M1-120, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-07, M1-08, M1-09, M1-10, M1-11, M1-12, M1-91, M1-92, M1-93, M1-94, M1-95, M1-96, M1-97, M1-98, M1-99, M1-121, M1-13, M1-14, M1-15, M1-16, M1-17, M1-18, M1-19, M1-20, M1-21, M1-22, M1-23, M1-24, M1-25, M1-26, M1-27, M1-28, M1-29, M1-30, M1-31, M1-32, M1-33, M1-34, M1-35, M1-36, M1-57, M1-37, M1-38, M1-39, M1-40, M1-41, M1-42, M1-43, M1-44, M1-45, M1-46, M1-47, M1-48, M1-49, M1-50, M1-51, M1-52, M1-53, M1-54, M1-55, M1-56, M1-58, M1-59, M1-60, M1-61, M1-62, M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-69, M1-70, M1-71, M1-73, M1-74, M1-75, M1-76, M1-77, M1-78, M1-79, M1-80, M1-81, M1-82, M1-83, M1-84, M1-85, M1-86, M1-87 | implementer |  |
 | M1-O1 | Create the Firebase project (Spark), Firestore in eur3, email sign-in, google-services.json secret | done | all of M0, M0.5-O2, M1-29, M1-O10 | owner |  |
 | M1-O2 | Register the SHA-1 and SHA-256 fingerprints of the debug key in Firebase (Google sign-in) | dropped | M1-O1, M1-O16 | owner |  |
 | M1-O3 | Check the Identity Platform upgrade needs no billing (OQ-25); if so, upgrade and enable TOTP via R… | owner to-do | M1-O1 | owner |  |
@@ -243,7 +244,7 @@ An arrow points from what a task waits on to the task. Dashed grey boxes are out
 
 ```mermaid
 flowchart LR
-    n0["M1-15 Auth data: email and password sign-up… (in progress)"]:::progress
+    n0["M1-121 Auth data: email and password over Fi… (ready)"]:::ready
     n1["M1-99 Sign-in UI part 2 (split from M1-16):… (ready)"]:::ready
     n2["M1-17 Email UI: create account, check your e… (blocked)"]:::blocked
     n3["M1-18 Household data 1: create, invite, revok… (in progress)"]:::progress
@@ -292,7 +293,6 @@ flowchart LR
     n11 --> n14
     n9 --> n14
     n13 --> n14
-    n0 --> n15
     n2 --> n15
     n3 --> n15
     n5 --> n15
@@ -453,8 +453,8 @@ flowchart LR
 - **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
 - **owner to-do** [#415](https://github.com/bondo/tally/issues/415): &#91;owner&#93; M1-O18&#58; remove LISTICLES_TASK from the Tally tooling environment
-- **PR to merge** [#396](https://github.com/bondo/tally/issues/396): M1-15&#58; email and password steps in core/domain with fakes (AUTH-05..08, AUTH-10); split M1-99
-- **task** M1-17: waits on M1-15
+- **PR to merge** [#395](https://github.com/bondo/tally/issues/395): M1-18&#58; household data 1&#58; create household and create invite (emulator), split of the rest
+- **task** M1-17: waits on M1-121
 - **task** M1-31: waits on M1-18
 - **task** M1-19: waits on M1-18
 - **task** M1-20: waits on M1-19, M1-17
@@ -464,5 +464,5 @@ flowchart LR
 - **task** M1-23: waits on M1-32, M1-O3
 - **task** M1-39: waits on M1-18, M1-17, M1-25
 - **task** M1-47: waits on M1-17, M1-19, M1-20 +6
-- **task** M1-48: waits on M1-15, M1-17, M1-18 +10
-- **task** M1-FU: waits on M1-98, M1-99, M1-15 +15
+- **task** M1-48: waits on M1-17, M1-18, M1-19 +9
+- **task** M1-FU: waits on M1-98, M1-99, M1-121 +15

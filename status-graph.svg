@@ -32,18 +32,18 @@
 <path d="M212 664 H233" class="edge s0" data-from="M3-O2" data-to="M3-O3" marker-end="url(#ah0)"/>
 <path d="M114 736 H131" class="edge s3" data-from="M6-O1" data-to="M6-O3" marker-end="url(#ah3)"/>
 <path d="M114 737 H122 V768 H131" class="edge s3" data-from="M6-O1" data-to="M6-O4" marker-end="url(#ah3)"/>
-<path d="M114 166 H131" class="edge s4 crit" data-from="M1-15" data-to="M1-17" marker-end="url(#ac4)"/>
+<path d="M114 166 H131" class="edge s4 crit" data-from="M1-121" data-to="M1-17" marker-end="url(#ac4)"/>
 <path d="M212 166 H233" class="edge s2 crit" data-from="M1-17" data-to="M1-22" marker-end="url(#ac2)"/>
 <path d="M314 167 H318 V194 H331" class="edge s1 crit" data-from="M1-22" data-to="M1-32" marker-end="url(#ac1)"/>
 <path d="M506 267 H514 V240 H523" class="edge s5 crit" data-from="M1-23" data-to="M1-47" marker-end="url(#ac5)"/>
 <path d="M412 199 H416 V262 H425" class="edge s0 crit" data-from="M1-32" data-to="M1-23" marker-end="url(#ac0)"/>
 <path d="M604 234 H617" class="edge s5 crit" data-from="M1-47" data-to="M1-48" marker-end="url(#ac5)"/>
 <path d="M698 235 H702 V326 H719" class="edge s5 crit" data-from="M1-48" data-to="M1-FU" marker-end="url(#ac5)"/>
-<text x="34" y="140" class="fg h">M1 Accounts and households: 94/118 done, 24 open</text>
+<text x="34" y="140" class="fg h">M1 Accounts and households: 95/119 done, 24 open</text>
 <text x="34" y="566" class="fg h">M2 Inventory lists: 0/2 done, 2 open</text>
 <text x="34" y="638" class="fg h">M3 Packing rules (domain): 0/3 done, 3 open</text>
 <text x="34" y="710" class="fg h">M6 Release: 0/4 done, 4 open</text>
-<g data-id="M1-15" data-state="review"><title>M1-15: Auth data: email and password sign-up, sign-in, verification, reset, error mapping, collision m… (in progress)</title><rect x="34" y="154" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,170 49,170 44,161" class="info mk-progress"/><text x="54" y="171" class="fg n">M1-15</text></g>
+<g data-id="M1-121" data-state="ready"><title>M1-121: Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), t… (ready)</title><rect x="34" y="154" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="166" r="4.5" class="ok mk-ready"/><text x="54" y="171" class="fg n">M1-121</text></g>
 <g data-id="M1-99" data-state="ready"><title>M1-99: Sign-in UI part 2 (split from M1-16): wireframe 01 look (mark, icons, grouped buttons), inset … (ready)</title><rect x="34" y="254" width="80" height="24" rx="4" class="nd-ready"/><circle cx="44" cy="266" r="4.5" class="ok mk-ready"/><text x="54" y="271" class="fg n">M1-99</text></g>
 <g data-id="M1-17" data-state="blocked"><title>M1-17: Email UI: create account, check your email, sign in, reset (AUTH-05..08, AUTH-10) (blocked)</title><rect x="132" y="154" width="80" height="24" rx="4" class="nd-blocked"/><rect x="138" y="162" width="8" height="8" class="warn mk-blocked"/><text x="152" y="171" class="fg n">M1-17</text></g>
 <g data-id="M1-18" data-state="review"><title>M1-18: Household data 1: create, invite, revoke, join, start-up self-heal (emulator) (in progress)</title><rect x="34" y="222" width="80" height="24" rx="4" class="nd-review"/><polygon points="39,238 49,238 44,229" class="info mk-progress"/><text x="54" y="239" class="fg n">M1-18</text></g>
@@ -95,6 +95,6 @@
 <text x="56" y="848" class="fg s">critical path: the longest chain of open tasks to M1-FU (8 tasks)</text>
 <text x="24" y="872" class="muted s">Colours are the Okabe-Ito colour-blind-safe palette; tasks far apart may share one.</text>
 <text x="24" y="892" class="muted s">Arrows point from dependency to dependent. Transitive arrows (A to C when A to B to C exists) are not drawn:</text>
-<text x="24" y="912" class="muted s">32 transitive arrows hidden.</text>
-<text x="24" y="932" class="muted s">Also not drawn: 162 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
+<text x="24" y="912" class="muted s">31 transitive arrows hidden.</text>
+<text x="24" y="932" class="muted s">Also not drawn: 164 dependencies on done or dropped tasks, 1 on a whole milestone.</text>
 </svg>
