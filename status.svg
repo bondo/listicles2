@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="880" height="2106" viewBox="0 0 880 2106" role="img" aria-labelledby="ti de"><title id="ti">Tally status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 100/128; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/3; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 7 PRs waiting, 25 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="2106" class="bg"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="2106" viewBox="0 0 880 2106" role="img" aria-labelledby="ti de"><title id="ti">Tally status</title><desc id="de">8 milestones (M0 Foundation and process 28/28; M0.5 Product design and guardrails 35/35; M1 Accounts and households 100/128; M2 Inventory lists 0/2; M3 Packing rules (domain) 0/3; M4 Packing templates and trips 0/0; M5 Barcode scanning 0/0; M6 Release 0/4), 7 PRs waiting, 26 blockers</desc><style>.bg{fill:#fff}.card{fill:#f6f8fa}rect.card{stroke:#d1d9e0}.tick{stroke:#1a7f37;fill:none;stroke-width:2}.fg{fill:#1f2328}.muted{fill:#59636e}.track{fill:#d1d9e0}.bar{fill:#0969da}.full{fill:#1a7f37}.ok{fill:#1a7f37}.info{fill:#0969da}.warn{fill:#9a6700}.bad{fill:#cf222e}.rule{stroke:#d1d9e0}text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px}.h{font-size:15px;font-weight:600}.t{font-size:20px;font-weight:600}.s{font-size:12px}@media (prefers-color-scheme: dark){.bg{fill:#0d1117}.card{fill:#161b22}rect.card{stroke:#30363d}.tick{stroke:#3fb950}.fg{fill:#e6edf3}.muted{fill:#9198a1}.track{fill:#30363d}.bar{fill:#4493f8}.full{fill:#3fb950}.ok{fill:#3fb950}.info{fill:#4493f8}.warn{fill:#d29922}.bad{fill:#f85149}.rule{stroke:#30363d}}</style><rect width="880" height="2106" class="bg"/>
 <text x="24" y="36" class="fg t">Tally status</text>
-<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-28 19:08 UTC</text>
+<text x="856" y="36" class="muted" text-anchor="end" id="generated">updated 2026-11-28 19:09 UTC</text>
 <text x="24" y="56" class="muted s">Checked every 30 minutes; the picture is rewritten only when something changes. Open follow-ups: 46. Outside questions: 0.</text>
 <text x="24" y="90" class="fg h">Milestones</text>
 <line x1="24" y1="98" x2="856" y2="98" class="rule"/>
@@ -175,9 +175,9 @@
 <text x="856" y="1682" class="ok" text-anchor="end">CI passing</text>
 <text x="24" y="1704" class="fg h">#425</text>
 <text x="80" y="1704" class="fg">M1-O18: mark done (LISTICLES_TASK removed, smoke passed)</text>
-<text x="856" y="1704" class="warn" text-anchor="end">CI passing  behind main</text>
+<text x="856" y="1704" class="warn" text-anchor="end">CI pending</text>
 <text x="24" y="1738" class="fg h">BLOCKERS</text>
-<text x="856" y="1738" class="muted s" text-anchor="end">25 open</text>
+<text x="856" y="1738" class="muted s" text-anchor="end">26 open</text>
 <line x1="24" y1="1746" x2="856" y2="1746" class="rule"/>
 <text x="24" y="1770" class="bad">owner to-do</text>
 <text x="120" y="1770" class="fg h">#120</text>
@@ -207,26 +207,27 @@
 <text x="120" y="1902" class="fg h">#415</text>
 <text x="190" y="1902" class="fg">[owner] M1-O18: remove LISTICLES_TASK from the Tally to…</text>
 <text x="856" y="1902" class="muted" text-anchor="end">0d</text>
-<text x="24" y="1924" class="info">PR to merge</text>
-<text x="120" y="1924" class="fg h">#423</text>
-<text x="190" y="1924" class="fg">M1-121: email and password over Firebase (Auth emulator…</text>
+<text x="24" y="1924" class="bad">owner to-do</text>
+<text x="120" y="1924" class="fg h">#426</text>
+<text x="190" y="1924" class="fg">[owner] M1-O19: set up the keyless rules deploy (service …</text>
+<text x="856" y="1924" class="muted" text-anchor="end">0d</text>
 <text x="24" y="1946" class="info">PR to merge</text>
-<text x="120" y="1946" class="fg h">#424</text>
-<text x="190" y="1946" class="fg">tasks.py: Mx-FU depends implicitly on every non-owner ta…</text>
-<text x="24" y="1968" class="warn">task</text>
-<text x="120" y="1968" class="fg h">M1-17</text>
-<text x="190" y="1968" class="fg">waits on M1-121</text>
+<text x="120" y="1946" class="fg h">#423</text>
+<text x="190" y="1946" class="fg">M1-121: email and password over Firebase (Auth emulator…</text>
+<text x="24" y="1968" class="info">PR to merge</text>
+<text x="120" y="1968" class="fg h">#424</text>
+<text x="190" y="1968" class="fg">tasks.py: Mx-FU depends implicitly on every non-owner ta…</text>
 <text x="24" y="1990" class="warn">task</text>
-<text x="120" y="1990" class="fg h">M1-102</text>
-<text x="190" y="1990" class="fg">waits on M1-101</text>
+<text x="120" y="1990" class="fg h">M1-17</text>
+<text x="190" y="1990" class="fg">waits on M1-121</text>
 <text x="24" y="2012" class="warn">task</text>
-<text x="120" y="2012" class="fg h">M1-31</text>
-<text x="190" y="2012" class="fg">waits on M1-102</text>
+<text x="120" y="2012" class="fg h">M1-102</text>
+<text x="190" y="2012" class="fg">waits on M1-101</text>
 <text x="24" y="2034" class="warn">task</text>
-<text x="120" y="2034" class="fg h">M1-19</text>
-<text x="190" y="2034" class="fg">waits on M1-101</text>
+<text x="120" y="2034" class="fg h">M1-31</text>
+<text x="190" y="2034" class="fg">waits on M1-102</text>
 <text x="24" y="2056" class="warn">task</text>
-<text x="120" y="2056" class="fg h">M1-20</text>
-<text x="190" y="2056" class="fg">waits on M1-19, M1-17</text>
-<text x="24" y="2078" class="muted">+11 more</text>
+<text x="120" y="2056" class="fg h">M1-19</text>
+<text x="190" y="2056" class="fg">waits on M1-101</text>
+<text x="24" y="2078" class="muted">+12 more</text>
 </svg>
