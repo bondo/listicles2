@@ -322,7 +322,8 @@ def summary(d: dict) -> str:
                 f"unreviewed since `{b['unreviewed_since']}`" if b["unreviewed_since"] else None]
         out.append(f"- `{b['name']}` {', '.join(x for x in bits if x)}: {b['disposition']}".replace("` : ", "`: "))
     times = [t["next_run"] for t in d["triggers"] if t["next_run"]]
-    out.append("\n**Scheduled tasks:** " + (f"{len(d['triggers'])}" + (f", next {min(times, key=lambda t: t if t.count(':') == 2 else t[:-1] + ':00Z')}" if times else "") if d["triggers"] else "none"))
+    first = min(times, key=lambda t: t if t.count(":") == 2 else t[:-1] + ":00Z") if times else None  # HH:MMZ and HH:MM:SSZ both occur
+    out.append("\n**Scheduled tasks:** " + (f"{len(d['triggers'])}" + (f", next {first}" if first else "") if d["triggers"] else "none"))
     out.append("**PR subscriptions:** " + (", ".join(f"#{n}" for n in d["subscriptions"]) or "none"))
     out.append("**Standing owner decisions:** " + (f"{len(d['decisions'])} (comment ids in the block)" if d["decisions"] else "none"))
     return "\n".join(out)
