@@ -20,7 +20,7 @@ GATE_MESSAGE = "warnings are not all errors"
 
 # Groovy init script; %s is the statement applied to the compile task's compilerOptions. M1-98: gradle.lifecycle.beforeProject, not
 # allprojects, which Gradle's isolated projects mode rejects
-# (gradle.properties turns it on once M1-121 lands).
+# (gradle.properties turns it on once M1-124 lands).
 INIT = """
 gradle.lifecycle.beforeProject { p ->
     p.tasks.matching { it.path == '%s' }.configureEach { %s }

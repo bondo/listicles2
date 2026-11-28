@@ -38,7 +38,7 @@ JAVA_API_26 = (
 
 # Groovy init script. %s is the directory holding the injected sources; %s the statement run on :app after it is evaluated (p: the project).
 # M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which Gradle's isolated projects mode rejects
-# (gradle.properties turns it on once M1-121 lands).
+# (gradle.properties turns it on once M1-124 lands).
 INIT = """
 gradle.lifecycle.afterProject { p ->
     if (p.path == ':core:domain') {

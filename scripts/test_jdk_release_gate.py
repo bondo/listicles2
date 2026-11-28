@@ -19,7 +19,7 @@ KOTLIN_TASK = ":core:domain:compileKotlin"
 JAVA_TASK = ":core:domain:compileJava"
 # Groovy init script; the first %s is a project path, the second the statement run for that project after it is evaluated.
 # M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which Gradle's isolated projects mode rejects
-# (gradle.properties turns it on once M1-121 lands).
+# (gradle.properties turns it on once M1-124 lands).
 INIT = """
 gradle.lifecycle.afterProject { p ->
     if (p.path == '%s') {
