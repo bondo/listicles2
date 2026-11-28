@@ -218,12 +218,17 @@ class PasswordAccountTest :
 
         test("R1-01: Send again is Try again later a minute after an email and after five in an hour, then sent") {
             var now = 0L
-            val firebase = firebase()
+            val firebase = FakePasswordAuthentication(verificationAnswer = PasswordAnswer.Failed)
             val account = firebase.account { now }
-            account.createAccount(EMAIL, PASSWORD) {}
+            account.createAccount(EMAIL, PASSWORD) {} // counts though its send failed (AUTH-10)
             now = COOLDOWN - 1
             account.sendVerificationAgain() shouldBe VerificationResult.TryAgainLater
             firebase.steps.count { it == "sendEmailVerification" } shouldBe 1
+            now = COOLDOWN // R2-01: a Send again that never went out uses none of the limits
+            account.sendVerificationAgain() shouldBe VerificationResult.Failed
+            firebase.verificationAnswer = PasswordAnswer.NoConnection
+            account.sendVerificationAgain() shouldBe VerificationResult.NeedsConnection
+            firebase.verificationAnswer = PasswordAnswer.Done
             repeat(PasswordAccount.MAX_EMAILS_PER_WINDOW - 1) { n ->
                 now = COOLDOWN * (n + 1)
                 account.sendVerificationAgain() shouldBe VerificationResult.Sent
@@ -232,6 +237,6 @@ class PasswordAccountTest :
             account.sendVerificationAgain() shouldBe VerificationResult.TryAgainLater
             now = WINDOW
             account.sendVerificationAgain() shouldBe VerificationResult.Sent
-            firebase.steps.count { it == "sendEmailVerification" } shouldBe PasswordAccount.MAX_EMAILS_PER_WINDOW + 1
+            firebase.steps.count { it == "sendEmailVerification" } shouldBe PasswordAccount.MAX_EMAILS_PER_WINDOW + 3
         }
     })
