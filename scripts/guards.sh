@@ -2,6 +2,9 @@
 # Guard checks (PLAN section 5.4). Fails on weakened checks.
 #   guards.sh            content checks on the working tree + diff checks against $GUARD_BASE (default origin/main)
 #   guards.sh --staged   content checks on the staged index only (pre-commit)
+#   guards.sh --pre-push URL   as the first form, with git's pre-push input on stdin (.githooks/pre-push): changed screenshot
+#                        references also pass when the open PR of the pushed branch carries the golden-update label
+#                        (scripts/hooks/golden_label.py, M1-126; fails closed).
 # Env: CI=true makes a missing base a hard failure and enables the diff-size limit (GUARD_MAX_DIFF, default 600).
 #      GOLDEN_UPDATE=1 allows changed screenshot references (CI sets it from the PR label).
 set -uo pipefail
@@ -9,6 +12,8 @@ cd "$(dirname "$0")/.." || exit 1
 
 STAGED=0
 [ "${1:-}" = "--staged" ] && STAGED=1
+PREPUSH=0 PUSH_URL="" PUSH_IN=""
+if [ "${1:-}" = "--pre-push" ]; then PREPUSH=1; PUSH_URL="${2:-}"; [ -t 0 ] || PUSH_IN=$(cat); fi
 BASE="${GUARD_BASE:-origin/main}"
 fail=0
 bad() { echo "guard: $*"; fail=1; }
@@ -1335,7 +1340,13 @@ if [ "$STAGED" = 0 ]; then
     # The list is read first: under pipefail `grep | grep -q` dies of SIGPIPE when more than one pipe buffer of paths matches (#251).
     gnames=$(git -c core.quotePath=false diff --name-only "$MB" HEAD)
     if [ "${GOLDEN_UPDATE:-0}" != 1 ] && grep -qE '(screenshots|golden|snapshots|roborazzi)/.*\.png$|src/[A-Za-z]*[Tt]est[A-Za-z]*/.*\.png$' <<<"$gnames"; then
-      bad "screenshot references changed without the golden-update label"
+      # On pre-push only, the label of the pushed branch's open PR counts too (M1-126); anything unclear refuses.
+      lbl=""
+      if [ "$PREPUSH" = 1 ] && lbl=$(python3 -I scripts/hooks/golden_label.py "$PUSH_URL" <<<"$PUSH_IN" 2>&1); then
+        echo "guard: note: $lbl"
+      else
+        bad "screenshot references changed without the golden-update label${lbl:+ ($lbl)}"
+      fi
     fi
     # Diff size outside generated files (docs count). Enforced in CI only.
     if [ "${CI:-}" = true ]; then
