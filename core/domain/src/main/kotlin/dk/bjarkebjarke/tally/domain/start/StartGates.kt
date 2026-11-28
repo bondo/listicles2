@@ -17,7 +17,7 @@ fun interface NameState {
     fun saved(): Flow<Boolean>
 }
 
-/** HH-06: a self-heal notice not yet seen, `null` while there is none. M1-18 implements it. Asked while signed in. */
+/** HH-06: a self-heal notice not yet seen, `null` while there is none. M1-102 implements it. Asked while signed in. */
 fun interface HouseholdNotices {
     fun pending(): Flow<HouseholdNotice?>
 }
