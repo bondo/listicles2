@@ -10,7 +10,7 @@ import unittest
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session_end_metrics.py")
-# M1-91: the hook reads TALLY_ROLE, TALLY_PR, TALLY_METRICS_DIR and TALLY_TASK (else LISTICLES_TASK); every run here starts from an
+# M1-91, M1-94: the hook reads TALLY_ROLE, TALLY_PR, TALLY_METRICS_DIR and TALLY_TASK only; every run here starts from an
 # env without any of these names, old or new (sessions set some of them).
 ENV_NAMES = ("TALLY_ROLE", "TALLY_PR", "TALLY_TASK", "TALLY_METRICS_DIR",
              "LISTICLES_ROLE", "LISTICLES_PR", "LISTICLES_TASK", "LISTICLES_METRICS_DIR", "CLAUDE_PROJECT_DIR")
@@ -100,7 +100,7 @@ class OutputDir(unittest.TestCase):
 
 
 class Tags(unittest.TestCase):
-    """M1-91: role, pr and task tags come from the TALLY_* names; only the task still falls back to LISTICLES_TASK."""
+    """M1-91, M1-94: role, pr and task tags come from the TALLY_* names only; the old LISTICLES_* names are ignored."""
 
     def tags(self, env):
         d = tempfile.mkdtemp()
@@ -120,14 +120,13 @@ class Tags(unittest.TestCase):
         self.assertEqual(self.tags({"LISTICLES_ROLE": "reviewer", "LISTICLES_PR": "42"})[:2], (None, None))
         self.assertEqual(self.tags({"TALLY_ROLE": "a", "LISTICLES_ROLE": "b", "TALLY_PR": "1", "LISTICLES_PR": "2"})[:2], ("a", "1"))
 
-    def test_task_is_tally_task_else_listicles_task(self):
-        for env, want in (({"TALLY_TASK": "tooling"}, "tooling"), ({"LISTICLES_TASK": "tooling"}, "tooling"),
+    def test_task_comes_from_tally_task_only(self):
+        for env, want in (({"TALLY_TASK": "tooling"}, "tooling"), ({"LISTICLES_TASK": "tooling"}, None),
                           ({"TALLY_TASK": "normal", "LISTICLES_TASK": "tooling"}, "normal"),
                           ({"TALLY_TASK": "tooling", "LISTICLES_TASK": "normal"}, "tooling"),
-                          ({"TALLY_TASK": "", "LISTICLES_TASK": "tooling"}, "tooling"), ({}, None)):
+                          ({"TALLY_TASK": "", "LISTICLES_TASK": "tooling"}, ""), ({}, None)):
             with self.subTest(env=env):
                 self.assertEqual(self.tags(env)[2], want)
-
 
 if __name__ == "__main__":
     unittest.main()
