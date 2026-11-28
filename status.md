@@ -8,7 +8,7 @@ Milestones, their tasks, what each open task waits on, and every blocker, genera
 |---|---|---|---|
 | M0 | Foundation and process | 28/28 (100%) | 0 |
 | M0.5 | Product design and guardrails | 35/35 (100%) | 0 |
-| M1 | Accounts and households | 100/128 (78%) | 28 |
+| M1 | Accounts and households | 101/128 (78%) | 27 |
 | M2 | Inventory lists | 0/2 (0%) | 2 |
 | M3 | Packing rules (domain) | 0/3 (0%) | 3 |
 | M4 | Packing templates and trips | not planned yet | 0 |
@@ -112,7 +112,7 @@ Nothing open.
 
 Google and email sign-in, households, invite links, members and ownership, with rules tests.
 
-**Progress:** 100/128 done (78%), 28 open.
+**Progress:** 101/128 done (78%), 27 open.
 
 ### Tasks
 
@@ -239,7 +239,7 @@ Google and email sign-in, households, invite links, members and ownership, with 
 | M1-94 | Tooling&#58; drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling | done | M1-O17, M1-91, M1-92 | implementer | [#413](https://github.com/bondo/tally/issues/413) |
 | M1-98 | Isolated projects in the build&#58; try org.gradle.unsafe.isolated-projects=true and enable it once the… | in progress | M1-84 | implementer | [#418](https://github.com/bondo/tally/issues/418) |
 | M1-O17 | Owner&#58; add TALLY_TASK=tooling to the Tally tooling environment (keep LISTICLES_TASK for now) | done | M1-91 | owner |  |
-| M1-O18 | Owner&#58; remove LISTICLES_TASK from the Tally tooling environment; drop the listicles2 path in th… | owner to-do | M1-94 | owner | [#425](https://github.com/bondo/tally/issues/425) |
+| M1-O18 | Owner&#58; remove LISTICLES_TASK from the Tally tooling environment; drop the listicles2 path in th… | done | M1-94 | owner |  |
 | M1-96 | Tooling&#58; Nix dev shell with the pinned firebase-tools for the rules deploy (M1-O6) | done | none | implementer | [#394](https://github.com/bondo/tally/issues/394) |
 | M1-122 | Crashlytics opt-in (split from M1-25)&#58; Send crash reports switch, manifest flag off, no Analyti… | blocked | M1-25, M1-125 | implementer |  |
 | M1-123 | Account navigation (part B of M1-25)&#58; home top-bar avatar opens Account over the home, wiring i… | blocked | M1-25, M1-125 | implementer |  |
@@ -275,12 +275,11 @@ flowchart LR
     n19["M1-O6 Deploy firestore.rules to the real proj… (owner to-do)"]:::owner
     n20["M1-86 Google sign-in switch in :app (off in … (ready)"]:::ready
     n21["M1-98 Isolated projects in the build: try org… (in progress)"]:::progress
-    n22["M1-O18 Owner: remove LISTICLES_TASK from th… (owner to-do)"]:::owner
-    n23["M1-122 Crashlytics opt-in (split from M1-25)… (blocked)"]:::blocked
-    n24["M1-123 Account navigation (part B of M1-25): … (blocked)"]:::blocked
-    n25["M1-125 Account screen UI (part of M1-25): Acc… (ready)"]:::ready
-    n26["M1-O19 Owner: set up the keyless rules deploy… (owner to-do)"]:::owner
-    n27["M1-127 Tooling: CI workflow that deploys fir… (blocked)"]:::blocked
+    n22["M1-122 Crashlytics opt-in (split from M1-25)… (blocked)"]:::blocked
+    n23["M1-123 Account navigation (part B of M1-25): … (blocked)"]:::blocked
+    n24["M1-125 Account screen UI (part of M1-25): Acc… (ready)"]:::ready
+    n25["M1-O19 Owner: set up the keyless rules deploy… (owner to-do)"]:::owner
+    n26["M1-127 Tooling: CI workflow that deploys fir… (blocked)"]:::blocked
     n0 --> n1
     n2 --> n3
     n3 --> n4
@@ -290,24 +289,24 @@ flowchart LR
     n5 --> n7
     n4 --> n7
     n1 --> n8
-    n25 --> n8
     n24 --> n8
+    n23 --> n8
     n8 --> n9
     n7 --> n9
     n9 --> n10
     n16 --> n10
     n1 --> n12
-    n25 --> n12
     n24 --> n12
+    n23 --> n12
     n1 --> n13
     n5 --> n13
     n6 --> n13
     n7 --> n13
     n8 --> n13
     n10 --> n13
+    n22 --> n13
     n23 --> n13
     n24 --> n13
-    n25 --> n13
     n9 --> n13
     n12 --> n13
     n1 --> n14
@@ -316,19 +315,19 @@ flowchart LR
     n7 --> n14
     n8 --> n14
     n10 --> n14
+    n22 --> n14
     n23 --> n14
     n24 --> n14
-    n25 --> n14
     n4 --> n14
     n9 --> n14
     n12 --> n14
     n13 --> n14
+    n22 --> n15
     n23 --> n15
     n24 --> n15
-    n25 --> n15
     n21 --> n15
     n0 --> n15
-    n27 --> n15
+    n26 --> n15
     n1 --> n15
     n5 --> n15
     n6 --> n15
@@ -344,9 +343,9 @@ flowchart LR
     n20 --> n15
     n2 --> n15
     n3 --> n15
-    n25 --> n23
-    n25 --> n24
-    n26 --> n27
+    n24 --> n22
+    n24 --> n23
+    n25 --> n26
     classDef ready fill:#dafbe1,stroke:#1a7f37,color:#1f2328
     classDef progress fill:#ddf4ff,stroke:#0969da,color:#1f2328
     classDef blocked fill:#fff8c5,stroke:#9a6700,color:#1f2328
@@ -476,7 +475,6 @@ flowchart LR
 - **owner to-do** [#375](https://github.com/bondo/tally/issues/375): &#91;owner&#93; M1-O4&#58; Enable the Play Integrity API for the Firebase project in the Google Cloud console
 - **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
-- **owner to-do** [#415](https://github.com/bondo/tally/issues/415): &#91;owner&#93; M1-O18&#58; remove LISTICLES_TASK from the Tally tooling environment
 - **owner to-do** [#426](https://github.com/bondo/tally/issues/426): &#91;owner&#93; M1-O19&#58; set up the keyless rules deploy (service account, Workload Identity Federation, …
 - **PR to merge** [#423](https://github.com/bondo/tally/issues/423): M1-121&#58; email and password over Firebase (Auth emulator tests), password bindings; split M1-1…
 - **PR to merge** [#424](https://github.com/bondo/tally/issues/424): tasks.py&#58; Mx-FU depends implicitly on every non-owner task of its milestone (owner merge)
