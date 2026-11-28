@@ -303,10 +303,10 @@ class Rules(unittest.TestCase):
         self.assertIn('executable = "python3"', checks)
         self.assertIn('"checkJavaApiLevel"', checks)
         self.assertTrue({"testDebugUnitTest", "verifyRoborazziDebug", "checkJavaApiLevel"} <= set(c.GRADLE_PYTHON_TASKS))
-        # M1-68 part B3: checkJavaApiLevel is in each JVM library module's listiclesChecks, which the root's detekt runs.
+        # M1-68 part B3: checkJavaApiLevel is in each JVM library module's tallyChecks, which the root's detekt runs.
         self.assertIn('dependsOn(warnings, release, "checkTestSettings", apiLevel)', checks)
-        self.assertIn('tasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }', root)
-        self.assertTrue({"detekt", "listiclesChecks"} <= set(c.GRADLE_PYTHON_TASKS))
+        self.assertIn('tasks.named("detekt") { dependsOn(tallyModules.map { "$it:tallyChecks" }) }', root)
+        self.assertTrue({"detekt", "tallyChecks"} <= set(c.GRADLE_PYTHON_TASKS))
 
     def test_npm_ci_never_runs_install_scripts(self):
         self.flagged(self.edit(CI, "npm ci --ignore-scripts --silent", "npm ci --silent"), "npm ci", "ignore-scripts")

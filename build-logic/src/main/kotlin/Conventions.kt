@@ -30,7 +30,7 @@ private const val TEST_SETTINGS = "must run on the JUnit Platform with failOnNoD
 /**
  * The test-support modules: they run only on the host JDK (21), never on Android, and use its newer API on purpose
  * (:core:testing blocks the network through java.net.spi.InetAddressResolver, JDK 18). The one list (PR 349 R1-01):
- * only these may apply listicles.jvm.testsupport, every module's checkJdkRelease keeps them out of its non-test
+ * only these may apply tally.jvm.testsupport, every module's checkJdkRelease keeps them out of its non-test
  * configurations, and they get no checkJavaApiLevel.
  */
 internal object TestSupportModules {

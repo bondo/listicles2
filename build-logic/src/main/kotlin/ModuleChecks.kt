@@ -15,8 +15,8 @@ import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 // M1-68 part B2 (issue 48): every module checks its own compile tasks and configurations, so the root reads no other
-// project. listiclesChecks groups a module's checks; the root build names `<module>:listiclesChecks` by task path for
-// each module in its listiclesModules (check_build_guards.py keeps that list equal to settings.gradle.kts).
+// project. tallyChecks groups a module's checks; the root build names `<module>:tallyChecks` by task path for
+// each module in its tallyModules (check_build_guards.py keeps that list equal to settings.gradle.kts).
 // Tested by scripts/test_warnings_gate.py, scripts/test_jdk_release_gate.py and scripts/test_java_api_level_gate.py.
 
 private const val JDK_RELEASE = "17"
@@ -26,10 +26,10 @@ private const val WARNINGS =
 
 // M1-68 part B3: the app hands its minSdk and api-versions.xml to the JVM modules' checkJavaApiLevel as an artifact
 // with this Usage, which no other variant has. A dependency on the app, not a read of its configuration.
-private const val JAVA_API_LEVEL = "listicles-java-api-level"
+private const val JAVA_API_LEVEL = "tally-java-api-level"
 private const val APP = ":app"
 
-/** Registers checkWarningsAsErrors, checkJdkRelease and listiclesChecks; [jdkRelease]: the JDK 17 API applies. */
+/** Registers checkWarningsAsErrors, checkJdkRelease and tallyChecks; [jdkRelease]: the JDK 17 API applies. */
 internal fun Project.registerModuleChecks(
     jdkRelease: Boolean,
     testSupport: Set<String>,
@@ -38,7 +38,7 @@ internal fun Project.registerModuleChecks(
     val release = registerJdkReleaseCheck(jdkRelease, testSupport)
     // A JVM module that may reach the app; lint's NewApi covers the Android modules, and test support never ships.
     val apiLevel = if (jdkRelease) listOf(registerJavaApiLevelCheck()) else emptyList()
-    tasks.register("listiclesChecks") {
+    tasks.register("tallyChecks") {
         group = "verification"
         description = "Runs this module's own checks (the root's detekt runs it for every module)."
         dependsOn(warnings, release, "checkTestSettings", apiLevel)
@@ -187,9 +187,9 @@ private fun Project.registerJdkReleaseCheck(
  * api-versions.xml fails the build.
  */
 private fun Project.registerJavaApiLevelCheck(): TaskProvider<Exec> {
-    val declared = configurations.dependencyScope("listiclesJavaApiLevel")
+    val declared = configurations.dependencyScope("tallyJavaApiLevel")
     val fromApp =
-        configurations.resolvable("listiclesJavaApiLevelFromApp") {
+        configurations.resolvable("tallyJavaApiLevelFromApp") {
             extendsFrom(declared.get())
             attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(JAVA_API_LEVEL))
         }
@@ -233,16 +233,16 @@ internal fun Project.registerJavaApiLevelInputs() {
                 .resolveSibling("data/api-versions.xml")
                 .path
         }
-    val output = layout.buildDirectory.file("listicles/java-api-level.txt")
+    val output = layout.buildDirectory.file("tally/java-api-level.txt")
     val write =
-        tasks.register("listiclesJavaApiLevelInputs") {
+        tasks.register("tallyJavaApiLevelInputs") {
             description = "Writes the app's minSdk and api-versions.xml path for the JVM modules' checkJavaApiLevel."
             inputs.property("minSdk", minSdk)
             inputs.property("apiVersions", apiVersions)
             outputs.file(output)
             doLast { output.get().asFile.writeText("${minSdk.get()}\n${apiVersions.get()}\n") }
         }
-    configurations.consumable("listiclesJavaApiLevelElements") {
+    configurations.consumable("tallyJavaApiLevelElements") {
         attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(JAVA_API_LEVEL))
         outgoing.artifact(output) { builtBy(write) }
     }

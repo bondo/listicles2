@@ -116,16 +116,16 @@ class JdkReleaseGateTest(unittest.TestCase):
         self.assertIn(":core:domain:implementation -> :core:testing", out)
 
     def test_the_testsupport_plugin_on_an_unlisted_module_fails(self):
-        # PR 349 R1-01: listicles.jvm.testsupport skips the JDK 17 compile check, so it must not work outside the
+        # PR 349 R1-01: tally.jvm.testsupport skips the JDK 17 compile check, so it must not work outside the
         # test-support modules that the leak check (and checkJavaApiLevel) also follow. A JVM library there passes.
-        for plugin, fails in (("listicles.jvm.testsupport", True), ("listicles.jvm.library", False)):
+        for plugin, fails in (("tally.jvm.testsupport", True), ("tally.jvm.library", False)):
             with self.subTest(plugin=plugin), tempfile.TemporaryDirectory() as d:
                 with open(os.path.join(d, "build.gradle.kts"), "w") as f:
                     f.write(f'plugins {{\n    id("{plugin}")\n}}\n')
                 rc, out = gradle(":fakes:checkJdkRelease", settings=SETTINGS_INIT % (ROOT, d))
                 if fails:
                     self.assertNotEqual(rc, 0, f"an unlisted module got the test-support exemption:\n{out}")
-                    self.assertIn("listicles.jvm.testsupport is only for the test-support modules [:core:testing], not :fakes", out)
+                    self.assertIn("tally.jvm.testsupport is only for the test-support modules [:core:testing], not :fakes", out)
                 else:
                     self.assertEqual(rc, 0, out)
 

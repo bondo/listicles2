@@ -15,23 +15,23 @@ dependencies {
 gradlePlugin {
     plugins {
         register("jvmLibrary") {
-            id = "listicles.jvm.library"
+            id = "tally.jvm.library"
             implementationClass = "JvmLibraryConventionPlugin"
         }
         register("jvmTestSupport") {
-            id = "listicles.jvm.testsupport"
+            id = "tally.jvm.testsupport"
             implementationClass = "JvmTestSupportConventionPlugin"
         }
         register("androidLibrary") {
-            id = "listicles.android.library"
+            id = "tally.android.library"
             implementationClass = "AndroidLibraryConventionPlugin"
         }
         register("androidApplication") {
-            id = "listicles.android.application"
+            id = "tally.android.application"
             implementationClass = "AndroidApplicationConventionPlugin"
         }
         register("dependencyFloors") {
-            id = "listicles.dependency.floors"
+            id = "tally.dependency.floors"
             implementationClass = "DependencyFloorsPlugin"
         }
     }

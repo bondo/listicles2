@@ -105,7 +105,7 @@ class JavaApiLevelGateTest(unittest.TestCase):
         self.assertIn(CHECKER_MESSAGE, out)
 
     def test_each_jvm_library_module_runs_its_own_check(self):
-        # M1-68 part B3: the module's own task, run by its listiclesChecks (the root's detekt runs every module's). The root, the
+        # M1-68 part B3: the module's own task, run by its tallyChecks (the root's detekt runs every module's). The root, the
         # Android modules (lint NewApi covers them) and the test-support module (host JDK API on purpose) have none.
         rc, out = gradle("detekt", "--dry-run")
         self.assertEqual(rc, 0, out)
@@ -113,15 +113,15 @@ class JavaApiLevelGateTest(unittest.TestCase):
         self.assertIn(":core:domain:checkJavaApiLevel SKIPPED", lines)
         for path in (":checkJavaApiLevel", ":app:checkJavaApiLevel", ":core:data:checkJavaApiLevel", ":core:testing:checkJavaApiLevel"):
             self.assertNotIn(f"{path} SKIPPED", lines)
-        rc, out = gradle(":core:domain:listiclesChecks", "--dry-run")
+        rc, out = gradle(":core:domain:tallyChecks", "--dry-run")
         self.assertEqual(rc, 0, out)
         self.assertIn(":core:domain:checkJavaApiLevel SKIPPED", out.splitlines())
-        self.assertIn(":app:listiclesJavaApiLevelInputs SKIPPED", out.splitlines())
+        self.assertIn(":app:tallyJavaApiLevelInputs SKIPPED", out.splitlines())
 
     def test_missing_api_versions_file_fails_closed(self):
         # The app's hand-over names, just after it is written, a path that does not exist: the build must fail, not pass.
         statement = (
-            "p.tasks.named('listiclesJavaApiLevelInputs') { t -> t.doLast {"
+            "p.tasks.named('tallyJavaApiLevelInputs') { t -> t.doLast {"
             " t.outputs.files.singleFile.text = '26\\n/nonexistent/data/api-versions.xml\\n' } }"
         )
         # The injected closure holds the task, which the configuration cache cannot store.
