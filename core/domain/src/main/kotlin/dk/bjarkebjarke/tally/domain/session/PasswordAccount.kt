@@ -12,7 +12,7 @@ import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
  * [MAX_EMAILS_PER_WINDOW] in [EMAIL_WINDOW_MS], the sign-up's email included (AUTH-06). The sign-up counts for an email
  * that had an account too, which got none, so both get the same answers (AUTH-10, R1-01). Firebase states no per-user
  * limit (docs/auth/limits: per project only), so the app keeps its own, meant to be stricter. [nowMs] is a monotonic
- * clock in milliseconds; the count lives in this instance, so the app keeps one for both screens (M1-99: a singleton).
+ * clock in milliseconds; the count lives in this instance, so the app keeps one for both screens (M1-121: a singleton).
  */
 class PasswordAccount(
     private val connectivity: Connectivity,
