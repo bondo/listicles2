@@ -156,6 +156,11 @@ object Sizes {
 val EmptyStateBubble = 96.dp
 val EmptyStateIcon = 44.dp
 
+/** Wireframe 01's `.logo` (72 dp, 20 dp corners) and `.btn .ms` (18 dp); not design tokens. */
+val SignInMarkSize = 72.dp
+val SignInMarkCorner = 20.dp
+val SignInButtonIconSize = 18.dp
+
 @Composable
 fun TallyTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

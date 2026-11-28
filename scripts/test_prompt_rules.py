@@ -1631,7 +1631,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_roles_yaml_has_the_orchestrator_handover_values_and_keeps_the_hook_values(self):
         big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
-        self.assertEqual(big, 35)  # owner decision 7153510972 item 6
+        self.assertEqual(big, 50)  # owner decision 7239676323 item 5
         self.assertLess(small, big)  # a 200k window hands over earlier, as the hook stages do
         # the context-guard hook stages are for every session and are not part of this decision
         self.assertEqual((self.context_value("step_boundary_after_percent_1m"), self.context_value("handoff_at_percent_1m")), (60, 80))
@@ -3334,7 +3334,7 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)"),
         (M1, "max only for the first reviewer of an `area:security-rules` or `area:sync-merge` pr"),
         (ROLES_YAML, "implementer_handoff_at_percent: 30"),
-        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
+        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 50"),
         (ORCH, "opus / high (max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`)"),
         (ORCH, "the implementer runs at high effort, not max"),
         (ORCH, "a pr in the security-rules, sync-merge or release area also needs a clean independent second-reviewer pass"),
@@ -3351,8 +3351,8 @@ class TokenSavingsTests(unittest.TestCase):
         (ORCH, "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
         (ORCH, "the merge-agent row's `spawned-at` records the rotation time"),
         (ORCH, "check that the state issue body names you as active before your first merge"),
-        (ORCH, "trigger: about 35% of a 1m window (" + P200),
-        (ORCH, "hand over at about 35% of a 1m window (" + P200),
+        (ORCH, "trigger: about 50% of a 1m window (" + P200),
+        (ORCH, "hand over at about 50% of a 1m window (" + P200),
         (ORCH, "### 8.6 merge agent"),
         (ORCH, "tags `role:merge-agent`, `tally:process`"),
         ("implementer", "hand off at about 30% context"),
@@ -3360,7 +3360,7 @@ class TokenSavingsTests(unittest.TestCase):
         ("reviewer", "max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`, in every round"),
         ("second-reviewer", "opus, high effort, per `agents/roles.yaml`"),
         ("planner", "plan prs at about 400 counted lines; a pr above 500 is split before its first review round"),
-        ("orchestrator", "at about 35% of a 1m window (" + P200),
+        ("orchestrator", "at about 50% of a 1m window (" + P200),
         ("orchestrator", "a fresh merge agent once a day, at the first merge request after 00:00 utc"),
         ("orchestrator", "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row"),
         ("orchestrator", "up to about 150 changed lines when they touch only tests or docs"),
@@ -3390,6 +3390,11 @@ class TokenSavingsTests(unittest.TestCase):
         ("orchestrator", "a second reviewer every round"),
         ("orchestrator", "at max effort for `risk:high` and security-rules"),
         ("orchestrator", "at about 50% of a 1M window (40% of a 200k one"),
+        # Owner decision 7239676323 item 5 (2026-11-28): 50% of a 1M window replaces 35%.
+        (ROLES_YAML, "orchestrator_handover_at_percent_1m: 35"),
+        (ORCH, "trigger: about 35% of a 1M window (" + P200),
+        (ORCH, "Hand over at about 35% of a 1M window (" + P200),
+        ("orchestrator", "at about 35% of a 1M window (" + P200),
     )
 
     def text(self, key):
@@ -3422,6 +3427,76 @@ class TokenSavingsTests(unittest.TestCase):
         for key, old in self.STALE:
             with self.subTest(key=key, old=old):
                 self.assertTrue(self.problems(key, self.text(key) + "\n\n" + old + "\n"))
+
+
+class AutonomyDecisionsTests(unittest.TestCase):
+    """Owner decisions 7239676323 items 1 and 4 and 7239863908 (state issue #399, 2026-11-28): the approver scope takes task-file and
+    decision-recording process PRs, and the Google Android SDK terms have a standing acceptance. Each phrase must be in the real file and
+    pinned by a `decisions-7239` rule (deleting it fails the checker)."""
+
+    ORCH, APPROVER, LICENSEE = "docs/ORCHESTRATION.md", "approver", "config/licensee/google-sdk-terms.txt"
+    LICENCE = ("licence and permission acceptances (except the standing acceptance of the google android sdk terms for com.google.firebase and "
+               "com.google.android.gms, #399 comment 7239863908, §1.1)")
+    SCOPE = ("approver scope, widened again (owner decision, #399 comment 7239676323, 2026-11-28, items 1 and 4)")
+    TASKS = ("a pr whose `docs/tasks.toml` change adds or splits tasks (new rows, `depends_on`, `notes`, `risk`), as `owner-batch`")
+    CHECKED = ("a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the pr-size rule) with no finding "
+               "above nit open against them, `scripts/tasks.py validate` passes, ci is green and there is no veto")
+    PROCESS = ("a process-file pr (orchestration.md, agents/prompts/, agents/roles.yaml, review.md, claude.md) whose diff only writes down "
+               "owner decisions already posted on the state issue (#399 or #373), each cited by comment id, after a clean review round that "
+               "checked every changed line against a cited decision")
+    EXACT = ("a change to who may approve or merge what, to guard thresholds, permissions or settings stays with the owner, unless a cited "
+             "owner decision states that exact change")
+    PINNED = (
+        (ORCH, SCOPE), (ORCH, TASKS), (ORCH, CHECKED), (ORCH, PROCESS), (ORCH, EXACT),
+        (ORCH, "other owner-retained paths in the same pr still need the owner"),
+        (ORCH, "standing acceptance of the google android sdk terms (owner decision, #399 comment 7239863908, 2026-11-28)"),
+        (ORCH, "the pr that needs such an artifact adds its exact `group:artifact:version` line to `config/licensee/google-sdk-terms.txt`, "
+               "citing this comment, and lists the added lines in its pr body; the reviewer checks each added line is in scope"),
+        (ORCH, "still with the owner: any artifact outside those two groups, any other licence, and any other permission acceptance"),
+        (ORCH, "except the standing acceptance of the google android sdk terms (#399 comment 7239863908, below)"),
+        (ORCH, LICENCE),
+        (ORCH, "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
+        (ORCH, "the approver's scope also takes task-file prs and decision-recording process prs (owner decision, #399 comment 7239676323 "
+               "items 1 and 4; §1.1)"),
+        (APPROVER, "also yours (§1.1, #399 comment 7239676323 items 1 and 4): " + TASKS.replace(", as `owner-batch`", "")),
+        (APPROVER, "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the pr-size rule) with no "
+                   "finding above nit open against them and `scripts/tasks.py validate` passes"),
+        (APPROVER, PROCESS),
+        (APPROVER, EXACT.replace("a change to who may approve or merge what, to guard thresholds, permissions or settings stays with the "
+                                 "owner", "a pr that changes who may approve or merge what, guard thresholds, permissions or settings is not "
+                                 "yours")),
+        (APPROVER, LICENCE),
+        (APPROVER, "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
+        ("orchestrator", LICENCE),
+        ("orchestrator", "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
+        (LICENSEE, "except lines under the standing acceptance of the google android sdk terms (#399 comment 7239863908)"),
+    )
+
+    def text(self, key):
+        path = ROOT / key if "/" in key else PROMPTS / f"{key}.md"
+        return path.read_text(encoding="utf-8")
+
+    def problems(self, key, text):
+        found = prompt_rules.check_doc_text(key, text) if "/" in key else prompt_rules.check_text(key, text)
+        return [p for p in found if p.startswith("decisions-7239")]
+
+    def test_the_real_files_carry_every_phrase(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase[:60]):
+                self.assertIn(phrase, prompt_rules.normalize(self.text(key)).lower().replace("# ", ""))
+
+    def test_the_real_files_pass_the_rules(self):
+        for key in sorted({k for k, _ in self.PINNED}):
+            with self.subTest(key=key):
+                self.assertEqual(self.problems(key, self.text(key)), [])
+
+    def test_deleting_any_phrase_fails_a_rule(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase[:60]):
+                norm = prompt_rules.normalize(self.text(key)).replace("# ", "")
+                cut = re.sub(re.escape(phrase), " ", norm, flags=re.I)
+                self.assertNotEqual(cut, norm)
+                self.assertTrue(self.problems(key, cut))
 
 
 if __name__ == "__main__":
