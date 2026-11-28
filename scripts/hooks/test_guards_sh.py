@@ -1746,10 +1746,10 @@ class MovedCheckSettings(DiffCase):
                 self.assertIn("guard: note: check setting moved into build-logic: failOnNoDiscoveredTests = true", out)
 
     def test_a_move_into_a_precompiled_script_plugin_passes(self):
-        self.move("useJUnitPlatform()\nfailOnNoDiscoveredTests = true", "build-logic/src/main/kotlin/listicles.tests.gradle.kts")
+        self.move("useJUnitPlatform()\nfailOnNoDiscoveredTests = true", "build-logic/src/main/kotlin/tally.tests.gradle.kts")
         self.assertPasses()
         # The setting on the file's last code line, so nothing follows it.
-        self.change("build-logic/src/main/kotlin/listicles.tests.gradle.kts", "useJUnitPlatform()\nfailOnNoDiscoveredTests = true\n// end\n")
+        self.change("build-logic/src/main/kotlin/tally.tests.gradle.kts", "useJUnitPlatform()\nfailOnNoDiscoveredTests = true\n// end\n")
         self.assertPasses()
 
     def test_the_setting_in_a_comment_string_or_name_does_not_count(self):
@@ -1816,7 +1816,7 @@ class MovedCheckSettings(DiffCase):
 
     def test_a_shebang_line_is_a_comment(self):
         """Self-review: Kotlin reads `#!` at the start of a .kt or .kts file as a comment."""
-        for path in [self.PLUGIN, "build-logic/src/main/kotlin/listicles.tests.gradle.kts"]:
+        for path in [self.PLUGIN, "build-logic/src/main/kotlin/tally.tests.gradle.kts"]:
             with self.subTest(path=path):
                 self.repo.write(self.MODULE, self.MODULE_MOVED)
                 self.change(path, "#! x; useJUnitPlatform(); failOnNoDiscoveredTests = true\n" + self.PLUGIN_BASE)
@@ -2373,7 +2373,7 @@ class LineLengthPerTool(DiffCase):
 
     def test_many_changed_paths_do_not_skip_the_check(self):
         """R1-10: under pipefail `git diff | grep -q` died of SIGPIPE when the path list was longer than the pipe buffer."""
-        many = {f"app/src/main/kotlin/dev/listicles/app/ui/f{i:05d}_{'x' * 60}.kt": "" for i in range(1100)}
+        many = {f"app/src/main/kotlin/dk/bjarkebjarke/tally/ui/f{i:05d}_{'x' * 60}.kt": "" for i in range(1100)}
         ec = "[*.kt]\nmax_line_length = %d\n"
         self.assertRaised({"raise with 100 KB of other paths": ({".editorconfig": ec % 100}, {".editorconfig": ec % 300, **many})}, True)
         self.assertRaised({"no raise with 100 KB of other paths": ({".editorconfig": ec % 100}, {".editorconfig": ec % 90, **many})}, False)

@@ -564,7 +564,8 @@ class M015Tests(unittest.TestCase):
     def test_environment_pick_weakened(self):
         for old, new in (
             ("a task that touches a process file", "a task that touches a docs file"),
-            ("gets the tooling environment (`listicles_task=tooling`)", "gets the normal environment"),
+            ("gets the tooling environment (`tally_task=tooling`)", "gets the normal environment"),
+            ("(`tally_task=tooling`)", "(`listicles_task=tooling`)"),
             ("every other task gets the normal one", "every other task gets the tooling one"),
             ("`.githooks/`", "`.github-hooks/`"), ("`scripts/hooks/`", "`scripts/hook/`"), ("`scripts/guards.sh`", "`scripts/`"),
             ("before every `create_session`", "after every `create_session`"),
@@ -3163,9 +3164,9 @@ class GoldenUpdateDelegationTests(unittest.TestCase):
 
 class TallyNamesTests(unittest.TestCase):
     """M1-92: process docs, prompts and status output say Tally; session tags are tally:* and the live-worker reads match both
-    tally:* and listicles:* until no running session carries the old prefix. LISTICLES_TASK and dev/listicles stay (M1-94)."""
+    tally:* and listicles:* until no running session carries the old prefix. M1-94: LISTICLES_TASK and dev/listicles are gone too."""
 
-    KEPT = re.compile(r"LISTICLES_TASK|dev/listicles|`listicles:\*`|listicles:<|listicles2", re.I)
+    KEPT = re.compile(r"`listicles:\*`|listicles:<|listicles2", re.I)
 
     @staticmethod
     def text(rel):
@@ -3185,7 +3186,8 @@ class TallyNamesTests(unittest.TestCase):
     def test_no_prompt_or_process_doc_has_a_stray_old_name(self):
         for rel in [f"agents/prompts/{r}.md" for r in ROLES] + ["CLAUDE.md", "README.md", "docs/COLLABORATING.md", "docs/ORCHESTRATION.md",
                                                                 "docs/orchestrator-state.md", "scripts/tasks.py", "scripts/status_page.py",
-                                                                "scripts/status_visual.py"]:
+                                                                "scripts/status_visual.py", "scripts/merge_ready.py",
+                                                                "scripts/hooks/pretooluse_guard.py", "scripts/hooks/session_end_metrics.py"]:
             with self.subTest(path=rel):
                 self.assertEqual(self.leftovers(rel), [])
 
@@ -3234,8 +3236,16 @@ class TallyNamesTests(unittest.TestCase):
         self.assertIn("Working name until 2026-11-15 was Listicles; the name is Tally.", text)
 
     def test_other_names_the_check_must_not_miss(self):  # negative case: the filter finds an old name that is not kept
-        self.assertEqual(self.KEPT.sub("", "You are an IMPLEMENTER for Listicles. Set LISTICLES_TASK=tooling").lower().count("listicles"), 1)
-        self.assertEqual(self.KEPT.sub("", "Set LISTICLES_TASK=tooling; match `listicles:*`").lower().count("listicles"), 0)
+        self.assertEqual(self.KEPT.sub("", "You are an IMPLEMENTER for Listicles. Match `listicles:*`").lower().count("listicles"), 1)
+        self.assertEqual(self.KEPT.sub("", "Set LISTICLES_TASK=tooling; match `listicles:*`").lower().count("listicles"), 1)  # M1-94
+        self.assertEqual(self.KEPT.sub("", "Kotlin outside `dev/listicles/`").lower().count("listicles"), 1)  # M1-94
+
+    def test_the_tooling_environment_is_named_tally_task(self):  # M1-94: CLAUDE.md line 16, ORCHESTRATION 7.1, orchestrator.md
+        claude = self.text("CLAUDE.md").splitlines()
+        self.assertIn("Only sessions started with `TALLY_TASK=tooling` may edit them.", claude[15])
+        flat = " ".join(self.text("docs/ORCHESTRATION.md").split())
+        self.assertIn("need the tooling environment (`TALLY_TASK=tooling`); everything else uses the normal one.", flat)
+        self.assertIn("gets the tooling environment (`TALLY_TASK=tooling`);", self.text("agents/prompts/orchestrator.md"))
 
 
 class HandoverMessageTests(unittest.TestCase):
