@@ -445,6 +445,7 @@ def hook_sources():
 # join that resolves to the repo root) other than as the base of a resolvable os.path.join, counted per file (R1-02). A new one fails
 # HookSuiteInputs until it is listed here with a reason, so a read the parse cannot follow (f-string, pathlib, cwd=ROOT) fails closed.
 ROOT_USES = {
+    "golden_label.py": (3, "imports repo_slug from scripts/ and runs git in ROOT (symbolic-ref, rev-parse, remote get-url): scripts/ prefix"),
     "pretooluse_guard.py": (1, "SCRIPT_ROOT is a candidate project root for resolving command paths; it reads no repo file"),
     "run_hook_tests.py": (2, "the runner starts itself (__file__) in each shard"),
     "test_gitenv_isolation.py": (2, "discovers suites in scripts/hooks (HERE) with cwd=ROOT; their own reads are checked in their files"),
