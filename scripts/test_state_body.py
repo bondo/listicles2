@@ -382,6 +382,18 @@ class LeanTest(unittest.TestCase):
         null = changed("branches", [{"name": "m1/x", "holder": None, "disposition": "d"}], changed("sessions", sessions[:1]))
         self.assertIsNone(state_body.load(body(null))["branches"][0]["holder"])
 
+    def test_render_keeps_a_named_holder_when_two_implementers_sit_on_the_branch(self):  # R1-01
+        sessions = [session_row(1, branch="m1/x"), session_row(2, branch="m1/x")]
+        data = changed("branches", [{"name": "m1/x", "holder": session_row(1)["id"], "disposition": "d"}], changed("sessions", sessions))
+        out = state_body.render(body(data))
+        self.assertIn(f'"holder": "{session_row(1)["id"]}"', out)
+        self.assertEqual(state_body.load(out)["branches"][0]["holder"], session_row(1)["id"])
+
+    def test_the_next_scheduled_run_is_the_earliest_time_whatever_the_precision(self):  # R1-02
+        trig = {"id": "trig_01Bak4xL", "fires_into": S1, "purpose": "x"}
+        data = changed("triggers", [dict(trig, next_run="2026-11-23T06:55:30Z"), dict(trig, id="trig_02", next_run="2026-11-23T06:55Z")])
+        self.assertIn("**Scheduled tasks:** 2, next 2026-11-23T06:55Z\n", state_body.summary(data) + "\n")
+
     def test_render_writes_the_canonical_lean_block(self):
         data = full(lean_state())
         for b in data["branches"]:
@@ -413,6 +425,7 @@ class LeanTest(unittest.TestCase):
         summary = state_body.summary(state_body.load(body(data)))
         rows = [ln for ln in summary.splitlines() if ln.startswith("- `m1/task-")]
         self.assertEqual(len(rows), 11)
+        self.assertIn("**Branches** (11; holder: the branch's implementer unless the block names one)", summary)  # R1-03
         self.assertIn("- `m1/task-1` PR #301, in review M1-41, reviewed through `abc1234`: R1; owner", rows[1])
         self.assertNotIn("holder", "\n".join(rows))
 
