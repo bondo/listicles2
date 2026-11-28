@@ -128,5 +128,6 @@ class Tags(unittest.TestCase):
             with self.subTest(env=env):
                 self.assertEqual(self.tags(env)[2], want)
 
+
 if __name__ == "__main__":
     unittest.main()

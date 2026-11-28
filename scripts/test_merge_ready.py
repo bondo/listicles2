@@ -614,7 +614,8 @@ class EmptyPatchTests(unittest.TestCase):
 
     def test_every_check_that_needs_a_patch_refuses_an_empty_one(self):
         cases = (("working-draft-docs", "docs/milestones/M1.md", r"no patch"), ("general", "docs/PLAN.md", r"no patch"),
-                 ("general", "app/src/main/kotlin/dk/bjarkebjarke/tally/A.kt", r"no patch"), ("dependabot", ".github/workflows/ci.yml", r"no patch from the API"),
+                 ("general", "app/src/main/kotlin/dk/bjarkebjarke/tally/A.kt", r"no patch"),
+                 ("dependabot", ".github/workflows/ci.yml", r"no patch from the API"),
                  ("dependabot", "gradle/wrapper/gradle-wrapper.properties", r"no patch from the API"))
         for kind, name, reason in cases:
             for patch in ("", None):
