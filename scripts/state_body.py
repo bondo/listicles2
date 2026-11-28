@@ -315,14 +315,14 @@ def summary(d: dict) -> str:
                                        "claims " + ",".join(s["tasks"]) if s["tasks"] else None) if x)
         note = f". {s['note']}" if "note" in s else ""
         out.append(f"- `{s['id']}` {s['role']}{', ' + where if where else ''}: {s['status']} (checked {s['checked']}){note}")
-    out.append(f"\n**Branches** ({len(d['branches'])}; holders in the block)")
+    out.append(f"\n**Branches** ({len(d['branches'])}; holder: the branch's implementer unless the block names one)")
     for b in d["branches"]:
         bits = [f"PR #{b['pr']}" if b["pr"] else None, "in review " + ",".join(b["in_review"]) if b["in_review"] else None,
                 f"reviewed through `{b['reviewed_through']}`" if b["reviewed_through"] else None,
                 f"unreviewed since `{b['unreviewed_since']}`" if b["unreviewed_since"] else None]
         out.append(f"- `{b['name']}` {', '.join(x for x in bits if x)}: {b['disposition']}".replace("` : ", "`: "))
     times = [t["next_run"] for t in d["triggers"] if t["next_run"]]
-    out.append("\n**Scheduled tasks:** " + (f"{len(d['triggers'])}" + (f", next {min(times)}" if times else "") if d["triggers"] else "none"))
+    out.append("\n**Scheduled tasks:** " + (f"{len(d['triggers'])}" + (f", next {min(times, key=lambda t: t if t.count(':') == 2 else t[:-1] + ':00Z')}" if times else "") if d["triggers"] else "none"))
     out.append("**PR subscriptions:** " + (", ".join(f"#{n}" for n in d["subscriptions"]) or "none"))
     out.append("**Standing owner decisions:** " + (f"{len(d['decisions'])} (comment ids in the block)" if d["decisions"] else "none"))
     return "\n".join(out)
