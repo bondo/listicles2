@@ -129,7 +129,8 @@ _DELEGATED = tuple(re.escape(t) for t in (
 ))
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
-    "settings, network allowlists, licence and permission acceptances (except 7239863908, above), guard thresholds (600/1500), design and product sign-off, merges of PRs "
+    "settings, network allowlists, licence and permission acceptances (except 7239863908, above), "
+    "guard thresholds (600/1500), design and product sign-off, merges of PRs "
     "with sync-merge content (sync and merge logic), the owner task M1-O5 (approving the privacy text before anyone but the owner installs the "
     "app), and changes to the process files that define these authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, "
     "agents/roles.yaml, agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)."
@@ -636,7 +637,8 @@ RULES = (
         "two-phase handover at about 50% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7239676323 item 5, 7158603054), "
         "first batch boundary: "
         "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
-        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k"),
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 35% of a 1m window",
+                r"about 50% of a 1m window \(40% of a 200k"),
     ),
     Rule(
         "handover-messages", ("orchestrator",),
@@ -1240,7 +1242,8 @@ RULES = (
          r"up to about 150 changed lines when they touch only tests or docs",
          r"a fresh implementer from `handoff/<branch>\.md` when the running one is above 30% context"),
         "the orchestrator hands over at about 50% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
-        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k", r"daily pacing recompute",
+        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 35% of a 1m window",
+                r"about 50% of a 1m window \(40% of a 200k", r"daily pacing recompute",
                    r"this pr's scaling", r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k",
                    r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
@@ -1503,7 +1506,8 @@ DOC_RULES = (
         ),
         "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
         "the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 35% of a 1m window",
+                r"about 50% of a 1m window \(40% of a 200k",
                    r"the owner archives you"),
     ),
     DocRule(
