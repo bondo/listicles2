@@ -3429,5 +3429,73 @@ class TokenSavingsTests(unittest.TestCase):
                 self.assertTrue(self.problems(key, self.text(key) + "\n\n" + old + "\n"))
 
 
+class AutonomyDecisionsTests(unittest.TestCase):
+    """Owner decisions 7239676323 items 1 and 4 and 7239863908 (state issue #399, 2026-11-28): the approver scope takes task-file and
+    decision-recording process PRs, and the Google Android SDK terms have a standing acceptance. Each phrase must be in the real file and
+    pinned by a `decisions-7239` rule (deleting it fails the checker)."""
+
+    ORCH, APPROVER, LICENSEE = "docs/ORCHESTRATION.md", "approver", "config/licensee/google-sdk-terms.txt"
+    SCOPE = ("approver scope, widened again (owner decision, #399 comment 7239676323, 2026-11-28, items 1 and 4)")
+    TASKS = ("a pr whose `docs/tasks.toml` change adds or splits tasks (new rows, `depends_on`, `notes`, `risk`), as `owner-batch`")
+    CHECKED = ("a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the pr-size rule) with no finding "
+               "above nit open against them, `scripts/tasks.py validate` passes, ci is green and there is no veto")
+    PROCESS = ("a process-file pr (orchestration.md, agents/prompts/, agents/roles.yaml, review.md, claude.md) whose diff only writes down "
+               "owner decisions already posted on the state issue (#399 or #373), each cited by comment id, after a clean review round that "
+               "checked every changed line against a cited decision")
+    EXACT = ("a change to who may approve or merge what, to guard thresholds, permissions or settings stays with the owner, unless a cited "
+             "owner decision states that exact change")
+    PINNED = (
+        (ORCH, SCOPE), (ORCH, TASKS), (ORCH, CHECKED), (ORCH, PROCESS), (ORCH, EXACT),
+        (ORCH, "other owner-retained paths in the same pr still need the owner"),
+        (ORCH, "standing acceptance of the google android sdk terms (owner decision, #399 comment 7239863908, 2026-11-28)"),
+        (ORCH, "the pr that needs such an artifact adds its exact `group:artifact:version` line to `config/licensee/google-sdk-terms.txt`, "
+               "citing this comment, and lists the added lines in its pr body; the reviewer checks each added line is in scope"),
+        (ORCH, "still with the owner: any artifact outside those two groups, any other licence, and any other permission acceptance"),
+        (ORCH, "except the standing acceptance of the google android sdk terms (#399 comment 7239863908, below)"),
+        (ORCH, "licence and permission acceptances (except 7239863908, above)"),
+        (ORCH, "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
+        (ORCH, "the approver's scope also takes task-file prs and decision-recording process prs (owner decision, #399 comment 7239676323 "
+               "items 1 and 4; §1.1)"),
+        (APPROVER, "also yours (§1.1, #399 comment 7239676323 items 1 and 4): " + TASKS.replace(", as `owner-batch`", "")),
+        (APPROVER, "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the pr-size rule) with no "
+                   "finding above nit open against them and `scripts/tasks.py validate` passes"),
+        (APPROVER, PROCESS.replace("after a clean", "when a clean")),
+        (APPROVER, EXACT.replace("a change to who may approve or merge what, to guard thresholds, permissions or settings stays with the "
+                                 "owner", "a pr that changes who may approve or merge what, guard thresholds, permissions or settings is not "
+                                 "yours")),
+        (APPROVER, "licence and permission acceptances (except 7239863908, above)"),
+        (APPROVER, "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
+        ("orchestrator", "licence and permission acceptances (except 7239863908, above)"),
+        ("orchestrator", "agents/prompts/), except a pr that only writes down owner decisions as 7239676323 item 4 states (above)"),
+        (LICENSEE, "except lines under the standing acceptance of the google android sdk terms (#399 comment 7239863908)"),
+    )
+
+    def text(self, key):
+        path = ROOT / key if "/" in key else PROMPTS / f"{key}.md"
+        return path.read_text(encoding="utf-8")
+
+    def problems(self, key, text):
+        found = prompt_rules.check_doc_text(key, text) if "/" in key else prompt_rules.check_text(key, text)
+        return [p for p in found if p.startswith("decisions-7239")]
+
+    def test_the_real_files_carry_every_phrase(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase[:60]):
+                self.assertIn(phrase, prompt_rules.normalize(self.text(key)).lower().replace("# ", ""))
+
+    def test_the_real_files_pass_the_rules(self):
+        for key in sorted({k for k, _ in self.PINNED}):
+            with self.subTest(key=key):
+                self.assertEqual(self.problems(key, self.text(key)), [])
+
+    def test_deleting_any_phrase_fails_a_rule(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase[:60]):
+                norm = prompt_rules.normalize(self.text(key)).replace("# ", "")
+                cut = re.sub(re.escape(phrase), " ", norm, flags=re.I)
+                self.assertNotEqual(cut, norm)
+                self.assertTrue(self.problems(key, cut))
+
+
 if __name__ == "__main__":
     unittest.main()
