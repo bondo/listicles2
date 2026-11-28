@@ -24,18 +24,4 @@
     <string name="signin_note">Your lists are kept with your account, so they follow you to a new phone.</string>
     <string name="signin_no_account">This phone has no Google account. Add one, or use email and password.</string>
     <string name="signin_failed">Could not sign in. Try again.</string>
-    <!-- AUTH-03, wireframes 18, 39, 45: the Account screen (M1-25). -->
-    <string name="account_title">Account</string>
-    <string name="account_back">Back</string>
-    <string name="account_sign_out">Sign out</string>
-    <string name="account_sign_out_body">Removes your lists from this phone</string>
-    <string name="account_sign_out_failed">Could not sign out. Try again.</string>
-    <string name="account_privacy">Privacy policy</string>
-    <!-- Where the privacy text of this language is published (privacy Q10). -->
-    <string name="account_privacy_url">https://github.com/bondo/tally/blob/main/docs/privacy/privacy-en.md</string>
-    <string name="sign_out_question_title">Sign out?</string>
-    <string name="sign_out_not_sent">Some changes have not been sent yet. If you sign out now, they will be lost.</string>
-    <string name="sign_out_may_not_be_sent">Changes you made may not have been sent yet. If you sign out now, they may be lost.</string>
-    <string name="sign_out_cancel">Cancel</string>
-    <string name="sign_out_anyway">Sign out anyway</string>
 </resources>

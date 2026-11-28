@@ -8,6 +8,9 @@ M1-25 (docs/milestones/M1.md row 21): Account screen (wireframe 18), sign-out UI
 ## Done
 - Tests first (2ef118b), then the Account screen, view model, en and da strings, privacy link (Q10).
 
+## Part C (M1-125): Account screen UI
+Moved out of PR 419 by a later commit; rebuild on a fresh branch from main after PR 419 merges, from commit 0691230: `AccountScreen.kt` (with `AccountRoute`), `AccountScreenTest.kt`, `res/drawable/ic_arrow_back.xml`, and the `account_*` and `sign_out_*` strings (values and values-da). M1-123 (navigation) depends on it.
+
 ## Part B (M1-123): navigation, rebuilt from commits
 Removed from this branch by a later commit: the home avatar, Account over the home (`AccountKey` back stack in `TallyApp`, `account` slot and `avatarInitial`), the `MainActivity` wiring, `HomeScreenAvatarTest`, and the `account_open` string (en, da). Rebuild on a fresh branch from main after M1-25 merges, from 76f32b0 (TallyApp, HomeScreen, MainActivity) and d836ebc (avatar only when Account is wired; test). A home-with-avatar golden needs the golden-update label.
 
