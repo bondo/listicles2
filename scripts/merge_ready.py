@@ -56,8 +56,8 @@ GH_STATUS_RE = re.compile(r"\(HTTP (\d{3})\)|^gh: HTTP (\d{3})$", re.M)
 # The state issue that holds owner decisions and batch approvals, and the one before it (None until the first rotation). At a rotation (milestone end,
 # about 250 comments or a 15 KB body, at a handover boundary) the successor opens the new issue and a PR moves this pointer: STATE_ISSUE = the new one,
 # PREVIOUS_STATE_ISSUE = the old one. This file is owner-only, so that PR is an owner merge; until it lands, approvals on the new issue refuse.
-STATE_ISSUE = 373
-PREVIOUS_STATE_ISSUE = 15
+STATE_ISSUE = 399
+PREVIOUS_STATE_ISSUE = 373
 WAIT_SECONDS, WAIT_POLL = 900, 30  # --wait: how long to wait for required checks, and the poll interval
 MERGE_TREE_TIMEOUT = 120  # seconds for one git fetch or merge-tree
 
@@ -90,7 +90,7 @@ _SEG = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"  # one path component: no dot-prefix, no "
 ROOT = r"(?:dev/listicles|dk/bjarkebjarke/tally)"  # the Kotlin package roots: the current one and the one M1-29 renames to (naming.md)
 GENERAL_ALLOW = tuple(re.compile(p) for p in (
     rf"app/src/(?:main|test|androidTest)/kotlin/{ROOT}(?:/{_SEG})+\.kt", rf"app/src/main/res(?:/{_SEG})+\.(?:xml|png|webp)",  # app sources, tests, res
-    rf"core/(?!testing/)[a-z][a-z0-9_-]*/src/(?:main|test)/kotlin/{ROOT}(?:/{_SEG})+\.kt",  # core module sources and tests (not core/testing)
+    rf"core/(?!testing/)[a-z][a-z0-9_-]*/src/(?:main|test|androidTest)/kotlin/{ROOT}(?:/{_SEG})+\.kt",  # core sources, tests (not core/testing)
     rf"docs(?:/{_SEG})+\.(?:md|csv|png|txt)", r"README\.md", r"docs/tasks\.toml"))  # docs (owner-only ones refused by the lists); tasks.toml: tasks_problems
 # Tests and config that are gates, wherever they sit (casefolded): the architecture package, the no-network, Robolectric and JUnit 4 engine tests, classes
 # named like core/testing's (R7-02), and res/xml and qualified forms such as xml-v31 (backup, device-transfer, network-security rules; R7-06).
