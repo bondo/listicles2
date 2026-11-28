@@ -117,6 +117,10 @@ class LabelAllows(Case):
         self.assertEqual(call["argv"], ["api", "--hostname", "github.com", "-X", "GET", "repos/o/r/pulls",
                                         "-f", "state=open", "-f", "head=o:work", "-f", "per_page=100"])
 
+    def test_push_of_head_to_the_checked_out_branch_allows(self):
+        """`git push -u origin HEAD` and `git push origin HEAD:work` give git's local ref as HEAD."""
+        self.allowed(stdin=f"HEAD {self.repo.head()} refs/heads/work {ZERO}\n")
+
     def test_other_labels_beside_it_do_not_matter(self):
         self.repo.answer([pr(labels=("big-pr", "golden-update", "x"))])
         self.allowed()
@@ -164,7 +168,7 @@ class LabelRefuses(Case):
                json.dumps([dict(pr(), labels="golden-update")]), json.dumps([dict(pr(), labels=["golden-update"])]),
                json.dumps([dict(pr(), labels=[{"name": 1}])]), json.dumps([{k: v for k, v in pr().items() if k != "head"}]),
                json.dumps([dict(pr(), head={"ref": "work"})]), json.dumps([dict(pr(), head={"ref": "work", "repo": None})]),
-               json.dumps([dict(pr(), number="7")]), json.dumps([{k: v for k, v in pr().items() if k != "labels"}])]
+               json.dumps([dict(pr(), number="7")]), json.dumps([dict(pr(), number=True)]), json.dumps([{k: v for k, v in pr().items() if k != "labels"}])]
         for body in bad:
             with self.subTest(body=body):
                 self.repo.answer(body)
@@ -191,13 +195,20 @@ class PushInputRefuses(Case):
                       f"refs/heads/work {head} refs/tags/work {ZERO}\n", f"refs/tags/v1 {head} refs/tags/v1 {ZERO}\n",
                       f"refs/heads/other {head} refs/heads/other {ZERO}\n", f"refs/heads/work {other} refs/heads/work {ZERO}\n",
                       f"(delete) {ZERO} refs/heads/work {head}\n", f"refs/heads/work {ZERO} refs/heads/work {head}\n",
-                      f"HEAD {head} refs/heads/work {ZERO}\n", f"refs/heads/work {head[:12]} refs/heads/work {ZERO}\n"]:
+                      f"HEAD {head} refs/heads/other {ZERO}\n", f"HEAD {head} refs/tags/work {ZERO}\n", f"HEAD {other} refs/heads/work {ZERO}\n",
+                      f"refs/heads/work {head[:12]} refs/heads/work {ZERO}\n"]:
             with self.subTest(stdin=stdin):
                 self.refused("golden_label:", gh_called=False, stdin=stdin)
 
     def test_detached_head_refuses(self):
         self.repo.git("checkout", "-q", "--detach")
         self.refused("golden_label:", gh_called=False)
+        self.refused("golden_label:", gh_called=False, stdin=f"HEAD {self.repo.head()} refs/heads/work {ZERO}\n")
+
+    def test_head_pushed_from_another_branch_refuses(self):
+        """`git push origin HEAD:work` from branch `other`: the guards checked `other`, so the label of work's PR does not count."""
+        self.repo.git("checkout", "-q", "-b", "other")
+        self.refused("golden_label:", gh_called=False, stdin=f"HEAD {self.repo.head()} refs/heads/work {ZERO}\n")
 
     def test_push_url_of_another_repository_refuses(self):
         for url in ("https://github.com/x/r.git", "https://github.com/o/r2", "https://example.com/o/r.git", "", "/tmp/r.git"):

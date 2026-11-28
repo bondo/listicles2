@@ -63,18 +63,19 @@ def pushed_branch(stdin: str, root: Path) -> str:
     if len(parts) != 4:
         raise Refused("pre-push input is not '<local ref> <local sha> <remote ref> <remote sha>'")
     local_ref, local_sha, remote_ref, _ = parts
-    if not (local_ref.startswith("refs/heads/") and remote_ref.startswith("refs/heads/")):
-        raise Refused(f"not a branch push: {local_ref[:100]!r} -> {remote_ref[:100]!r}")
-    branch = local_ref[len("refs/heads/"):]
-    if remote_ref != local_ref:
-        raise Refused(f"the remote branch {remote_ref[:100]!r} is not {local_ref[:100]!r}")
+    # `git push origin HEAD` and `HEAD:<branch>` name the local side HEAD; the symbolic-ref check below still ties it to the branch.
+    if local_ref not in ("HEAD", remote_ref):
+        raise Refused(f"{local_ref[:100]!r} is not pushed to the same branch name ({remote_ref[:100]!r}); push with `git push`")
+    if not remote_ref.startswith("refs/heads/"):
+        raise Refused(f"not a branch push: {remote_ref[:100]!r}")
+    branch = remote_ref[len("refs/heads/"):]
     if not BRANCH.fullmatch(branch) or ".." in branch or branch.startswith(("/", "-")):
         raise Refused(f"branch name not supported: {branch[:100]!r}")
     if not SHA.fullmatch(local_sha) or local_sha == ZERO:
         raise Refused("a branch delete or an unparsable commit id")
     head_ref = git(root, "symbolic-ref", "-q", "HEAD")
-    if head_ref != local_ref:
-        raise Refused(f"{local_ref} is not the checked-out branch ({head_ref or 'detached HEAD'}), which the guards checked")
+    if head_ref != remote_ref:
+        raise Refused(f"{remote_ref} is not the checked-out branch ({head_ref or 'detached HEAD'}), which the guards checked")
     if git(root, "rev-parse", "--verify", "-q", "HEAD^{commit}") != local_sha:
         raise Refused(f"the pushed commit is not HEAD of {branch}, which the guards checked")
     return branch
