@@ -1228,7 +1228,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-17", "M1-25"]
+depends_on = ["M1-17", "M1-25", "M1-125", "M1-123"]
 
 [[task]]
 id = "M1-32"
@@ -1251,13 +1251,14 @@ notes = "Dropped if the Identity Platform upgrade needs billing (OQ-25, M1-O3). 
 
 [[task]]
 id = "M1-25"
-title = "Account screen (wireframe 18) and navigation: sign-out UI (AUTH-03), Crashlytics opt-in switch, no Analytics"
+title = "Account view model and profile wiring (AUTH-03 over the M1-14 sign-out); the screen is M1-125, navigation M1-123, the Crashlytics opt-in M1-122"
 milestone = "M1"
-status = "todo"
+status = "done"
+pr = 419
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60", "M1-88"]
-notes = "P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, deleted in LocalUserData.clear() so that a sign-out Firebase starts by itself clears them too (M1-89, SignedOutCleanup), tested; the in-app privacy link is privacy Q10"
+notes = "P11: the screen is Account, not Settings. Split three ways, like M1-16 and M1-99: this task is the view model, AccountProfiles and their wiring (PR 419); M1-125 has the screen, the sign-out question and the privacy link (privacy Q10); M1-123 the home avatar (Q1 A) and navigation; M1-122 the Crashlytics opt-in (privacy Q3, Q13: sets no user id or custom keys, tested). Sign-out clearing all local app data incl. last-opened times is LocalUserData.clear() (M1-89, SignedOutCleanup); no last-opened store exists before M2"
 
 [[task]]
 id = "M1-26"
@@ -1533,7 +1534,7 @@ milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
-depends_on = ["M1-08", "M1-10", "M1-18", "M1-17", "M1-25", "M1-62"]
+depends_on = ["M1-08", "M1-10", "M1-18", "M1-17", "M1-25", "M1-125", "M1-123", "M1-62"]
 notes = "P9 of docs/milestones/M1.md; wireframes 42, 43; implements the ProfileRepository of M1-17"
 
 [[task]]
@@ -1671,7 +1672,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-16", "M1-17", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-25", "M1-27", "M1-32", "M1-39", "M1-03", "M1-04"]
+depends_on = ["M1-16", "M1-17", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-25", "M1-122", "M1-123", "M1-125", "M1-27", "M1-32", "M1-39", "M1-03", "M1-04"]
 notes = "Opus worker, one-off prompt (docs/reviews/README.md section 3.4); result to owner and collaborator together; findings target M2"
 
 [[task]]
@@ -1681,7 +1682,7 @@ milestone = "M1"
 status = "todo"
 assignee = "process"
 risk = "normal"
-depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-68", "M1-69", "M1-82"]
+depends_on = ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12", "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24", "M1-25", "M1-122", "M1-123", "M1-125", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-60", "M1-62", "M1-31", "M1-32", "M1-33", "M1-35", "M1-36", "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-49", "M1-50", "M1-51", "M1-52", "M1-53", "M1-54", "M1-68", "M1-69", "M1-82"]
 notes = "Opus worker (docs/reviews/README.md section 3.2): story-to-test trace incl. START-01 and AUTH-12, escaped issues; findings target M2. Add M1-34 here and to M1-FU when PR #249 merges"
 
 [[task]]
@@ -1745,7 +1746,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = [
-  "M1-88", "M1-89", "M1-90", "M1-120",
+  "M1-88", "M1-89", "M1-90", "M1-120", "M1-122", "M1-123", "M1-125",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99", "M1-121",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
@@ -1932,7 +1933,7 @@ status = "todo"
 assignee = "planner"
 risk = "normal"
 depends_on = ["milestone:M1"]
-notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); item writes per batch under the access-call limits, 5 when every call counts, and whether production caches calls on one document as the emulator does (ADR 0002, item e); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da). Sign-out wording: the list and item listeners feed LocalUserData.unsentChangesSeen from hasPendingWrites (M1-67's FirestoreSession answers false until a listener exists, so the question uses wireframe 45, not 39)"
+notes = "Agenda (issue 257; decide before the M2 rules PRs): counter storage and the increment problem (#207); caps for items per list and invites per household before external testers (#204, 7003828200); revisit the accepted residual that one account can still use up the quota through many lists (lists per user unbounded, 7064904144); the two-phase list delete (#208); sync and merge simulation tests (#39); the Undo create rule for the original createdBy (7000527780); the anonymise rule shape and its gap after leave, removal, stop sharing and household deletion (7000513565); kept uids on households, tombstones and lists.updatedBy (7003847292, M2 half of closed #205), and, only if M1-FU re-defers #281, a member's invites under an abandoned tombstone (R1-A-02, R1-B-07 of PR #265); the post-v1 undo/redo reading the owner confirms (PLAN section 7); list and item name lengths (M1.md P4); item writes per batch under the access-call limits, 5 when every call counts, and whether production caches calls on one document as the emulator does (ADR 0002, item e); #198 items 4 and 5; for the M6 plan: Baseline and Startup Profiles and the Compose stability report (checklist follow-up 6). Privacy Q4, Q8, Q11 (#15 comment 7082747493): when the anonymise cases, the kept uids (#205) and the export (OQ-38) are decided, update the to-confirm markers in docs/privacy section 7 and add the export to the privacy text (en and da). Sign-out wording: the list and item listeners feed LocalUserData.unsentChangesSeen from hasPendingWrites (M1-67's FirestoreSession answers false until a listener exists, so the question uses wireframe 45, not 39). Carried from M1-25: the last-opened store (OQ-35) must be cleared in LocalUserData.clear() at sign-out, with a test (privacy Q13)"
 
 [[task]]
 id = "M2-FU"
@@ -2172,3 +2173,33 @@ risk = "normal"
 depends_on = []
 pr = 394
 notes = "Owner decision 7136806608 on #373, extended by the owner via the orchestrator (flakes disabled on the owner's workstation): flake.nix and shell.nix (one shell definition, `nix develop` and `nix-shell`), flake.lock pins nixpkgs (shell.nix reads it), Node from that nixpkgs, firebase-tools from firebase/package-lock.json (npm ci, no second pin). scripts/check_nix_shell.py: static check (no network) plus --live (both entry points print the lockfile's firebase-tools version), wired into verify.sh and CI. M1.md R7 gets the commands. Build files: owner-only merge, approver-eligible. Scope is firebase-tools only (no JDK or Android)"
+
+[[task]]
+id = "M1-122"
+title = "Crashlytics opt-in (split from M1-25): Send crash reports switch, manifest flag off, no Analytics, no user id or custom keys"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-25", "M1-125"]
+notes = "Split from M1-25. The owner accepted the Google Android SDK terms of com.google.firebase:firebase-measurement-connector:20.0.1 (#399 comment 7239508302 item 3, widened by the standing acceptance 7239863908): this PR adds that exact line to config/licensee/google-sdk-terms.txt citing them, and lists it in its PR body. Plan and tests: the handoff file of PR 419 at commit 42a7cd9 (handoff/m1-account-25.md): libs.firebase.crashlytics and its verification metadata, the manifest flag firebase_crashlytics_collection_enabled=false, CrashReports and PreferencesCrashReports, the Send crash reports switch row in the Account screen (M1-125), tests that no Analytics class is on the classpath and that no source sets a user id or custom keys; privacy Q3 and Q13"
+
+[[task]]
+id = "M1-123"
+title = "Account navigation (part B of M1-25): home top-bar avatar opens Account over the home, wiring in MainActivity; sign-out returns to sign-in"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-25", "M1-125"]
+notes = "Split from M1-25 (about 700 lines in full). Not stacked: a PR from main after PR 419 merges, rebuilt from commits 76f32b0 (TallyApp account slot and AccountKey back stack, HomeScreen avatar, MainActivity wiring) and d836ebc (avatar only when Account is wired, HomeScreenAvatarTest) on branch m1/account-25; needs the account_open string back (en, da). A home-with-avatar golden needs the golden-update label"
+
+[[task]]
+id = "M1-125"
+title = "Account screen UI (part of M1-25): AccountScreen with the sign-out question (wireframes 18, 39, 45), privacy link, en and da strings"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-25"]
+notes = "Split from PR 419 (about 750 lines). Not stacked: a PR from main after PR 419 merges, rebuilt from commit 0691230 of branch m1/account-25 (AccountScreen.kt, AccountScreenTest.kt, ic_arrow_back.xml, the account_* and sign_out_* strings in values and values-da; AccountScreen.kt exists there with the crash switch already removed). The view model and AccountActions are in PR 419"
