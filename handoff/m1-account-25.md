@@ -9,12 +9,13 @@ M1-25 (docs/milestones/M1.md row 21): Account screen (wireframe 18), sign-out UI
 - Tests first (2ef118b), then the Account screen, view model, en and da strings, privacy link (Q10).
 
 ## Part C (M1-125): Account screen UI
-Moved out of PR 419 by a later commit; rebuild on a fresh branch from main after PR 419 merges, from commit 0691230: `AccountScreen.kt` (with `AccountRoute`), `AccountScreenTest.kt`, `res/drawable/ic_arrow_back.xml`, and the `account_*` and `sign_out_*` strings (values and values-da). M1-123 (navigation) depends on it.
+Moved out of PR 419 by a later commit; rebuild on a fresh branch from main after PR 419 merges, from commit 0691230: `AccountScreen.kt` (with `AccountRoute`), `AccountScreenTest.kt`, the back-arrow drawable `ic_arrow_back`, and the `account_*` and `sign_out_*` strings (values and values-da). M1-123 (navigation) depends on it.
 
 ## Part B (M1-123): navigation, rebuilt from commits
 Removed from this branch by a later commit: the home avatar, Account over the home (`AccountKey` back stack in `TallyApp`, `account` slot and `avatarInitial`), the `MainActivity` wiring, `HomeScreenAvatarTest`, and the `account_open` string (en, da). Rebuild on a fresh branch from main after M1-25 merges, from 76f32b0 (TallyApp, HomeScreen, MainActivity) and d836ebc (avatar only when Account is wired; test). A home-with-avatar golden needs the golden-update label.
 
-## Held back: Crashlytics opt-in (M1-122, needs the owner)
+## Held back: Crashlytics opt-in (M1-122)
+Owner decision: the Android SDK terms of firebase-measurement-connector:20.0.1 are accepted for M1-122 only (#399 comment 7239508302, item 3). M1-122 adds the licence line with that comment id; it is not part of PR 419.
 `com.google.firebase:firebase-crashlytics` (in the BoM 35.2.0, resolves to 21.1.0) brings in exactly one artifact that `licensee` rejects, with the Android SDK terms:
 - `com.google.firebase:firebase-measurement-connector:20.0.1`
 Nothing else is flagged (checked on androidDebug and androidRelease). `firebase-analytics` is not on the classpath. Licence acceptance is the owner's: needs a line in `config/licensee/google-sdk-terms.txt`.
