@@ -9,6 +9,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import dk.bjarkebjarke.tally.data.FirebaseEmulator
+import dk.bjarkebjarke.tally.domain.account.AccountProfile
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
 import dk.bjarkebjarke.tally.domain.session.GoogleIdToken
 import dk.bjarkebjarke.tally.domain.session.GoogleSignInResult
@@ -317,6 +318,27 @@ class SessionEmulatorTest {
                 listOf(googleAccountId(email), NAME, email, PHOTO),
                 listOf(google.uid, google.displayName, google.email, google.photoUrl?.toString()),
             )
+        }
+
+    @Test
+    fun theProfileIsTheSignedInNameAndEmailAndEmptyAfterSignOut() =
+        emulatorTest {
+            val email = "profile-${UUID.randomUUID()}@example.com"
+            assertEquals(AccountProfile(null, null), authentication.current())
+
+            authentication.signInWithGoogle(googleIdToken(email, NAME))
+            assertEquals(AccountProfile(NAME, email), authentication.current())
+
+            signOut().discardingUnsentChanges()
+            assertEquals(AccountProfile(null, null), authentication.current())
+        }
+
+    @Test
+    fun aBlankGoogleNameIsNoName() =
+        emulatorTest {
+            val email = "blank-${UUID.randomUUID()}@example.com"
+            authentication.signInWithGoogle(googleIdToken(email, "  "))
+            assertEquals(AccountProfile(null, email), authentication.current())
         }
 
     private suspend fun signIn(token: String) {

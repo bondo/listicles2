@@ -15,6 +15,7 @@ import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.MainActivity
 import dk.bjarkebjarke.tally.R
 import dk.bjarkebjarke.tally.connectivity.ConnectivityModule
+import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
@@ -26,6 +27,7 @@ import dk.bjarkebjarke.tally.domain.start.NameState
 import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import dk.bjarkebjarke.tally.session.SessionModule
 import dk.bjarkebjarke.tally.session.StartedActivity
+import dk.bjarkebjarke.tally.testing.FakeAccountProfiles
 import dk.bjarkebjarke.tally.testing.FakeAuthentication
 import dk.bjarkebjarke.tally.testing.FakeConnectivity
 import dk.bjarkebjarke.tally.testing.FakeEmailVerification
@@ -105,6 +107,11 @@ class SignedOutStartTest {
 
     /** What the signed-out cleanup (M1-89) deletes; it runs on a thread of the application scope. */
     private val steps: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    /** The Account screen's profile (M1-25). */
+    @BindValue
+    @JvmField
+    val accountProfiles: AccountProfiles = FakeAccountProfiles()
 
     @BindValue
     @JvmField
