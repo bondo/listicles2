@@ -43,7 +43,7 @@ import dk.bjarkebjarke.tally.TallyTheme
 fun HomeScreen(
     modifier: Modifier = Modifier,
     avatarInitial: String = "",
-    onAccount: () -> Unit = {},
+    onAccount: (() -> Unit)? = null,
 ) {
     val accountDescription = stringResource(R.string.account_open)
     Scaffold(
@@ -52,17 +52,19 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.lists_title), Modifier.semantics { heading() }) },
                 actions = {
-                    // Wireframe 02: the avatar opens Account (M1-25).
-                    IconButton(onAccount) {
-                        Surface(
-                            Modifier.size(Sizes.icon + Spacing.s).semantics {
-                                contentDescription = accountDescription
-                            },
-                            CircleShape,
-                            MaterialTheme.colorScheme.primaryContainer,
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(avatarInitial, style = MaterialTheme.typography.labelLarge)
+                    // Wireframe 02: the avatar opens Account (M1-25); without an Account to open there is no button.
+                    if (onAccount != null) {
+                        IconButton(onAccount) {
+                            Surface(
+                                Modifier.size(Sizes.icon + Spacing.s).semantics {
+                                    contentDescription = accountDescription
+                                },
+                                CircleShape,
+                                MaterialTheme.colorScheme.primaryContainer,
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(avatarInitial, style = MaterialTheme.typography.labelLarge)
+                                }
                             }
                         }
                     }

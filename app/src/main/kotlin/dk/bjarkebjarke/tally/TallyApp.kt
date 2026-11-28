@@ -41,7 +41,7 @@ fun TallyApp(
     viewModel: StartViewModel,
     modifier: Modifier = Modifier,
     signIn: @Composable () -> Unit = { SignInScreen(SignInUiState(), {}, {}, {}) },
-    account: @Composable (onBack: () -> Unit) -> Unit = {},
+    account: (@Composable (onBack: () -> Unit) -> Unit)? = null,
     avatarInitial: () -> String = { "" },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -58,7 +58,7 @@ fun TallyApp(
     modifier: Modifier = Modifier,
     darkTheme: Boolean = isSystemInDarkTheme(),
     signIn: @Composable () -> Unit = { SignInScreen(SignInUiState(), {}, {}, {}) },
-    account: @Composable (onBack: () -> Unit) -> Unit = {},
+    account: (@Composable (onBack: () -> Unit) -> Unit)? = null,
     avatarInitial: () -> String = { "" },
 ) {
     TallyTheme(darkTheme) {
@@ -82,9 +82,12 @@ fun TallyApp(
                             entry<StartStep.EnterName> { StepPlaceholder(R.string.gate_name_title) }
                             entry<StartStep.Notice> { key -> StepPlaceholder(noticeTitle(key.notice)) }
                             entry<StartStep.Home> {
-                                HomeScreen(avatarInitial = avatarInitial(), onAccount = { accountOpen = true })
+                                HomeScreen(
+                                    avatarInitial = avatarInitial(),
+                                    onAccount = account?.let { { accountOpen = true } },
+                                )
                             }
-                            entry<AccountKey> { account { accountOpen = false } }
+                            entry<AccountKey> { account?.invoke { accountOpen = false } }
                         },
                 )
             }
