@@ -4,6 +4,7 @@
 The body is free prose (kept as is), a generated summary between the markers BEGIN and END, and exactly one fenced
 ```json block that holds the state: usage, sessions, branches, triggers, the owner queue and the next steps. The block
 is the source; the summary is derived from it, so edit the block and run `render`. Standard library only.
+A row may leave out its empty optional fields (M1-120); `load` fills them and `render` writes the canonical lean form.
 
 Usage:
   scripts/state_body.py validate [--comments N] BODY   exit 1 with every problem on stderr; BODY is a file or - for stdin.
@@ -20,6 +21,7 @@ scripts/tasks.py --state state.md reads the claimed and in-review task ids from 
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import re
 import sys
@@ -127,11 +129,19 @@ STATUSES = ("running", "idle-with-result", "idle-no-result", "failed", "archived
 
 TAG = pattern(r"[a-z][a-z-]*:\S+", "a session tag like pr:319 (ORCHESTRATION.md 2.1)")
 
+# M1-120 (owner decision 7140391316 item 3): a row may leave out its empty fields, so the body stays small. Required are the fields that
+# carry meaning: who (id, role), when (spawned, checked), what is expected, status; a branch's name and disposition. `load` fills the rest
+# with the defaults below; `render` writes them out again only when they are not the default (the canonical lean form).
+SESSION_DEFAULTS: dict[str, Any] = {"tags": [], "branch": None, "pr": None, "tasks": []}
+BRANCH_DEFAULTS: dict[str, Any] = {"holder": None, "pr": None, "in_review": [], "reviewed_through": None, "unreviewed_since": None}
+SESSION_ORDER = ("id", "role", "tags", "branch", "pr", "tasks", "spawned", "expects", "checked", "status", "note")
+BRANCH_ORDER = ("name", "holder", "pr", "in_review", "reviewed_through", "unreviewed_since", "disposition")
 SESSION_ROW = obj({"id": SESSION, "role": ROLE, "tags": list_of(TAG), "branch": nullable(TEXT), "pr": nullable(NUMBER), "tasks": list_of(TASK),
                    "spawned": TIME, "expects": TEXT, "checked": TIME, "status": one_of(*STATUSES), "note": TEXT},
-                  optional=frozenset({"note"}))
+                  optional=frozenset({"note", *SESSION_DEFAULTS}))
 BRANCH_ROW = obj({"name": TEXT, "holder": nullable(SESSION), "pr": nullable(NUMBER), "in_review": list_of(TASK),
-                  "reviewed_through": nullable(SHA), "unreviewed_since": nullable(SHA), "disposition": TEXT})
+                  "reviewed_through": nullable(SHA), "unreviewed_since": nullable(SHA), "disposition": TEXT},
+                 optional=frozenset(BRANCH_DEFAULTS))
 STATE = obj({
     "schema": kind(lambda v: type(v) is int and v == SCHEMA, str(SCHEMA)),
     "orchestrator": obj({"session": SESSION, "since": TIME, "predecessor": nullable(SESSION), "depth": COUNT}),
@@ -152,9 +162,31 @@ STATE = obj({
 })
 
 
+def implementers(data: dict, branch: str) -> list[str]:
+    """Ids of the implementer sessions on `branch`: the holder of a branch row that names none."""
+    return [s["id"] for s in data["sessions"] if s["role"] == "implementer" and s.get("branch") == branch]
+
+
+def normalize(data: dict) -> list[str]:
+    """Fill the omitted row fields in place (an omitted holder is the one implementer on the branch); the errors it cannot fill."""
+    errs = []
+    for row in data["sessions"]:
+        for k, v in SESSION_DEFAULTS.items():
+            row.setdefault(k, copy.copy(v))
+    for i, row in enumerate(data["branches"]):
+        if "holder" not in row:
+            found = implementers(data, row["name"])
+            if len(found) > 1:
+                errs.append(f"branches[{i}].holder: {len(found)} implementer sessions on {row['name']}; name the holder")
+            row["holder"] = found[0] if len(found) == 1 else None
+        for k, v in BRANCH_DEFAULTS.items():
+            row.setdefault(k, copy.copy(v))
+    return errs
+
+
 def cross_checks(data: dict) -> list[str]:
     """Rules across rows; only called once the shape is valid."""
-    errs = []
+    errs = normalize(data)
     for key, label, name in (("sessions", "session", "id"), ("branches", "branch", "name")):
         seen = [row[name] for row in data[key]]
         errs += [f"duplicate {label} {x}" for x in sorted({x for x in seen if seen.count(x) > 1})]
@@ -225,10 +257,31 @@ def load(text: str) -> dict:
     return parse(text)[3]
 
 
+def lean(data: dict) -> dict:
+    """The canonical lean form: row fields at their default (and a holder the sessions already imply) are left out."""
+    def row(r: dict, order: tuple[str, ...], defaults: dict) -> dict:
+        return {k: r[k] for k in order if k in r and (k not in defaults or r[k] != defaults[k])}
+
+    out = dict(data)
+    out["sessions"] = [row(r, SESSION_ORDER, SESSION_DEFAULTS) for r in data["sessions"]]
+    branches = []
+    for r in data["branches"]:
+        found = implementers(data, r["name"])
+        implied = found[0] if len(found) == 1 else None  # two implementers imply nothing: the holder must stay named
+        lean_row = row(r, BRANCH_ORDER, BRANCH_DEFAULTS)
+        if r["holder"] is None and not found or r["holder"] is not None and r["holder"] == implied:
+            lean_row.pop("holder", None)
+        elif r["holder"] is None:
+            lean_row["holder"] = None  # an explicit null: no holder although an implementer sits on the branch
+        branches.append(lean_row)
+    out["branches"] = branches
+    return out
+
+
 def dump(data: dict) -> str:
-    """Canonical block content: one top-level key per line, one list item per line."""
+    """Canonical block content: one top-level key per line, one list item per line, empty row fields left out."""
     rows = []
-    for k, v in data.items():
+    for k, v in lean(data).items():
         if isinstance(v, list) and v:
             items = ",\n".join("    " + json.dumps(x, ensure_ascii=False) for x in v)
             rows.append(f"  {json.dumps(k)}: [\n{items}\n  ]")
@@ -253,23 +306,25 @@ def summary(d: dict) -> str:
     for q in d["owner_queue"]:
         ref = " ".join(x for x in (q["task"], f"#{q['issue']}" if q["issue"] else None) if x)
         out.append(f"- {q['kind']}{' ' + ref if ref else ''}: {q['text']}; then {q['then']}")
-    out.append(f"\n**Sessions** ({len(d['sessions'])})")
-    for s in d["sessions"]:
+    counts = {st: sum(1 for s in d["sessions"] if s["status"] == st) for st in STATUSES}
+    out.append(f"\n**Sessions** ({len(d['sessions'])}): " + (", ".join(f"{n} {st}" for st, n in counts.items() if n) or "none"))
+    for s in d["sessions"]:  # a running session is a count; the block has its row. The others need the orchestrator's attention
+        if s["status"] == "running":
+            continue
         where = ", ".join(x for x in (f"`{s['branch']}`" if s["branch"] else None, f"PR #{s['pr']}" if s["pr"] else None,
                                        "claims " + ",".join(s["tasks"]) if s["tasks"] else None) if x)
         note = f". {s['note']}" if "note" in s else ""
         out.append(f"- `{s['id']}` {s['role']}{', ' + where if where else ''}: {s['status']} (checked {s['checked']}){note}")
-    out.append(f"\n**Branches** ({len(d['branches'])})")
+    out.append(f"\n**Branches** ({len(d['branches'])}; holders in the block)")
     for b in d["branches"]:
-        bits = [f"PR #{b['pr']}" if b["pr"] else None, f"holder `{b['holder']}`" if b["holder"] else "no holder",
-                "in review " + ",".join(b["in_review"]) if b["in_review"] else None,
+        bits = [f"PR #{b['pr']}" if b["pr"] else None, "in review " + ",".join(b["in_review"]) if b["in_review"] else None,
                 f"reviewed through `{b['reviewed_through']}`" if b["reviewed_through"] else None,
                 f"unreviewed since `{b['unreviewed_since']}`" if b["unreviewed_since"] else None]
-        out.append(f"- `{b['name']}` {', '.join(x for x in bits if x)}: {b['disposition']}")
-    out.append("\n**Scheduled tasks:** " + ("; ".join(f"`{t['id']}` into `{t['fires_into']}`, {t['purpose']}, next {t['next_run']}"
-                                                      for t in d["triggers"]) or "none"))
+        out.append(f"- `{b['name']}` {', '.join(x for x in bits if x)}: {b['disposition']}".replace("` : ", "`: "))
+    times = [t["next_run"] for t in d["triggers"] if t["next_run"]]
+    out.append("\n**Scheduled tasks:** " + (f"{len(d['triggers'])}" + (f", next {min(times)}" if times else "") if d["triggers"] else "none"))
     out.append("**PR subscriptions:** " + (", ".join(f"#{n}" for n in d["subscriptions"]) or "none"))
-    out.append("**Standing owner decisions:** " + ("; ".join(f"{x['comment']} ({x['what']})" for x in d["decisions"]) or "none"))
+    out.append("**Standing owner decisions:** " + (f"{len(d['decisions'])} (comment ids in the block)" if d["decisions"] else "none"))
     return "\n".join(out)
 
 

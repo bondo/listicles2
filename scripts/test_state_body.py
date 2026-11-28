@@ -294,7 +294,8 @@ class RenderTest(unittest.TestCase):
     def test_block_is_compact_one_list_item_per_line(self):
         block = state_body.dump(STATE)
         self.assertIn(f'    {{"id": "{S2}", "role": "implementer"', block)
-        self.assertEqual(json.loads(block), STATE)
+        self.assertEqual(json.loads(block), state_body.lean(STATE))  # empty row fields are left out (M1-120)
+        self.assertEqual(state_body.load(f"```json\n{block}\n```\n"), STATE)
 
     def test_render_refuses_an_invalid_body(self):
         with self.assertRaises(state_body.StateError):
