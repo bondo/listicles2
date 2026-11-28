@@ -1195,6 +1195,13 @@ class Conventions(unittest.TestCase):
                 self.assertEqual(["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"],
                                  self.problems({"core/domain/build.gradle.kts": text}))
 
+    def test_an_old_listicles_convention_id_is_not_a_module_convention(self):
+        # M1-93 R1-01: the ids were renamed, so a module still applying listicles.* has no convention (Gradle would fail on it too).
+        for text in ('plugins {\n    alias(libs.plugins.listicles.jvm.library)\n}\n', 'plugins {\n    id("listicles.android.library")\n}\n'):
+            with self.subTest(text=text):
+                self.assertEqual(["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"],
+                                 self.problems({"core/domain/build.gradle.kts": text}))
+
     def test_a_module_without_a_build_file_is_flagged(self):
         found = self.problems({"core/domain/build.gradle.kts": None})
         self.assertEqual(found, [":core:domain: no build file at core/domain/build.gradle.kts"])
@@ -1280,6 +1287,12 @@ class Aggregation(unittest.TestCase):
                          ('tasks.named("detekt") {', '// tasks.named("detekt") {')):
             with self.subTest(new=new):
                 self.assertEqual(self.problems(ROOT_BUILD.replace(old, new)), want)
+
+    def test_the_old_listicles_names_are_not_accepted(self):
+        # M1-93 R1-01: the root list and the wiring must use the tally names.
+        for old, new in (("tallyModules", "listiclesModules"), ("tallyChecks", "listiclesChecks")):
+            with self.subTest(old=old):
+                self.assertNotEqual([], self.problems(ROOT_BUILD.replace(old, new)))
 
     def test_no_settings_file_skips_it(self):
         self.assertEqual(self.problems(None, settings=None), [])

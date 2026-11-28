@@ -130,7 +130,8 @@ class Wiring(unittest.TestCase):
 
     def test_the_data_module_must_apply_the_android_library_convention(self):
         # M1-68 part B: :core:testing and the JUnit Platform come from the convention plugin, not the module build file.
-        for new in ("alias(libs.plugins.android.library)", "// alias(libs.plugins.tally.android.library)"):
+        for new in ("alias(libs.plugins.android.library)", "// alias(libs.plugins.tally.android.library)",
+                    "alias(libs.plugins.listicles.android.library)"):
             with self.subTest(new):
                 shutil.copy(ROOT / BUILD, self.root / BUILD)
                 got = self.mutated(BUILD, "alias(libs.plugins.tally.android.library)", new)
