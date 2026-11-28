@@ -5,9 +5,11 @@ Copy everything below the line into the state issue body (label `orchestrator-st
 
 1. **Prose**: the two sentences below and, when needed, short free text for the owner. Nothing in it is read by a script.
 2. **Generated summary**, between the two `state:summary` markers. Never edit it by hand: edit the block and run
-   `scripts/state_body.py render body.md > new.md`.
-3. **One fenced `json` block**, the state itself (schema 1, checked by `scripts/state_body.py validate`). Every field is mandatory
-   (only a session row's `note` is optional); unknown, missing or wrongly typed fields fail the check. `tasks.py --state` reads the claimed
+   `scripts/state_body.py render body.md > new.md`. It is lean on purpose (M1-120): counts for the sessions, one row only for a session
+   that is not `running`, one line per branch (no holder), counts for the scheduled tasks and the standing decisions. The block has every row.
+3. **One fenced `json` block**, the state itself (schema 1, checked by `scripts/state_body.py validate`). Every top-level field is mandatory.
+   In a row, the fields that carry the meaning are mandatory too (session: `id`, `role`, `spawned`, `expects`, `checked`, `status`; branch:
+   `name`, `disposition`); the others may be left out when empty (see the field notes). Unknown, missing or wrongly typed fields fail the check. `tasks.py --state` reads the claimed
    and in-review task ids from this block (§4.3).
 
 Read, edit, check, write (every wake that changes state):
@@ -27,6 +29,12 @@ Keep the whole body under that limit: history goes into comments or onto the PR 
 Field notes (the schema in `scripts/state_body.py` wins):
 * Times are UTC, `2026-11-23T05:33Z`. `usage.state` is one of the §3.1 states. `tasks_ref` is the one ref that carries `docs/tasks.toml`
   (the ready query reads it from here, §4.3).
+* Optional row fields (M1-120, owner decision 7140391316 item 3: the body keeps its 15000-byte limit and gets leaner): session `tags`
+  (`[]`), `branch`, `pr` (null), `tasks` (`[]`), `note`; branch `holder`, `pr`, `reviewed_through`, `unreviewed_since` (null), `in_review`
+  (`[]`). Leaving a field out means its empty value; `render` writes the canonical lean form (it drops empty fields, so a body that still
+  spells them out shrinks on the next render). An **omitted `holder`** is the one `implementer` session whose `branch` is this branch (none:
+  no holder); with two implementers on a branch it is an error, name the holder. Write `"holder": null` to say no holder although an
+  implementer sits on the branch. `tasks.py --state` treats a row without `tasks` or `in_review` as empty.
 * `sessions[].tasks` are the claims; release them (empty list) when a row is `archived` or `failed`. `branches[].in_review` are the tasks
   awaiting review or merge. A task id appears in at most one session row.
 * `owner_queue[].kind` is `todo`, `question` or `approval`; `then` is the orchestrator's follow-up action.
@@ -52,10 +60,11 @@ unless you are the orchestrator named in the block; comment instead.
   "tasks_ref": "main",
   "usage": {"state": "ok", "read_at": "2026-11-23T05:33Z"},
   "sessions": [
-    {"id": "session_EXAMPLE2", "role": "implementer", "tags": ["batch:M1-9", "pr:319"], "branch": "claude/example", "pr": 319, "tasks": ["M1-09"], "spawned": "2026-11-23T04:00Z", "expects": "WORKER-RESULT and push", "checked": "2026-11-23T05:33Z", "status": "running"}
+    {"id": "session_EXAMPLE2", "role": "implementer", "tags": ["batch:M1-9", "pr:319"], "branch": "claude/example", "pr": 319, "tasks": ["M1-09"], "spawned": "2026-11-23T04:00Z", "expects": "WORKER-RESULT and push", "checked": "2026-11-23T05:33Z", "status": "running"},
+    {"id": "session_EXAMPLE3", "role": "reviewer", "branch": "claude/example", "pr": 319, "spawned": "2026-11-23T05:00Z", "expects": "WORKER-RESULT", "checked": "2026-11-23T05:33Z", "status": "running"}
   ],
   "branches": [
-    {"name": "claude/example", "holder": "session_EXAMPLE2", "pr": 319, "in_review": ["M1-09"], "reviewed_through": "abc1234", "unreviewed_since": null, "disposition": "next round"}
+    {"name": "claude/example", "pr": 319, "in_review": ["M1-09"], "reviewed_through": "abc1234", "disposition": "next round"}
   ],
   "triggers": [
     {"id": "trig_EXAMPLE", "fires_into": "session_EXAMPLE", "purpose": "45-minute check-in", "next_run": "2026-11-23T06:15Z"}

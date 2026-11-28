@@ -584,7 +584,7 @@ def state_ids(text: str) -> tuple[list[str], list[str]]:
         if not isinstance(rows, list):
             raise InputError(f"state block: {key} must be a list")
         for i, row in enumerate(rows):
-            got = row.get(field_name) if isinstance(row, dict) else None
+            got = row.get(field_name, []) if isinstance(row, dict) else None  # M1-120: a lean row leaves out an empty list
             if not isinstance(got, list) or not all(isinstance(x, str) for x in got):
                 raise InputError(f"state block: {key}[{i}].{field_name} must be a list of task ids")
             ids += got

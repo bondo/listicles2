@@ -723,6 +723,13 @@ class StateBodyTest(unittest.TestCase):
         self.assertEqual({r["id"]: r["state"] for r in json.loads(out)},
                          {"M0-01": "claimed", "M0-02": "in-review", "M0-03": "ready", "M0-04": "blocked", "M0-FU": "blocked"})
 
+    def test_rows_without_tasks_or_in_review_hold_none(self):  # M1-120: a lean block omits empty optional fields
+        data = {"schema": 1, "sessions": [{"id": "session_01a"}, {"id": "session_01b", "tasks": ["M0-01"]}],
+                "branches": [{"name": "b/x"}, {"name": "b/y", "in_review": ["M0-02"]}]}
+        self.assertEqual(tasks.state_ids(f"```json\n{json.dumps(data)}\n```\n"), (["M0-01"], ["M0-02"]))
+        code, out, _ = self.run_state(f"```json\n{json.dumps(data)}\n```\n", "ready")
+        self.assertEqual((code, [ln.split()[0] for ln in out.splitlines()]), (0, ["M0-03"]))
+
     def test_state_and_explicit_lists_are_exclusive(self):
         for flag in ("--claimed", "--in-review"):
             code, _, err = self.run_state(self.state(), flag, "M0-03", "ready")

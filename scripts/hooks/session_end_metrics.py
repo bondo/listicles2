@@ -2,7 +2,7 @@
 """SessionEnd hook: sum token usage from the session transcript into metrics/sessions/<id>.json (PLAN 9.4).
 
 Hook input (stdin JSON): session_id, transcript_path, cwd, reason. Never fails the session: errors go to stderr, exit 0.
-Env tags set at spawn: TALLY_ROLE, TALLY_PR, TALLY_TASK (else LISTICLES_TASK, the old name, M1-91). Output dir: TALLY_METRICS_DIR,
+Env tags set at spawn: TALLY_ROLE, TALLY_PR, TALLY_TASK (only the TALLY_* names, M1-94). Output dir: TALLY_METRICS_DIR,
 else <project root>/metrics/sessions
 (project root = CLAUDE_PROJECT_DIR, else the git root of cwd, else cwd).
 Transcript facts (verified): assistant records carry message.id, message.model and message.usage; the same message id
@@ -83,7 +83,7 @@ def main():
         "branch": b,
         "role": os.environ.get("TALLY_ROLE"),
         "pr": os.environ.get("TALLY_PR"),
-        "task": os.environ.get("TALLY_TASK") or os.environ.get("LISTICLES_TASK"),
+        "task": os.environ.get("TALLY_TASK"),
         "main": main_u,
         "subagents": {"transcripts": len(subs), "total": sub_total},
     }

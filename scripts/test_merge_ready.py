@@ -25,7 +25,7 @@ import pretooluse_guard  # noqa: E402  # justified: its PROTECTED list is the so
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "merge_ready.py"
-REPO = "bondo/listicles2"  # fixtures only: main() takes the repository from scripts/repo_slug.py (M1-85), tests pass it in
+REPO = "bondo/tally"  # fixtures only: main() takes the repository from scripts/repo_slug.py (M1-85), tests pass it in
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
 N = 77
@@ -614,7 +614,8 @@ class EmptyPatchTests(unittest.TestCase):
 
     def test_every_check_that_needs_a_patch_refuses_an_empty_one(self):
         cases = (("working-draft-docs", "docs/milestones/M1.md", r"no patch"), ("general", "docs/PLAN.md", r"no patch"),
-                 ("general", "app/src/main/kotlin/dev/listicles/A.kt", r"no patch"), ("dependabot", ".github/workflows/ci.yml", r"no patch from the API"),
+                 ("general", "app/src/main/kotlin/dk/bjarkebjarke/tally/A.kt", r"no patch"),
+                 ("dependabot", ".github/workflows/ci.yml", r"no patch from the API"),
                  ("dependabot", "gradle/wrapper/gradle-wrapper.properties", r"no patch from the API"))
         for kind, name, reason in cases:
             for patch in ("", None):
@@ -705,10 +706,8 @@ class GeneralKindTests(unittest.TestCase):
         self.assertEqual(api.merged, [], "a refused PR must not be merged")
         self.assertRegex(text, reason)
 
-    ALLOWED = ("app/src/main/kotlin/dev/listicles/app/Lists.kt", "app/src/main/res/values/strings.xml", "app/src/main/res/values-da/strings.xml",
-               "app/src/test/kotlin/dev/listicles/app/ListsTest.kt", "app/src/androidTest/kotlin/dev/listicles/app/ListsUiTest.kt",
-               "core/domain/src/main/kotlin/dev/listicles/domain/Lists.kt", "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt",
-               "app/src/main/kotlin/dk/bjarkebjarke/tally/Lists.kt", "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsTest.kt",  # after M1-29
+    ALLOWED = ("app/src/main/kotlin/dk/bjarkebjarke/tally/Lists.kt", "app/src/main/res/values/strings.xml", "app/src/main/res/values-da/strings.xml",
+               "app/src/test/kotlin/dk/bjarkebjarke/tally/ListsTest.kt", "app/src/androidTest/kotlin/dk/bjarkebjarke/tally/ListsUiTest.kt",
                "core/domain/src/main/kotlin/dk/bjarkebjarke/tally/domain/Lists.kt",
                "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/domain/ListsTest.kt",
                "docs/PLAN.md", "docs/milestones/M1.md", "docs/adr/0002-x.md", "docs/metrics/m0-backfill.txt", "README.md")
@@ -721,7 +720,7 @@ class GeneralKindTests(unittest.TestCase):
     CORE_ANDROID_TEST = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/config/MinVersionEmulatorTest.kt"
 
     def test_a_core_module_android_test_source_is_merged(self):  # unblocks #391: instrumented tests of core modules are general
-        for name in (self.CORE_ANDROID_TEST, "core/domain/src/androidTest/kotlin/dev/listicles/domain/ListsTest.kt"):
+        for name in (self.CORE_ANDROID_TEST, "core/domain/src/androidTest/kotlin/dk/bjarkebjarke/tally/domain/ListsTest.kt"):
             with self.subTest(name=name):
                 self.assertFalse(merge_ready.owner_only(name))
                 api = make_api(files=[file_entry(name)])
@@ -748,15 +747,26 @@ class GeneralKindTests(unittest.TestCase):
                 self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
 
     def test_core_testing_is_refused_by_the_allowlist_itself(self):  # R1-01: not only by the gate regex, so the (?!testing/) lookahead is pinned
-        for root in ("dev/listicles", "dk/bjarkebjarke/tally"):
-            for source_set in ("main", "test", "androidTest"):
-                name = f"core/testing/src/{source_set}/kotlin/{root}/other/X.kt"  # a package that is not `testing`, so GENERAL_GATE_RE stays out
-                with self.subTest(name=name):
-                    self.assertIsNone(merge_ready.GENERAL_GATE_RE.search(name.casefold()))
-                    self.assertTrue(merge_ready.owner_only(name))
-                    self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
-                    self.assertFalse(any(p.fullmatch(name) for p in merge_ready.GENERAL_ALLOW))
-                    self.assertTrue(any(p.fullmatch(name.replace("core/testing/", "core/data/")) for p in merge_ready.GENERAL_ALLOW))
+        for source_set in ("main", "test", "androidTest"):
+            name = f"core/testing/src/{source_set}/kotlin/dk/bjarkebjarke/tally/other/X.kt"  # a package that is not `testing`, so GENERAL_GATE_RE stays out
+            with self.subTest(name=name):
+                self.assertIsNone(merge_ready.GENERAL_GATE_RE.search(name.casefold()))
+                self.assertTrue(merge_ready.owner_only(name))
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+                self.assertFalse(any(p.fullmatch(name) for p in merge_ready.GENERAL_ALLOW))
+                self.assertTrue(any(p.fullmatch(name.replace("core/testing/", "core/data/")) for p in merge_ready.GENERAL_ALLOW))
+
+    def test_kotlin_under_the_old_package_root_is_owner_only(self):  # M1-94: dev/listicles is no general root (no file left since M1-55)
+        for name in ("app/src/main/kotlin/dev/listicles/app/Lists.kt", "app/src/test/kotlin/dev/listicles/app/ListsTest.kt",
+                     "app/src/androidTest/kotlin/dev/listicles/app/ListsUiTest.kt", "core/domain/src/main/kotlin/dev/listicles/domain/Lists.kt",
+                     "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt",
+                     "core/data/src/androidTest/kotlin/dev/listicles/data/ListsTest.kt", "app/src/main/kotlin/dev/listicles/X.kt"):
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+                self.assertFalse(any(p.fullmatch(name) for p in merge_ready.GENERAL_ALLOW))
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+                new = name.replace("dev/listicles/app/", "dk/bjarkebjarke/tally/").replace("dev/listicles/", "dk/bjarkebjarke/tally/")
+                self.assertFalse(merge_ready.owner_only(new), new)  # the same file under the current root still merges as general
 
     def test_every_path_outside_the_allowlist_is_refused(self):  # fail closed: R6-01, R6-05, R6-03, R6-04 and everything unknown
         names = ("firebase/.npmrc", "firebase/jest.config.cjs", "firebase/eslint.config.mjs", "firebase/nested/eslint.config.mjs",  # R6-01, R6-05, R6-03
@@ -764,17 +774,16 @@ class GeneralKindTests(unittest.TestCase):
                  "app/build.gradle.kts", "build.gradle.kts", "gradle.properties", "ruff.toml", "mypy.ini", ".editorconfig", ".gitignore",
                  "config/detekt/detekt.yml", "config/detekt/fixtures/Case.kt", "firebase/firestore.rules", "firebase/test/rules.test.ts",
                  "app/src/main/AndroidManifest.xml", "app/proguard-rules.pro", "app/src/test/resources/robolectric.properties",
-                 "core/testing/src/main/kotlin/dev/listicles/testing/NoNetwork.kt", "core/domain/build.gradle.kts",
-                 "NEW_TOP_LEVEL.txt", "newdir/file.md", "app/src/main/kotlin/dev/listicles/app/Notes.md", "app/src/main/res/raw/x.sh",
+                 "core/testing/src/main/kotlin/dk/bjarkebjarke/tally/testing/NoNetwork.kt", "core/domain/build.gradle.kts",
+                 "NEW_TOP_LEVEL.txt", "newdir/file.md", "app/src/main/kotlin/dk/bjarkebjarke/tally/Notes.md", "app/src/main/res/raw/x.sh",
                  "app/src/main/kotlin/.hidden.kt", "app/src/main/res/.npmrc", "docs/.gitattributes",  # a new dotfile inside an allowlisted dir
-                 "core/domain/src/test/kotlin/dev/listicles/architecture/NewRule.kt", "app/src/test/kotlin/dev/listicles/app/NoNetworkInAppTest.kt",
-                 "app/src/test/kotlin/dev/listicles/app/RobolectricOfflineWiringTest.kt",  # gate tests
-                 "app/src/test/kotlin/dev/listicles/app/Junit4EngineTest.kt",
-                 "core/domain/src/test/kotlin/io/kotest/provided/ProjectConfig.kt", "core/domain/src/test/kotlin/dev/listicles/PackageConfig.kt",  # R7-01
-                 "core/domain/src/test/kotlin/dev/listicles/domain/ProjectConfig.kt", "app/src/test/kotlin/org/junit/Assert.kt",  # only dev/listicles
-                 "core/domain/src/test/kotlin/dev/listicles/testing/BlockingSelectorProvider.kt",  # R7-02: same-name classes of core/testing
-                 "app/src/test/kotlin/dev/listicles/testing/BlockingAsynchronousChannelProvider.kt",
-                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingSelectorProvider.kt",  # the same rules under the new root
+                 "app/src/test/kotlin/dk/bjarkebjarke/tally/NoNetworkInAppTest.kt",
+                 "app/src/test/kotlin/dk/bjarkebjarke/tally/RobolectricOfflineWiringTest.kt",  # gate tests
+                 "app/src/test/kotlin/dk/bjarkebjarke/tally/Junit4EngineTest.kt",
+                 "core/domain/src/test/kotlin/io/kotest/provided/ProjectConfig.kt",  # R7-01
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/domain/ProjectConfig.kt", "app/src/test/kotlin/org/junit/Assert.kt",  # only the root
+                 "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingSelectorProvider.kt",  # R7-02: same-name classes of core/testing
+                 "app/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingAsynchronousChannelProvider.kt",
                  "app/src/test/kotlin/dk/bjarkebjarke/tally/testing/BlockingInetAddressResolverProvider.kt",
                  "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/PackageConfig.kt", "app/src/test/kotlin/dk/bjarkebjarke/other/X.kt",
                  "app/src/main/kotlin/dk/bjarkebjarke/X.kt", "app/src/main/kotlin/dk/bjarkebjarke/tally/../X.kt",
@@ -791,7 +800,7 @@ class GeneralKindTests(unittest.TestCase):
                 self.assertTrue(merge_ready.owner_only(name))
                 self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
 
-    SPEC = "core/domain/src/test/kotlin/dev/listicles/domain/ListsTest.kt"
+    SPEC = "core/domain/src/test/kotlin/dk/bjarkebjarke/tally/domain/ListsTest.kt"
 
     def test_a_kotlin_change_that_names_kotest_project_config_is_refused(self):  # R7-01: one extension makes every Kotest spec pass
         for line in ("class Ext : AbstractProjectConfig() {", "import io.kotest.provided.ProjectConfig", "@AutoScan object Mask : TestCaseExtension",
@@ -1507,7 +1516,7 @@ class WiringTests(unittest.TestCase):
                     r"sources and tests under `app/src/` and `core/<module>/src/`, app resources and docs files that are not owner-only may merge as "
                     r"`general`; every other path, including config, dotfiles, build scripts, workflows, `firebase/` and `scripts/`, is owner-only by default")
 
-    R7_RISK = (r"also owner-only for `general`: kotlin outside `dev/listicles/` and `dk/bjarkebjarke/tally/`, a `testing/` package under either root "
+    R7_RISK = (r"also owner-only for `general`: kotlin outside `dk/bjarkebjarke/tally/`, a `testing/` package under it "
                r"outside `core/testing`, kotest `projectconfig` and "
                r"`packageconfig` classes, every `lint\.xml` and `lint-baseline\.xml`, `res/xml/` and its qualified forms such as `res/xml-v31/`, "
                r"a values alias of an xml resource, and `docs/collaborating\.md`\. `docs/tasks\.toml` merges as `general` only when the diff "
