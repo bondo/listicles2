@@ -7,6 +7,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.Source
 import dk.bjarkebjarke.tally.data.FirebaseEmulator
 import dk.bjarkebjarke.tally.data.session.FirestoreSession
+import dk.bjarkebjarke.tally.domain.household.InviteLookup
 import dk.bjarkebjarke.tally.domain.household.Invites
 import dk.bjarkebjarke.tally.domain.household.Membership
 import kotlinx.coroutines.CoroutineScope
@@ -21,20 +22,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.security.SecureRandom
 import java.util.UUID
 
 /**
- * M1-18 against the Auth and Firestore emulators (`ui` job) with the project's rules: create a household and invite to
- * it (HH-01, HH-02) with two users, each a Google-style account (a verified email) whose `users/{uid}` holds no
- * household and, unless a test says otherwise, a name (AUTH-12). A user switch starts a new Firestore instance, as the
- * app's sign-out does (M1-14), so no write goes out under the previous user.
+ * M1-18 and M1-100 against the Auth and Firestore emulators (`ui` job) with the project's rules: create a household,
+ * invite to it and join it (HH-01 to HH-03) with up to four users, each a Google-style account (a verified email) whose
+ * `users/{uid}` holds no household and, unless a test says otherwise, a name (AUTH-12). A user switch starts a new
+ * Firestore instance, as the app's sign-out does (M1-14), so no write goes out under the previous user.
  */
 @RunWith(AndroidJUnit4::class)
 class HouseholdsEmulatorTest {
     private lateinit var auth: FirebaseAuth
     private lateinit var session: FirestoreSession
     private val tokens = mutableMapOf<String, String>()
-    private val now = System.currentTimeMillis()
+    private var now = System.currentTimeMillis()
     private val households by lazy { FirestoreHouseholds(session, auth) { now } }
 
     @Before
@@ -71,8 +73,54 @@ class HouseholdsEmulatorTest {
             )
             assertEquals(now + Invites.LIFETIME_MS, read("invites/$code").getDate("expiresAt")?.time)
 
-            signIn("Bob")
+            val bob = signIn("Bob")
             assertNull(households.createInvite(home)) // not a member: the household read is refused
+            assertEquals(InviteLookup.Open("Home"), households.invite(code))
+            assertEquals(Membership.Member(home), households.join(code))
+            assertEquals(mapOf(ann to listOf("owner", "Ann"), bob to listOf("member", "Bob")), members(home))
+            assertEquals(listOf(code), fields("households/$home/members/$bob", "viaInvite"))
+            assertEquals(listOf(home), fields("users/$bob", "householdId"))
+
+            val cat = signIn("Cat")
+            assertEquals(InviteLookup.Unusable, households.invite(code)) // used up: the rules deny the read
+            assertEquals(Membership.InviteUnusable, households.join(code))
+            assertEquals(listOf(null), fields("users/$cat", "householdId"))
+        }
+
+    @Test
+    fun anInviteIsUnusableExpiredRevokedNeverMadeOrUnderATombstone() =
+        emulatorTest {
+            signIn("Ann")
+            val home = member(households.create("Home"))
+            val (revoked, open) = List(2) { checkNotNull(households.createInvite(home)) }
+            now -= 8 * DAY_MS
+            val expired = checkNotNull(households.createInvite(home)) // the rules take any expiry up to 7 days
+            now += 8 * DAY_MS
+            session
+                .firestore()
+                .document("invites/$revoked")
+                .delete()
+                .await() // its creator revokes it (HH-02)
+            val neverMade = Invites.newCode(home, SecureRandom())
+
+            val bob = signIn("Bob")
+            for (code in listOf(expired, revoked, neverMade, "not-an-invite", "invites/$open", "$open/x")) {
+                assertEquals(code, InviteLookup.Unusable, households.invite(code))
+                assertEquals(code, Membership.InviteUnusable, households.join(code))
+            }
+            assertEquals(listOf(null), fields("users/$bob", "householdId"))
+            assertEquals(InviteLookup.Open("Home"), households.invite(open)) // no refused join used it up
+
+            signIn("Ann")
+            session
+                .firestore()
+                .document("households/$home")
+                .update("deleted", true, "name", "")
+                .await()
+            signIn("Bob")
+            assertEquals(InviteLookup.Unusable, households.invite(open))
+            assertEquals(Membership.InviteUnusable, households.join(open))
+            assertEquals(listOf(null), fields("users/$bob", "householdId"))
         }
 
     @Test
@@ -80,10 +128,13 @@ class HouseholdsEmulatorTest {
         emulatorTest {
             signIn("Ann")
             val home = member(households.create("Home"))
+            val code = checkNotNull(households.createInvite(home))
             session.firestore().terminate().await() // the first step of a sign-out's clear(), not finished yet
 
             assertEquals(Membership.Failed, households.create("Second"))
             assertNull(households.createInvite(home))
+            assertEquals(InviteLookup.Failed, households.invite(code))
+            assertEquals(Membership.Failed, households.join(code))
         }
 
     @Test
@@ -93,14 +144,24 @@ class HouseholdsEmulatorTest {
             val home = member(households.create("Home"))
             assertEquals(Membership.AlreadyInHousehold, households.create("Second"))
             assertEquals(listOf(home), fields("users/$ann", "householdId"))
+            val code = checkNotNull(households.createInvite(home))
+
+            val bob = signIn("Bob")
+            val away = member(households.create("Away"))
+            assertEquals(Membership.AlreadyInHousehold, households.join(code))
+            assertEquals(listOf(away), fields("users/$bob", "householdId"))
 
             val dan = signIn("Dan", nameSaved = false)
             assertEquals(Membership.Failed, households.create("Home"))
+            assertEquals(Membership.Failed, households.join(code))
             assertEquals(listOf(null), fields("users/$dan", "householdId"))
+            assertEquals(InviteLookup.Open("Home"), households.invite(code)) // nothing used it up
 
             auth.signOut()
             assertEquals(Membership.Failed, households.create("Home"))
             assertNull(households.createInvite(home))
+            assertEquals(InviteLookup.Failed, households.invite(code))
+            assertEquals(Membership.Failed, households.join(code))
         }
 
     /** Signs [name] in; the first time as a new account whose `users/{uid}` holds no household. */
@@ -159,5 +220,6 @@ class HouseholdsEmulatorTest {
 
     private companion object {
         const val TEST_TIMEOUT_MS = 60_000L
+        const val DAY_MS = 86_400_000L
     }
 }
