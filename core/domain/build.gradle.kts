@@ -6,7 +6,12 @@ plugins {
 }
 
 // M0.5-10: shipped dependencies must be on the owner's licence allowlist.
-apply(from = rootProject.file("config/licensee/policy.gradle"))
+apply(
+    from =
+        isolated.rootProject.projectDirectory
+            .file("config/licensee/policy.gradle")
+            .asFile,
+)
 
 dependencies {
     // M1-60: observable state (Flow) in domain interfaces, e.g. SessionState (checklist section 4).

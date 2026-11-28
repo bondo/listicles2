@@ -3,12 +3,14 @@
 # a strong model at high effort (`implementer-sonnet` is the owner's exception, decision 7032210967 on #15); there are no per-session token budgets (spend is reported per PR class and milestone).
 # `max_effort_when` lists the cases that raise effort to max; an agent may ask for more in its WORKER-RESULT and the
 # orchestrator decides within this file. Agents must not escalate on their own judgment.
+# Token savings (owner decision 7153510972 on #399, items 1-5): max effort only for the first reviewer of a PR labelled
+# area:security-rules or area:sync-merge; every other reviewer runs at high. A risk:high implementer runs at high effort, not max.
 # Roles without a `prompt` have none yet (retro): its prompt follows in a later redesign PR.
 roles:
   orchestrator:
     model: opus
     effort: medium
-    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 50% context (1M window; 40% of a 200k one), see `context`
+    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 35% context (1M window; 25% of a 200k one, see the note at `context`), see `context`
     prompt: agents/prompts/orchestrator.md
   planner:
     model: opus
@@ -30,8 +32,8 @@ roles:
       - sync and merge logic
       - guard, hook and command-parsing tooling
       - a new implementer for a PR that already had 3 or more review rounds
-    max_effort_when:
-      - the PR is tagged risk:high in the milestone doc
+    # No `max_effort_when`: a risk:high implementer runs at high effort, not max (owner decision 7153510972 item 1).
+    # Handoff at about 30% context (`context.implementer_handoff_at_percent`); a fix round goes to a fresh implementer from handoff/<branch>.md when the running one is above 30%.
   implementer-sonnet:
     model: sonnet
     effort: medium
@@ -44,7 +46,7 @@ roles:
   merge-agent:
     model: sonnet
     effort: medium
-    session: long-lived, started by the orchestrator; merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge
+    session: long-lived, started by the orchestrator, replaced by a fresh merge agent once a day, at the first merge request after 00:00 UTC (the old one is archived after its metrics row, ORCHESTRATION 7.5; owner decision 7153510972 item 5); merges under the standing authorization 7005366747 once #15 names it as active (tag role:merge-agent, parent session the orchestrator; 7085221356) and for owner-only PRs under a batch approval 7007421567; it verifies 7085221356 itself before its first merge
     definition: docs/ORCHESTRATION.md section 7.5
   # Owner decision, #15 comment 7075812943: approves owner-only PRs in its scope (tooling, build, CI, gate, security rules, privacy docs; #15 comment 7123360368) in the owner's place (ORCHESTRATION 1.1, 7.5); never merges, edits or pushes.
   approver:
@@ -59,10 +61,9 @@ roles:
     session: fresh, one per review round
     prompt: agents/prompts/reviewer.md
     max_effort_when:
-      - the PR is tagged risk:high in the milestone doc
-      - the PR is labelled area:security-rules, even without the risk:high tag (owner decision, #134; R7 in docs/reviews/README.md)
-      - the PR is labelled area:sync-merge, even without the risk:high tag (same decision)
+      - the first reviewer of a PR labelled area:security-rules or area:sync-merge (owner decisions #134 and 7153510972; R7 in docs/reviews/README.md): the first reviewer (the primary reviewer, not the second reviewer) in every round (owner decision 7158603054 item 1); every other reviewer runs at high
   # The delta review of a small fix-only or docs-only commit (ORCHESTRATION 7.2.3): the reviewer prompt, focused on the findings it is given.
+  # It covers fix-only commits up to about 150 changed lines when they touch only tests or docs (owner decision 7153510972 item 4); other fix commits stay at about 30 lines.
   recheck-reviewer:
     model: sonnet
     effort: medium
@@ -71,11 +72,8 @@ roles:
   second-reviewer:
     model: opus
     effort: high
-    session: fresh, same round as the reviewer, for risk:high PRs and protected areas
+    session: fresh, same round as the reviewer, only for security-rules, sync-merge and release PRs, at high effort (owner decision 7153510972 item 1; replaces the second reviewer for every risk:high PR)
     prompt: agents/prompts/second-reviewer.md
-    max_effort_when:
-      - the PR is tagged risk:high in the milestone doc
-      - the PR is labelled area:security-rules, even without the risk:high tag (owner decision, #15 comment 7123360368: the approver needs a max-effort pass)
   escalation-reviewer:
     model: opus
     effort: max
@@ -106,10 +104,12 @@ roles:
     effort: high
     session: fresh, one per retro run
 context:
-  # Orchestrator handover (ORCHESTRATION 5; owner decision on #15, comment 7001335975): earlier than the hook stages below.
-  # The 200k value scales 80 -> 60 the same way (50 -> 37.5, rounded to 40).
-  orchestrator_handover_at_percent_1m: 50
-  orchestrator_handover_at_percent_200k: 40
+  # Orchestrator handover (ORCHESTRATION 5; owner decisions #15 comment 7001335975 and 7153510972 item 6): earlier than the hook stages below.
+  # The 200k value is set by the owner: 25% of a 200k window (owner decision 7158603054 item 2).
+  orchestrator_handover_at_percent_1m: 35
+  orchestrator_handover_at_percent_200k: 25
+  # Implementer handoff (owner decision 7153510972 item 2): earlier than the hook stages below, which stay the backstop.
+  implementer_handoff_at_percent: 30
   # Hook stages for every session (scripts/hooks/context_guard.py, scripts/statusline.sh):
   handoff_at_percent_1m: 80
   step_boundary_after_percent_1m: 60
