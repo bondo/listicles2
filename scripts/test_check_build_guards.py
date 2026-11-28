@@ -1306,6 +1306,95 @@ class Aggregation(unittest.TestCase):
         self.assertEqual(cbg.main(["x", d]), 1)
 
 
+IP = "org.gradle.unsafe.isolated-projects"
+PROPS = f"org.gradle.parallel=true\norg.gradle.configuration-cache=true\n{IP}=true\nkotlin.code.style=official\n"
+
+
+class IsolatedProjects(unittest.TestCase):
+    """M1-98, check 5: gradle.properties keeps Gradle's isolated projects mode on, read as java.util.Properties reads it, and
+    nothing that starts Gradle (shell scripts, gradlew, workflows, git hooks) sets it again on the command line."""
+
+    MISSING = f"gradle.properties: {IP}=true missing"
+
+    def problems(self, props=PROPS, extra=None, settings=SETTINGS):
+        files = {"settings.gradle.kts": settings, "gradle.properties": props}
+        files.update(extra or {})
+        return cbg.isolated_projects_problems(tree({k: v for k, v in files.items() if v is not None}))
+
+    def assert_flagged(self, want, props=PROPS, extra=None):
+        found = self.problems(props, extra)
+        self.assertEqual(len(found), 1, f"{props!r} {extra} -> {found}")
+        self.assertIn(want, found[0])
+        self.assertIn("M1-98", found[0])
+
+    def test_on_passes_in_every_spelling_java_properties_reads(self):
+        for props in (PROPS, f"{IP}=true", f"{IP} = true\n", f"  {IP}:true\n", f"{IP} true\n", f"{IP}\t=\ttrue\n",
+                      f"{IP}=false\n{IP}=true\n", f"{IP}=tr\\\n    ue\n", f"# {IP}=false \\\n{IP}=true\n",
+                      f"! {IP}=false\n{IP}=true\n", f"org.gradle.unsafe.isolated\\-projects=true\n", f"{IP}=\\u0074rue\n",
+                      f"{IP}=true\r\nandroid.useAndroidX=true\r\n"):
+            with self.subTest(props=props):
+                self.assertEqual(self.problems(props), [])
+
+    def test_off_missing_or_not_exactly_true_is_flagged(self):
+        for props in (PROPS.replace(f"{IP}=true", f"{IP}=false"), f"{IP}=true\n{IP}=false\n", f"{IP}=TRUE\n", f"{IP}=yes\n",
+                      f"{IP}=true # on\n", f"{IP}=true  \n", f"{IP}=\n", f"{IP}=1\n"):
+            with self.subTest(props=props):
+                self.assert_flagged(f"gradle.properties: {IP} must be exactly true", props)
+
+    def test_commented_out_or_swallowed_by_a_continuation_counts_as_missing(self):
+        for props in ("", PROPS.replace(f"{IP}=true\n", ""), f"# {IP}=true\n", f"! {IP}=true\n", f"   # {IP}=true\n",
+                      f"kotlin.code.style=official \\\n{IP}=true\n", f"{IP}x=true\n", f"x.{IP}=true\n",
+                      f"org.gradle.unsafe.isolated_projects=true\n"):
+            with self.subTest(props=props):
+                found = self.problems(props)
+                self.assertTrue(found and found[0].startswith(self.MISSING), f"{props!r} -> {found}")
+
+    def test_another_key_for_the_same_mode_is_flagged(self):
+        for key in (f"systemProp.{IP}", "org.gradle.isolated-projects", f"{IP}.enabled", "org.gradle.unsafe.isolatedProjects"):
+            with self.subTest(key=key):
+                self.assert_flagged(f"gradle.properties: {key} also names isolated projects", PROPS + f"{key}=false\n")
+
+    def test_no_gradle_properties_is_flagged(self):
+        found = self.problems(None)
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("gradle.properties missing", found[0])
+
+    def test_a_command_line_override_is_flagged(self):
+        flag = f"-D{IP}=false"
+        for rel, text in (("scripts/verify.sh", f"gradle() {{ ./gradlew -q {flag} \"$@\"; }}\n"),
+                          ("scripts/screenshots.sh", f"./gradlew -P{IP}=false verify\n"),
+                          ("gradlew", f'DEFAULT_JVM_OPTS="{flag}"\n'),
+                          (".github/workflows/ci.yml", f"env:\n  GRADLE_OPTS: -Dorg.gradle.daemon=false {flag}\n"),
+                          (".github/workflows/codeql.yaml", "run: ./gradlew -Dorg.gradle.unsafe.isolated-projects=false x\n"),
+                          (".githooks/pre-push", "./gradlew --project-prop org.gradle.unsafe.isolatedProjects=false x\n"),
+                          ("tools/run.sh", "export GRADLE_OPTS=-Dorg.gradle.unsafe.ISOLATED_PROJECTS=false\n")):
+            with self.subTest(rel=rel):
+                self.assert_flagged(f"{rel}:1: names isolated projects", extra={rel: text})
+
+    def test_comments_and_unrelated_files_pass(self):
+        extra = {"scripts/verify.sh": f"# Gradle reads {IP} from gradle.properties (M1-98)\nstep build gradle build\n",
+                 ".github/workflows/ci.yml": f"    # {IP} comes from gradle.properties\n    run: ./gradlew build\n",
+                 "docs/notes.md": f"{IP}=false\n", "scripts/notes.py": f"FLAG = '-D{IP}=false'\n",
+                 "build/tmp/x.sh": f"./gradlew -D{IP}=false\n"}
+        self.assertEqual(self.problems(extra=extra), [])
+
+    def test_no_settings_file_skips_it(self):
+        self.assertEqual(self.problems(None, settings=None), [])
+
+    def test_the_real_repository_keeps_it_on(self):
+        self.assertEqual(cbg.isolated_projects_problems(ROOT), [])
+
+    def test_main_reports_it(self):
+        d = tree({"settings.gradle.kts": SETTINGS, "build.gradle.kts": ROOT_BUILD,
+                  "app/build.gradle.kts": APP + "dependencies {\n    implementation(libs.a)\n}\n",
+                  "core/domain/build.gradle.kts": DOMAIN, "gradle.properties": f"{IP}=false\n",
+                  "app/src/main/AndroidManifest.xml": manifest('android:allowBackup="false"')})
+        self.assertEqual(cbg.main(["x", d]), 1)
+        with open(os.path.join(d, "gradle.properties"), "w", encoding="utf-8") as f:
+            f.write(PROPS)
+        self.assertEqual(cbg.main(["x", d]), 0)
+
+
 class Wiring(unittest.TestCase):
     def read(self, *parts):
         with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
