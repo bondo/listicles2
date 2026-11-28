@@ -710,7 +710,7 @@ RULES = (
         (
             r"environment pick \(§7\.1, retro r8\)", r"before every `create_session`",
             r"a task that touches a process file \(`CLAUDE\.md`, `REVIEW\.md`, `agents/`, `\.claude/`, `\.github/`, `\.githooks/`, "
-            r"`scripts/guards\.sh`, `scripts/hooks/`\) gets the tooling environment \(`LISTICLES_TASK=tooling`\)",
+            r"`scripts/guards\.sh`, `scripts/hooks/`\) gets the tooling environment \(`TALLY_TASK=tooling`\)",
             r"every other task gets the normal one", r"the task's `notes` names it", r"a wrong pick blocks the worker",
         ),
         "the environment is picked before create_session: process files need the tooling one, everything else the normal one (§7.1)",

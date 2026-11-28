@@ -10,8 +10,8 @@ import unittest
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 
 GUARD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pretooluse_guard.py")
-# M1-91: the guard reads TALLY_TASK, else LISTICLES_TASK. Tooling sessions run this suite with one of them set, so every
-# guard run starts from an env without either; TOOLING is the tooling session the guard tests use.
+# M1-94: the guard reads TALLY_TASK only (LISTICLES_TASK, the old name, no longer counts). Tooling sessions run this suite with
+# either set, so every guard run starts from an env without both; TOOLING is the tooling session the guard tests use.
 TASK_NAMES = ("TALLY_TASK", "LISTICLES_TASK")
 TOOLING = {"TALLY_TASK": "tooling"}
 
@@ -160,7 +160,7 @@ class Guard(unittest.TestCase):
 
 
 class TaskNames(unittest.TestCase):
-    """M1-91: a tooling session is TALLY_TASK=tooling, or LISTICLES_TASK=tooling while TALLY_TASK is unset or empty."""
+    """M1-94: a tooling session is TALLY_TASK=tooling and nothing else; LISTICLES_TASK (the old name, M1-91) no longer counts."""
 
     @classmethod
     def setUpClass(cls):
@@ -173,24 +173,27 @@ class TaskNames(unittest.TestCase):
         return run("Bash", {"command": "sed -i s/a/b/ CLAUDE.md"}, self.d, env)
 
     def test_tooling_sessions(self):
-        for env in ({"TALLY_TASK": "tooling"}, {"LISTICLES_TASK": "tooling"}, {"TALLY_TASK": "tooling", "LISTICLES_TASK": "tooling"},
-                    {"TALLY_TASK": "tooling", "LISTICLES_TASK": "normal"}, {"TALLY_TASK": "", "LISTICLES_TASK": "tooling"}):
+        for env in ({"TALLY_TASK": "tooling"}, {"TALLY_TASK": "tooling", "LISTICLES_TASK": "tooling"},
+                    {"TALLY_TASK": "tooling", "LISTICLES_TASK": "normal"}, {"TALLY_TASK": "tooling", "LISTICLES_TASK": ""}):
             with self.subTest(env=env):
                 self.assertEqual(self.edit(env).returncode, 0)
                 self.assertEqual(self.bash(env), 0)
 
     def test_other_sessions(self):
-        for env in ({}, {"TALLY_TASK": "normal", "LISTICLES_TASK": "tooling"}, {"TALLY_TASK": "normal"}, {"LISTICLES_TASK": "normal"},
-                    {"TALLY_TASK": "Tooling"}, {"LISTICLES_TASK": "tooling "}, {"TALLY_TASK": "", "LISTICLES_TASK": ""},
-                    {"TALLY_TASK": " ", "LISTICLES_TASK": "tooling"}, {"LISTICLES_TASK_X": "tooling"}, {"TALLY_TASKS": "tooling"}):
+        for env in ({}, {"LISTICLES_TASK": "tooling"}, {"TALLY_TASK": "", "LISTICLES_TASK": "tooling"},
+                    {"TALLY_TASK": "normal", "LISTICLES_TASK": "tooling"}, {"TALLY_TASK": "normal"}, {"LISTICLES_TASK": "normal"},
+                    {"TALLY_TASK": "Tooling"}, {"TALLY_TASK": "tooling "}, {"TALLY_TASK": " ", "LISTICLES_TASK": "tooling"},
+                    {"TALLY_TASK": ""}, {"TALLY_TASK_X": "tooling"}, {"TALLY_TASKS": "tooling"}):
             with self.subTest(env=env):
                 self.assertEqual(self.edit(env).returncode, 2)
                 self.assertEqual(self.bash(env), 2)
 
     def test_refusal_names_tally_task(self):
-        err = self.edit({}).stderr
-        self.assertIn("TALLY_TASK=tooling", err)
-        self.assertNotIn("LISTICLES_TASK", err)
+        for env in ({}, {"LISTICLES_TASK": "tooling"}):
+            with self.subTest(env=env):
+                err = self.edit(env).stderr
+                self.assertIn("TALLY_TASK=tooling", err)
+                self.assertNotIn("LISTICLES_TASK", err)
 
 
 if __name__ == "__main__":
