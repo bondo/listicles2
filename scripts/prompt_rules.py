@@ -3,7 +3,7 @@ Agent Usage Redesign PR 2: plan review, self-review, finding verification, secon
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
 docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md,
-docs/reviews/collaborator-workflow.md, docs/milestones/M1.md, agents/roles.yaml and handoff/TEMPLATE.md).
+docs/reviews/collaborator-workflow.md, docs/milestones/M1.md, config/licensee/google-sdk-terms.txt, agents/roles.yaml and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -636,7 +636,7 @@ RULES = (
         "two-phase handover at about 50% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7239676323 item 5, 7158603054), "
         "first batch boundary: "
         "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
-        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 35% of a 1m window"),
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k"),
     ),
     Rule(
         "handover-messages", ("orchestrator",),
@@ -1240,7 +1240,7 @@ RULES = (
          r"up to about 150 changed lines when they touch only tests or docs",
          r"a fresh implementer from `handoff/<branch>\.md` when the running one is above 30% context"),
         "the orchestrator hands over at about 50% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
-        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 35% of a 1m window", r"daily pacing recompute",
+        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k", r"daily pacing recompute",
                    r"this pr's scaling", r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k",
                    r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
@@ -1503,7 +1503,7 @@ DOC_RULES = (
         ),
         "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
         "the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 35% of a 1m window",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k",
                    r"the owner archives you"),
     ),
     DocRule(
@@ -1912,7 +1912,7 @@ DOC_RULES = (
         "second reviewer high, the implementer at high and handing off at 30%, the 150-line re-check, the daily merge agent (7153510972)",
         forbidden=(r"second-reviewer: model: opus effort: max",
                    r"a new implementer for a pr that already had 3 or more review rounds max_effort_when: - the pr is tagged risk:high",
-                   r"every later round", r"daily pacing recompute", r"orchestrator_handover_at_percent_200k: 30",
+                   r"every later round", r"daily pacing recompute", r"orchestrator_handover_at_percent_200k: 30", r"orchestrator_handover_at_percent_1m: 35",
                    r"pending owner confirmation"),
     ),
     DocRule(
@@ -1943,7 +1943,7 @@ DOC_RULES = (
         "ORCHESTRATION carries the token-savings rules: effort, implementer context and fix rounds, PR size, the 150-line re-check, the daily "
         "merge agent and its spawn message, the 50% orchestrator handover (7239676323 item 5)",
         forbidden=(r"opus / high \(max for `risk:high`\)", r"second reviewer every round", r"max effort for `risk:high`",
-                   r"about 35% of a 1m window", r"daily pacing recompute", r"this pr's scaling",
+                   r"about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k", r"daily pacing recompute", r"this pr's scaling",
                    r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k", r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
     DocRule(

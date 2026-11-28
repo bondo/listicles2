@@ -1631,7 +1631,7 @@ class OrchestratorHandoverAndRecipesTests(unittest.TestCase):
 
     def test_roles_yaml_has_the_orchestrator_handover_values_and_keeps_the_hook_values(self):
         big, small = self.context_value("orchestrator_handover_at_percent_1m"), self.context_value("orchestrator_handover_at_percent_200k")
-        self.assertEqual(big, 35)  # owner decision 7153510972 item 6
+        self.assertEqual(big, 50)  # owner decision 7239676323 item 5
         self.assertLess(small, big)  # a 200k window hands over earlier, as the hook stages do
         # the context-guard hook stages are for every session and are not part of this decision
         self.assertEqual((self.context_value("step_boundary_after_percent_1m"), self.context_value("handoff_at_percent_1m")), (60, 80))
