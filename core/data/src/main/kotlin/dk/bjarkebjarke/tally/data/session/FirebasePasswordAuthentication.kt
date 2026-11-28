@@ -36,7 +36,7 @@ class FirebasePasswordAuthentication(
 
     override suspend fun sendPasswordReset(email: String) = answer { auth.sendPasswordResetEmail(email).await() }
 
-    /** Once verified, a new ID token at once: the rules' `email_verified` and the M1-127 gate see it now, not later. */
+    /** Once verified, a new ID token at once: the rules' `email_verified` and the M1-129 gate see it now, not later. */
     override suspend fun reloadEmailVerified(): PasswordAnswer {
         val user = auth.currentUser ?: return PasswordAnswer.NotSignedIn
         var verified = false

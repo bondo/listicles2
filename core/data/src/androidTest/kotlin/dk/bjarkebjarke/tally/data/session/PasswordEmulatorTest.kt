@@ -27,7 +27,7 @@ import java.util.UUID
 /**
  * M1-121: email and password (M1.md, M1-15) against the Auth emulator with email enumeration protection on, as in the
  * real project (M1-O1). What these record about Firebase is checked once in the real project before the app relies on
- * it: M1-O20 the password cases, and with Google (off in v1) M1-128 adds one.
+ * it: M1-O20 the password cases, and with Google (off in v1) M1-130 adds one.
  */
 @RunWith(AndroidJUnit4::class)
 class PasswordEmulatorTest {
@@ -137,13 +137,13 @@ class PasswordEmulatorTest {
             }
 
             assertEquals(2, FirebaseEmulator.oobCodes(withPassword, RESET).size)
-            assertEquals(2, FirebaseEmulator.oobCodes(onlyGoogle, RESET).size) // OQ-34(b): its link is M1-128's
+            assertEquals(2, FirebaseEmulator.oobCodes(onlyGoogle, RESET).size) // OQ-34(b): its link is M1-130's
             assertEquals(emptyList<String>(), FirebaseEmulator.oobCodes(unknown, RESET))
         }
 
     /**
      * AUTH-06: Continue answers not verified until the link is opened, then verified with a new ID token whose
-     * `email_verified` claim is true at once: the token Firestore sends to the rules (M1-127 gates on it).
+     * `email_verified` claim is true at once: the token Firestore sends to the rules (M1-129 gates on it).
      */
     @Test
     fun continueIsVerifiedOnceTheLinkIsOpenedWithTheClaimRenewed() =

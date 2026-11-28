@@ -1093,14 +1093,14 @@ notes = "Split (PR 396): with the Firebase data layer, its Auth emulator tests a
 
 [[task]]
 id = "M1-121"
-title = "Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), Hilt bindings (gate: M1-127, collision: M1-128)"
+title = "Auth data: email and password over Firebase in :core:data (Auth emulator tests for each case), Hilt bindings (gate: M1-129, collision: M1-130)"
 milestone = "M1"
 status = "done"
 assignee = "implementer"
 risk = "high"
 pr = 423
 depends_on = ["M1-15"]
-notes = "Split from M1-15 (PR 396). FirebaseAuthentication implements PasswordAuthentication (createUserWithEmailAndPassword, signInWithEmailAndPassword, useAppLanguage, sendEmailVerification, sendPasswordResetEmail, reload with a forced ID-token refresh once verified, so the rules see email_verified) and EmailVerification (the M1-62 gate) from the ID-token listener, maps Firebase's exceptions to PasswordAnswer, and adds GoogleSignInResult.EmailHasPasswordAccount for the non-Gmail collision (wireframe 44; FirebaseAuthentication's comment points here). Auth emulator tests with enumeration protection on, as in the real project (M1-O1), for each case of docs/milestones/M1.md (M1-15): sign-up for a new email and for one with a password or a Google-only account (no account, session or email), wrong password, unknown and Google-only email, a reset for each, the verification link (oobCodes) and the gate, the collision, and the reverse case of OQ-34(b) (a reset for a Google-only email: record what the emulator does). Bindings: PasswordAuthentication, PasswordAccount (one instance with a monotonic clock, SystemClock.elapsedRealtime: its Send again limits span both screens) and EmailVerification (replacing the GateModule stand-in). Adds the owner task to check the recorded behaviour once in the real project (R1) before relying on it. Split (PR 423): the whole task measured about 680 counted lines (above 500). This PR holds FirebasePasswordAuthentication (the password calls, the exception mapping, the forced token refresh), the emulator tests of the password cases, the PasswordAuthentication and PasswordAccount bindings and the owner check M1-O20; M1-127 the email-verified gate, M1-128 the Google cases (collision, OQ-34(b) reverse case) with their owner check"
+notes = "Split from M1-15 (PR 396). FirebaseAuthentication implements PasswordAuthentication (createUserWithEmailAndPassword, signInWithEmailAndPassword, useAppLanguage, sendEmailVerification, sendPasswordResetEmail, reload with a forced ID-token refresh once verified, so the rules see email_verified) and EmailVerification (the M1-62 gate) from the ID-token listener, maps Firebase's exceptions to PasswordAnswer, and adds GoogleSignInResult.EmailHasPasswordAccount for the non-Gmail collision (wireframe 44; FirebaseAuthentication's comment points here). Auth emulator tests with enumeration protection on, as in the real project (M1-O1), for each case of docs/milestones/M1.md (M1-15): sign-up for a new email and for one with a password or a Google-only account (no account, session or email), wrong password, unknown and Google-only email, a reset for each, the verification link (oobCodes) and the gate, the collision, and the reverse case of OQ-34(b) (a reset for a Google-only email: record what the emulator does). Bindings: PasswordAuthentication, PasswordAccount (one instance with a monotonic clock, SystemClock.elapsedRealtime: its Send again limits span both screens) and EmailVerification (replacing the GateModule stand-in). Adds the owner task to check the recorded behaviour once in the real project (R1) before relying on it. Split (PR 423): the whole task measured about 680 counted lines (above 500). This PR holds FirebasePasswordAuthentication (the password calls, the exception mapping, the forced token refresh), the emulator tests of the password cases, the PasswordAuthentication and PasswordAccount bindings and the owner check M1-O20; M1-129 the email-verified gate, M1-130 the Google cases (collision, OQ-34(b) reverse case) with their owner check"
 
 [[task]]
 id = "M1-16"
@@ -1749,7 +1749,7 @@ risk = "normal"
 depends_on = [
   "M1-88", "M1-89", "M1-90", "M1-120", "M1-122", "M1-123", "M1-125",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
-  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99", "M1-121", "M1-127", "M1-128",
+  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99", "M1-121", "M1-129", "M1-130",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
@@ -1959,7 +1959,7 @@ depends_on = ["M1-O1"]
 notes = "Re-homed from M1-O16 (owner decision 7110878938; ids are never reused). Split from M1-O1 (owner decision 7110501630): Google sign-in is postponed until Tally has a public support email. After v1 (owner decision 7110878938): then M3-O2 and M3-O3, then switch the Google button on (M1-86) in an app update. Its [owner] issue is opened after this PR merges"
 
 [[task]]
-id = "M1-127"
+id = "M1-129"
 title = "Email-verified start gate over Firebase (split from M1-121): EmailVerification from the ID token's email_verified claim, replacing the GateModule stand-in"
 milestone = "M1"
 status = "todo"
@@ -1969,14 +1969,14 @@ depends_on = ["M1-121"]
 notes = "Split from M1-121 (about 680 counted lines in full). Not stacked: a PR from main after M1-121 merges, rebuilt from commit 728fafa of PR 423 (branch m1/auth-data-121, also refs/pull/423/head) (the full version; tests first in 0db143e): FirebasePasswordAuthentication also implements EmailVerification, an ID-token listener that reads the email_verified claim (getIdToken(false); offline with an expired token, isEmailVerified), so the gate never opens before the rules allow writes; SessionModule binds it in place of GateModule's stand-in (SignInAndSignOutWiringTest then binds FakeEmailVerification, as it uninstalls SessionModule); AppGraphTest checks the binding; PasswordEmulatorTest's gate cases (closed until Continue after the link, open for Google, closed signed out). About 90 changed lines"
 
 [[task]]
-id = "M1-128"
+id = "M1-130"
 title = "Google cases over Firebase (split from M1-121): the non-Gmail collision message and the OQ-34(b) reverse case (Auth emulator)"
 milestone = "M1"
 status = "todo"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-121"]
-notes = "Split from M1-121 (about 680 counted lines in full). Not stacked: a PR from main after M1-121 merges, rebuilt from commit 728fafa of PR 423 (branch m1/auth-data-121, also refs/pull/423/head) (tests first in 0db143e): GoogleSignInResult.EmailHasPasswordAccount, FirebaseAuthentication's mapping of ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL to it, SignInMessage.EmailHasPasswordAccount with the decided text en/da (stories.md OQ-34(a), string signin_email_has_password) and its view model and screen tests; emulator tests: the collision (a Google token with email_verified false stands in for a non-Gmail account, as the emulator trusts no provider by domain), and the OQ-34(b) reverse case with FirebaseEmulator.resetPassword (recorded on firebase-tools 15.36.0: same uid, password set, Google removed, the next Google sign-in adds it back), then the M1-121 pointers of M1.md (docs check 3, section 6 OQ-34(b)) and stories.md OQ-34(b) name M1-128. Adds the M3 owner task (after M3-O1, M3-O2, M1-86) to check in the real project once Google is on: the collision with a real non-Gmail account, the reverse case, and the Google-only sign-up and sign-in answers M1-121 recorded. Google sign-in is off in v1 (M1-86), so this only matters once it is on. About 120 changed lines"
+notes = "Split from M1-121 (about 680 counted lines in full). Not stacked: a PR from main after M1-121 merges, rebuilt from commit 728fafa of PR 423 (branch m1/auth-data-121, also refs/pull/423/head) (tests first in 0db143e): GoogleSignInResult.EmailHasPasswordAccount, FirebaseAuthentication's mapping of ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL to it, SignInMessage.EmailHasPasswordAccount with the decided text en/da (stories.md OQ-34(a), string signin_email_has_password) and its view model and screen tests; emulator tests: the collision (a Google token with email_verified false stands in for a non-Gmail account, as the emulator trusts no provider by domain), and the OQ-34(b) reverse case with FirebaseEmulator.resetPassword (recorded on firebase-tools 15.36.0: same uid, password set, Google removed, the next Google sign-in adds it back), then the M1-121 pointers of M1.md (docs check 3, section 6 OQ-34(b)) and stories.md OQ-34(b) name M1-130. Adds the M3 owner task (after M3-O1, M3-O2, M1-86) to check in the real project once Google is on: the collision with a real non-Gmail account, the reverse case, and the Google-only sign-up and sign-in answers M1-121 recorded. Google sign-in is off in v1 (M1-86), so this only matters once it is on. About 120 changed lines"
 
 [[task]]
 id = "M1-O20"
@@ -1985,7 +1985,7 @@ milestone = "M1"
 status = "todo"
 assignee = "owner"
 risk = "normal"
-depends_on = ["M1-O1", "M1-121", "M1-127", "M1-17"]
+depends_on = ["M1-O1", "M1-121", "M1-129", "M1-17"]
 notes = "Found by M1-121 (PasswordEmulatorTest, Auth emulator of firebase-tools 15.36.0 with enumeration protection on); CI never talks to a real project. With the debug app on the real project (M1.md R1), once: sign up with an email that already has an account (expect the same 'check your email' screen, nobody signed in, no email arrives); sign in with a wrong password and with an unknown email (one 'Wrong email or password'); reset for an unknown email (the same answer, no email); open a verification link, then Continue (the lists open at once, Firestore writes are allowed). Note the result on #15 (no email address). A difference is a bug for M1-121's code, filed as an issue"
 
 [[task]]
