@@ -4,7 +4,7 @@
   * ci.yml `ui` job: the parsed job equals one frozen mapping (EXPECTED_UI), which runs the `:app` and `:core:data` connected tests inside
     `firebase emulators:exec --only auth,firestore --project demo-tally`. Any other key, step, flag, `if`, `needs` or fallback fails,
   * verify.sh and the CI `tasks` job run this check and its tests; verify.sh compiles the :core:data androidTest sources,
-  * :core:data has :core:testing and the JUnit Platform on its unit tests (#217 item 3): it applies listicles.android.library, whose
+  * :core:data has :core:testing and the JUnit Platform on its unit tests (#217 item 3): it applies tally.android.library, whose
     shared settings (build-logic Conventions.kt) add both to every module; checkTestSettings checks the result. And a smoke test.
 Run: python3 -I scripts/check_ui_emulators.py  (exit 1 and one line per problem).
 """
@@ -63,7 +63,7 @@ EXPECTED_UI = {
 UI_PROBLEM = "ci.yml jobs.ui (parsed) is not equal to EXPECTED_UI in check_ui_emulators.py"
 DATA_COMPILE = ":core:data:assembleDebugAndroidTest"
 PLUGIN = "build-logic/src/main/kotlin/Conventions.kt"
-CONVENTION_PROBLEM = ":core:data must apply alias(libs.plugins.listicles.android.library), which gives its unit tests :core:testing (#217 item 3)"
+CONVENTION_PROBLEM = ":core:data must apply alias(libs.plugins.tally.android.library), which gives its unit tests :core:testing (#217 item 3)"
 JUNIT_PROBLEM = (
     "Conventions.kt must run every Test task on the JUnit Platform (useJUnitPlatform()), "
     "or the :core:testing network block never installs (#217 item 3)"
@@ -128,7 +128,7 @@ def data_module_problems(root):
     problems = []
     build = (root / "core/data/build.gradle.kts").read_text()
     plugin = (root / PLUGIN).read_text()
-    if not re.search(r"(?m)^\s*alias\(libs\.plugins\.listicles\.android\.library\)\s*$", build):
+    if not re.search(r"(?m)^\s*alias\(libs\.plugins\.tally\.android\.library\)\s*$", build):
         problems.append(CONVENTION_PROBLEM)
     add = r'(?m)^\s*dependencies\.add\("testImplementation", dependencies\.project\(mapOf\("path" to TEST_SUPPORT\)\)\)\s*$'
     if not re.search(add, plugin) or not re.search(r'(?m)^private const val TEST_SUPPORT = ":core:testing"$', plugin):

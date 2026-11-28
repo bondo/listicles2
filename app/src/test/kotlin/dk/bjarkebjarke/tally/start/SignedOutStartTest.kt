@@ -11,36 +11,52 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import dagger.hilt.android.testing.UninstallModules
+import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.MainActivity
 import dk.bjarkebjarke.tally.R
 import dk.bjarkebjarke.tally.connectivity.ConnectivityModule
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
+import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
+import dk.bjarkebjarke.tally.domain.start.EmailVerification
+import dk.bjarkebjarke.tally.domain.start.HouseholdNotices
+import dk.bjarkebjarke.tally.domain.start.NameState
+import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import dk.bjarkebjarke.tally.session.SessionModule
 import dk.bjarkebjarke.tally.session.StartedActivity
 import dk.bjarkebjarke.tally.testing.FakeAuthentication
 import dk.bjarkebjarke.tally.testing.FakeConnectivity
+import dk.bjarkebjarke.tally.testing.FakeEmailVerification
 import dk.bjarkebjarke.tally.testing.FakeGoogleCredentials
+import dk.bjarkebjarke.tally.testing.FakeHouseholdNotices
+import dk.bjarkebjarke.tally.testing.FakeLocalUserData
+import dk.bjarkebjarke.tally.testing.FakeNameState
 import dk.bjarkebjarke.tally.testing.FakeSessionState
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.kotest.matchers.types.shouldNotBeSameInstanceAs
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.job
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Collections
 import javax.inject.Inject
 
 /**
- * M1-60: the real activity, its Hilt ViewModel and the root, with a signed-out session, open on sign-in. The fake
- * session replaces the whole Firebase session module (M1-88), so the test needs no Firebase app.
+ * M1-60: the real activity, its Hilt ViewModel and the root, with a signed-out session, open on sign-in. Fakes replace
+ * the Firebase session module and the gates (M1-88, M1-89), so the test needs no Firebase app.
  */
 @HiltAndroidTest
-@UninstallModules(SessionModule::class, ConnectivityModule::class)
+@UninstallModules(SessionModule::class, GateModule::class, ConnectivityModule::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(application = HiltTestApplication::class)
 class SignedOutStartTest {
@@ -68,12 +84,42 @@ class SignedOutStartTest {
     @JvmField
     val authentication: Authentication = fakeAuthentication
 
+    /** The update gate reads config/app (M1-82) until the test lets it answer; the root is on Loading meanwhile. */
+    private val gateAnswers = CompletableDeferred<Unit>()
+
+    @BindValue
+    @JvmField
+    val update: UpdateGate = UpdateGate { flowOf(false).onStart { gateAnswers.await() } }
+
+    @BindValue
+    @JvmField
+    val email: EmailVerification = FakeEmailVerification()
+
+    @BindValue
+    @JvmField
+    val name: NameState = FakeNameState()
+
+    @BindValue
+    @JvmField
+    val notices: HouseholdNotices = FakeHouseholdNotices()
+
+    /** What the signed-out cleanup (M1-89) deletes; it runs on a thread of the application scope. */
+    private val steps: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    @BindValue
+    @JvmField
+    val userData: LocalUserData = FakeLocalUserData(steps = steps)
+
     @Inject
     lateinit var startedActivity: StartedActivity
 
+    @Inject
+    @ApplicationScope
+    lateinit var applicationScope: CoroutineScope
+
     @Test
     fun signedOutStartShowsSignIn() {
-        // The update gate reads its remembered minimum on IO (R1-02), so the first state arrives a moment later.
+        gateAnswers.complete(Unit)
         compose.waitUntil(START_TIMEOUT_MS) {
             compose.onAllNodesWithText(compose.activity.getString(R.string.app_tag)).fetchSemanticsNodes().isNotEmpty()
         }
@@ -84,6 +130,7 @@ class SignedOutStartTest {
     /** M1-16: the sign-in screen's Google button reaches the graph's GoogleSignIn (fake picker and Firebase). */
     @Test
     fun theGoogleButtonSignsInThroughTheGraph() {
+        gateAnswers.complete(Unit)
         val google = compose.activity.getString(R.string.signin_google)
         compose.waitUntil(START_TIMEOUT_MS) { compose.onAllNodesWithText(google).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(google).performClick()
@@ -135,7 +182,30 @@ class SignedOutStartTest {
         startedActivity.current() shouldBeSameInstanceAs main
     }
 
+    /**
+     * M1-89: MainActivity starts the process's one signed-out cleanup once the root is ready, so a signed-out start
+     * deletes a copy that a session left on the phone after the update gate read through the Firestore instance a clear
+     * terminates (R1-01). A recreated MainActivity starts no second watcher.
+     */
+    @Test
+    fun theStartedActivityStartsTheOneSignedOutCleanupOnceTheRootIsReady() {
+        hilt.inject()
+        runCatching { compose.waitUntil(GATE_READ_MS) { steps.isNotEmpty() } } // ends early only if a clear starts
+        steps shouldBe emptyList()
+        gateAnswers.complete(Unit)
+        compose.waitUntil(START_TIMEOUT_MS) { "cleared" in steps }
+        steps shouldBe listOf("clear", "cleared")
+        val scope = applicationScope.coroutineContext.job
+        val watchers = scope.children.count()
+
+        compose.activityRule.scenario.recreate()
+
+        scope.children.count() shouldBe watchers
+        steps shouldBe listOf("clear", "cleared")
+    }
+
     private companion object {
         const val START_TIMEOUT_MS = 5_000L
+        const val GATE_READ_MS = 500L
     }
 }

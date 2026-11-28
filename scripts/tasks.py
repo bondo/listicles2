@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Task graph for Listicles: validate docs/tasks.toml and list ready tasks deterministically.
+"""Task graph for Tally: validate docs/tasks.toml and list ready tasks deterministically.
 
 Process: docs/ORCHESTRATION.md section 4. Standard library only (Python 3.11+ for tomllib).
 
@@ -137,7 +137,7 @@ def parse(text: str, burn_down: bool = True) -> Graph:
             assignee=raw["assignee"], risk=raw["risk"], depends_on=raw["depends_on"], index=i,
             issue=raw.get("issue"), pr=raw.get("pr"), notes=raw.get("notes", ""),
         )
-        if not isinstance(t.id, str) or not re.fullmatch(r"[A-Za-z0-9.]+-(\d{2}|O\d+|FU)", t.id):
+        if not isinstance(t.id, str) or not re.fullmatch(r"[A-Za-z0-9.]+-(\d{2,3}|O\d+|FU)", t.id):
             errors.append(f"{where}: id must look like M1-03 (agent), M1-O2 (owner) or M1-FU (burn-down)")
         elif t.id in seen:
             errors.append(f"{where}: duplicate id")
@@ -584,7 +584,7 @@ def state_ids(text: str) -> tuple[list[str], list[str]]:
         if not isinstance(rows, list):
             raise InputError(f"state block: {key} must be a list")
         for i, row in enumerate(rows):
-            got = row.get(field_name) if isinstance(row, dict) else None
+            got = row.get(field_name, []) if isinstance(row, dict) else None  # M1-120: a lean row leaves out an empty list
             if not isinstance(got, list) or not all(isinstance(x, str) for x in got):
                 raise InputError(f"state block: {key}[{i}].{field_name} must be a list of task ids")
             ids += got

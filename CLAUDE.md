@@ -1,4 +1,4 @@
-# CLAUDE.md: rules for agents working on Listicles
+# CLAUDE.md: rules for agents working on Tally
 
 Read `docs/PLAN.md` (section for your task) and your handoff file in `handoff/` if one exists. Shared household
 lists app: Kotlin, Compose, Firebase (Firestore + Auth), no Cloud Functions, English + Danish.
@@ -13,7 +13,7 @@ lists app: Kotlin, Compose, Firebase (Firestore + Auth), no Cloud Functions, Eng
 - No `--no-verify`, no force-push, no push to `main`, no `git reset --hard`/`stash`/`checkout .` with
   uncommitted changes (commit a WIP commit first). The PreToolUse hook blocks these.
 - Process files are read-only for you: `CLAUDE.md`, `REVIEW.md`, `agents/`, `.claude/`, `.github/`, `.githooks/`,
-  `scripts/guards.sh`, `scripts/hooks/`. Only sessions started with `LISTICLES_TASK=tooling` may edit them.
+  `scripts/guards.sh`, `scripts/hooks/`. Only sessions started with `TALLY_TASK=tooling` may edit them.
   If you think one needs a change, say so in the PR description.
 - Never disable or skip a test, add a baseline, lower a threshold, or add a suppression. If a check is wrong, ask.
   A suppression needs `// justified: <specific reason>` on the same line, at least 3 words of letters (the guard checks that); reviewers check the content.

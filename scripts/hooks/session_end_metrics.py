@@ -2,7 +2,8 @@
 """SessionEnd hook: sum token usage from the session transcript into metrics/sessions/<id>.json (PLAN 9.4).
 
 Hook input (stdin JSON): session_id, transcript_path, cwd, reason. Never fails the session: errors go to stderr, exit 0.
-Env tags set at spawn: LISTICLES_ROLE, LISTICLES_PR, LISTICLES_TASK. Output dir: LISTICLES_METRICS_DIR, else <project root>/metrics/sessions
+Env tags set at spawn: TALLY_ROLE, TALLY_PR, TALLY_TASK (only the TALLY_* names, M1-94). Output dir: TALLY_METRICS_DIR,
+else <project root>/metrics/sessions
 (project root = CLAUDE_PROJECT_DIR, else the git root of cwd, else cwd).
 Transcript facts (verified): assistant records carry message.id, message.model and message.usage; the same message id
 repeats once per content block, so only the LAST record per id counts. Subagent transcripts live in
@@ -65,7 +66,7 @@ def main():
         print("session_end_metrics: bad hook input", file=sys.stderr)
         return
     cwd = data.get("cwd") or os.getcwd()
-    out_dir = os.environ.get("LISTICLES_METRICS_DIR") or os.path.join(project_root(cwd), "metrics", "sessions")
+    out_dir = os.environ.get("TALLY_METRICS_DIR") or os.path.join(project_root(cwd), "metrics", "sessions")
     main_u = usage_of(tp)
     subs = [usage_of(p) for p in sorted(glob.glob(os.path.join(tp[:-6], "subagents", "*.jsonl")))] if tp.endswith(".jsonl") else []
     sub_total = dict.fromkeys(FIELDS, 0)
@@ -80,9 +81,9 @@ def main():
         "session_id": sid,
         "end_reason": data.get("reason"),
         "branch": b,
-        "role": os.environ.get("LISTICLES_ROLE"),
-        "pr": os.environ.get("LISTICLES_PR"),
-        "task": os.environ.get("LISTICLES_TASK"),
+        "role": os.environ.get("TALLY_ROLE"),
+        "pr": os.environ.get("TALLY_PR"),
+        "task": os.environ.get("TALLY_TASK"),
         "main": main_u,
         "subagents": {"transcripts": len(subs), "total": sub_total},
     }

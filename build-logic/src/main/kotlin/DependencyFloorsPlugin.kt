@@ -4,7 +4,7 @@ import java.io.StringReader
 import java.util.Properties
 
 /**
- * listicles.dependency.floors (issue 187, docs/SECURITY.md): in the project it is applied to, every configuration
+ * tally.dependency.floors (issue 187, docs/SECURITY.md): in the project it is applied to, every configuration
  * raises a dependency that has a Dependabot advisory to the first fixed version in
  * gradle/patched-dependencies.properties. Only raises: a newer version that a plugin asks for still wins. The root
  * build applies it, and so does every convention plugin.
@@ -22,7 +22,7 @@ class DependencyFloorsPlugin : Plugin<Project> {
         val floors = Properties().apply { load(StringReader(text)) }
         target.configurations.configureEach {
             resolutionStrategy.eachDependency {
-                val fixed = floors.getProperty("${requested.group}:${requested.name}")
+                val fixed = floors["${requested.group}:${requested.name}"] as String?
                 val wanted = requested.version
                 if (fixed != null && wanted != null && isOlder(wanted, fixed)) {
                     useVersion(fixed)

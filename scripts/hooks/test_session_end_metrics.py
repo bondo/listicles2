@@ -10,6 +10,16 @@ import unittest
 import gitenv  # noqa: F401  # justified: imported for its side effect, drops GIT_DIR and friends (see gitenv.py)
 
 HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session_end_metrics.py")
+# M1-91, M1-94: the hook reads TALLY_ROLE, TALLY_PR, TALLY_METRICS_DIR and TALLY_TASK only; every run here starts from an
+# env without any of these names, old or new (sessions set some of them).
+ENV_NAMES = ("TALLY_ROLE", "TALLY_PR", "TALLY_TASK", "TALLY_METRICS_DIR",
+             "LISTICLES_ROLE", "LISTICLES_PR", "LISTICLES_TASK", "LISTICLES_METRICS_DIR", "CLAUDE_PROJECT_DIR")
+
+
+def clean_env(env=None):
+    e = {k: v for k, v in os.environ.items() if k not in ENV_NAMES}
+    e.update(env or {})
+    return e
 
 
 def rec(mid, out, model="m1"):
@@ -29,7 +39,7 @@ class Metrics(unittest.TestCase):
         with open(os.path.join(d, "s1", "subagents", "x.jsonl"), "w") as f:
             f.write(json.dumps(rec("c", 9)) + "\n")
         out = os.path.join(d, "out")
-        env = dict(os.environ, LISTICLES_METRICS_DIR=out, LISTICLES_ROLE="implementer")
+        env = clean_env({"TALLY_METRICS_DIR": out, "TALLY_ROLE": "implementer"})
         r = subprocess.run([sys.executable, "-I", HOOK], input=json.dumps(
             {"session_id": "s1", "transcript_path": tp, "cwd": d, "reason": "other"}), env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -43,7 +53,7 @@ class Metrics(unittest.TestCase):
         self.assertEqual(j["role"], "implementer")
 
     def test_bad_input_never_fails(self):
-        r = subprocess.run([sys.executable, "-I", HOOK], input="x", capture_output=True, text=True)
+        r = subprocess.run([sys.executable, "-I", HOOK], input="x", capture_output=True, text=True, env=clean_env())
         self.assertEqual(r.returncode, 0)
 
 
@@ -55,8 +65,7 @@ class OutputDir(unittest.TestCase):
         tp = os.path.join(d, "s.jsonl")
         with open(tp, "w") as f:
             f.write(json.dumps(rec("a", 1)) + "\n")
-        e = {k: v for k, v in os.environ.items() if k not in ("LISTICLES_METRICS_DIR", "CLAUDE_PROJECT_DIR")}
-        e.update(env or {})
+        e = clean_env(env)
         r = subprocess.run([sys.executable, "-I", HOOK], input=json.dumps(
             {"session_id": "s", "transcript_path": tp, "cwd": cwd, "reason": "other"}), env=e, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -80,8 +89,44 @@ class OutputDir(unittest.TestCase):
         plain, out = tempfile.mkdtemp(), tempfile.mkdtemp()
         self.run_hook(plain)
         self.assertTrue(os.path.exists(os.path.join(plain, "metrics", "sessions", "s.json")))
-        self.run_hook(plain, {"LISTICLES_METRICS_DIR": out})
+        self.run_hook(plain, {"TALLY_METRICS_DIR": out})
         self.assertTrue(os.path.exists(os.path.join(out, "s.json")))
+
+    def test_the_old_dir_name_is_ignored(self):
+        plain, old = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.run_hook(plain, {"LISTICLES_METRICS_DIR": old})
+        self.assertTrue(os.path.exists(os.path.join(plain, "metrics", "sessions", "s.json")))
+        self.assertEqual(os.listdir(old), [])
+
+
+class Tags(unittest.TestCase):
+    """M1-91, M1-94: role, pr and task tags come from the TALLY_* names only; the old LISTICLES_* names are ignored."""
+
+    def tags(self, env):
+        d = tempfile.mkdtemp()
+        tp = os.path.join(d, "s.jsonl")
+        with open(tp, "w") as f:
+            f.write(json.dumps(rec("a", 1)) + "\n")
+        out = os.path.join(d, "out")
+        r = subprocess.run([sys.executable, "-I", HOOK], input=json.dumps({"session_id": "s", "transcript_path": tp, "cwd": d, "reason": "x"}),
+                           env=clean_env(dict(env, TALLY_METRICS_DIR=out)), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(os.path.join(out, "s.json")) as f:
+            j = json.load(f)
+        return j["role"], j["pr"], j["task"]
+
+    def test_role_and_pr_come_from_the_tally_names_only(self):
+        self.assertEqual(self.tags({"TALLY_ROLE": "reviewer", "TALLY_PR": "42"})[:2], ("reviewer", "42"))
+        self.assertEqual(self.tags({"LISTICLES_ROLE": "reviewer", "LISTICLES_PR": "42"})[:2], (None, None))
+        self.assertEqual(self.tags({"TALLY_ROLE": "a", "LISTICLES_ROLE": "b", "TALLY_PR": "1", "LISTICLES_PR": "2"})[:2], ("a", "1"))
+
+    def test_task_comes_from_tally_task_only(self):
+        for env, want in (({"TALLY_TASK": "tooling"}, "tooling"), ({"LISTICLES_TASK": "tooling"}, None),
+                          ({"TALLY_TASK": "normal", "LISTICLES_TASK": "tooling"}, "normal"),
+                          ({"TALLY_TASK": "tooling", "LISTICLES_TASK": "normal"}, "tooling"),
+                          ({"TALLY_TASK": "", "LISTICLES_TASK": "tooling"}, ""), ({}, None)):
+            with self.subTest(env=env):
+                self.assertEqual(self.tags(env)[2], want)
 
 
 if __name__ == "__main__":

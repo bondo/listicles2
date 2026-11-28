@@ -799,7 +799,8 @@ class CommandLine(unittest.TestCase):
         r = self.run_cli(root)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         lines = [ln for ln in r.stdout.splitlines() if ln.startswith("build-guards: ")]
-        self.assertEqual(len(lines), 5, r.stdout)  # a literal coordinate, two targetSdk, cleartext, allowBackup
+        # a literal coordinate, two targetSdk, cleartext, allowBackup, and lib/build.gradle:1 (`android` is not on the Groovy allowlist)
+        self.assertEqual(len(lines), 6, r.stdout)
         self.assertTrue(any(ln.startswith("build-guards: lib/build.gradle:3: ") and "catalog" in ln for ln in lines), r.stdout)
         self.assertEqual(sum("targetSdk" in ln for ln in lines), 2, r.stdout)
         self.assertTrue(any("usesCleartextTraffic" in ln for ln in lines))
@@ -837,8 +838,8 @@ class CommandLine(unittest.TestCase):
 
 
 SETTINGS = 'include(":app", ":core:domain")\n'
-APP = 'plugins {\n    alias(libs.plugins.listicles.android.application)\n}\nandroid { defaultConfig { targetSdk = 37 } }\n'
-DOMAIN = 'plugins {\n    id("listicles.jvm.library")\n}\n'
+APP = 'plugins {\n    alias(libs.plugins.tally.android.application)\n}\nandroid { defaultConfig { targetSdk = 37 } }\n'
+DOMAIN = 'plugins {\n    id("tally.jvm.library")\n}\n'
 
 
 class Conventions(unittest.TestCase):
@@ -878,11 +879,285 @@ class Conventions(unittest.TestCase):
             "project(\":app\", Action { pluginManager.apply(\"x\") })",
             "project(\":app\", { pluginManager.apply(\"x\") })",
             "project(':app', { p -> p.pluginManager.apply('x') })",
+            # M1-84: isolated projects. The root project is read only through isolated.rootProject; no parent; no project(...)
+            # held in a variable or passed anywhere but a dependency declaration.
+            'apply(from = rootProject.file("config/licensee/policy.gradle"))',
+            'val tokens = rootProject.layout.projectDirectory.file("design/tokens.json")',
+            "val dir = rootProject.projectDir",
+            "val dir = project.rootProject.projectDir",
+            "val dir = rootProject?.projectDir",
+            "val root = rootProject",
+            "f(rootProject)",
+            "val dir = getRootProject().getProjectDir()",
+            "val dir = isolated.rootProject.projectDirectory.also { rootProject.file(\"x\") }",
+            "gradle.rootProject { }",
+            "gradle.rootProject(Action { })",
+            "val v = parent?.version",
+            "val v = project.parent!!.version",
+            "val v = getParent().version",
+            "val v = project.getParent().version",
+            "val p = parent",
+            'val app = project(":app")',
+            'var app: Project? = findProject(":app")',
+            'val app = rootProject.findProject(":app")',
+            'configure(listOf(project(":app"))) { }',
+            'configure(listOf(project(":app"), project(":core:domain"))) { }',
+            'with(project(":app")) { }',
+            'run(project(":app")) { }',
+            'f(project(":app"))',
+            'dependencies { implementation(listOf(project(":app"))) }',
+            'dependencies { val p = project(":app") }',
+            'dependencies { p = project(":app") }',
+            'dependencies { with(project(":app")) { } }',
+            "def app = project(':app')",
+            # Self-review: an allowlist, not a list of banned wrappers; the template code of a string; this/getProject() receivers.
+            'dependencies { (project(":app")).pluginManager.apply("x") }',
+            'dependencies { id(project(":app")).version = "x" }',
+            'dependencies { arrayListOf(project(":app")).forEach { it.version = "1" } }',
+            'dependencies { ps.add(project(":app")) }',
+            'dependencies { implementation(Pair(project(":a"), 1).first) }',
+            'dependencies { project(":app") }',
+            "dependencies { ps = [null, project(':app')] }",
+            'val d = "${rootProject.projectDir}/x"',
+            'val d = "$rootProject/x"',
+            "def d = \"${rootProject.projectDir}/x\"",
+            "val v = this.parent?.version",
+            "val v = getProject().parent",
+            "gradle.projectsLoaded { }",
+            "gradle.projectsEvaluated { }",
+            # PR 384 R1-01: project/findProject without the literal `project(` token; R1-02: a parenthesized receiver of parent.
+            'val app = `project`(":app")',
+            '`project`(":app").pluginManager.apply("x")',
+            'val app = `findProject`(":app")',
+            'val v = project.`project`(":app")',
+            'dependencies { `project`(":app") }',
+            "val p = ::project",
+            "val p = ::`project`",
+            '(::project)(":app")',
+            "val f = Project::findProject",
+            "def app = this.&project",
+            "def app = this.& findProject",
+            "owner.'project'(':app')",
+            'owner."project"(":app")',
+            "'findProject' (':app')",
+            "val v = (project).parent",
+            "val v = (this).parent",
+            "val v = ( project )?.parent?.version",
+            "val v = (getProject()).parent",
+            # PR 384 R2-02, R2-03: a dynamic call, and a backticked, doubly parenthesized, `!!` or cast receiver of parent.
+            "this.invokeMethod(\"project\", \":app\")",
+            "val v = `project`.parent",
+            "val v = `project`.getParent()",
+            "val v = `getProject`().parent",
+            "val v = ((project)).parent",
+            "val v = (project!!).parent",
+            "val v = (project as Project).parent",
+            "val v = (project as Project?)?.parent?.version",
+            # Self-review of R3 (each ran in Gradle 8.14.3): Kotlin reaches a name at run time only through Gradle's property
+            # lookup, the Groovy builder and reflection, so those fail as a class; parent fails on any receiver.
+            'val p = project.property("parent")',
+            'val p = project.findProperty("rootProject")',
+            'val n = "parent"; val p = project.property(n)',
+            'val p = project.property("$n")',
+            'val p = project.properties["parent"]',
+            'project.withGroovyBuilder { "getParent"() }',
+            "val f = Project::getParent",
+            "val f = Project::getRootProject",
+            "val v = listOf(project).map { it.parent }",
+            'val q = file("a").parent',  # fails closed: File.parent has the name, use parentFile
+            "val m = Project::class.members",
+            'val m = project.javaClass.getMethod("getParent")',
+            "import kotlin.reflect.full.memberProperties",
+            # Second self-review of R3 (each ran in Gradle 8.14.3): the lexer follows Kotlin's nested comments and backticked
+            # names; a Project from a task, a dependency or the task graph; GroovyObject and InvokerHelper lookups by name.
+            '/* /* */ " */ val p = project.parent',
+            'val `x\'` = 1; val p = project.parent',
+            'val p = tasks.findByPath(":b:help")!!.project',
+            'val p = tasks.getByPath(":b:help")',
+            'val p = gradle.taskGraph.allTasks.map { it.project }',
+            'val p = tasks.named("x").get().getProject()',
+            'val p = (dependencies.project(mapOf("path" to ":b")) as ProjectDependency).dependencyProject',
+            'val p = (project as groovy.lang.GroovyObject).getProperty("parent")',
+            'val p = org.codehaus.groovy.runtime.InvokerHelper.getProperty(project, "parent")',
+            'val p = (project as org.gradle.internal.extensibility.DynamicObjectAware).asDynamicObject',
+            'val h = java.lang.invoke.MethodHandles.lookup()',
+            'val p = properties["parent"]',
+            # PR 384 R4-02 (ran in Gradle 8.14.3): reflection fails as a class, by package and by the bean and field lookups.
+            "import java.beans.Introspector",
+            'val p = Introspector.getBeanInfo(Project::class.java).propertyDescriptors.first { it.name == "par" + "ent" }'
+            '.readMethod.invoke(project) as Project',
+            'val f = Project::class.java.getDeclaredField("x")',
+            "val f = Project::class.java.getFields()",
+            "val f = Project::class.java.declaredFields",
+            "val f = Project::class.java.fields",
+            "import java.beans.Expression",
+            'val p = Expression(project, "get" + "Parent", arrayOf()).value as Project',
+            "val m: java.lang.reflect.Method? = null",
+            "import kotlin.reflect.KProperty1",
+            "val h: java.lang.invoke.MethodHandle? = null",
+            "val d = PropertyDescriptor(\"parent\", Project::class.java).getReadMethod()",
+            # PR 384 R4-03 (ran in Gradle 8.14.3): ::getProject, and the APIs that hand out another project's tasks.
+            'val p = configurations.getByName("runtimeClasspath").buildDependencies.getDependencies(null).map(Task::getProject)',
+            'configurations.getByName("runtimeClasspath").buildDependencies.getDependencies(null).first().run { println(project.path) }',
+            'val t = tasks.named("x").get().taskDependencies.getDependencies(null)',
+            "val f = Task::getProject",
+            "val f = Task::`getProject`",
+            "val f = Task::getTaskDependencies",
         ):
             with self.subTest(code=code):
                 found = self.problems({"build.gradle.kts": code + "\n"})
                 self.assertEqual(len(found), 1, found)
                 self.assertRegex(found[0], r"^build\.gradle\.kts:\d+: reaches other projects")
+
+    def test_groovy_command_syntax_and_dynamic_method_names_are_flagged(self):
+        # PR 384 R2-01, R2-02: Groovy calls project(...) without parentheses, and by a method name in any kind of string.
+        for code in (
+            "project ':app', { apply plugin: 'x' }",
+            "def app = project ':app'",
+            "findProject ':app'",
+            "def app = owner.project \":app\"",
+            "owner.'project' ':app', { }",
+            "def f = delegate.&\"project\"",
+            "def f = delegate.&'findProject'",
+            "owner.'''project'''(':app')",
+            'owner."""project"""(\':app\')',
+            "owner./project/(':app')",
+            "owner.$/project/$(':app')",
+            "owner.\"${'project'}\"(':app')",
+            "owner.\"${name}\"",
+            "this.invokeMethod('project', ':app')",
+            # PR 384 R3-01, R3-02: Groovy resolves a name at run time in more ways than these lines show, so check 4 denies the class:
+            # a string literal used as a name (after a dot, called, in command syntax or as a subscript key), a dynamic member
+            # `.(expr)`, the meta and reflection API, and \\u escapes.
+            "def r = project':b'",
+            "def r = findProject':b'",
+            "def r = \"${'project'}\"(':b')",
+            "def r = /project/(':b')",
+            "def r = $/project/$(':b')",
+            "def r = project.'pro\\u006aect'(':b')",
+            "def r = pro\\u006aect(':b')",
+            "def r = project.('pro' + 'ject')(':b')",
+            "def r = project.&('project')",
+            "project.metaClass.getMetaMethod('project', String).invoke(project, ':b')",
+            "def p = project.'parent'",
+            "def p = project.getProperty('parent')",
+            "def p = project.property('parent')",
+            "def r = project['rootProject']",
+            "def r = owner[\"project\"](':b')",
+            "project.'allprojects' { println it.path }",
+            "def r = 'project' ':b'",
+            "def m = project.class.getMethod('project', String)",
+            "evaluate('project(\":b\")')",
+            "def p = project.@parent",
+            "def p = project?.@'parent'",
+            # Self-review of R3 (each ran in Gradle 8.14.3): a .gradle file uses only GROOVY_IDENTIFIERS, so a lookup API not on the
+            # list fails whatever its name; a non-integer subscript, any slashy string and any \\u escape fail too.
+            "def p = project.findProperty('parent')",
+            "def p = findProperty('rootProject')",
+            "def p = project.properties.parent",
+            "def p = project.properties.get('parent')",
+            "def p = project.getAt('parent')",
+            "def name = 'parent'; def p = project[name]",
+            "def f = project.&getParent",
+            "def f = project.&getRootProject",
+            "def m = project.class.methods.find { it.name == 'getParent' }.invoke(project)",
+            "def x = /it's/; def p = project.parent",
+            "def x = $/\"/$; def p = project.parent",
+            "def p = [project]*.parent",
+            "def p = project.with { it.parent }",
+            "def e = project.extensions",
+            "def r = 'a.b'.split(/\\./)",
+            "// \\u0027",
+            # Groovy calls a local closure in a dependency statement, so project(...) fails in a .gradle file outright.
+            "def ok = { it.version = 'x' }; dependencies { ok project(':b') }",
+            "dependencies { implementation project(':core:domain') }",
+        ):
+            with self.subTest(code=code):
+                found = self.problems({"config/licensee/policy.gradle": code + "\n"})
+                self.assertEqual(len(found), 1, found)
+                self.assertRegex(found[0], r"^config/licensee/policy\.gradle:1: reaches other projects")
+
+    def test_a_slashy_string_cannot_hide_code_from_the_guard(self):
+        # A quote inside a slashy string would start a string the guard blanks; the slashy string itself fails.
+        found = self.problems({"config/licensee/policy.gradle": "def x = /\'\'\'/\ndef p = project.parent\ndef y = /\'\'\'/\n"})
+        self.assertTrue(found and found[0].startswith("config/licensee/policy.gradle:1: reaches other projects"), found)
+
+    def test_a_groovy_name_off_the_allowlist_is_named(self):
+        found = self.problems({"config/licensee/policy.gradle": "def ok = project.extensions\n"})
+        self.assertEqual(found, ["config/licensee/policy.gradle:1: reaches other projects (`extensions` is not on the Groovy allowlist); "
+                                 "a .gradle file uses only the names in GROOVY_IDENTIFIERS (Groovy resolves names at run time)"])
+
+    def test_groovy_reads_of_the_own_project_and_plain_strings_pass(self):
+        # Self-review of R3: a .gradle file uses only GROOVY_IDENTIFIERS; these forms of the licensee policy stay fine.
+        code = (
+            "def ok = project.ext.has('x') ? project.ext.get('x') : null\ndef line = 'project' + \"findProject\" + 'parent'\n"
+            "def reason = \"${project.name}: ${version}\".toString()\ndef spdx = 4 / 2 / (1)\n"
+            "def parts = 'a:b'.split(':') as List\ndef coordinates = parts[0]\nallowUrl('https://x/y') { because('z') }\n"
+            "def unknown = [a: 'b', 'c': 'd']\nif (unknown.isEmpty() && parts.get(1) != null) { return }\n"
+        )
+        self.assertEqual(self.problems({"config/licensee/policy.gradle": code}), [])
+
+    def test_isolated_project_reads_are_flagged_in_module_build_files_and_build_logic(self):
+        # M1-84: the module build files read the root through isolated.rootProject; so do the convention plugins.
+        for name in ("app/build.gradle.kts", "core/domain/build.gradle", "config/licensee/policy.gradle", "build-logic/src/main/kotlin/P.kt"):
+            for code, shown in (
+                ('val f = rootProject.file("x")', "rootProject"),
+                ("val v = target.parent?.version", "parent"),
+                ('val p = target.project(":app")', "project(...)"),
+            ):
+                with self.subTest(name=name, code=code):
+                    base = {"app/build.gradle.kts": APP, "core/domain/build.gradle": DOMAIN}.get(name, "")
+                    lines = base.count("\n")
+                    found = self.problems({name: base + code + "\n"} | ({"core/domain/build.gradle.kts": None} if name.startswith("core") else {}))
+                    self.assertEqual(len(found), 1, found)
+                    self.assertTrue(found[0].startswith(f"{name}:{lines + 1}: reaches other projects ({shown}"), found)
+
+    def test_settings_files_may_name_the_root_project_but_not_configure_it(self):
+        # In a settings file rootProject is the ProjectDescriptor (rootProject.name), not a Project; gradle.rootProject { } is a hook.
+        names = ("settings.gradle.kts", "build-logic/settings.gradle.kts", "x/settings.gradle", "build-logic/src/main/kotlin/a.settings.gradle.kts",
+                 "build-logic/src/main/groovy/a.settings.gradle")
+        for name in names:
+            ok = SETTINGS if name == "settings.gradle.kts" else ""
+            with self.subTest(name=name):
+                text = 'rootProject.name = "x"\nrootProject.buildFileName = "b.kts"\nsettings.rootProject.projectDir = file("r")\n'
+                self.assertEqual(self.problems({name: ok + text}), [])
+            for code in ("gradle.rootProject { }", "val r = rootProject", "f(rootProject)", "it.rootProject.name = \"x\"",
+                         "rootProject.children.forEach { }", "gradle.projectsLoaded { rootProject.extensions }"):
+                with self.subTest(name=name, code=code):
+                    found = self.problems({name: ok + code + "\n"})
+                    self.assertEqual(len(found), 1, found)
+                    self.assertRegex(found[0], rf"^{re.escape(name)}:\d+: reaches other projects")
+
+    def test_isolated_reads_and_project_dependencies_pass(self):
+        code = (
+            'apply(from = isolated.rootProject.projectDirectory.file("config/licensee/policy.gradle").asFile)\n'
+            'val t = project.isolated.rootProject.projectDirectory.file("design/tokens.json")\n'
+            'val d = getIsolated().getRootProject().getProjectDirectory()\n'
+            'val n = isolated.rootProject\n'
+            "val g = target.isolated.rootProject.projectDirectory\n"
+            "val f = layout.projectDirectory.asFile.parentFile\nval myparent = 1\nval parentDir = 2\n"
+            "val r = myrootProject\nval s = rootProjectDir\nval own = project\nval path = project.path\n"
+            "dependencies {\n    implementation(project(\":core:domain\"))\n    api(project(path = \":core:domain\"))\n"
+            "    add(\"implementation\", project(\":core:domain\"))\n    \"implementation\"(project(\":core:domain\"))\n"
+            "    testImplementation(testFixtures(project(\":core:domain\")))\n"
+            "    implementation(\n        project(\":core:domain\"),\n    )\n}\n"
+            "dependencies.implementation(project(\":core:domain\"))\n"
+            "dependencies { implementation(`project`(\":core:domain\")) }\n"
+            "val q2 = \"project\" + 'findProject'\nval q3 = listOf(\"project\")\n"
+            "dependencies {\n    implementation(project(\":core:domain\")) { exclude(group = \"x\") }\n"
+            "    testImplementation(platform(project(\":core:domain\")));\n}\n"
+            "val s = \"${layout.projectDirectory}/$version: parent rootProject\"\n"
+            "val m = mapOf(\"project\" to project.name, \"parent\" to 1)\n"
+            "val ins = tasks.register(\"x\") { inputs.property(\"taskCount\", 1) }\nval f2 = file(\"a\").parentFile\n"
+            "dependencies { testImplementation(libs.kotest.property) }\n"
+            "val op = objects.property(String::class.java)\nval props = java.util.Properties()\nval home = System.getProperty(\"user.home\")\n"
+            "/* a /* nested */ comment */ val own = project.name\nval `my name` = 1\n"
+            "val fields = \"a|b\".split('|')\nval (name, other) = fields\nval first = fields[0]\n"
+            "val d2 = dependencies.project(mapOf(\"path\" to \":x\"))\n"
+        )
+        groovy = "plugins {\n    id 'com.example'\n}\n"  # a project dependency fails in Groovy (see the Groovy deny cases)
+        self.assertEqual(self.problems({"build.gradle.kts": code, "core/domain/build.gradle.kts": DOMAIN + code,
+                                        "config/licensee/policy.gradle": groovy}), [])
 
     def test_build_logic_kotlin_must_not_configure_other_projects_or_set_target_sdk(self):
         for src, want in (("fun f(p: Project) { p.allprojects { } }", "reaches other projects"),
@@ -905,19 +1180,26 @@ class Conventions(unittest.TestCase):
 
     def test_a_module_without_a_convention_plugin_is_flagged(self):
         found = self.problems({"core/domain/build.gradle.kts": 'plugins {\n    alias(libs.plugins.kotlin.jvm)\n}\n'})
-        self.assertEqual(found, ["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"])
+        self.assertEqual(found, ["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"])
 
     def test_two_convention_plugins_or_a_commented_out_one_are_flagged(self):
-        for text, n in ((DOMAIN.replace("}", '    id("listicles.android.library")\n}'), 2), ('plugins {\n    // id("listicles.jvm.library")\n}\n', 0)):
+        for text, n in ((DOMAIN.replace("}", '    id("tally.android.library")\n}'), 2), ('plugins {\n    // id("tally.jvm.library")\n}\n', 0)):
             with self.subTest(n=n):
-                self.assertEqual([f"core/domain/build.gradle.kts: applies {n} listicles convention plugins; apply exactly one (build-logic/)"],
+                self.assertEqual([f"core/domain/build.gradle.kts: applies {n} tally convention plugins; apply exactly one (build-logic/)"],
                                  self.problems({"core/domain/build.gradle.kts": text}))
 
     def test_the_dependency_floors_plugin_is_not_a_module_convention(self):
-        # R1-03 (PR 320): a module with only listicles.dependency.floors gets none of the module conventions.
-        for text in ('plugins {\n    alias(libs.plugins.listicles.dependency.floors)\n}\n', 'plugins {\n    id("listicles.dependency.floors")\n}\n'):
+        # R1-03 (PR 320): a module with only tally.dependency.floors gets none of the module conventions.
+        for text in ('plugins {\n    alias(libs.plugins.tally.dependency.floors)\n}\n', 'plugins {\n    id("tally.dependency.floors")\n}\n'):
             with self.subTest(text=text):
-                self.assertEqual(["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"],
+                self.assertEqual(["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"],
+                                 self.problems({"core/domain/build.gradle.kts": text}))
+
+    def test_an_old_listicles_convention_id_is_not_a_module_convention(self):
+        # M1-93 R1-01: the ids were renamed, so a module still applying listicles.* has no convention (Gradle would fail on it too).
+        for text in ('plugins {\n    alias(libs.plugins.listicles.jvm.library)\n}\n', 'plugins {\n    id("listicles.android.library")\n}\n'):
+            with self.subTest(text=text):
+                self.assertEqual(["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"],
                                  self.problems({"core/domain/build.gradle.kts": text}))
 
     def test_a_module_without_a_build_file_is_flagged(self):
@@ -963,8 +1245,15 @@ class Conventions(unittest.TestCase):
         self.assertEqual(cbg.convention_problems(ROOT), [])
         self.assertEqual(len(cbg.module_paths(ROOT)), 4)
 
+    def test_the_real_module_build_files_read_the_root_through_isolated_projects(self):
+        # M1-84: not vacuous: the module build files and the licensee policy do read root files, through isolated.rootProject.
+        for rel in ("app/build.gradle.kts", "core/data/build.gradle.kts", "core/domain/build.gradle.kts", "config/licensee/policy.gradle"):
+            with self.subTest(rel=rel):
+                code = cbg.strip(cbg.read(ROOT, rel), blank_strings=True)
+                self.assertRegex(code, r"isolated\s*\.\s*rootProject\s*\.\s*projectDirectory\s*\.\s*file\(", rel)
 
-ROOT_BUILD = 'val listiclesModules = listOf(":app", ":core:domain")\ntasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }\n'
+
+ROOT_BUILD = 'val tallyModules = listOf(":app", ":core:domain")\ntasks.named("detekt") { dependsOn(tallyModules.map { "$it:tallyChecks" }) }\n'
 
 
 class Aggregation(unittest.TestCase):
@@ -980,24 +1269,30 @@ class Aggregation(unittest.TestCase):
 
     def test_a_missing_or_extra_module_is_flagged(self):
         self.assertEqual(self.problems(settings='include(":app", ":core:domain", ":core:data")\n'),
-                         ["build.gradle.kts: listiclesModules misses :core:data (settings.gradle.kts includes it)"])
+                         ["build.gradle.kts: tallyModules misses :core:data (settings.gradle.kts includes it)"])
         self.assertEqual(self.problems(ROOT_BUILD.replace('":core:domain"', '":core:domain", ":core:gone"')),
-                         ["build.gradle.kts: listiclesModules lists :core:gone, which settings.gradle.kts does not include"])
+                         ["build.gradle.kts: tallyModules lists :core:gone, which settings.gradle.kts does not include"])
         self.assertEqual(self.problems(ROOT_BUILD.replace('":core:domain"', '":core:domain", ":app"')),
-                         ["build.gradle.kts: listiclesModules lists :app twice"])
+                         ["build.gradle.kts: tallyModules lists :app twice"])
 
     def test_no_list_or_a_commented_out_one_is_flagged(self):
-        want = "build.gradle.kts: no `val listiclesModules = listOf(...)` (the root runs every module's listiclesChecks by task path)"
-        for text in (None, "", "// " + ROOT_BUILD, ROOT_BUILD.replace("val listiclesModules", "val modules")):
+        want = "build.gradle.kts: no `val tallyModules = listOf(...)` (the root runs every module's tallyChecks by task path)"
+        for text in (None, "", "// " + ROOT_BUILD, ROOT_BUILD.replace("val tallyModules", "val modules")):
             with self.subTest(text=text):
                 self.assertIn(want, self.problems(text))
 
     def test_detekt_must_depend_on_every_listed_module_check(self):
-        want = ['build.gradle.kts: detekt does not depend on dependsOn(listiclesModules.map { "$it:listiclesChecks" })']
-        for old, new in (("listiclesChecks", "checkWarningsAsErrors"), ('tasks.named("detekt")', 'tasks.named("lint")'),
+        want = ['build.gradle.kts: detekt does not depend on dependsOn(tallyModules.map { "$it:tallyChecks" })']
+        for old, new in (("tallyChecks", "checkWarningsAsErrors"), ('tasks.named("detekt")', 'tasks.named("lint")'),
                          ('tasks.named("detekt") {', '// tasks.named("detekt") {')):
             with self.subTest(new=new):
                 self.assertEqual(self.problems(ROOT_BUILD.replace(old, new)), want)
+
+    def test_the_old_listicles_names_are_not_accepted(self):
+        # M1-93 R1-01: the root list and the wiring must use the tally names.
+        for old, new in (("tallyModules", "listiclesModules"), ("tallyChecks", "listiclesChecks")):
+            with self.subTest(old=old):
+                self.assertNotEqual([], self.problems(ROOT_BUILD.replace(old, new)))
 
     def test_no_settings_file_skips_it(self):
         self.assertEqual(self.problems(None, settings=None), [])
@@ -1007,7 +1302,7 @@ class Aggregation(unittest.TestCase):
 
     def test_main_reports_it(self):
         d = tree({"settings.gradle.kts": SETTINGS, "build.gradle.kts": "", "app/build.gradle.kts": APP, "core/domain/build.gradle.kts": DOMAIN})
-        self.assertIn("listiclesModules", "".join(cbg.aggregation_problems(d)))
+        self.assertIn("tallyModules", "".join(cbg.aggregation_problems(d)))
         self.assertEqual(cbg.main(["x", d]), 1)
 
 

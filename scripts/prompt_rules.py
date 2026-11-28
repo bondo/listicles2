@@ -3,7 +3,7 @@ Agent Usage Redesign PR 2: plan review, self-review, finding verification, secon
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
 docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md,
-docs/reviews/collaborator-workflow.md, agents/roles.yaml and handoff/TEMPLATE.md).
+docs/reviews/collaborator-workflow.md, docs/milestones/M1.md, agents/roles.yaml and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -124,8 +124,8 @@ _DELEGATED = tuple(re.escape(t) for t in (
     "and the orchestrator follows it without asking",
     "the orchestrator may defer a minor finding past the 8-per-milestone follow-up cap when its fix is out of the PR's scope or the PR is at the "
     "line guard, with the usual follow-up issue and `decision` comment; majors still need the owner",
-    "the orchestrator starts `risk:high` tasks without asking; they still get max effort, a second reviewer every round and a clean "
-    "second-reviewer pass before READY",
+    "the orchestrator starts `risk:high` tasks without asking; the implementer runs at high effort, not max, and a PR in the security-rules, "
+    "sync-merge or release area gets a second reviewer and a clean second-reviewer pass before READY",
 ))
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
@@ -139,8 +139,8 @@ RETAINED = re.escape(
 _SCOPE = tuple(re.escape(t) for t in (
     "Approver scope, widened (owner decision, #15 comment 7123360368, 2026-11-24): the approver also approves (a) PRs with security-rules "
     "content (`firebase/` rules and their tests) and (b) changes to the privacy docs (`docs/privacy/**`), in both cases only after a clean "
-    "final review round, with green CI and no veto; for a security-rules or `risk:high` PR it also needs a clean independent second-reviewer "
-    "pass at max effort (§7.2.2). The record, the merge as `owner-batch` and the owner's veto are those of (1).",
+    "final review round, with green CI and no veto; a PR in the security-rules, sync-merge or release area also needs a clean independent "
+    "second-reviewer pass (§7.2.2). The record, the merge as `owner-batch` and the owner's veto are those of (1).",
 ))
 # Wording the decision replaced: the owner is no longer asked for these.
 _STALE_ASKS = (r"the escalation reviewer's `owner` ruling", r"`risk:high` work(?: before starting it| \(before starting it\))",
@@ -583,7 +583,8 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 50% of a 1m window \(40% of a 200k one, `agents/roles\.yaml` context\)",
+            r"handover \(§5, two-phase\), at about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\), "
+            r"`agents/roles\.yaml` context\)",
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
             r"a successor does §5\.2",
@@ -592,9 +593,23 @@ RULES = (
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 50% of a 1M window (40% of 200k, owner decision #15 comment 7001335975), first batch boundary: "
+        "two-phase handover at about 35% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7153510972, 7158603054), "
+        "first batch boundary: "
         "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
-        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window"),
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 50% of a 1m window"),
+    ),
+    Rule(
+        "handover-messages", ("orchestrator",),
+        (
+            r"as the incoming orchestrator, `send_message` the outgoing one as soon as your `handover-ack` is posted, telling it to check for the ack now",
+            r"#373 comments 7136480651 and 7136535861",
+            r"the scheduled 5-minute checks stay the fallback in both directions",
+            r"a message only prompts the check: read the comment itself",
+            r"post `handover-released`, then as your last action `send_message` the successor naming that comment's id, "
+            r"so it checks for the release now, and stop",
+        ),
+        "handover messages (owner decisions #373 comments 7136480651, 7136535861): the incoming orchestrator messages the outgoing one after its ack, "
+        "the outgoing one messages the incoming one last, naming the release comment id; the 5-minute checks stay the fallback",
     ),
     Rule(
         "lock-takeover", ("orchestrator",),
@@ -695,7 +710,7 @@ RULES = (
         (
             r"environment pick \(§7\.1, retro r8\)", r"before every `create_session`",
             r"a task that touches a process file \(`CLAUDE\.md`, `REVIEW\.md`, `agents/`, `\.claude/`, `\.github/`, `\.githooks/`, "
-            r"`scripts/guards\.sh`, `scripts/hooks/`\) gets the tooling environment \(`LISTICLES_TASK=tooling`\)",
+            r"`scripts/guards\.sh`, `scripts/hooks/`\) gets the tooling environment \(`TALLY_TASK=tooling`\)",
             r"every other task gets the normal one", r"the task's `notes` names it", r"a wrong pick blocks the worker",
         ),
         "the environment is picked before create_session: process files need the tooling one, everything else the normal one (§7.1)",
@@ -853,11 +868,10 @@ RULES = (
             r"you are not given the first reviewer's findings", r"risk:high", r"security-rules, sync-merge and release",
             r"never edit or push the pr branch: report only", r"marked ready only after your pass",
             r"ids `s<round>-<nn>`", r"never `r<round>-<nn>`",  # own id prefix: no same-round collision (R2-01 of #128)
-            r"opus, high effort \(max for `risk:high` prs and for prs labelled `area:security-rules`, even without `risk:high`, per "
-            r"`agents/roles\.yaml`; you do not raise your own effort\)",  # roles.yaml max_effort_when backs it (#15 comment 7123360368)
+            r"opus, high effort, per `agents/roles\.yaml` \(you do not raise your own effort\)",  # no max_effort_when (owner decision 7153510972)
         ),
-        "the second reviewer works independently on risk:high and protected areas and never edits the PR branch",
-        forbidden=(r"effort \(max for `risk:high` prs and for prs labelled `area:sync-merge`",),  # the decision names security-rules and risk:high only
+        "the second reviewer works independently on the security-rules, sync-merge and release areas and never edits the PR branch",
+        forbidden=(r"effort \(max for `risk:high` prs",),
     ),
     Rule(
         "verifier-handoff", ("implementer", "reviewer", "second-reviewer"),
@@ -896,12 +910,12 @@ RULES = (
         "impl-model-and-handoff", ("implementer",),
         (
             r"model and effort come from `agents/roles\.yaml` \(opus, high effort for spikes, design or architecture, risk:high, security rules, "
-            r"sync/merge, guard/hook/command-parsing tooling and a new implementer for a pr with 3\+ review rounds, max for risk:high prs; "
+            r"sync/merge, guard/hook/command-parsing tooling and a new implementer for a pr with 3\+ review rounds; never max, also for risk:high prs; "
             r"sonnet, medium effort otherwise, high for tooling; a running session keeps its model\)",
             r"60% of a 1m window, 40% of a 200k one", r"80% / 60%",
         ),
         "the implementer prompt names the roles.yaml model and the hook's handoff thresholds (rev 46 rows 1, 12)",
-        forbidden=(r"at about 50% context", r"implementer for listicles\. opus, high effort"),
+        forbidden=(r"at about 50% context", r"implementer for (?:listicles|tally)\. opus, high effort"),
     ),
     Rule(
         "impl-minors-and-triage", ("implementer",),
@@ -919,10 +933,11 @@ RULES = (
     Rule(
         "reviewer-effort", ("reviewer",),
         (
-            r"opus, high effort \(max for `risk:high` prs and for prs labelled `area:security-rules` or `area:sync-merge`, even without `risk:high`, "
-            r"per `agents/roles\.yaml`",
+            r"opus, high effort \(max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`, in every round, where "
+            r"the first reviewer is the primary reviewer, not the second reviewer, per `agents/roles\.yaml`",
         ),
-        "the reviewer prompt names max effort for risk:high, area:security-rules and area:sync-merge PRs, as roles.yaml and R7 do (#134)",
+        "the reviewer prompt names max effort for the first reviewer of area:security-rules and area:sync-merge PRs only, "
+        "as roles.yaml does (#134, 7153510972)",
         forbidden=(r"max for `?risk:high`? prs\)",),
     ),
     Rule(
@@ -1000,7 +1015,8 @@ RULES = (
             r"\(1\) no optional extras \(recurring reviews r3 and r4,", r"the stages are cumulative",
             r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice", r"\(3\) pause new work and finish the open prs",
             r"a stage lifts, and the limit returns to the §7\.1 default, at the first check-in where its trigger no longer applies",
-            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews and the r2 usage read",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on security-rules, "
+            r"sync-merge and release prs, delta reviews and the r2 usage read",
         ),
         "concurrency is for pipeline flow (default 10, reviews without a slot); throttle only near a rate limit or in overage (2026-11-18)",
         forbidden=(r"cap of [35] workers|at most 5 worker sessions|worker cap 3, then 2|recurring reviews r2|one stage per check-in|§7\.7\.5 forecast says",),
@@ -1009,7 +1025,7 @@ RULES = (
         "orch-spawn-checks", ("orchestrator",),
         (
             r"plan review \(§7\.2\.2\): after the planner writes `docs/milestones/<mx>\.md` and before any implementer starts, spawn a fresh reviewer",
-            r"second reviewer \(§7\.2\.2\): for `risk:high` prs and the security-rules, sync-merge and release areas, spawn a second fresh "
+            r"second reviewer \(§7\.2\.2\): for prs in the security-rules, sync-merge and release areas only, at high effort, spawn a second fresh "
             r"session in the same round, never showing it the reviewer's findings, and merge both reports",
             r"escalation reviewer \(§7\.2\.2\): when round 4 still has a confirmed finding above nit \(deferred minors do not count\) "
             r"or a dispute is still open, spawn one escalation reviewer per pr",
@@ -1025,7 +1041,7 @@ RULES = (
         (
             r"merge agent \(§7\.5\): the merge agent merges every ready pr except the owner-only ones, one at a time",
             OWNER_ONLY,
-            r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
+            r"a pr in the security-rules, sync-merge or release area is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent you spawn needs no owner authorization in its own session \(#15 comment 7085221356\): it carries the tag "
@@ -1092,8 +1108,8 @@ RULES = (
         "delegated-decisions", ("orchestrator",),
         _DELEGATED + (
             RETAINED,
-            r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round \(a `risk:high`, security-rules or release-area pr "
-            r"only after its clean second-reviewer pass, at max effort for `risk:high` and security-rules, §7\.2\.2\), with the pr number, "
+            r"approver \(§7\.5\): spawn one per pr once the pr is ready with a clean final round \(a security-rules, sync-merge or release-area pr "
+            r"only after its clean second-reviewer pass, §7\.2\.2\), with the pr number, "
             r"the head sha, the round "
             r"history and the deferral records; check for a `veto #n` comment on #15 before you send the merge request, and tell the merge agent "
             r"to read #15 for one right before it runs `scripts/merge_ready\.py`",
@@ -1106,7 +1122,7 @@ RULES = (
     Rule(
         "approver-role", ("approver",),
         (
-            r"you are the approver for listicles\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
+            r"you are the approver for tally\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
             r"fresh session, one per pr, started by the orchestrator once an owner-only pr in your scope \(§1\.1: tooling, build, ci or gate, "
             r"security rules, privacy docs\) is ready",
             r"you decide in the owner's place whether the pr may be merged as `owner-batch`\. you never merge it",
@@ -1122,8 +1138,8 @@ RULES = (
             r"`scripts/verify\.sh` and ci, and no suppression, baseline, skipped test or lowered threshold without the owner's recorded decision",
             r"4\. clean final round: the last round was a fresh reviewer's whole-diff round \(or, for later commits, a delta review\) with no "
             r"finding above nit open; every deferral has its follow-up issue and `decision` comment under `docs/follow-ups\.md` §2; "
-            r"a `risk:high` pr, a security-rules pr or another protected area \(release\) also has a clean independent second-reviewer pass "
-            r"\(§7\.2\.2\), at max effort for a `risk:high` or security-rules pr",
+            r"a pr in the security-rules, sync-merge or release area also has a clean independent second-reviewer pass "
+            r"\(§7\.2\.2\)",
             r"5\. ci: every required check succeeded on the head sha",
             r"6\. no closing keyword: no commit message and no pr body has close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved "
             r"directly before an issue number",
@@ -1140,6 +1156,42 @@ RULES = (
         "the approver checks head, scope, REVIEW.md, the clean final round, CI, closing keywords and the veto, posts the anchored record or a "
         "refusal, and never merges, edits or pushes (owner decision, #15 comment 7075812943; ORCHESTRATION 7.5)",
         forbidden=(r"\byou (?:may|can|should|will|must) (?:merge|push|edit|mark|label)",),
+    ),
+    # Owner decision 7153510972 on #399 (token savings), items 1-3 and 5; the phrases are listed in test_prompt_rules.TokenSavingsTests.
+    Rule(
+        "token-savings-implementer", ("implementer",),
+        (r"hand off at about 30% context", r"a pr above 500 counted lines is split before its first review round"),
+        "the implementer hands off at about 30% context and a PR above 500 counted lines is split before its first review round (7153510972 items 2, 3)",
+        forbidden=(r"max for risk:high prs",),
+    ),
+    Rule(
+        "token-savings-reviewer", ("reviewer",),
+        (r"max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`, in every round",),
+        "max effort only for the first reviewer of a security-rules or sync-merge PR, in every round (7153510972 item 1)",
+        forbidden=(r"max for `risk:high` prs", r"every later round runs at high"),
+    ),
+    Rule(
+        "token-savings-second-reviewer", ("second-reviewer",),
+        (r"opus, high effort, per `agents/roles\.yaml`",),
+        "the second reviewer runs at high effort (7153510972 item 1)",
+        forbidden=(r"max for `risk:high` prs",),
+    ),
+    Rule(
+        "token-savings-planner", ("planner",),
+        (r"plan prs at about 400 counted lines; a pr above 500 is split before its first review round",),
+        "the planner plans PRs at about 400 counted lines and splits above 500 (7153510972 item 3)",
+    ),
+    Rule(
+        "token-savings-orchestrator", ("orchestrator",),
+        (r"at about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\)",
+         r"a fresh merge agent once a day, at the first merge request after 00:00 utc",
+         r"sets the old merge-agent row to archived \(once it has no merge in flight\) and adds the new agent's row",
+         r"up to about 150 changed lines when they touch only tests or docs",
+         r"a fresh implementer from `handoff/<branch>\.md` when the running one is above 30% context"),
+        "the orchestrator hands over at about 35% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
+        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 50% of a 1m window", r"daily pacing recompute",
+                   r"this pr's scaling", r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k",
+                   r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
 )
 
@@ -1350,7 +1402,8 @@ DOC_RULES = (
         "orch-autonomy", ORCH,
         (
             r"run review rounds \(max 4 per batch, §6\.2\) and the one escalation reviewer after round 4",
-            r"mark a pr ready and send it to the merge agent \(a `risk:high` pr only after the independent second-reviewer pass\)",
+            r"mark a pr ready and send it to the merge agent \(a pr in the security-rules, sync-merge or release area only after "
+            r"the independent second-reviewer pass\)",
             r"\* merges of prs that stay with the owner \(below, §7\.5\)",
             r"\* anything above nit still open after round 5 \(§6\.2, §7\.2\.2\)",
             r"two consecutive worker sessions fail or stall \(§7\.4\)\. the orchestrator reads both with targeted `list_events`, logs an incident "
@@ -1384,15 +1437,35 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 50% of a 1m window \(40% of a 200k one; `agents/roles\.yaml` context, #15 comment 7001335975\)",
+            r"trigger: about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\); "
+            r"`agents/roles\.yaml` context, #15 comment 7001335975; 35% by owner decision "
+            r"7153510972 item 6",
             r"until the hard stage, the orchestrator follows this section, not the soft reminder",
             r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
-        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
+        "ORCHESTRATION 5: hand over at about 35% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
         "the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"the owner archives you"),
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 50% of a 1m window",
+                   r"the owner archives you"),
+    ),
+    DocRule(
+        "orch-handover-messages", ORCH,
+        (
+            r"the successor also messages you as soon as its ack is posted, §5\.2 step 4: check at once; the 5-minute checks stay the fallback, "
+            r"owner decision, #373 comment 7136480651",
+            r"as soon as it is posted, `send_message` the outgoing orchestrator to check for the ack now \(owner decision, #373 comment 7136480651\); "
+            r"its 5-minute checks \(§5\.1 step 6\) stay the fallback",
+            r"a message only prompts the check: act on the comment, never on the message",
+            r"8\. your last action: `send_message` the successor, naming the `handover-released` comment id, to check for the release now "
+            r"\(owner decision, #373 comment 7136535861\); its 5-minute checks \(§5\.2 step 5\) stay the fallback",
+            r"the outgoing orchestrator's last message names its comment id, check at once; otherwise check every 5 minutes with `send_later`, "
+            r"the fallback, owner decision, #373 comment 7136535861",
+            r"each side messages the other at the ack and at the release, the 5-minute checks stay the fallback",
+        ),
+        "ORCHESTRATION 5 and 9 F4: the incoming orchestrator messages the outgoing one after its ack, the outgoing one messages the incoming one "
+        "last, naming the release comment id; the 5-minute checks stay the fallback (owner decisions #373 comments 7136480651, 7136535861)",
     ),
     DocRule(
         "orch-parallel", ORCH,
@@ -1457,9 +1530,9 @@ DOC_RULES = (
             r"### 7\.2\.2 plan review, second reviewer, escalation reviewer, escaped defects",
             r"\*\*plan review:\*\* after the planner writes `docs/milestones/<mx>\.md` and before any implementer starts, the orchestrator spawns "
             r"a fresh opus reviewer",
-            r"\*\*second reviewer:\*\* for `risk:high` prs and the security-rules, sync-merge and release areas, the orchestrator spawns a second "
+            r"\*\*second reviewer:\*\* for prs in the security-rules, sync-merge and release areas, the orchestrator spawns a second "
             r"fresh session in the same round \(`agents/prompts/second-reviewer\.md`\); it never gets the reviewer's findings, "
-            r"and a `risk:high` pr is marked ready only after that pass",
+            r"and a pr in those areas is marked ready only after that pass",
             r"\*\*escalation:\*\* when round 4 still has a confirmed finding above nit \(deferred minors do not count\) or a dispute is still "
             r"open, the orchestrator spawns one escalation reviewer per pr",
             r"every spawn in §7\.2\.2 uses the §8\.3 message \(.*?\) with its own role line",
@@ -1501,7 +1574,7 @@ DOC_RULES = (
             r"\* \*\*merge agent:\*\* the merge agent merges every ready pr that is not owner-only under the owner's standing authorization, one at a time, "
             r"and an owner-only pr only as kind `owner-batch`",
             OWNER_ONLY,
-            r"a `risk:high` pr is marked ready only after the independent second-reviewer pass is clean",
+            r"a pr in the security-rules, sync-merge or release area is marked ready only after the independent second-reviewer pass is clean",
             r"docs prs whose owner approval can wait go to it too and carry the status line "
             r"`working draft \.\.\.; not owner-approved \(see issue #15\)`",
             r"a merge agent the orchestrator spawns needs no owner authorization in its own session \(owner decision, #15 comment 7085221356\): "
@@ -1528,7 +1601,8 @@ DOC_RULES = (
             r"the stages are cumulative", r"\(3\) pause new work and finish the open prs",
             r"\(2\) halve the concurrency limit, once per check-in while stage 2 applies, at most twice",
             r"a stage lifts, and the limit returns to the §7\.1 default, at the first check-in where its trigger no longer applies",
-            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on `risk:high`, delta reviews, and the r2 usage read",
+            r"never throttled: review rounds, verification of blockers and majors, the second reviewer on security-rules, "
+            r"sync-merge and release prs, delta reviews, and the r2 usage read",
         ),
         "ORCHESTRATION 7.7.6: throttle only near a rate limit or in overage: extras, halve the concurrency, pause new work; reviews are never throttled",
         forbidden=(r"the worker cap 3, then 2", r"stays at stage 1 with the cap at 5", r"recurring reviews r2", r"one stage per check-in",
@@ -1577,7 +1651,8 @@ DOC_RULES = (
             r"\*\*nits are accepted without a round\.\*\* a review with verdict `ready_nits_only` goes to the merge request \(§7\.5\)\. "
             r"its nits are recorded as accepted in the pr review table and the round row: no fix round, no re-review, no follow-up issue",
             r"\*\*a small fix is re-checked cheaply\.\*\* a re-check of a small fix-only or docs-only commit \(the fixes of the previous round's "
-            r"findings, about 30 changed lines or fewer in total\) is the delta review of §7\.2, with its inputs, done by a fresh sonnet medium "
+            r"findings, about 30 changed lines or fewer in total, or up to about 150 when they touch only tests or docs; "
+            r"owner decision 7153510972, item 4\) is the delta review of §7\.2, with its inputs, done by a fresh sonnet medium "
             r"reviewer \(`recheck-reviewer` in `agents/roles\.yaml`\), focused on those findings\. full rounds stay opus at the effort "
             r"`agents/roles\.yaml` gives the reviewer",
             r"\*\*guard and prompt_rules hardening prs stop early\.\*\* on a pr that hardens `scripts/guards\.sh`, "
@@ -1691,7 +1766,7 @@ DOC_RULES = (
             r"the orchestrator reads #15 for one before it sends the merge request and the merge agent right before it runs "
             r"`scripts/merge_ready\.py`, and neither merges or requests the merge of a vetoed pr",
             r"is refused by the approver and waits for the owner's own batch approval",
-            r"the second reviewer runs at max effort for `risk:high` and `area:security-rules` prs \(`agents/roles\.yaml`\)",
+            r"the second reviewer runs at high effort \(`agents/roles\.yaml`; owner decision 7153510972, item 1\)",
             r"for an owner-only pr in the approver's scope \(§1\.1\), an approver agent's anchored",
             r"or any owner-only path outside the approver's scope \(§1\.1\), is refused by the approver",
         ),
@@ -1702,13 +1777,12 @@ DOC_RULES = (
     DocRule(
         "roles-second-reviewer", "agents/roles.yaml",
         (
-            r"second-reviewer: model: opus effort: high session: fresh, same round as the reviewer, for risk:high prs and protected areas "
-            r"prompt: agents/prompts/second-reviewer\.md max_effort_when: - the pr is tagged risk:high in the milestone doc "
-            r"- the pr is labelled area:security-rules, even without the risk:high tag \(owner decision, #15 comment 7123360368",
+            r"second-reviewer: model: opus effort: high session: fresh, same round as the reviewer, only for security-rules, sync-merge "
+            r"and release prs, at high effort \(owner decision 7153510972 item 1; replaces the second reviewer for every risk:high pr\) "
+            r"prompt: agents/prompts/second-reviewer\.md escalation-reviewer:",
         ),
-        "roles.yaml: the second reviewer is max effort for risk:high and area:security-rules PRs, which the approver's condition needs "
-        "(owner decision, #15 comment 7123360368)",
-        forbidden=(r"second-reviewer:[^\n]{0,200}effort: max",),
+        "roles.yaml: the second reviewer is high effort and only for security-rules, sync-merge and release PRs (owner decision 7153510972)",
+        forbidden=(r"second-reviewer: model: opus effort: max", r"second-reviewer:.{0,300}max_effort_when"),
     ),
     DocRule(
         "roles-approver", "agents/roles.yaml",
@@ -1762,6 +1836,65 @@ DOC_RULES = (
         "ORCHESTRATION 7.1 (home), 7.5, 7.8 and 8.2: reviews start on push, no loop-wait for CI, CI green before READY and the merge request "
         "(owner decision, #15 comment 7075952806)",
         forbidden=PUSH_WORDING_STALE,
+    ),
+    # Owner decision 7153510972 on #399 (token savings), items 1-6; the phrases are listed in test_prompt_rules.TokenSavingsTests.
+    DocRule(
+        "token-savings-roles", "agents/roles.yaml",
+        tuple(re.escape(t) for t in (
+            "the first reviewer of a pr labelled area:security-rules or area:sync-merge",
+            "a risk:high implementer runs at high effort, not max",
+            "for security-rules, sync-merge and release prs",
+            "up to about 150 changed lines when they touch only tests or docs",
+            "a fresh merge agent once a day, at the first merge request after 00:00 utc",
+            "the first reviewer (the primary reviewer, not the second reviewer) in every round (owner decision 7158603054 item 1)",
+            "25% of a 200k window (owner decision 7158603054 item 2)",
+            "orchestrator_handover_at_percent_200k: 25",
+            "implementer_handoff_at_percent: 30",
+            "orchestrator_handover_at_percent_1m: 35",
+        )),
+        "roles.yaml carries the token-savings rules: reviewer max effort only for the first reviewer of security-rules and sync-merge PRs, the "
+        "second reviewer high, the implementer at high and handing off at 30%, the 150-line re-check, the daily merge agent (7153510972)",
+        forbidden=(r"second-reviewer: model: opus effort: max",
+                   r"a new implementer for a pr that already had 3 or more review rounds max_effort_when: - the pr is tagged risk:high",
+                   r"every later round", r"daily pacing recompute", r"orchestrator_handover_at_percent_200k: 30",
+                   r"pending owner confirmation"),
+    ),
+    DocRule(
+        "token-savings-orchestration", ORCH,
+        tuple(re.escape(t) for t in (
+            "opus / high (max for the first reviewer of a pr labelled `area:security-rules` or `area:sync-merge`)",
+            "the implementer runs at high effort, not max",
+            "a pr in the security-rules, sync-merge or release area also needs a clean independent second-reviewer pass",
+            "the second reviewer runs at high effort",
+            "about 30 changed lines or fewer in total, or up to about 150 when they touch only tests or docs",
+            "an implementer hands off at about 30% context",
+            "a fix round goes to a fresh implementer",
+            "a pr above 500 counted lines is split before its first review round",
+            "a fresh merge agent once a day, at the first merge request after 00:00 utc (checked at each check-in)",
+            "spawn it in three steps: (1) `create_session` with the template below and `merge requests: wait for the first merge request`",
+            "(3) send the first merge request with `send_message`, only after that update",
+            "a `merge-agent` row that is not archived or failed",
+            "if the body does not name you as active, do not merge; send_message the orchestrator and wait",
+            "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row",
+            "the merge-agent row's `spawned-at` records the rotation time",
+            "check that the state issue body names you as active before your first merge",
+            "trigger: about 35% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
+            "hand over at about 35% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
+            "the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)",
+            "### 8.6 merge agent",
+            "tags `role:merge-agent`, `tally:process`",
+        )),
+        "ORCHESTRATION carries the token-savings rules: effort, implementer context and fix rounds, PR size, the 150-line re-check, the daily "
+        "merge agent and its spawn message, the 35% orchestrator handover (7153510972)",
+        forbidden=(r"opus / high \(max for `risk:high`\)", r"second reviewer every round", r"max effort for `risk:high`",
+                   r"about 50% of a 1m window", r"daily pacing recompute", r"this pr's scaling",
+                   r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k", r"i\.e\. the orchestrator's first check-in of the utc day"),
+    ),
+    DocRule(
+        "token-savings-m1", "docs/milestones/M1.md",
+        (r"max only for the first reviewer of an `area:security-rules` or `area:sync-merge` pr",),
+        "the M1 plan gives max effort only to the first reviewer of a security-rules or sync-merge PR, as PLAN 9.1 does (7153510972)",
+        forbidden=(r"both at max for `risk:high`",),
     ),
 )
 

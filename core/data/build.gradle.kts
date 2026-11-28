@@ -1,16 +1,21 @@
 plugins {
-    alias(libs.plugins.listicles.android.library)
+    alias(libs.plugins.tally.android.library)
     alias(libs.plugins.licensee)
 }
 
 // M0.5-10, M1-66: :app ships this module, so its dependencies must be on the owner's licence allowlist too
 // (the Google SDK terms lines in config/licensee/google-sdk-terms.txt, approved in M1-O14).
-apply(from = rootProject.file("config/licensee/policy.gradle"))
+apply(
+    from =
+        isolated.rootProject.projectDirectory
+            .file("config/licensee/policy.gradle")
+            .asFile,
+)
 
 val firestoreRulesAssetDir = layout.buildDirectory.dir("generated/firestoreRules")
 val syncFirestoreRulesAsset =
     tasks.register<Sync>("syncFirestoreRulesAsset") {
-        from(rootProject.file("firebase/firestore.rules"))
+        from(isolated.rootProject.projectDirectory.file("firebase/firestore.rules"))
         into(firestoreRulesAssetDir)
     }
 

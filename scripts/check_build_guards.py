@@ -33,14 +33,40 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    `subprojects` or `childProjects` (also `getAllprojects()` and the like, so a read such as `allprojects.flatMap { ... }` too; M1-68 part B3,
    issue 48), member access on (also after `?` or `!!`) or a configure block for `project(...)`/`findProject(...)`, a `project(path, ...)`
    call with an Action or lambda argument, `evaluationDependsOn`, and
-   `gradle.allprojects`/`beforeProject`/`afterProject`. A project dependency (`implementation(project(":x"))`) is fine. Known gaps (M1-84):
-   `rootProject.<member>` reads, `parent`, `gradle.rootProject { }`, and a `project(...)` held in a variable or passed to `with`/`run` or
-   `configure(listOf(project(...))) { }`.
+   `gradle.allprojects`/`beforeProject`/`afterProject`/`projectsLoaded`/`projectsEvaluated`. M1-84 (isolated projects): any `rootProject`
+   (also `getRootProject()`, passed, held in a variable or in string template code, `gradle.rootProject { }`) other than
+   `isolated.rootProject`, which reads the root's directory; in a settings file `rootProject` is the project descriptor, so there only
+   `rootProject.name`, `.buildFileName` and `.projectDir` pass. `parent` and `getParent` on any receiver (also a reference such as
+   `Project::getParent`; File.parent and Path.parent share the name and fail closed, use `parentFile`). A `project(...)`/`findProject(...)`
+   that is not a direct argument of a dependency declaration (an allowlist: a call that is a whole statement in a `dependencies { }` block,
+   `"conf"(...)`, Groovy `conf project(...)`, or `dependencies.<conf>(...)`, with only `testFixtures`/`platform`/`enforcedPlatform` in
+   between), so one held in a variable or in `configure(listOf(project(...))) { }` fails; so does a callable reference (`::project`, Groovy
+   `.&project`) and a quoted `project`/`findProject` call. A backticked name counts as the plain one. Kotlin reaches a name at run time
+   only through Gradle's property lookup, the Groovy builder and reflection, so those fail as a class (DYNAMIC_API): `withGroovyBuilder`,
+   `properties`, the KClass members API, `javaClass`, method lookups (`getMethod`, `methods` and the like), field lookups (`getField(s)`,
+   `getDeclaredField(s)`, a `.fields` or `.declaredFields` member), bean lookups (`Introspector`, `BeanInfo`, `PropertyDescriptor`,
+   `propertyDescriptors`, `readMethod`, `writeMethod`, `Expression`), and the packages `java.beans`, `java.lang.reflect`,
+   `java.lang.invoke` and `kotlin.reflect` by name, and `property`/`findProperty`/`hasProperty` with anything but a plain string literal
+   that is not a denied name. So do the APIs that hand out a Project without naming it: `.project`/`getProject()` on a task or any other
+   receiver and `::getProject`, `findByPath`, `getByPath`, `dependencyProject`, `taskGraph`, and the APIs that hand out another project's
+   tasks: `buildDependencies`, `taskDependencies` and `getDependencies` (PROJECT_GETTERS), and `GroovyObject`, `InvokerHelper`,
+   `asDynamicObject` and `MethodHandles`. Kotlin text is lexed as Kotlin: block comments nest and a backticked name is one token. Groovy
+   resolves every name at run time, so a .gradle file is read by allowlist: it uses only the identifiers in GROOVY_IDENTIFIERS (what the
+   licensee policy needs, keywords and the plugins and dependencies DSL), and none of the forms that name something without an identifier:
+   a string literal used as a name (after `.`, `.&` or `.@`, called, in command syntax such as `project ':app', { }` or `project':b'`), a
+   method pointer, field access or dynamic member (`.&`, `.@`, `.(expr)`), a subscript whose key is not an integer, a slashy string, and a
+   `\\uXXXX` escape anywhere (PR 384 R1 to R3). A .gradle file declares no project dependency either: a closure can pose as a configuration
+   (`ok project(':b')`). A project dependency (`implementation(project(":x"))`, `dependencies.project(mapOf(...))`) is fine. One finding
+   per line. Known gaps: check 4 reads text, so a Kotlin API it does not list that returns a Project or another project's task, a Project
+   behind an implicit receiver (`otherTask.run { project }`), or a Project reached through a helper function, passes; Gradle's isolated
+   projects mode is what enforces this in the build (M1-98). Fails closed on: a Kotlin parameter or named argument called `parent`,
+   File.parent, a settings plugin in build-logic/ Kotlin that reads `settings.rootProject`, and a Groovy `conf project(':a'),
+   project(':b')` list.
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
-   The root build's `val listiclesModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
-   `listiclesChecks` by task path (aggregation_problems; M1-68 part B2: each module runs its own checks, the root reads none).
+   The root build's `val tallyModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
+   `tallyChecks` by task path (aggregation_problems; M1-68 part B2: each module runs its own checks, the root reads none).
 
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
@@ -76,10 +102,15 @@ def read(root, rel):
 
 # -- source text without comments --------------------------------------------------------------------------------------------------
 
-def strip(text, blank_strings=False, strings=None):
+TEMPLATE_NAME = re.compile(r"\$[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")  # `$name`, Groovy `$a.b.c`
+
+
+def strip(text, blank_strings=False, strings=None, templates=False, kotlin=False):
     """The text with every comment replaced by spaces (newlines kept, so offsets and lines stay); with blank_strings also the
     contents of string literals. Reads Kotlin (`"..."` with `${...}`, `\"\"\"...\"\"\"`) and Groovy (`'...'`) strings. A list passed
-    as strings receives the offset where the contents of each string literal start."""
+    as strings receives the offset where the contents of each string literal start. With templates, blank_strings keeps the code of
+    `${...}` and `$name` templates (`$a.b.c` for Groovy), so check 4 reads `"${rootProject.projectDir}"`. With kotlin, block comments
+    nest and a backticked name is one token, as Kotlin lexes them (a quote inside either is not a string)."""
     out = list(text)
     n = len(text)
 
@@ -98,10 +129,19 @@ def strip(text, blank_strings=False, strings=None):
                 blank(i, j)
                 i = j
             elif text.startswith("/*", i):
-                j = text.find("*/", i + 2)
-                j = n if j < 0 else j + 2
+                j, depth = i + 2, 1
+                while j < n and depth:
+                    if kotlin and text.startswith("/*", j):
+                        depth, j = depth + 1, j + 2
+                    elif text.startswith("*/", j):
+                        depth, j = depth - 1, j + 2
+                    else:
+                        j += 1
                 blank(i, j)
                 i = j
+            elif kotlin and c == "`":
+                j = text.find("`", i + 1)
+                i = n if j < 0 else j + 1
             elif c in "\"'":
                 i = string(i)
             elif nested and c == "{":
@@ -119,6 +159,7 @@ def strip(text, blank_strings=False, strings=None):
     def string(i):
         start = i
         q = text[i]
+        keep = []  # template code spans kept with templates
         triple = text.startswith(q * 3, i)
         i += 3 if triple else 1
         if strings is not None:
@@ -137,11 +178,22 @@ def strip(text, blank_strings=False, strings=None):
             if not triple and c == "\n":  # an unterminated string ends at the line
                 break
             if q == '"' and c == "$" and text.startswith("{", i + 1):
-                i = code(i + 2, True)
+                j = code(i + 2, True)
+                keep.append((i, j))
+                i = j
+                continue
+            m = TEMPLATE_NAME.match(text, i) if q == '"' else None
+            if m:
+                keep.append((i + 1, m.end()))  # without the `$`, so the name reads as code
+                i = m.end()
                 continue
             i += 1
         if blank_strings:
-            blank(start + 1, max(start + 1, i - 1))
+            a = start + 1
+            for k0, k1 in (keep if templates else []):
+                blank(a, k0)
+                a = k1
+            blank(a, max(a, i - 1))
         return i
 
     code(0, False)
@@ -529,11 +581,16 @@ def catalog_problems(root):
 # String contents are blanked, so `project("...")` is matched with its parentheses (one level of nesting, as in `project(mapOf(...))`).
 CROSS_PROJECT = re.compile(
     r"(?<![\w$])(?:get)?(?:[aA]llprojects|[sS]ubprojects|[cC]hildProjects)(?![\w$])"
-    r"|(?<![\w$])(?:project|findProject)\s*\((?:[^()]|\([^()]*\))*\)\s*(?:\?|!!)?\s*[.{]"
+    r"|(?<![\w$])`?(?:project|findProject)`?\s*\((?:[^()]|\([^()]*\))*\)\s*(?:\?|!!)?\s*[.{]"
     # PR 359 R1-01: project(path, Action { }) and project(path, { }).
-    r"|(?<![\w$])project\s*\([^(){}]*,\s*(?:Action\b|\{)"
+    r"|(?<![\w$])`?project`?\s*\([^(){}]*,\s*(?:Action\b|\{)"
+    # PR 384 R1-01: a callable reference (Kotlin `::project`, Groovy `.&project`).
+    r"|(?:::|\.\s*&)\s*`?(?:project|findProject)`?(?![\w$])"
+    # PR 384 R2-02: a Groovy slashy method name (`owner./project/(...)`, `$/project/$`) and a dynamic call by name.
+    r"|\.\s*&?\s*\$?/(?:project|findProject)/"
+    r"|(?<![\w$])invokeMethod\b"
     r"|(?<![\w$])evaluationDependsOn(?:Children)?\b"
-    r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject)\b"
+    r"|(?<![\w$])gradle\s*\.\s*(?:lifecycle\s*\.\s*)?(?:allprojects|beforeProject|afterProject|projectsLoaded|projectsEvaluated)\b"
 )
 # What the convention plugins own; a module build file that sets one again makes a second copy that can drift. Since M1-68 part B
 # that includes the JUnit Platform, failOnNoDiscoveredTests (checkTestSettings checks the result per module) and :core:testing.
@@ -542,8 +599,8 @@ OWNED = re.compile(
     r"|useJUnitPlatform|failOnNoDiscoveredTests)\b|(-Xjdk-release)"
     r"|(?<![\w$])testImplementation\s*\(\s*project\s*\(\s*(?:path\s*=\s*)?\":core:testing\""
 )
-# The four module conventions; listicles.dependency.floors is not one (it carries none of the module settings; R1-03).
-MODULE_CONVENTION = r"listicles\.(?:jvm\.(?:library|testsupport)|android\.(?:library|application))"
+# The four module conventions; tally.dependency.floors is not one (it carries none of the module settings; R1-03).
+MODULE_CONVENTION = r"tally\.(?:jvm\.(?:library|testsupport)|android\.(?:library|application))"
 CONVENTION = re.compile(rf"\balias\s*\(\s*libs\.plugins\.{MODULE_CONVENTION}\s*\)|\bid\s*\(\s*\"{MODULE_CONVENTION}\"\s*\)")
 INCLUDE_CALL = re.compile(r"\binclude\s*\(([^)]*)\)")
 
@@ -556,13 +613,265 @@ def module_paths(root):
     return [p for m in INCLUDE_CALL.finditer(text) for p in re.findall(r"\"(:[^\"]+)\"", m.group(1))]
 
 
+# M1-84, isolated projects: the root project is read only through `isolated.rootProject` (an IsolatedProject: its directory, name and
+# path). In a settings file `rootProject` is the ProjectDescriptor: there only `rootProject.name`, `.buildFileName` and `.projectDir`
+# (also on `settings.`) pass.
+ROOT_PROJECT = re.compile(r"(?<![\w$])(?:rootProject|getRootProject)(?![\w$])")  # also a reference, Project::getRootProject
+ISOLATED_BEFORE = re.compile(r"(?<![\w$])(?:isolated|getIsolated\s*\(\s*\))\s*(?:\?|!!)?\s*\.\s*$")
+DESCRIPTOR = re.compile(r"\s*\.\s*(?:name|buildFileName|projectDir)(?![\w$])")
+SETTINGS_RECEIVER = re.compile(r"(?:^|[^\w$.\s])\s*(?:settings\s*\.\s*)?$")
+# The parent project, by its name on any receiver: File.parent and Path.parent share the name and fail closed (use parentFile).
+PARENT = re.compile(r"(?<![\w$])(?:parent|getParent)(?![\w$])")  # on any receiver (R3 self-review); File.parent fails closed
+# project(...)/findProject(...) on any receiver but `dependencies.` (DependencyHandler.project, a dependency). It passes only as a direct
+# argument of a dependency declaration (an allowlist): a call that is a whole statement in a `dependencies { }` block (`conf(...)`,
+# `"conf"(...)`, `add("conf", ...)`, Groovy `conf project(...)`, optionally with a configuration block) or `dependencies.<conf>(...)`,
+# with only testFixtures, platform or enforcedPlatform between it and project(...).
+PROJECT_CALL = re.compile(r"(?<![\w$])`?(?:project|findProject)`?\s*\(")  # also backticked (PR 384 R1-01)
+# A name in a string literal (PR 384 R1-01, R2-02, R3-01, R3-02). Kotlin has none but `"conf"(...)`, so there only a quoted
+# project/findProject call fails. Groovy resolves every name at run time, so a .gradle file is read by allowlist (R3 self-review):
+# it uses only the identifiers in GROOVY_IDENTIFIERS (what the licensee policy needs, keywords and the plugins/dependencies DSL), and
+# none of the forms that name something without an identifier: a string literal used as a name (after `.`, `.&` or `.@`, called, in
+# command syntax), a method pointer, field access or dynamic member (`.&`, `.@`, `.(expr)`), a subscript with a key that is not an
+# integer, a slashy string, and a `\uXXXX` escape anywhere. A map key or named argument (`[a: 1]`, `project(path: ':x')`) is a
+# string, not a name.
+PROJECT_NAMES = {"project", "findProject"}
+MEMBER_BEFORE = re.compile(r"\.\s*[&@]?\s*$")  # also Groovy method pointer .& and direct field access .@
+CALL_AFTER = re.compile(r"\s*\(")
+# Groovy command syntax after a name (an argument, not `in`, `instanceof` or `as`; PR 384 R2-01), with no space before a quote (R3-01).
+COMMAND_AFTER = re.compile(r"""[ \t]+(?!(?:in|instanceof|as)\b)['"\w$]|['"]""")
+GROOVY_COMMAND = re.compile(r"""(?<![\w$])`?(?:project|findProject)`?(?:[ \t]+(?!(?:in|instanceof|as)\b)(?=['"\w$/\[])|(?=['"]))""")
+SUBSCRIPT_BEFORE = re.compile(r"[\w$)\]]\s*\[\s*$")
+GROOVY_IDENTIFIERS = frozenset(
+    [
+        # config/licensee/policy.gradle
+        "Action", "File", "GoogleTermsCheck", "GradleException", "JsonSlurper", "List", "Map", "Override", "Serializable", "String",
+        "Task", "allow", "allowDependency", "allowUrl", "allowedSpdxIds", "any", "approved", "approvedCoordinates", "artifact",
+        "artifactId", "artifactTermsUrls", "artifactUrls", "as", "asFile", "because", "class", "collect", "configureEach",
+        "contains", "coordinates", "def", "doLast", "each", "every", "execute", "exists", "ext", "file", "findAll", "get",
+        "googleTermsFile", "googleTermsUrls", "groovy", "groupId", "has", "identifier", "if", "implements", "import", "indexOf",
+        "isEmpty", "isolated", "it", "join", "json", "jsonOutput", "licensee", "licenseeTask", "line", "listName", "name", "new",
+        "ok", "parse", "parts", "problems", "project", "projectDirectory", "readLines", "reason", "return", "rootProject", "size",
+        "spdx", "spdxIds", "spdxLicenses", "split", "startsWith", "substring", "task", "tasks", "termsUrls", "throw", "toString",
+        "trim", "unknown", "unknownLicenses", "url", "version", "void",
+        # keywords and literals
+        "else", "null", "true", "false", "in", "instanceof", "for", "while", "try", "catch", "finally", "break", "continue",
+        "static", "final", "private", "public", "protected",
+        # the plugins and dependencies DSL, and a settings file's project descriptor
+        "plugins", "id", "alias", "libs", "dependencies", "implementation", "api", "settings", "buildFileName", "projectDir",
+    ]
+)
+IDENTIFIER = re.compile(r"(?<![\w$])[A-Za-z_][\w$]*")
+MAP_KEY = re.compile(r"\s*:(?!:)")  # after an identifier that follows `[`, `(` or `,`: a map key or named argument
+GROOVY_FORMS = re.compile(
+    r"(?<!\.)[?*]?\.\s*[&@(]"  # method pointer, direct field access, dynamic member; not a range `0..(n)`
+    r"|[\w$)\]]\s*\[(?!\s*\d+\s*\])"  # a subscript whose key is not an integer: project[name], map['key']
+    r"|\$/"  # a dollar-slashy string
+)
+DENIED_NAMES = {"parent", "getParent", "rootProject", "getRootProject", "allprojects", "getAllprojects", "subprojects", "getSubprojects",
+                "childProjects", "getChildProjects"}
+# Kotlin reaches a name at run time only through Gradle's property lookup, the Groovy builder and reflection (R3 self-review).
+DYNAMIC_API = re.compile(
+    r"(?<![\w$])(?:withGroovyBuilder|invokeMethod|metaClass|getMetaClass|getMetaMethod|javaClass|getMethod|getMethods|getDeclaredMethod"
+    r"|getDeclaredMethods|methods|declaredMethods|members|declaredMembers|memberFunctions|memberProperties|declaredMemberFunctions"
+    r"|declaredMemberProperties|memberExtensionFunctions|memberExtensionProperties|staticProperties|staticFunctions|functions"
+    r"|declaredFunctions|callBy|forName|getAt|evaluate|GroovyShell|Eval|GroovyObject|InvokerHelper|asDynamicObject|getAsDynamicObject"
+    r"|DynamicObject|DynamicObjectAware|MethodHandles|findVirtual|findGetter"
+    # PR 384 R4-02: bean and field lookups, and the reflective packages by name (an import or a qualified name).
+    r"|Introspector|BeanInfo|getBeanInfo|PropertyDescriptor|propertyDescriptors|getPropertyDescriptors|readMethod|getReadMethod"
+    r"|writeMethod|getWriteMethod|Expression|getField|getFields|getDeclaredField|getDeclaredFields)(?![\w$])"
+    r"|\.\s*`?(?:fields|declaredFields)`?(?![\w$])"  # a member, not a local `val fields`
+    r"|(?<![\w$])(?:java\s*\.\s*beans|java\s*\.\s*lang\s*\.\s*(?:reflect|invoke)|kotlin\s*\.\s*reflect)(?![\w$])"
+)
+# A property lookup by name passes only with a plain string literal that is not a denied name: inputs.property("taskCount", x).
+PROPERTY_CALL = re.compile(r"(?<![\w$])(?:property|findProperty|hasProperty|getProperty|setProperty)\s*\(\s*")
+CLASS_ARGUMENT = re.compile(r"[\w.]+\s*::\s*class(?:\s*\.\s*java)?\s*[,)]")  # objects.property(String::class.java)
+# APIs that hand out a Project without naming it: a task's project, a project dependency's project, the task graph (R3 second
+# self-review). `.project` as a property on any receiver; `dependencies.project(...)` and `x.project(...)` are calls (PROJECT_CALL).
+PROJECT_GETTERS = re.compile(
+    r"(?<![\w$])(?:findByPath|getByPath|dependencyProject|getDependencyProject|taskGraph|getTaskGraph"
+    # PR 384 R4-03: the APIs that hand out another project's tasks.
+    r"|buildDependencies|getBuildDependencies|taskDependencies|getTaskDependencies|getDependencies)(?![\w$])"
+    r"|::\s*`?getProject`?(?![\w$])"
+    r"|\.\s*`?project`?(?![\w$`])(?!\s*\()|\.\s*`?getProject`?\s*\("
+)
+PROPERTIES_USE = re.compile(r"(?<![\w$])(?:properties|getProperties)(?=\s*[\[.(])|\.\s*(?:properties|getProperties)(?![\w$])")
+DEPENDENCIES_BEFORE = re.compile(r"(?<![\w$])dependencies\s*\.\s*(?:constraints\s*\.\s*)?$")
+WRAPPERS = {"testFixtures", "platform", "enforcedPlatform"}
+NOT_DEPENDENCY_CALLS = KEYWORDS | {"with", "run", "apply", "also", "let", "configure", "project", "findProject"}
+STATEMENT_START = re.compile(r"(?:^|[\n;{])[ \t]*$")
+STATEMENT_END = re.compile(r"[ \t]*(?:$|[\n;}]|\{)")
+WINDOW = 400  # how far back a receiver is looked for
+
+
+def literals(raw, starts):
+    """(quote offset, end offset, contents) of each string literal whose contents start at an offset in starts (see strip)."""
+    for s in starts:
+        delim = raw[s - 3 : s] if raw[s - 3 : s] in ('"""', "'''") else raw[s - 1 : s]
+        i, depth = s, 0
+        while i < len(raw) and not (depth == 0 and raw.startswith(delim, i)):
+            if len(delim) == 1 and raw[i] == "\\":
+                i += 1
+            elif delim[0] == '"' and raw.startswith("${", i):
+                depth += 1
+                i += 1
+            elif depth and raw[i] == "}":
+                depth -= 1
+            elif len(delim) == 1 and raw[i] == "\n":
+                break
+            i += 1
+        closed = raw.startswith(delim, i)
+        yield s - len(delim), min(len(raw), i + len(delim)) if closed else i, raw[s:i]
+
+
+def string_names(raw, text, starts, groovy):
+    """Offsets of string literals used as a name (see PROJECT_NAMES). raw gives the contents, text (comments and string contents
+    blanked, same offsets) what is around them."""
+    found = []
+    for q, e, contents in literals(raw, starts):
+        before = text[max(0, q - WINDOW) : q]
+        named = MEMBER_BEFORE.search(before) or (contents in PROJECT_NAMES and CALL_AFTER.match(text, e))
+        if named or (groovy and (CALL_AFTER.match(text, e) or COMMAND_AFTER.match(text, e) or SUBSCRIPT_BEFORE.search(before))):
+            found.append(q)
+    return found
+
+
+def groovy_problems(raw, text):
+    """(strong, weak) offsets in a .gradle file: the forms that name something without an identifier, and identifiers that are not
+    on the allowlist (see GROOVY_IDENTIFIERS)."""
+    strong = [m.start() for m in GROOVY_FORMS.finditer(text)] + [m.start() for m in re.finditer(r"\\u[0-9a-fA-F]{4}", raw)]
+    operand = ""  # the last character before i that is not whitespace
+    for i, c in enumerate(text):
+        if c == "/" and not (operand.isalnum() or operand in "_$)]'\""):  # where an operand goes: a slashy string, not a division
+            strong.append(i)
+        if not c.isspace():
+            operand = c
+    weak = []
+    for m in IDENTIFIER.finditer(text):
+        if m.group() in GROOVY_IDENTIFIERS:
+            continue
+        if MAP_KEY.match(text, m.end()) and text[: m.start()].rstrip()[-1:] in ("[", "(", ","):
+            continue
+        weak.append((m.start(), m.group()))
+    return strong, weak
+
+
+def dynamic_lookups(text, lits):
+    """Offsets of a run-time name lookup (DYNAMIC_API, or PROPERTY_CALL without a plain, allowed literal); lits maps a literal's
+    quote offset to (end, contents)."""
+    found = [m.start() for p in (DYNAMIC_API, PROJECT_GETTERS, PROPERTIES_USE) for m in p.finditer(text)]
+    for m in PROPERTY_CALL.finditer(text):
+        if CLASS_ARGUMENT.match(text, m.end()):
+            continue
+        end, contents = lits.get(m.end(), (None, None))
+        if end is None or "$" in contents or contents in DENIED_NAMES or not re.match(r"\s*[,)]", text[end:]):
+            found.append(m.start())
+    return found
+
+
+def is_settings(p):
+    name = p.rsplit("/", 1)[-1]
+    return name in ("settings.gradle.kts", "settings.gradle") or name.endswith((".settings.gradle.kts", ".settings.gradle"))
+
+
+def opener(blank, pos):
+    """The offset of the innermost bracket that is open at pos, or -1."""
+    depth = 0
+    for i in range(pos - 1, -1, -1):
+        c = blank[i]
+        if c in ")]}":
+            depth += 1
+        elif c in "([{":
+            if not depth:
+                return i
+            depth -= 1
+    return -1
+
+
+def closer(blank, i):
+    """The offset just after the bracket that closes the one at i."""
+    depth = 0
+    for j in range(i, len(blank)):
+        depth += {"(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1}.get(blank[j], 0)
+        if not depth:
+            return j + 1
+    return len(blank)
+
+
+def declaration(blank, start, end, deps, name):
+    """True when the call from start to end is a whole dependency declaration statement (see PROJECT_CALL)."""
+    if name in NOT_DEPENDENCY_CALLS or not STATEMENT_END.match(blank, end):
+        return False
+    head = blank[max(0, start - WINDOW) : start]
+    return bool(DEPENDENCIES_BEFORE.search(head) or (within(deps, start) and STATEMENT_START.search(head)))
+
+
+def dependency_argument(blank, pos, deps, wrapped=0):
+    """True when the project(...) call at pos is a direct argument of a dependency declaration (see PROJECT_CALL)."""
+    o = opener(blank, pos)
+    before = blank[max(0, pos - WINDOW) : pos]
+    if o >= 0 and blank[o] == "(":
+        if not re.search(r"[(,]\s*$|[(,]\s*[A-Za-z_]\w*\s*=\s*$", before):
+            return False
+        m = re.search(r"(?:([A-Za-z_]\w*)|\"[ \t]*\")[ \t]*$", blank[max(0, o - WINDOW) : o])
+        if not m:
+            return False
+        name, start = m.group(1) or "", o - (len(blank[max(0, o - WINDOW) : o]) - m.start())
+        if name in WRAPPERS:
+            return wrapped < 2 and dependency_argument(blank, start, deps, wrapped + 1)
+        return declaration(blank, start, closer(blank, o), deps, name)
+    # Groovy without parentheses: `conf project(':x')` at the start of a statement.
+    m = re.search(r"(?:^|(?<=[\n;{]))[ \t]*([A-Za-z_]\w*)[ \t]+$", before)
+    if not m or wrapped:
+        return False
+    start = pos - (len(before) - m.start(1))
+    return declaration(blank, start, closer(blank, blank.index("(", pos)), deps, m.group(1))
+
+
+def cross_project(text, settings, extra=(), weak=()):
+    """(line, what, hint) for each line of text (comments and string contents blanked) that reaches other projects, first finding only.
+    extra: more (offset, what, hint) findings; weak: findings reported only on a line with no other (the Groovy allowlist)."""
+    found = []
+    for m in CROSS_PROJECT.finditer(text):
+        found.append((m.start(), m.group().strip(), "move it into a convention plugin in build-logic/"))
+    for m in ROOT_PROJECT.finditer(text):
+        before = text[max(0, m.start() - WINDOW) : m.start()]
+        if (not (DESCRIPTOR.match(text, m.end()) and SETTINGS_RECEIVER.search(before)) if settings else not ISOLATED_BEFORE.search(before)):
+            found.append((m.start(), "rootProject", "read root files through isolated.rootProject.projectDirectory"))
+    for m in PARENT.finditer(text):
+        found.append((m.start(), "parent", "a project reads only its own and isolated.rootProject's state"))
+    deps = blocks(text)
+    for m in PROJECT_CALL.finditer(text):
+        if not DEPENDENCIES_BEFORE.search(text[max(0, m.start() - WINDOW) : m.start()]) and not dependency_argument(text, m.start(), deps):
+            call = "findProject" if "findProject" in m.group() else "project"
+            found.append((m.start(), f"{call}(...)", "use project(...) only as a dependency, e.g. implementation(project(...))"))
+    found += list(extra)
+    lines = {}
+    for start, what, hint in sorted(found) + sorted(weak):
+        lines.setdefault(line_of(text, start), (what, hint))
+    return [(line, what, hint) for line, (what, hint) in sorted(lines.items())]
+
+
 def convention_problems(root):
     problems = []
     for p in gradle_files(root) + [p for p in walk(root) if p.startswith("build-logic/") and p.endswith(".kt")]:
-        text = strip(read(root, p), blank_strings=True)
-        for m in CROSS_PROJECT.finditer(text):
-            where = f"{p}:{line_of(text, m.start())}"
-            problems.append(f"{where}: reaches other projects ({m.group().strip()}); move it into a convention plugin in build-logic/")
+        raw, starts = read(root, p), []
+        text = strip(raw, blank_strings=True, templates=True, strings=starts, kotlin=not p.endswith(".gradle"))
+        groovy, lits = p.endswith(".gradle"), {q: (e, c) for q, e, c in literals(raw, starts)}
+        runtime = "call methods and read properties by their plain names"
+        extra = [(q, "a name in a string", runtime) for q in string_names(raw, text, starts, groovy)]
+        extra += [(o, "a name looked up at run time", runtime) for o in dynamic_lookups(text, lits)]
+        weak = []
+        if groovy:
+            extra += [(m.start(), "project(...)", "call project(...) with parentheses, only as a dependency") for m in GROOVY_COMMAND.finditer(text)]
+            # A Groovy closure can pose as a configuration (`def ok = { ... }; dependencies { ok project(':b') }`), so a .gradle
+            # file declares no project dependency (R3 second self-review).
+            extra += [(m.start(), "project(...)", "declare project dependencies in a Kotlin build file") for m in PROJECT_CALL.finditer(text)]
+            strong, names = groovy_problems(raw, text)
+            extra += [(o, "a name resolved at run time", runtime) for o in strong]
+            allowlist = "a .gradle file uses only the names in GROOVY_IDENTIFIERS (Groovy resolves names at run time)"
+            weak = [(o, f"`{n}` is not on the Groovy allowlist", allowlist) for o, n in names]
+        found = cross_project(text, is_settings(p), extra, weak)
+        problems += [f"{p}:{line}: reaches other projects ({what}); {hint}" for line, what, hint in found]
         if p.endswith(".kt"):
             for m in TARGET_TOKEN.finditer(text):
                 problems.append(f"{p}:{line_of(text, m.start())}: {m.group()} in build-logic; set it in the module build file, where the floor guard reads it")
@@ -580,14 +889,14 @@ def convention_problems(root):
         text = strip(read(root, build))
         applied = CONVENTION.findall(text)
         if len(applied) != 1:
-            problems.append(f"{build}: applies {len(applied)} listicles convention plugins; apply exactly one (build-logic/)")
+            problems.append(f"{build}: applies {len(applied)} tally convention plugins; apply exactly one (build-logic/)")
         for m in OWNED.finditer(text):
             problems.append(f"{build}:{line_of(text, m.start())}: {m.group()} is set by the convention plugins in build-logic/; do not set it again here")
     return problems
 
 
-ROOT_MODULES = re.compile(r"(?m)^val listiclesModules = listOf\(([^)]*)\)")
-ROOT_WIRING = re.compile(r'(?m)^tasks\.named\("detekt"\)\s*\{\s*dependsOn\(listiclesModules\.map\s*\{\s*"\$it:listiclesChecks"\s*\}\)\s*\}')
+ROOT_MODULES = re.compile(r"(?m)^val tallyModules = listOf\(([^)]*)\)")
+ROOT_WIRING = re.compile(r'(?m)^tasks\.named\("detekt"\)\s*\{\s*dependsOn\(tallyModules\.map\s*\{\s*"\$it:tallyChecks"\s*\}\)\s*\}')
 
 
 def aggregation_problems(root):
@@ -597,13 +906,13 @@ def aggregation_problems(root):
     text = strip(read(root, "build.gradle.kts")) if os.path.isfile(os.path.join(root, "build.gradle.kts")) else ""
     lists = ROOT_MODULES.findall(text)
     if len(lists) != 1:
-        return ["build.gradle.kts: no `val listiclesModules = listOf(...)` (the root runs every module's listiclesChecks by task path)"]
+        return ["build.gradle.kts: no `val tallyModules = listOf(...)` (the root runs every module's tallyChecks by task path)"]
     listed = re.findall(r"\"(:[^\"]+)\"", lists[0])
-    problems = [f"build.gradle.kts: listiclesModules misses {m} (settings.gradle.kts includes it)" for m in modules if m not in listed]
-    problems += [f"build.gradle.kts: listiclesModules lists {m}, which settings.gradle.kts does not include" for m in dict.fromkeys(listed) if m not in modules]
-    problems += [f"build.gradle.kts: listiclesModules lists {m} twice" for m in dict.fromkeys(listed) if listed.count(m) > 1]
+    problems = [f"build.gradle.kts: tallyModules misses {m} (settings.gradle.kts includes it)" for m in modules if m not in listed]
+    problems += [f"build.gradle.kts: tallyModules lists {m}, which settings.gradle.kts does not include" for m in dict.fromkeys(listed) if m not in modules]
+    problems += [f"build.gradle.kts: tallyModules lists {m} twice" for m in dict.fromkeys(listed) if listed.count(m) > 1]
     if not ROOT_WIRING.search(text):
-        problems.append('build.gradle.kts: detekt does not depend on dependsOn(listiclesModules.map { "$it:listiclesChecks" })')
+        problems.append('build.gradle.kts: detekt does not depend on dependsOn(tallyModules.map { "$it:tallyChecks" })')
     return problems
 
 

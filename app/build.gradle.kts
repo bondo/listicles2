@@ -5,7 +5,7 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.process.CommandLineArgumentProvider
 
 plugins {
-    alias(libs.plugins.listicles.android.application)
+    alias(libs.plugins.tally.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
@@ -16,7 +16,12 @@ plugins {
 }
 
 // M0.5-10: shipped dependencies must be on the owner's licence allowlist.
-apply(from = rootProject.file("config/licensee/policy.gradle"))
+apply(
+    from =
+        isolated.rootProject.projectDirectory
+            .file("config/licensee/policy.gradle")
+            .asFile,
+)
 
 android {
     namespace = "dk.bjarkebjarke.tally"
@@ -258,7 +263,7 @@ tasks.withType<Test>().configureEach {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     // M1-04: ThemeTokensTest reads design/tokens.json; see TokensArgs. scripts/check_screenshots.py checks this wiring.
     jvmArgumentProviders.add(
-        TokensArgs(rootProject.layout.projectDirectory.file("design/tokens.json")),
+        TokensArgs(isolated.rootProject.projectDirectory.file("design/tokens.json")),
     )
     dependsOn(syncRobolectricAndroidAll)
     jvmArgumentProviders.add(
@@ -268,7 +273,10 @@ tasks.withType<Test>().configureEach {
 }
 
 // A JUnit 4 test with no result XML was silently skipped: fail the build (issue #212).
-val gateScript = rootProject.file("scripts/check_test_results.py").path
+val gateScript =
+    isolated.rootProject.projectDirectory
+        .file("scripts/check_test_results.py")
+        .asFile.path
 val gateSources =
     layout.projectDirectory
         .dir("src/test")

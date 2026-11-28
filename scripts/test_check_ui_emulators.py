@@ -68,7 +68,7 @@ class Wiring(unittest.TestCase):
         self.assertEqual(got, ["firebase.json emulators.firestore port 8080 differs from FIRESTORE_PORT 8081 in FirebaseEmulator.kt"])
 
     def test_the_project_must_be_demo_tally(self):
-        got = self.mutated(HELPER, 'PROJECT_ID = "demo-tally"', 'PROJECT_ID = "listicles"')
+        got = self.mutated(HELPER, 'PROJECT_ID = "demo-tally"', 'PROJECT_ID = "other-project"')
         self.assertEqual(got, ["FirebaseEmulator.kt PROJECT_ID must be demo-tally (a demo- project never reaches the real Firebase)"])
 
     def test_the_ui_job_is_exactly_the_pinned_one(self):
@@ -77,7 +77,7 @@ class Wiring(unittest.TestCase):
         mutations = {
             "no emulators:exec": (EXEC, "echo"),
             "only firestore": ("--only auth,firestore", "--only firestore"),
-            "another project": ("--project demo-tally", "--project listicles"),
+            "another project": ("--project demo-tally", "--project other-project"),
             "no data tests": (" " + tasks, ""),
             "no app tests": (":app:connectedDebugAndroidTest ", ""),
             "dry run": ("--console=plain :app", "--dry-run --console=plain :app"),
@@ -130,10 +130,11 @@ class Wiring(unittest.TestCase):
 
     def test_the_data_module_must_apply_the_android_library_convention(self):
         # M1-68 part B: :core:testing and the JUnit Platform come from the convention plugin, not the module build file.
-        for new in ("alias(libs.plugins.android.library)", "// alias(libs.plugins.listicles.android.library)"):
+        for new in ("alias(libs.plugins.android.library)", "// alias(libs.plugins.tally.android.library)",
+                    "alias(libs.plugins.listicles.android.library)"):
             with self.subTest(new):
                 shutil.copy(ROOT / BUILD, self.root / BUILD)
-                got = self.mutated(BUILD, "alias(libs.plugins.listicles.android.library)", new)
+                got = self.mutated(BUILD, "alias(libs.plugins.tally.android.library)", new)
                 self.assertEqual(got, [c.CONVENTION_PROBLEM])
 
     def test_the_plugin_must_put_the_test_support_module_on_every_unit_test_classpath(self):
