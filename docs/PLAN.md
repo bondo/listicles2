@@ -510,7 +510,8 @@ enforce the rules rather than goodwill.
        line carries a valid `justified:` reason; the lists and their reasons are in `scripts/guards.sh`, the rationale in `docs/guards-known-gaps.md`
      * any detekt or lint baseline file
      * a lowered `minBound`, PIT threshold or lint severity, by comparing against `main`
-     * changed screenshot reference images, unless the PR has the `golden-update` label
+     * changed screenshot reference images, unless the PR has the `golden-update` label (CI reads it from the event; pre-push looks up
+       the open PR of the pushed branch, `scripts/hooks/golden_label.py`, M1-126)
      * a diff over 600 changed lines outside generated files
    * `release-smoke`: the release variant with R8 on builds in CI (`:app:assembleRelease`, unsigned, demo-tally stand-in config, nothing signed or uploaded; M1-33); the stand-in opt-in flag is allowed in this job only
    * `python-lint`: ruff and mypy on `scripts/`, versions pinned, with tests that deliberate violations fail

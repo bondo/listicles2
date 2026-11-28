@@ -106,6 +106,19 @@ class PrePushHook(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertFalse(self.gradle_called())
 
+    def test_guards_get_pre_push_with_the_push_url_and_git_s_input(self):
+        """M1-126: guards.sh --pre-push <url> reads the pushed refs to look up the golden-update label of the branch's PR."""
+        self.stub("scripts/guards.sh", 'printf "%s\\n" "$@" > "$STUB_LOG.args"; cat > "$STUB_LOG.in"')
+        self.commit("docs/a.md", "x")
+        stdin = f"refs/heads/b {self.rev()} refs/heads/b {self.base}\n"
+        r = subprocess.run(["bash", os.path.join(self.repo, ".githooks", "pre-push"), "origin", "https://github.com/o/r.git"], input=stdin,
+                           cwd=self.repo, env=dict(os.environ, STUB_LOG=self.log), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        with open(self.log + ".args") as f:
+            self.assertEqual(f.read(), "--pre-push\nhttps://github.com/o/r.git\n")
+        with open(self.log + ".in") as f:
+            self.assertEqual(f.read(), stdin)
+
     def test_garbage_stdin_builds(self):
         self.commit("docs/a.md", "x")
         self.assertEqual(self.push(stdin="nonsense\n")[0], 0)

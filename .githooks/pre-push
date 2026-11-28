@@ -9,7 +9,7 @@ input=$(cat)  # git's pre-push stdin, read once for both questions
 scope=$(printf '%s\n' "$input" | python3 -I scripts/hooks/prepush_scope.py)
 hooks=$(printf '%s\n' "$input" | python3 -I scripts/hooks/prepush_scope.py --hook-tests)
 echo "pre-push: scope=$scope hook-tests=${hooks:-run}"
-./scripts/guards.sh || exit 1
+printf '%s\n' "$input" | ./scripts/guards.sh --pre-push "${2:-}" || exit 1  # the pushed refs, for the golden-update label (M1-126)
 if [ "$hooks" = skip ]; then
   echo "pre-push: no change to a hook-suite input, skipping the hook tests (CI runs them on every PR)"
 else
