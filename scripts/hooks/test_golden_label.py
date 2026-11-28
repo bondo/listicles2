@@ -18,7 +18,7 @@ from test_guards_sh import Repo
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 ZERO = "0" * 40
-URL = "https://github.com/o/r.git"
+URL = "https://github.com/bondo/r.git"
 GH_STUB = f"""#!{sys.executable}
 import json, os, sys
 d = os.path.dirname(os.path.abspath(__file__))
@@ -31,13 +31,13 @@ with open(os.path.join(d, "rc")) as f:
 """
 
 
-def pr(number=7, ref="work", head_repo="o/r", base_repo="o/r", labels=("golden-update",), state="open"):
+def pr(number=7, ref="work", head_repo="bondo/r", base_repo="bondo/r", labels=("golden-update",), state="open"):
     return {"number": number, "state": state, "labels": [{"name": n} for n in labels],
             "head": {"ref": ref, "repo": {"full_name": head_repo}}, "base": {"ref": "main", "repo": {"full_name": base_repo}}}
 
 
 class GoldenRepo(Repo):
-    """A guards test repo with the helper and repo_slug.py beside guards.sh (untracked), origin = o/r, branch `work`, a stub gh."""
+    """A guards test repo with the helper and repo_slug.py beside guards.sh (untracked), origin = bondo/r, branch `work`, a stub gh."""
 
     def __init__(self):
         super().__init__()
@@ -114,8 +114,8 @@ class LabelAllows(Case):
         out = self.allowed()
         self.assertIn("golden-update label on PR #7", out)
         (call,) = self.repo.calls()
-        self.assertEqual(call["argv"], ["api", "--hostname", "github.com", "-X", "GET", "repos/o/r/pulls",
-                                        "-f", "state=open", "-f", "head=o:work", "-f", "per_page=100"])
+        self.assertEqual(call["argv"], ["api", "--hostname", "github.com", "-X", "GET", "repos/bondo/r/pulls",
+                                        "-f", "state=open", "-f", "head=bondo:work", "-f", "per_page=100"])
 
     def test_push_of_head_to_the_checked_out_branch_allows(self):
         """`git push -u origin HEAD` and `git push origin HEAD:work` give git's local ref as HEAD."""
@@ -157,6 +157,21 @@ class LabelRefuses(Case):
         self.repo.answer([pr(), pr(number=8)])
         self.refused("2 open PRs")
 
+    def test_gh_missing_from_path_refuses(self):
+        """R1-01: no gh at all (OSError from subprocess.run), with every other tool on PATH linked into one directory."""
+        tools = tempfile.mkdtemp(prefix="golden-tools-")
+        self.addCleanup(shutil.rmtree, tools, True)
+        for d in os.environ.get("PATH", "").split(os.pathsep):
+            for name in os.listdir(d) if os.path.isdir(d) else ():
+                dst = os.path.join(tools, name)
+                if name != "gh" and not os.path.lexists(dst) and os.access(os.path.join(d, name), os.X_OK):
+                    os.symlink(os.path.join(d, name), dst)
+        rc, out = self.repo.prepush(PATH=tools)
+        self.assertEqual(rc, 1, out)
+        self.assertIn("screenshot references changed without the golden-update label", out)
+        self.assertIn("golden_label: gh api failed", out)
+        self.assertEqual(self.repo.calls(), [])
+
     def test_gh_error_refuses(self):
         for rc in (1, 4, 127):
             with self.subTest(rc=rc):
@@ -176,7 +191,7 @@ class LabelRefuses(Case):
 
     def test_another_branch_or_repository_on_the_pr_refuses(self):
         for kw in ({"ref": "work2"}, {"ref": "Work"}, {"ref": "work "}, {"ref": "feature/work"}, {"head_repo": "fork/r"},
-                   {"head_repo": "o/r2"}, {"base_repo": "x/r"}, {"state": "closed"}):
+                   {"head_repo": "bondo/r2"}, {"base_repo": "x/r"}, {"state": "closed"}):
             with self.subTest(**kw):
                 self.repo.answer([pr(**kw)])
                 self.refused("golden_label:")
@@ -211,15 +226,22 @@ class PushInputRefuses(Case):
         self.refused("golden_label:", gh_called=False, stdin=f"HEAD {self.repo.head()} refs/heads/work {ZERO}\n")
 
     def test_push_url_of_another_repository_refuses(self):
-        for url in ("https://github.com/x/r.git", "https://github.com/o/r2", "https://example.com/o/r.git", "", "/tmp/r.git"):
+        for url in ("https://github.com/x/r.git", "https://github.com/bondo/r2", "https://example.com/bondo/r.git", "", "/tmp/r.git"):
             with self.subTest(url=url):
                 self.refused("golden_label:", gh_called=False, args=("--pre-push", url))
 
     def test_missing_push_url_refuses(self):
         self.refused("golden_label:", gh_called=False, args=("--pre-push",))
 
+    def test_origin_and_push_of_another_owner_refuse(self):
+        """R1-02: the owner is pinned (as merge_ready.py does), so a set-url to another owner's copy refuses even when both agree."""
+        for url in ("https://github.com/o/r.git", "https://github.com/bondo-x/r.git", "https://github.com/Bondo/r.git"):
+            with self.subTest(url=url):
+                self.repo.git("remote", "set-url", "origin", url)
+                self.refused("another owner", gh_called=False, args=("--pre-push", url))
+
     def test_origin_of_another_host_refuses(self):
-        self.repo.git("remote", "set-url", "origin", "https://example.com/o/r.git")
+        self.repo.git("remote", "set-url", "origin", "https://example.com/bondo/r.git")
         self.refused("golden_label:", gh_called=False)
 
 
@@ -245,8 +267,8 @@ class EnvironmentCannotSteer(Case):
     def test_steering_variables_do_not_reach_gh(self):
         self.allowed(**self.STEER)
         (call,) = self.repo.calls()
-        self.assertIn("repos/o/r/pulls", call["argv"])
-        self.assertIn("head=o:work", call["argv"])
+        self.assertIn("repos/bondo/r/pulls", call["argv"])
+        self.assertIn("head=bondo:work", call["argv"])
         for k in self.STEER:
             self.assertNotIn(k, call["env"])
 
