@@ -47,10 +47,10 @@ VERIFY_STEPS = (f"step ci-hardening-tests {TESTS_CMD}", f"step ci-hardening {CHE
 PYTHON_WORD = re.compile(r"(?<![\w./-])(?:python3?|pip3?)(?![\w-])")
 NODE_WORD = re.compile(r"(?<![\w./-])(?:node|npm|npx)(?![\w-])")
 # Gradle tasks that run python3 in an Exec (checkUnitTestResults finalizes the unit-test tasks, checkJavaApiLevel in build-logic ModuleChecks.kt,
-# which each JVM library module's listiclesChecks and so the root's detekt run):
+# which each JVM library module's tallyChecks and so the root's detekt run):
 # a job that runs one of them needs the python pin although its commands never say `python3`. A fixed list, held to the build files by
 # the tests; `check` and `build` stay out (they would match build/ paths).
-GRADLE_PYTHON_TASKS = ("testDebugUnitTest", "verifyRoborazziDebug", "recordRoborazziDebug", "checkJavaApiLevel", "listiclesChecks", "detekt")
+GRADLE_PYTHON_TASKS = ("testDebugUnitTest", "verifyRoborazziDebug", "recordRoborazziDebug", "checkJavaApiLevel", "tallyChecks", "detekt")
 GRADLE_PYTHON = re.compile(r"gradlew\b[\s\S]*(?<![\w])(?:" + "|".join(GRADLE_PYTHON_TASKS) + r")(?![\w])")
 # setup-python's interpreter has no PyYAML (the runner image's had) and most gate scripts import yaml.
 LOCK_STEMS = ("scripts/requirements-ci", "scripts/requirements-lint")  # each has a .in (top-level pins) and a .txt (the hash lock)

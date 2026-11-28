@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.listicles.jvm.testsupport)
+    alias(libs.plugins.tally.jvm.testsupport)
 }
 
 dependencies {

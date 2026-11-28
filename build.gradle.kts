@@ -3,7 +3,7 @@ import io.gitlab.arturbosch.detekt.Detekt
 // Dependabot alerts (issue 187, docs/SECURITY.md): transitive build and lint tool dependencies that have an advisory are
 // raised to the first fixed version, from gradle/patched-dependencies.properties. Constraints only raise: a newer version
 // that a plugin asks for still wins. scripts/dependency_floors.py checks gradle/verification-metadata.xml against the advisories.
-// This block runs before the script body; the listicles.dependency.floors plugin (build-logic) reads the same file for every
+// This block runs before the script body; the tally.dependency.floors plugin (build-logic) reads the same file for every
 // project configuration, here and in each module.
 buildscript {
     val patched =
@@ -30,7 +30,7 @@ plugins {
     alias(libs.plugins.google.services) apply false
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.ksp) apply false
-    alias(libs.plugins.listicles.dependency.floors)
+    alias(libs.plugins.tally.dependency.floors)
 }
 
 spotless {
@@ -109,12 +109,12 @@ kover {
 }
 
 // M0.5-09, issue 211 and M1-68 part B2 (issue 48): checkWarningsAsErrors and checkJdkRelease are each module's own
-// tasks (build-logic ModuleChecks.kt), so the root reads no other project. listiclesChecks groups a module's checks,
+// tasks (build-logic ModuleChecks.kt), so the root reads no other project. tallyChecks groups a module's checks,
 // and detekt (verify.sh and CI) runs it for every module by task path. check_build_guards.py keeps this list equal to
 // the modules in settings.gradle.kts. Part B3: checkJavaApiLevel too, in each JVM library module. Run: ./gradlew
 // checkWarningsAsErrors checkJdkRelease checkJavaApiLevel (every module that has them).
-val listiclesModules = listOf(":app", ":core:data", ":core:domain", ":core:testing")
-tasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }
+val tallyModules = listOf(":app", ":core:data", ":core:domain", ":core:testing")
+tasks.named("detekt") { dependsOn(tallyModules.map { "$it:tallyChecks" }) }
 
 // M0.5-10: the licensee policy (config/licensee/policy.gradle) is tested against a fixture build whose
 // artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's

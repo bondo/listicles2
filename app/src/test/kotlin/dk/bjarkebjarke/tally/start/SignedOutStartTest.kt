@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.lifecycle.Lifecycle
 import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -13,6 +14,10 @@ import dagger.hilt.android.testing.UninstallModules
 import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.MainActivity
 import dk.bjarkebjarke.tally.R
+import dk.bjarkebjarke.tally.connectivity.ConnectivityModule
+import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
+import dk.bjarkebjarke.tally.domain.session.Authentication
+import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
 import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.start.EmailVerification
@@ -21,7 +26,10 @@ import dk.bjarkebjarke.tally.domain.start.NameState
 import dk.bjarkebjarke.tally.domain.start.UpdateGate
 import dk.bjarkebjarke.tally.session.SessionModule
 import dk.bjarkebjarke.tally.session.StartedActivity
+import dk.bjarkebjarke.tally.testing.FakeAuthentication
+import dk.bjarkebjarke.tally.testing.FakeConnectivity
 import dk.bjarkebjarke.tally.testing.FakeEmailVerification
+import dk.bjarkebjarke.tally.testing.FakeGoogleCredentials
 import dk.bjarkebjarke.tally.testing.FakeHouseholdNotices
 import dk.bjarkebjarke.tally.testing.FakeLocalUserData
 import dk.bjarkebjarke.tally.testing.FakeNameState
@@ -48,7 +56,7 @@ import javax.inject.Inject
  * the Firebase session module and the gates (M1-88, M1-89), so the test needs no Firebase app.
  */
 @HiltAndroidTest
-@UninstallModules(SessionModule::class, GateModule::class)
+@UninstallModules(SessionModule::class, GateModule::class, ConnectivityModule::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(application = HiltTestApplication::class)
 class SignedOutStartTest {
@@ -61,6 +69,20 @@ class SignedOutStartTest {
     @BindValue
     @JvmField
     val session: SessionState = FakeSessionState(signedIn = false)
+
+    @BindValue
+    @JvmField
+    val connectivity: Connectivity = FakeConnectivity(online = true)
+
+    @BindValue
+    @JvmField
+    val credentials: GoogleCredentials = FakeGoogleCredentials()
+
+    private val fakeAuthentication = FakeAuthentication()
+
+    @BindValue
+    @JvmField
+    val authentication: Authentication = fakeAuthentication
 
     /** The update gate reads config/app (M1-82) until the test lets it answer; the root is on Loading meanwhile. */
     private val gateAnswers = CompletableDeferred<Unit>()
@@ -103,6 +125,17 @@ class SignedOutStartTest {
         }
         compose.onNodeWithText(compose.activity.getString(R.string.app_tag)).assertExists()
         compose.onNodeWithText(compose.activity.getString(R.string.lists_empty_title)).assertDoesNotExist()
+    }
+
+    /** M1-16: the sign-in screen's Google button reaches the graph's GoogleSignIn (fake picker and Firebase). */
+    @Test
+    fun theGoogleButtonSignsInThroughTheGraph() {
+        gateAnswers.complete(Unit)
+        val google = compose.activity.getString(R.string.signin_google)
+        compose.waitUntil(START_TIMEOUT_MS) { compose.onAllNodesWithText(google).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(google).performClick()
+        compose.waitUntil(START_TIMEOUT_MS) { fakeAuthentication.googleIdTokens.isNotEmpty() }
+        fakeAuthentication.googleIdTokens shouldBe listOf("fake-google-id-token")
     }
 
     /**

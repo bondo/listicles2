@@ -27,6 +27,8 @@ import androidx.navigation3.ui.NavDisplay
 import dk.bjarkebjarke.tally.domain.start.HouseholdNotice
 import dk.bjarkebjarke.tally.domain.start.StartStep
 import dk.bjarkebjarke.tally.home.HomeScreen
+import dk.bjarkebjarke.tally.signin.SignInScreen
+import dk.bjarkebjarke.tally.signin.SignInUiState
 import dk.bjarkebjarke.tally.start.StartUiState
 import dk.bjarkebjarke.tally.start.StartViewModel
 import dk.bjarkebjarke.tally.update.UpdateScreen
@@ -36,9 +38,10 @@ import dk.bjarkebjarke.tally.update.UpdateScreen
 fun TallyApp(
     viewModel: StartViewModel,
     modifier: Modifier = Modifier,
+    signIn: @Composable () -> Unit = { SignInScreen(SignInUiState(), {}, {}, {}) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    TallyApp(state, modifier)
+    TallyApp(state, modifier, signIn = signIn)
 }
 
 /**
@@ -50,6 +53,7 @@ fun TallyApp(
     state: StartUiState,
     modifier: Modifier = Modifier,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    signIn: @Composable () -> Unit = { SignInScreen(SignInUiState(), {}, {}, {}) },
 ) {
     TallyTheme(darkTheme) {
         Surface(modifier.fillMaxSize()) {
@@ -61,7 +65,7 @@ fun TallyApp(
                     entryProvider =
                         entryProvider {
                             entry<StartStep.Update> { UpdateScreen() }
-                            entry<StartStep.SignIn> { SignInPlaceholder() }
+                            entry<StartStep.SignIn> { signIn() }
                             entry<StartStep.VerifyEmail> { StepPlaceholder(R.string.gate_verify_title) }
                             entry<StartStep.EnterName> { StepPlaceholder(R.string.gate_name_title) }
                             entry<StartStep.Notice> { key -> StepPlaceholder(noticeTitle(key.notice)) }
@@ -70,23 +74,6 @@ fun TallyApp(
                 )
             }
         }
-    }
-}
-
-/** Sign-in until M1-16 builds wireframe 01: the app name and its tagline. */
-@Composable
-private fun SignInPlaceholder(modifier: Modifier = Modifier) {
-    Column(
-        modifier.fillMaxSize().safeDrawingPadding().padding(Sizes.screenGutter),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            stringResource(R.string.app_name),
-            Modifier.semantics { heading() },
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(stringResource(R.string.app_tag), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
     }
 }
 

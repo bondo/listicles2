@@ -838,8 +838,8 @@ class CommandLine(unittest.TestCase):
 
 
 SETTINGS = 'include(":app", ":core:domain")\n'
-APP = 'plugins {\n    alias(libs.plugins.listicles.android.application)\n}\nandroid { defaultConfig { targetSdk = 37 } }\n'
-DOMAIN = 'plugins {\n    id("listicles.jvm.library")\n}\n'
+APP = 'plugins {\n    alias(libs.plugins.tally.android.application)\n}\nandroid { defaultConfig { targetSdk = 37 } }\n'
+DOMAIN = 'plugins {\n    id("tally.jvm.library")\n}\n'
 
 
 class Conventions(unittest.TestCase):
@@ -1180,19 +1180,26 @@ class Conventions(unittest.TestCase):
 
     def test_a_module_without_a_convention_plugin_is_flagged(self):
         found = self.problems({"core/domain/build.gradle.kts": 'plugins {\n    alias(libs.plugins.kotlin.jvm)\n}\n'})
-        self.assertEqual(found, ["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"])
+        self.assertEqual(found, ["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"])
 
     def test_two_convention_plugins_or_a_commented_out_one_are_flagged(self):
-        for text, n in ((DOMAIN.replace("}", '    id("listicles.android.library")\n}'), 2), ('plugins {\n    // id("listicles.jvm.library")\n}\n', 0)):
+        for text, n in ((DOMAIN.replace("}", '    id("tally.android.library")\n}'), 2), ('plugins {\n    // id("tally.jvm.library")\n}\n', 0)):
             with self.subTest(n=n):
-                self.assertEqual([f"core/domain/build.gradle.kts: applies {n} listicles convention plugins; apply exactly one (build-logic/)"],
+                self.assertEqual([f"core/domain/build.gradle.kts: applies {n} tally convention plugins; apply exactly one (build-logic/)"],
                                  self.problems({"core/domain/build.gradle.kts": text}))
 
     def test_the_dependency_floors_plugin_is_not_a_module_convention(self):
-        # R1-03 (PR 320): a module with only listicles.dependency.floors gets none of the module conventions.
-        for text in ('plugins {\n    alias(libs.plugins.listicles.dependency.floors)\n}\n', 'plugins {\n    id("listicles.dependency.floors")\n}\n'):
+        # R1-03 (PR 320): a module with only tally.dependency.floors gets none of the module conventions.
+        for text in ('plugins {\n    alias(libs.plugins.tally.dependency.floors)\n}\n', 'plugins {\n    id("tally.dependency.floors")\n}\n'):
             with self.subTest(text=text):
-                self.assertEqual(["core/domain/build.gradle.kts: applies 0 listicles convention plugins; apply exactly one (build-logic/)"],
+                self.assertEqual(["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"],
+                                 self.problems({"core/domain/build.gradle.kts": text}))
+
+    def test_an_old_listicles_convention_id_is_not_a_module_convention(self):
+        # M1-93 R1-01: the ids were renamed, so a module still applying listicles.* has no convention (Gradle would fail on it too).
+        for text in ('plugins {\n    alias(libs.plugins.listicles.jvm.library)\n}\n', 'plugins {\n    id("listicles.android.library")\n}\n'):
+            with self.subTest(text=text):
+                self.assertEqual(["core/domain/build.gradle.kts: applies 0 tally convention plugins; apply exactly one (build-logic/)"],
                                  self.problems({"core/domain/build.gradle.kts": text}))
 
     def test_a_module_without_a_build_file_is_flagged(self):
@@ -1246,7 +1253,7 @@ class Conventions(unittest.TestCase):
                 self.assertRegex(code, r"isolated\s*\.\s*rootProject\s*\.\s*projectDirectory\s*\.\s*file\(", rel)
 
 
-ROOT_BUILD = 'val listiclesModules = listOf(":app", ":core:domain")\ntasks.named("detekt") { dependsOn(listiclesModules.map { "$it:listiclesChecks" }) }\n'
+ROOT_BUILD = 'val tallyModules = listOf(":app", ":core:domain")\ntasks.named("detekt") { dependsOn(tallyModules.map { "$it:tallyChecks" }) }\n'
 
 
 class Aggregation(unittest.TestCase):
@@ -1262,24 +1269,30 @@ class Aggregation(unittest.TestCase):
 
     def test_a_missing_or_extra_module_is_flagged(self):
         self.assertEqual(self.problems(settings='include(":app", ":core:domain", ":core:data")\n'),
-                         ["build.gradle.kts: listiclesModules misses :core:data (settings.gradle.kts includes it)"])
+                         ["build.gradle.kts: tallyModules misses :core:data (settings.gradle.kts includes it)"])
         self.assertEqual(self.problems(ROOT_BUILD.replace('":core:domain"', '":core:domain", ":core:gone"')),
-                         ["build.gradle.kts: listiclesModules lists :core:gone, which settings.gradle.kts does not include"])
+                         ["build.gradle.kts: tallyModules lists :core:gone, which settings.gradle.kts does not include"])
         self.assertEqual(self.problems(ROOT_BUILD.replace('":core:domain"', '":core:domain", ":app"')),
-                         ["build.gradle.kts: listiclesModules lists :app twice"])
+                         ["build.gradle.kts: tallyModules lists :app twice"])
 
     def test_no_list_or_a_commented_out_one_is_flagged(self):
-        want = "build.gradle.kts: no `val listiclesModules = listOf(...)` (the root runs every module's listiclesChecks by task path)"
-        for text in (None, "", "// " + ROOT_BUILD, ROOT_BUILD.replace("val listiclesModules", "val modules")):
+        want = "build.gradle.kts: no `val tallyModules = listOf(...)` (the root runs every module's tallyChecks by task path)"
+        for text in (None, "", "// " + ROOT_BUILD, ROOT_BUILD.replace("val tallyModules", "val modules")):
             with self.subTest(text=text):
                 self.assertIn(want, self.problems(text))
 
     def test_detekt_must_depend_on_every_listed_module_check(self):
-        want = ['build.gradle.kts: detekt does not depend on dependsOn(listiclesModules.map { "$it:listiclesChecks" })']
-        for old, new in (("listiclesChecks", "checkWarningsAsErrors"), ('tasks.named("detekt")', 'tasks.named("lint")'),
+        want = ['build.gradle.kts: detekt does not depend on dependsOn(tallyModules.map { "$it:tallyChecks" })']
+        for old, new in (("tallyChecks", "checkWarningsAsErrors"), ('tasks.named("detekt")', 'tasks.named("lint")'),
                          ('tasks.named("detekt") {', '// tasks.named("detekt") {')):
             with self.subTest(new=new):
                 self.assertEqual(self.problems(ROOT_BUILD.replace(old, new)), want)
+
+    def test_the_old_listicles_names_are_not_accepted(self):
+        # M1-93 R1-01: the root list and the wiring must use the tally names.
+        for old, new in (("tallyModules", "listiclesModules"), ("tallyChecks", "listiclesChecks")):
+            with self.subTest(old=old):
+                self.assertNotEqual([], self.problems(ROOT_BUILD.replace(old, new)))
 
     def test_no_settings_file_skips_it(self):
         self.assertEqual(self.problems(None, settings=None), [])
@@ -1289,7 +1302,7 @@ class Aggregation(unittest.TestCase):
 
     def test_main_reports_it(self):
         d = tree({"settings.gradle.kts": SETTINGS, "build.gradle.kts": "", "app/build.gradle.kts": APP, "core/domain/build.gradle.kts": DOMAIN})
-        self.assertIn("listiclesModules", "".join(cbg.aggregation_problems(d)))
+        self.assertIn("tallyModules", "".join(cbg.aggregation_problems(d)))
         self.assertEqual(cbg.main(["x", d]), 1)
 
 

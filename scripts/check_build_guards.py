@@ -65,8 +65,8 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    Every module in settings.gradle.kts
    `include(...)` applies exactly one module convention plugin (MODULE_CONVENTION) and does not set again what they own (see OWNED). build-logic/ sets no
    targetSdk (check 1 reads Gradle files only). No settings.gradle.kts: the module part is skipped (the real-repository test reads four).
-   The root build's `val listiclesModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
-   `listiclesChecks` by task path (aggregation_problems; M1-68 part B2: each module runs its own checks, the root reads none).
+   The root build's `val tallyModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
+   `tallyChecks` by task path (aggregation_problems; M1-68 part B2: each module runs its own checks, the root reads none).
 
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
@@ -599,8 +599,8 @@ OWNED = re.compile(
     r"|useJUnitPlatform|failOnNoDiscoveredTests)\b|(-Xjdk-release)"
     r"|(?<![\w$])testImplementation\s*\(\s*project\s*\(\s*(?:path\s*=\s*)?\":core:testing\""
 )
-# The four module conventions; listicles.dependency.floors is not one (it carries none of the module settings; R1-03).
-MODULE_CONVENTION = r"listicles\.(?:jvm\.(?:library|testsupport)|android\.(?:library|application))"
+# The four module conventions; tally.dependency.floors is not one (it carries none of the module settings; R1-03).
+MODULE_CONVENTION = r"tally\.(?:jvm\.(?:library|testsupport)|android\.(?:library|application))"
 CONVENTION = re.compile(rf"\balias\s*\(\s*libs\.plugins\.{MODULE_CONVENTION}\s*\)|\bid\s*\(\s*\"{MODULE_CONVENTION}\"\s*\)")
 INCLUDE_CALL = re.compile(r"\binclude\s*\(([^)]*)\)")
 
@@ -889,14 +889,14 @@ def convention_problems(root):
         text = strip(read(root, build))
         applied = CONVENTION.findall(text)
         if len(applied) != 1:
-            problems.append(f"{build}: applies {len(applied)} listicles convention plugins; apply exactly one (build-logic/)")
+            problems.append(f"{build}: applies {len(applied)} tally convention plugins; apply exactly one (build-logic/)")
         for m in OWNED.finditer(text):
             problems.append(f"{build}:{line_of(text, m.start())}: {m.group()} is set by the convention plugins in build-logic/; do not set it again here")
     return problems
 
 
-ROOT_MODULES = re.compile(r"(?m)^val listiclesModules = listOf\(([^)]*)\)")
-ROOT_WIRING = re.compile(r'(?m)^tasks\.named\("detekt"\)\s*\{\s*dependsOn\(listiclesModules\.map\s*\{\s*"\$it:listiclesChecks"\s*\}\)\s*\}')
+ROOT_MODULES = re.compile(r"(?m)^val tallyModules = listOf\(([^)]*)\)")
+ROOT_WIRING = re.compile(r'(?m)^tasks\.named\("detekt"\)\s*\{\s*dependsOn\(tallyModules\.map\s*\{\s*"\$it:tallyChecks"\s*\}\)\s*\}')
 
 
 def aggregation_problems(root):
@@ -906,13 +906,13 @@ def aggregation_problems(root):
     text = strip(read(root, "build.gradle.kts")) if os.path.isfile(os.path.join(root, "build.gradle.kts")) else ""
     lists = ROOT_MODULES.findall(text)
     if len(lists) != 1:
-        return ["build.gradle.kts: no `val listiclesModules = listOf(...)` (the root runs every module's listiclesChecks by task path)"]
+        return ["build.gradle.kts: no `val tallyModules = listOf(...)` (the root runs every module's tallyChecks by task path)"]
     listed = re.findall(r"\"(:[^\"]+)\"", lists[0])
-    problems = [f"build.gradle.kts: listiclesModules misses {m} (settings.gradle.kts includes it)" for m in modules if m not in listed]
-    problems += [f"build.gradle.kts: listiclesModules lists {m}, which settings.gradle.kts does not include" for m in dict.fromkeys(listed) if m not in modules]
-    problems += [f"build.gradle.kts: listiclesModules lists {m} twice" for m in dict.fromkeys(listed) if listed.count(m) > 1]
+    problems = [f"build.gradle.kts: tallyModules misses {m} (settings.gradle.kts includes it)" for m in modules if m not in listed]
+    problems += [f"build.gradle.kts: tallyModules lists {m}, which settings.gradle.kts does not include" for m in dict.fromkeys(listed) if m not in modules]
+    problems += [f"build.gradle.kts: tallyModules lists {m} twice" for m in dict.fromkeys(listed) if listed.count(m) > 1]
     if not ROOT_WIRING.search(text):
-        problems.append('build.gradle.kts: detekt does not depend on dependsOn(listiclesModules.map { "$it:listiclesChecks" })')
+        problems.append('build.gradle.kts: detekt does not depend on dependsOn(tallyModules.map { "$it:tallyChecks" })')
     return problems
 
 
