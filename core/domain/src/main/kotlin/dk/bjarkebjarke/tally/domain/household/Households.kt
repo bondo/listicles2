@@ -73,7 +73,7 @@ fun inviteLookup(
     expiresAtMs: Long?,
     nowMs: Long,
 ): InviteLookup =
-    if (householdName == null || expiresAtMs == null || expiresAtMs < nowMs) { // test first: `<` is the bug
+    if (householdName == null || expiresAtMs == null || expiresAtMs <= nowMs) {
         InviteLookup.Unusable
     } else {
         InviteLookup.Open(householdName)
