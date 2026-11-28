@@ -1748,7 +1748,7 @@ risk = "normal"
 depends_on = [
   "M1-88", "M1-89", "M1-90", "M1-120", "M1-122", "M1-123", "M1-125", "M1-126",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
-  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99", "M1-121",
+  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99", "M1-121", "M1-127",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
@@ -1817,7 +1817,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-O1", "M1-11"]
-notes = "docs/milestones/M1.md R7 (issue 209): firebase deploy --only firestore:rules from that main commit, note the commit on #15, compare the live ruleset with main before a tester build"
+notes = "docs/milestones/M1.md R7 (issue 209): firebase deploy --only firestore:rules from that main commit, note the commit on #15, compare the live ruleset with main before a tester build. Done by CI once the workflow of M1-127 has deployed once (owner decision 7239676323 item 2, refined by 7242591575, #399); each deploy waits for the owner's approval of the firebase-prod environment in GitHub"
 
 [[task]]
 id = "M1-O7"
@@ -2215,3 +2215,23 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-25"]
 notes = "Split from PR 419 (about 750 lines). Not stacked: a PR from main after PR 419 merges, rebuilt from commit 0691230 of branch m1/account-25 (AccountScreen.kt, AccountScreenTest.kt, ic_arrow_back.xml, the account_* and sign_out_* strings in values and values-da; AccountScreen.kt exists there with the crash switch already removed). The view model and AccountActions are in PR 419"
+
+[[task]]
+id = "M1-O19"
+title = "Owner: set up the keyless rules deploy (service account, Workload Identity Federation, firebase-prod environment)"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Owner decisions 7239676323 item 2 and 7242591575 on #399; settings outside git, the owner's hands. Google Cloud: a service account whose only role is roles/firebaserules.admin; a workload identity pool and provider that trust only repo:bondo/tally on refs/heads/main; the impersonation binding from that identity to the service account; no JSON key is created or stored and there is no repository secret. GitHub: the environment firebase-prod, restricted to main, with the owner as required reviewer, and its non-secret variables (project id, WIF provider name, service account email). The orchestrator files the issue with the exact steps; M1-127 depends on it"
+
+[[task]]
+id = "M1-127"
+title = "Tooling: CI workflow that deploys firestore.rules from main after a merge that changes it, keyless, in the firebase-prod environment"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "high"
+depends_on = ["M1-O19"]
+notes = "Owner decisions 7239676323 item 2 and 7242591575 on #399. Tooling env (TALLY_TASK=tooling), test-first with negative cases: on a push to main that changes firebase/firestore.rules, a job in the GitHub environment firebase-prod (restricted to main, owner as required reviewer, so every deploy waits for the owner's approval) runs the rules tests, authenticates with google-github-actions/auth through Workload Identity Federation (no stored key, no repository secret), deploys with the pinned firebase-tools (M1-96), then reads back the released ruleset and compares it with the merged file. It does not run on pull requests, forks or other branches, and does nothing when the rules file is unchanged. Production security rules (PLAN 9.1), so risk high. Workflow files: owner-only merge, approver-eligible under #15 comment 7075812943 item 1. Once it has deployed once, M1-O6 is done by CI"

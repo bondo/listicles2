@@ -10,7 +10,7 @@ roles:
   orchestrator:
     model: opus
     effort: medium
-    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 35% context (1M window; 25% of a 200k one, see the note at `context`), see `context`
+    session: one long-lived session started by the owner (depth 0); handoff at a batch boundary near 50% context (1M window; 25% of a 200k one, see the note at `context`), see `context`
     prompt: agents/prompts/orchestrator.md
   planner:
     model: opus
@@ -104,9 +104,9 @@ roles:
     effort: high
     session: fresh, one per retro run
 context:
-  # Orchestrator handover (ORCHESTRATION 5; owner decisions #15 comment 7001335975 and 7153510972 item 6): earlier than the hook stages below.
+  # Orchestrator handover (ORCHESTRATION 5; owner decisions #15 comment 7001335975 and 7239676323 item 5): earlier than the hook stages below.
   # The 200k value is set by the owner: 25% of a 200k window (owner decision 7158603054 item 2).
-  orchestrator_handover_at_percent_1m: 35
+  orchestrator_handover_at_percent_1m: 50
   orchestrator_handover_at_percent_200k: 25
   # Implementer handoff (owner decision 7153510972 item 2): earlier than the hook stages below, which stay the backstop.
   implementer_handoff_at_percent: 30

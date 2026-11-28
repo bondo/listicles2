@@ -3,7 +3,7 @@ Agent Usage Redesign PR 2: plan review, self-review, finding verification, secon
 full-diff review, kept implementer, minors fixed by default, the single escalation; PR 4: orchestration (pipeline-flow concurrency, throttle,
 gates, merge agent, archive sweep, design rounds 3). DOC_RULES also pin CLAUDE.md, REVIEW.md, docs/FOLLOW-UPS.md,
 docs/PLAN.md, docs/ORCHESTRATION.md, docs/COLLABORATING.md, docs/BRANCH-PROTECTION.md, docs/reviews/README.md,
-docs/reviews/collaborator-workflow.md, docs/milestones/M1.md, agents/roles.yaml and handoff/TEMPLATE.md).
+docs/reviews/collaborator-workflow.md, docs/milestones/M1.md, config/licensee/google-sdk-terms.txt, agents/roles.yaml and handoff/TEMPLATE.md).
 
 Usage: python3 -I scripts/prompt_rules.py [--prompts agents/prompts] [--root REPO_ROOT]
 Exit status: 0 ok, 1 a rule is missing (one line per problem on stdout), 2 bad usage.
@@ -129,10 +129,12 @@ _DELEGATED = tuple(re.escape(t) for t in (
 ))
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
-    "settings, network allowlists, licence and permission acceptances, guard thresholds (600/1500), design and product sign-off, merges of PRs "
+    "settings, network allowlists, licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+    "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1), "
+    "guard thresholds (600/1500), design and product sign-off, merges of PRs "
     "with sync-merge content (sync and merge logic), the owner task M1-O5 (approving the privacy text before anyone but the owner installs the "
     "app), and changes to the process files that define these authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, "
-    "agents/roles.yaml, agents/prompts/)."
+    "agents/roles.yaml, agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)."
 )
 # Owner decision, #15 comment 7123360368 (2026-11-24): the approver's scope also takes security-rules PRs and privacy-doc changes. The one home
 # of the rule is ORCHESTRATION 1.1; the approver and orchestrator prompts point to it.
@@ -142,6 +144,48 @@ _SCOPE = tuple(re.escape(t) for t in (
     "final review round, with green CI and no veto; a PR in the security-rules, sync-merge or release area also needs a clean independent "
     "second-reviewer pass (§7.2.2). The record, the merge as `owner-batch` and the owner's veto are those of (1).",
 ))
+# Owner decisions 7239676323 items 1 and 4 and 7239863908 (#399, 2026-11-28): the approver's scope takes task-file and decision-recording
+# process PRs; the Google Android SDK terms have a standing acceptance. Pinned in ORCHESTRATION 1.1 and 7.5, the approver prompt, the retained
+# sentence (RETAINED) and the licensee header; test_prompt_rules.AutonomyDecisionsTests lists the phrases.
+_TASKS_PR = "a PR whose `docs/tasks.toml` change adds or splits tasks (new rows, `depends_on`, `notes`, `risk`)"
+_PROCESS_PR = (
+    "a process-file PR (ORCHESTRATION.md, agents/prompts/, agents/roles.yaml, REVIEW.md, CLAUDE.md) whose diff only writes down owner decisions "
+    "already posted on the state issue (#399 or #373), each cited by comment id,"
+)
+_EXACT = (
+    "a change to who may approve or merge what, to guard thresholds, permissions or settings stays with the owner, unless a cited owner "
+    "decision states that exact change"
+)
+_DECISIONS_ORCH = tuple(re.escape(t) for t in (
+    "Approver scope, widened again (owner decision, #399 comment 7239676323, 2026-11-28, items 1 and 4)",
+    _TASKS_PR + ", as `owner-batch`",
+    "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the PR-size rule) with no finding above nit "
+    "open against them, `scripts/tasks.py validate` passes, CI is green and there is no veto",
+    "other owner-retained paths in the same PR still need the owner",
+    _PROCESS_PR + " after a clean review round that checked every changed line against a cited decision",
+    _EXACT,
+    "Standing acceptance of the Google Android SDK terms (owner decision, #399 comment 7239863908, 2026-11-28)",
+    "the PR that needs such an artifact adds its exact `group:artifact:version` line to `config/licensee/google-sdk-terms.txt`, citing this "
+    "comment, and lists the added lines in its PR body; the reviewer checks each added line is in scope",
+    "licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+    "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1)",
+    "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
+    "Still with the owner: any artifact outside those two groups, any other licence, and any other permission acceptance",
+    "except the standing acceptance of the Google Android SDK terms (#399 comment 7239863908, below)",
+    "The approver's scope also takes task-file PRs and decision-recording process PRs (owner decision, #399 comment 7239676323 items 1 and 4; §1.1)",
+))
+_DECISIONS_APPROVER = tuple(re.escape(t) for t in (
+    "Also yours (§1.1, #399 comment 7239676323 items 1 and 4): " + _TASKS_PR,
+    "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the PR-size rule) with no finding above nit "
+    "open against them and `scripts/tasks.py validate` passes",
+    _PROCESS_PR + " after a clean review round that checked every changed line against a cited decision",
+    "licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+    "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1)",
+    "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
+    "a PR that changes who may approve or merge what, guard thresholds, permissions or settings is not yours, unless a cited owner decision "
+    "states that exact change",
+))
+
 # Wording the decision replaced: the owner is no longer asked for these.
 _STALE_ASKS = (r"the escalation reviewer's `owner` ruling", r"`risk:high` work(?: before starting it| \(before starting it\))",
                r"merges of owner-only prs(?:;| \(§7\.5\))")
@@ -583,7 +627,7 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\), "
+            r"handover \(§5, two-phase\), at about 50% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\), "
             r"`agents/roles\.yaml` context\)",
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
@@ -593,10 +637,11 @@ RULES = (
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 35% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7153510972, 7158603054), "
+        "two-phase handover at about 50% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7239676323 item 5, 7158603054), "
         "first batch boundary: "
         "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
-        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 50% of a 1m window"),
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 35% of a 1m window",
+                r"about 50% of a 1m window \(40% of a 200k"),
     ),
     Rule(
         "handover-messages", ("orchestrator",),
@@ -1120,6 +1165,18 @@ RULES = (
         "(owner decision, #15 comment 7075812943; ORCHESTRATION 1.1, 7.5)",
     ),
     Rule(
+        "decisions-7239-approver", ("approver",), _DECISIONS_APPROVER,
+        "the approver prompt carries the task-file and decision-recording scope and the exact-change limit (#399 comment 7239676323 items 1, 4)",
+    ),
+    Rule(
+        "decisions-7239-orchestrator", ("orchestrator",), tuple(re.escape(t) for t in (
+            "licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+            "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1)",
+            "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
+        )),
+        "the orchestrator prompt carries the exceptions to the owner-retained list (#399 comments 7239676323 item 4, 7239863908)",
+    ),
+    Rule(
         "approver-role", ("approver",),
         (
             r"you are the approver for tally\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
@@ -1183,13 +1240,14 @@ RULES = (
     ),
     Rule(
         "token-savings-orchestrator", ("orchestrator",),
-        (r"at about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\)",
+        (r"at about 50% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\)",
          r"a fresh merge agent once a day, at the first merge request after 00:00 utc",
          r"sets the old merge-agent row to archived \(once it has no merge in flight\) and adds the new agent's row",
          r"up to about 150 changed lines when they touch only tests or docs",
          r"a fresh implementer from `handoff/<branch>\.md` when the running one is above 30% context"),
-        "the orchestrator hands over at about 35% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
-        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 50% of a 1m window", r"daily pacing recompute",
+        "the orchestrator hands over at about 50% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
+        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 35% of a 1m window",
+                r"about 50% of a 1m window \(40% of a 200k", r"daily pacing recompute",
                    r"this pr's scaling", r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k",
                    r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
@@ -1198,6 +1256,11 @@ RULES = (
 
 ORCH = "docs/ORCHESTRATION.md"
 DOC_RULES = (
+    DocRule("decisions-7239-orch", ORCH, _DECISIONS_ORCH,
+            "ORCHESTRATION 1.1 and 7.5 carry the approver scope of #399 comment 7239676323 items 1, 4 and the standing acceptance 7239863908"),
+    DocRule("decisions-7239-licensee", "config/licensee/google-sdk-terms.txt",
+            (re.escape("Except lines under the standing acceptance of the Google Android SDK terms (#399 comment 7239863908)"),),
+            "the licensee header names the standing acceptance of 7239863908"),
     DocRule(
         "orch-no-resolve-thread", ORCH,
         (
@@ -1437,17 +1500,18 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\); "
-            r"`agents/roles\.yaml` context, #15 comment 7001335975; 35% by owner decision "
-            r"7153510972 item 6",
+            r"trigger: about 50% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\); "
+            r"`agents/roles\.yaml` context, #15 comment 7001335975; 50% by owner decision "
+            r"7239676323 item 5 \(it replaces 35%, 7153510972 item 6\)",
             r"until the hard stage, the orchestrator follows this section, not the soft reminder",
             r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
-        "ORCHESTRATION 5: hand over at about 35% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
+        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
         "the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 50% of a 1m window",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 35% of a 1m window",
+                r"about 50% of a 1m window \(40% of a 200k",
                    r"the owner archives you"),
     ),
     DocRule(
@@ -1850,13 +1914,13 @@ DOC_RULES = (
             "25% of a 200k window (owner decision 7158603054 item 2)",
             "orchestrator_handover_at_percent_200k: 25",
             "implementer_handoff_at_percent: 30",
-            "orchestrator_handover_at_percent_1m: 35",
+            "orchestrator_handover_at_percent_1m: 50",
         )),
         "roles.yaml carries the token-savings rules: reviewer max effort only for the first reviewer of security-rules and sync-merge PRs, the "
         "second reviewer high, the implementer at high and handing off at 30%, the 150-line re-check, the daily merge agent (7153510972)",
         forbidden=(r"second-reviewer: model: opus effort: max",
                    r"a new implementer for a pr that already had 3 or more review rounds max_effort_when: - the pr is tagged risk:high",
-                   r"every later round", r"daily pacing recompute", r"orchestrator_handover_at_percent_200k: 30",
+                   r"every later round", r"daily pacing recompute", r"orchestrator_handover_at_percent_200k: 30", r"orchestrator_handover_at_percent_1m: 35",
                    r"pending owner confirmation"),
     ),
     DocRule(
@@ -1878,16 +1942,16 @@ DOC_RULES = (
             "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row",
             "the merge-agent row's `spawned-at` records the rotation time",
             "check that the state issue body names you as active before your first merge",
-            "trigger: about 35% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
-            "hand over at about 35% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
+            "trigger: about 50% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
+            "hand over at about 50% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
             "the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)",
             "### 8.6 merge agent",
             "tags `role:merge-agent`, `tally:process`",
         )),
         "ORCHESTRATION carries the token-savings rules: effort, implementer context and fix rounds, PR size, the 150-line re-check, the daily "
-        "merge agent and its spawn message, the 35% orchestrator handover (7153510972)",
+        "merge agent and its spawn message, the 50% orchestrator handover (7239676323 item 5)",
         forbidden=(r"opus / high \(max for `risk:high`\)", r"second reviewer every round", r"max effort for `risk:high`",
-                   r"about 50% of a 1m window", r"daily pacing recompute", r"this pr's scaling",
+                   r"about 35% of a 1m window", r"about 50% of a 1m window \(40% of a 200k", r"daily pacing recompute", r"this pr's scaling",
                    r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k", r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
     DocRule(
