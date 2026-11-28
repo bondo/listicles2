@@ -718,6 +718,46 @@ class GeneralKindTests(unittest.TestCase):
         self.assertEqual(go(api, kind="general")[0], 0)
         self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
 
+    CORE_ANDROID_TEST = "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/config/MinVersionEmulatorTest.kt"
+
+    def test_a_core_module_android_test_source_is_merged(self):  # unblocks #391: instrumented tests of core modules are general
+        for name in (self.CORE_ANDROID_TEST, "core/domain/src/androidTest/kotlin/dev/listicles/domain/ListsTest.kt"):
+            with self.subTest(name=name):
+                self.assertFalse(merge_ready.owner_only(name))
+                api = make_api(files=[file_entry(name)])
+                self.assertEqual(go(api, kind="general")[0], 0)
+                self.assertEqual([m[1]["sha"] for m in api.merged], [SHA])
+
+    def test_core_android_test_paths_that_stay_owner_only_are_refused(self):  # negative cases of the androidTest widening
+        names = ("core/testing/src/androidTest/kotlin/dk/bjarkebjarke/tally/testing/X.kt",  # core/testing stays a gate
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/architecture/NewRule.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/NoNetworkTest.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/RobolectricWiringTest.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/testing/BlockingSelectorProvider.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/ProjectConfig.kt",
+                 "core/data/src/androidTest/AndroidManifest.xml", "core/data/src/androidTest/res/values/strings.xml",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/data/Notes.md",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/../X.kt", "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/.hidden.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/tally/.d/X.kt", "core/data/src/androidTest/java/dk/bjarkebjarke/tally/X.kt",
+                 "core/data/src/androidTest/kotlin/dk/bjarkebjarke/other/X.kt", "core/data/src/androidTest/kotlin/X.kt",
+                 "core/data/src/androidTest/X.kt", "core/data/src/androidTestDebug/kotlin/dk/bjarkebjarke/tally/X.kt",
+                 "core/src/androidTest/kotlin/dk/bjarkebjarke/tally/X.kt", "core/Data/src/androidTest/kotlin/dk/bjarkebjarke/tally/X.kt")
+        for name in names:
+            with self.subTest(name=name):
+                self.assertTrue(merge_ready.owner_only(name))
+                self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+
+    def test_core_testing_is_refused_by_the_allowlist_itself(self):  # R1-01: not only by the gate regex, so the (?!testing/) lookahead is pinned
+        for root in ("dev/listicles", "dk/bjarkebjarke/tally"):
+            for source_set in ("main", "test", "androidTest"):
+                name = f"core/testing/src/{source_set}/kotlin/{root}/other/X.kt"  # a package that is not `testing`, so GENERAL_GATE_RE stays out
+                with self.subTest(name=name):
+                    self.assertIsNone(merge_ready.GENERAL_GATE_RE.search(name.casefold()))
+                    self.assertTrue(merge_ready.owner_only(name))
+                    self.refused(make_api(files=[file_entry(name)]), r"outside kind general")
+                    self.assertFalse(any(p.fullmatch(name) for p in merge_ready.GENERAL_ALLOW))
+                    self.assertTrue(any(p.fullmatch(name.replace("core/testing/", "core/data/")) for p in merge_ready.GENERAL_ALLOW))
+
     def test_every_path_outside_the_allowlist_is_refused(self):  # fail closed: R6-01, R6-05, R6-03, R6-04 and everything unknown
         names = ("firebase/.npmrc", "firebase/jest.config.cjs", "firebase/eslint.config.mjs", "firebase/nested/eslint.config.mjs",  # R6-01, R6-05, R6-03
                  "scripts/shellcheckrc", "scripts/.shellcheckrc", "scripts/verify.sh", "scripts/new_tool.py",  # R6-04, scripts
@@ -992,7 +1032,8 @@ def fake_merge_tree(result=TREE, calls=None, fail=None):
     return merge_tree
 
 
-def approval_comment(listed, login="bondo", assoc="OWNER", issue=15, edited=False, line="batch approval: "):
+def approval_comment(listed, login="bondo", assoc="OWNER", issue=None, edited=False, line="batch approval: "):
+    issue = merge_ready.STATE_ISSUE if issue is None else issue  # the current state issue, whatever the pointer says at call time
     return {"user": {"login": login}, "author_association": assoc, "issue_url": f"https://api.github.com/repos/{REPO}/issues/{issue}",
             "body": f"{line}{listed}\nThanks.", "created_at": "2026-11-19T12:00:00Z",
             "updated_at": "2026-11-19T12:05:00Z" if edited else "2026-11-19T12:00:00Z"}
@@ -1091,7 +1132,7 @@ class OwnerBatchTests(unittest.TestCase):
                  "edited": approval_comment(f"#{N}@{C1[:7]}", edited=True), "#150": approval_comment(f"#{N}@{C1[:7]}", issue=150)}
         for name, comment in cases.items():
             with self.subTest(name):
-                self.refused(batch_api(comment=comment), r"approval comment.*(owner|#15|edited)")
+                self.refused(batch_api(comment=comment), r"approval comment.*(owner|not on the state issue #399|edited)")
 
     def test_anything_but_update_branch_merges_of_main_after_the_approved_sha_is_refused(self):
         merge = commit(M2, [M1, MAIN2], "Merge branch 'main' into x")
@@ -1215,20 +1256,20 @@ class StateIssueRotationTests(unittest.TestCase):
         self.assertTrue(prev is None or (type(prev) is int and 0 < prev != cur), prev)
         self.assertEqual(merge_ready.state_issues(), (cur,) if prev is None else (cur, prev))
 
-    def test_the_pointer_is_the_state_issue_after_the_rotation_from_15_to_373(self):  # rotation decision: #15 comment 7125300567
-        self.assertEqual((merge_ready.STATE_ISSUE, merge_ready.PREVIOUS_STATE_ISSUE), (373, 15))
-        self.assertEqual(merge_ready.state_issues(), (373, 15))
+    def test_the_pointer_is_the_state_issue_after_the_rotation_from_373_to_399(self):  # rotation decision: #373 comment 7140025416
+        self.assertEqual((merge_ready.STATE_ISSUE, merge_ready.PREVIOUS_STATE_ISSUE), (399, 373))
+        self.assertEqual(merge_ready.state_issues(), (399, 373))
 
-    def test_with_the_real_pointer_373_and_15_count_and_any_third_issue_is_refused(self):
-        for issue in (373, 15):
+    def test_with_the_real_pointer_399_and_373_count_and_any_third_issue_is_refused(self):
+        for issue in (399, 373):
             with self.subTest(issue=issue):
                 code, text, merged = self.code(approval_comment(self.OK, issue=issue))
                 self.assertEqual((code, len(merged)), (0, 1), text)
-        for issue in (16, 372, 374, 37, 3730, 1, 400):
+        for issue in (15, 16, 372, 374, 398, 400, 39, 3990, 37, 1):
             with self.subTest(refused=issue):
                 code, text, merged = self.code(approval_comment(self.OK, issue=issue))
                 self.assertEqual((code, merged), (1, []), text)
-                self.assertRegex(text, r"not on the state issue #373 or the previous state issue #15")
+                self.assertRegex(text, r"not on the state issue #399 or the previous state issue #373")
 
     def test_a_bad_pointer_refuses_every_approval(self):  # a typo in the rotation PR must fail closed, not open
         for cur, prev in ((15, 15), (0, None), (None, 15), ("15", None), (True, None), (400, "15"), (400, 0), (-1, 15)):

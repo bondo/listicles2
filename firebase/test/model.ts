@@ -1,10 +1,8 @@
 // The reference model of PLAN section 3.1 (M1-06, P17): who may read and write what, written from
 // the PLAN rows, not from firestore.rules, so that fuzz.test.ts can compare the two on random
-// cases. ROWS has a row for each allow statement of the rules (fuzz.test.ts checks it). The PLAN
-// rows the rules lack are extension points, denied here until their task adds the rule and its row:
-// leave, remove member, the removed markers, the soft delete, its cleanup and P6 (M1-11). A new
-// allow statement fails that check until its row is in; a new path of an existing one (the soft
-// delete) fails the fuzz on its base case (fuzz.ts).
+// cases. ROWS has a row for each allow statement of the rules (fuzz.test.ts checks it). That check
+// cannot see a new path of an existing allow statement (M1-11's Leave, a member delete), and the
+// random cases may miss one: each path gets a template in fuzz.ts.
 
 export const NOW = Symbol("request.time"); // FieldValue.serverTimestamp() in a write
 export const T0 = new Date(0); // every stored timestamp, never request.time
@@ -36,6 +34,7 @@ type Row = (x: Ctx & { old: Doc | undefined; doc: Doc }, ...ids: string[]) => bo
 export const user = (uid: string): string => `users/${uid}`;
 export const household = (hid: string): string => `households/${hid}`;
 export const member = (hid: string, uid: string): string => `households/${hid}/members/${uid}`;
+export const marker = (hid: string, uid: string): string => `households/${hid}/removed/${uid}`;
 
 // P4: 1-50 code points and not blank. Blank is as Firestore's trim() has it: only code points up
 // to U+0020 (the app's Kotlin trim also strips Unicode spaces: M1-90).
@@ -56,6 +55,24 @@ const live = (w: World, hid: string): boolean => w.get(household(hid))?.deleted 
 // PLAN 3.1 Reads: a member of the live household, M(uid) and LIVE.
 const reader = (x: Ctx, hid: string): boolean =>
     x.signedIn && live(x.before, hid) && isMember(x.before, hid, x.uid);
+// Delete household (M1-95): the owner's cleanup reads and deletes under the tombstone, O(uid).
+const cleanup = (x: Ctx, hid: string): boolean => {
+    const home = x.before.get(household(hid));
+    return x.signedIn && home?.deleted === true && home.ownerUid === x.uid;
+};
+// The owner of the live household, O(uid) and LIVE (M1-11: Remove member and the markers).
+const owns = (x: Ctx, hid: string): boolean => {
+    const home = x.before.get(household(hid));
+    return x.signedIn && home?.deleted === false && home.ownerUid === x.uid;
+};
+const marks = (x: Ctx, hid: string): boolean => owns(x, hid) || cleanup(x, hid);
+// Remove member's marker (M1-11): by the owner of the live household, removedAt the request time,
+// for a member before the request whose member doc is gone after it.
+const writesMarker = (x: Ctx & { doc: Doc }, hid: string, uid: string): boolean =>
+    owns(x, hid) &&
+    x.doc.removedAt === NOW &&
+    isMember(x.before, hid, uid) &&
+    !isMember(x.after, hid, uid);
 
 // householdId (P5): unchanged; set (null -> hid) with the caller's member doc in a live household
 // after the request; cleared (hid -> null) once that member doc is gone after it; never hid1 -> hid2.
@@ -177,12 +194,20 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
                 d.createdBy === x.uid && d.ownerUid === x.uid && isMember(x.after, hid, x.uid);
             return x.signedIn && /^[A-Za-z0-9]{20}$/.test(hid) && shape && values && own;
         },
-        update: (x, hid) => transfers(x, x.old, x.doc, hid),
+        // Transfer ownership, or the soft delete (M1-95): the owner of the live household sets
+        // deleted and clears the name (#205), nothing else.
+        update: (x, hid) => {
+            const owner = x.signedIn && x.old?.deleted === false && x.old.ownerUid === x.uid;
+            const soft = x.doc.deleted === true && x.doc.name === "";
+            const softDelete = owner && soft && only(x.old, x.doc, ["deleted", "name"]);
+            return softDelete || transfers(x, x.old, x.doc, hid);
+        },
     },
     "households/{hid}/members/{uid}": {
-        // The caller's own member path in any household (it may not exist), or a member's read.
-        get: (x, hid, uid) => (x.signedIn && uid === x.uid) || reader(x, hid),
-        list: (x, hid) => reader(x, hid),
+        // The caller's own member path in any household (it may not exist), a member's read, or
+        // the owner's cleanup.
+        get: (x, hid, uid) => (x.signedIn && uid === x.uid) || reader(x, hid) || cleanup(x, hid),
+        list: (x, hid) => reader(x, hid) || cleanup(x, hid),
         create: (x, hid, uid) => createsOwner(x, x.doc, hid, uid) || joins(x, x.doc, hid, uid),
         // While the household is live: the caller's own displayName (P4), or, by the owner before
         // the request, the role ownerUid gives the doc after it (Transfer ownership).
@@ -197,25 +222,48 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
                 home?.ownerUid === x.uid && only(x.old, x.doc, ["role"]) && x.doc.role === role;
             return x.signedIn && home?.deleted === false && (name || transfer);
         },
+        // Leave (M1-11): a member who is not the owner deletes their own member doc while the
+        // household is live. Under a tombstone (M1-95): the caller's own, even when it is gone
+        // (P6), or the cleanup. Remove member (M1-11): the owner of the live household deletes
+        // another's, who is not the owner after the request either, with the marker written in it.
+        delete: (x, hid, uid) => {
+            const home = x.before.get(household(hid));
+            const own = x.signedIn && uid === x.uid;
+            const leave = own && !!x.old && home?.deleted === false && home.ownerUid !== x.uid;
+            const target = uid !== x.uid && x.after.get(household(hid))?.ownerUid !== uid;
+            const marked = x.after.get(marker(hid, uid))?.removedAt === NOW;
+            const removes = owns(x, hid) && target && marked;
+            return leave || (own && home?.deleted === true) || cleanup(x, hid) || removes;
+        },
+    },
+    // The removed markers: the owner gets, lists and deletes them, in a live household (M1-11) or
+    // in the tombstone's cleanup (M1-95). Remove member writes one (M1-11): a create holds only
+    // removedAt, an overwrite of a leftover one changes only removedAt (P4).
+    "households/{hid}/removed/{uid}": {
+        get: marks,
+        list: marks,
+        delete: marks,
+        create: (x, hid, uid) => keysAre(x.doc, ["removedAt"]) && writesMarker(x, hid, uid),
+        update: (x, hid, uid) => only(x.old, x.doc, ["removedAt"]) && writesMarker(x, hid, uid),
     },
     // Invites (M1-12), each while the household is live: get, any signed-in user (verified; they
     // need the code, HH-03); list, a member whose query fixes householdId and, unless the owner,
     // createdBy as the caller (#280); create (below); delete, its creator or the owner, any member
-    // once it has expired, or the joiner in the join batch.
+    // once it has expired, or the joiner in the join batch. Under a tombstone the owner's cleanup gets,
+    // lists (on householdId) and deletes them (M1-95).
     "invites/{code}": {
-        get: (x) => x.signedIn && live(x.before, String(x.old?.householdId)),
+        get: (x) => {
+            const hid = String(x.old?.householdId);
+            return (x.signedIn && live(x.before, hid)) || cleanup(x, hid);
+        },
         list: (x) => {
             const hid = x.where.householdId;
             const own =
                 x.where.createdBy === x.uid ||
                 x.before.get(household(String(hid)))?.ownerUid === x.uid;
-            return (
-                x.signedIn &&
-                typeof hid === "string" &&
-                live(x.before, hid) &&
-                isMember(x.before, hid, x.uid) &&
-                own
-            );
+            if (typeof hid !== "string") return false;
+            const mine = live(x.before, hid) && isMember(x.before, hid, x.uid) && own;
+            return (x.signedIn && mine) || cleanup(x, hid);
         },
         create: (x, code) => createsInvite(x, x.doc, code),
         delete: (x, code) => {
@@ -232,7 +280,7 @@ export const ROWS: Readonly<Record<string, Partial<Record<Method, Row>>>> = {
                 x.before.get(household(hid))?.ownerUid === x.uid ||
                 expired ||
                 joiner;
-            return x.signedIn && live(x.before, hid) && who;
+            return (x.signedIn && live(x.before, hid) && who) || cleanup(x, hid);
         },
     },
     // Anyone, even signed out (START-01); no client writes.

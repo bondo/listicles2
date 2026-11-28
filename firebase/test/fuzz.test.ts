@@ -23,7 +23,8 @@ test("the row check sees rules the model lacks (read, write) and a row the rules
     const methods = ["get", "list", "create", "update", "delete"].map((k) => `x/{id} ${k}`);
     expect(h.allowedMethods(added)).toEqual([...ROWS, ...methods].sort());
     const noList = h.RULES.replace("allow list: if signedIn() && readsMembers(hid);", "");
-    expect(h.allowedMethods(noList)).toEqual(ROWS.filter((r) => !r.endsWith("{uid} list")));
+    const members = "households/{hid}/members/{uid} list";
+    expect(h.allowedMethods(noList)).toEqual(ROWS.filter((r) => r !== members));
 });
 
 // A row template's base case is a request PLAN 3.1 allows; an extension point's is denied until
@@ -56,8 +57,10 @@ test("the emulator and the model agree on every case", async () => {
 });
 
 // The negative case (P17): each mutant weakens one condition of firestore.rules, so the rules
-// allow a case the model denies, which the fuzz must find. Seed 1 finds each within 2701 cases,
-// seeds 2 and 3 within 3363, any of seeds 1 to 100 within 8672 (PR #372 has the reach per seed),
+// allow a case the model denies, which the fuzz must find. Seed 1 finds each within 2701 cases
+// (#372's own, unchanged; the later ones, measured again with M1-11's templates, within 1726).
+// Seeds 2 and 3 find #372's within 3363 (unchanged) and the later ones within 8275; any of seeds
+// 1 to 100 found #372's within 8672 (PR #372 has the reach per seed; not measured again). All
 // under the cap of 3 * RUNS.
 const MUTANTS: [string, string, string][] = [
     ["Signed in without a verified email", "token.email_verified == true", "token != null"],
@@ -65,11 +68,15 @@ const MUTANTS: [string, string, string][] = [
     ["users doc: from one household to another (P5)", "(before == null && after", "(after"],
     ["Display name: any value (P4)", "&& validName(doc.displayName))", ")"],
     ["Display name update: the role too (P4)", "['displayName'])", "['displayName', 'role'])"],
-    ["Member reads under a tombstone (LIVE)", "return household.deleted == false && ", "return "],
+    [
+        "Member reads under a tombstone (LIVE)",
+        "(household.deleted == false && exists(memberDoc(hid, request.auth.uid)))\n        || cleansUp",
+        "(exists(memberDoc(hid, request.auth.uid)))\n        || cleansUp",
+    ],
     ["Transfer: the old owner keeps the role", "data.role == 'member'", "data.role != null"],
     ["Member doc: another uid (P1)", "uid == request.auth.uid && validName", "validName"],
     ["Household name: any length (P4)", "validName(data.name) &&", "data.name.trim() != '' &&"],
-    ["Tombstone read: of a live household too", "household.deleted == true && ", ""],
+    ["Tombstone read: of a live household too", "household.deleted == true && get(", "get("],
     [
         "Invite list: all, by any member (#280)",
         "invite.createdBy == request.auth.uid ||",
@@ -80,14 +87,20 @@ const MUTANTS: [string, string, string][] = [
     ["Invite create: an expiry up to 9 days ahead (HH-02)", "value(7, 'd')", "value(9, 'd')"],
     ["Invite cleanup under a tombstone (LIVE)", "time && household.deleted == false", "time"],
     [
-        "Invite revoke by the owner under a tombstone (LIVE)",
-        "ownerUid == request.auth.uid && household.deleted == false",
-        "ownerUid == request.auth.uid",
+        "Tombstone cleanup by anyone, not only its owner (O(uid))",
+        "return household.deleted == true && household.ownerUid == request.auth.uid;",
+        "return household.deleted == true;",
+    ],
+    ["Soft delete: the name kept (#205)", "after.name == ''", "after.name is string"],
+    [
+        "P6: another member's doc under a tombstone",
+        "(uid == request.auth.uid && household.deleted",
+        "(household.deleted",
     ],
     [
         "Invite delete: the expired cleanup by a non-member",
-        "exists(memberDoc(invite.householdId, request.auth.uid)))",
-        "true)",
+        "household.deleted == false\n          && exists(memberDoc(invite.householdId, request.auth.uid)))",
+        "household.deleted == false)",
     ],
     ["Join: through an expired invite", "invite.expiresAt > request.time", "true"],
     ["Join: through another household's invite", "invite.householdId == hid && ", ""],
@@ -105,14 +118,51 @@ const MUTANTS: [string, string, string][] = [
     ],
     [
         "Invite list: by a non-member who created them or owns the household",
-        "uid)\n        && exists(memberDoc(invite.householdId, request.auth.uid))",
-        "uid)",
+        "uid)\n          && exists(memberDoc(invite.householdId, request.auth.uid)))",
+        "uid))",
+    ],
+    ["Leave: by the owner (!O(uid))", "household.ownerUid != request.auth.uid", "true"],
+    ["Leave: another member's doc", "(uid == request.auth.uid && resource", "(resource"],
+    ["Leave: no member doc of the caller (M(uid))", "resource != null &&", ""],
+    [
+        "Remove member: the member delete without the marker",
+        "getAfter(markerDoc(hid, uid)).data.removedAt == request.time",
+        "true",
+    ],
+    [
+        "Remove member: with a leftover marker",
+        "getAfter(markerDoc(hid, uid)).data.removedAt == request.time",
+        "getAfter(markerDoc(hid, uid)).data.removedAt != null",
+    ],
+    [
+        "Remove member: the owner removes himself",
+        "\n          && uid != household.ownerUid\n          && uid != getAfter(householdDoc(hid)).data.ownerUid",
+        "",
+    ],
+    [
+        "Marker: by a plain member (O(uid))",
+        "household.ownerUid == request.auth.uid\n        && keys.hasOnly",
+        "true\n        && keys.hasOnly",
+    ],
+    [
+        "Marker: under a tombstone (LIVE)",
+        "return household.deleted == false && household.ownerUid == request.auth.uid\n        && keys",
+        "return household.ownerUid == request.auth.uid\n        && keys",
+    ],
+    ["Marker: another field (P4)", "keys.hasOnly(['removedAt'])", "true"],
+    ["Marker: of a non-member (M(target))", "&& exists(memberDoc(hid, uid)) &&", "&&"],
+    ["Marker: the target still a member", "&& !existsAfter(memberDoc(hid, uid))", ""],
+    [
+        "Markers: any member of the live household reads them (O(uid))",
+        "(household.deleted == false && household.ownerUid == request.auth.uid)\n        || cleansUp",
+        "(household.deleted == false)\n        || cleansUp",
     ],
 ];
 
+// Each mutant's `from` occurs once in the rules, so a later rules edit cannot retarget it unseen.
 test.each(MUTANTS)("the fuzz finds the mutant: %s", async (_what, from, to) => {
+    expect(h.RULES.split(from)).toHaveLength(2);
     const rules = h.RULES.replace(from, to);
-    expect(rules).not.toBe(h.RULES);
     const run = fuzz(rules, { seed: 1, numRuns: 3 * RUNS, endOnFailure: true });
     await expect(run).rejects.toThrow("the emulator says allowed, the model denied");
 });

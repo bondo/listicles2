@@ -8,7 +8,7 @@ author and reviewer. Source of the process: `docs/PLAN.md` section 6.
   the relevant section, and from round 2 the findings JSON of all earlier rounds. Focus on the commits since the last round:
   re-check each open finding, then review the new code and how the fixes interact with the old code.
 - Run whatever proves a finding: any test, the app's JVM screenshots, or a script. CI runs the full suite. Findings come with proof.
-- On `risk:high` PRs and in the protected areas a second reviewer (`agents/prompts/second-reviewer.md`) reviews the same round
+- In the security-rules, sync-merge and release areas a second reviewer (`agents/prompts/second-reviewer.md`) reviews the same round
   independently; the orchestrator merges both reports.
 - **Reviewers never edit or push the PR branch.** Report only: severity, file:line, recommendation, and per finding an
   `area` and a `recommend` (`fix-now` or `defer`, see Findings format). The reviewer recommends and never decides deferral:

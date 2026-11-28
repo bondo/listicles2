@@ -115,6 +115,19 @@ class ValidateTest(unittest.TestCase):
         g = tasks.parse(path.read_text(encoding="utf-8"))  # strict: burn-down tasks required
         self.assertGreater(len(g.tasks), 0)
 
+    def test_agent_ids_take_two_or_three_digits(self):
+        # M1-99 was used, so M1-100 and up must validate; the pattern is pinned at two or three digits.
+        for tid in ("M1-03", "M1-99", "M1-100", "M1-999", "M1-001"):
+            self.assertIn(tid, graph(task(tid, milestone="M1")).by_id)
+        for tid in ("M1-1", "M1-1000", "M1-0100", "M1-ABC", "M1-1O0", "M1-10x", "M1-O", "M1-FU1", "M1-1 00"):
+            self.assertIn("id must look like", errors_of(task(tid, milestone="M1")), tid)
+
+    def test_three_digit_ids_keep_file_order_and_owner_ids(self):
+        g = graph(task("M1-100", milestone="M1"), task("M1-99", milestone="M1"), task("M1-O1", milestone="M1", assignee="owner"))
+        self.assertEqual(ready_ids(g), ["M1-100", "M1-99", "M1-O1"])  # position in the file, not id order
+        self.assertIn("owner tasks (and only they)", errors_of(task("M1-100", milestone="M1", assignee="owner")))
+        self.assertIn("id must look like", errors_of(task("M1-O100x", milestone="M1", assignee="owner")))
+
     def test_rejects_duplicate_ids(self):
         self.assertIn("duplicate id", errors_of(task("M0-01"), task("M0-01")))
 
@@ -709,6 +722,13 @@ class StateBodyTest(unittest.TestCase):
         code, out, _ = self.run_state(self.state(), "--json", "status")
         self.assertEqual({r["id"]: r["state"] for r in json.loads(out)},
                          {"M0-01": "claimed", "M0-02": "in-review", "M0-03": "ready", "M0-04": "blocked", "M0-FU": "blocked"})
+
+    def test_rows_without_tasks_or_in_review_hold_none(self):  # M1-120: a lean block omits empty optional fields
+        data = {"schema": 1, "sessions": [{"id": "session_01a"}, {"id": "session_01b", "tasks": ["M0-01"]}],
+                "branches": [{"name": "b/x"}, {"name": "b/y", "in_review": ["M0-02"]}]}
+        self.assertEqual(tasks.state_ids(f"```json\n{json.dumps(data)}\n```\n"), (["M0-01"], ["M0-02"]))
+        code, out, _ = self.run_state(f"```json\n{json.dumps(data)}\n```\n", "ready")
+        self.assertEqual((code, [ln.split()[0] for ln in out.splitlines()]), (0, ["M0-03"]))
 
     def test_state_and_explicit_lists_are_exclusive(self):
         for flag in ("--claimed", "--in-review"):
