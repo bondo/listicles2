@@ -20,7 +20,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The slow self-tests, about 20 cold Gradle builds each; the licensee gate's are excluded from detekt by gradle-exclude.
 SELFTESTS = ("scripts/test_warnings_gate.py", "scripts/test_jdk_release_gate.py", "scripts/test_java_api_level_gate.py",
-             "scripts/test_google_services_release_gate.py", "scripts/test_test_settings_gate.py")
+             "scripts/test_google_services_release_gate.py", "scripts/test_test_settings_gate.py", "scripts/test_spotless_gate.py")
 # Anything that can change what the gate self-tests inspect or how the build is configured.
 RUN_SUFFIXES = (".gradle.kts", ".gradle", ".properties")
 RUN_PREFIXES = ("gradle/", "config/", "buildSrc/", "build-logic/", ".github/")
@@ -32,6 +32,7 @@ RUN_FILES = {
     "scripts/test_java_api_level_gate.py",
     "scripts/test_google_services_release_gate.py",
     "scripts/test_test_settings_gate.py",
+    "scripts/test_spotless_gate.py",
     "scripts/check_java_api_level.py",
     "scripts/ci_scope.py",
 }

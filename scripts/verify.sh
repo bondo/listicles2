@@ -35,7 +35,7 @@ step ci-scope-tests python3 -I scripts/test_ci_scope.py
 # merge base with origin/main; anything but a clean `skip` from scripts/ci_scope.py runs them. CI on main always runs them.
 gate_exclude=()
 if gate_scope=$(python3 -I scripts/ci_scope.py local-scope 2>/dev/null) && [ "$gate_scope" = skip ]; then
-  echo "skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, google-services-release-gate-tests, test-settings-gate-tests, testLicenseeGate (no gate input changed since the merge base with origin/main; scripts/ci_scope.py)"
+  echo "skip  warnings-gate-tests, jdk-release-gate-tests, java-api-level-gate-tests, google-services-release-gate-tests, test-settings-gate-tests, spotless-gate-tests, testLicenseeGate (no gate input changed since the merge base with origin/main; scripts/ci_scope.py)"
   SKIPPED=1
   gate_exclude=(-x testLicenseeGate)
 else
@@ -44,6 +44,7 @@ else
   step java-api-level-gate-tests python3 -I scripts/test_java_api_level_gate.py
   step google-services-release-gate-tests python3 -I scripts/test_google_services_release_gate.py
   step test-settings-gate-tests python3 -I scripts/test_test_settings_gate.py
+  step spotless-gate-tests python3 -I scripts/test_spotless_gate.py
 fi
 step java-api-level-tests python3 -I scripts/test_check_java_api_level.py
 step pit-config-tests python3 -I scripts/test_check_pit_config.py

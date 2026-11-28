@@ -33,14 +33,34 @@ plugins {
     alias(libs.plugins.tally.dependency.floors)
 }
 
+// M0.5-09, issue 211 and M1-68 part B2 (issue 48): checkWarningsAsErrors and checkJdkRelease are each module's own
+// tasks (build-logic ModuleChecks.kt), so the root reads no other project. tallyChecks groups a module's checks,
+// and detekt (verify.sh and CI) runs it for every module by task path. check_build_guards.py keeps this list equal to
+// the modules in settings.gradle.kts. Part B3: checkJavaApiLevel too, in each JVM library module. Run: ./gradlew
+// checkWarningsAsErrors checkJdkRelease checkJavaApiLevel (every module that has them).
+val tallyModules = listOf(":app", ":core:data", ":core:domain", ":core:testing")
+tasks.named("detekt") { dependsOn(tallyModules.map { "$it:tallyChecks" }) }
+
+// M1-98: file trees, not "**/..." strings. For such a string Spotless excludes the root's and every subproject's build
+// directory by reading that project's layout, which Gradle's isolated projects mode rejects; a file tree is used as given.
+// The trees exclude the same: .git, .gradle, build/ and each module's build/ (scripts/test_spotless_gate.py).
+fun spotlessFiles(
+    vararg patterns: String,
+    buildDirs: List<String>,
+) = fileTree(rootDir) {
+    include(*patterns)
+    exclude(listOf(".git/**", ".gradle/**") + buildDirs)
+}
+
+val moduleBuildDirs = listOf("build/**") + tallyModules.map { it.removePrefix(":").replace(':', '/') + "/build/**" }
+
 spotless {
     kotlin {
-        target("**/src/**/*.kt")
+        target(spotlessFiles("**/src/**/*.kt", buildDirs = moduleBuildDirs))
         ktlint(libs.versions.ktlint.get())
     }
     kotlinGradle {
-        target("*.gradle.kts", "**/*.gradle.kts")
-        targetExclude("**/build/**")
+        target(spotlessFiles("*.gradle.kts", "**/*.gradle.kts", buildDirs = listOf("**/build/**")))
         ktlint(libs.versions.ktlint.get())
     }
 }
@@ -107,14 +127,6 @@ kover {
         }
     }
 }
-
-// M0.5-09, issue 211 and M1-68 part B2 (issue 48): checkWarningsAsErrors and checkJdkRelease are each module's own
-// tasks (build-logic ModuleChecks.kt), so the root reads no other project. tallyChecks groups a module's checks,
-// and detekt (verify.sh and CI) runs it for every module by task path. check_build_guards.py keeps this list equal to
-// the modules in settings.gradle.kts. Part B3: checkJavaApiLevel too, in each JVM library module. Run: ./gradlew
-// checkWarningsAsErrors checkJdkRelease checkJavaApiLevel (every module that has them).
-val tallyModules = listOf(":app", ":core:data", ":core:domain", ":core:testing")
-tasks.named("detekt") { dependsOn(tallyModules.map { "$it:tallyChecks" }) }
 
 // M0.5-10: the licensee policy (config/licensee/policy.gradle) is tested against a fixture build whose
 // artifacts have chosen licences. Each case runs the fixture's `licensee` task: it must pass for the owner's

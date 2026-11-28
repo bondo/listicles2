@@ -2,7 +2,7 @@
 
 Needs a JDK and the Gradle wrapper, so it is its own verify.sh step (not part of scripts/hooks).
 Each bad configuration is injected with a Gradle init script (-I), so no source file changes. The injection runs
-in afterEvaluate, after the build's own shared setting, so it overrides what the build configured.
+in gradle.lifecycle.afterProject (afterEvaluate), after the build's own shared setting, so it overrides what the build configured.
 The gate must pass on the clean build and fail, naming the task or configuration, for every way a JVM module
 could compile against the JDK 21 API, and for a test-support module that reaches a non-test configuration.
 """
@@ -18,12 +18,12 @@ GATE_MESSAGE = "JVM modules must compile against the JDK 17 API"
 KOTLIN_TASK = ":core:domain:compileKotlin"
 JAVA_TASK = ":core:domain:compileJava"
 # Groovy init script; the first %s is a project path, the second the statement run for that project after it is evaluated.
+# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which Gradle's isolated projects mode rejects
+# (gradle.properties turns it on once M1-124 lands).
 INIT = """
-allprojects {
-    afterEvaluate { p ->
-        if (p.path == '%s') {
-            %s
-        }
+gradle.lifecycle.afterProject { p ->
+    if (p.path == '%s') {
+        %s
     }
 }
 """
