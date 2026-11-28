@@ -267,6 +267,13 @@ test.each<[string, Request]>([
     await assertFails(request(dan.verified));
 });
 
+// Erin's leftover marker (removed and rejoined before the soft delete): only the overwrite's LIVE
+// denies it in the batch whose cleanup deletes her member doc.
+test("denied under the tombstone: the owner removes erin, overwriting her leftover marker", async () => {
+    await seed({ [marker(TOMB, ERIN)]: { removedAt: T0 } });
+    await assertFails(removes(ERIN)(dan.verified));
+});
+
 // The cleanup reads on their own, in a world the app never makes: frank owns NEST, which is live,
 // with no member doc there, so only the cleanup's `deleted == true` can deny his reads; a rule that
 // let the owner read without it would let him in.

@@ -229,6 +229,13 @@ describe("Remove member (one batch)", () => {
     ])("denied: %s", async (_what, db, request) => {
         await assertFails(request(db()));
     });
+
+    // Alice's leftover marker (removed, then rejoined): only the overwrite's O(uid) denies her
+    // Leave that overwrites it.
+    test("denied: a plain member's Leave overwriting her leftover marker", async () => {
+        await seed({ [marker(ALICE)]: { removedAt: T0 } });
+        await assertFails(leave(alice.verified, ALICE, [], true));
+    });
 });
 
 describe("The removed markers: only the owner gets, lists and deletes them", () => {
