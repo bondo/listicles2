@@ -2066,10 +2066,11 @@ notes = "Normal env (no process file); owner-only merge (build scripts and scrip
 id = "M1-94"
 title = "Tooling: drop LISTICLES_TASK and the dev/listicles package root; docs name TALLY_TASK=tooling"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-O17", "M1-91", "M1-92"]
+pr = 413
 notes = "Tooling env (CLAUDE.md, scripts/hooks/). Implementer profile Opus (guard/hook change). Step 3 of the LISTICLES_TASK transition; after M1-O17 (the tooling environment sets TALLY_TASK), else main's guard would refuse tooling sessions. Start once no tooling session spawned before M1-O17 is still running (the orchestrator checks the state body's spawn times), or restart such sessions. After M1-92 (same CLAUDE.md, ORCHESTRATION.md, orchestrator.md and prompt_rules.py). Files: scripts/hooks/pretooluse_guard.py and session_end_metrics.py read TALLY_TASK only (tests: LISTICLES_TASK=tooling alone is now not tooling); CLAUDE.md line 16, ORCHESTRATION 7.1, agents/prompts/orchestrator.md and the scripts/prompt_rules.py pin with its test name TALLY_TASK=tooling; scripts/merge_ready.py ROOT and docs/ORCHESTRATION.md 7.5 drop dev/listicles (no file is left under it since M1-55; this narrows general merges, test: a Kotlin file under dev/listicles is owner-only) with scripts/test_merge_ready.py (its REPO fixture becomes bondo/tally, the dev/listicles general-path fixtures move to dk/bjarkebjarke/tally, and the R7_RISK pin follows the 7.5 text); scripts/hooks/test_guards_sh.py fixture paths (listicles.tests.gradle.kts, dev/listicles/app). Keeps the old-slug fixtures in test_repo_slug.py, test_owner_drift_check.py and test_mark_ready.py (they test the renamed repo's old remotes). About 150 changed lines"
 
 [[task]]
