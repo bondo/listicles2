@@ -23,6 +23,5 @@
     <string name="signin_email">Brug e-mail og adgangskode</string>
     <string name="signin_note">Dine lister gemmes med din konto, så de følger med til en ny telefon.</string>
     <string name="signin_no_account">Der er ingen Google-konto på denne telefon. Tilføj en, eller brug e-mail og adgangskode.</string>
-    <string name="signin_email_has_password">Der findes allerede en konto med denne e-mail. Log ind med din e-mail og adgangskode.</string>
     <string name="signin_failed">Kunne ikke logge ind. Prøv igen.</string>
 </resources>

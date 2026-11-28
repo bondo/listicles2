@@ -9,23 +9,12 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import dk.bjarkebjarke.tally.domain.session.PasswordAnswer
 import dk.bjarkebjarke.tally.domain.session.PasswordAuthentication
-import dk.bjarkebjarke.tally.domain.start.EmailVerification
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
-/**
- * Email and password over Firebase Authentication (M1-121, the calls of M1-15), and the email-verified start gate
- * (AUTH-06, M1-62), on the same Auth session as [FirebaseAuthentication].
- */
+/** Email and password over Firebase Authentication (M1-121: the calls of M1-15), on the session of the app's Auth. */
 class FirebasePasswordAuthentication(
     private val auth: FirebaseAuth,
-) : PasswordAuthentication,
-    EmailVerification {
+) : PasswordAuthentication {
     /** The app's session: the default Firebase app's Auth. */
     constructor() : this(FirebaseAuth.getInstance())
 
@@ -48,7 +37,7 @@ class FirebasePasswordAuthentication(
 
     override suspend fun sendPasswordReset(email: String) = answer { auth.sendPasswordResetEmail(email).await() }
 
-    /** Once verified, a new ID token at once: the rules' `email_verified` and [verified] see it now, not in an hour. */
+    /** Once verified, a new ID token at once: the rules' `email_verified` and the M1-127 gate see it now, not later. */
     override suspend fun reloadEmailVerified(): PasswordAnswer {
         val user = auth.currentUser ?: return PasswordAnswer.NotSignedIn
         var verified = false
@@ -59,28 +48,6 @@ class FirebasePasswordAuthentication(
                 if (verified) user.getIdToken(true).await()
             }
         return if (answer == PasswordAnswer.Done && !verified) PasswordAnswer.NotVerified else answer
-    }
-
-    /**
-     * The `email_verified` claim of the signed-in user's ID token, which the rules check, so the gate never opens
-     * before they would allow the user's writes; false while nobody is signed in. Firebase calls the listener at every
-     * sign-in, sign-out and new token. Offline with an expired token the claim cannot be read: then the email as last
-     * read.
-     */
-    override fun verified(): Flow<Boolean> =
-        callbackFlow {
-            val listener = FirebaseAuth.IdTokenListener { trySend(Unit) }
-            auth.addIdTokenListener(listener)
-            awaitClose { auth.removeIdTokenListener(listener) }
-        }.conflate().map { tokenVerified() }.distinctUntilChanged()
-
-    private suspend fun tokenVerified(): Boolean {
-        val user = auth.currentUser ?: return false
-        return try {
-            user.getIdToken(false).await().claims["email_verified"] == true
-        } catch (expected: FirebaseException) {
-            user.isEmailVerified
-        }
     }
 
     private suspend fun answer(call: suspend () -> Unit): PasswordAnswer =

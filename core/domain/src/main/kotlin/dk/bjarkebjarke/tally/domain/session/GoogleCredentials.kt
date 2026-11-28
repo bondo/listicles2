@@ -33,10 +33,7 @@ sealed interface GoogleIdToken {
 
 /** Firebase Authentication as sign-in and sign-out use it (M1-14). Throws nothing but `CancellationException`. */
 interface Authentication {
-    /**
-     * Signs in with a Google ID token: [GoogleSignInResult.SignedIn], [GoogleSignInResult.EmailHasPasswordAccount] or
-     * [GoogleSignInResult.Failed].
-     */
+    /** Signs in with a Google ID token: [GoogleSignInResult.SignedIn] or [GoogleSignInResult.Failed]. */
     suspend fun signInWithGoogle(idToken: String): GoogleSignInResult
 
     /** Ends the session on this phone; [SessionState] turns false. */

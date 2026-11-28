@@ -24,7 +24,6 @@ import dk.bjarkebjarke.tally.domain.session.PasswordAuthentication
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
-import dk.bjarkebjarke.tally.domain.start.EmailVerification
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
@@ -54,16 +53,10 @@ object SessionModule {
     @Provides
     fun authentication(authentication: FirebaseAuthentication): Authentication = authentication
 
-    /** Email and password (M1-121) and the email-verified start gate (M1-62) on the same Auth session. */
+    /** Email and password (M1-121), on the same default Firebase app's Auth. */
     @Provides
     @Singleton
-    fun firebasePasswordAuthentication(): FirebasePasswordAuthentication = FirebasePasswordAuthentication()
-
-    @Provides
-    fun passwordAuthentication(authentication: FirebasePasswordAuthentication): PasswordAuthentication = authentication
-
-    @Provides
-    fun emailVerification(authentication: FirebasePasswordAuthentication): EmailVerification = authentication
+    fun passwordAuthentication(): PasswordAuthentication = FirebasePasswordAuthentication()
 
     @Provides
     @Singleton

@@ -82,15 +82,6 @@ class SignInScreenTest {
     }
 
     @Test
-    @Config(qualifiers = "da")
-    fun theCollisionMessageIsASnackbarInDanish() {
-        show(SignInUiState(message = SignInMessage.EmailHasPasswordAccount))
-        compose
-            .onNodeWithText("Der findes allerede en konto med denne e-mail. Log ind med din e-mail og adgangskode.")
-            .assertExists()
-    }
-
-    @Test
     fun whileSigningInTheGoogleButtonIsDisabledSoItCannotBeTappedTwice() {
         show(SignInUiState(busy = true))
         compose.onNodeWithText("Continue with Google").assertIsNotEnabled()

@@ -2,7 +2,6 @@ package dk.bjarkebjarke.tally.data.session
 
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.GoogleAuthProvider
 import dk.bjarkebjarke.tally.domain.account.AccountProfile
 import dk.bjarkebjarke.tally.domain.account.AccountProfiles
@@ -42,15 +41,9 @@ class FirebaseAuthentication(
         return try {
             auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
             GoogleSignInResult.SignedIn
-        } catch (collision: FirebaseAuthUserCollisionException) {
-            // Firebase does not trust this Google account for an email that has a password account (M1-121).
-            if (collision.errorCode == "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL") {
-                GoogleSignInResult.EmailHasPasswordAccount
-            } else {
-                GoogleSignInResult.Failed
-            }
         } catch (expected: FirebaseException) {
-            // A refused token, no network, too many attempts or a disabled account.
+            // A refused token, no network, too many attempts or a disabled account. M1-121 tells the email collision
+            // (AUTH-10) apart.
             GoogleSignInResult.Failed
         }
     }

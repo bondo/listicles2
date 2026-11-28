@@ -116,16 +116,11 @@ object FirebaseEmulator {
             authorization = "Bearer owner",
         )
 
-    /**
-     * Turns email enumeration protection on or off (on in the real project, M1-O1, M1.md R1) and answers the setting
-     * it had, for the test to put back.
-     */
-    fun emailPrivacy(on: Boolean): Boolean {
+    /** Turns email enumeration protection on (as in the real project, M1-O1, M1.md R1) or off (the default). */
+    fun emailPrivacy(on: Boolean) {
         val url = URL("http://$HOST:$AUTH_PORT/emulator/v1/projects/$PROJECT_ID/config")
-        val before = JSONObject(send("GET", url, null, "Reading the Auth config"))
         val privacy = JSONObject().put("enableImprovedEmailPrivacy", on)
         send("PATCH", url, JSONObject().put("emailPrivacyConfig", privacy), "Setting email privacy")
-        return before.getJSONObject("emailPrivacyConfig").optBoolean("enableImprovedEmailPrivacy")
     }
 
     /** The codes of the emails the Auth emulator "sent" to [email] (`VERIFY_EMAIL`, `PASSWORD_RESET`), oldest first. */
@@ -145,15 +140,6 @@ object FirebaseEmulator {
     /** Opens the link of a verification email, as the user does in their mail app. */
     fun openVerificationLink(code: String) {
         send("POST", identityToolkit("accounts:update"), JSONObject().put("oobCode", code), "Verifying the email")
-    }
-
-    /** Sets [password] through the link of a reset email, as the user does on Firebase's action page. */
-    fun resetPassword(
-        code: String,
-        password: String,
-    ) {
-        val body = JSONObject().put("oobCode", code).put("newPassword", password)
-        send("POST", identityToolkit("accounts:resetPassword"), body, "Resetting the password")
     }
 
     /** The accounts with [email], as an administrator sees them (`localId`, `providerUserInfo`). */

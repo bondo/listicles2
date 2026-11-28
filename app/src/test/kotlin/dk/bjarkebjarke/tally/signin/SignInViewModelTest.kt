@@ -85,15 +85,6 @@ class SignInViewModelTest {
         second.uiState.value shouldBe SignInUiState(message = SignInMessage.Failed)
     }
 
-    /** M1-121: the non-Gmail collision has its own message (wireframe 44). */
-    @Test
-    fun aGoogleAccountWhoseEmailHasAPasswordAccountShowsTheCollisionMessage() {
-        authentication.googleResult = GoogleSignInResult.EmailHasPasswordAccount
-        val viewModel = viewModel()
-        viewModel.continueWithGoogle()
-        viewModel.uiState.value shouldBe SignInUiState(message = SignInMessage.EmailHasPasswordAccount)
-    }
-
     @Test
     fun aShownMessageIsCleared() {
         connectivity.online = false

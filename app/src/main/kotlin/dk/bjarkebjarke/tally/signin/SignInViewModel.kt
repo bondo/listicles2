@@ -33,7 +33,6 @@ class SignInViewModel
                     when (googleSignIn()) {
                         GoogleSignInResult.NeedsConnection -> SignInMessage.NeedsConnection
                         GoogleSignInResult.NoAccount -> SignInMessage.NoAccount
-                        GoogleSignInResult.EmailHasPasswordAccount -> SignInMessage.EmailHasPasswordAccount
                         GoogleSignInResult.Failed -> SignInMessage.Failed
                         GoogleSignInResult.SignedIn, GoogleSignInResult.Cancelled -> null
                     }
@@ -51,8 +50,5 @@ data class SignInUiState(
     val message: SignInMessage? = null,
 )
 
-/**
- * What the user hears after "Continue with Google"; a closed picker (AUTH-01) has none. [EmailHasPasswordAccount]: the
- * non-Gmail collision (M1.md docs check 3, wireframe 44).
- */
-enum class SignInMessage { NeedsConnection, NoAccount, EmailHasPasswordAccount, Failed }
+/** What the user hears after "Continue with Google"; a closed picker (AUTH-01) has none. */
+enum class SignInMessage { NeedsConnection, NoAccount, Failed }

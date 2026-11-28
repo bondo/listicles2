@@ -112,26 +112,26 @@ class AppGraphTest {
         FirebaseApp.initializeApp(RuntimeEnvironment.getApplication())
     }
 
-    /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-39, M1-102). */
+    /** M1-62: until the gate tasks bind real sources, every gate passes (M1-27, M1-127, M1-39, M1-102). */
     @Test
     fun gateStandInsAllPass() {
         hilt.inject()
         runBlocking {
             update.updateRequired().first() shouldBe false
+            email.verified().first() shouldBe true
             name.saved().first() shouldBe true
             notices.pending().first() shouldBe null
         }
     }
 
     /**
-     * M1-121: the email gate and the password calls are Firebase's, and the app has one [PasswordAccount] with the
-     * phone's monotonic clock, so the Send again limits span the sign-up and the "check your email" screens.
+     * M1-121: the password calls are Firebase's, and the app has one [PasswordAccount] with the phone's monotonic
+     * clock, so the Send again limits span the sign-up and the "check your email" screens.
      */
     @Test
-    fun theEmailGateAndOnePasswordAccountAreFirebases() {
+    fun thePasswordCallsAreFirebasesWithOnePasswordAccount() {
         hilt.inject()
-        email.shouldBeInstanceOf<FirebasePasswordAuthentication>()
-        passwordAuthentication shouldBeSameInstanceAs email
+        passwordAuthentication.shouldBeInstanceOf<FirebasePasswordAuthentication>()
         passwordAccount shouldBeSameInstanceAs otherPasswordAccount
         val clock =
             PasswordAccount::class.java
