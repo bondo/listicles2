@@ -181,14 +181,47 @@ class BurnDownTest(unittest.TestCase):
     def test_milestone_with_only_owner_tasks_needs_none(self):
         tasks.parse(HEADER + task("M0-O1", assignee="owner"))
 
-    def test_burn_down_must_depend_on_every_other_agent_task(self):
+    def test_burn_down_needs_no_explicit_depends_on(self):
+        # owner decision 7242447401 item 2: the burn-down depends on every other non-owner task of its milestone implicitly
+        g = tasks.parse(HEADER + "\n".join([task("M0-01"), task("M0-02"), task("M0-FU")]))
+        self.assertEqual(tasks.dependencies(g, g.by_id["M0-FU"]), ["M0-01", "M0-02"])
+
+    def test_burn_down_rejects_a_redundant_entry_for_a_task_of_its_milestone(self):
         msg = errors_of(task("M0-01"), task("M0-02"), task("M0-FU", deps=["M0-01"]), burn_down=True)
-        self.assertIn("M0-FU must depend on M0-02", msg)
-        self.assertNotIn("M0-FU must depend on M0-01", msg)
+        self.assertIn("M0-FU lists M0-01 in depends_on, but it depends on every other non-owner task of M0 already", msg)
+        self.assertNotIn("M0-02", msg)
+
+    def test_burn_down_keeps_entries_that_are_not_implied(self):
+        g = tasks.parse(HEADER + "\n".join([
+            task("M0-01"), task("M0-O1", assignee="owner"), task("M0-FU", deps=["M0-O1", "M1-01", "milestone:M1"]),
+            task("M1-01", milestone="M1"), task("M1-FU", milestone="M1")]))
+        self.assertEqual(tasks.dependencies(g, g.by_id["M0-FU"]), ["M0-01", "M0-O1", "M1-01", "milestone:M1"])
+
+    def test_only_the_burn_down_depends_implicitly(self):
+        g = graph(task("M0-01"), task("M0-02"), task("M0-FU"))
+        self.assertEqual(tasks.dependencies(g, g.by_id["M0-02"]), [])
+        self.assertEqual(tasks.dependencies(g, g.by_id["M0-01"]), [])
+
+    def test_a_burn_down_of_another_milestone_is_not_implied(self):
+        g = graph(task("M0-01"), task("M1-01", milestone="M1"), task("M1-FU", milestone="M1"))
+        self.assertEqual(tasks.dependencies(g, g.by_id["M1-FU"]), ["M1-01"])
 
     def test_burn_down_need_not_depend_on_owner_tasks(self):
-        tasks.parse(HEADER + "\n".join([task("M0-01"), task("M0-O1", assignee="owner"),
-                                        task("M0-FU", deps=["M0-01"])]))
+        tasks.parse(HEADER + "\n".join([task("M0-01"), task("M0-O1", assignee="owner"), task("M0-FU")]))
+
+    def test_a_cycle_through_the_implicit_edges_is_found(self):
+        parts = [task("M0-01", deps=["M0-FU"]), task("M0-FU")]
+        self.assertIn("dependency cycle: M0-01 -> M0-FU -> M0-01", errors_of(*parts))
+        self.assertIn("dependency cycle", errors_of(*parts, burn_down=True))
+
+    def test_burn_down_done_while_a_task_of_its_milestone_is_todo_is_rejected(self):
+        msg = errors_of(task("M0-01"), task("M0-02", status="done"), task("M0-FU", status="done"))
+        self.assertIn("M0-FU: status done but depends on M0-01, which is still todo", msg)
+        self.assertNotIn("M0-02", msg)
+
+    def test_burn_down_done_after_all_work_or_with_only_an_owner_task_todo_is_fine(self):
+        graph(task("M0-01", status="done"), task("M0-02", status="dropped"),
+              task("M0-O1", assignee="owner"), task("M0-FU", status="done"))
 
     def test_burn_down_is_assigned_to_implementer(self):
         msg = errors_of(task("M0-01"), task("M0-FU", assignee="planner", deps=["M0-01"]), burn_down=True)
@@ -200,8 +233,48 @@ class BurnDownTest(unittest.TestCase):
 
     def test_tasks_may_depend_on_the_burn_down_without_a_cycle(self):
         # a task may depend on the burn-down (e.g. the milestone merge) without creating a cycle
-        tasks.parse(HEADER + "\n".join([task("M0-01"), task("M0-FU", deps=["M0-01"]),
+        tasks.parse(HEADER + "\n".join([task("M0-01"), task("M0-FU"),
                                         task("M0-O1", assignee="owner", deps=["M0-FU"])]))
+
+
+class ImplicitBurnDownDeriveTest(unittest.TestCase):
+    """M0-FU waits on every other non-owner task of M0 without listing them (owner decision 7242447401 item 2)."""
+
+    def test_blocked_while_any_milestone_task_is_todo_and_waits_on_each_of_them(self):
+        g = graph(task("M0-01", status="done"), task("M0-02"), task("M0-03"), task("M0-FU"))
+        d = tasks.derive(g)
+        self.assertEqual((d["M0-FU"]["state"], d["M0-FU"]["unmet"]), ("blocked", ["M0-02", "M0-03"]))
+        self.assertNotIn("M0-FU", ready_ids(g))
+
+    def test_ready_once_every_milestone_task_is_done_or_dropped(self):
+        g = graph(task("M0-01", status="done"), task("M0-02", status="dropped"), task("M0-FU"))
+        self.assertEqual(ready_ids(g), ["M0-FU"])
+
+    def test_a_claimed_or_in_review_task_still_blocks_it(self):
+        g = graph(task("M0-01"), task("M0-FU"))
+        self.assertEqual(tasks.derive(g, claimed=["M0-01"])["M0-FU"]["state"], "blocked")
+        self.assertEqual(tasks.derive(g, in_review=["M0-01"])["M0-FU"]["state"], "blocked")
+
+    def test_owner_tasks_are_not_implied(self):
+        g = graph(task("M0-01", status="done"), task("M0-O1", assignee="owner"), task("M0-FU"))
+        self.assertEqual(ready_ids(g), ["M0-FU"])
+
+    def test_an_explicit_owner_dependency_is_still_waited_on(self):
+        g = graph(task("M0-01", status="done"), task("M0-O1", assignee="owner"), task("M0-FU", deps=["M0-O1"]))
+        self.assertEqual(tasks.derive(g)["M0-FU"], {"state": "blocked", "unmet": ["M0-O1"]})
+
+    def test_tasks_of_other_milestones_are_not_implied(self):
+        g = graph(task("M0-01", status="done"), task("M1-01", milestone="M1"), task("M0-FU"))
+        self.assertEqual(ready_ids(g), ["M0-FU", "M1-01"])
+
+    def test_an_explicit_entry_is_not_listed_twice(self):
+        g = graph(task("M0-01"), task("M0-FU", deps=["M0-01"]))  # lax mode accepts the redundant entry
+        self.assertEqual(tasks.derive(g)["M0-FU"]["unmet"], ["M0-01"])
+
+    def test_a_milestone_dependency_on_the_burn_down_waits_for_all_the_work(self):
+        g = graph(task("M0-01"), task("M0-FU"), task("M1-01", milestone="M1", deps=["milestone:M0"]))
+        self.assertEqual(tasks.derive(g)["M1-01"]["unmet"], ["milestone:M0"])
+        self.assertEqual(tasks.edges(g, g.by_id["M0-FU"]), ["M0-01"])
 
 
 class DeriveTest(unittest.TestCase):
@@ -401,7 +474,7 @@ class CliTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             f = Path(d, "tasks.toml")
             if "M0-FU" not in text:  # the CLI is strict: add the burn-down task the file must have
-                text += task("M0-FU", deps=re.findall(r'id = "(M0-\d\d)"', text))
+                text += task("M0-FU")
             f.write_text(HEADER + text, encoding="utf-8")
             out, err = io.StringIO(), io.StringIO()
             with redirect_stdout(out), redirect_stderr(err):
@@ -468,7 +541,7 @@ class CliTest(unittest.TestCase):
             return self.run_cli(text, "--followups", str(fus), *args)
 
     def test_ready_prints_follow_up_summary_and_burn_down_note(self):
-        text = task("M0-01", status="done") + task("M0-FU", deps=["M0-01"])
+        text = task("M0-01", status="done") + task("M0-FU")
         code, out, _ = self.run_fu(text, [fu_issue(1, "minor", "M0")], "ready")
         self.assertEqual(code, 0)
         self.assertIn("M0-FU", out)
@@ -480,7 +553,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(out.splitlines()[-1], "open follow-ups: 2 (blocker 0, major 0, minor 1, nit 1)")
 
     def test_plain_ready_output_is_unchanged_without_followups_file(self):
-        text = task("M0-01", status="done") + task("M0-FU", deps=["M0-01"])
+        text = task("M0-01", status="done") + task("M0-FU")
         code, out, _ = self.run_cli(text, "ready")
         self.assertEqual(code, 0)
         self.assertNotIn("follow-ups", out)
@@ -672,8 +745,8 @@ class RetroTaskTests(unittest.TestCase):
                   if t.milestone == "M0.5" and t.id not in (retro[0].id, "M0.5-FU") and t.assignee != "owner"}
         self.assertLessEqual(before, set(retro[0].depends_on))  # every one of them, open or done: no status filter
         for t in graph.tasks:
-            if t.milestone == "M0.5":
-                self.assertEqual(retro[0].id in t.depends_on, t.id == "M0.5-FU", t.id)
+            if t.milestone == "M0.5":  # the burn-down gets the retro task implicitly, no other task depends on it
+                self.assertEqual(retro[0].id in tasks.dependencies(graph, t), t.id == "M0.5-FU", t.id)
         notes = retro[0].notes.lower()
         for word in ("baseline", "docs/agent-tuning.md", "docs/agent-metrics.csv", "pilot", "at most 3", "kill switch"):
             self.assertIn(word, notes)

@@ -188,6 +188,15 @@ class BuildModel(unittest.TestCase):
         self.assertEqual(tasks_a["A-02"]["title"], "Ready thing")
         self.assertEqual(tasks_a["A-O1"]["assignee"], "owner")
 
+    def test_a_burn_down_task_lists_its_implied_dependencies_as_deps(self):
+        # owner decision 7242447401 item 2: the Mx-FU line of the file is empty, the page still draws its edges
+        fu = ('\n[[task]]\nid = "A-FU"\ntitle = "Burn down"\nmilestone = "A"\nstatus = "todo"\nassignee = "implementer"\n'
+              'risk = "normal"\ndepends_on = []\n')
+        ms = {m["id"]: m for m in model(tasks=TASKS + fu)["milestones"]}
+        row = next(t for t in ms["A"]["tasks"] if t["id"] == "A-FU")
+        self.assertEqual(row["deps"], ["A-01", "A-02", "A-03", "A-04"])
+        self.assertEqual(row["unmet"], [{"ref": r, "owner": False, "milestone": False} for r in ("A-02", "A-04")])
+
     def test_tasks_carry_the_pr_number_from_the_task_file(self):
         text = TASKS.replace('title = "Done thing"', 'title = "Done thing"\npr = 5', 1)
         tasks_a = {t["id"]: t for t in model(tasks=text)["milestones"][0]["tasks"]}
