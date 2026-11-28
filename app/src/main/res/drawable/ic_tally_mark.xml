@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app mark of wireframe 01 (`logo()` in wireframes.html): four tally strokes and the one across them. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="44dp"
+    android:height="40dp"
+    android:viewportWidth="44"
+    android:viewportHeight="40">
+    <path
+        android:pathData="M8,6v28M16,6v28M24,6v28M32,6v28M3,30L39,10"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeColor="@android:color/white" />
+</vector>
