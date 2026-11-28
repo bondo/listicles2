@@ -8,6 +8,7 @@ import dagger.hilt.android.testing.UninstallModules
 import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.connectivity.ConnectivityModule
 import dk.bjarkebjarke.tally.data.session.FirestoreSession
+import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
@@ -18,6 +19,7 @@ import dk.bjarkebjarke.tally.domain.session.LocalUserData
 import dk.bjarkebjarke.tally.domain.session.SessionState
 import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
+import dk.bjarkebjarke.tally.testing.FakeAccountProfiles
 import dk.bjarkebjarke.tally.testing.FakeAuthentication
 import dk.bjarkebjarke.tally.testing.FakeConnectivity
 import dk.bjarkebjarke.tally.testing.FakeGoogleCredentials
@@ -73,6 +75,11 @@ class SignInAndSignOutWiringTest {
     @BindValue
     @JvmField
     val authentication: Authentication = firebase
+
+    /** The Account screen's profile (M1-25). */
+    @BindValue
+    @JvmField
+    val accountProfiles: AccountProfiles = FakeAccountProfiles()
 
     @BindValue
     @JvmField
