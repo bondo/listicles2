@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.listicles.jvm.library)
+    alias(libs.plugins.tally.jvm.library)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
     alias(libs.plugins.pitest)

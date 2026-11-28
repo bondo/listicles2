@@ -2020,10 +2020,11 @@ notes = "rename checklist item 5 (#15 comment 7107080653) and the after-rename c
 id = "M1-90"
 title = "Blank names: one definition for the rules (trim strips code points up to U+0020) and the app (Kotlin trim)"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "high"
 depends_on = ["M1-06"]
+pr = 402
 notes = "Found by M1-06 with an emulator probe: Firestore's trim() strips only code points up to U+0020, while Validation.name (M1-13) uses Kotlin's trim(), which also strips Unicode spaces (U+00A0, U+3000) but not U+0001 to U+0008. So the rules accept a name of only U+3000 that the app rejects, and deny a name of U+0001 that the app accepts (PLAN 3.1 P4: non-empty after trim). Owner decision 7125484823 (#373 item 3): change both sides. The Firestore rules refuse a name whose trim() is empty (a PLAN 3.1 P4 amendment, then a rules PR with allow and deny tests), and the app trims input before writing. Keep validName in firebase/test/model.ts in step. area:security-rules for the rules part"
 
 # ---- Tally rename sweep (owner decision 7124795794 on #15: "change to tally everywhere"; reopens the rename deferred in
@@ -2080,10 +2081,11 @@ notes = "Owner decision 7140391316 item 3 on #399 (\"keep the 15000-byte limit; 
 id = "M1-93"
 title = "Build names: rootProject.name tally, convention plugin ids tally.*, catalog aliases, tallyChecks and tallyModules"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-68"]
+pr = 414
 notes = "Normal env (no process file); owner-only merge (build scripts and scripts/), approver-eligible as a build PR. After M1-68 (#359) merges: it rewrites the same ModuleChecks.kt, Conventions.kt, build.gradle.kts and check_build_guards.py lines. One atomic PR (the ids, the catalog accessors libs.plugins.listicles.* and the module scripts must change together): settings.gradle.kts (rootProject.name, comment), build-logic/build.gradle.kts (5 ids), build-logic/src/main/kotlin ConventionPlugins.kt, Conventions.kt, DependencyFloorsPlugin.kt, ModuleChecks.kt (listiclesChecks becomes tallyChecks; from #359 also the configurations listiclesJavaApiLevel, listiclesJavaApiLevelFromApp and listiclesJavaApiLevelElements, the task listiclesJavaApiLevelInputs, the attribute value listicles-java-api-level and the build path listicles/java-api-level.txt), build.gradle.kts (tallyModules, wiring, alias), gradle/libs.versions.toml (5 aliases tally-*), app/ and core/*/build.gradle.kts aliases, scripts/check_build_guards.py and check_ui_emulators.py regexes and messages, scripts/check_ci_hardening.py GRADLE_PYTHON_TASKS (listiclesChecks) and its comment, their tests and test_check_ci_hardening.py, test_jdk_release_gate.py, test_java_api_level_gate.py, test_warnings_gate.py, docs/ANDROID-BEST-PRACTICES.md. The list is as of #359 (head 4981dd3); done check: after the PR, `git grep -i listicles` lists only the history the block header keeps and the names M1-91, M1-92 and M1-94 own. Test-first: the guard tests expect tally.* and fail on a listicles.* id. Risks: gradle/verification-metadata.xml has no project or included-build entry, so it should not change; if Gradle asks for a metadata change, stop and ask (owner file). The configuration cache and CI Gradle caches miss once (first static job after merge is cold). The licensee and warnings gate self-tests run (build-logic and catalog are their inputs, M1-38). Kotlin module names follow each project name, not the root, so no class or artifact changes. About 200 changed lines"
 
 [[task]]

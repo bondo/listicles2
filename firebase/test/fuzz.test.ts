@@ -57,11 +57,11 @@ test("the emulator and the model agree on every case", async () => {
 });
 
 // The negative case (P17): each mutant weakens one condition of firestore.rules, so the rules
-// allow a case the model denies, which the fuzz must find. Seed 1 finds each within 2701 cases
-// (#372's own, unchanged; the later ones, measured again with M1-11's templates, within 1726).
-// Seeds 2 and 3 find #372's within 3363 (unchanged) and the later ones within 8275; any of seeds
-// 1 to 100 found #372's within 8672 (PR #372 has the reach per seed; not measured again). All
-// under the cap of 3 * RUNS.
+// allow a case the model denies, which the fuzz must find. Measured again on the rules with both
+// M1-90's blank names and M1-11's templates: seed 1 finds each within 1726 cases (M1-90's at
+// 1228, and at 491 and 119 on seeds 2 and 3), seeds 2 and 3 within 8275; any of seeds 1 to 100
+// found #372's within 8672 on #372's rules (PR #372 has the reach per seed; not measured again).
+// All under the cap of 3 * RUNS.
 const MUTANTS: [string, string, string][] = [
     ["Signed in without a verified email", "token.email_verified == true", "token != null"],
     ["Create household: an id of 21 characters (P3)", "{20}$", "{20,21}$"],
@@ -76,6 +76,11 @@ const MUTANTS: [string, string, string][] = [
     ["Transfer: the old owner keeps the role", "data.role == 'member'", "data.role != null"],
     ["Member doc: another uid (P1)", "uid == request.auth.uid && validName", "validName"],
     ["Household name: any length (P4)", "validName(data.name) &&", "data.name.trim() != '' &&"],
+    [
+        "Names: Unicode White_Space not blank, as trim() has it (P4, M1-90)",
+        String.raw`\\x{85}\\x{A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}`,
+        "",
+    ],
     ["Tombstone read: of a live household too", "household.deleted == true && get(", "get("],
     [
         "Invite list: all, by any member (#280)",
