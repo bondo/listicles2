@@ -108,7 +108,7 @@ class WarningsGateTest(unittest.TestCase):
         self.assertIn(":checkWarningsAsErrors", out)
         # M1-68 part B2: each module checks its own compile tasks, and the root runs every module's checks by task path.
         for module in MODULES:
-            self.assertIn(f"{module}:listiclesChecks SKIPPED", out)
+            self.assertIn(f"{module}:tallyChecks SKIPPED", out)
             self.assertIn(f"{module}:checkWarningsAsErrors SKIPPED", out)
 
     def test_each_module_checks_its_own_compile_tasks(self):
