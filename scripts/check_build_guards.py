@@ -68,6 +68,12 @@ build file cannot make the check pass vacuously. Comments and strings are ignore
    The root build's `val tallyModules = listOf(...)` names exactly the settings modules, and detekt depends on each one's
    `tallyChecks` by task path (aggregation_problems; M1-68 part B2: each module runs its own checks, the root reads none).
 
+5. Isolated projects (M1-98). gradle.properties sets `org.gradle.unsafe.isolated-projects=true`, so Gradle itself rejects at configuration
+   time the cross-project access check 4 can only read in the text. The file is read as java.util.Properties reads it (`#`/`!` comments,
+   `=`, `:` or whitespace separators, backslash continuations and escapes; the last definition wins), and the value must be exactly
+   `true`. No other gradle.properties key names the mode (`systemProp.`..., another spelling), and no shell script, gradlew, workflow
+   or git hook names it outside a `#` comment line, so nothing turns it off on the command line. No settings.gradle.kts: skipped.
+
 Run: python3 -I scripts/check_build_guards.py [repo root]   (exit 1 and one `build-guards: ...` line per problem; one line when fine)
 """
 
@@ -916,9 +922,83 @@ def aggregation_problems(root):
     return problems
 
 
+# -- 5. isolated projects (M1-98) --------------------------------------------------------------------------------------------------
+
+ISOLATED_PROJECTS = "org.gradle.unsafe.isolated-projects"
+ISOLATED_NAME = re.compile(r"isolated[-_.]?projects", re.I)  # any spelling of the mode's name, in a key or on a command line
+PROPERTY_SEPARATORS = "=: \t\f"
+PROPERTY_ESCAPE = re.compile(r"\\(u[0-9a-fA-F]{4}|.)", re.S)
+
+
+def unescape_property(text):
+    return PROPERTY_ESCAPE.sub(lambda m: chr(int(m[1][1:], 16)) if len(m[1]) == 5 else {"t": "\t", "n": "\n", "r": "\r", "f": "\f"}.get(m[1], m[1]), text)
+
+
+def property_pair(line):
+    """Key and value of one logical line: the key ends at the first unescaped `=`, `:` or whitespace, then one separator."""
+    i = 0
+    while i < len(line) and line[i] not in PROPERTY_SEPARATORS:
+        i += 2 if line[i] == "\\" else 1
+    key, j = line[:i], i
+    while j < len(line) and line[j] in " \t\f":
+        j += 1
+    if j < len(line) and line[j] in "=:":
+        j += 1
+    while j < len(line) and line[j] in " \t\f":
+        j += 1
+    return unescape_property(key), unescape_property(line[j:])
+
+
+def properties(text):
+    """(key, value) pairs in file order, as java.util.Properties reads them: `#` and `!` comment lines, a line ending in an odd
+    number of backslashes continues on the next one (whose leading whitespace is dropped), escapes in keys and values."""
+    pairs, joined = [], None
+    for raw in text.splitlines():
+        line = raw.lstrip(" \t\f") if joined is None else joined + raw.lstrip(" \t\f")
+        if joined is None and (not line or line.startswith(("#", "!"))):
+            continue
+        if (len(line) - len(line.rstrip("\\"))) % 2 == 1:
+            joined = line[:-1]
+            continue
+        joined = None
+        pairs.append(property_pair(line))
+    if joined is not None:
+        pairs.append(property_pair(joined))
+    return pairs
+
+
+def gradle_launchers(root):
+    """Files that start Gradle and could set the mode again: shell scripts, gradlew, workflows and git hooks."""
+    return [p for p in walk(root) if p.endswith(".sh") or p in ("gradlew", "gradlew.bat") or p.startswith(".githooks/")
+            or (p.startswith(".github/workflows/") and p.endswith((".yml", ".yaml")))]
+
+
+def isolated_projects_problems(root):
+    if not os.path.isfile(os.path.join(root, "settings.gradle.kts")):
+        return []
+    why = "M1-98: Gradle's isolated projects mode enforces in the build what check 4 reads in the text"
+    if not os.path.isfile(os.path.join(root, "gradle.properties")):
+        return [f"gradle.properties missing; it must set {ISOLATED_PROJECTS}=true ({why})"]
+    pairs = properties(read(root, "gradle.properties"))
+    values = [v for k, v in pairs if k == ISOLATED_PROJECTS]
+    problems = []
+    if not values:
+        problems.append(f"gradle.properties: {ISOLATED_PROJECTS}=true missing ({why})")
+    elif values[-1] != "true":
+        problems.append(f"gradle.properties: {ISOLATED_PROJECTS} must be exactly true, not {values[-1]!r} (the last definition wins; {why})")
+    problems += [f"gradle.properties: {k} also names isolated projects; set only {ISOLATED_PROJECTS}=true ({why})"
+                 for k in dict.fromkeys(k for k, _v in pairs if k != ISOLATED_PROJECTS and ISOLATED_NAME.search(k))]
+    for rel in gradle_launchers(root):
+        for n, line in enumerate(read(root, rel).splitlines(), 1):
+            if ISOLATED_NAME.search(line) and not line.lstrip().startswith("#"):
+                problems.append(f"{rel}:{n}: names isolated projects; gradle.properties alone keeps the mode on ({why})")
+    return problems
+
+
 def main(argv):
     root = os.path.abspath(argv[1]) if len(argv) > 1 else os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     problems = catalog_problems(root) + target_sdk_problems(root) + manifest_problems(root) + convention_problems(root) + aggregation_problems(root)
+    problems += isolated_projects_problems(root)
     if problems:
         for p in problems:
             print(f"build-guards: {p}")

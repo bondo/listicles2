@@ -1330,7 +1330,7 @@ class IsolatedProjects(unittest.TestCase):
     def test_on_passes_in_every_spelling_java_properties_reads(self):
         for props in (PROPS, f"{IP}=true", f"{IP} = true\n", f"  {IP}:true\n", f"{IP} true\n", f"{IP}\t=\ttrue\n",
                       f"{IP}=false\n{IP}=true\n", f"{IP}=tr\\\n    ue\n", f"# {IP}=false \\\n{IP}=true\n",
-                      f"! {IP}=false\n{IP}=true\n", f"org.gradle.unsafe.isolated\\-projects=true\n", f"{IP}=\\u0074rue\n",
+                      f"! {IP}=false\n{IP}=true\n", "org.gradle.unsafe.isolated\\-projects=true\n", f"{IP}=\\u0074rue\n",
                       f"{IP}=true\r\nandroid.useAndroidX=true\r\n"):
             with self.subTest(props=props):
                 self.assertEqual(self.problems(props), [])
@@ -1344,7 +1344,7 @@ class IsolatedProjects(unittest.TestCase):
     def test_commented_out_or_swallowed_by_a_continuation_counts_as_missing(self):
         for props in ("", PROPS.replace(f"{IP}=true\n", ""), f"# {IP}=true\n", f"! {IP}=true\n", f"   # {IP}=true\n",
                       f"kotlin.code.style=official \\\n{IP}=true\n", f"{IP}x=true\n", f"x.{IP}=true\n",
-                      f"org.gradle.unsafe.isolated_projects=true\n"):
+                      "org.gradle.unsafe.isolated_projects=true\n"):
             with self.subTest(props=props):
                 found = self.problems(props)
                 self.assertTrue(found and found[0].startswith(self.MISSING), f"{props!r} -> {found}")
@@ -1364,7 +1364,7 @@ class IsolatedProjects(unittest.TestCase):
         for rel, text in (("scripts/verify.sh", f"gradle() {{ ./gradlew -q {flag} \"$@\"; }}\n"),
                           ("scripts/screenshots.sh", f"./gradlew -P{IP}=false verify\n"),
                           ("gradlew", f'DEFAULT_JVM_OPTS="{flag}"\n'),
-                          (".github/workflows/ci.yml", f"env:\n  GRADLE_OPTS: -Dorg.gradle.daemon=false {flag}\n"),
+                          (".github/workflows/ci.yml", f"  GRADLE_OPTS: -Dorg.gradle.daemon=false {flag}\n"),
                           (".github/workflows/codeql.yaml", "run: ./gradlew -Dorg.gradle.unsafe.isolated-projects=false x\n"),
                           (".githooks/pre-push", "./gradlew --project-prop org.gradle.unsafe.isolatedProjects=false x\n"),
                           ("tools/run.sh", "export GRADLE_OPTS=-Dorg.gradle.unsafe.ISOLATED_PROJECTS=false\n")):
