@@ -37,7 +37,8 @@ JAVA_API_26 = (
 )
 
 # Groovy init script. %s is the directory holding the injected sources; %s the statement run on :app after it is evaluated (p: the project).
-# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which the isolated projects mode (gradle.properties) rejects.
+# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which Gradle's isolated projects mode rejects
+# (gradle.properties turns it on once M1-121 lands).
 INIT = """
 gradle.lifecycle.afterProject { p ->
     if (p.path == ':core:domain') {
@@ -119,8 +120,8 @@ class JavaApiLevelGateTest(unittest.TestCase):
 
     def test_missing_api_versions_file_fails_closed(self):
         # The app's hand-over names, just after it is written, a path that does not exist: the build must fail, not pass.
-        # The closure holds the task's output files, not the task: the configuration cache, which the isolated projects mode
-        # (gradle.properties, M1-98) keeps on, cannot store a task.
+        # The closure holds the task's output files, not the task: the configuration cache (on in gradle.properties; Gradle's
+        # isolated projects mode, M1-98, does not let a build turn it off) cannot store a task.
         statement = (
             "p.tasks.named('tallyJavaApiLevelInputs') { t -> def files = t.outputs.files; t.doLast {"
             " files.singleFile.text = '26\\n/nonexistent/data/api-versions.xml\\n' } }"

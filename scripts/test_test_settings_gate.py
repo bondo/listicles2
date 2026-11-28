@@ -20,7 +20,8 @@ TEST_TASKS = (":app:testDebugUnitTest", ":core:data:testDebugUnitTest", ":core:d
 GATE_MESSAGE = "must run on the JUnit Platform with failOnNoDiscoveredTests"
 
 # Groovy init script; after each project is configured (so after the convention plugin), %s is applied to the task with that path.
-# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which the isolated projects mode (gradle.properties) rejects.
+# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which Gradle's isolated projects mode rejects
+# (gradle.properties turns it on once M1-121 lands).
 INIT = """
 gradle.lifecycle.afterProject { p ->
     p.tasks.matching { it.path == '%s' }.configureEach { %s }

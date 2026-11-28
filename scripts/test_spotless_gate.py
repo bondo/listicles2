@@ -54,7 +54,8 @@ def probes(files):
 
 
 def spotless_check():
-    cmd = [str(ROOT / "gradlew"), "-q", "--console=plain", "--no-daemon", "spotlessCheck"]
+    # --continue: the Kotlin and the Gradle-script checks both report, whichever fails first.
+    cmd = [str(ROOT / "gradlew"), "-q", "--console=plain", "--no-daemon", "--continue", "spotlessCheck"]
     for attempt in range(5):
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
         out = r.stdout + r.stderr

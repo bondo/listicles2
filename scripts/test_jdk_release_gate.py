@@ -18,7 +18,8 @@ GATE_MESSAGE = "JVM modules must compile against the JDK 17 API"
 KOTLIN_TASK = ":core:domain:compileKotlin"
 JAVA_TASK = ":core:domain:compileJava"
 # Groovy init script; the first %s is a project path, the second the statement run for that project after it is evaluated.
-# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which the isolated projects mode (gradle.properties) rejects.
+# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which Gradle's isolated projects mode rejects
+# (gradle.properties turns it on once M1-121 lands).
 INIT = """
 gradle.lifecycle.afterProject { p ->
     if (p.path == '%s') {
