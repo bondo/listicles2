@@ -20,7 +20,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
-/** M1-25 (AUTH-03, privacy Q3): what the Account screen shows and what its switch and "Sign out" do, with fakes. */
+/** M1-25 (AUTH-03): what the Account view model shows and what "Sign out" does, with fakes. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AccountViewModelTest {
     private val steps = mutableListOf<String>()
@@ -51,7 +51,7 @@ class AccountViewModelTest {
         )
 
     @Test
-    fun showsTheProfileAndTheSwitchOffUntilTheUserTurnsItOn() {
+    fun showsTheSignedInProfileAndNoQuestion() {
         viewModel().uiState.value shouldBe AccountUiState(profile)
     }
 

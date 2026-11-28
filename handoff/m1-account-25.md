@@ -6,7 +6,7 @@ Delete this file in the PR's final commit.
 M1-25 (docs/milestones/M1.md row 21): Account screen (wireframe 18), sign-out UI (AUTH-03, wireframes 39 and 45), the home avatar. The Crashlytics part is held back until the owner accepts one licence (below).
 
 ## Done
-- Tests first (2ef118b), then the Account screen, view model, en and da strings, privacy link (Q10).
+- Tests first (2ef118b), then the Account view model, AccountProfiles, wiring (SessionModule, FirebaseAuthentication.current()) and fakes. The screen is M1-125.
 
 ## Part C (M1-125): Account screen UI
 Moved out of PR 419 by a later commit; rebuild on a fresh branch from main after PR 419 merges, from commit 0691230: `AccountScreen.kt` (with `AccountRoute`), `AccountScreenTest.kt`, the back-arrow drawable `ic_arrow_back`, and the `account_*` and `sign_out_*` strings (values and values-da). M1-123 (navigation) depends on it.
