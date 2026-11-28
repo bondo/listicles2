@@ -129,7 +129,8 @@ _DELEGATED = tuple(re.escape(t) for t in (
 ))
 RETAINED = re.escape(
     "Stays with the owner: settings outside git (repository settings, rulesets, environments, collaborator access), `.claude` permissions and "
-    "settings, network allowlists, licence and permission acceptances (except 7239863908, above), "
+    "settings, network allowlists, licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+    "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1), "
     "guard thresholds (600/1500), design and product sign-off, merges of PRs "
     "with sync-merge content (sync and merge logic), the owner task M1-O5 (approving the privacy text before anyone but the owner installs the "
     "app), and changes to the process files that define these authorities (CLAUDE.md, REVIEW.md, ORCHESTRATION.md approval rules, "
@@ -166,7 +167,8 @@ _DECISIONS_ORCH = tuple(re.escape(t) for t in (
     "Standing acceptance of the Google Android SDK terms (owner decision, #399 comment 7239863908, 2026-11-28)",
     "the PR that needs such an artifact adds its exact `group:artifact:version` line to `config/licensee/google-sdk-terms.txt`, citing this "
     "comment, and lists the added lines in its PR body; the reviewer checks each added line is in scope",
-    "licence and permission acceptances (except 7239863908, above)",
+    "licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+    "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1)",
     "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
     "Still with the owner: any artifact outside those two groups, any other licence, and any other permission acceptance",
     "except the standing acceptance of the Google Android SDK terms (#399 comment 7239863908, below)",
@@ -176,8 +178,9 @@ _DECISIONS_APPROVER = tuple(re.escape(t) for t in (
     "Also yours (§1.1, #399 comment 7239676323 items 1 and 4): " + _TASKS_PR,
     "a review round explicitly checked the new or changed tasks (ids, dependencies, risk, notes, the PR-size rule) with no finding above nit "
     "open against them and `scripts/tasks.py validate` passes",
-    _PROCESS_PR + " when a clean review round that checked every changed line against a cited decision",
-    "licence and permission acceptances (except 7239863908, above)",
+    _PROCESS_PR + " after a clean review round that checked every changed line against a cited decision",
+    "licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+    "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1)",
     "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
     "a PR that changes who may approve or merge what, guard thresholds, permissions or settings is not yours, unless a cited owner decision "
     "states that exact change",
@@ -1167,7 +1170,8 @@ RULES = (
     ),
     Rule(
         "decisions-7239-orchestrator", ("orchestrator",), tuple(re.escape(t) for t in (
-            "licence and permission acceptances (except 7239863908, above)",
+            "licence and permission acceptances (except the standing acceptance of the Google Android SDK terms for "
+            "com.google.firebase and com.google.android.gms, #399 comment 7239863908, §1.1)",
             "agents/prompts/), except a PR that only writes down owner decisions as 7239676323 item 4 states (above)",
         )),
         "the orchestrator prompt carries the exceptions to the owner-retained list (#399 comments 7239676323 item 4, 7239863908)",
