@@ -1104,7 +1104,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-16"]
-notes = "Split from M1-16 (PR 397, round 2 R2-01: 746 > 600 changed lines). Not stacked: a PR from main after PR 397 merges. Work is on the local branch m1/signin-ui-part2 of the M1-16 session (also in handoff/m1-signin-ui-16.md): the app mark, login and mail icons, grouped buttons, SignInScreenInsetsTest, the screen tests for all messages, SignInScreenScreenshotTest with the 5 goldens (golden-update label), and the open R2-02 (icon beside the first label line at 200 % font) and R2-03 (a real gap between the buttons) with tests"
+notes = "Split from M1-16 (PR 397, round 2 R2-01: 746 > 600 changed lines). Not stacked: a PR from main after PR 397 merges, starting from branch m1/signin-ui-part2 (head 90a58d1, merge main in): the app mark, login and mail icons, grouped buttons, SignInScreenInsetsTest, the screen tests for all messages. If the branch is gone, rebuild from commits 216684a..90a58d1 of the PR 397 history. SignInScreenScreenshotTest and the 5 SignInScreen_* goldens are not on the branch (the pre-push guard needs the golden-update label): write the test like UpdateScreenScreenshotTest and record with scripts/screenshots.sh record. Open there: R2-02 (icon beside the first label line at 200 % font) and R2-03 (a real gap between the buttons at 200 %), each test first"
 
 [[task]]
 id = "M1-17"
