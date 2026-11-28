@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import repo_slug  # noqa: E402  # justified: after the sys.path insert, python3 -I does not add the scripts directory itself
 
 LABEL = "golden-update"
+OWNER = "bondo"  # pinned, as merge_ready.py does: a set-url to another owner's copy refuses (#420 R1-02)
 HOST = "github.com"
 ZERO = "0" * 40
 SHA = re.compile(r"[0-9a-f]{40}", re.ASCII)
@@ -82,9 +83,9 @@ def pushed_branch(stdin: str, root: Path) -> str:
 
 
 def repository(push_url: str, root: Path) -> str:
-    """OWNER/NAME of the origin remote, when the push goes to it."""
+    """OWNER/NAME of the origin remote, when OWNER owns it and the push goes to it."""
     try:
-        slug = repo_slug.resolve(environ={}, root=root)
+        slug = repo_slug.resolve(environ={}, root=root, owner=OWNER)
     except repo_slug.RepoSlugError as e:
         raise Refused(str(e)) from None
     if repo_slug.slug_from_url(push_url) != slug:
