@@ -380,7 +380,7 @@ Owner work is tasks with `assignee = "owner"`, and each one gets an issue once i
 
 ## 5. Orchestrator handover
 
-Trigger: about 35% of a 1M window (25% of a 200k window (owner decision 7158603054 item 2); `agents/roles.yaml` context, #15 comment 7001335975; 35% by owner decision 7153510972 item 6, written here as the orchestrator's own practice). This is earlier than the hook stages every session gets (60% / 80%); until the hard stage, the orchestrator follows this section, not the soft reminder. (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
+Trigger: about 50% of a 1M window (25% of a 200k window (owner decision 7158603054 item 2); `agents/roles.yaml` context, #15 comment 7001335975; 50% by owner decision 7239676323 item 5 (it replaces 35%, 7153510972 item 6), written here as the orchestrator's own practice). This is earlier than the hook stages every session gets (60% / 80%); until the hard stage, the orchestrator follows this section, not the soft reminder. (`get_session` with no id → `context_usage.used_tokens / max_tokens`,
 or the status line), at the first **batch boundary** (if none comes before the hard stage, at the next step boundary) rather than mid-batch.
 `used_tokens` can read 0 while a turn is running, so read it at the start of a wake and treat 0 as
 **unknown**, not as "plenty left". When it is unknown, hand over at the first batch boundary after about
@@ -920,7 +920,7 @@ commit or push. Read docs/ORCHESTRATION.md, then state issue #{state_issue} (bod
 since the last "handover"). Do §5.2 (incoming checklist) first, including the ready query (§4.3),
 then continue from the block's `next`. If the lock was not released to you or there is no handover comment, follow §5.3.
 Follow §1.1 (autonomy: what you may do unasked, what you must ask the owner). Predecessor: {session_id}.
-Hand over at about 35% of a 1M window (25% of a 200k window (owner decision 7158603054 item 2)), §5. At lineage depth 6 or more the owner starts the next orchestrator (§5.1 step 5, §9 F3).
+Hand over at about 50% of a 1M window (25% of a 200k window (owner decision 7158603054 item 2)), §5. At lineage depth 6 or more the owner starts the next orchestrator (§5.1 step 5, §9 F3).
 Repo access and worker-prompt recipes: §7.8.
 ```
 

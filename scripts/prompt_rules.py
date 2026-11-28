@@ -583,7 +583,7 @@ RULES = (
     Rule(
         "handover", ("orchestrator",),
         (
-            r"handover \(§5, two-phase\), at about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\), "
+            r"handover \(§5, two-phase\), at about 50% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\), "
             r"`agents/roles\.yaml` context\)",
             r"at the first batch boundary \(if none comes before the hard stage, at the next step boundary\): run §5\.1",
             r"with context unknown, hand over at the first batch boundary after about 40 wakes or 20 spawned sessions",
@@ -593,10 +593,10 @@ RULES = (
             r"`handover` comment", r"§8\.1 bootstrap prompt", r"until its `handover-ack`",
             r"only the triggers listed in your own handover comment", r"`handover-released`",
         ),
-        "two-phase handover at about 35% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7153510972, 7158603054), "
+        "two-phase handover at about 50% of a 1M window (25% of 200k, owner decisions #15 comment 7001335975, 7239676323 item 5, 7158603054), "
         "first batch boundary: "
         "comment, successor, ack, release (§5); depth 6 or more: the owner starts the successor",
-        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 50% of a 1m window"),
+        forbidden=(r"at about 50% context", r"at about 80% context", r"at about 80% of a 1m window", r"at about 35% of a 1m window"),
     ),
     Rule(
         "handover-messages", ("orchestrator",),
@@ -1183,13 +1183,13 @@ RULES = (
     ),
     Rule(
         "token-savings-orchestrator", ("orchestrator",),
-        (r"at about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\)",
+        (r"at about 50% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\)",
          r"a fresh merge agent once a day, at the first merge request after 00:00 utc",
          r"sets the old merge-agent row to archived \(once it has no merge in flight\) and adds the new agent's row",
          r"up to about 150 changed lines when they touch only tests or docs",
          r"a fresh implementer from `handoff/<branch>\.md` when the running one is above 30% context"),
-        "the orchestrator hands over at about 35% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
-        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 50% of a 1m window", r"daily pacing recompute",
+        "the orchestrator hands over at about 50% of a 1M window and starts a fresh merge agent once a day (7153510972 items 5, 6)",
+        forbidden=(r"second reviewer every round", r"max effort for `risk:high`", r"at about 35% of a 1m window", r"daily pacing recompute",
                    r"this pr's scaling", r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k",
                    r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
@@ -1437,17 +1437,17 @@ DOC_RULES = (
     DocRule(
         "orch-handover", ORCH,
         (
-            r"trigger: about 35% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\); "
-            r"`agents/roles\.yaml` context, #15 comment 7001335975; 35% by owner decision "
-            r"7153510972 item 6",
+            r"trigger: about 50% of a 1m window \(25% of a 200k window \(owner decision 7158603054 item 2\); "
+            r"`agents/roles\.yaml` context, #15 comment 7001335975; 50% by owner decision "
+            r"7239676323 item 5 \(it replaces 35%, 7153510972 item 6\)",
             r"until the hard stage, the orchestrator follows this section, not the soft reminder",
             r"at the first \*\*batch boundary\*\* \(if none comes before the hard stage, at the next step boundary\)",
             r"after about 40 wakes, or after 20 worker sessions",
             r"the new orchestrator archives you in its sweep \(§5\.2 step 7\)", r"7\. archive sweep \(§7\.4\)",
         ),
-        "ORCHESTRATION 5: hand over at about 35% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
+        "ORCHESTRATION 5: hand over at about 50% of a 1M window at a batch boundary (40 wakes or 20 sessions when unknown); "
         "the successor archives the predecessor",
-        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 50% of a 1m window",
+        forbidden=(r"about 50% context", r"trigger: about 80% context", r"trigger: about 80% of a 1m window", r"trigger: about 35% of a 1m window",
                    r"the owner archives you"),
     ),
     DocRule(
@@ -1878,16 +1878,16 @@ DOC_RULES = (
             "sets the old merge-agent row to archived (once it has no merge in flight) and adds the new agent's row",
             "the merge-agent row's `spawned-at` records the rotation time",
             "check that the state issue body names you as active before your first merge",
-            "trigger: about 35% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
-            "hand over at about 35% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
+            "trigger: about 50% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
+            "hand over at about 50% of a 1m window (25% of a 200k window (owner decision 7158603054 item 2)",
             "the first reviewer is the primary reviewer in every round (owner decision 7158603054, item 1)",
             "### 8.6 merge agent",
             "tags `role:merge-agent`, `tally:process`",
         )),
         "ORCHESTRATION carries the token-savings rules: effort, implementer context and fix rounds, PR size, the 150-line re-check, the daily "
-        "merge agent and its spawn message, the 35% orchestrator handover (7153510972)",
+        "merge agent and its spawn message, the 50% orchestrator handover (7239676323 item 5)",
         forbidden=(r"opus / high \(max for `risk:high`\)", r"second reviewer every round", r"max effort for `risk:high`",
-                   r"about 50% of a 1m window", r"daily pacing recompute", r"this pr's scaling",
+                   r"about 35% of a 1m window", r"daily pacing recompute", r"this pr's scaling",
                    r"pending owner confirmation", r"pr #408's scaling", r"30% of a 200k", r"i\.e\. the orchestrator's first check-in of the utc day"),
     ),
     DocRule(
