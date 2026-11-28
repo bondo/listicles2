@@ -151,20 +151,20 @@ val testLicenseeGate =
                 "com.google.firebase:firebase-auth:25.0.0",
                 "com.google.firebase:firebase-auth-interop:20.0.0",
                 "com.google.android.gms:play-services-auth:21.1.1",
-                "com.google.android.gms:play-services-auth-api-phone:18.0.2",
-                "com.google.android.gms:play-services-auth-base:18.0.10",
+                "com.google.android.gms:play-services-auth-api-phone:18.3.1",
+                "com.google.android.gms:play-services-auth-base:18.3.4",
                 "com.google.android.gms:play-services-auth-blockstore:16.4.0",
-                "com.google.android.gms:play-services-base:18.9.0",
-                "com.google.android.gms:play-services-basement:18.9.0",
-                "com.google.android.gms:play-services-fido:21.0.0",
+                "com.google.android.gms:play-services-base:18.11.1",
+                "com.google.android.gms:play-services-basement:18.12.1",
+                "com.google.android.gms:play-services-fido:21.3.1",
                 "com.google.android.gms:play-services-identity-credentials:16.0.0-alpha08",
-                "com.google.android.gms:play-services-tasks:18.4.0",
+                "com.google.android.gms:play-services-tasks:18.4.1",
                 "com.google.android.libraries.identity.googleid:googleid:1.2.1",
-                "com.google.android.recaptcha:recaptcha:18.6.1",
+                "com.google.android.recaptcha:recaptcha:18.9.4",
                 "com.google.android.play:core-common:2.0.3",
-                "com.google.android.play:integrity:1.3.0",
-                "com.google.re2j:re2j:1.6",
-                "org.codehaus.mojo:animal-sniffer-annotations:1.27",
+                "com.google.android.play:integrity:1.6.0",
+                "com.google.re2j:re2j:1.8",
+                "org.codehaus.mojo:animal-sniffer-annotations:1.29.1",
             ).joinToString(",")
         val notGoogle = "not the Google/Android SDK terms"
         val coordinates = "must be group:artifact:version"
@@ -191,7 +191,7 @@ val testLicenseeGate =
                 // exactly its own artifact (integrity: Play Integrity terms; core-common: Play Core license), listed.
                 licenseeCase(
                     "play integrity terms on integrity, listed",
-                    "com.google.android.play:integrity:1.0",
+                    "com.google.android.play:integrity:1.6.0",
                     "approved-play-integrity.txt",
                     passes = true,
                 ),
@@ -203,7 +203,7 @@ val testLicenseeGate =
                 ),
                 licenseeCase(
                     "play integrity terms on integrity, not listed",
-                    "com.google.android.play:integrity:1.0",
+                    "com.google.android.play:integrity:1.6.0",
                     passes = false,
                     message = "integrity/overview#tos",
                 ),
@@ -217,12 +217,12 @@ val testLicenseeGate =
                 ),
                 licenseeCase(
                     "M1-O14: Go licence URL on re2j",
-                    "com.google.re2j:re2j:1.6",
+                    "com.google.re2j:re2j:1.8",
                     passes = true,
                 ),
                 licenseeCase(
                     "M1-O14: MIT.txt URL on animal-sniffer-annotations",
-                    "org.codehaus.mojo:animal-sniffer-annotations:1.27",
+                    "org.codehaus.mojo:animal-sniffer-annotations:1.29.1",
                     passes = true,
                 ),
                 licenseeCase(
@@ -269,7 +269,7 @@ val testLicenseeGate =
                 ),
                 licenseeCase(
                     "play core license on integrity, listed",
-                    "com.google.android.play:integrity:2.0",
+                    "com.google.android.play:integrity:1.6.0",
                     "approved-integrity-core.txt",
                     passes = false,
                     message = notGoogle,
