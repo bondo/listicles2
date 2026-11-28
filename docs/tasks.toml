@@ -1214,7 +1214,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-60", "M1-88"]
-notes = "Split: this PR has the Account screen, sign-out UI, avatar and navigation; the Crashlytics opt-in switch, manifest flag and no-Analytics tests are M1-100 (needs the owner to accept the licence of firebase-measurement-connector:20.0.1, see handoff/m1-account-25.md). Stays todo until M1-100 is merged. Last-opened times: no store exists before M2, LocalUserData.clear() is the place that clears it. P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, deleted in LocalUserData.clear() so that a sign-out Firebase starts by itself clears them too (M1-89, SignedOutCleanup), tested; the in-app privacy link is privacy Q10"
+notes = "Split: this PR has the Account screen, sign-out UI, avatar and navigation; the Crashlytics opt-in switch, manifest flag and no-Analytics tests are M1-122 (needs the owner to accept the licence of firebase-measurement-connector:20.0.1, see handoff/m1-account-25.md). The home avatar and the navigation to Account (Account over home, wiring) are M1-123, rebuilt from commits 76f32b0 and d836ebc (see handoff/m1-account-25.md). Stays todo until M1-122 and M1-123 are merged. Last-opened times: no store exists before M2, LocalUserData.clear() is the place that clears it. P11: the screen is Account, not Settings; sign-out UI and its Compose tests moved here from M1-16 (#194). Adds the avatar to Account to the M1 home top bar (Q1 A); M1-60 left it out until Account exists. Acceptance (privacy Q3, Q10, Q13): Crashlytics sets no user id or custom keys, tested; sign-out clears all local app data for the account, incl. last-opened times, deleted in LocalUserData.clear() so that a sign-out Firebase starts by itself clears them too (M1-89, SignedOutCleanup), tested; the in-app privacy link is privacy Q10"
 
 [[task]]
 id = "M1-26"
@@ -1702,7 +1702,7 @@ status = "todo"
 assignee = "implementer"
 risk = "normal"
 depends_on = [
-  "M1-88", "M1-89", "M1-90", "M1-120", "M1-100",
+  "M1-88", "M1-89", "M1-90", "M1-120", "M1-122", "M1-123",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
   "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
@@ -2127,7 +2127,7 @@ pr = 394
 notes = "Owner decision 7136806608 on #373, extended by the owner via the orchestrator (flakes disabled on the owner's workstation): flake.nix and shell.nix (one shell definition, `nix develop` and `nix-shell`), flake.lock pins nixpkgs (shell.nix reads it), Node from that nixpkgs, firebase-tools from firebase/package-lock.json (npm ci, no second pin). scripts/check_nix_shell.py: static check (no network) plus --live (both entry points print the lockfile's firebase-tools version), wired into verify.sh and CI. M1.md R7 gets the commands. Build files: owner-only merge, approver-eligible. Scope is firebase-tools only (no JDK or Android)"
 
 [[task]]
-id = "M1-100"
+id = "M1-122"
 title = "Crashlytics opt-in (split from M1-25): Send crash reports switch, manifest flag off, no Analytics, no user id or custom keys"
 milestone = "M1"
 status = "todo"
@@ -2135,3 +2135,13 @@ assignee = "implementer"
 risk = "normal"
 depends_on = ["M1-25"]
 notes = "Needs the owner to accept the licence of com.google.firebase:firebase-measurement-connector:20.0.1 (Android SDK terms) in config/licensee/google-sdk-terms.txt first. Plan and tests in handoff/m1-account-25.md; privacy Q3 and Q13"
+
+[[task]]
+id = "M1-123"
+title = "Account navigation (part B of M1-25): home top-bar avatar opens Account over the home, wiring in MainActivity; sign-out returns to sign-in"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-25"]
+notes = "Split from M1-25 (about 700 lines in full). Not stacked: a PR from main after M1-25 merges, rebuilt from commits 76f32b0 (TallyApp account slot and AccountKey back stack, HomeScreen avatar, MainActivity wiring) and d836ebc (avatar only when Account is wired, HomeScreenAvatarTest) on branch m1/account-25; needs the account_open string back (en, da). A home-with-avatar golden needs the golden-update label"

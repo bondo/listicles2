@@ -27,7 +27,6 @@
     <!-- AUTH-03, wireframes 18, 39, 45: Konto-skærmen (M1-25). -->
     <string name="account_title">Konto</string>
     <string name="account_back">Tilbage</string>
-    <string name="account_open">Konto</string>
     <string name="account_sign_out">Log ud</string>
     <string name="account_sign_out_body">Fjerner dine lister fra denne telefon</string>
     <string name="account_sign_out_failed">Kunne ikke logge ud. Prøv igen.</string>

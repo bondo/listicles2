@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -20,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -30,46 +28,21 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import dk.bjarkebjarke.tally.EmptyStateBubble
 import dk.bjarkebjarke.tally.EmptyStateIcon
 import dk.bjarkebjarke.tally.R
-import dk.bjarkebjarke.tally.Sizes
 import dk.bjarkebjarke.tally.Spacing
 import dk.bjarkebjarke.tally.TallyTheme
 
 /**
  * The M1 home (Q1 A, see #194): the Lists screen of wireframe 02 in its empty state, without "Create list"; M2 fills
- * it. The top bar's household icon comes with the household screen (M1-19); the avatar opens Account (M1-25).
+ * it. The top bar's household icon comes with the household screen (M1-19) and the avatar with Account (M1-25), so no
+ * button here leads nowhere.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
-    modifier: Modifier = Modifier,
-    avatarInitial: String = "",
-    onAccount: (() -> Unit)? = null,
-) {
-    val accountDescription = stringResource(R.string.account_open)
+fun HomeScreen(modifier: Modifier = Modifier) {
     Scaffold(
         modifier,
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.lists_title), Modifier.semantics { heading() }) },
-                actions = {
-                    // Wireframe 02: the avatar opens Account (M1-25); without an Account to open there is no button.
-                    if (onAccount != null) {
-                        IconButton(onAccount) {
-                            Surface(
-                                Modifier.size(Sizes.icon + Spacing.s).semantics {
-                                    contentDescription = accountDescription
-                                },
-                                CircleShape,
-                                MaterialTheme.colorScheme.primaryContainer,
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(avatarInitial, style = MaterialTheme.typography.labelLarge)
-                                }
-                            }
-                        }
-                    }
-                },
-            )
+            TopAppBar(title = { Text(stringResource(R.string.lists_title), Modifier.semantics { heading() }) })
         },
     ) { padding ->
         Column(

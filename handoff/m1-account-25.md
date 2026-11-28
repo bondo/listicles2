@@ -6,9 +6,12 @@ Delete this file in the PR's final commit.
 M1-25 (docs/milestones/M1.md row 21): Account screen (wireframe 18), sign-out UI (AUTH-03, wireframes 39 and 45), the home avatar. The Crashlytics part is held back until the owner accepts one licence (below).
 
 ## Done
-- Tests first (2ef118b), then the Account screen, view model, navigation (avatar opens Account over home, back pops, sign-out returns to sign-in), en and da strings, privacy link (Q10).
+- Tests first (2ef118b), then the Account screen, view model, en and da strings, privacy link (Q10).
 
-## Held back: Crashlytics opt-in (needs the owner)
+## Part B (M1-123): navigation, rebuilt from commits
+Removed from this branch by a later commit: the home avatar, Account over the home (`AccountKey` back stack in `TallyApp`, `account` slot and `avatarInitial`), the `MainActivity` wiring, `HomeScreenAvatarTest`, and the `account_open` string (en, da). Rebuild on a fresh branch from main after M1-25 merges, from 76f32b0 (TallyApp, HomeScreen, MainActivity) and d836ebc (avatar only when Account is wired; test). A home-with-avatar golden needs the golden-update label.
+
+## Held back: Crashlytics opt-in (M1-122, needs the owner)
 `com.google.firebase:firebase-crashlytics` (in the BoM 35.2.0, resolves to 21.1.0) brings in exactly one artifact that `licensee` rejects, with the Android SDK terms:
 - `com.google.firebase:firebase-measurement-connector:20.0.1`
 Nothing else is flagged (checked on androidDebug and androidRelease). `firebase-analytics` is not on the classpath. Licence acceptance is the owner's: needs a line in `config/licensee/google-sdk-terms.txt`.

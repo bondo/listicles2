@@ -7,10 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
-import dk.bjarkebjarke.tally.account.AccountRoute
-import dk.bjarkebjarke.tally.account.AccountViewModel
-import dk.bjarkebjarke.tally.account.initialOf
-import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.session.SignedOutCleanup
 import dk.bjarkebjarke.tally.session.StartedActivity
 import dk.bjarkebjarke.tally.signin.SignInRoute
@@ -25,13 +21,9 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     private val start: StartViewModel by viewModels()
     private val signInModel: SignInViewModel by viewModels()
-    private val accountModel: AccountViewModel by viewModels()
 
     @Inject
     lateinit var startedActivity: StartedActivity
-
-    @Inject
-    lateinit var profiles: AccountProfiles
 
     @Inject
     lateinit var signedOutCleanup: SignedOutCleanup
@@ -49,14 +41,7 @@ class MainActivity : ComponentActivity() {
         // M1-88: Credential Manager opens Google's account picker in this activity while it is started.
         lifecycle.addObserver(startedActivity)
         enableEdgeToEdge()
-        setContent {
-            TallyApp(
-                start,
-                signIn = { SignInRoute(signInModel, onEmail = ::openEmailScreens) },
-                account = { onBack -> AccountRoute(accountModel, onBack) },
-                avatarInitial = { initialOf(profiles.current()) },
-            )
-        }
+        setContent { TallyApp(start, signIn = { SignInRoute(signInModel, onEmail = ::openEmailScreens) }) }
     }
 
     /** M1-17 opens the email screens; until then "Use email and password" does nothing. */

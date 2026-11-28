@@ -27,7 +27,6 @@
     <!-- AUTH-03, wireframes 18, 39, 45: the Account screen (M1-25). -->
     <string name="account_title">Account</string>
     <string name="account_back">Back</string>
-    <string name="account_open">Account</string>
     <string name="account_sign_out">Sign out</string>
     <string name="account_sign_out_body">Removes your lists from this phone</string>
     <string name="account_sign_out_failed">Could not sign out. Try again.</string>
