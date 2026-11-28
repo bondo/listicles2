@@ -1747,7 +1747,7 @@ risk = "normal"
 depends_on = [
   "M1-88", "M1-89", "M1-90", "M1-120",
   "M1-01", "M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-07", "M1-08", "M1-09", "M1-10", "M1-11", "M1-12",
-  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99", "M1-121",
+  "M1-91", "M1-92", "M1-93", "M1-94", "M1-95", "M1-96", "M1-97", "M1-98", "M1-99", "M1-121", "M1-122",
   "M1-13", "M1-14", "M1-15", "M1-16", "M1-17", "M1-18", "M1-19", "M1-20", "M1-21", "M1-22", "M1-23", "M1-24",
   "M1-25", "M1-26", "M1-27", "M1-28", "M1-29", "M1-30", "M1-31", "M1-32", "M1-33", "M1-34", "M1-35", "M1-36", "M1-57",
   "M1-37", "M1-38", "M1-39", "M1-40", "M1-41", "M1-42", "M1-43", "M1-44", "M1-45", "M1-46", "M1-47", "M1-48",
@@ -1816,7 +1816,7 @@ status = "todo"
 assignee = "owner"
 risk = "normal"
 depends_on = ["M1-O1", "M1-11"]
-notes = "docs/milestones/M1.md R7 (issue 209): firebase deploy --only firestore:rules from that main commit, note the commit on #15, compare the live ruleset with main before a tester build"
+notes = "docs/milestones/M1.md R7 (issue 209): firebase deploy --only firestore:rules from that main commit, note the commit on #15, compare the live ruleset with main before a tester build. Done by CI once the workflow of M1-122 has deployed once (owner decision 7239676323 item 2, #399): the owner then no longer deploys by hand"
 
 [[task]]
 id = "M1-O7"
@@ -2172,3 +2172,23 @@ risk = "normal"
 depends_on = []
 pr = 394
 notes = "Owner decision 7136806608 on #373, extended by the owner via the orchestrator (flakes disabled on the owner's workstation): flake.nix and shell.nix (one shell definition, `nix develop` and `nix-shell`), flake.lock pins nixpkgs (shell.nix reads it), Node from that nixpkgs, firebase-tools from firebase/package-lock.json (npm ci, no second pin). scripts/check_nix_shell.py: static check (no network) plus --live (both entry points print the lockfile's firebase-tools version), wired into verify.sh and CI. M1.md R7 gets the commands. Build files: owner-only merge, approver-eligible. Scope is firebase-tools only (no JDK or Android)"
+
+[[task]]
+id = "M1-O19"
+title = "Owner: create a service account limited to deploying firestore.rules and add it as a repository secret"
+milestone = "M1"
+status = "todo"
+assignee = "owner"
+risk = "normal"
+depends_on = ["M1-O1"]
+notes = "Owner decision 7239676323 item 2 on #399: rules deploy moves to CI. Settings outside git, the owner's hands: in the Firebase project create a service account whose only role is deploying Firestore rules, and add its key as a repository secret (name agreed in the M1-122 PR). The orchestrator files this issue; M1-122 depends on it"
+
+[[task]]
+id = "M1-122"
+title = "Tooling: CI workflow that deploys firestore.rules from main after a merge that changes it"
+milestone = "M1"
+status = "todo"
+assignee = "implementer"
+risk = "normal"
+depends_on = ["M1-O19"]
+notes = "Owner decision 7239676323 item 2 on #399. Tooling env (TALLY_TASK=tooling), test-first with negative cases: a workflow that, after a merge to main that changes firebase/firestore.rules, deploys it with the pinned firebase-tools (M1-96) using the repository secret of M1-O19; it does not run on pull requests, forks or other branches, and does nothing when the rules file is unchanged. Workflow files: owner-only merge, approver-eligible. Once it has deployed once, M1-O6 is done by CI"
