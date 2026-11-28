@@ -186,6 +186,42 @@ _DECISIONS_APPROVER = tuple(re.escape(t) for t in (
     "states that exact change",
 ))
 
+# Owner decisions 7242447401 item 1 and 7243276183 (#399, 2026-11-28): implementers accept routine follow-ups on their own branch; the
+# approver takes PRs whose owner-only paths include goldens of a signed-off design. Pinned in ORCHESTRATION 1.1, 7.5 and 8.2 and in the
+# implementer, approver and orchestrator prompts; test_prompt_rules.FollowupsGoldensTests lists the phrases.
+_FOLLOWUPS = (
+    "on your own branch only, you accept orchestrator requests that are routine follow-ups of your task: merging `main` into your branch "
+    "(a merge commit; never rebase, amend or force-push), the fix round of a review round of your PR, and PR-body refreshes"
+)
+_FOLLOWUPS_REST = "Anything else still needs the spawn task or the owner; approvals are still never relayed"
+_GOLDENS = (
+    "the approver may approve, as `owner-batch`, a PR whose owner-only paths include screenshot goldens (`app/src/test/screenshots/**`), "
+    "provided a review round checked the new or changed goldens and found them intended (no finding open against them, the `golden-update` "
+    "note on the state issue names the head and round), the goldens render a design the owner has already signed off (wireframes, design "
+    "tokens, icon decisions), CI is green and there is no veto"
+)
+_GOLDENS_NEW = "A golden that shows a new or changed design (not yet signed off) stays with the owner"
+_DECISIONS_7243_ORCH = tuple(re.escape(t) for t in (
+    "Approver scope, goldens (owner decision, #399 comment 7243276183, 2026-11-28): " + _GOLDENS,
+    _GOLDENS_NEW,
+    "This widens the approver scope of 7075812943, 7123360368 and 7239676323",
+    "The approver's scope also takes a PR whose owner-only paths include screenshot goldens of a signed-off design (owner decision, #399 "
+    "comment 7243276183; §1.1)",
+    "Routine follow-ups from the orchestrator on your own branch (merging main with a merge commit, the fix round of a review of your PR, "
+    "PR-body refreshes) are part of this task (owner decision 7242447401 item 1 on #399)",
+))
+_DECISIONS_7243_APPROVER = tuple(re.escape(t) for t in (
+    "And yours (§1.1, #399 comment 7243276183): a PR whose owner-only paths include screenshot goldens (`app/src/test/screenshots/**`), "
+    "as `owner-batch`, provided a review round checked the new or changed goldens and found them intended (no finding open against them, "
+    "the `golden-update` note on the state issue names the head and round), the goldens render a design the owner has already signed off "
+    "(wireframes, design tokens, icon decisions), CI is green and there is no veto",
+    _GOLDENS_NEW,
+))
+_DECISIONS_7242_IMPLEMENTER = tuple(re.escape(t) for t in (
+    "Routine follow-ups from the orchestrator (owner decision, #399 comment 7242447401 item 1): " + _FOLLOWUPS,
+    _FOLLOWUPS_REST,
+))
+
 # Wording the decision replaced: the owner is no longer asked for these.
 _STALE_ASKS = (r"the escalation reviewer's `owner` ruling", r"`risk:high` work(?: before starting it| \(before starting it\))",
                r"merges of owner-only prs(?:;| \(§7\.5\))")
@@ -1177,6 +1213,18 @@ RULES = (
         "the orchestrator prompt carries the exceptions to the owner-retained list (#399 comments 7239676323 item 4, 7239863908)",
     ),
     Rule(
+        "decisions-7243-approver", ("approver",), _DECISIONS_7243_APPROVER,
+        "the approver prompt carries the golden scope of #399 comment 7243276183",
+    ),
+    Rule(
+        "decisions-7243-orchestrator", ("orchestrator",), _DECISIONS_7243_ORCH[3:4],
+        "the orchestrator prompt names the golden scope of the approver (#399 comment 7243276183)",
+    ),
+    Rule(
+        "decisions-7242-implementer", ("implementer",), _DECISIONS_7242_IMPLEMENTER,
+        "the implementer prompt accepts routine follow-ups on its own branch (#399 comment 7242447401 item 1)",
+    ),
+    Rule(
         "approver-role", ("approver",),
         (
             r"you are the approver for tally\. opus, high effort \(`agents/roles\.yaml`; you do not change your own effort\)\. "
@@ -1258,6 +1306,8 @@ ORCH = "docs/ORCHESTRATION.md"
 DOC_RULES = (
     DocRule("decisions-7239-orch", ORCH, _DECISIONS_ORCH,
             "ORCHESTRATION 1.1 and 7.5 carry the approver scope of #399 comment 7239676323 items 1, 4 and the standing acceptance 7239863908"),
+    DocRule("decisions-7243-orch", ORCH, _DECISIONS_7243_ORCH[:4] + _DECISIONS_7243_ORCH[4:],
+            "ORCHESTRATION 1.1, 7.5 and 8.2 carry #399 comments 7243276183 (goldens to the approver) and 7242447401 item 1 (routine follow-ups)"),
     DocRule("decisions-7239-licensee", "config/licensee/google-sdk-terms.txt",
             (re.escape("Except lines under the standing acceptance of the Google Android SDK terms (#399 comment 7239863908)"),),
             "the licensee header names the standing acceptance of 7239863908"),

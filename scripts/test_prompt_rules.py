@@ -3499,5 +3499,64 @@ class AutonomyDecisionsTests(unittest.TestCase):
                 self.assertTrue(self.problems(key, cut))
 
 
+class FollowupsGoldensTests(unittest.TestCase):
+    """Owner decisions 7242447401 item 1 and 7243276183 (state issue #399, 2026-11-28): implementers accept routine follow-ups on their own
+    branch; the approver takes PRs whose owner-only paths include goldens of a signed-off design. Each phrase must be in the real file and
+    pinned by a `decisions-7242` or `decisions-7243` rule (deleting it fails the checker)."""
+
+    ORCH = "docs/ORCHESTRATION.md"
+    FOLLOWUPS = ("on your own branch only, you accept orchestrator requests that are routine follow-ups of your task: merging `main` into "
+                 "your branch (a merge commit; never rebase, amend or force-push), the fix round of a review round of your pr, and pr-body "
+                 "refreshes")
+    REST = "anything else still needs the spawn task or the owner; approvals are still never relayed"
+    GOLDENS = ("a pr whose owner-only paths include screenshot goldens (`app/src/test/screenshots/**`), as `owner-batch`, provided a review "
+               "round checked the new or changed goldens and found them intended (no finding open against them, the `golden-update` note on "
+               "the state issue names the head and round), the goldens render a design the owner has already signed off (wireframes, design "
+               "tokens, icon decisions), ci is green and there is no veto")
+    NEW = "a golden that shows a new or changed design (not yet signed off) stays with the owner"
+    PINNED = (
+        ("implementer", "routine follow-ups from the orchestrator (owner decision, #399 comment 7242447401 item 1): " + FOLLOWUPS),
+        ("implementer", REST),
+        (ORCH, "routine follow-ups from the orchestrator on your own branch (merging main with a merge commit, the fix round of a review of "
+               "your pr, pr-body refreshes) are part of this task (owner decision 7242447401 item 1 on #399)"),
+        (ORCH, "approver scope, goldens (owner decision, #399 comment 7243276183, 2026-11-28): the approver may approve, as `owner-batch`, "
+               "a pr whose owner-only paths include screenshot goldens"),
+        (ORCH, NEW),
+        (ORCH, "this widens the approver scope of 7075812943, 7123360368 and 7239676323"),
+        (ORCH, "the approver's scope also takes a pr whose owner-only paths include screenshot goldens of a signed-off design (owner "
+               "decision, #399 comment 7243276183; §1.1)"),
+        ("approver", "and yours (§1.1, #399 comment 7243276183): " + GOLDENS),
+        ("approver", NEW),
+        ("orchestrator", "the approver's scope also takes a pr whose owner-only paths include screenshot goldens of a signed-off design "
+                         "(owner decision, #399 comment 7243276183; §1.1)"),
+    )
+
+    def text(self, key):
+        path = ROOT / key if "/" in key else PROMPTS / f"{key}.md"
+        return path.read_text(encoding="utf-8")
+
+    def problems(self, key, text):
+        found = prompt_rules.check_doc_text(key, text) if "/" in key else prompt_rules.check_text(key, text)
+        return [p for p in found if p.startswith(("decisions-7242", "decisions-7243"))]
+
+    def test_the_real_files_carry_every_phrase(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase[:60]):
+                self.assertIn(phrase, prompt_rules.normalize(self.text(key)).lower().replace("# ", ""))
+
+    def test_the_real_files_pass_the_rules(self):
+        for key in sorted({k for k, _ in self.PINNED}):
+            with self.subTest(key=key):
+                self.assertEqual(self.problems(key, self.text(key)), [])
+
+    def test_deleting_any_phrase_fails_a_rule(self):
+        for key, phrase in self.PINNED:
+            with self.subTest(key=key, phrase=phrase[:60]):
+                norm = prompt_rules.normalize(self.text(key)).replace("# ", "")
+                cut = re.sub(re.escape(phrase), " ", norm, flags=re.I)
+                self.assertNotEqual(cut, norm)
+                self.assertTrue(self.problems(key, cut))
+
+
 if __name__ == "__main__":
     unittest.main()
