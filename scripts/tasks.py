@@ -198,7 +198,7 @@ def parse(text: str, burn_down: bool = True) -> Graph:
                         break
                 continue
             dep = by_id.get(d)
-            if dep is not None and dep.assignee != "owner" and dep.status == "todo" and d != t.id:
+            if dep is not None and dep.assignee != "owner" and dep.status == "todo":
                 errors.append(f"{t.id}: status done but depends on {d}, which is still todo")
     if errors:
         raise TaskFileError(errors)
