@@ -45,11 +45,15 @@ service cloud.firestore {
       return /databases/$(database)/documents/households/$(hid)/removed/$(uid);
     }
 
-    // A name (PLAN 3.1 field validation, P4): 1-50 code points, non-empty after trim. The regex counts
+    // A name (PLAN 3.1 field validation, P4): 1-50 code points, not blank. The first regex counts
     // them (`.` is one code point; (?s) lets it match a line break too). Not size(): on the emulator it
-    // counts UTF-16 units, 100 for 50 non-BMP characters (option A, #15 comment 7083518706).
+    // counts UTF-16 units, 100 for 50 non-BMP characters (option A, #15 comment 7083518706). Blank
+    // (M1-90): every code point is U+0000 to U+0020, which trim() strips, or Unicode White_Space,
+    // which trim() keeps above U+0020; the app's Validation removes the same code points from both
+    // ends of a name before it writes it.
     function validName(name) {
-      return name is string && name.matches('(?s).{1,50}') && name.trim().size() > 0;
+      return name is string && name.matches('(?s).{1,50}')
+        && !name.matches('[\\x{0}-\\x{20}\\x{85}\\x{A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}]*');
     }
 
     // The users doc (PLAN 3.1, P9): householdId, always present, and name, optional.

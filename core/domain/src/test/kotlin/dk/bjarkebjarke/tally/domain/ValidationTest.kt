@@ -1,12 +1,16 @@
 package dk.bjarkebjarke.tally.domain
 
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.Codepoint
+import io.kotest.property.arbitrary.bind
+import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.int
+import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
@@ -18,7 +22,8 @@ private const val NON_BMP_NAME_LENGTH = 50
 private val anyCodePoints =
     Arb.int(0x20..ASTRAL_END).filter { it !in 0xD800..0xDFFF }.map { Codepoint(it) }
 
-// Every char Kotlin's trim() and the spec count as whitespace: controls, Unicode spaces, line and paragraph separators.
+// Every char Kotlin's trim() counts as whitespace, which the email is trimmed of: controls, Unicode spaces, line and
+// paragraph separators.
 private val whitespaceChars =
     listOf(
         '\t',
@@ -53,11 +58,46 @@ private val whitespaceChars =
 
 private val whitespaceRuns = Arb.string(0..20, Arb.element(whitespaceChars).map { Codepoint(it.code) })
 
-private val visibleCores = Arb.string(1..50, anyCodePoints).filter { it.isNotBlank() && it == it.trim() }
+// The blank code points of a name (PLAN 3.1 P4, M1-90): U+0000 to U+0020, which the rules' trim() strips, and
+// Unicode White_Space. The rules' validName lists the same ones (firebase/test/names.test.ts checks them there).
+private val blankCodePoints =
+    (0x0..0x20) + listOf(0x85, 0xA0, 0x1680) + (0x2000..0x200A) + listOf(0x2028, 0x2029, 0x202F, 0x205F, 0x3000)
+private val blank = blankCodePoints.toSet()
+
+// Java's regex knows the Unicode White_Space property, so it checks the list above independently.
+private val unicodeWhiteSpace = Regex("\\p{IsWhite_Space}")
+
+private val blankRuns = Arb.string(0..20, Arb.element(blankCodePoints).map { Codepoint(it) })
+
+// Any code point that is not blank and not a lone surrogate: BMP and non-BMP, other controls included.
+private val visibleCodePoints =
+    Arb.int(0x0..ASTRAL_END).filter { it !in 0xD800..0xDFFF && it !in blank }.map { Codepoint(it) }
+
+// What a user may type: blank and visible code points, half and half.
+private val typedCodePoints = Arb.choice(Arb.element(blankCodePoints).map { Codepoint(it) }, visibleCodePoints)
+
+// 1 to 50 code points with a visible one at each end and anything between.
+private val visibleCores =
+    Arb.choice(
+        visibleCodePoints.map { text(it.value) },
+        Arb.bind(visibleCodePoints, Arb.list(typedCodePoints, 0..48), visibleCodePoints) { first, between, last ->
+            (listOf(first) + between + last).joinToString("") { text(it.value) }
+        },
+    )
+
+private fun text(codePoint: Int) = String(Character.toChars(codePoint))
 
 private fun codePoints(s: String) = s.codePointCount(0, s.length)
 
 private fun astral(n: Int) = "😀".repeat(n) // U+1F600, 2 UTF-16 chars each
+
+// The rules' validName (PLAN 3.1 P4) on the saved value: 1 to 50 code points, not all of them blank.
+private fun rulesAccept(saved: String) =
+    codePoints(saved) in 1..Validation.MAX_NAME_CODE_POINTS && saved.codePoints().anyMatch { it !in blank }
+
+// The code points of all of Unicode for which `wrong` holds; any is a failure.
+private fun everyCodePointWhere(wrong: (Int) -> Boolean): List<String> =
+    (0..Character.MAX_CODE_POINT).filter(wrong).map { "U+%04X".format(it) }
 
 class ValidationTest :
     FunSpec({
@@ -114,9 +154,24 @@ class ValidationTest :
             Validation.normalizedEmail("  me@example.com\n") shouldBe "me@example.com"
         }
 
-        test("name: 1 to 50 code points after trimming passes") {
-            checkAll(Arb.string(1..50, anyCodePoints).filter { it.isNotBlank() && it == it.trim() }) { n ->
+        test("name: the blank code points are U+0000 to U+0020 and Unicode White_Space, no others") {
+            blank.size shouldBe 52
+            everyCodePointWhere { (it <= 0x20 || unicodeWhiteSpace.matches(text(it))) != (it in blank) }.shouldBeEmpty()
+        }
+
+        test("name: a name of one code point is empty exactly when that code point is blank, in all of Unicode") {
+            everyCodePointWhere { (Validation.name(text(it)) == NameError.Empty) != (it in blank) }.shouldBeEmpty()
+        }
+
+        test("name: exactly the blank code points are trimmed from either end, in all of Unicode") {
+            everyCodePointWhere { (Validation.normalizedName(text(it) + "a" + text(it)) == "a") != (it in blank) }
+                .shouldBeEmpty()
+        }
+
+        test("name: 1 to 50 code points with a visible one at each end pass") {
+            checkAll(visibleCores) { n ->
                 Validation.name(n) shouldBe null
+                Validation.normalizedName(n) shouldBe n
             }
         }
 
@@ -138,28 +193,35 @@ class ValidationTest :
             Validation.name("   \u00A0 ") shouldBe NameError.Empty
         }
 
-        test("name: whitespace-only of any Unicode kind fails") {
-            checkAll(whitespaceRuns) { n -> Validation.name(n) shouldBe NameError.Empty }
+        // M1-90: Kotlin's trim() kept U+0000 to U+0008, U+000E to U+001B and U+0085, which the rules count as blank.
+        test("name: control characters and NEL count as blank, a zero-width space does not") {
+            Validation.name("\u0001") shouldBe NameError.Empty
+            Validation.name("\u0085") shouldBe NameError.Empty
+            Validation.name("\u0001\u3000\u0008") shouldBe NameError.Empty
+            Validation.normalizedName("\u0001\u3000Åse\u0085\u001B") shouldBe "Åse"
+            Validation.normalizedName(" Ann\u0001Lee\u00A0") shouldBe "Ann\u0001Lee"
+            Validation.name("\u200B") shouldBe null
         }
 
-        test("name: whitespace padding around 1 to 50 code points passes, 51 or more fails") {
-            checkAll(whitespaceRuns, visibleCores, whitespaceRuns) { l, core, r ->
+        test("name: blank code points only, of any kind, fail") {
+            checkAll(blankRuns) { n -> Validation.name(n) shouldBe NameError.Empty }
+        }
+
+        test("name: blank padding around 1 to 50 code points passes and is trimmed away, 51 or more fails") {
+            checkAll(blankRuns, visibleCores, blankRuns) { l, core, r ->
                 Validation.name(l + core + r) shouldBe null
+                Validation.normalizedName(l + core + r) shouldBe core
                 Validation.name(l + core + astral(51 - codePoints(core)) + r) shouldBe NameError.TooLong
             }
         }
 
-        test("name: the normalized value is exactly what was validated") {
+        test("name: the app accepts a name exactly when the rules accept the value it saves") {
             Validation.normalizedName("  \u3000Åse\t ") shouldBe "Åse"
-            checkAll(whitespaceRuns, visibleCores, whitespaceRuns) { l, core, r ->
-                val raw = l + core + r
-                Validation.name(raw) shouldBe null
-                Validation.normalizedName(raw) shouldBe core
-            }
-            checkAll(Arb.string(0..80, anyCodePoints)) { raw ->
-                if (Validation.name(raw) == null) {
-                    (codePoints(Validation.normalizedName(raw)) in 1..Validation.MAX_NAME_CODE_POINTS) shouldBe true
-                }
+            checkAll(Arb.string(0..80, typedCodePoints)) { raw ->
+                val saved = Validation.normalizedName(raw)
+                (Validation.name(raw) == null) shouldBe rulesAccept(saved)
+                (Validation.name(raw) == NameError.Empty) shouldBe raw.codePoints().allMatch { it in blank }
+                Validation.normalizedName(saved) shouldBe saved
             }
         }
 
