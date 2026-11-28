@@ -18,10 +18,11 @@ APP_TASK = ":app:compileDebugKotlin"
 MODULES = (":app", ":core:data", ":core:domain", ":core:testing")
 GATE_MESSAGE = "warnings are not all errors"
 
-# Groovy init script; %s is the statement applied to the compile task's compilerOptions.
+# Groovy init script; %s is the statement applied to the compile task's compilerOptions. M1-98: gradle.lifecycle.beforeProject, not
+# allprojects, which the isolated projects mode (gradle.properties) rejects.
 INIT = """
-allprojects {
-    tasks.matching { it.path == '%s' }.configureEach { %s }
+gradle.lifecycle.beforeProject { p ->
+    p.tasks.matching { it.path == '%s' }.configureEach { %s }
 }
 """
 

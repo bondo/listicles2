@@ -37,15 +37,14 @@ JAVA_API_26 = (
 )
 
 # Groovy init script. %s is the directory holding the injected sources; %s the statement run on :app after it is evaluated (p: the project).
+# M1-98: gradle.lifecycle.afterProject, not allprojects/afterEvaluate, which the isolated projects mode (gradle.properties) rejects.
 INIT = """
-allprojects {
-    afterEvaluate { p ->
-        if (p.path == ':core:domain') {
-            p.kotlin.sourceSets.main.kotlin.srcDir('%s')
-            p.sourceSets.main.java.srcDir('%s')
-        }
-        if (p.path == ':app') { %s }
+gradle.lifecycle.afterProject { p ->
+    if (p.path == ':core:domain') {
+        p.kotlin.sourceSets.main.kotlin.srcDir('%s')
+        p.sourceSets.main.java.srcDir('%s')
     }
+    if (p.path == ':app') { %s }
 }
 """
 
@@ -120,12 +119,13 @@ class JavaApiLevelGateTest(unittest.TestCase):
 
     def test_missing_api_versions_file_fails_closed(self):
         # The app's hand-over names, just after it is written, a path that does not exist: the build must fail, not pass.
+        # The closure holds the task's output files, not the task: the configuration cache, which the isolated projects mode
+        # (gradle.properties, M1-98) keeps on, cannot store a task.
         statement = (
-            "p.tasks.named('tallyJavaApiLevelInputs') { t -> t.doLast {"
-            " t.outputs.files.singleFile.text = '26\\n/nonexistent/data/api-versions.xml\\n' } }"
+            "p.tasks.named('tallyJavaApiLevelInputs') { t -> def files = t.outputs.files; t.doLast {"
+            " files.singleFile.text = '26\\n/nonexistent/data/api-versions.xml\\n' } }"
         )
-        # The injected closure holds the task, which the configuration cache cannot store.
-        rc, out = gradle("--no-configuration-cache", "checkJavaApiLevel", app_statement=statement)
+        rc, out = gradle("checkJavaApiLevel", app_statement=statement)
         self.assertNotEqual(rc, 0, out)
         self.assertIn("cannot check", out)
         self.assertIn("/nonexistent/data/api-versions.xml", out)

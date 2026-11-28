@@ -33,14 +33,21 @@ plugins {
     alias(libs.plugins.tally.dependency.floors)
 }
 
+// M1-98: file trees, not "**/..." strings. For such a string Spotless excludes every subproject's build directory by reading
+// that project's layout, which the isolated projects mode (gradle.properties) rejects; a file tree is used as given.
+fun spotlessFiles(vararg patterns: String) =
+    fileTree(rootDir) {
+        include(*patterns)
+        exclude("**/build/**", ".git/**", ".gradle/**")
+    }
+
 spotless {
     kotlin {
-        target("**/src/**/*.kt")
+        target(spotlessFiles("**/src/**/*.kt"))
         ktlint(libs.versions.ktlint.get())
     }
     kotlinGradle {
-        target("*.gradle.kts", "**/*.gradle.kts")
-        targetExclude("**/build/**")
+        target(spotlessFiles("*.gradle.kts", "**/*.gradle.kts"))
         ktlint(libs.versions.ktlint.get())
     }
 }
