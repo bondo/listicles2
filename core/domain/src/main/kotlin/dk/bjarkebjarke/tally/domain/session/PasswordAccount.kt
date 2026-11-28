@@ -69,8 +69,7 @@ class PasswordAccount(
     suspend fun sendVerificationAgain(): VerificationResult =
         when {
             !connectivity.isOnline() -> VerificationResult.NeedsConnection
-            !tookEmail(nowMs()) -> VerificationResult.TryAgainLater
-            else -> verificationSent(inAppLanguage { authentication.sendEmailVerification() })
+            else -> sentAgain(nowMs())
         }
 
     /** "Continue" (AUTH-06): verified once the link was opened; with nobody signed in, not yet (AUTH-10). */
@@ -111,6 +110,16 @@ class PasswordAccount(
             if (free) emails.addLast(now)
             free
         }
+
+    /** Within the limits, sends the email again; one that never went out uses none of them (R2-01). */
+    private suspend fun sentAgain(now: Long): VerificationResult {
+        if (!tookEmail(now)) return VerificationResult.TryAgainLater
+        val result = verificationSent(inAppLanguage { authentication.sendEmailVerification() })
+        if (result == VerificationResult.NeedsConnection || result == VerificationResult.Failed) {
+            synchronized(emails) { emails.remove(now) }
+        }
+        return result
+    }
 
     private suspend fun inAppLanguage(send: suspend () -> PasswordAnswer): PasswordAnswer {
         authentication.useAppLanguage()
