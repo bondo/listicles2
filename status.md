@@ -456,6 +456,7 @@ flowchart LR
 - **owner to-do** [#375](https://github.com/bondo/tally/issues/375): &#91;owner&#93; M1-O4&#58; Enable the Play Integrity API for the Firebase project in the Google Cloud console
 - **owner to-do** [#376](https://github.com/bondo/tally/issues/376): &#91;owner&#93; M3-O1&#58; Enable Google sign-in in Firebase (needs a public support email for Tally)
 - **owner to-do** [#377](https://github.com/bondo/tally/issues/377): &#91;owner&#93; M6-O1&#58; Create the GitHub release key; register its SHA-1/SHA-256 in Firebase, App Check a…
+- **owner to-do** [#415](https://github.com/bondo/tally/issues/415): &#91;owner&#93; M1-O18&#58; remove LISTICLES_TASK from the Tally tooling environment
 - **PR to merge** [#396](https://github.com/bondo/tally/issues/396): M1-15&#58; email and password steps in core/domain with fakes (AUTH-05..08, AUTH-10); split M1-99
 - **task** M1-17: waits on M1-15
 - **task** M1-31: waits on M1-18
