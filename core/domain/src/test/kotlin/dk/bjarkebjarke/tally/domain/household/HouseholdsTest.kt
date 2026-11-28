@@ -24,6 +24,7 @@ class HouseholdsTest :
             membership(null, null) { error("no batch") } shouldBe Membership.Failed
             checkAll(Arb.string()) { name ->
                 membership(null, name) { Membership.Member(householdId = it) } shouldBe Membership.Member(name)
+                membership(null, name) { Membership.InviteUnusable } shouldBe Membership.InviteUnusable
             }
         }
 

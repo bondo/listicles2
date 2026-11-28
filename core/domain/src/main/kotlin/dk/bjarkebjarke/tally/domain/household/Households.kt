@@ -1,9 +1,11 @@
 package dk.bjarkebjarke.tally.domain.household
 
 /**
- * Create a household, invite to it and join it (HH-01, HH-02, HH-03): the writes of PLAN 3.1, which the Firestore
- * rules check. Each needs a connection (SYNC-03, OQ-22), so a screen runs it through `Connectivity.whenOnline`; a write
- * that loses it on the way stays queued, and the call waits until it is sent (a cancelled call's write still goes out).
+ * Create a household, invite to it and join it (HH-01, HH-02, HH-03): the writes of PLAN 3.1 and the invite's read,
+ * which the Firestore rules check. Each needs a connection (SYNC-03, OQ-22), so a screen runs it through
+ * `Connectivity.whenOnline`: a read fails offline, and a write that loses the connection on the way stays queued, the
+ * call waiting until it is sent (a cancelled call's write still goes out). A screen opens only for a verified user, so
+ * a denied invite read or join is always HH-03's message.
  */
 interface Households {
     /** HH-01: a household named [name], trimmed (the screen checked it with `Validation.name`), owned by the caller. */
@@ -37,6 +39,7 @@ sealed interface Membership {
 
 /** What the join screen shows for a code (HH-03). */
 sealed interface InviteLookup {
+    /** The rules let the caller read it and it has not expired; the join can still be refused (its creator left). */
     data class Open(
         val householdName: String,
     ) : InviteLookup
