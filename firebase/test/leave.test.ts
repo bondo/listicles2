@@ -203,6 +203,19 @@ describe("Remove member (one batch)", () => {
         await assertFails(removal(bob.verified, CAROL, r));
     });
 
+    // The overwrite of a leftover marker alone, no member delete in the batch (PLAN 3.1: deny a
+    // non-owner write, a write while the target stays a member): carol's, seeded here, and gus's,
+    // who is no member.
+    test.each<[string, () => h.Db, string]>([
+        ["a non-member's of gus's", () => frank.verified, GUS],
+        ["a plain member's of carol's", () => alice.verified, CAROL],
+        ["the owner's of carol's, carol staying a member", () => bob.verified, CAROL],
+        ["the owner's of gus's, who is no member", () => bob.verified, GUS],
+    ])("denied: a marker overwrite alone, %s", async (_what, db, uid) => {
+        await seed({ [marker(CAROL)]: { removedAt: T0 } });
+        await assertFails(db().doc(marker(uid)).set({ removedAt: NOW }));
+    });
+
     // O(uid), never M(uid) or createdBy (alice created HOME). In the last row only the marker's
     // O(uid) denies: alice may leave, and she is a member before the batch, not after it.
     test.each<[string, () => h.Db, Request]>([
