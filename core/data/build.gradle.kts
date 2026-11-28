@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.listicles.android.library)
+    alias(libs.plugins.tally.android.library)
     alias(libs.plugins.licensee)
 }
 

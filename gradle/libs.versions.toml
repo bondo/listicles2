@@ -111,8 +111,8 @@ google-services = { id = "com.google.gms.google-services", version.ref = "google
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 # M1-46: the convention plugins of the included build build-logic/ (no version: they are built with the project).
-listicles-jvm-library = { id = "listicles.jvm.library" }
-listicles-jvm-testsupport = { id = "listicles.jvm.testsupport" }
-listicles-android-library = { id = "listicles.android.library" }
-listicles-android-application = { id = "listicles.android.application" }
-listicles-dependency-floors = { id = "listicles.dependency.floors" }
+tally-jvm-library = { id = "tally.jvm.library" }
+tally-jvm-testsupport = { id = "tally.jvm.testsupport" }
+tally-android-library = { id = "tally.android.library" }
+tally-android-application = { id = "tally.android.application" }
+tally-dependency-floors = { id = "tally.dependency.floors" }

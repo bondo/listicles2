@@ -5,7 +5,7 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.process.CommandLineArgumentProvider
 
 plugins {
-    alias(libs.plugins.listicles.android.application)
+    alias(libs.plugins.tally.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
     alias(libs.plugins.licensee)
