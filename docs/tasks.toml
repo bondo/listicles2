@@ -2081,10 +2081,11 @@ notes = "Owner decision 7140391316 item 3 on #399 (\"keep the 15000-byte limit; 
 id = "M1-126"
 title = "Tooling: pre-push guard honours the PR's golden-update label, as CI does"
 milestone = "M1"
-status = "todo"
+status = "done"
 assignee = "implementer"
 risk = "normal"
 depends_on = []
+pr = 420
 notes = "Owner decision 7239508302 item 2 on #399 (fix the guard rather than allow a one-off GOLDEN_UPDATE=1 push; #417 is blocked on it). Tooling env. scripts/guards.sh --pre-push <url> (called by .githooks/pre-push with git's stdin): when screenshot PNGs changed and GOLDEN_UPDATE is not 1, scripts/hooks/golden_label.py looks up the open PR whose head is the pushed branch of this repo (gh api, origin slug, steering GH_* and GITHUB_REPOSITORY variables dropped) and allows only when it carries golden-update. Fail closed on no PR, several PRs, a gh error, an unparsable answer, a ref, branch or repository that does not match exactly. CI keeps GOLDEN_UPDATE from the label. Tests: scripts/hooks/test_golden_label.py (gh stubbed), test_prepush_hook.py"
 
 [[task]]
