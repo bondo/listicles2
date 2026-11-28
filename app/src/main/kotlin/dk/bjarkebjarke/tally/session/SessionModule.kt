@@ -11,6 +11,7 @@ import dk.bjarkebjarke.tally.ApplicationScope
 import dk.bjarkebjarke.tally.data.session.CredentialManagerGoogleCredentials
 import dk.bjarkebjarke.tally.data.session.FirebaseAuthentication
 import dk.bjarkebjarke.tally.data.session.FirestoreSession
+import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.connectivity.Connectivity
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleCredentials
@@ -40,6 +41,10 @@ object SessionModule {
 
     @Provides
     fun sessionState(authentication: FirebaseAuthentication): SessionState = authentication
+
+    /** The Account screen's profile (M1-25). */
+    @Provides
+    fun accountProfiles(authentication: FirebaseAuthentication): AccountProfiles = authentication
 
     @Provides
     fun authentication(authentication: FirebaseAuthentication): Authentication = authentication
