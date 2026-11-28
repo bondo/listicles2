@@ -79,13 +79,6 @@ class ManifestSurfaceTest {
             )
     }
 
-    /** M1-25 (privacy Q3): Crashlytics collects nothing until the user turns "Send crash reports" on. */
-    @Test
-    fun crashlyticsCollectionIsOffInTheManifest() {
-        val flag = elements("meta-data").single { it.android("name") == "firebase_crashlytics_collection_enabled" }
-        flag.android("value") shouldBe "false"
-    }
-
     @Test
     fun hasNoBrowserEntryPointForFirebaseAuth() {
         // Browser sign-in with an OAuthProvider, and phone number verification: Tally has neither.

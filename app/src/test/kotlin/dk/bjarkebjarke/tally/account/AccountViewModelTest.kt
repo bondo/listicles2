@@ -5,7 +5,6 @@ import dk.bjarkebjarke.tally.domain.session.SignOut
 import dk.bjarkebjarke.tally.testing.FakeAccountProfiles
 import dk.bjarkebjarke.tally.testing.FakeAuthentication
 import dk.bjarkebjarke.tally.testing.FakeConnectivity
-import dk.bjarkebjarke.tally.testing.FakeCrashReports
 import dk.bjarkebjarke.tally.testing.FakeGoogleCredentials
 import dk.bjarkebjarke.tally.testing.FakeLocalUserData
 import io.kotest.matchers.shouldBe
@@ -29,7 +28,6 @@ class AccountViewModelTest {
     private val userData = FakeLocalUserData(steps = steps)
     private val authentication = FakeAuthentication(steps = steps)
     private val credentials = FakeGoogleCredentials(steps = steps)
-    private val crashReports = FakeCrashReports()
     private val profile = AccountProfile(name = "Sam Jensen", email = "sam@example.com")
 
     @Before
@@ -38,10 +36,11 @@ class AccountViewModelTest {
     @After
     fun resetDispatcher() = Dispatchers.resetMain()
 
+    private val profiles = FakeAccountProfiles(profile)
+
     private fun viewModel() =
         AccountViewModel(
-            FakeAccountProfiles(profile),
-            crashReports,
+            profiles,
             SignOut(
                 connectivity,
                 userData,
@@ -53,24 +52,15 @@ class AccountViewModelTest {
 
     @Test
     fun showsTheProfileAndTheSwitchOffUntilTheUserTurnsItOn() {
-        viewModel().uiState.value shouldBe AccountUiState(profile, crashReportsOn = false)
+        viewModel().uiState.value shouldBe AccountUiState(profile)
     }
 
     @Test
-    fun theSwitchShowsWhatWasStored() {
-        crashReports.sending = true
-        viewModel().uiState.value.crashReportsOn shouldBe true
-    }
-
-    @Test
-    fun theSwitchWritesThroughAndShowsTheNewValue() {
+    fun openingReadsTheAccountSignedInNow() {
         val viewModel = viewModel()
-        viewModel.setCrashReports(true)
-        crashReports.sending shouldBe true
-        viewModel.uiState.value.crashReportsOn shouldBe true
-        viewModel.setCrashReports(false)
-        crashReports.sending shouldBe false
-        viewModel.uiState.value.crashReportsOn shouldBe false
+        profiles.profile = AccountProfile("Alex", "alex@example.com")
+        viewModel.opened()
+        viewModel.uiState.value.profile shouldBe AccountProfile("Alex", "alex@example.com")
     }
 
     @Test
@@ -125,7 +115,7 @@ class AccountViewModelTest {
         userData.clearFails = true
         val viewModel = viewModel()
         viewModel.signOut()
-        viewModel.uiState.value shouldBe AccountUiState(profile, crashReportsOn = false, failed = true)
+        viewModel.uiState.value shouldBe AccountUiState(profile, failed = true)
         steps.contains("signOut") shouldBe false
         viewModel.failureShown()
         viewModel.uiState.value.failed shouldBe false

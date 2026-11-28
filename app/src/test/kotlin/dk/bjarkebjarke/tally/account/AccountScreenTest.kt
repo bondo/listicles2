@@ -4,8 +4,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,7 +32,7 @@ class AccountScreenTest {
             }
         }
 
-    private fun show(state: AccountUiState = AccountUiState(profile, crashReportsOn = false)) =
+    private fun show(state: AccountUiState = AccountUiState(profile)) =
         compose.setContent {
             CompositionLocalProvider(LocalUriHandler provides uriHandler) {
                 TallyTheme(false) {
@@ -42,7 +40,6 @@ class AccountScreenTest {
                         state,
                         AccountActions(
                             onBack = { calls += "back" },
-                            onCrashReports = { calls += "crash $it" },
                             onSignOut = { calls += "signOut" },
                             onSignOutAnyway = { calls += "anyway" },
                             onCancel = { calls += "cancel" },
@@ -59,8 +56,6 @@ class AccountScreenTest {
         show()
         compose.onNodeWithText("Sam Jensen").assertExists()
         compose.onNodeWithText("sam@example.com").assertExists()
-        compose.onNodeWithText("Send crash reports").assertExists()
-        compose.onNodeWithText("Off until you turn it on. Helps fix crashes.").assertExists()
         compose.onNodeWithText("Sign out").assertExists()
         compose.onNodeWithText("Removes your lists from this phone").assertExists()
         compose.onNodeWithText("Privacy policy").assertExists()
@@ -70,8 +65,6 @@ class AccountScreenTest {
     @Config(qualifiers = "da")
     fun danish() {
         show()
-        compose.onNodeWithText("Send nedbrudsrapporter").assertExists()
-        compose.onNodeWithText("Slået fra, indtil du slår det til. Hjælper med at rette nedbrud.").assertExists()
         compose.onNodeWithText("Log ud").assertExists()
         compose.onNodeWithText("Fjerner dine lister fra denne telefon").assertExists()
         compose.onNodeWithText("Privatlivspolitik").assertExists()
@@ -79,24 +72,8 @@ class AccountScreenTest {
 
     @Test
     @Config(qualifiers = "en")
-    fun theSwitchShowsItsStateAndReportsTheNewOne() {
-        show()
-        compose.onNodeWithText("Send crash reports").assertIsOff()
-        compose.onNodeWithText("Send crash reports").performClick()
-        calls shouldBe listOf("crash true")
-    }
-
-    @Test
-    @Config(qualifiers = "en")
-    fun theSwitchShownOnWhenOn() {
-        show(AccountUiState(profile, crashReportsOn = true))
-        compose.onNodeWithText("Send crash reports").assertIsOn()
-    }
-
-    @Test
-    @Config(qualifiers = "en")
     fun signOutWaitsWhileItRuns() {
-        show(AccountUiState(profile, crashReportsOn = false, signingOut = true))
+        show(AccountUiState(profile, signingOut = true))
         compose.onNodeWithText("Sign out").assertIsNotEnabled()
     }
 
@@ -121,7 +98,7 @@ class AccountScreenTest {
     @Test
     @Config(qualifiers = "en")
     fun wireframe39AsksWithTheUnsentChangeText() {
-        show(AccountUiState(profile, crashReportsOn = false, question = SignOutQuestion.NotSentYet))
+        show(AccountUiState(profile, question = SignOutQuestion.NotSentYet))
         compose.onNodeWithText("Sign out?").assertExists()
         compose
             .onNodeWithText(
@@ -135,7 +112,7 @@ class AccountScreenTest {
     @Test
     @Config(qualifiers = "en")
     fun wireframe45AsksWithoutClaimingAChangeIsUnsent() {
-        show(AccountUiState(profile, crashReportsOn = false, question = SignOutQuestion.MayNotBeSent))
+        show(AccountUiState(profile, question = SignOutQuestion.MayNotBeSent))
         compose
             .onNodeWithText("Changes you made may not have been sent yet. If you sign out now, they may be lost.")
             .assertExists()
@@ -144,7 +121,7 @@ class AccountScreenTest {
     @Test
     @Config(qualifiers = "da")
     fun theQuestionInDanish() {
-        show(AccountUiState(profile, crashReportsOn = false, question = SignOutQuestion.NotSentYet))
+        show(AccountUiState(profile, question = SignOutQuestion.NotSentYet))
         compose.onNodeWithText("Log ud?").assertExists()
         compose.onNodeWithText("Nogle ændringer er ikke sendt endnu. Hvis du logger ud nu, går de tabt.").assertExists()
         compose.onNodeWithText("Annuller").assertExists()
@@ -154,7 +131,7 @@ class AccountScreenTest {
     @Test
     @Config(qualifiers = "en")
     fun aFailedSignOutIsAMessageReportedShownAtOnce() {
-        show(AccountUiState(profile, crashReportsOn = false, failed = true))
+        show(AccountUiState(profile, failed = true))
         compose.onNodeWithText("Could not sign out. Try again.").assertExists()
         compose.waitForIdle()
         calls shouldBe listOf("shown")

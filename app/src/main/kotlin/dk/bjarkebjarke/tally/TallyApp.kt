@@ -12,7 +12,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,9 +41,11 @@ fun TallyApp(
     viewModel: StartViewModel,
     modifier: Modifier = Modifier,
     signIn: @Composable () -> Unit = { SignInScreen(SignInUiState(), {}, {}, {}) },
+    account: @Composable (onBack: () -> Unit) -> Unit = {},
+    avatarInitial: () -> String = { "" },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    TallyApp(state, modifier, signIn = signIn)
+    TallyApp(state, modifier, signIn = signIn, account = account, avatarInitial = avatarInitial)
 }
 
 /**
@@ -54,14 +58,22 @@ fun TallyApp(
     modifier: Modifier = Modifier,
     darkTheme: Boolean = isSystemInDarkTheme(),
     signIn: @Composable () -> Unit = { SignInScreen(SignInUiState(), {}, {}, {}) },
+    account: @Composable (onBack: () -> Unit) -> Unit = {},
+    avatarInitial: () -> String = { "" },
 ) {
     TallyTheme(darkTheme) {
         Surface(modifier.fillMaxSize()) {
             if (state is StartUiState.Ready) {
-                val backStack = remember(state.route) { listOf(state.route) }
+                // Account opens over the home (the avatar) and ends with it: a new step resets the stack, so a
+                // sign-out, which moves the start to sign-in, leaves Account too.
+                var accountOpen by remember(state.route) { mutableStateOf(false) }
+                val backStack =
+                    remember(state.route, accountOpen) {
+                        if (accountOpen) listOf(state.route, AccountKey) else listOf(state.route)
+                    }
                 NavDisplay(
                     backStack = backStack,
-                    onBack = {},
+                    onBack = { accountOpen = false },
                     entryProvider =
                         entryProvider {
                             entry<StartStep.Update> { UpdateScreen() }
@@ -69,13 +81,19 @@ fun TallyApp(
                             entry<StartStep.VerifyEmail> { StepPlaceholder(R.string.gate_verify_title) }
                             entry<StartStep.EnterName> { StepPlaceholder(R.string.gate_name_title) }
                             entry<StartStep.Notice> { key -> StepPlaceholder(noticeTitle(key.notice)) }
-                            entry<StartStep.Home> { HomeScreen() }
+                            entry<StartStep.Home> {
+                                HomeScreen(avatarInitial = avatarInitial(), onAccount = { accountOpen = true })
+                            }
+                            entry<AccountKey> { account { accountOpen = false } }
                         },
                 )
             }
         }
     }
 }
+
+/** The Account screen's place on the back stack, above the home (M1-25). */
+private data object AccountKey
 
 @StringRes
 private fun noticeTitle(notice: HouseholdNotice): Int =

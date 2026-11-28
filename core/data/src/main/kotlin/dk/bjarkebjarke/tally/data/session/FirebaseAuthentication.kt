@@ -3,6 +3,8 @@ package dk.bjarkebjarke.tally.data.session
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import dk.bjarkebjarke.tally.domain.account.AccountProfile
+import dk.bjarkebjarke.tally.domain.account.AccountProfiles
 import dk.bjarkebjarke.tally.domain.session.Authentication
 import dk.bjarkebjarke.tally.domain.session.GoogleSignInResult
 import dk.bjarkebjarke.tally.domain.session.SessionState
@@ -20,7 +22,8 @@ import kotlinx.coroutines.tasks.await
 class FirebaseAuthentication(
     private val auth: FirebaseAuth,
 ) : SessionState,
-    Authentication {
+    Authentication,
+    AccountProfiles {
     /** The app's session (M1-88): the default Firebase app's Auth. */
     constructor() : this(FirebaseAuth.getInstance())
 
@@ -46,4 +49,7 @@ class FirebaseAuthentication(
     }
 
     override fun signOut() = auth.signOut()
+
+    override fun current(): AccountProfile =
+        auth.currentUser.let { AccountProfile(name = it?.displayName?.ifBlank { null }, email = it?.email) }
 }
